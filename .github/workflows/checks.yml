@@ -537,6 +537,14 @@ jobs:
       - name: Sign-in
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run signin
+      # Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):
+      # two signed-in pages on the same account (a show and a phone) list and
+      # join the show in one tap while keeping the QR code, a third page on
+      # another account sees nothing, and losing the internet keeps local
+      # remote control up.
+      - name: Linking devices by account
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run accountlink
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout

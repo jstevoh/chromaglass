@@ -5712,15 +5712,21 @@ once the login works (23.14).*
   the repo already deploys and checks. *Measure:* in the manner of
   `npm run report-worker`: a bad webhook signature refused, a bad token refused, a
   good token given its own keys and no one else's, a refunded key gone.
-- **23.14** (one PR, after 23.10 and the QR link of PR #380): linking devices by
-  account. A phone, tablet or laptop signed in to the same account sees the account's
-  running shows in a list and joins one with a tap: the account hands over the
-  show's address and key, which #380's QR carries today. The QR stays for a guest's
-  phone or one not signed in, and for a venue whose Wi-Fi has no internet. Once
-  linked, control stays on the local network either way, so the internet going never
-  drops the remote. *Measure:* in the manner of `npm run phone` with the emulator: two
-  signed-in pages, one a show and one a phone, the show listed and joined with no
-  address typed; a third page on another account sees nothing.
+- **23.14** (**shipped**, this PR): linking devices by
+  account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
+  with `server/remote-server.js` publishes its LAN relay address and show key to
+  `/account-shows` with its Firebase ID token (90 s TTL, isolated by account UID). A phone,
+  tablet or laptop signed in to the same account sees the account's running shows in a list
+  (on `PhonePlay`, `PhoneStage`, `AccountSheet`, `DeskPanels` `Phone · iPad` and
+  `LaptopLink`) and joins one with a single tap: the account hands over the show's address
+  and key, which #380's QR carries today. The QR stays for a guest's phone or one not signed
+  in, and for a venue whose Wi-Fi has no internet. Once linked, control stays on the local
+  network either way, so the internet going never drops the remote. *Measure:*
+  `npm run accountlink` (6/6, wired into `checks.yml` `Measure · lab`): token/store isolation,
+  two signed-in pages on the same account (one a show, one a phone) where the show is listed
+  and joined with a tap and no address typed while the QR code stays on `Phone · iPad`, a
+  third page on another account sees nothing, and cutting off the internet and account
+  service leaves the local remote socket driving the show.
 - **23.15** (with §12's iPhone app): Sign in with Apple native in the iPhone app, and
   deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
   laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*

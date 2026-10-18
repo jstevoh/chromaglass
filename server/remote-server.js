@@ -26,9 +26,10 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
+import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
-const DIST = resolve(HERE, '..', 'dist');
+const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
 const PORT = Number(process.env.PORT ?? 3000);
 // The show key: a phone or a network display must present it to join. It
 // matters once the server is reachable beyond the room (through a tunnel,
@@ -154,9 +155,15 @@ const lanAddresses = () =>
     .filter((n) => n && n.family === 'IPv4' && !n.internal)
     .map((n) => n.address);
 
+const handleAccountShows = createAccountShowsHandler();
+
 // ── Static files, with SPA fallback ────────────────────────────────────
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
+  if (url.pathname === ACCOUNT_SHOWS_PATH) {
+    void handleAccountShows(req, res, url);
+    return;
+  }
   // The display asks for this before opening a socket, so a page served from
   // anywhere else knows not to try. Static hosts answer with index.html.
   if (url.pathname === INFO_PATH) {

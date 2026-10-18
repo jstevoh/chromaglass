@@ -5,6 +5,11 @@ import {
   signOutCurrentAccount,
   deleteCurrentAccount,
 } from '../lib/firebaseAuth';
+import {
+  useAccountShows,
+  joinAccountShow,
+  unpublishAccountShows,
+} from '../lib/accountShows';
 
 interface AccountSheetProps {
   onClose: () => void;
@@ -15,6 +20,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
   const [confirmMode, setConfirmMode] = useState<'none' | 'signout' | 'delete'>('none');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const accountShows = useAccountShows();
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +38,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
     setBusy(true);
     setError(null);
     try {
+      await unpublishAccountShows();
       await signOutCurrentAccount();
       window.dispatchEvent(new Event('cg-signed-out'));
     } catch (err: unknown) {
@@ -44,6 +51,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
     setBusy(true);
     setError(null);
     try {
+      await unpublishAccountShows();
       await deleteCurrentAccount();
       window.dispatchEvent(new Event('cg-signed-out'));
     } catch (err: unknown) {
@@ -87,6 +95,37 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
           <div className="mt-1 truncate text-sm font-medium text-neutral-100">
             {email || 'Signed-in user'}
           </div>
+        </div>
+
+        <div className="mt-4">
+          <div className="text-xs uppercase tracking-wider text-neutral-500">Running shows</div>
+          {accountShows.length > 0 ? (
+            <div className="mt-2 flex flex-col gap-1.5" data-testid="account-shows">
+              {accountShows.map((show) => (
+                <button
+                  key={show.id}
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    joinAccountShow(show);
+                  }}
+                  data-testid="account-show-join"
+                  data-cg-account-show={show.id}
+                  className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-left text-sm font-medium text-neutral-100 transition hover:bg-white/15"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                    <span className="truncate">{show.name}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-medium text-amber-300">Join</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1 text-xs text-neutral-500" data-testid="account-shows-empty">
+              No running shows on this account.
+            </p>
+          )}
         </div>
 
         <div className="mt-5 flex flex-col gap-2.5">

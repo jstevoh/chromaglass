@@ -5,6 +5,7 @@ import type { VisualizerSettings } from '../../types';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
 import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playGesture';
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
+import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 
 /**
  * Play: ChromaGlass on a phone for someone listening, not performing.
@@ -284,9 +285,10 @@ export function PhonePlay(p: PhonePlayProps) {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  const accountShows = useAccountShows();
   const s = p.settings;
   const zoom = zoomOf(s);
-  const showHint = !sheet && !touched && picked === 'dropper' && visits < HINT_VISITS;
+  const showHint = !sheet && !touched && picked === 'dropper' && visits < HINT_VISITS && accountShows.length === 0;
   const saveNamed = () => {
     const name = saveName?.trim();
     if (!name || !p.onSave) return;
@@ -347,6 +349,26 @@ export function PhonePlay(p: PhonePlayProps) {
 
       {/* ── The bottom: the hint, then the tray or the sheet ── */}
       <div className="pointer-events-none flex flex-col items-center">
+        {accountShows.length > 0 && (
+          <div className="pointer-events-auto mb-2 flex w-full max-w-[560px] flex-col gap-1.5 px-3" data-testid="account-shows">
+            {accountShows.map((show) => (
+              <button
+                key={show.id}
+                type="button"
+                onClick={() => joinAccountShow(show)}
+                data-testid="account-show-join"
+                data-cg-account-show={show.id}
+                className={`flex min-h-[48px] w-full items-center justify-between gap-3 rounded-2xl px-4 py-2 text-left text-[14px] font-medium text-text ${GLASS_PILL}`}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                  <span className="truncate">{show.name}</span>
+                </span>
+                <span className="shrink-0 text-[13px] font-medium text-accent-text">Join show</span>
+              </button>
+            ))}
+          </div>
+        )}
         {showHint && (
           <div className={`mb-2 rounded-full px-3 py-1 text-[12px] text-text-2 ${GLASS_PILL}`} data-testid="play-hint">
             {zoom > 1.05 ? 'tap drops · drag streaks · pinch zooms · hold presses' : 'tap drops · drag streaks · two fingers blow · hold presses'}

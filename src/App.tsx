@@ -93,6 +93,7 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
+import { usePublishAccountShow } from './lib/accountShows';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
@@ -4025,6 +4026,7 @@ export default function App() {
       }
     },
   });
+  usePublishAccountShow(!phone && remoteLink.status === 'connected', pinnedLookName);
 
   runActionRef.current = runAction;
 

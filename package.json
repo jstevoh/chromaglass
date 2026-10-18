@@ -92,6 +92,7 @@
     "fingerprint-worker": "node scripts/fingerprint-worker.mjs",
     "privacy": "node scripts/privacy.mjs",
     "signin": "PW_WEBGPU=1 node scripts/signin.mjs",
+    "accountlink": "PW_WEBGPU=1 node scripts/accountlink.mjs",
     "fx": "npm run build && node scripts/fx.mjs",
     "shots": "npm run build && node scripts/shots.mjs",
     "brand": "node scripts/brand.mjs",

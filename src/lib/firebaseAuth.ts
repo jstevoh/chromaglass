@@ -187,6 +187,22 @@ export async function getCurrentUserEmail(): Promise<string | null> {
   }
 }
 
+export async function getCurrentIdToken(): Promise<string | null> {
+  try {
+    const auth = getFirebaseAuth();
+    if (!auth.currentUser) {
+      await Promise.race([
+        auth.authStateReady(),
+        new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+      ]);
+    }
+    if (!auth.currentUser) return null;
+    return await auth.currentUser.getIdToken();
+  } catch {
+    return null;
+  }
+}
+
 export async function signOutCurrentAccount(): Promise<void> {
   clearSignedInCached();
   try {
