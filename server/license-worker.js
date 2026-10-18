@@ -112,16 +112,31 @@ async function handleWebhook(request, env, cors) {
     return json({ error: 'expected an object' }, 400, cors);
   }
 
-  const event = String(body.event || '');
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-  const orderId = typeof body.orderId === 'string' && body.orderId ? body.orderId.trim() : '';
+  // Support both our direct JSON payload and Lemon Squeezy's native JSON:API webhook payload
+  const lsAttr = body.data?.attributes || {};
+  const lsItem = lsAttr.first_order_item || {};
+  const lsProductName = String(lsItem.product_name || lsItem.variant_name || '').toLowerCase();
+  const lsProductId = Number(lsItem.product_id || 0);
+  const rawEvent = String(body.event || body.meta?.event_name || '');
+  const isLsUpgrade =
+    rawEvent === 'order_created' &&
+    (lsProductId === 1450532 || lsProductName.includes('upgrade'));
+  const event = isLsUpgrade ? 'order_upgraded' : rawEvent;
+
+  const rawEmail = body.email || lsAttr.user_email || body.meta?.custom_data?.email || '';
+  const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
+  const rawOrderId = body.orderId || body.data?.id || lsItem.order_id || '';
+  const orderId = rawOrderId ? String(rawOrderId).trim() : '';
   const keyId =
     (typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : '') ||
     (orderId ? `key_${orderId}` : `key_${Date.now().toString(36)}_${rand(6)}`);
 
   if (event === 'order_created' || event === 'license_created') {
     if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);
-    const tier = body.tier === 'pro' ? 'pro' : 'home';
+    const tier =
+      body.tier === 'pro' || lsProductId === 1450531 || lsProductName.includes('pro')
+        ? 'pro'
+        : 'home';
     const now = typeof body.issuedAt === 'number' ? body.issuedAt : Date.now();
     const updatesUntil = typeof body.updatesUntil === 'number' ? body.updatesUntil : now + ONE_YEAR_MS;
     const maxMachines = typeof body.maxMachines === 'number' ? body.maxMachines : MAX_MACHINES_PER_KEY;
