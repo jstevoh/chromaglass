@@ -33,20 +33,27 @@ let emulatorConnected = false;
 export function getFirebaseAuth(): Auth {
   if (authInstance) return authInstance;
 
+  const emu = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR;
+  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+  const sameOriginDomain =
+    !emu && (host.endsWith('.web.app') || host.endsWith('.firebaseapp.com'))
+      ? host
+      : undefined;
+
   const existing = getApps();
   appInstance =
     existing.length > 0
       ? existing[0]
       : initializeApp({
           apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-          authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'localhost',
+          authDomain:
+            sameOriginDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'localhost',
           projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'demo-chromaglass',
           appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:000000000000:web:000000000000',
         });
 
   authInstance = getAuth(appInstance);
 
-  const emu = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR;
   if (emu && !emulatorConnected) {
     emulatorConnected = true;
     connectAuthEmulator(authInstance, emu, { disableWarnings: true });
@@ -90,22 +97,23 @@ export async function checkPendingRedirect(): Promise<User | null> {
   let pending = false;
   try {
     pending = sessionStorage.getItem(REDIRECT_PENDING_KEY) === '1';
-  } catch {
-    return null;
-  }
-  if (!pending) return null;
-
-  try {
-    sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+    if (pending) {
+      sessionStorage.removeItem(REDIRECT_PENDING_KEY);
+    }
   } catch {
     // ignore
   }
+  if (!pending && import.meta.env.VITE_FIREBASE_AUTH_EMULATOR) return null;
 
-  const auth = getFirebaseAuth();
-  const res = await getRedirectResult(auth);
-  if (res?.user) {
-    setSignedInCached(res.user.email);
-    return res.user;
+  try {
+    const auth = getFirebaseAuth();
+    const res = await getRedirectResult(auth);
+    if (res?.user) {
+      setSignedInCached(res.user.email);
+      return res.user;
+    }
+  } catch {
+    // ignore if no redirect was pending
   }
   return null;
 }

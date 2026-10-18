@@ -71,7 +71,7 @@
     "check": "node scripts/check.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
     "update": "git pull origin main && npm install && npm run build",
-    "deploy": "npx firebase-tools deploy --only hosting",
+    "deploy": "VITE_FIREBASE_API_KEY=AIzaSyA-9eWPIG37Ar_rTz0JSBEg5UE8PX5LUIY VITE_FIREBASE_AUTH_DOMAIN=chromaglass.firebaseapp.com VITE_FIREBASE_PROJECT_ID=chromaglass VITE_FIREBASE_APP_ID=1:793087423172:web:cde0ef97b16e012cef0f91 npm run build && npx firebase-tools deploy --only hosting",
     "deploy:reports": "npx wrangler deploy -c wrangler.report.toml",
     "ship": "npm run update && npm run deploy && npm run remote",
     "show": "npm run update && npm run remote",

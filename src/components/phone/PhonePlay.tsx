@@ -492,6 +492,10 @@ export function PhonePlay(p: PhonePlayProps) {
                   <button onClick={() => { void shareClip(); }} data-testid="play-share"
                     className="h-[52px] min-w-0 flex-1 truncate rounded-[14px] bg-primary px-2 text-[15px] font-medium text-on-primary">{clipLabel}</button>
                 )}
+                {p.onOpenAccount && (
+                  <button onClick={() => { setSheet(false); p.onOpenAccount?.(); }} data-testid="play-sheet-account"
+                    className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Account</button>
+                )}
               </div>
               </div>
             </div>

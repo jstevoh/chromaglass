@@ -1055,6 +1055,7 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.onPlayScreen && <Tile icon={Waves} label="Play screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
+            {p.onOpenAccount && <Tile icon={Settings} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
