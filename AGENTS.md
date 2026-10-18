@@ -15,3 +15,10 @@ body or files, a Firebase or Cloudflare console step the owner did with you), re
 there the same day: a comment on the related PR or issue, or a line in `PLAN.md`'s status
 table when there is no PR. Name secrets, never their values. Details in
 `docs/handoff.md` ("Leaving a record").
+
+## Never deploy by hand, never commit keys
+
+Never deploy by hand: deploys come only from `main` through CI.
+
+Never commit keys or secrets: they go in repo or Worker secrets, by name only. If one is
+already committed, say so on the PR and stop.
