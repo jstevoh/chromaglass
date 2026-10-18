@@ -126,6 +126,12 @@ export function requestGpuEarly(): void {
  * where `fill` is not. So this one writes a storage texture through a
  * uniform's bounds test, the same few lines `fill` is, and nothing more.
  *
+ * Nor is building enough. The second Mac run built the fill-shaped kernel in
+ * 0.13 s (adapter 1.53 s, built 1.66 s) and the opening's own `fill` was still
+ * given 2.6 s after it was asked, its first use 2.3 s of that, and the stop
+ * came again, 2.13 s from 2.19 s. Metal's work on a first command buffer is
+ * not in the build, so the warm now runs the kernel once and awaits the queue.
+ *
  * Never the reason the show does not open: a pipeline that will not build, or
  * does not within `WARM_CAP_MS`, is let go and the opening goes on as before.
  */
@@ -140,14 +146,39 @@ struct Warm { a: vec4f, b: vec4f }
 }`;
 async function warmCompiler(device: GPUDevice): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const made: { destroy(): void }[] = [];
   try {
     const module = device.createShaderModule({ label: 'warm', code: WARM_WGSL });
     await Promise.race([
-      device.createComputePipelineAsync({ label: 'warm', layout: 'auto', compute: { module, entryPoint: 'main' } }),
+      (async () => {
+        const pipeline = await device.createComputePipelineAsync({ label: 'warm', layout: 'auto', compute: { module, entryPoint: 'main' } });
+        // Built is not yet run: the second push's warm resolved in 0.13 s and
+        // the opening's first kernel still took 2.6 s, with its first use
+        // (handing it to the GPU) 2.3 s of that. So the kernel is run once on a
+        // texture of its own and the queue awaited, which is the first command
+        // buffer this page sends the GPU.
+        const target = device.createTexture({ label: 'warm', size: [8, 8], format: 'rgba16float', usage: GPUTextureUsage.STORAGE_BINDING });
+        const args = device.createBuffer({ label: 'warm', size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        made.push(target, args);
+        device.queue.writeBuffer(args, 0, new Float32Array([0, 0, 0, 0, 8, 8, 0, 0]));
+        const bind = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: { buffer: args } }, { binding: 2, resource: target.createView() }],
+        });
+        const encoder = device.createCommandEncoder({ label: 'warm' });
+        const pass = encoder.beginComputePass({ label: 'warm' });
+        pass.setPipeline(pipeline);
+        pass.setBindGroup(0, bind);
+        pass.dispatchWorkgroups(1, 1);
+        pass.end();
+        device.queue.submit([encoder.finish()]);
+        await device.queue.onSubmittedWorkDone();
+      })(),
       new Promise<void>((resolve) => { timer = setTimeout(resolve, WARM_CAP_MS); }),
     ]);
   } catch { /* the opening builds its own, and says so if it cannot */ } finally {
     clearTimeout(timer);
+    for (const m of made) { try { m.destroy(); } catch { /* gone with the device */ } }
   }
 }
 

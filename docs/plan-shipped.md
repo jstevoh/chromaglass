@@ -1924,6 +1924,14 @@ renders used to do for it.
   opening's `fill` does (a storage-texture write), so the warm is now that shape, and
   `npm run startup` prints the page's first compute pipeline beside the adapter and the
   device ("first compile asked …, given …"), which says what the warm cost each run.
+  That row said the second Mac run was red too: the fill-shaped kernel was built in
+  0.13 s (adapter 1.53 s, built 1.66 s) and the opening's own `fill` was still given
+  2.6 s after it was asked, 2.3 s of that its first use, and the stop came again, 2.13 s
+  from 2.19 s. So a build alone does not absorb the cold start: Metal's work on a first
+  command buffer is not in it. The warm now runs its kernel once on an 8×8 texture and
+  waits for the queue to say the work is done, then frees what it made. If that is also
+  red, the first submit is a cost of the GPU process itself and moving it earlier only
+  moves the stop; the next step is then a plan item, not another guess.
   Cloud numbers only (no GPU): `npm run intro` 13/13 and `npm run loadtime` 4/4, the
   first frame 0.67 s. The Mac's reading is the flake tracker's: `npm run flakes --
   --check 'no stop in the opening'` for the week before this merge against the week

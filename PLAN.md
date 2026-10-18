@@ -3323,7 +3323,10 @@ for, and the GPU was asked for only after they had arrived and drawn.
   every one the adapter or device wait and then the first compile) is now warmed
   and waited for at boot. Not yet measured on the Mac: judge it with `npm run flakes
   -- --check 'no stop in the opening'`, the week before its merge against the week
-  after (19aa). The story is in `docs/plan-shipped.md`.
+  after (19aa). Two Mac runs went red on the first versions (an empty kernel, then a
+  built-only one): the opening's first use of the GPU cost 2.3 s whatever had been
+  compiled, so the warm now runs a kernel once and awaits the queue. The story is in
+  `docs/plan-shipped.md`.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
