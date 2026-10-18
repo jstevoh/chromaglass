@@ -5736,12 +5736,8 @@ once the login works (23.14).*
 - **23.6** (**shipped**, this PR): the site's logo layer shows the ChromaGlass
   mark only (`SettingsPanel.tsx` and `DeskPanels.tsx`); your own
   logo is the app's. *Measure:* `npm run tiers` (11/11).
-- **23.8** (one PR, `desktop/`, before 23.7): Home's listening features. The app hears
-  whatever the Mac plays with no tab to share (macOS's own system-audio capture, asked
-  for once), and an ambient mode runs the plate full screen on the TV for hours with
-  the frame cap and the quiet of 14j. *Measure:* in `npm run desktop`, a tone played by
-  another process reaches the ear; on the owner's Mac, an album through a streaming app
-  drives the plate (docs/judging.md, next free number at merge).
+- **23.8** (**shipped**, this PR, `desktop/`): Home's listening features. The app hears
+  whatever the Mac plays with no tab to share (`desktop/main.js` `setDisplayMediaRequestHandler` with macOS ScreenCaptureKit loopback + local PCM tap, `desktop/preload.cjs`, `desktop/electron-builder.config.cjs` `NSAudioCaptureUsageDescription`, `SoundPanel.tsx` `"System audio"` source), and an ambient TV mode (`Show → Ambient TV Mode (Cool & Quiet)`, `SoundPanel.tsx` toggle, `PhoneStage.tsx` Play sheet tile, `governor.ts`, `drawGate.ts`) runs the plate full screen on the TV for hours with the 60 Hz draw/compositor cap, 30 Hz solver step rate cap, opening rung floor, and doubled retry wait on repeated rung failures (`90 s → 180 s → 360 s`) of 14j. *Measure:* in `npm run desktop` (13/13), a tone played by another process reaches the ear with no tab picker (`ear reads 6, volume 52`) and Ambient TV mode caps the solver at 30 steps/s, the display at 60 Hz, and holds the opening rung; `npm run rungs` (75/75) and `npm run phone` (379/379). On the owner's Mac, an album through a streaming app drives the plate (docs/judging.md, next free number at merge).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
 - **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on

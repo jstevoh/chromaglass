@@ -52,7 +52,8 @@ import type { RemoteMessage } from './lib/remoteProtocol';
 import { runBench, formatBench, readRenderer } from './lib/bench';
 import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
-import type { EngineStatus } from './lib/platform';
+import { isDesktopApp, type EngineStatus } from './lib/platform';
+import { isGlobalAmbientMode, setGlobalAmbientMode, onAmbientModeChange } from './lib/governor';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
 import { PhonePlay } from './components/phone/PhonePlay';
@@ -152,8 +153,8 @@ const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 function rememberedSource(): AudioSource {
   try {
     const raw = localStorage.getItem(AUDIO_SOURCE_KEY);
-    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker.
-    if (raw === 'microphone' || raw === 'simulated') return raw;
+    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker in a browser (never in the Mac app).
+    if (raw === 'microphone' || raw === 'simulated' || (raw === 'system' && isDesktopApp())) return raw;
   } catch { /* private */ }
   return 'none';
 }
@@ -498,6 +499,11 @@ export default function App() {
       };
     (window as unknown as { chromaglassGovernor?: () => unknown }).chromaglassGovernor =
       () => wallRef.current?.governor?.() ?? null;
+    (window as unknown as { chromaglassAmbient?: (on?: boolean) => boolean }).chromaglassAmbient =
+      (on?: boolean) => {
+        if (typeof on === 'boolean') setAmbientModeRef.current(on);
+        return isGlobalAmbientMode();
+      };
     (window as unknown as { chromaglassSanitizePatch?: typeof sanitizePatch }).chromaglassSanitizePatch = sanitizePatch;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
@@ -548,6 +554,29 @@ export default function App() {
       (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => wallRef.current?.pourText(rows, opts);
     (window as unknown as { chromaglassBench?: unknown }).chromaglassBench =
       (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
+  }, []);
+
+  // ── Ambient TV mode (PLAN.md 23.8 / 14j): cool & quiet (60 Hz draw, 30 Hz physics) ──
+  const [ambientMode, setAmbientModeState] = useState<boolean>(() => isGlobalAmbientMode());
+  const setAmbientMode = useCallback((on: boolean) => {
+    setGlobalAmbientMode(on);
+    setAmbientModeState(on);
+    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { setAmbient?: (on: boolean) => void } }).__CHROMAGLASS_NATIVE__;
+    native?.setAmbient?.(on);
+  }, []);
+  const setAmbientModeRef = useRef(setAmbientMode);
+  setAmbientModeRef.current = setAmbientMode;
+  useEffect(() => {
+    const unsubGov = onAmbientModeChange((on) => setAmbientModeState(on));
+    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { onAmbientChange?: (fn: (on: boolean) => void) => () => void } }).__CHROMAGLASS_NATIVE__;
+    const unsubNative = native?.onAmbientChange?.((on) => {
+      setGlobalAmbientMode(on);
+      setAmbientModeState(on);
+    });
+    return () => {
+      unsubGov();
+      unsubNative?.();
+    };
   }, []);
 
   /*
@@ -876,6 +905,8 @@ export default function App() {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   /** The synthesised band, when that is what the show is listening to. */
   const simulatedRef = useRef<SimulatedMusic | null>(null);
+  /** The Mac app's system-audio loopback tap (PLAN.md 23.8). */
+  const systemTapRef = useRef<{ stop: () => void } | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   /** The wall's engine, always; `visualizerRef` is the desk's, which in Preview with a wall up is a copy (PLAN.md 8b; see `drafting`). */
   const wallRef = useRef<LiquidVisualizerHandle | null>(null);
@@ -992,6 +1023,7 @@ export default function App() {
       setAudioStream(null);
     }
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
+    if (systemTapRef.current) { systemTapRef.current.stop(); systemTapRef.current = null; }
     // The drone owns an AudioContext and four running oscillators; leaving it
     // behind would keep them sounding under whatever replaced it.
     stopDrone();
@@ -1042,21 +1074,73 @@ export default function App() {
     try {
       let stream: MediaStream;
       if (source === 'system') {
-        // Raw, as the microphone below, and in stereo: a shared tab is the
-        // music itself. With plain `audio: true` Chrome shared a music tab as
-        // a call: one channel, with echo cancellation, noise suppression and
-        // auto gain all on. The show heard it processed, and a recording of
-        // it failed outright (the master's 320 kbps is more AAC than one
-        // channel carries). Plain again only if the constraints are refused,
-        // never after the person has said no to sharing.
-        try {
-          stream = await navigator.mediaDevices.getDisplayMedia({
-            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
-            video: true,
+        const nativeTap = (window as unknown as {
+          __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: Float32Array, sampleRate: number) => void) => () => void };
+        }).__CHROMAGLASS_NATIVE__?.onSystemAudioPcm;
+        if (nativeTap) {
+          // Mac app (PLAN.md 23.8): ScreenCaptureKit loopback via setDisplayMediaRequestHandler
+          // (no tab picker) combined with the main-process loopback audio tap.
+          let displayStream: MediaStream | null = null;
+          try {
+            displayStream = await navigator.mediaDevices.getDisplayMedia({
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
+              video: true,
+            });
+          } catch {
+            displayStream = null;
+          }
+          if (ask !== sourceAskRef.current) {
+            displayStream?.getTracks().forEach(t => t.stop());
+            return;
+          }
+          const ctx = new AudioContext();
+          if (ctx.state === 'suspended') void ctx.resume();
+          const dest = ctx.createMediaStreamDestination();
+          if (displayStream && displayStream.getAudioTracks().length > 0) {
+            try {
+              ctx.createMediaStreamSource(displayStream).connect(dest);
+            } catch { /* fallback to PCM tap */ }
+          }
+          let nextTime = 0;
+          const unsubPcm = nativeTap((samples: Float32Array, sampleRate: number) => {
+            if (!samples || samples.length === 0 || ctx.state === 'closed') return;
+            if (ctx.state === 'suspended') void ctx.resume();
+            const sr = sampleRate > 0 ? sampleRate : ctx.sampleRate;
+            const buf = ctx.createBuffer(1, samples.length, sr);
+            buf.getChannelData(0).set(samples);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(dest);
+            const now = ctx.currentTime;
+            if (nextTime < now) nextTime = now + 0.005;
+            src.start(nextTime);
+            nextTime += buf.duration;
           });
-        } catch (e) {
-          if (!(e instanceof TypeError) && (e as Error)?.name !== 'OverconstrainedError') throw e;
-          stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          systemTapRef.current = {
+            stop: () => {
+              unsubPcm();
+              displayStream?.getTracks().forEach(t => t.stop());
+              if (ctx.state !== 'closed') void ctx.close();
+            },
+          };
+          stream = dest.stream;
+        } else {
+          // Raw, as the microphone below, and in stereo: a shared tab is the
+          // music itself. With plain `audio: true` Chrome shared a music tab as
+          // a call: one channel, with echo cancellation, noise suppression and
+          // auto gain all on. The show heard it processed, and a recording of
+          // it failed outright (the master's 320 kbps is more AAC than one
+          // channel carries). Plain again only if the constraints are refused,
+          // never after the person has said no to sharing.
+          try {
+            stream = await navigator.mediaDevices.getDisplayMedia({
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
+              video: true,
+            });
+          } catch (e) {
+            if (!(e instanceof TypeError) && (e as Error)?.name !== 'OverconstrainedError') throw e;
+            stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          }
         }
       } else {
         // Ask for the raw microphone. The browser's defaults — echo
@@ -3488,6 +3572,7 @@ export default function App() {
           // Straight from the render rather than from the cast snapshot, which
           // is assembled for a receiver and not for a question.
           isAutomated: l.isAutomated,
+          ambient: isGlobalAmbientMode(),
           settings: settingsRef.current,
           appRenders: appRendersRef.current,
         };
@@ -5793,6 +5878,8 @@ export default function App() {
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
             recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording }}
+            ambientMode={ambientMode}
+            onAmbientMode={setAmbientMode}
             onHide={hideOverlays}
             onFullLayout={() => {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
@@ -5921,6 +6008,8 @@ export default function App() {
             onDrone={changeDrone}
             droneRunning={droneRunning}
             onDroneToggle={toggleDrone}
+            ambientMode={ambientMode}
+            onAmbientMode={setAmbientMode}
             onClose={() => setShowSound(false)}
           />
           </PanelGuard>

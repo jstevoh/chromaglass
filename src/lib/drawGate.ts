@@ -135,12 +135,22 @@
 
 export type DrawSource = 'frame' | 'ask';
 
+let globalAmbientDrawMode = false;
+export function isGlobalAmbientDrawMode(): boolean {
+  return globalAmbientDrawMode;
+}
+export function setGlobalAmbientDrawMode(on: boolean): void {
+  globalAmbientDrawMode = Boolean(on);
+}
+
 /** An offer this soon after the last draw, as a fraction of a refresh, is turned down. */
 export const DRAW_SKIP_FRACTION = 0.6;
 /** The fastest display there is: 240 Hz. */
 export const REFRESH_MIN_MS = 1000 / 240;
 /** What is assumed before either clock has been measured. */
 export const REFRESH_DEFAULT_MS = 1000 / 60;
+/** Ambient mode's 60 Hz draw ceiling (14j / 23.8): 0.8 of a 60 Hz interval lets 60 Hz jitter through and halves 120 Hz. */
+export const AMBIENT_MIN_DRAW_MS = (1000 / 60) * 0.8;
 /**
  * How long a clock may go quiet and still count as running: a quarter of a
  * second, the same hold `lib/earClock.ts` gives the wall's ragged asks
@@ -222,6 +232,8 @@ export const stampMisses = { ahead: 0, aheadMs: 0, stale: 0, staleMs: 0, lastAt:
 export class DrawGate {
   /** When anything was last drawn (ms). */
   lastDraw = -Infinity;
+  /** Optional explicit per-gate ambient cap (defaults to global ambient mode). */
+  ambient = false;
   private readonly lastOffer: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
   private readonly gaps: Record<DrawSource, number[]> = { frame: [], ask: [] };
   /**
@@ -266,6 +278,10 @@ export class DrawGate {
     if (gap > CLOCK_FRESH_MS) g.length = 0;
     else if (gap > 0) { g.push(gap); if (g.length > GAPS) g.shift(); }
     this.lastOffer[source] = now;
+    if ((this.ambient || globalAmbientDrawMode) && now - this.lastDraw < AMBIENT_MIN_DRAW_MS) {
+      this.skipped[source]++;
+      return false;
+    }
     // Gated only while the other clock is running too: one clock alone, the
     // show with no wall or the wall with the show covered, draws every tick.
     // And never this clock's own next refresh (see above).

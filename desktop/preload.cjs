@@ -9,7 +9,7 @@
  *
  * CommonJS, because a sandboxed preload cannot be an ES module.
  */
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 function parseArg(prefix) {
   const arg = (process.argv || []).find((a) => typeof a === 'string' && a.startsWith(prefix));
@@ -33,4 +33,23 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   platform: process.platform,
   requireSignIn,
   license,
+  onSystemAudioPcm(fn) {
+    if (typeof fn !== 'function') return () => {};
+    const listener = (_event, samples) => {
+      try { fn(samples); } catch { /* ignore */ }
+    };
+    ipcRenderer.on('chromaglass:system-audio-pcm', listener);
+    return () => ipcRenderer.removeListener('chromaglass:system-audio-pcm', listener);
+  },
+  onAmbientChange(fn) {
+    if (typeof fn !== 'function') return () => {};
+    const listener = (_event, on) => {
+      try { fn(Boolean(on)); } catch { /* ignore */ }
+    };
+    ipcRenderer.on('chromaglass:ambient', listener);
+    return () => ipcRenderer.removeListener('chromaglass:ambient', listener);
+  },
+  setAmbient(on) {
+    ipcRenderer.send('chromaglass:set-ambient', Boolean(on));
+  },
 });

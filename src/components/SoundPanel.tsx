@@ -3,6 +3,7 @@ import { Mic, Monitor, FileAudio, Music, Drum, Slash, Play, Pause, Repeat, Waves
 import { Sheet } from './ui';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
+import { isDesktopApp } from '../lib/platform';
 
 /**
  * Sound: where the show's music comes from, in one place you can find.
@@ -40,7 +41,8 @@ const SOURCES: ReadonlyArray<{
 export function SoundPanel({
   source, onSource, inputs, inputId, onInput,
   playing, time, loop, onLoop, onToggle, onSeek,
-  nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle, onClose,
+  nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle,
+  ambientMode = false, onAmbientMode, onClose,
 }: {
   source: AudioSource;
   onSource: (s: AudioSource) => void;
@@ -61,10 +63,22 @@ export function SoundPanel({
   /** Whether the instrument is sounding, and its start/stop. */
   droneRunning: boolean;
   onDroneToggle: () => void;
+  ambientMode?: boolean;
+  onAmbientMode?: (on: boolean) => void;
   onClose: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const chosen = SOURCES.find(s => s.id === source) ?? SOURCES[0];
+  const desktop = isDesktopApp();
+  const sources = SOURCES.map(s => (
+    s.id === 'system' && desktop
+      ? {
+          ...s,
+          label: 'System audio',
+          blurb: 'Whatever this Mac plays (a streaming app, a music library, a DAW), heard directly in stereo with no tab to share.',
+        }
+      : s
+  ));
+  const chosen = sources.find(s => s.id === source) ?? sources[0];
 
   return (
     <Sheet title={<><Music size={16} /> Sound</>} onClose={onClose} width={760} height={680} testId="sound-panel">
@@ -76,7 +90,7 @@ export function SoundPanel({
 
         <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {SOURCES.map(s => {
+          {sources.map(s => {
             const Icon = s.icon;
             const on = source === s.id;
             return (
@@ -95,6 +109,28 @@ export function SoundPanel({
           })}
         </div>
         <p className="mt-2 min-h-[32px] text-[12px] leading-relaxed text-muted">{chosen.blurb}</p>
+
+        {onAmbientMode && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border px-3.5 py-2.5" data-testid="sound-ambient-row">
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-text">Ambient TV mode (cool &amp; quiet)</p>
+              <p className="text-[11px] text-faint">Caps the draw at 60 Hz, steps the liquid at 30 Hz and holds the opening rung so the fan stays off over a long listening session.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onAmbientMode(!ambientMode)}
+              aria-pressed={ambientMode}
+              data-testid="sound-ambient-toggle"
+              className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                ambientMode
+                  ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100'
+                  : 'border-border text-muted hover:bg-hover hover:text-text'
+              }`}
+            >
+              {ambientMode ? 'On · 30 Hz' : 'Off'}
+            </button>
+          </div>
+        )}
 
         {source === 'drone' && (
           <div className="mt-3 rounded-xl border border-border p-3" data-testid="drone-controls">
