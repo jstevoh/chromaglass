@@ -98,8 +98,8 @@ export function requestGpuEarly(): void {
 }
 
 /**
- * One trivial compute pipeline, built and waited for, before anything else
- * asks the device for work.
+ * One small compute pipeline, shaped like the opening's first, built and
+ * waited for, before anything else asks the device for work.
  *
  * What was reported: `npm run startup`'s "no stop in the opening" went red on
  * 14 of 124 cold Mac runs (2026-10-11 to 18, `npm run flakes`), every one a
@@ -119,14 +119,29 @@ export function requestGpuEarly(): void {
  * the opening's first compile would have paid the same start. A warm shader
  * cache (every visit after the first) makes this a few milliseconds.
  *
+ * It is not an empty kernel. The first version built `fn main() {}`, and on
+ * the PR's own Mac run (device given at 1.52 s, the app's first render at
+ * 1.61 s, so that compile cost under 0.1 s) the stop still came, 2.08 s from
+ * 1.99 s, with the opening's first real compile; an empty kernel is cheap
+ * where `fill` is not. So this one writes a storage texture through a
+ * uniform's bounds test, the same few lines `fill` is, and nothing more.
+ *
  * Never the reason the show does not open: a pipeline that will not build, or
  * does not within `WARM_CAP_MS`, is let go and the opening goes on as before.
  */
 const WARM_CAP_MS = 6_000;
+const WARM_WGSL = /* wgsl */ `
+struct Warm { a: vec4f, b: vec4f }
+@group(0) @binding(0) var<uniform> A: Warm;
+@group(0) @binding(2) var dst: texture_storage_2d<rgba16float, write>;
+@compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (id.x >= u32(A.b.x) || id.y >= u32(A.b.y)) { return; }
+  textureStore(dst, vec2i(id.xy), A.a);
+}`;
 async function warmCompiler(device: GPUDevice): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const module = device.createShaderModule({ label: 'warm', code: '@compute @workgroup_size(1) fn main() {}' });
+    const module = device.createShaderModule({ label: 'warm', code: WARM_WGSL });
     await Promise.race([
       device.createComputePipelineAsync({ label: 'warm', layout: 'auto', compute: { module, entryPoint: 'main' } }),
       new Promise<void>((resolve) => { timer = setTimeout(resolve, WARM_CAP_MS); }),

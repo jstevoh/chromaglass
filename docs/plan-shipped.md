@@ -1911,12 +1911,19 @@ renders used to do for it.
   frame in flight (the desk's first render, the intro moving into the plate's slot)
   when the process went busy, and rAF stops until it comes back. Asking sooner cannot
   help (the adapter is asked 0.05–0.53 s in). So `requestGpuEarly` (`gpu/device.ts`)
-  now also builds one empty compute pipeline on the early device, asynchronously, and
+  now also builds one small compute pipeline on the early device, asynchronously, and
   `main.tsx` holds the App's first render (and so `adoptIntro` and the desk's first
   frame) until that is done, or 3.5 s with no adapter yet, or 7 s in all; the chunk keeps downloading
   meanwhile. The hold is capped, so a refused or hung GPU never blocks the page; the
   painted loading rectangle and the still intro are what shows. The cold compile is
   paid once either way, only earlier, and a warm shader cache makes it milliseconds.
+  The first version built an empty kernel (`fn main() {}`) and its own Mac run went red
+  on the target line: device given 1.52 s, the app's first render 1.61 s (so that
+  compile cost under 0.1 s), builds ahead from 1.65 s, and the stop 2.08 s from 1.99 s
+  with no long task or hold. An empty kernel does not start the compiler the way the
+  opening's `fill` does (a storage-texture write), so the warm is now that shape, and
+  `npm run startup` prints the page's first compute pipeline beside the adapter and the
+  device ("first compile asked …, given …"), which says what the warm cost each run.
   Cloud numbers only (no GPU): `npm run intro` 13/13 and `npm run loadtime` 4/4, the
   first frame 0.67 s. The Mac's reading is the flake tracker's: `npm run flakes --
   --check 'no stop in the opening'` for the week before this merge against the week
