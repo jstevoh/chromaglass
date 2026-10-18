@@ -394,6 +394,13 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # The score (PLAN 28h): each of a song show's cues drawn where the
+      # scheduler fires it, a cue pinned to a section firing on that section
+      # through a stretched live take, and the nudge putting a late map's cue
+      # back on the song's turn without firing a section's cue twice.
+      - name: The song's score
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run score
       # A setting from a menu, the phone or a saved look survives sanitizePatch
       # (PLAN.md QA-29, 14n): every value every choice setting can take, every
       # preset intact, malformed patches, gestures and MIDI maps dropped.

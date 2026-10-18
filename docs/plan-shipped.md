@@ -3812,6 +3812,37 @@ tag says intro, five samples of five; the phone's Sound sheet says the desk's li
 the song's shape. A song in C sharp the band never plays: "Not sure where in “…” (0%):
 following its sound", the playhead keeping time. A map with no harmony: no line.
 
+## 28h. The score: the song drawn, its show's cues on it, and a nudge (asked 2026-10-11)
+
+The owner: now that the show hears a song and
+remembers it, draw it as a score, put the sequencer's changes on the song's shape,
+and during a show watch it and nudge the visuals back into step. Built on what was
+there: the song map (sections and energy from the first listen, `songMap.ts`) and
+the song's show (`songShows.ts`, cues that already fire "at the second chorus").
+`lib/songScore.ts` draws the sections, the energy and the playhead, and places each
+cue by running the scheduler itself over the song, so the picture cannot disagree
+with what fires. A tap on the lane picks a section; a cue added there is pinned to
+it ("this chorus only" or "every chorus"), and a song with no show gets one on the
+look that is playing. The nudge moves the song's position: a beat (half a second
+with no tempo), "Section starts now" (the show got there early) and "Next section
+now" (the song got there first), the section ones worked out from the clock at the
+press rather than the position last drawn; it lasts for that play of the song and
+survives the fingerprint's re-anchoring, which is right about the audio and blind
+to where the map put an edge (`SongPosition`). A nudge is a seek: lyric triggers
+and a replay's gestures start from where it lands. A show the score makes by
+pinning its first cue starts without fading the plate to its look. "Before the end"
+cues count from one length for the runtime and the score (`songDuration`: the
+track's, the show's note of it, then the map's). The desk's Score panel (Live) and the phone's Play sheet draw
+the same component. `npm run score` (in Measure): every cue drawn where the
+scheduler fires it, pinning, a stretched and skipped live take read through map
+time, and both section nudges (a late map edge: the chorus cue at 40 s unnudged,
+at 37 s when "Next section now" is pressed as the chorus is heard).
+
+With the followed place (28g-2, #387): a nudge moves the place the follower holds
+(`FollowedPlace.resync`, PLAN 28g-8), not only the clock's offset, and the score and
+the shows read that place. An identification while the follower is unsure resyncs to
+the fingerprint's offset plus the nudge, so a nudge survives a re-anchor.
+
 ## 29. The closeup's ferrofluid drop
 
 ### 29a. The drop as a bead with the light on it (this PR)

@@ -3325,6 +3325,34 @@ for, and the GPU was asked for only after they had arrived and drawn.
   much later. What the GPU process does for the still intro's first paint (its
   gradients, the SVGs, the web font) is the question; a still image of it, or
   painting it only after the device is given, are the two things to try.
+  Read again 2026-10-18 over 124 Mac runs' logs (2026-10-11 to 18): the "no stop in
+  the opening" line went red on 14 (11%), and every red was this wait, 1.3–2.4 s on
+  the adapter or the device and then 2.4–4 s on the first compute pipeline, the
+  Metal compiler starting cold. Asking sooner cannot help: the adapter is already
+  asked 0.05–0.53 s into the page (mean 0.11 s). It went red on 12 of the 56 runs
+  where the adapter answered at 0.5 s or later and on 2 of the 68 where it answered
+  sooner. The intro is still throughout, so nothing on the screen stops. At one red
+  in nine a fix cannot be judged by its own PR's runs (eight greens in a row happen
+  by chance two times in five); it is judged by `npm run flakes -- --check 'no stop
+  in the opening'` over the week before its merge against the week after (19aa).
+  **Tried 2026-10-18 (PR #396), and it did not work.** Warming the compiler at boot
+  and holding the app's first render for it went red on all three Mac runs of its
+  own PR, each version on the same line: an empty kernel (stop 2.08 s from 1.99 s),
+  a built fill-shaped kernel (2.13 s from 2.19 s; the warm built in 0.13 s and the
+  opening's own `fill` was still given 2.6 s after it was asked), and that kernel
+  run once with the queue awaited (3.35 s from 3.42 s, the warm costing 0.2 s). At
+  the 11% base rate three reds in a row is about one in 700, so the warm does not
+  help and may hurt, and it was taken out. What the last run showed: the stop is
+  not Metal's compiler starting (the warm started it). It is the opening's own
+  `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside the display's render
+  pipeline (2.64 s) while the frame asked at 3.42 s waited for the GPU process
+  until 6.80 s: long animation frame 3.37 s, rendering delayed, 0.00 s blocked, no
+  script and no long task. A kernel of another shape does not shorten that
+  compile. The next thing to try is not a warm: ask the opening's first fills
+  before the display's pipeline and let the intro's frames wait until they are
+  given (the stop is then at a time nothing is drawn), judged as above. `npm run
+  startup` now prints the page's first compute pipeline ("first compile asked …,
+  given …"), judged by nothing.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
@@ -5129,6 +5157,32 @@ pressing, as the file is about 500 KB.
   split Measure to get back. The next Chromium check goes in a part of its own or splits
   this one as 19b did; until then a slow runner turns the part red with nothing wrong.
 
+### 19aa. A flake tracker: each check's reds counted from CI's own logs
+**Shipped** (2026-10-18): `npm run flakes` reads every run of `checks.yml` and `deploy.yml`
+in a window (`--days`, `--since`, `--until`; 7 days by default), every attempt's jobs and
+each job's log, and prints, per check (the runner's system, the command and the check's
+name, since `renders` on Linux and on Metal measure different things), how many times it
+printed FAIL, of how many, how many of those reds printed ok on the same commit in
+another job (a floor on the flakes: the code did not change and the answer did), how
+many were on main, and how many branches the reds came from (twenty-five reds on one
+branch is that branch's change being caught; the same spread over eight is the check).
+A re-run's copied jobs are counted once, jobs cancelled part way are read, and red jobs
+that printed no FAIL line are listed by job. `--check <regex>` lists every attempt of
+the matching checks with its detail. It is the 2026-10-17 audit by hand (657 red checks
+over three weeks, a day of reading) as a script, and it exists now so the startup fix
+(14v-6) can be judged on ordinary pushes. Reading, 2026-10-11 to 18 (219 runs, 1,892
+jobs, about 80 s; logs cached in the temp folder): the magnet's two drag lines 27 and 26
+of 130 over 15 branches (#373's leak), startup's opening 17 of 137 (12%, the audit's
+11%), render-app's same seed 11 of 128, the band's renders lines 10 of 135 on the
+laptop and 7 on the phone, tools' Blow 9 of 131, ferrodrift's "pulled in no more than in
+silence" 7 of 134; Measure's logic job red 16 times with no FAIL line (type errors).
+Not a gate and no bar: a rate depends on what was pushed.
+
+- **19aa-1. Work the list down.** The magnet's drag lines wait on #373 (29c); startup's
+  on 14v-6; the Blow on its paused root cause; render-app's "same seed twice draws the
+  same frames" (11 of 128, 8 branches), the renders lines and ferrodrift's have no item
+  yet and are next to read.
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
@@ -5643,32 +5697,22 @@ once the login works (23.14).*
 
 - **23.1** *(owner)*: the merchant account, the Home price ($29–39) and Pro's ($199),
   and the checkout page.
-- **23.2** (**shipped**, this PR): a hosted-site build flag (`VITE_FIREBASE_HOSTED_SITE=1`,
-  `src/lib/tier.ts`, `src/components/TierLockedTile.tsx`) that shows each paid feature
-  above as an "In the ChromaGlass app" tile with a link (`MIDI · OSC · DMX · Art-Net · Ableton Link`,
-  `NDI · Syphon · Spout · Virtual webcam`, `Audio stems · file render`, `Custom logo · clean export`),
-  off in the app and in a local `npm run dev`. *Measure:* `npm run tiers` (11/11, wired into
-  `checks.yml` `Measure · lab`): loads the site build and the app build and verifies which
-  controls each shows against the table.
-- **23.3** (**shipped**, this PR): the song-ID Worker (`server/fingerprint-worker.js`) takes a
-  licence key (`X-ChromaGlass-License`) as well as an allowed origin, and the site's manual tag
-  stays. 14o's gates come first and stay (origin, size, per-/64 hour, the day's ceiling, in
-  `npm run fingerprint-worker`); a valid Ed25519-signed key raises the hour's count (`licensedHourlyCap`),
-  not the day's (`dailyCap`). *Measure:* `npm run fingerprint-worker` (23/23): no key uses free
-  cap, a bad signature or expired key is refused with 403, a good key answers up to the licensed
-  hourly cap and still obeys the daily ceiling.
-- **23.4** (**shipped**, this PR): the key in the Mac app (`server/server-license.js`,
-  `server/remote-server.js`, `desktop/main.js`, `src/lib/licenseKey.ts`, `src/components/LicenseGate.tsx`):
-  Ed25519 signature check, activation and the two-machine count, the key's tier (Home or Pro)
-  and the features each opens, an upgrade key (Home → Pro), and an "unlicensed" app that runs
-  as the site does. *Measure:* `npm run tiers` (11/11): good Home/Pro keys, bad signature,
-  two-machine limit, and unlicensed mode verified.
-- **23.5** (**shipped**, this PR): the site's Record capped to a 15-second clip (`FREE_SITE_MAX_RECORD_SEC`)
-  and Render to 720p (`FREE_SITE_MAX_RENDER_HEIGHT`), each with a small ChromaGlass corner mark
-  (`drawCornerMark` in `src/recorder.ts`) the Mixer cannot hide; the app's untouched. *Measure:*
+- **23.2** (**shipped**, this PR): a hosted-site build flag (`VITE_FIREBASE_HOSTED_SITE=1`, or `?tierGates=1` for checks) that shows each paid feature
+  above as an "In the ChromaGlass app" tile with a link (`src/lib/tierGates.ts`, `SettingsPanel.tsx`, `DeskPanels.tsx`), off in a licensed app and in a
+  local `npm run dev`. *Measure:* `npm run tiers` (11/11, wired into `checks.yml` `Measure · lab`): loads the gated build and verifies 7 tiles on the free tier, 2 Pro tiles on a Home key, and 0 tiles on a Pro key.
+- **23.3** (**shipped**, this PR): the song-ID Worker (`server/fingerprint-worker.js`) takes an Ed25519-signed `X-ChromaGlass-Key` licence key as
+  well as an allowed origin, and the site's manual tag stays. 14o's gates come first
+  and stay (origin, size, per-/64 hour, the day's ceiling, in `npm run
+  fingerprint-worker`); a good key raises the hour's count (`LICENSED_RATE_PER_HOUR = 300`), not skipping the day's (`DAILY_LIMIT = 1000`). *Measure:*
+  `npm run fingerprint-worker` (23/23): no key refused when `REQUIRE_LICENSE_KEY=1`, a bad signature refused before reading the body or calling the service, a good key answered and allowed past the 30/hr cap while stopping at `DAILY_LIMIT`.
+- **23.4** (**shipped**, this PR): the key in the Mac app and show server (`server/license-key.js`, `server/server-license.js`, `server/remote-server.js`, `src/lib/licenseKey.ts`, `desktop/`): offline Ed25519 signature check, activation
+  and the two-machine count (`/license-activate`, `/license-deactivate`, `/license-info.json` on loopback), the key's tier (Home or Pro) and the features each
+  opens, Home → Pro upgrade keys, and an unlicensed app that runs as the site does (`requireSignIn=1&tierGates=1`). *Measure:* `npm run tiers` (11/11): verified with a valid Home key, a valid Pro upgrade key, tampered/expired keys, 2-machine cap, and no key.
+- **23.5** (**shipped**, this PR): the site's Record capped to a 15-second clip (`FREE_RECORD_MAX_SECONDS = 15`)
+  and Render to 720p (`FREE_RENDER_MAX_HEIGHT = 720`), each with a small ChromaGlass corner mark (`useRecorder.ts`, `useSongRender.ts`) the Mixer cannot hide; the app's untouched. *Measure:*
   `npm run tiers` (11/11): verifies the 15 s cap, 720p cap, and corner mark pixels on recorded frames.
 - **23.6** (**shipped**, this PR): the site's logo layer shows the ChromaGlass
-  mark only (`Built-in ChromaGlass mark` in `SettingsPanel.tsx` and `DeskPanels.tsx`); your own
+  mark only (`SettingsPanel.tsx` and `DeskPanels.tsx`); your own
   logo is the app's. *Measure:* `npm run tiers` (11/11).
 - **23.8** (one PR, `desktop/`, before 23.7): Home's listening features. The app hears
   whatever the Mac plays with no tab to share (macOS's own system-audio capture, asked
@@ -5680,10 +5724,9 @@ once the login works (23.14).*
   pasted into the site unlocks it there too (bypassable from source, which is fine).
 - **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
   with Google, Apple and the emailed link; authorised domains configured; web config wired into
-  `deploy.yml` and `.env.production`.
-- **23.13** (**shipped**, this PR): `public/privacy.html` and `public/terms.html` completed and
-  approved by the owner, including cookie/analytics consent (`src/lib/analyticsConsent.ts`) and
-  23.12's licence key and 2-machine terms. *Measure:* `npm run privacy` (CI, part `logic`).
+  `deploy.yml` via GitHub Actions repository secrets (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`).
+- **23.13** (**shipped**, #390 and extended in this PR): `public/privacy.html` and `public/terms.html` completed and
+  approved by the owner, including 23.12's licence key, Lemon Squeezy checkout, and 2-machine terms. *Measure:* `npm run privacy` (16/16, CI, part `logic`).
 - **23.10** (**shipped**, this PR; brief `docs/handoff-signin.md`): the sign-in on the
   hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
   with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
@@ -5695,15 +5738,15 @@ once the login works (23.14).*
   `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
   than today's bar.
 - **23.11** (**shipped**, this PR): the Mac app with no key asks for the
-  same sign-in once (`LicenseGate.tsx` + `/api/license`), online, then runs as the site does;
-  with a key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
+  same sign-in once (`LicenseGate.tsx`, `src/main.tsx`), online, then runs as the site does;
+  with a verified Ed25519 key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
   and signed in, and with none and signed out.
 - **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`).
   The merchant's webhook files each Ed25519-signed key under the buyer's email in Workers KV;
   a signed-in app asks the Worker for its keys with its Firebase ID token, checked against
   Google's public keys, and activates up to 2 machines per key. *Measure:*
-  `npm run license-worker` (11/11, wired into `checks.yml` `Check · logic`): a bad webhook
-  signature refused, a bad token refused, a good token given its own keys and no one else's,
+  `npm run license-worker` (11/11, wired into `checks.yml` `Measure · logic`): a bad webhook
+  signature refused, missing `LICENSE_PRIVATE_KEY` fails closed (500), a bad token refused, a good token given its own keys and no one else's,
   Home→Pro upgrade, two-machine cap, and a refunded key revoked.
 - **23.14** (**shipped**, this PR): linking devices by
   account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
@@ -6462,12 +6505,16 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (the sequencer runs a section stage on its own clock), but a show's "at the second
     chorus" still fires on the guess. Decide whether a show's section actions wait for the
     place to be sure, and say so on the Songs panel.
-  - **28g-8. Found along the way: the score's nudge.** When 28h's nudge lands (#375), it
-    calls `FollowedPlace.resync(mapSec, now)` (its third argument, the time it is now,
-    defaults to the second), which starts the clock there and anchors the follower. A
-    re-identification of the same song does not move a place that is sure; a nudge is the
-    performer's word and should, so the nudge calls it directly, not through the hook's
-    identification effect.
+  - **28g-8. The score's nudge** (**shipped**, #375; story in `docs/plan-shipped.md` §28h).
+    A nudge (`useMusicIntelligence`'s `seekBy`) moves the followed place itself:
+    `FollowedPlace.resync(mapSec, now)` starts the clock there and anchors the follower,
+    called directly, not through the identification effect (which leaves a sure place
+    alone). The clock keeps the nudge too, so an identification while the follower is
+    unsure resyncs to `offsetSec + nudge`. Open from it: the steering closes a nudged
+    place back toward what the follower hears, so a nudge of a section's edge on a sure
+    follower is corrected within a second (right when the follower is right, and a nudge
+    that will not stay when the follower is wrong); decide whether a nudge holds the
+    follower off for a few bars.
   - **28g-9. Found along the way: an intro on one held chord.** For as long as one chord
     is held (the check's intro, four bars of A minor into a verse that opens on it), no
     place in it sounds different from another, and the follower slid 1.4 bars behind into
@@ -6475,6 +6522,29 @@ Turing Print" work (#331), which also made the reaction grow at all.
     held the identification's clock meanwhile and jumped once. A rehearsal map made from a
     file (28g-3) can carry bar positions from the beat grid, which would fix the place
     inside a held chord.
+- **28h. The score: the song drawn, its show's cues on it, and a nudge** (**shipped**,
+  this PR; the story is in `docs/plan-shipped.md` §28h). Open from it:
+  - **28h-1.** (**shipped** with 28g-8.) The nudge re-anchors the follower rather than
+    adding an offset to it; position stays in the map's own seconds.
+  - **28h-2.** Correct the score, not just the clock: drag a section's edge and save
+    the map, so the next play of the song is right without a nudge. Today the nudge
+    is an offset for the whole song, which fixes one late edge and moves the rest.
+  - **28h-3.** A score that draws itself as an unknown song plays, from the live song
+    shape (`songShape.ts`: builds, drops, breakdowns), before any map exists.
+  - **28h-4.** The sequencer's own stages on the lane: a sequence started for a song
+    (`startAt`) lays its stages end to end by seconds and does not follow the nudge or
+    a section's time; show the stages against the sections, and let a stage advance
+    on a named section ("the second chorus"), not only on any section change.
+    A show started by hand from the Songs sheet keeps its own clock and reads no
+    sections, so the nudge leaves it alone.
+  - **28h-7.** A listen's replay and a recorded take count from the recognised
+    start (`songStartMs`), not the nudged position: a take made after a nudge stores
+    the unnudged start. Decide whether a take should carry the nudge.
+  - **28h-5.** The remote phone (`RemoteControl.tsx`, over the show server) does not
+    get the score yet; the phone layout's Play sheet does.
+  - **28h-6.** A repeated section in a live take (the band plays the chorus twice)
+    maps back to the same section index, so a cue on it fires once; decide with 28g
+    whether a repeat should fire its cue again.
 
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 

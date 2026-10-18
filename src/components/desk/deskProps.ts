@@ -3,6 +3,7 @@ import type { MixTakes } from '../../lib/mixFade';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import type { DeskLayout, LayoutName } from '../../lib/deskLayout';
 import type { DeskDots, DeskMode } from './DeskHeader';
+import type { SongScoreProps } from '../SongScore';
 
 /**
  * A cue: one row of the set list.
@@ -120,6 +121,8 @@ export interface DeskProps {
   onSetAction: (a: SetAction, name?: string) => void;
   onItemAction: (id: string, a: SetItemAction) => void;
   songNow: string | null;
+  /** The song as a score, its show's cues and the nudge (PLAN 28h); the Score panel, and the phone's Play sheet. */
+  score?: SongScoreProps;
   liveId: string | null;
   nextId: string | null;
   onCue: (id: string) => void;
