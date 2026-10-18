@@ -3459,14 +3459,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     M dt: at Phase Edge's most that is 2.6, on Magnet Garden 3.9. The
     steepest the limit allows everywhere under the hand drew a bead at each
     finger's tip and left the rest grey: the surface tension goes as √W,
-    and pulled the fingers back in. And on a labyrinth plate without a hand
-    magnet (close = 0, ferro-maze) where mix(1.0, ..., close) left well
-    at 1.0, the repulsion and music shear diffused the black cells into brown
-    mud (showreel: 33% black to 9%); steepening with A.b.y directly holds the
-    phase in its two wells across the dish.
+    and pulled the fingers back in.
   */
   let close = spikesClose(A.a);
-  let wellNeed = max(2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, sqrt(max(A.b.y, 0.0)) * 10.0);
+  let wellNeed = mix(1.0, 2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, close);
   let well = min(max(1.0, wellNeed), (1.9 / max(A.b.x, 1e-4) - 64.0) / 16.0);
   let local = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * well - lap;
   let repel = A.b.y * chi * w;
