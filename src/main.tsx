@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client';
 import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
 import { isPhoneApp } from './lib/appLink';
-import { requestGpuEarly } from './gpu/device';
+import { requestGpuEarly, gpuWarm } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
 
 // The black box, first: whatever goes wrong from here on has a line
@@ -26,7 +26,12 @@ const Root = params.has('remote')
   ? lazy(() => import('./components/RemoteControl'))
   : params.has('cast')
     ? lazy(() => import('./components/CastDisplay'))
-    : lazy(() => import('./App'));
+    // The show's first render waits for the GPU's start (gpu/device.ts,
+    // `warmCompiler`): a frame handed over when Chromium's GPU process is
+    // about to be busy for seconds is what stopped the page's frames. The
+    // download goes on meanwhile; only the render waits, and not past 3.5 s for an
+    // adapter that has not answered, nor 7 s in all.
+    : lazy(() => Promise.all([import('./App'), gpuWarm()]).then(([app]) => app));
 
 // Installable: the service worker is what lets Chrome and Edge offer
 // "Install app", for a dock icon and a window with no browser chrome. Only

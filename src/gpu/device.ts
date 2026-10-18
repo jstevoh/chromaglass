@@ -81,8 +81,81 @@ function settles<T>(p: Promise<T>, what: string): Promise<T> {
  * replaced, "Try again") asks afresh, as before.
  */
 let early: Promise<Gpu | GpuFailure> | null = null;
+// Settled when the early request has its answer and the compiler is warm, or
+// has failed; already settled for a page that never asked (the remote, a cast).
+let earlyDone: Promise<void> = Promise.resolve();
+// True once the adapter and device have answered: from then on only the
+// compiler's start is being waited for.
+let earlyAnswered = false;
 export function requestGpuEarly(): void {
-  if (!early) early = askGpu();
+  if (early) return;
+  early = askGpu().then(async (got) => {
+    earlyAnswered = true;
+    if (!('failure' in got)) await warmCompiler(got.device);
+    return got;
+  });
+  earlyDone = early.then(() => undefined, () => undefined);
+}
+
+/**
+ * One trivial compute pipeline, built and waited for, before anything else
+ * asks the device for work.
+ *
+ * What was reported: `npm run startup`'s "no stop in the opening" went red on
+ * 14 of 124 cold Mac runs (2026-10-11 to 18, `npm run flakes`), every one a
+ * stop of 2.0 to 3.5 s in the page's frames. What was measured (PLAN 14v-6):
+ * on a CI Mac with the shader cache empty, Chromium's GPU process spends 1.3
+ * to 2.4 s handing over the adapter or the device, and then another 2.4 to 4 s
+ * when the first compute pipeline is built, the trivial `fill` kernel, which
+ * is the Metal compiler starting. The page cannot present a frame while the
+ * GPU process is inside either, and a frame it had already handed over (the
+ * desk's first render, the intro moving into the plate) is what the
+ * compositor then waits on, so rAF stops. Asking for the adapter earlier
+ * cannot help (it is asked at 0.05 to 0.53 s, mean 0.11 s); the page can
+ * only avoid having a frame in flight when the wait begins. So the app's
+ * first render waits for this (`gpuWarm`, `main.tsx`), and the compiler
+ * starts here, on a pipeline with nothing in it, with the intro held still
+ * over a rectangle that is already painted. The cost is paid once either way:
+ * the opening's first compile would have paid the same start. A warm shader
+ * cache (every visit after the first) makes this a few milliseconds.
+ *
+ * Never the reason the show does not open: a pipeline that will not build, or
+ * does not within `WARM_CAP_MS`, is let go and the opening goes on as before.
+ */
+const WARM_CAP_MS = 6_000;
+async function warmCompiler(device: GPUDevice): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const module = device.createShaderModule({ label: 'warm', code: '@compute @workgroup_size(1) fn main() {}' });
+    await Promise.race([
+      device.createComputePipelineAsync({ label: 'warm', layout: 'auto', compute: { module, entryPoint: 'main' } }),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, WARM_CAP_MS); }),
+    ]);
+  } catch { /* the opening builds its own, and says so if it cannot */ } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Resolves once the early GPU request has been answered and its compiler is
+ * warm (or has failed); at once for a page that did not ask. `main.tsx` holds
+ * the app's first render on it.
+ *
+ * Two caps. A cold Mac hands over the adapter and device in 1.3 to 2.4 s, so an
+ * adapter still unanswered at `GPU_ANSWER_MS` is a hang, not a cold start, and
+ * the page goes on (a hung adapter must not keep the desk away for the whole
+ * of the longer cap: `npm run intro` lines 5 and 5b press the intro 1.5 s after
+ * it is taken in, and the failure screen arrives at 10 s). Once a device
+ * exists, the compiler's own start gets until `GPU_HOLD_MS` in all.
+ */
+const GPU_ANSWER_MS = 3_500;
+const GPU_HOLD_MS = 7_000;
+export function gpuWarm(): Promise<void> {
+  return new Promise((resolve) => {
+    const unanswered = setTimeout(() => { if (!earlyAnswered) resolve(); }, GPU_ANSWER_MS);
+    const cap = setTimeout(resolve, GPU_HOLD_MS);
+    void earlyDone.then(() => { clearTimeout(unanswered); clearTimeout(cap); resolve(); });
+  });
 }
 
 export async function requestGpu(): Promise<Gpu | GpuFailure> {
