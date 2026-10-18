@@ -3,7 +3,9 @@ import type { MixTakes } from '../lib/mixFade';
 import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
-import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MAPPABLE_SOURCES, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
+import { SOURCE_NAMES } from '../lib/audioFeatures';
+import { HIT_FEATURES, HIT_FEATURE_LABELS } from '../lib/hitSource';
+import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
 import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
@@ -224,6 +226,9 @@ const PATCH_SOURCES: [PatchSource, string][] = [
   // The sound again, by name: the kick, the snare, the hats and the bands
   // (`bands` in types.ts says why it is a source of its own).
   ['bands', 'Bands'],
+  // And its hits and its note (`lib/hitSource.ts`): how hard each drum's
+  // last hit was, falling over a quarter second. Same microphone, same master.
+  ['hits', 'Hits'],
   // The odd one out, and last for that reason: the other three report what is
   // happening in the room, and this one is a shape you asked for.
   ['shape', 'Shapes'],
@@ -239,7 +244,8 @@ const PATCH_SOURCES: [PatchSource, string][] = [
  */
 const featuresFor = (source: PatchSource): [string, string][] =>
   source === 'sound' ? AUDIO_FEATURES
-    : source === 'bands' ? MAPPABLE_SOURCES.map(f => [f, MUSIC_SOURCE_LABELS[f]] as [string, string])
+    : source === 'bands' ? SOURCE_NAMES.map(f => [f, MUSIC_SOURCE_LABELS[f]] as [string, string])
+    : source === 'hits' ? HIT_FEATURES.map(f => [f, HIT_FEATURE_LABELS[f]] as [string, string])
     : source === 'shape' ? MODULATOR_FEATURES.map(f => [f, MODULATOR_LABELS[f]] as [string, string])
     : SCENE_FEATURES;
 
@@ -1990,9 +1996,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           A patch is a <span className="text-white/60">source</span>, something that changes in it,
           a control it moves, and how far — a floor filling up opening the turbulence, a crowd
           going still slowing the plate, someone crossing left to right walking the lamp across
-          with them. The source can be the room camera, the film projector, the sound, or a shape
-          (an LFO on the bar, or an envelope a pad fires), and a patch can land on every plate or
-          on one of them, so a reel can drive layer 1 while the bass drives layer 2.
+          with them. The source can be the room camera, the film projector, the sound (its
+          levels, its bands, or its hits: how hard each kick, snare and hat landed, and the
+          note), or a shape (an LFO on the bar, or an envelope a pad fires), and a patch can
+          land on every plate or on one of them, so a reel can drive layer 1 while the bass
+          drives layer 2.
         </Info>
         <div className="mb-3">
           <div className="flex items-center justify-between mb-2">
@@ -2168,7 +2176,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Sound Impact"
-          disabled={!listens('sound') && !listens('bands') && !midi?.map.sound?.some(isMapping) && 'no patch reads the sound'}
+          disabled={!listens('sound') && !listens('bands') && !listens('hits') && !midi?.map.sound?.some(isMapping) && 'no patch reads the sound'}
           value={settings.soundImpact ?? 1}
           min={0}
           max={1}
