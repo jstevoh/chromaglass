@@ -8,6 +8,7 @@ import {
 import {
   activateLocalLicenseKey,
   deactivateLocalLicenseKey,
+  getCachedLicenseStatus,
   syncServerLicense,
 } from '../lib/licenseKey';
 import {
@@ -76,6 +77,49 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
     }
   };
 
+  const [keyCopied, setKeyCopied] = useState(false);
+
+  const syncAccountKeysFromWorker = async (isCancelled?: () => boolean) => {
+    const licensesUrl = import.meta.env.VITE_FIREBASE_LICENSES_URL as string | undefined;
+    if (!licensesUrl) return;
+    const authMod = await loadFirebaseAuth().catch(() => null);
+    if (!authMod || isCancelled?.()) return;
+    const token = await authMod.getCurrentIdToken().catch(() => null);
+    if (!token || isCancelled?.()) return;
+    if (hasExplicitMarketingChoice()) {
+      void syncMarketingPreferenceToServer(token, getMarketingOptIn());
+    }
+    try {
+      const res = await fetch(`${licensesUrl.replace(/\/$/, '')}/keys`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        keys?: Array<{ key?: string; token?: string; tier?: string; revoked?: boolean }>;
+        marketingOptIn?: boolean | null;
+      };
+      if (typeof data.marketingOptIn === 'boolean' && !hasExplicitMarketingChoice() && !isCancelled?.()) {
+        setMarketingOptInState(data.marketingOptIn);
+        setMarketingOptIn(data.marketingOptIn);
+      }
+      const validRemote = (data.keys ?? []).filter((k) => (k.token || k.key) && !k.revoked);
+      const bestRemote =
+        validRemote.find((k) => k.tier === 'pro') ?? validRemote[0];
+      const remoteToken = bestRemote?.token || bestRemote?.key;
+      const current = getActiveLicenseInfo();
+      if (
+        remoteToken &&
+        (!current.valid || (bestRemote?.tier === 'pro' && current.tier !== 'pro'))
+      ) {
+        await activateLocalLicenseKey(remoteToken);
+        if (!isCancelled?.()) refreshLicenseState();
+      }
+    } catch {
+      // offline or unreachable
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     loadFirebaseAuth().then(async (authMod) => {
@@ -84,37 +128,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
       if (!cancelled && liveEmail) {
         setEmail(liveEmail);
       }
-      const licensesUrl = import.meta.env.VITE_FIREBASE_LICENSES_URL as string | undefined;
-      if (licensesUrl) {
-        const token = await authMod.getCurrentIdToken();
-        if (cancelled || !token) return;
-        if (hasExplicitMarketingChoice()) {
-          void syncMarketingPreferenceToServer(token, getMarketingOptIn());
-        }
-        try {
-          const res = await fetch(`${licensesUrl.replace(/\/$/, '')}/keys`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store',
-          });
-          if (!res.ok) return;
-          const data = (await res.json()) as {
-            keys?: Array<{ key?: string; token?: string; tier?: string; revoked?: boolean }>;
-            marketingOptIn?: boolean | null;
-          };
-          if (typeof data.marketingOptIn === 'boolean' && !hasExplicitMarketingChoice() && !cancelled) {
-            setMarketingOptInState(data.marketingOptIn);
-            setMarketingOptIn(data.marketingOptIn);
-          }
-          const activeRemote = (data.keys ?? []).find((k) => (k.token || k.key) && !k.revoked);
-          const remoteToken = activeRemote?.token || activeRemote?.key;
-          if (remoteToken && !getActiveLicenseInfo().valid) {
-            await activateLocalLicenseKey(remoteToken);
-            if (!cancelled) refreshLicenseState();
-          }
-        } catch {
-          // offline or unreachable
-        }
-      }
+      await syncAccountKeysFromWorker(() => cancelled);
     });
     syncServerLicense().then(() => {
       if (!cancelled) refreshLicenseState();
@@ -341,19 +355,57 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
         )}
 
         <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-xs uppercase tracking-wider text-neutral-400">License Key</span>
-            {licenseInfo.valid && (
-              <button
-                type="button"
-                data-cg-license-deactivate=""
-                disabled={licenseBusy}
-                onClick={handleDeactivateKey}
-                className="text-[11px] text-neutral-400 underline hover:text-neutral-200"
-              >
-                Deactivate machine
-              </button>
-            )}
+            <div className="flex items-center gap-2.5">
+              {Boolean(import.meta.env.VITE_FIREBASE_LICENSES_URL) && (
+                <button
+                  type="button"
+                  data-cg-license-sync=""
+                  disabled={licenseBusy}
+                  onClick={async () => {
+                    setLicenseBusy(true);
+                    setLicenseError(null);
+                    try {
+                      await syncAccountKeysFromWorker();
+                    } finally {
+                      setLicenseBusy(false);
+                    }
+                  }}
+                  className="text-[11px] text-neutral-400 underline hover:text-neutral-200"
+                >
+                  Sync purchases
+                </button>
+              )}
+              {licenseInfo.valid && getCachedLicenseStatus().token && (
+                <button
+                  type="button"
+                  data-cg-license-copy=""
+                  onClick={() => {
+                    const tok = getCachedLicenseStatus().token;
+                    if (tok && navigator.clipboard) {
+                      void navigator.clipboard.writeText(tok);
+                      setKeyCopied(true);
+                      setTimeout(() => setKeyCopied(false), 2000);
+                    }
+                  }}
+                  className="text-[11px] text-amber-300/90 underline hover:text-amber-200"
+                >
+                  {keyCopied ? 'Copied!' : 'Copy key'}
+                </button>
+              )}
+              {licenseInfo.valid && (
+                <button
+                  type="button"
+                  data-cg-license-deactivate=""
+                  disabled={licenseBusy}
+                  onClick={handleDeactivateKey}
+                  className="text-[11px] text-neutral-400 underline hover:text-neutral-200"
+                >
+                  Deactivate machine
+                </button>
+              )}
+            </div>
           </div>
           <form onSubmit={handleActivateKey} className="mt-2 flex gap-1.5">
             <input
