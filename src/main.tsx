@@ -5,6 +5,11 @@ import { install as installCrashLog, record as crashRecord } from './lib/crashLo
 import { isPhoneApp } from './lib/appLink';
 import { requestGpuEarly } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
+import {
+  isSignedInCached,
+  hasEmailSignInLink,
+  getPendingEmail,
+} from './lib/authFlag';
 
 // The black box, first: whatever goes wrong from here on has a line
 // (docs/crash-plan.md).
@@ -27,6 +32,10 @@ const Root = params.has('remote')
   : params.has('cast')
     ? lazy(() => import('./components/CastDisplay'))
     : lazy(() => import('./App'));
+
+const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
+  ? lazy(() => import('./components/SignInScreen'))
+  : null;
 
 // Installable: the service worker is what lets Chrome and Edge offer
 // "Install app", for a dock icon and a window with no browser chrome. Only
@@ -138,11 +147,63 @@ function Loading() {
   );
 }
 
+function Gate() {
+  const gateActive = Boolean(import.meta.env.VITE_FIREBASE_API_KEY) && show;
+  const [phase, setPhase] = useState<'app' | 'completing-link' | 'signin'>(() => {
+    if (!gateActive) return 'app';
+    if (isSignedInCached()) return 'app';
+    if (hasEmailSignInLink() && getPendingEmail()) return 'completing-link';
+    return 'signin';
+  });
+
+  useEffect(() => {
+    if (!gateActive) return;
+    const onSignedOut = () => setPhase('signin');
+    window.addEventListener('cg-signed-out', onSignedOut);
+    return () => window.removeEventListener('cg-signed-out', onSignedOut);
+  }, [gateActive]);
+
+  useEffect(() => {
+    if (!gateActive) return;
+    if (phase === 'app') {
+      if (import.meta.env.VITE_FIREBASE_API_KEY) {
+        void import('./lib/firebaseAuth').then((m) => m.verifyReturningUserInBackground());
+      }
+      return;
+    }
+    if (phase === 'completing-link') {
+      if (import.meta.env.VITE_FIREBASE_API_KEY) {
+        let cancelled = false;
+        void import('./lib/firebaseAuth')
+          .then((m) => m.completeEmailLinkSignIn())
+          .then((res) => {
+            if (cancelled) return;
+            setPhase(res.needsEmail ? 'signin' : 'app');
+          })
+          .catch(() => {
+            if (!cancelled) setPhase('signin');
+          });
+        return () => {
+          cancelled = true;
+        };
+      }
+    }
+  }, [gateActive, phase]);
+
+  if (phase === 'completing-link') {
+    return <Loading />;
+  }
+  if (phase === 'signin' && LazySignIn) {
+    return <LazySignIn onSignedIn={() => setPhase('app')} />;
+  }
+  return <Root />;
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Boot>
       <Suspense fallback={<Loading />}>
-        <Root />
+        <Gate />
       </Suspense>
     </Boot>
   </StrictMode>,
