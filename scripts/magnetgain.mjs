@@ -97,9 +97,11 @@
  * (ρh²/12μ, about a tenth of a second for the drop and oil together), against
  * GAIN · ⟨∇ψ⟩ · ν_ref / (ν_ff + ν_clear) with ⟨∇ψ⟩ the shader's own gradient
  * averaged over the drop's cells along the path the centroid took. The check
- * asks the two to agree within a third: the drop is eight cells across with a
- * three-cell grey rim whose drag is the geometric mean of the two liquids',
- * and the disc's drag law is for a sharp disc in an unbounded cell. It is
+ * asks the two to agree within a third: the drop is seventeen cells across
+ * on 384² with a grey rim two or three cells wide (its ferrofluid at its own
+ * mobility: phaseForce raises the force to the complement of hsPrep's drag
+ * exponent, so the two cancel cell by cell), the Darcy speed is a sharp
+ * disc's in an unbounded cell, and ∇ψ is averaged over the drop's cells. It is
  * red if the force is read in other units than this says (a gain re-tuned
  * through hsPrep's Darcy factor read as 1 in ferrofluid cells, the ×180 of
  * #373's first round, would read 180× the speed), and red if the pull is
@@ -312,9 +314,26 @@ fn magnetRadius() -> f32 { return R; }
   const far = rows[4].steep;
   // The solver's ψ is under the quadratic by (1 + b/2Bs)/(1 + b/Bs)² in its slope, 0.84 at b 0.02.
   const sat = (1 + far.share / (2 * K.Bs)) / (1 + far.share / K.Bs) ** 2;
-  const ratioLin = far.ratio * far.fLin / far.fLang;
-  check('in the weak field the linear law\'s pull over the solver\'s is GAIN_phys over MAGNET_GAIN', Math.abs(ratioLin * sat / (gainPhys / K.gain) - 1) < 0.05,
-    `${ratioLin.toFixed(3)} at Ferro Maze's magnet (b ${far.share.toFixed(3)}, where the solver's law is ${sat.toFixed(3)} of its quadratic), against ${(gainPhys / K.gain / sat).toFixed(3)}; the Langevin law's ${far.ratio.toFixed(3)}`);
+  // Both pulls through the one drag, the reference liquid's at the rest gap
+  // (darcyRef, the drag GAIN_phys is defined through): the physics' f over
+  // the solver's GAIN·∇ψ, each as the speed it gives that liquid. Divided
+  // by GAIN_phys / MAGNET_GAIN the gain and the drag both cancel, and what
+  // is left is f_lin · L · sat over perPsi · ∇ψ: that the shader's ∇ψ, in
+  // the joules one unit of ψ was matched to, is the linear law's force at
+  // this magnet. So it holds the shader's energy against the derivation,
+  // not the gain, which the check after it holds on its own (its first
+  // form was named for the gain, and would have passed at any MAGNET_GAIN).
+  // The EFH1 drop's speed in the oil over the solver's drop's (the table's
+  // ratio, printed beside) is not this ratio: it carries EFH1's own
+  // viscosity against the solver's ferrofluid's (FERRO_NU), the two
+  // liquids' data and not the gain's units, and read as the gain it was 4%
+  // out.
+  const pull = (f) => f * h0 * h0 / (12 * muRef) / (K.gain * far.dpsi * L);
+  const ratioLin = pull(far.fLin), ratioLang = pull(far.fLang);
+  check('in the weak field the shader\'s ∇ψ, in the joules a unit of ψ is matched to, is the linear Kelvin force (its law\'s saturation allowed for)', Math.abs(ratioLin * sat / (gainPhys / K.gain) - 1) < 0.05,
+    `the linear law's pull over the solver's ${ratioLin.toFixed(3)} at Ferro Maze's magnet (b ${far.share.toFixed(3)}, where the solver's law is ${sat.toFixed(3)} of its quadratic), against GAIN_phys over MAGNET_GAIN, ${(gainPhys / K.gain / sat).toFixed(3)} with the saturation; the Langevin law's ${ratioLang.toFixed(3)}; the EFH1 drop's speed in the oil over the solver's drop's ${far.ratio.toFixed(3)}`);
+  check('MAGNET_GAIN is a tenth of GAIN_phys, the gain the derivation gives at EFH1\'s χ (PLAN 29c-2)', Math.abs(K.gain / gainPhys / 0.10 - 1) < 0.1,
+    `MAGNET_GAIN ${K.gain.toExponential(3)} is ${(K.gain / gainPhys).toFixed(3)} of GAIN_phys ${gainPhys.toExponential(3)} s (0.10 asked, within a tenth)`);
 
   // ── The solver's drop against the Darcy speed ──
   /*
@@ -328,13 +347,13 @@ fn magnetRadius() -> f32 { return R; }
     the first thirty are still the rise (the first form of this read ten
     steps at thirty, a fifth under the steady speed).
 
-    And whether the drop moves as a body: its rim's velocity against its
-    core's, read off the velocity field at the end as the phase-weighted
-    mean over every cell with any ferrofluid against the mean over the
-    cells nine tenths full. Before the rim's force was read against the
-    ferrofluid's own drag (phaseForce, PLAN 29c) the rim went at 0.55 of
-    the core under the weak magnet and the centroid at 0.44 of the pull
-    asked; with it, 0.81 and 0.68 at thirty steps.
+    Whether the drop holds together under its drag is `npm run ferrodrag`'s
+    measure, not this check's. The share is carried at the mixture's
+    velocity (PLAN 29c-4), so a cell's ferrofluid has no velocity of its
+    own to read against its core's, and the rim statistic an earlier form
+    of this check read off the carry's own field went with that field (the
+    drop's mixture, share-weighted, at 0.81 of its core's speed with the
+    rim's force read against the ferrofluid's own drag, 0.55 before).
   */
   const N = 384, R = 0.022, D = 0.1, H = 0.2, STEPS = 60, EVERY = 2, LAST = 10;
   const measure = async (W) => {
@@ -356,15 +375,12 @@ fn magnetRadius() -> f32 { return R; }
       const path = [await centroid()];
       for (let k = 0; k < STEPS / EVERY; k++) { await lab.step(EVERY, on); path.push(await centroid()); }
       const p = await lab.phase();
-      const vel = await lab.field('vel');
       const cells = [];
-      let coreU = 0, coreN = 0, rimU = 0, rimW = 0;
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const v = p.data[j * N + i];
         if (v > 0.05) cells.push([(i + 0.5) / N, (j + 0.5) / N, v]);
-        if (v > 0.001) { const ux = vel[(j * N + i) * 4]; rimU += v * ux; rimW += v; if (v > 0.9) { coreU += ux; coreN++; } }
       }
-      return { path, cells, body: coreN > 0 && rimW > 0 ? (rimU / rimW) / (coreU / coreN) : 0, core: coreN };
+      return { path, cells };
     }, { N, R, D, W, H, STEPS, EVERY });
     const last = run.path[run.path.length - 1];
     const window = run.path.slice(-LAST - 1);
@@ -373,30 +389,41 @@ fn magnetRadius() -> f32 { return R; }
     const pred = [];
     for (const c of window) {
       const h = 1 / N;
-      const q = run.cells.flatMap(([x, y]) => [{ x: x - last.x + c.x + h, y: y - last.y + c.y }, { x: x - last.x + c.x - h, y: y - last.y + c.y }])
-        .map((pt) => ({ ...pt, radius: K.radius, mx: 0.5 + D, my: 0.5, h: H, w: W }));
+      // Four samples a cell, x ± h and y ± h: the x gradient is the pull's
+      // direction, and the two together are the cell's own |∇ψ|, which is
+      // what the per-step guard caps, cell by cell. The drop's mean pull
+      // can sit under the guard while its cells nearest the magnet are
+      // capped, so the guard's two checks hold the steepest cell, not the
+      // mean (the mean is what the speed is predicted from).
+      const q = run.cells.flatMap(([x, y]) => {
+        const cx = x - last.x + c.x, cy = y - last.y + c.y;
+        return [{ x: cx + h, y: cy }, { x: cx - h, y: cy }, { x: cx, y: cy + h }, { x: cx, y: cy - h }];
+      }).map((pt) => ({ ...pt, radius: K.radius, mx: 0.5 + D, my: 0.5, h: H, w: W }));
       const e = await shader(q);
-      let s = 0, g = 0;
-      run.cells.forEach(([, , v], i) => { s += v; g += v * (e[2 * i].energy - e[2 * i + 1].energy) * (0.5 * N); });
+      let s = 0, g = 0, steepest = 0;
+      run.cells.forEach(([, , v], i) => {
+        const gx = (e[4 * i].energy - e[4 * i + 1].energy) * (0.5 * N);
+        const gy = (e[4 * i + 2].energy - e[4 * i + 3].energy) * (0.5 * N);
+        s += v; g += v * gx;
+        steepest = Math.max(steepest, Math.hypot(gx, gy));
+      });
       const dpsi = g / s;
-      pred.push({ dpsi, asked: K.gain * dpsi, v: Math.min(K.gain * dpsi, capCells(N)) * inOil });
+      pred.push({ dpsi, asked: K.gain * dpsi, steepest: K.gain * steepest, v: Math.min(K.gain * dpsi, capCells(N)) * inOil });
     }
     const predicted = pred.reduce((t, p) => t + p.v, 0) / pred.length;
     const speeds = run.path.slice(1).map((c, i) => ((c.x - run.path[i].x) * N / EVERY).toFixed(2)).join(' ');
     console.log(`  Magnet ${W} at depth ${H}, ${D} of the plate from a drop r ${R} (${(R * L * 1e3).toFixed(1)} mm): the centroid's speed every ${EVERY} steps, cells a step: ${speeds}.`);
-    console.log(`    Over the last ${LAST * EVERY} steps ${fmt(measured, 4)} plate/s (${(measured * L * 100).toFixed(2)} cm/s), ${(measured * N / 60).toFixed(2)} cells a step; the pull asked ${pred.map((p) => fmt(p.asked, 3)).join(', ')} plate/s (∇ψ ${fmt(pred[0].dpsi, 0)} to ${fmt(pred[pred.length - 1].dpsi, 0)} per plate), Darcy's drop ${fmt(predicted, 4)} plate/s; the rim at ${run.body.toFixed(2)} of the core's speed (${run.core} cells nine tenths full).`);
-    return { measured, predicted, asked: Math.max(...pred.map((p) => p.asked)), body: run.body };
+    console.log(`    Over the last ${LAST * EVERY} steps ${fmt(measured, 4)} plate/s (${(measured * L * 100).toFixed(2)} cm/s), ${(measured * N / 60).toFixed(2)} cells a step; the pull asked ${pred.map((p) => fmt(p.asked, 3)).join(', ')} plate/s (∇ψ ${fmt(pred[0].dpsi, 0)} to ${fmt(pred[pred.length - 1].dpsi, 0)} per plate), its steepest cell ${fmt(Math.max(...pred.map((p) => p.steepest)), 3)} plate/s, Darcy's drop ${fmt(predicted, 4)} plate/s.`);
+    return { measured, predicted, asked: Math.max(...pred.map((p) => p.asked)), steepest: Math.max(...pred.map((p) => p.steepest)) };
   };
   const strong = await measure(0.4);
   const weak = await measure(0.08);
   console.log(`  The real EFH1 drop in this oil would go ${fmt(rows[1].table[Math.round(0.08 / D_RHO)].uOil, 3)} m/s under the 0.4 magnet.`);
-  check('under a magnet that asks less than the per-step guard, the drop moves at Darcy\'s speed for the Kelvin force: GAIN · ∇ψ · ν_ref / (ν_ff + ν_clear)',
-    weak.asked < 0.9 * capCells(N) && Math.abs(weak.measured / weak.predicted - 1) < 0.34 && weak.measured > 0,
-    `${fmt(weak.measured, 4)} measured against ${fmt(weak.predicted, 4)} predicted plate/s, ${((weak.measured / weak.predicted - 1) * 100).toFixed(0)}% apart (asked within 34%); the pull asked ${fmt(weak.asked, 3)} against the guard's ${capCells(N).toFixed(3)}`);
-  check('and moves as a body: its rim goes at least 0.7 of its core\'s speed', weak.body >= 0.7,
-    `the rim at ${weak.body.toFixed(2)} of the core (0.55 with the rim's force read against the mixed drag)`);
-  check('under the drop\'s dragged magnet the pull asks no more than the guard, so the guard is not the speed law', strong.asked < capCells(N),
-    `asked ${fmt(strong.asked, 3)} plate/s against MAGNET_CELLS's ${capCells(N).toFixed(3)} on ${N}²; the drop went ${fmt(strong.measured, 4)} plate/s against Darcy's ${fmt(strong.predicted, 4)}, its rim at ${strong.body.toFixed(2)} of its core`);
+  check('under a magnet that asks less than the per-step guard in every cell, the drop moves at Darcy\'s speed for the Kelvin force: GAIN · ∇ψ · ν_ref / (ν_ff + ν_clear)',
+    weak.steepest < 0.9 * capCells(N) && Math.abs(weak.measured / weak.predicted - 1) < 0.34 && weak.measured > 0,
+    `${fmt(weak.measured, 4)} measured against ${fmt(weak.predicted, 4)} predicted plate/s, ${((weak.measured / weak.predicted - 1) * 100).toFixed(0)}% apart (asked within 34%); the pull asked ${fmt(weak.asked, 3)} over the drop, ${fmt(weak.steepest, 3)} at its steepest cell, against the guard's ${capCells(N).toFixed(3)}`);
+  check('under the drop\'s dragged magnet the pull asks no more than the guard in any cell, so the guard is not the speed law', strong.steepest < capCells(N),
+    `asked ${fmt(strong.asked, 3)} plate/s over the drop, ${fmt(strong.steepest, 3)} at its steepest cell, against MAGNET_CELLS's ${capCells(N).toFixed(3)} on ${N}²; the drop went ${fmt(strong.measured, 4)} plate/s against Darcy's ${fmt(strong.predicted, 4)}`);
 } finally {
   await close();
 }

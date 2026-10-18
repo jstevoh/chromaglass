@@ -144,12 +144,13 @@ const DRIFT_LEAST = 0.2;
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
 const PHASE_RELAX = 6;
 /*
-  C_α, how hard a moving edge of the ferrofluid is pressed back to the
-  grid's width against the flux step's spreading (phaseCompress in
-  wgsl/fluid.ts, PLAN 29c-1). 1 is the volume-of-fluid solvers' usual
-  value: the compression's speed is the flow's own, which is about what a
-  first-order step spreads an edge by, no more. Nothing at rest whatever
-  it is.
+  C_α, how much of what the flux step's limiter withheld at a moving edge of
+  the ferrofluid is given back (phaseCompress in wgsl/fluid.ts, PLAN 29c-1).
+  1 is all of it: the second-order flux the limiter cut at each face to stay
+  monotone, ½c(1 − c) of the face's slope by the share withheld (wgsl/fluid.ts,
+  withheld), which is what spreads a dragged drop's trailing edge. Nothing at
+  rest whatever it is, nothing on a smooth profile, and nothing on the deep
+  plate (the step).
 */
 const PHASE_COMPRESS = 1;
 /*
@@ -1003,9 +1004,6 @@ export class WebGPUFluid {
   private phaseGap: GPUBuffer | null = null;
   private phaseGapPrimed = false;
   private mazeReady = false;
-  /** The ferrofluid's own velocity for its carry (phaseVelocity), made with the phase's stage; the mixture's when the step runs without it. */
-  private phaseVelT: GPUTexture | null = null;
-  private phaseOwnVel = false;
   /** For the harness: whether the phase stage is running at all. */
   get phaseIsLive(): boolean { return this.phaseLive; }
   private airCover = 0;
@@ -1181,7 +1179,6 @@ export class WebGPUFluid {
       ['phaseCHVolume', [R32], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
       ['phaseMomentum', [VEL], open.phase],
-      ['phaseVelocity', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
       // The ferrofluid pushing the dye (Pushes Dye), on the dye's own grid.
       ['phaseDisplace', [dye], open.displace],
@@ -1505,13 +1502,34 @@ export class WebGPUFluid {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
     if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
-    const ride = this.phaseRide();
+    const ride = this.ride();
     const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}:${ride.label}`;
     let group = this.groups.get(key);
     if (!group) {
       const gap = this.ensurePhaseGap();
       group = bindGroup(this.device, pipe, [this.sim, args, this.phase.read, ride, this.phase.write, this.press, this.squeeze.read, gap,
         thin ? this.hsP! : gap, thin ? this.hsMob! : gap, this.ensureStand()]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
+  /**
+   * phaseCompress: run's bindings, then the phase's substep plan (phasePlan's
+   * psub: 1/m and m), for the substeps the step's carry ran, which the
+   * step's deficit at each face is summed over.
+   */
+  private runPhaseCompress(pass: GPUComputePassEncoder, stand: GPUTexture, args: GPUBuffer): void {
+    const pipe = this.pipeline('phaseCompress', this.phase.write.format);
+    if (!pipe) return;
+    const reads = [this.phase.read, this.phaseBlurT!, this.ride(), this.squeeze.read, stand];
+    const key = `phaseCompress:${this.phase.write.label}:${reads.map((r) => r.label).join(',')}:${args.label}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...reads, this.phase.write, this.phaseSub!]);
       this.groups.set(key, group);
     }
     pass.setPipeline(pipe);
@@ -1547,10 +1565,10 @@ export class WebGPUFluid {
     const there = this.phase.read, back = this.phase.write;
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
       const a = this.arg(`phase advect plan ${j}`, [1, j, 0, REST_GAP, 0, disp, 1, 0]);
-      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.phaseRide().label}`;
+      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.ride().label}`;
       let ga = this.groups.get(ka);
       if (!ga) {
-        ga = bindGroup(this.device, adv, [this.sim, a, there, this.phaseRide(), back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
+        ga = bindGroup(this.device, adv, [this.sim, a, there, this.ride(), back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
         this.groups.set(ka, ga);
       }
       pass.setPipeline(adv);
@@ -2826,18 +2844,6 @@ export class WebGPUFluid {
         press drew the ferrofluid into the middle), the filter moving volume
         too (phaseGrid, and why).
       */
-      // With the ferrofluid's drift (phaseVelocity, and why); the lab's
-      // control (phaseDrift 0) carries it by the mixture's, as before.
-      this.phaseOwnVel = (p.phaseDrift ?? 1) > 0;
-      if (this.phaseOwnVel) {
-        if (!this.phaseVelT) {
-          this.phaseVelT = this.disposer.track(this.device.createTexture({
-            label: 'phase vel', size: [this.N, this.N], format: this.vel.read.format,
-            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-          }));
-        }
-        this.run(pass, 'phaseVelocity', this.phaseVelT, [this.ride(), this.phase.read], none);
-      }
       if (volume) this.runPhasePlanned(pass, subs, disp, stand);
       else for (let k = 0; k < subs; k++) {
         this.runPhaseAdvect(pass, adv(k));
@@ -2853,21 +2859,31 @@ export class WebGPUFluid {
         this.phase.swap();
       }
       /*
-        What the flux step spread of a moving edge, taken back along the
-        edge's normal at the flow's own speed (phaseCompress, PLAN 29c-1):
-        nothing where the ferrofluid is at rest. The normal is read from
-        the field blurred once here (phaseBlur), not blurred face by face.
+        What the flux step spread of a moving edge this step, given back
+        at each face (phaseCompress, PLAN 29c-1): the second-order flux the
+        step's limiter withheld there, nothing where the ferrofluid is at
+        rest or its profile smooth, bounded by the cells' share and room.
+        The normal is read from the field blurred once here (phaseBlur),
+        not blurred face by face. The thin gap's only, where it was
+        measured (ferrodrag, ferropress): the deep plate's looks were
+        measured with the spreading in them, and the compression at its
+        first strength, run there too, broke three (spikes 2/6, maze 3/4,
+        fingers 3/4 on the Mac, 2026-10-17); what the limiter's deficit,
+        given back, does to them is not measured yet (PLAN 29c-1).
       */
-      if (!this.phaseBlurT) {
-        this.phaseBlurT = this.disposer.track(this.device.createTexture({
-          label: 'phase blur', size: [this.N, this.N], format: R32,
-          usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-        }));
+      if (thin) {
+        if (!this.phaseBlurT) {
+          this.phaseBlurT = this.disposer.track(this.device.createTexture({
+            label: 'phase blur', size: [this.N, this.N], format: R32,
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+          }));
+        }
+        this.run(pass, 'phaseBlur', this.phaseBlurT, [this.phase.read], none);
+        // The faces' Courant numbers are the flux step's: the mixture's velocity,
+        // which carries the share, over the substeps the carry ran (runPhaseCompress).
+        this.runPhaseCompress(pass, stand, this.arg('phase compress', [PHASE_COMPRESS, disp, volume, subs]));
+        this.phase.swap();
       }
-      this.run(pass, 'phaseBlur', this.phaseBlurT, [this.phase.read], none);
-      this.run(pass, 'phaseCompress', this.phase.write, [this.phase.read, this.phaseBlurT, this.ride(), this.squeeze.read, stand],
-        this.arg('phase compress', [PHASE_COMPRESS, disp, volume, 0]));
-      this.phase.swap();
 
       /*
         Cahn–Hilliard keeps the two liquids apart, maze or not: it conserves
@@ -4485,11 +4501,6 @@ export class WebGPUFluid {
   /** The flow the thin carries ride: the forced flow, less the glass's drift when it has one (driftCells). */
   private ride(): GPUTexture {
     return this.riding ? this.velRide : this.velForced;
-  }
-
-  /** What the ferrofluid's share is carried by: its own velocity (phaseVelocity) once the phase's stage has made it, else the flow the colour rides. */
-  private phaseRide(): GPUTexture {
-    return this.phaseOwnVel && this.phaseVelT ? this.phaseVelT : this.ride();
   }
 
   /**

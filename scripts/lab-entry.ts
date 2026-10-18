@@ -347,7 +347,13 @@ const api = {
   },
   /** The thickest film Clear Film lays, as a share of the gap (FILM_MAX in src/gpu/fluid.ts). */
   filmMax: FILM_MAX,
-  async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  async phase() {
+    const f = await lab!.solver.readPhase();
+    if (!f) return null;
+    // A share gone non-finite reads as an empty plate (nothing over a half): loud instead.
+    for (let k = 0; k < f.data.length; k++) if (!Number.isFinite(f.data[k])) throw new Error(`phase: non-finite at cell ${k}`);
+    return { n: f.n, data: Array.from(f.data) };
+  },
   /** The spun dish's swirl on its own grid (readSwirl): `npm run dish`. */
   async swirl() { const f = await lab!.solver.readSwirl(); return { m: f.m, data: Array.from(f.data) }; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },

@@ -16,8 +16,8 @@
  *  2. The drop holds together: surface tension keeps its boundary sharp
  *     against shear, and its half-full area (cells with phase > 0.5) stays
  *     within 15% of its start.
- *  3. With no magnet, the drop does not move: its centroid stays within a
- *     fraction of a cell from rest over the same 180 steps.
+ *  3. With no magnet, the drop does not move: its centroid stays within half
+ *     a cell of rest over the same 180 steps, and the drop is still there.
  *
  * Lab only (software WebGPU in headless Chrome).
  */
@@ -37,12 +37,15 @@ try {
   const result = await page.evaluate(async ({ N, R }) => {
     const getStats = async () => {
       const p = await lab.phase();
-      let halfCount = 0;
+      // A plate with no phase field, or one read at another size, is not a drop at rest.
+      if (!p || p.n !== N) throw new Error(`phase: ${p ? `${p.n}² read for ${N}²` : 'no phase field'}`);
+      let halfCount = 0, n01 = 0;
       let sumPhase = 0, sumX = 0, sumY = 0;
       for (let j = 0; j < N; j++) {
         for (let i = 0; i < N; i++) {
           const val = p.data[j * N + i];
           if (val > 0.5) halfCount++;
+          if (val > 0.01) n01++;
           if (val > 0.05) {
             sumPhase += val;
             sumX += (i + 0.5) / N * val;
@@ -52,6 +55,7 @@ try {
       }
       return {
         halfCount,
+        n01,
         cx: sumPhase > 0 ? sumX / sumPhase : 0,
         cy: sumPhase > 0 ? sumY / sumPhase : 0,
       };
@@ -121,11 +125,12 @@ try {
   const areaChange = Math.abs(areaRatio - 1);
   const noMagMoved = Math.hypot(noMag1.cx - noMag0.cx, noMag1.cy - noMag0.cy);
 
-  // 1. Follows the magnet
+  // 1. Follows the magnet: from where it was put (a cell of 0.36, or the lag
+  // is read off another drop), and the way the magnet went.
   check(
     'the drop centroid follows the magnet within 2 drop radii across 0.3 plate drag',
-    lag < twoR,
-    `lag ${(lag / R).toFixed(2)}R (cx ${(s1.cx).toFixed(4)} vs magnet 0.6600, limit ${(twoR / R).toFixed(1)}R)`,
+    lag < twoR && Math.abs(s0.cx - 0.36) < 1 / N && s1.cx - s0.cx >= 0.3 - twoR,
+    `lag ${(lag / R).toFixed(2)}R (cx ${(s1.cx).toFixed(4)} from ${(s0.cx).toFixed(4)} vs magnet 0.6600, limit ${(twoR / R).toFixed(1)}R); ${s0.n01} → ${s1.n01} cells over 0.01`,
   );
 
   // 2. Holds together (half-full area stays within 15% of start)
@@ -135,11 +140,13 @@ try {
     `area ${s0.halfCount} → ${s1.halfCount} cells (${(areaRatio * 100).toFixed(1)}% kept, limit ±15%)`,
   );
 
-  // 3. With no magnet, does not move
+  // 3. With no magnet, does not move: half a cell over 180 steps, and the drop
+  // has to be there to be read (an empty readback puts both centroids at 0, 0,
+  // a cell apart from nothing).
   check(
     'with no magnet, the drop does not move',
-    noMagMoved < 0.005,
-    `moved ${(noMagMoved * N).toFixed(3)} cells (${(noMagMoved).toFixed(6)} plate widths)`,
+    noMagMoved < 0.5 / N && noMag0.halfCount > 0 && noMag1.halfCount > 0,
+    `moved ${(noMagMoved * N).toFixed(3)} cells (${(noMagMoved).toFixed(6)} plate widths, limit half a cell); ${noMag0.halfCount} → ${noMag1.halfCount} cells half full`,
   );
 
 } finally {

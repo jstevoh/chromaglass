@@ -6431,17 +6431,24 @@ the code's entry points, the checks to add and the scenes to match, in
 - ~~**29c. The drop follows the hand and holds together.**~~ **Shipped** (#373; the story in
   `docs/plan-shipped.md` §29c): the rim's force read against the ferrofluid's own drag, the
   moving edge compressed back (29c-1), the gain derived and what is kept of it named (29c-2),
-  the ferrofluid's momentum carried with it (phaseMomentum) and the rim riding the body's
-  velocity (phaseVelocity, 29c-4), the check `npm run ferrodrag` and the derivation `npm run
-  magnetgain`. If the closeup's
+  the ferrofluid's momentum carried with it (phaseMomentum) and the rim's ferrofluid carried
+  as a drift flux on the body's velocity (phaseVelocity, 29c-4), the check `npm run ferrodrag`
+  and the derivation `npm run magnetgain`. If the closeup's
   camera ever follows the drop, it follows smoothly and never with the sound (the sway work's
   `frameSway`, default 0, stays the only way sound moves the frame). Still open:
   - **29c-1. The moving edge is compressed back to the grid's width** (phaseCompress:
     Weller's interface compression, a flux along the edge's normal at the flow's own speed,
-    read from the field blurred once a step). A shortcut standing in for an interface the
-    grid cannot draw: a real drop's edge is a molecule thick, the grid's three cells of grey,
-    and the flux step spreads a moving one by half a cell times the cells it moves. Nothing
-    at rest.
+    read from the field blurred once a step, and only the share of each face's slope the
+    flux step's limiter withheld: the first form, every moving face alike, sharpened a
+    smooth pool the step had not spread, `ferropress`'s lifted ring 0.049 against the 0.03
+    bar where main has 0.012; matched to the limiter 0.003). A shortcut standing in for an
+    interface the grid cannot draw: a real drop's edge is a molecule thick, the grid's three
+    cells of grey, and the flux step spreads a moving one by half a cell times the cells it
+    moves. Nothing at rest. The thin gap's only so far: run on the deep plate too, whose
+    looks were measured with the spreading in them, the first form broke three of them on
+    the Mac's `plate` shard (spikes 2/6, maze 3/4, fingers 3/4 at #373's third head), so
+    the deep plate keeps main's step. Open: run `spikes`, `maze` and `fingers` with the
+    limiter-matched form on the deep plate and decide whether the looks take it.
   - **29c-2. The gain is a tenth of EFH1's, and the far pools sit by it.** `npm run
     magnetgain` works the pull out in tesla, metres and seconds: the solver's ψ is the
     Langevin energy of the ferrofluid in the rod's field, so GAIN_phys = (χ/2μ₀)(SPIKE_B_REF·Br)²
@@ -6464,19 +6471,20 @@ the code's entry points, the checks to add and the scenes to match, in
     29c-5), only in how saturated the maze reads the field (phaseMu's `sat`), which every
     labyrinth look is tuned on: move Bs to the physics with the maze looks re-read.
   - ~~**29c-4. The ferrofluid in a rim cell rides the cell's mean velocity, not its own
-    column's.**~~ **Shipped** (#373; the story in `docs/plan-shipped.md` §29c): the share is
-    carried by the ferrofluid's own velocity, extended from the body (the cells over
-    PHASE_BODY, 0.9) over the rim within PHASE_REACH cells, a Gaussian a cell wide
-    (phaseVelocity), with the ferrofluid's momentum carried along its own trace
-    (phaseMomentum). A shortcut standing in for the interface the grid cannot draw: a real
-    rim is the drop's own liquid and moves with it, and the drift flux φ(1−φ)(u_ff −
-    u_clear) of the two Darcy speeds under the one pressure would carry a mixed cell's
-    ferrofluid at its own, where the extension carries it at the body's.
+    column's.**~~ **Shipped** (#373; the story in `docs/plan-shipped.md` §29c): a mixed cell's
+    ferrofluid is carried at u_ff, the velocity of the drop it belongs to, not at the cell's
+    mixture velocity φu_ff + (1−φ)u_oil, with u_ff a first-order least-squares fit over the
+    body's cells (φ > PHASE_BODY within PHASE_REACH, Gaussian-weighted; a velocity and its
+    gradients, exact for a translation, a squeeze and a rotation) read at the cell
+    (phaseVelocity), the mixture's where no body is in reach, and the ferrofluid's momentum
+    carried along its own trace (phaseMomentum). A shortcut standing in for the interface the
+    grid cannot draw: the two Darcy speeds under the one pressure (29c-6) would give the cell's
+    ferrofluid its own velocity, where the fit gives it the body's extended to the cell.
   - **29c-5. The hand's speed limit is the grid's.** A real drop under a hand's magnet is
     pinned to it, its Darcy speed under the Kelvin force metres a second (`npm run magnetgain`
     prints each magnet's); the solver's is MAGNET_CELLS, 2.4 cells a step, 0.375 of the plate
     a second on 384² and 0.19 on 768². The drop follows a hand at 0.1 of the plate a second
-    with a lag of 1.4 radii (`npm run ferrodrag`, 29c-4); how much faster it can follow, and
+    with a lag of 1.6 radii (`npm run ferrodrag`, 29c-4); how much faster it can follow, and
     what its shape pays, is not measured, so a hand dragged faster may leave it behind. The
     hand's own carry already takes substeps for its speed (handSubs, up to
     CARRY_SUBSTEPS at CARRY_COURANT of a cell each): the magnet's asked cells a step should set
@@ -6496,6 +6504,24 @@ the code's entry points, the checks to add and the scenes to match, in
     its constant coefficient (the same stencil with k on each face, and a multigrid that
     coarsens it). Until then magnetgain reads the drop's speed against the two-liquid law with
     a bar of 34%, wide for this.
+  - **29c-7. A resting drop dissolves into its halo.** With no magnet and nothing moving, a
+    drop of 0.022 of the plate on the thin gap (`npm run ferrodrag`'s drop, phaseSharp 0.75,
+    384²) goes from 116 half-full cells to 84 over 200 resting steps (100 at the 20th, where
+    the check starts its clock, 84 at its end) while its cells over 0.01 go 222 → 600 and its
+    share's sum stays 112.08 to the last digit: the ferrofluid is not lost, it spreads into a
+    faint halo, the drop's peak falling 0.996 → 0.946. Main does the same, step for step (the
+    thin gap's new passes do nothing at rest; measured against main on the same scene), and
+    the deep plate slower (116 → 92) with the share over 1 in eight cells by 0.4% at the end.
+    The Cahn–Hilliard step's mobility is constant, so a curved edge's chemical potential
+    (Gibbs–Thomson) drives share out through the bulk until the bulk balances the curvature,
+    a lone small drop's Ostwald ripening against the plate: inferred from the shape of the
+    loss (the peak falls, the halo grows, the sum holds), not measured against a flat edge.
+    The remedy in the literature is the degenerate mobility M(φ) = φ(1−φ) (Cahn, Elliott and
+    Novick-Cohen 1996: transport along the interface only, nothing through the bulk), and a
+    bounded potential, logarithmic or clipped, for the deep plate's overshoot. Until then
+    `ferrodrag`'s area check reads the dragged drop against the resting drop's end, FD_STILL
+    cells, not its 100 at the start, so this loss is not the drag's to answer for, and its
+    third check holds a drop still at that loss.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the

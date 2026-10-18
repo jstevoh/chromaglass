@@ -3569,7 +3569,16 @@ Found, in three rounds of review and a takeover:
   double well 2.9 times did not hold. Weller's interface compression takes it back along
   the edge's normal at the flow's own speed (phaseCompress, 29c-1), from the field blurred
   once a step (phaseBlur; blurred face by face it read 216 cells a cell and cost every
-  ferrofluid look a fifth of its step on the Mac, 29.2 → 35.7 ms).
+  ferrofluid look a fifth of its step on the Mac, 29.2 → 35.7 ms). Its first form compressed
+  every moving face alike and sharpened a smooth pool the limiter had not spread:
+  `ferropress`'s pool came back fuller after the lift (worst ring 0.049 against the 0.03 bar;
+  main's 0.012; 0.008 with the compression off), the same in every arm of the drift and the
+  momentum tried. Each face's compression is now scaled by the share of its slope the
+  limiter withheld (`withheld`: 1 − minmod(Δ_up, Δ_f)/Δ_f, the same two slopes phaseAdvect
+  limits; a few per cent on a smooth pool, 1 at a drop's shoulders), and the ring is
+  0.003. Run on the deep plate too, the first form broke spikes (2/6), maze (3/4) and
+  fingers (3/4) on the Mac, whose bars were measured with the spreading; so the compression
+  is the thin gap's only and the deep plate is main's step (open under 29c-1).
 - **The gain.** Antigravity's 1.04e-4 (17× main's) passed `ferrodrag` by running on the
   per-step guard, which makes the force uniform over the drop (every cell at the cap, so the
   drop moves as a body at 0.42 of the cap), and turned `fingers` 1/4, `ferrodye` 4/5 and
@@ -3594,7 +3603,10 @@ Found, in three rounds of review and a takeover:
   ferrofluid's share of each cell, before the step's forces (its momentum φu over its share
   where the trace lands; the oil's part reads as it was; a look without ferrofluid runs the
   step as before): the drop reaches the magnet's speed, 0.099 of the plate a second, and its
-  lag settles at 1.85R. `phaseMomentum: 0` runs the step without it, the lab's control.
+  lag settles at 1.85R. `phaseMomentum: 0` runs the step without it, the lab's control. With
+  the rim riding the drop (below) the pass is worth FD_MOMWORTH radii, FD_LAG against FD_MOM0
+  without it, against the term's own size: a velocity with a memory that does not travel
+  with the liquid lags a moving force by the speed times the drag time, Uτ, 0.6R here.
 - **The carry's wake.** With the momentum carried the half-full area fell from 100 to 82
   cells over 3 s and the cells over 0.01 of ferrofluid grew from 352 to 972, a tenth of the
   drop's ferrofluid shed and eaten by the sharpening steps. The step has one velocity a
@@ -3603,21 +3615,49 @@ Found, in three rounds of review and a takeover:
   left it behind (the axis behind the drop at 1 s, the rim carried by the nine cells round
   it by share: the rim's last cells at 0.93 of the core's speed, the wake behind them at
   0.84 down to 0.39 of it). A real interface has no such cell: the liquid on both sides of
-  it moves with it. phaseVelocity carries the share by the ferrofluid's own velocity,
-  extended from the body (the cells over 0.9 ferrofluid) over the rim within four cells, a
-  Gaussian a cell wide, as a level set's is, so the whole rim translates with the body: at
-  3 s the wake is 86 cells (3.6 cells' worth of ferrofluid, centred on the drop) where the
-  nine-cell carry left 721 (18 cells' worth, 2.5 radii behind and falling back 0.8 radii a
-  second), the half-full area 109 cells, the cells over 0.01 268, the rear rim at 0.99 of
-  the core's speed, and the lag 1.41R (1.79R with the nine-cell carry, 1.85R with none).
-  Named as the shortcut it is (29c-4): a mixed cell's ferrofluid rides the body's velocity
-  nearby, standing in for the interface the grid cannot draw.
+  it moves with it. A mixed cell's velocity is the volume mean of its two liquids',
+  u_mix = φu_ff + (1−φ)u_oil, so carried at it the ferrofluid goes the oil's share slower
+  than its own liquid; the ferrofluid's flux is φu_ff, its share at its own velocity, and
+  that is what phaseVelocity carries it at, with u_ff the velocity of the drop the cell's
+  ferrofluid belongs to: a first-order least-squares fit (a velocity and its two gradients)
+  over the body's cells (over 0.9 ferrofluid) within four cells, Gaussian-weighted two cells
+  wide, read at the cell; a rim cell with no body in reach keeps the mixture's. Two forms
+  came before it. The first was a switch, the body's Gaussian mean in place of the
+  mixture's velocity in every rim cell, and it failed the press: a mean is biased towards
+  where the body is, and under the glass's squeeze (u ∝ r) a rim cell read the body's
+  slower velocity from inside it and was carried slower than the liquid it is part of, so
+  the pool packed (ferropress's middle 1.025 of full with the glass down, main 0.960, the
+  bar 3% of 0.956; the lift's ring 0.046, bar 0.03), and on the Mac's GPU the switch's
+  patchy field raised 23 domes with no magnet (spikes) and lost a finger and a maze (3 of 4
+  each). The fit with gradients is exact for a translation, a squeeze and a rotation, so
+  under the press the rim reads the velocity the squeeze gives its own position and the
+  pool spreads as main's does. The second was the blend φu_mix + (1−φ)u_ff, written as the
+  mixture's carry plus a drift flux φ(1−φ)(u_ff − u_mix): the ferrofluid's flux past the
+  other liquid is φ(1−φ)(u_ff − u_oil), 1/(1−φ) of that, and the shortfall carried a
+  half-full cell's ferrofluid at three quarters of the drop's speed. The compression's
+  first form hid it by packing the shed rim back on (lag 1.62R, the half-full area 102 of
+  100); matched to the limiter, the blend's drop shed three fifths of itself (lag 2.49R,
+  the half-full area 32). At u_ff: the lag FD_LAG, the half-full area FD_AREA cells against
+  the resting drop's FD_STILL over the same steps (29c-7), FD_N01 cells over 0.01 against
+  the resting drop's FD_REST01 (the mixture's carry at this compression lag FD_DRIFT0 with
+  FD_DRIFT0AREA half full and FD_DRIFT0N01 over 0.01, and 972 at the first form's), and
+  FD_MOM0 without the momentum pass. Named as the shortcut it is (29c-4): a mixed cell's
+  ferrofluid rides the body's velocity extended to it, standing in for the interface the
+  grid cannot draw.
 - phaseMu and mazeReady run as on main (maze and spikes only); the first rounds had them on
   every ferrofluid look.
 
-Checks: `npm run ferrodrag` (new, lab; 3/3: lag 1.41R at main's gain with the rim's
-force, the momentum carried and the rim riding the body, 2.78R with the rim's force alone,
-5.88R without it, bar 2R; the half-full area within 15%, 100 → 109 cells; nothing moves
-without a magnet, 0.002 cells) and `npm run magnetgain` (new, lab; the field, the weak-field ratio, the drop at the
-two-phase Darcy speed and its rim at 0.7 of its core, the dragged magnet under the guard).
-Both on the Mac's `open` shard.
+Checks: `npm run ferrodrag` (new, lab; 3/3: lag FD_LAG at main's gain with the rim's
+force, the momentum carried and the rim riding the body's velocity, FD_MOM0 without the
+momentum and FD_DRIFT0 with the mixture's carry at the same compression, 5.88R with the
+force read against the mixed drag at the first form's, bar 2R; half-full cells 100 →
+FD_AREA where the resting drop goes 100 → FD_STILL, FD_AREABAR; nothing moves without a
+magnet, the resting drop's centroid within half a cell, FD_MOVED) and `npm run magnetgain`
+(new, lab; 6/6: the field within MG_FIELD of Biot–Savart, the weak field's ∇ψ the linear
+Kelvin force within MG_WEAK, MAGNET_GAIN a tenth of GAIN_phys, the drop at MG_DARCY of the
+two-phase Darcy speed, its rim's ferrofluid at MG_RIM of its core's speed by the carry's
+own velocity (bar 0.9; the mixture's MG_MIX over the same cells, and with the carry off
+MG_DRIFT0, red), the dragged magnet under the guard at its steepest cell). ferrodrag
+on the Mac's `open` shard, magnetgain on `fifth`. `npm run ferropress` is 7/7 again (the
+lifted pool's worst ring 0.003, bar 0.03, where #373's third head had 0.049 and main 0.012;
+the middle with the glass down 0.963, main's 0.960, bar within 3% of 0.956).
