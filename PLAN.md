@@ -3325,6 +3325,16 @@ for, and the GPU was asked for only after they had arrived and drawn.
   much later. What the GPU process does for the still intro's first paint (its
   gradients, the SVGs, the web font) is the question; a still image of it, or
   painting it only after the device is given, are the two things to try.
+  Read again 2026-10-18 over 124 Mac runs' logs (2026-10-11 to 18): the "no stop in
+  the opening" line went red on 14 (11%), and every red was this wait, 1.3–2.4 s on
+  the adapter or the device and then 2.4–4 s on the first compute pipeline, the
+  Metal compiler starting cold. Asking sooner cannot help: the adapter is already
+  asked 0.05–0.53 s into the page (mean 0.11 s). It went red on 12 of the 56 runs
+  where the adapter answered at 0.5 s or later and on 2 of the 68 where it answered
+  sooner. The intro is still throughout, so nothing on the screen stops. At one red
+  in nine a fix cannot be judged by its own PR's runs (eight greens in a row happen
+  by chance two times in five); it is judged by `npm run flakes -- --check 'no stop
+  in the opening'` over the week before its merge against the week after (19aa).
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
@@ -5128,6 +5138,32 @@ pressing, as the file is about 500 KB.
   in the app 1:04, the sound's renders 0:47, the intro 0:38, Chromium 0:30), the margin 19b
   split Measure to get back. The next Chromium check goes in a part of its own or splits
   this one as 19b did; until then a slow runner turns the part red with nothing wrong.
+
+### 19aa. A flake tracker: each check's reds counted from CI's own logs
+**Shipped** (2026-10-18): `npm run flakes` reads every run of `checks.yml` and `deploy.yml`
+in a window (`--days`, `--since`, `--until`; 7 days by default), every attempt's jobs and
+each job's log, and prints, per check (the runner's system, the command and the check's
+name, since `renders` on Linux and on Metal measure different things), how many times it
+printed FAIL, of how many, how many of those reds printed ok on the same commit in
+another job (a floor on the flakes: the code did not change and the answer did), how
+many were on main, and how many branches the reds came from (twenty-five reds on one
+branch is that branch's change being caught; the same spread over eight is the check).
+A re-run's copied jobs are counted once, jobs cancelled part way are read, and red jobs
+that printed no FAIL line are listed by job. `--check <regex>` lists every attempt of
+the matching checks with its detail. It is the 2026-10-17 audit by hand (657 red checks
+over three weeks, a day of reading) as a script, and it exists now so the startup fix
+(14v-6) can be judged on ordinary pushes. Reading, 2026-10-11 to 18 (219 runs, 1,892
+jobs, about 80 s; logs cached in the temp folder): the magnet's two drag lines 27 and 26
+of 130 over 15 branches (#373's leak), startup's opening 17 of 137 (12%, the audit's
+11%), render-app's same seed 11 of 128, the band's renders lines 10 of 135 on the
+laptop and 7 on the phone, tools' Blow 9 of 131, ferrodrift's "pulled in no more than in
+silence" 7 of 134; Measure's logic job red 16 times with no FAIL line (type errors).
+Not a gate and no bar: a rate depends on what was pushed.
+
+- **19aa-1. Work the list down.** The magnet's drag lines wait on #373 (29c); startup's
+  on 14v-6; the Blow on its paused root cause; render-app's "same seed twice draws the
+  same frames" (11 of 128, 8 branches), the renders lines and ferrodrift's have no item
+  yet and are next to read.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
