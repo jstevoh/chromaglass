@@ -552,6 +552,7 @@ Where each batch stands, as of 2026-09-27:
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #256: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
+| 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -4524,7 +4525,8 @@ zero-scatter liquids. Story and measurements in `docs/plan-shipped.md` §18j.
   noise, through a cosine rainbow at 85%. The physical Airy table (`filmTable.ts`,
   `filmPhysics`) exists and is 0 in every preset. Real film colour in transmission is
   faint (0–8%), so a strong rainbow is a look and should be named one. The honest
-  version is a transported film-thickness field driven by the soap. Cost: about 0.2 ms.
+  version is a transported film-thickness field driven by the soap. **Planned as §32**
+  (a draining soap film in reflection; its check is written first). Cost: about 0.2 ms.
 - **Linear light:** everything is composited in sRGB-encoded values. The six-band
   spectral sums, every mix, screen and add, the camera's blur and its bloom are biased
   by that. Decoding at the inputs and encoding in the finish is free, but it moves every
@@ -6812,6 +6814,162 @@ machine-learning tools (DeNoise, UpRes, Retimer, Face, Matte Assist, Depth Map):
 repair or mask footage the plate does not have, and anything that reads as generated fails
 the rule that nothing looks like AI. Keying, retouching, titles and the VR tools: footage
 work. The audio visualizer's spectrum bars.
+
+## 32. The soap film: a draining film seen in reflection (asked 2026-10-18)
+
+*Asked 2026-10-18: the owner shared a photograph of a vertical soap film in reflected
+light and asked how to get that effect, and to hand the way to Antigravity. The check
+that judges it, `npm run soapfilm`, is written and committed first (this PR); the build
+is 32a–32e below.*
+
+**What the photograph shows.** A film hanging in a frame and draining. Newton's series
+in horizontal bands (silver, straw, purple, blue, green-gold, orange, magenta, and the
+orders after), black lace where the film has thinned past about 30 nm, with dots and
+islands of colour inside the black, and the bands combed and curled by the flow that
+made them. Measured on the film's crop: black (luma under 0.12) 1.1% of the film, dark
+(luma under 0.2) 14.3%, saturated (chroma over 0.25) 15%, silver 10.9%, 9 of the 12 hue
+sectors holding more than 4% of the coloured pixels, mean luma by quarter from the top
+0.39, 0.515, 0.605, 0.401, edge density 1.2% (gradient over 0.25) and 7.2% (over 0.15).
+
+**What the app has, and the gap.** `filmTable.ts` gives the colour of a film of a given
+thickness (Airy's sum, the CIE matching functions, a 5500 K lamp), at normal incidence
+only, and the plate reads it as a faint tint: this plate is a projector, the light is the
+film's *transmitted* light (pale by construction, `1 − R`) and the table's reflection is
+gained and kept under 8%. The photograph is a *reflected* view on a dark ground. Three
+things are missing and none of them is a colour trick:
+
+1. A film that has a thickness in nanometres and is moved by gravity. Clear Film (20b)
+   tears but has no gravity and no thickness, and 18k's note says the honest version is a
+   transported thickness field.
+2. A film that thins until it ruptures, from the top, to Newton black.
+3. A reflection that depends on the angle you look from, because the path in the film is
+   `2 n d cos θ`. The photograph's bands are bands of thickness seen at one angle; look
+   from the side and every colour moves.
+
+**The model (what is physics, and what is named).** Vertical drainage of a real film is
+marginal regeneration: thin patches rise out of the Plateau border and thick ones sink,
+because the film is a nearly inextensible sheet pulled by surface tension, so thickness
+can only be exchanged, not stretched. The reference model keeps that and drops the rest:
+
+- The film is a 2D incompressible Darcy flow, `u = (1/ζ)(−∇p + ρ g (h − h̄) ŷ)` with
+  `∇·u = 0`. `h` is the thickness (nm), `h̄` its mean, `g` points down the film, and `p`,
+  the Lagrange multiplier of the incompressibility, is the film's tension. Thick film
+  sinks, thin film rises, and nothing is made or lost (`∇·u = 0`, `h` advected in
+  conservation form). A MAC grid, a Gauss-Seidel projection and a limited second-order
+  (minmod) advection; first-order upwind is measured below to be too diffusive.
+- Evaporation takes a constant `evap` nm/s off every cell (about 5), which thins the top
+  first because it is thinnest first. A cell under 30 nm relaxes to 8 nm (Newton's black
+  film) over 0.5 s and stays there.
+- The reflected colour is `filmReflectance(n0, n1, n2, d, λ, cosI)` summed through the
+  matching functions: the table's Airy with the path `4π n d cos θ_t / λ`, `cos θ_t` from
+  Snell's law. The first reflectance maximum at 550 nm therefore sits at `d₀ / cos θ_t`.
+
+**Named shortcuts (the owner's rule: name them, give each a plan item).**
+(a) *Gravity in the plane of a plate that lies flat.* The Hele-Shaw plate is horizontal; the
+film "hangs" because `g` is applied along the picture's y. It is a look of a vertical film,
+named so, and 32d keeps it a setting. (b) *ζ is tuned*, not derived: with `ρg = 9810` and
+`ζ = 1.5` a 1600 nm patch falls the height of a 64-row film in about 30 s of show time. The
+real drainage takes minutes, so this is a time compression (32d: a rate setting, never
+tied to the sound). (c) *Evaporation is constant*, standing in for Plateau-border suction
+and marginal regeneration at the frame; a rate that grows with the local curvature is the
+next step in the physics. (d) *Rupture is a relaxation to 8 nm*, not a nucleation event;
+the lace and islands come from the flow's noise, not from a model of bursting. (e) *Explicit
+Marangoni plug flow* (the surfactant's own motion) is left out: it is stiff (wave speed
+about 7.7 m/s on this grid) and the Darcy flow already carries the exchange.
+Literature the model sits in: Chomaz, *J. Fluid Mech.* 2001 (the vertical film's
+convection), Gros, Bussonnière and Cantat on marginal regeneration, and Huang and
+colleagues 2020.
+
+**The target (numbers, from the photograph and from the prototype).** A 32 × 64 film of
+seeded noise on 800 nm, evaporating at 5 nm/s, at `dt` 0.05, over 120 s, sampled every
+5 s. The prototype reaches true rupture (film under 30 nm, the only black that is the
+film's and not a dark band's) after about 95 s, so the look stage is short: at 110 s the
+film under 30 nm is 2.7%, dark 16.1%, saturated 83%, 9 of 12 hue sectors, and the window
+the check asks for is exactly its three samples in a row, so 32a has no slack there and
+should say so in its PR rather than tune toward it. One honest gap: the prototype is far
+more saturated than the photograph (80–90%, against 15%) because the reflected table at
+gain 4 is colourful, and the photograph's silver and white come from the look (the gain,
+the ground, light that is not a point), so the saturation bar asks only for *more than*
+10%, and 32b is where the look is tuned toward the photo's 15%.
+
+**The check: `npm run soapfilm`** (`scripts/soapfilm.mjs`, node only, 7 groups, 23 lines).
+It holds the *model*, not a picture of it, and it was written against three look-alikes
+that it must fail (a film with no black, a blur laid over a fixed ramp, and a
+compressible flow), each of which passed an earlier, weaker draft. C1 gravity sorts the
+film (a 1600 nm patch sinks and a 400 nm one rises, each at least a quarter of the film's
+height in 600 steps); C2 nothing is made or lost (mean thickness to 1e-9, a uniform film
+stays uniform); C3 gravity is the only driver (with `g = 0` a noisy film does not move at
+all; with `g` reversed the sort reverses; half the gravity sorts about half as fast, a
+ratio of 0.35 to 0.7 after 2.5 s: the owner's rule against whole-frame motion from
+sound); C4 the flow is a flow and the thickness moves with it (face divergence under
+1e-3 of the fastest speed over the cell size; the falling patch keeps a local peak of at
+least 45% of its excess after 5 s, where first-order upwind keeps 38% and a limited
+second-order scheme 51%, and its mass stays within 0.3 to 1.7 of the start; and every
+cell's change in a step lies in the interval its faces' flows could carry, the face
+thickness taken anywhere between its two neighbours, so a smoothed film or a flow that is
+reported but not used falls outside); C5 the colours move with the angle (the picture is
+the table's colour for each thickness to 1.5/255, in 0..1, a film at 30° and 50° looks
+like a thinner one straight on, `d cos θ_t`, an independently written Airy formula
+agrees with the table to 1e-6, and `cosI = 1` is the table's own value); C6 the film
+drains like a real one (quarter means grow top to bottom from 30 s on, the top reaches
+true rupture first and by 120 s, a ruptured cell stays black); C7 it looks like the
+photograph (a window of at least three samples in a row in which film under 30 nm is
+between 0.5% and 6%, dark between 3% and 25%, saturated over 10% and at least 7 of the 12
+hue sectors held). Black is the film's thickness, never the picture's brightness. Against
+a scratch prototype of the model above (not committed) it reads 23 of 23; with no
+`src/lib/soapFilm.ts` it exits 1 and says so. A bar is never moved to get green: if the
+model cannot reach one, the PR says what it reached and asks.
+
+### 32a. The CPU reference (first PR, Antigravity)
+
+`src/lib/soapFilm.ts` exports `createSoapFilm({nx, ny, dx, h0, noise, seed})`,
+`stepSoapFilm(f, dt, {g, evap})` and `soapFilmRgb(f, {cosI, gain})`, and
+`filmReflectance` in `src/lib/filmTable.ts` gains a sixth argument, `cosI`, the cosine of
+the angle of incidence in air (its default, 1, is today's behaviour to the bit, which
+`npm run filmtable` already asks). The contract is in `scripts/soapfilm.mjs`'s header: a
+film is `{nx, ny, dx, h}` with `h` in nm, row 0 at the top, gravity toward +y, closed
+box; it exposes its last flow as `f.uf` (nx+1 by ny) and `f.vf` (nx by ny+1), m/s on the
+cell faces, zero at the walls. Wire `npm run soapfilm` into `checks.yml`'s node part in the
+same PR. *Measure:* `npm run soapfilm` 23 of 23, `npm run filmtable` still green, and the
+step's cost for the 32 by 64 film in a PR comment (the prototype takes 0.8 s for 600 steps).
+
+### 32b. The reflected view
+
+A reflected-light read of the film that does not use the plate's transmission path:
+`soapFilmRgb` with the angle, a lamp that is a soft box and not a point, and the dark
+ground the photograph has. The look's own numbers (gain, how much silver) are tuned here
+against the photograph's 15% saturated and 10.9% silver. *Measure:* `npm run soapfilm` C7
+with its saturation bar unchanged, and a `look` render of the film beside the photograph at
+three viewing angles (the bands move, the black does not).
+
+### 32c. The GPU solver
+
+The same model as compute passes in `src/gpu/wgsl/` (the thickness texture, a Jacobi or
+red-black projection, the limited advection), run on the plate's grid. A lab check,
+`npm run soapgpu` (`PW_WEBGPU=1`), runs the 32a scenarios on the GPU and holds C1–C4 and C6
+to the CPU reference within a stated tolerance, so the GPU is judged by the model and not
+by whatever it draws. *Measure:* `soapgpu` plus `wgsl`, `physics` and `derive` unchanged,
+and the pass's cost in ms at the plate's size.
+
+### 32d. On the plate
+
+A "Soap Film" look: the film's reflected colour on a dark ground, a time-compression rate
+(named shortcut b) and a viewing angle, all settings with MIDI and the desks, default off
+so every existing preset looks as it did today (`setting-auditor`). The film hangs under
+its own gravity only: the sound may brighten or push it by its fast readings (hits, bands,
+onsets) but never move it as a whole (frameSway stays 0), and the preset's sound patch uses
+no song shape. *Measure:* `panel`, `desk`, `lampzero`, a `look` render against the
+photograph, and a new lab check that the setting at 0 is the plate to the bit.
+
+### 32e. The phone
+
+Every feature ships its phone version in the same PR as the feature: 32d's controls on the
+phone and the iPad, the film on the wall through Send to wall. *Measure:* `phone`,
+`draftwall`, `layout`.
+
+*Not doing now:* a thickness that follows the dye (the film is its own medium; mixing it
+with the pigment's opacity is 18k's old shortcut, and the reason for this section), Marangoni
+plug flow (named above), and any recorded footage as a texture.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
