@@ -728,7 +728,15 @@ function pourLiquid(fluid: FluidSimulation, id: string, x: number, y: number, st
   const room = fluid.liquid.headroom(liq.behaviour);
   if (room <= 0.02) return;
   const r = Math.max(2, Math.round((liq.injectRadius ?? 3) * GRID_SCALE));
-  fluid.liquid.deposit(x, y, r, liq.behaviour, AUTO_DOSE * strength * room);
+  // Emulsion scattering (milk/oil cloudiness) needs a host body to sit in:
+  // a colourless bottle dose landing on empty black water (`!hasDye`) otherwise
+  // lays a grey-white scattering cloud across the dark ground (PLAN 28d-A).
+  const ix = Math.max(0, Math.min(fluid.size - 1, Math.round(x)));
+  const iy = Math.max(0, Math.min(fluid.size - 1, Math.round(y)));
+  const idx = ix + iy * fluid.size;
+  const hasDye = (fluid.density[idx] ?? 0) + (fluid.readDensity?.[idx] ?? 0) >= 0.05;
+  const b = liq.behaviour.scatter && !hasDye ? { ...liq.behaviour, scatter: 0 } : liq.behaviour;
+  fluid.liquid.deposit(x, y, r, b, AUTO_DOSE * strength * room);
 }
 
 /**
@@ -1047,6 +1055,8 @@ class FluidSimulation {
   viewHalfW = 0.33;
   viewHalfH = 0.21;
   meanDensity = 0; // rolling measure of how full the plate is
+  /** Mean density inside the dish laid by the most recent `seedPreset` (null if cleared by hand). */
+  seedMean: number | null = null;
   /**
    * The average colour on this layer, 0..1 per channel.
    *
@@ -2144,6 +2154,7 @@ class FluidSimulation {
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
     this.dyeMovePending = false;
+    this.seedMean = null;
     this.gpu?.clear();
   }
 
@@ -2253,8 +2264,25 @@ class FluidSimulation {
     const harmony = PRESET_CONTRACTS[presetId] || pickHarmony();
     const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
 
+    const dishSum = () => {
+      let s = 0;
+      for (let j = 0; j < S; j++) {
+        const v = (j + 0.5) / S - 0.5;
+        for (let i = 0; i < S; i++) {
+          const u = (i + 0.5) / S - 0.5;
+          if (u * u + v * v < OPEN_RIM * OPEN_RIM) s += Math.min(6.0, this.density[i + j * S]);
+        }
+      }
+      return s / Math.max(1, this.dishArea);
+    };
+    const beforeMean = dishSum();
+
     const areas = plateAreas(presetId);
-    if (areas) { this.layAreas(areas, col); return harmony; }
+    if (areas) {
+      this.layAreas(areas, col);
+      this.seedMean = Math.max(0, dishSum() - beforeMean);
+      return harmony;
+    }
 
     switch (presetId) {
       case 'galaxy': {
@@ -2808,6 +2836,7 @@ class FluidSimulation {
       }
     }
 
+    this.seedMean = Math.max(0, dishSum() - beforeMean);
     return harmony;
   }
 
@@ -3825,7 +3854,19 @@ class FluidSimulation {
     // Eased down over the zoom's travel, not dropped at the first notch: the
     // plate emptying at 1.05x was a jump of its own (reported as the zoom
     // not being smooth, "especially at the beginning steps").
-    const budget = Math.max(0.1, Math.min(1.2, settings.dyeBudget ?? 0.85));
+    // Named regulator shortcut (PLAN 18g / 28d-A, pending 18c-2): a seeded look
+    // whose opening composition covers less of the dish than its `dyeBudget`
+    // slider (`seedMean < dyeBudget`, e.g. Jellyfish Bloom 0.14 vs 0.65, Comet
+    // 0.16 vs 0.85, Cyberpunk 0.11 vs 0.50) holds `min(dyeBudget, seedMean)` so
+    // the music turns the bodies over rather than filling the black void up to
+    // 0.85. And because `stepDecay` runs once per `dt`-scaled solver step while
+    // frame-driven injectors run at 60 Hz, `regStepScale` scales the per-step
+    // regulator ceiling by `1 / (dt / 0.05)` on seeded plates so slow-`dt` looks
+    // (`jellyfish-bloom` dt 0.008, `deep-ocean` dt 0.009) hold their budget.
+    const rawBudget = this.seedMean !== null && this.seedMean > 0
+      ? (this.seedMean > 0.85 && (settings.dyeBudget ?? 0.85) >= 0.85 ? this.seedMean : Math.min(settings.dyeBudget ?? 0.85, this.seedMean))
+      : (settings.dyeBudget ?? 0.85);
+    const budget = Math.max(0.06, Math.min(Math.max(1.2, this.seedMean ?? 0), rawBudget));
     const targetMean = budget + (0.28 - budget) * macroAmountOf(settings);
     const over = Math.max(0, this.meanDensity / targetMean - 1);
     /*
@@ -3874,7 +3915,8 @@ class FluidSimulation {
     */
     // PLAN 18g: Kept as a named safety cap until PLAN 18c-2 (pours add volume): prevents
     // runaway saturation on looks where colour is injected without added volume.
-    const regulatorEvap = Math.min(0.12, over * over * 0.6);
+    const regStepScale = this.seedMean !== null ? 1 / Math.max(0.08, Math.min(1, Math.max(0, this.dt) / 0.05)) : 1;
+    const regulatorEvap = Math.min(0.28, Math.min(0.12, over * over * 0.6) * regStepScale);
     /*
       Only ever upward, and H6 tried the other direction and took it out
       again. A bubble's exclusion is a multiply, so it destroys the dye it
@@ -5630,6 +5672,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const laySecondPlate = (fluid: FluidSimulation, presetId: string) => {
     // The Fillmore look is two projectors: the second plate starts with its own wash.
     if (presetId === 'fillmore-1969') fluid.seedPreset('fillmore-wash', noise2D);
+    else fluid.seedMean = fluidsRef.current[0]?.seedMean ?? null;
   };
 
   const layPlate = (presetId: string, layBack = false, phase?: LookPhase) => {
@@ -7270,8 +7313,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // A print is that product too, starch's complex, whatever the palette (depositChem, 26d).
               const print = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
               const c = chemAmt > 0 && print === 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : TURING_PRODUCT;
-              const amount = (chemAmt > 0 ? chemAmt : 0.6) * 0.02 * sixtieths;
-              g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22, print, chemAmt > 0 ? 1 : 0);
+              const seededReef = lead.seedMean !== null && lead.seedMean > 0 && print === 0;
+              const chemTarget = seededReef ? Math.min(currentSettings.dyeBudget ?? 0.85, lead.seedMean!) : (currentSettings.dyeBudget ?? 0.85);
+              const chemRoom = seededReef ? Math.max(0, Math.min(1, (1.0 - lead.meanDensity / Math.max(0.06, chemTarget)) * 2.5)) : 1;
+              const chemDt = seededReef ? Math.min(1, Math.max(0.05, lead.dt / 0.05)) * chemRoom : 1;
+              const amount = (chemAmt > 0 ? chemAmt : 0.6) * 0.02 * sixtieths * chemDt;
+              g.depositChemistry?.(g.chem.read, amount, [c.r, c.g, c.b], 0.22, print, chemAmt > 0 ? 1 : 0, seededReef ? 1 : 0);
             }
           }
         }
@@ -8025,10 +8072,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const color = area ? areaColor(li, area) : harmonyColor(harmonyOf(li));
                   const styles = stylesOf(li);
                   const style = DICE.evolve.pick(styles);
+                  const clearPhase = af.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
+                  const lookTarget = af.seedMean !== null && af.seedMean > 0
+                    ? (af.seedMean > 0.85 && (currentSettings.dyeBudget ?? 0.85) >= 0.85 ? af.seedMean : Math.min(currentSettings.dyeBudget ?? 0.85, af.seedMean))
+                    : (currentSettings.dyeBudget ?? 0.85);
+                  const evolveRoom = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - af.meanDensity / Math.max(0.06, lookTarget)) * 2.5));
+                  const evolveDt = Math.min(1, Math.max(0.08, af.dt / 0.05)) * evolveRoom;
                   // A gust is a bigger pour, not just a more frequent one:
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
-                  af.autoInject(style, rx, ry, 1.5 + energy * 4, color.r, color.g, color.b, energy);
+                  if (evolveDt > 0.001) {
+                    af.autoInject(style, rx, ry, (1.5 + energy * 4) * evolveDt, color.r, color.g, color.b, energy);
+                  }
                   af.addTemp(rx, ry, 0.3 + energy * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
                   // the bench, and half the bottles there are not just colour.
@@ -8443,11 +8498,29 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // eight seconds of the show.
                   const turn = Math.floor(time / 8);
                   const areaTime = time * 0.3 + colorMod * Math.PI;
+                  // Named regulator shortcut (PLAN 28d-A): continuous per-frame music
+                  // injectors (`center pulse`, `bass ring`, `mid orbit`, `treble sparkle`,
+                  // `swell`) scale by `dt / 0.05` and the headroom left under the look's
+                  // initial fill (`pourRoom`), and on clear-carrier phase layers (`ferro-maze`,
+                  // `seedMean === 0`) pour no dye into the ferrofluid cells. On sparse dark
+                  // looks (`lampGround < 0.05` and `lookTarget < 0.45`), continuous streams
+                  // place coherent drops (`contStyle`) rather than `spray`/`splatter` mist,
+                  // and `treble sparkle` uses `sparkCol` directly rather than mixing 50%
+                  // white (`* 0.5 + 0.5`).
+                  const clearPhase = activeFluid.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
+                  const lookTarget = activeFluid.seedMean !== null && activeFluid.seedMean > 0
+                    ? (activeFluid.seedMean > 0.85 && (currentSettings.dyeBudget ?? 0.85) >= 0.85 ? activeFluid.seedMean : Math.min(currentSettings.dyeBudget ?? 0.85, activeFluid.seedMean))
+                    : (currentSettings.dyeBudget ?? 0.85);
+                  const pourRoom = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - activeFluid.meanDensity / Math.max(0.06, lookTarget)) * 2.5));
+                  const pourDt = Math.min(1, Math.max(0.04, activeFluid.dt / 0.05)) * pourRoom;
+                  const sparseDark = (currentSettings.lampGround ?? 0) < 0.05 && lookTarget < 0.45;
+                  const contStyle = () => { const st = aStyle(); return sparseDark && (st === 'spray' || st === 'splatter') ? 'drop' : st; };
 
                   // Center pulse — scales with density mapping
                   if (densityMod > 0.005) {
                     const pc = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime) : audioCol;
-                    activeFluid.autoInject(aStyle(), bassX, bassY, densityMod * 0.025 * autoAmp, pc.r, pc.g, pc.b, densityMod);
+                    const st = contStyle();
+                    if (pourDt > 0.001) activeFluid.autoInject(st, bassX, bassY, densityMod * 0.025 * autoAmp * pourDt, pc.r, pc.g, pc.b, densityMod);
                     activeFluid.addTemp(bassX, bassY, densityMod * 0.018 * autoAmp);
                   }
 
@@ -8503,8 +8576,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const rx2 = Math.floor(bassX + Math.cos(a) * rad);
                       const ry2 = Math.floor(bassY + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * autoAmp;
-                        activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
+                        const dropStr = bass01 * (0.5 + 0.7 * DICE.music.float()) * autoAmp * pourDt;
+                        if (dropStr > 0.001) activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
                         // Outward expansion with natural fluid swirl
                         const swirl = 0.2 * (DICE.music.float() - 0.5);
                         const pvx = (Math.cos(a) - Math.sin(a) * swirl) * (0.18 + 0.15 * DICE.music.float()) * bass01;
@@ -8537,7 +8610,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const mx = Math.floor(midAt.x + (noise2D(time * 0.25, 12.3) * 0.7 + Math.cos(time * 0.45) * 0.3) * orbitR);
                     const my = Math.floor(midAt.y + (noise2D(47.1, time * 0.25) * 0.7 + Math.sin(time * 0.55) * 0.3) * orbitR);
                     if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
-                      activeFluid.autoInject(aStyle(), mx, my, mid01 * 0.06 * autoAmp, midCol.r, midCol.g, midCol.b, mid01);
+                      const st = contStyle();
+                      if (pourDt > 0.001) activeFluid.autoInject(st, mx, my, mid01 * 0.06 * autoAmp * pourDt, midCol.r, midCol.g, midCol.b, mid01);
                       activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
                     }
                   }
@@ -8557,11 +8631,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const sx = sp ? Math.floor(sp.x) : DICE.music.int(GRID_SIZE - 20) + 10;
                       const sy = sp ? Math.floor(sp.y) : DICE.music.int(GRID_SIZE - 20) + 10;
                       activeFluid.addTemp(sx, sy, treble01 * 0.6 * autoAmp);
-                      for (let ddy = -1; ddy <= 1; ddy++) {
-                        for (let ddx = -1; ddx <= 1; ddx++) {
-                          const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
-                          activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 1.1 * w,
-                            sparkCol.r * 0.5 + 0.5, sparkCol.g * 0.5 + 0.5, sparkCol.b * 0.5 + 0.5);
+                      if (pourDt > 0.001) {
+                        for (let ddy = -1; ddy <= 1; ddy++) {
+                          for (let ddx = -1; ddx <= 1; ddx++) {
+                            const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
+                            activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 0.12 * autoAmp * pourDt * w,
+                              sparkCol.r, sparkCol.g, sparkCol.b);
+                          }
                         }
                       }
                     }
@@ -8581,7 +8657,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const swellCol = swellArea ? areaCycle(activeLayerRef.current, swellArea, areaTime + 1.1) : colFor(2.6);
                     const ex = Math.floor(swellAt.x + (noise2D(time * 0.18, 71.9) * 0.7 + Math.cos(time * 0.32) * 0.3) * swellR);
                     const ey = Math.floor(swellAt.y + (noise2D(88.4, time * 0.18) * 0.7 + Math.sin(time * 0.27) * 0.3) * swellR);
-                    activeFluid.autoInject(aStyle(), ex, ey, energy01 * 0.06 * autoAmp, swellCol.r, swellCol.g, swellCol.b, energy01);
+                    const st = contStyle();
+                    if (pourDt > 0.001) activeFluid.autoInject(st, ex, ey, energy01 * 0.06 * autoAmp * pourDt, swellCol.r, swellCol.g, swellCol.b, energy01);
                   }
                 }
               }
@@ -8909,7 +8986,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
 
           // Emergency seeding
-          if (!hasContent && time % 5 < 0.02 && l === 0 && drainFrameRef.current === 0) {
+          if (!hasContent && fluid.seedMean !== 0 && time % 5 < 0.02 && l === 0 && drainFrameRef.current === 0) {
             const color = harmonyColor(harmonyRef.current);
             fluid.addDensity(GRID_SIZE / 2, GRID_SIZE / 2, 5.0, color.r, color.g, color.b);
           }

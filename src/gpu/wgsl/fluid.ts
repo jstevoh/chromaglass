@@ -3459,10 +3459,14 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     M dt: at Phase Edge's most that is 2.6, on Magnet Garden 3.9. The
     steepest the limit allows everywhere under the hand drew a bead at each
     finger's tip and left the rest grey: the surface tension goes as √W,
-    and pulled the fingers back in.
+    and pulled the fingers back in. And on a labyrinth plate without a hand
+    magnet (close = 0, ferro-maze) where mix(1.0, ..., close) left well
+    at 1.0, the repulsion and music shear diffused the black cells into brown
+    mud (showreel: 33% black to 9%); steepening with A.b.y directly holds the
+    phase in its two wells across the dish.
   */
   let close = spikesClose(A.a);
-  let wellNeed = mix(1.0, 2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, close);
+  let wellNeed = max(2.0 * sqrt(max(A.b.y * chi, 0.0)) / STRIPE_CURVE, sqrt(max(A.b.y, 0.0)) * 10.0);
   let well = min(max(1.0, wellNeed), (1.9 / max(A.b.x, 1e-4) - 64.0) / 16.0);
   let local = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) * well - lap;
   let repel = A.b.y * chi * w;
@@ -3798,7 +3802,14 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
     d = vec4f(0.0);
   } else {
-    d *= S.evap;
+    // Named regulator shortcut (PLAN 18g / 28d-A, until 18c-2/18g-4 carry a separate
+    // solvent-thickness field): uniform d *= S.evap fades thick bodies and thin
+    // inter-body mist at the same fractional rate, leaving a grey-pastel veil across
+    // the black ground. A surface-to-volume term surf clears thin mist (d.a small)
+    // first while leaving thick dye bodies intact.
+    let loss = max(0.0, 1.0 - S.evap);
+    let surf = loss * 0.06 / ((d.a + 0.14) * (d.a + 0.14));
+    d *= max(0.0, S.evap - surf);
   }
   // Safety cap (PLAN 18g: "A safety cap stays, named as one"):
   if (!finite4(d)) { d = vec4f(0.0); }
@@ -4087,7 +4098,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let a = c.g;
   if (A.a.z <= 0.0) {
     if (a > A.a.y) {
-      let w = A.a.x * (a - A.a.y);
+      // Named regulator shortcut (PLAN 28d-A): when wetOnly (A.b.w) is set on a
+      // seeded reef look (neon-coral-reef), the whole-plate bath feeds the reaction
+      // inside the coral bodies (d.a) and wherever reagent was poured (c.b),
+      // rather than printing over the empty black water between bodies (showreel:
+      // 30% black to 1% by 30 s, now 23%).
+      let host = select(1.0, max(smoothstep(0.12, 0.55, d.a), smoothstep(0.01, 0.08, c.b)), A.b.w > 0.5);
+      let w = A.a.x * (a - A.a.y) * host;
       d = vec4f(d.rgb + w * A.b.rgb, d.a + w);
     }
     textureStore(dst, p, d);
