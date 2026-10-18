@@ -1233,7 +1233,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     look's resting ferrofluid is as it was, to the bit), nothing where the
     profile is smooth (Δ_up ≈ Δ_f, nothing withheld: the paraboloid pool
     pressed under the glass in \`npm run ferropress\` comes back to the
-    one never pressed, worst ring FP_RING against the 0.03 bar), and no
+    one never pressed, worst ring 0.002 against the 0.03 bar), and no
     more than the step withheld (C_α = 1). Each face's exchange is one
     number read alike from both sides, moved toward the fuller side of the
     edge, and at most a quarter of min(lo, 1 − hi), the emptier cell's
@@ -1274,11 +1274,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     falls by two thirds a cell is more than twice the smaller share; and
     its ¼|c| for the step's ½|c|(1 − |c|) read the deficit short again at
     a slow face, by near half. So it gave back a quarter to a half of what
-    the limiter took, and the drop lost the rest. This form gives it all
-    back, with the flux step's own numbers in it: measured on ferrodrag's
-    scene (3 s, main's gain), the lag FD_LAG radii against the bar's 2 (the
-    second form 2.49), the half-full area FD_AREA cells from 100 against
-    the resting drop's FD_STILL (the second form 32).
+    the limiter took, and the drop lost the rest. This form gives back what
+    the limiter took, with the flux step's own numbers in it (\`npm run
+    ferropress\` 7/7, worst ring 0.002). Two other losses remained on
+    \`ferrodrag\`'s scene: Cahn–Hilliard's bulk diffusion through the oil
+    (fixed in phaseCHVolume below by degenerate mobility, \`npm run
+    ferrorest\`: 100 → 90 half-full cells at rest against 84 with constant
+    mobility, cells over 0.01 +94 against +248, and on the dragged drop
+    324 → 1238 against 352 → 1602), and the trailing rim carried at the
+    cell's mixture velocity in the oil's return flow (PLAN 29c-8;
+    \`ferrodrag\` 1/3, lag 3.24R, half-full 100 → 0).
 
     The direction and the normal are the edge's, read from the field
     blurred by [1 2 1]² once a step (phaseBlur, the \`blur\` texture), not
@@ -3862,7 +3867,29 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     of the difference is at most the plain step's, so its stability limit
     is unchanged. The gap is the one the phase has now moved into.
 
-    CH_PROSE_PLACEHOLDER
+    And the mobility is degenerate, 4m(1 − m) at each face's mean share
+    m = ½(c_p + c_q), with no floor (Elliott & Garcke 1996; PLAN 29c).
+    With a constant mobility at Cahn number ≈ 0.5 (an eight-cell drop on
+    384², R = 0.022, Phase Edge 0.75), a curved edge's Gibbs–Thomson
+    chemical potential shifts the bulk equilibrium to c_eq ≈ 0.021 and
+    drives ferrofluid out through the clear oil at 2·M·dt a substep: at
+    rest (\`npm run ferrorest\`) the drop's half-full cells fell 100 → 84
+    over 180 steps (116 → 84 from pour), its peak fell 0.996 → 0.946, and
+    its halo of cells over 0.01 grew by +248 (352 → 600), the same as on
+    main with Thin Gap on; a dragged drop left that halo behind in fresh
+    oil and re-made it as it moved (352 → 1602 cells over 0.01). Immiscible
+    liquids do not diffuse through each other's bulk; transport in a thin
+    gap is along the interface only. Evaluating 4m(1 − m) at the face's
+    mean share m is symmetric in (p, q), so each face's flux stays
+    antisymmetric and Σc·h is kept (to 0.01% over 200 steps, against a
+    9.8% loss when evaluated at c_p alone); it reaches 1 at m = 0.5, stays
+    at most 1 so the explicit stability limit (≤ M₀) is unchanged, and
+    vanishes in pure oil and pure ferrofluid. Measured on \`ferrorest\`: the
+    resting drop holds 90 of 100 half-full cells, its peak holds 0.975,
+    and its halo grows by +94 (324 → 418); on the dragged drop the cells
+    over 0.01 fall from 1602 to 1238 (the remaining trailing-rim loss to
+    the oil's return flow is PLAN 29c-8). The deep plate's \`phaseCH\` stays
+    as on main (PLAN 29c-1).
   */
   phaseCHVolume: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;

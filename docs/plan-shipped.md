@@ -3603,61 +3603,64 @@ Found, in three rounds of review and a takeover:
   ferrofluid's share of each cell, before the step's forces (its momentum φu over its share
   where the trace lands; the oil's part reads as it was; a look without ferrofluid runs the
   step as before): the drop reaches the magnet's speed, 0.099 of the plate a second, and its
-  lag settles at 1.85R. `phaseMomentum: 0` runs the step without it, the lab's control. With
-  the rim riding the drop (below) the pass is worth FD_MOMWORTH radii, FD_LAG against FD_MOM0
-  without it, against the term's own size: a velocity with a memory that does not travel
-  with the liquid lags a moving force by the speed times the drag time, Uτ, 0.6R here.
-- **The carry's wake.** With the momentum carried the half-full area fell from 100 to 82
-  cells over 3 s and the cells over 0.01 of ferrofluid grew from 352 to 972, a tenth of the
-  drop's ferrofluid shed and eaten by the sharpening steps. The step has one velocity a
-  cell, the mixture's, and the rim's force drives a mixed cell to the share's part of the
-  drop's speed, so the faint back of the rim rode the oil's return flow and the flux step
-  left it behind (the axis behind the drop at 1 s, the rim carried by the nine cells round
-  it by share: the rim's last cells at 0.93 of the core's speed, the wake behind them at
-  0.84 down to 0.39 of it). A real interface has no such cell: the liquid on both sides of
-  it moves with it. A mixed cell's velocity is the volume mean of its two liquids',
-  u_mix = φu_ff + (1−φ)u_oil, so carried at it the ferrofluid goes the oil's share slower
-  than its own liquid; the ferrofluid's flux is φu_ff, its share at its own velocity, and
-  that is what phaseVelocity carries it at, with u_ff the velocity of the drop the cell's
-  ferrofluid belongs to: a first-order least-squares fit (a velocity and its two gradients)
-  over the body's cells (over 0.9 ferrofluid) within four cells, Gaussian-weighted two cells
-  wide, read at the cell; a rim cell with no body in reach keeps the mixture's. Two forms
-  came before it. The first was a switch, the body's Gaussian mean in place of the
-  mixture's velocity in every rim cell, and it failed the press: a mean is biased towards
-  where the body is, and under the glass's squeeze (u ∝ r) a rim cell read the body's
-  slower velocity from inside it and was carried slower than the liquid it is part of, so
-  the pool packed (ferropress's middle 1.025 of full with the glass down, main 0.960, the
-  bar 3% of 0.956; the lift's ring 0.046, bar 0.03), and on the Mac's GPU the switch's
-  patchy field raised 23 domes with no magnet (spikes) and lost a finger and a maze (3 of 4
-  each). The fit with gradients is exact for a translation, a squeeze and a rotation, so
-  under the press the rim reads the velocity the squeeze gives its own position and the
-  pool spreads as main's does. The second was the blend φu_mix + (1−φ)u_ff, written as the
-  mixture's carry plus a drift flux φ(1−φ)(u_ff − u_mix): the ferrofluid's flux past the
-  other liquid is φ(1−φ)(u_ff − u_oil), 1/(1−φ) of that, and the shortfall carried a
-  half-full cell's ferrofluid at three quarters of the drop's speed. The compression's
-  first form hid it by packing the shed rim back on (lag 1.62R, the half-full area 102 of
-  100); matched to the limiter, the blend's drop shed three fifths of itself (lag 2.49R,
-  the half-full area 32). At u_ff: the lag FD_LAG, the half-full area FD_AREA cells against
-  the resting drop's FD_STILL over the same steps (29c-7), FD_N01 cells over 0.01 against
-  the resting drop's FD_REST01 (the mixture's carry at this compression lag FD_DRIFT0 with
-  FD_DRIFT0AREA half full and FD_DRIFT0N01 over 0.01, and 972 at the first form's), and
-  FD_MOM0 without the momentum pass. Named as the shortcut it is (29c-4): a mixed cell's
-  ferrofluid rides the body's velocity extended to it, standing in for the interface the
-  grid cannot draw.
-- phaseMu and mazeReady run as on main (maze and spikes only); the first rounds had them on
-  every ferrofluid look.
+  lag settles at 1.85R. `phaseMomentum: 0` runs the step without it, the lab's control.
+- **The resting drop leaked into its halo (`phaseCHVolume`, 29c-7).** The thin gap's
+  Cahn–Hilliard step used a constant mobility at Cahn number ≈ 0.5 (an eight-cell drop on
+  384², `R = 0.022`, `phaseSharp = 0.75`), so the curved interface's Gibbs–Thomson chemical
+  potential shifted the bulk equilibrium to `c_eq ≈ 0.021` and drove ferrofluid out through
+  the clear oil at `2·M·dt` per substep. At rest with no magnet (`npm run ferrorest`), the
+  drop's half-full cells fell `100 → 84` over the 180 steps after the 20-step settle
+  (`116 → 84` from pour), its peak fell `0.996 → 0.946`, and its halo of cells over `0.01`
+  grew by `+248` (`352 → 600`, from `222` as poured), step for step as on `main` with
+  `thinGap: 1`; a dragged drop continually left that halo behind in fresh oil and re-made it
+  as it moved, losing about half its ferrofluid (`352 → 1602` cells over `0.01`).
+  `phaseCHVolume` now multiplies each face's flux by the degenerate mobility
+  `mob = 4m(1 − m)` at the face's mean share `m = ½(c_p + c_q)`, with no floor (Elliott &
+  Garcke 1996): antisymmetric across each face so `Σc·h` is conserved (to `0.011%` over 180
+  steps, against a `9.8%` loss when evaluated at `c_p` alone), at most `1` so the explicit
+  stability limit (`≤ M_0`) is unchanged, and zero in pure oil and pure ferrofluid. At rest
+  (`npm run ferrorest`, 4/4) the drop holds `90` of `100` half-full cells, its peak holds
+  `0.975`, and its halo grows by `+94` (`324 → 418`), while on the dragged drop the cells
+  over `0.01` fall from `1602` to `1238`. The deep plate's `phaseCH` stays as on `main`
+  (29c-1).
+- **The carry's wake and the trailing rim (29c-4, 29c-8).** With the limiter-matched
+  compression and degenerate mobility in place, a dragged drop (`npm run ferrodrag`: `0.3` of
+  the plate in 3 s under a `0.4` magnet at depth `0.2`) still loses its trailing rim to the
+  oil's dipole return flow (`ferrodrag` 1/3: lag `3.24R`, half-full cells `100 → 0`, cells
+  over `0.01` `324 → 1238`). The step has one velocity a cell, the mixture's
+  `u_mix = φu_ff + (1 − φ)u_oil`, and where the back rim thins the oil closing in behind the
+  drop dominates `u_mix` and carries that faint ferrofluid into the wake. Two forms of a
+  separate ferrofluid carry were tried and dropped (29c-4). The first was a switch, the
+  body's Gaussian mean in place of the mixture's velocity in every rim cell (`phaseVelocity`),
+  and it failed the press: a mean is biased towards where the body is, and under the glass's
+  squeeze (`u ∝ r`) a rim cell read the body's slower velocity from inside it and was carried
+  slower than the liquid it is part of, so the pool packed (`ferropress`'s middle `1.025` of
+  full with the glass down, main `0.960`, the bar 3% of `0.956`; the lift's ring `0.046`, bar
+  `0.03`), and on the Mac's GPU the switch's patchy field raised 23 domes with no magnet
+  (`spikes`) and lost a finger and a maze (3 of 4 each). The second was a first-order
+  least-squares fit of the body's velocity and its two gradients (exact for a translation, a
+  squeeze and a rotation), applied as a drift flux `φ(1 − φ)(u_ff − u_mix)` (`phaseDrift`):
+  the compression's first form hid its shortfall by packing the shed rim back on (lag `1.62R`,
+  half-full area `102` of `100`); matched to the limiter, the blend's drop shed three fifths
+  of itself (lag `2.49R`, half-full area `32`). So the carry is the mixture's velocity again,
+  and the trailing-rim loss is open as **29c-8** (`npm run ferrodrag` stays out of CI as
+  known red until 29c-8).
+- `phaseMu` and `mazeReady` run as on main (maze and spikes only); the first rounds had them
+  on every ferrofluid look.
 
-Checks: `npm run ferrodrag` (new, lab; 3/3: lag FD_LAG at main's gain with the rim's
-force, the momentum carried and the rim riding the body's velocity, FD_MOM0 without the
-momentum and FD_DRIFT0 with the mixture's carry at the same compression, 5.88R with the
-force read against the mixed drag at the first form's, bar 2R; half-full cells 100 →
-FD_AREA where the resting drop goes 100 → FD_STILL, FD_AREABAR; nothing moves without a
-magnet, the resting drop's centroid within half a cell, FD_MOVED) and `npm run magnetgain`
-(new, lab; 6/6: the field within MG_FIELD of Biot–Savart, the weak field's ∇ψ the linear
-Kelvin force within MG_WEAK, MAGNET_GAIN a tenth of GAIN_phys, the drop at MG_DARCY of the
-two-phase Darcy speed, its rim's ferrofluid at MG_RIM of its core's speed by the carry's
-own velocity (bar 0.9; the mixture's MG_MIX over the same cells, and with the carry off
-MG_DRIFT0, red), the dragged magnet under the guard at its steepest cell). ferrodrag
-on the Mac's `open` shard, magnetgain on `fifth`. `npm run ferropress` is 7/7 again (the
-lifted pool's worst ring 0.003, bar 0.03, where #373's third head had 0.049 and main 0.012;
-the middle with the glass down 0.963, main's 0.960, bar within 3% of 0.956).
+Checks: `npm run ferrorest` (new, lab, on the Mac's `open` shard; 4/4: half-full cells
+`116 → 100 → 90` over 20 settling and 180 resting steps, `90.0%` kept against the `>= 88%`
+bar where constant mobility falls to `84`; peak `0.996 → 1.000 → 0.975`, bar `>= 0.96` where
+constant mobility falls to `0.946`; halo cells over `0.01` `222 → 324 → 418`, `+94` against
+the `<= +120` bar where constant mobility grows `+248`, `352 → 600`; volume `Σc·h`
+`3.36244 → 3.36248 → 3.36286`, `+0.011%` drift against `0.1%` bar where cell-centred mobility
+loses `9.8%`; centroid moved `0.010` cells, bar `< 0.5` cells) and `npm run magnetgain` (new,
+lab, on `fifth`; 5/5: the field within `0.004%` of Biot–Savart over 905 points, the weak
+field's ∇ψ the linear Kelvin force within `5%` at `11.461` against `11.461`, `MAGNET_GAIN`
+`6e-6` at `0.104` of `GAIN_phys` `5.775e-5` s, the drop at `0.0114` vs `0.0130` plate/s
+(`-13%`, bar `34%`) of the two-phase Darcy speed under a weak magnet, and the dragged magnet
+under the per-step guard at its steepest cell, `0.262` vs `0.375` plate/s on `384²`).
+`npm run ferropress` is 7/7 (`worst ring 0.002` on the Mac, `0.004` on software WebGPU, bar
+`0.03`, where #373's third head had `0.049` and main `0.012`; the middle with the glass down
+`0.968 → 0.981`, volume `0.01570 → 0.01570`). `npm run ferrodrag` (new script, out of CI
+until 29c-8) is 1/3 (`lag 3.24R`, `half-full 100 → 0`, `moved 0.010 cells`).
