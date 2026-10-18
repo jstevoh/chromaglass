@@ -14,7 +14,7 @@ export const DEFAULT_PUBLIC_JWK = {
   alg: 'Ed25519',
   ext: true,
   key_ops: ['verify'],
-  x: 'ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw',
+  x: 'E_OrBzBgNWzoKgdlDOVjCjqb6CvkE4L0olobNv2u96A',
 };
 
 export const MAX_MACHINES_PER_KEY = 2;

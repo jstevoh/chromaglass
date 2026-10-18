@@ -33,7 +33,7 @@ export const DEFAULT_PUBLIC_JWK: JsonWebKey = {
   alg: 'Ed25519',
   ext: true,
   key_ops: ['verify'],
-  x: 'ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw',
+  x: 'E_OrBzBgNWzoKgdlDOVjCjqb6CvkE4L0olobNv2u96A',
 };
 
 function fromBase64Url(str: string): Uint8Array | null {

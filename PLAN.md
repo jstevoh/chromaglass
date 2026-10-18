@@ -5745,7 +5745,8 @@ once the login works (23.14).*
   The merchant's webhook files each Ed25519-signed key under the buyer's email in Workers KV;
   a signed-in app asks the Worker for its keys with its Firebase ID token, checked against
   Google's public keys, and activates up to 2 machines per key. *Measure:*
-  `npm run license-worker` (11/11, wired into `checks.yml` `Measure · logic`): a bad webhook
+  `npm run license-worker` (12/12, wired into `checks.yml` `Measure · logic`): `DEFAULT_PUBLIC_JWK.x`
+  matches across `server/license-key.js` and `src/lib/licenseKey.ts` and is not the burned key, a bad webhook
   signature refused, missing `LICENSE_PRIVATE_KEY` fails closed (500), a bad token refused, a good token given its own keys and no one else's,
   Home→Pro upgrade, two-machine cap, and a refunded key revoked.
 - **23.14** (**shipped**, this PR): linking devices by
@@ -5767,6 +5768,12 @@ once the login works (23.14).*
   deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
   laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
   `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).
+- **23.16**: carry saved state from `web.app` to `.art`, then move returning users.
+  `index.html` currently redirects `chromaglass.web.app` to `chromaglass.art` only when
+  `navigator.onLine` holds, there is no `navigator.serviceWorker.controller`, there is no
+  saved ChromaGlass state in `localStorage` (licence, signed-in flag, settings, set list),
+  and there is no `?remote` or `?cast`, so returning users and offline shows do not lose
+  their origin-scoped state before a handoff moves it across.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free

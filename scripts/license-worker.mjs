@@ -19,6 +19,7 @@
  *   7. a refunded key is gone from GET /keys and refused by POST /activate.
  */
 
+import { readFileSync } from 'node:fs';
 import worker from '../server/license-worker.js';
 import { verifyLicenseKey } from '../server/license-key.js';
 
@@ -27,6 +28,24 @@ const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
   console.log(`${ok ? ' ok ' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
+
+// ── 0. Built-in Ed25519 public key guard ─────────────────────────
+{
+  const BURNED_PUBLIC_X = 'ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw';
+  const serverKeyText = readFileSync(new URL('../server/license-key.js', import.meta.url), 'utf8');
+  const clientKeyText = readFileSync(new URL('../src/lib/licenseKey.ts', import.meta.url), 'utf8');
+  const serverX = serverKeyText.match(/DEFAULT_PUBLIC_JWK[\s\S]*?\bx:\s*'([^']+)'/)?.[1] ?? '';
+  const clientX = clientKeyText.match(/DEFAULT_PUBLIC_JWK[\s\S]*?\bx:\s*'([^']+)'/)?.[1] ?? '';
+  check(
+    '0. DEFAULT_PUBLIC_JWK.x in server/license-key.js and src/lib/licenseKey.ts match and are not the burned key',
+    Boolean(serverX) &&
+      Boolean(clientX) &&
+      serverX !== BURNED_PUBLIC_X &&
+      clientX !== BURNED_PUBLIC_X &&
+      serverX === clientX,
+    `server=${serverX}, client=${clientX}`,
+  );
+}
 
 class FakeKV {
   constructor() {
