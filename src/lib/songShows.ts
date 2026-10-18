@@ -314,11 +314,32 @@ export interface SongClock {
 /** What has fired, so an action fires once (or once per section, or once per kick count). */
 export type FiredState = Map<string, number>;
 
-const sectionKind = (label: string): SectionKind | null => {
+export const sectionKind = (label: string): SectionKind | null => {
   const l = label.toLowerCase();
   for (const k of SECTIONS) if (k !== 'any' && l.startsWith(k)) return k;
   return null;
 };
+
+/**
+ * Which section the song is in at `t`, and how many of each kind have begun
+ * (this one included), from a song map's sections.
+ *
+ * Here rather than in the hook that runs a show, because the score
+ * (`songScore.ts`) has to place a cue exactly where the runtime will fire it,
+ * and two copies of this count are two answers to "which chorus is the
+ * second one" the day one of them changes.
+ */
+export function sectionsAt(sections: readonly { start: number; end: number; label: string }[] | null | undefined, t: number): Pick<SongClock, 'section' | 'sectionCounts'> {
+  if (!sections?.length) return { section: null, sectionCounts: {} };
+  const index = sections.findIndex((s) => t >= s.start && t < s.end);
+  if (index < 0) return { section: null, sectionCounts: {} };
+  const counts: Record<string, number> = {};
+  for (let i = 0; i <= index; i++) {
+    const kind = sections[i].label.toLowerCase().replace(/[^a-z].*$/, '');
+    counts[kind] = (counts[kind] ?? 0) + 1;
+  }
+  return { section: { label: sections[index].label, index }, sectionCounts: counts };
+}
 
 /**
  * The actions that are due now, given where the song is and what has fired.

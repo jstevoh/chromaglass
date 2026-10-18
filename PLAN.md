@@ -3325,6 +3325,16 @@ for, and the GPU was asked for only after they had arrived and drawn.
   much later. What the GPU process does for the still intro's first paint (its
   gradients, the SVGs, the web font) is the question; a still image of it, or
   painting it only after the device is given, are the two things to try.
+  Read again 2026-10-18 over 124 Mac runs' logs (2026-10-11 to 18): the "no stop in
+  the opening" line went red on 14 (11%), and every red was this wait, 1.3–2.4 s on
+  the adapter or the device and then 2.4–4 s on the first compute pipeline, the
+  Metal compiler starting cold. Asking sooner cannot help: the adapter is already
+  asked 0.05–0.53 s into the page (mean 0.11 s). It went red on 12 of the 56 runs
+  where the adapter answered at 0.5 s or later and on 2 of the 68 where it answered
+  sooner. The intro is still throughout, so nothing on the screen stops. At one red
+  in nine a fix cannot be judged by its own PR's runs (eight greens in a row happen
+  by chance two times in five); it is judged by `npm run flakes -- --check 'no stop
+  in the opening'` over the week before its merge against the week after (19aa).
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
@@ -5129,6 +5139,32 @@ pressing, as the file is about 500 KB.
   split Measure to get back. The next Chromium check goes in a part of its own or splits
   this one as 19b did; until then a slow runner turns the part red with nothing wrong.
 
+### 19aa. A flake tracker: each check's reds counted from CI's own logs
+**Shipped** (2026-10-18): `npm run flakes` reads every run of `checks.yml` and `deploy.yml`
+in a window (`--days`, `--since`, `--until`; 7 days by default), every attempt's jobs and
+each job's log, and prints, per check (the runner's system, the command and the check's
+name, since `renders` on Linux and on Metal measure different things), how many times it
+printed FAIL, of how many, how many of those reds printed ok on the same commit in
+another job (a floor on the flakes: the code did not change and the answer did), how
+many were on main, and how many branches the reds came from (twenty-five reds on one
+branch is that branch's change being caught; the same spread over eight is the check).
+A re-run's copied jobs are counted once, jobs cancelled part way are read, and red jobs
+that printed no FAIL line are listed by job. `--check <regex>` lists every attempt of
+the matching checks with its detail. It is the 2026-10-17 audit by hand (657 red checks
+over three weeks, a day of reading) as a script, and it exists now so the startup fix
+(14v-6) can be judged on ordinary pushes. Reading, 2026-10-11 to 18 (219 runs, 1,892
+jobs, about 80 s; logs cached in the temp folder): the magnet's two drag lines 27 and 26
+of 130 over 15 branches (#373's leak), startup's opening 17 of 137 (12%, the audit's
+11%), render-app's same seed 11 of 128, the band's renders lines 10 of 135 on the
+laptop and 7 on the phone, tools' Blow 9 of 131, ferrodrift's "pulled in no more than in
+silence" 7 of 134; Measure's logic job red 16 times with no FAIL line (type errors).
+Not a gate and no bar: a rate depends on what was pushed.
+
+- **19aa-1. Work the list down.** The magnet's drag lines wait on #373 (29c); startup's
+  on 14v-6; the Blow on its paused root cause; render-app's "same seed twice draws the
+  same frames" (11 of 128, 8 branches), the renders lines and ferrodrift's have no item
+  yet and are next to read.
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
@@ -6457,12 +6493,16 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (the sequencer runs a section stage on its own clock), but a show's "at the second
     chorus" still fires on the guess. Decide whether a show's section actions wait for the
     place to be sure, and say so on the Songs panel.
-  - **28g-8. Found along the way: the score's nudge.** When 28h's nudge lands (#375), it
-    calls `FollowedPlace.resync(mapSec, now)` (its third argument, the time it is now,
-    defaults to the second), which starts the clock there and anchors the follower. A
-    re-identification of the same song does not move a place that is sure; a nudge is the
-    performer's word and should, so the nudge calls it directly, not through the hook's
-    identification effect.
+  - **28g-8. The score's nudge** (**shipped**, #375; story in `docs/plan-shipped.md` §28h).
+    A nudge (`useMusicIntelligence`'s `seekBy`) moves the followed place itself:
+    `FollowedPlace.resync(mapSec, now)` starts the clock there and anchors the follower,
+    called directly, not through the identification effect (which leaves a sure place
+    alone). The clock keeps the nudge too, so an identification while the follower is
+    unsure resyncs to `offsetSec + nudge`. Open from it: the steering closes a nudged
+    place back toward what the follower hears, so a nudge of a section's edge on a sure
+    follower is corrected within a second (right when the follower is right, and a nudge
+    that will not stay when the follower is wrong); decide whether a nudge holds the
+    follower off for a few bars.
   - **28g-9. Found along the way: an intro on one held chord.** For as long as one chord
     is held (the check's intro, four bars of A minor into a verse that opens on it), no
     place in it sounds different from another, and the follower slid 1.4 bars behind into
@@ -6470,6 +6510,29 @@ Turing Print" work (#331), which also made the reaction grow at all.
     held the identification's clock meanwhile and jumped once. A rehearsal map made from a
     file (28g-3) can carry bar positions from the beat grid, which would fix the place
     inside a held chord.
+- **28h. The score: the song drawn, its show's cues on it, and a nudge** (**shipped**,
+  this PR; the story is in `docs/plan-shipped.md` §28h). Open from it:
+  - **28h-1.** (**shipped** with 28g-8.) The nudge re-anchors the follower rather than
+    adding an offset to it; position stays in the map's own seconds.
+  - **28h-2.** Correct the score, not just the clock: drag a section's edge and save
+    the map, so the next play of the song is right without a nudge. Today the nudge
+    is an offset for the whole song, which fixes one late edge and moves the rest.
+  - **28h-3.** A score that draws itself as an unknown song plays, from the live song
+    shape (`songShape.ts`: builds, drops, breakdowns), before any map exists.
+  - **28h-4.** The sequencer's own stages on the lane: a sequence started for a song
+    (`startAt`) lays its stages end to end by seconds and does not follow the nudge or
+    a section's time; show the stages against the sections, and let a stage advance
+    on a named section ("the second chorus"), not only on any section change.
+    A show started by hand from the Songs sheet keeps its own clock and reads no
+    sections, so the nudge leaves it alone.
+  - **28h-7.** A listen's replay and a recorded take count from the recognised
+    start (`songStartMs`), not the nudged position: a take made after a nudge stores
+    the unnudged start. Decide whether a take should carry the nudge.
+  - **28h-5.** The remote phone (`RemoteControl.tsx`, over the show server) does not
+    get the score yet; the phone layout's Play sheet does.
+  - **28h-6.** A repeated section in a live take (the band plays the chorus twice)
+    maps back to the same section index, so a cue on it fires once; decide with 28g
+    whether a repeat should fire its cue again.
 
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
