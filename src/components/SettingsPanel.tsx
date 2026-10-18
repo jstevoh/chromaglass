@@ -20,7 +20,7 @@ import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
-import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced } from '../lib/tierGates';
+import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
 
 /**
  * Pinning a control onto a desk.
@@ -2431,10 +2431,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <div
               data-cg-free-logo-mark="ChromaGlass"
               data-cg-app-tile="custom-logo"
-              className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-100"
+              onClick={openAccountSheet}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+              className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
             >
-              <div className="font-semibold text-amber-200">
-                In the ChromaGlass app · Custom band logo &amp; text layer
+              <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
+                <span>In the ChromaGlass app · Custom band logo &amp; text layer</span>
+                <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
               </div>
               <p className="mt-0.5 text-amber-100/90">
                 On the free site, the logo layer displays the ChromaGlass mark. Unlock Home or Pro to load your own band mark or SVG.
@@ -3792,8 +3797,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           data-cg-effective-tier={getEffectiveTier()}
           className="mt-6 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4"
         >
-          <div className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-amber-200">
-            In the ChromaGlass app
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-amber-200">
+              In the ChromaGlass app
+            </span>
+            <button
+              type="button"
+              onClick={openAccountSheet}
+              className="text-[11px] font-semibold text-amber-200 underline underline-offset-2 hover:text-amber-100"
+            >
+              {getEffectiveTier() === 'home' ? 'Upgrade to Pro →' : 'Get Home or Pro →'}
+            </button>
           </div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {APP_FEATURE_TILES.filter((t) => (getEffectiveTier() === 'home' ? t.tier === 'pro' : true)).map((tile) => (
@@ -3801,7 +3815,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 key={tile.id}
                 data-cg-app-tile={tile.id}
                 data-cg-tile-tier={tile.tier}
-                className="rounded-lg border border-white/10 bg-black/40 p-2.5 text-[12px] leading-snug"
+                onClick={openAccountSheet}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+                className="cursor-pointer rounded-lg border border-white/10 bg-black/40 p-2.5 text-[12px] leading-snug transition-colors hover:border-amber-500/40 hover:bg-black/60"
               >
                 <div className="flex items-center justify-between gap-2 font-medium text-neutral-100">
                   <span>{tile.title}</span>

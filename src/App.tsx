@@ -301,6 +301,13 @@ export default function App() {
     ? () => setShowAccount(true)
     : undefined;
 
+  useEffect(() => {
+    if (!hasAccountOrLicenseUI) return;
+    const onOpen = () => setShowAccount(true);
+    window.addEventListener('cg-open-account', onOpen);
+    return () => window.removeEventListener('cg-open-account', onOpen);
+  }, []);
+
   // The laptop driving the projector must not dim, sleep or screensave: what
   // it does, the wall does. Held while the plate is running and dropped the
   // moment it is paused, so a machine left on the desk overnight is not kept

@@ -10,7 +10,14 @@ import {
   deactivateLocalLicenseKey,
   syncServerLicense,
 } from '../lib/licenseKey';
-import { getActiveLicenseInfo, getEffectiveTier } from '../lib/tierGates';
+import {
+  CHECKOUT_HOME_URL,
+  CHECKOUT_PRO_URL,
+  CHECKOUT_UPGRADE_URL,
+  buildCheckoutUrl,
+  getActiveLicenseInfo,
+  getEffectiveTier,
+} from '../lib/tierGates';
 
 async function loadFirebaseAuth() {
   if (!import.meta.env.VITE_FIREBASE_API_KEY) return null;
@@ -171,6 +178,9 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
         ? 'Free'
         : 'Unlocked';
 
+  const checkoutEmail = email || licenseInfo.email;
+  const currentTier = licenseInfo.valid ? licenseInfo.tier : effectiveTier;
+
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-y-auto"
@@ -206,12 +216,78 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
             </div>
           </div>
           <span
-            data-cg-license-tier={licenseInfo.valid ? licenseInfo.tier : effectiveTier}
+            data-cg-license-tier={currentTier}
             className="shrink-0 rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-200"
           >
             {tierLabel}
           </span>
         </div>
+
+        {currentTier !== 'pro' && (
+          <div
+            data-cg-account-store=""
+            className="mt-4 rounded-xl border border-amber-400/25 bg-amber-500/[0.06] p-3"
+          >
+            <div className="text-xs font-semibold uppercase tracking-wider text-amber-200">
+              {currentTier === 'home' ? 'Upgrade to Pro' : 'Get the ChromaGlass App'}
+            </div>
+            {currentTier === 'home' ? (
+              <div className="mt-2 flex flex-col gap-2">
+                <p className="text-xs leading-relaxed text-neutral-300">
+                  Pay only the difference ($164) to unlock multi-projector edge blend, Syphon/Spout/NDI, Art-Net DMX, OSC &amp; custom band logos on this account.
+                </p>
+                <a
+                  href={buildCheckoutUrl(CHECKOUT_UPGRADE_URL, checkoutEmail)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-cg-buy-upgrade=""
+                  className="flex min-h-[38px] items-center justify-between rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-neutral-950 transition hover:bg-amber-400"
+                >
+                  <span>Upgrade Home → Pro</span>
+                  <span>$164</span>
+                </a>
+              </div>
+            ) : (
+              <div className="mt-2 flex flex-col gap-2">
+                <a
+                  href={buildCheckoutUrl(CHECKOUT_HOME_URL, checkoutEmail)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-cg-buy-home=""
+                  className="flex flex-col rounded-lg border border-white/15 bg-black/40 p-2.5 text-left transition hover:border-amber-400/50 hover:bg-black/60"
+                >
+                  <div className="flex items-center justify-between text-xs font-semibold text-neutral-100">
+                    <span>ChromaGlass Home</span>
+                    <span className="rounded bg-amber-500/20 px-2 py-0.5 text-amber-200">$35 · once</span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-neutral-400">
+                    System audio capture, ambient TV mode, full-length unmarked recordings, 1080p/4K song renders &amp; phone remote (2 machines).
+                  </p>
+                </a>
+                <a
+                  href={buildCheckoutUrl(CHECKOUT_PRO_URL, checkoutEmail)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-cg-buy-pro=""
+                  className="flex flex-col rounded-lg border border-amber-400/30 bg-black/50 p-2.5 text-left transition hover:border-amber-400/70 hover:bg-black/70"
+                >
+                  <div className="flex items-center justify-between text-xs font-semibold text-amber-200">
+                    <span>ChromaGlass Pro</span>
+                    <span className="rounded bg-amber-500 px-2 py-0.5 text-neutral-950">$199 · once</span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-neutral-300">
+                    Everything in Home + multi-projector edge blend, Syphon/Spout/NDI video out, Art-Net DMX, OSC &amp; your own band logo.
+                  </p>
+                </a>
+              </div>
+            )}
+            {checkoutEmail && (
+              <p className="mt-2 text-[11px] text-neutral-400">
+                Checkout pre-fills <span className="text-neutral-200">{checkoutEmail}</span> so your key links to this account automatically.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <div className="flex items-center justify-between">

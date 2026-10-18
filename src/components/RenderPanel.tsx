@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Film, X } from 'lucide-react';
 import type { SongRenderState } from '../hooks/useSongRender';
 import { estimateFilmBytes } from '../lib/render';
-import { FREE_RENDER_MAX_HEIGHT, isFreeTierGated } from '../lib/tierGates';
+import { FREE_RENDER_MAX_HEIGHT, isFreeTierGated, openAccountSheet } from '../lib/tierGates';
 
 /**
  * Render this song: the size, the rate and the seed, then progress and a
@@ -91,9 +91,13 @@ export function RenderPanel(p: Props) {
         <div
           data-cg-app-tile="full-render"
           data-cg-render-free-cap="720p"
-          className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-100"
+          onClick={openAccountSheet}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+          className="mt-2 cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
         >
-          <span className="font-semibold text-amber-200">In the ChromaGlass app:</span> 1080p &amp; 4K unmarked song renders. Free-site renders are 720p with the ChromaGlass corner mark.
+          <span className="font-semibold text-amber-200">In the ChromaGlass app:</span> 1080p &amp; 4K unmarked song renders. Free-site renders are 720p with the ChromaGlass corner mark. <span className="font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
         </div>
       )}
 
