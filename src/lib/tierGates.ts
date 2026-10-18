@@ -57,6 +57,60 @@ export function openAccountSheet(): void {
   }
 }
 
+const MARKETING_OPTIN_KEY = 'chromaglass-marketing-optin';
+const MARKETING_OPTIN_AT_KEY = 'chromaglass-marketing-optin-at';
+
+export function getMarketingOptIn(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(MARKETING_OPTIN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function hasExplicitMarketingChoice(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const v = localStorage.getItem(MARKETING_OPTIN_KEY);
+    return v === '1' || v === '0';
+  } catch {
+    return false;
+  }
+}
+
+export function setMarketingOptIn(optIn: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(MARKETING_OPTIN_KEY, optIn ? '1' : '0');
+    localStorage.setItem(MARKETING_OPTIN_AT_KEY, new Date().toISOString());
+    window.dispatchEvent(new CustomEvent('cg-marketing-changed', { detail: { optIn } }));
+  } catch {
+    // storage unavailable
+  }
+}
+
+export async function syncMarketingPreferenceToServer(
+  idToken: string,
+  optIn: boolean,
+): Promise<void> {
+  const licensesUrl = import.meta.env.VITE_FIREBASE_LICENSES_URL as string | undefined;
+  if (!licensesUrl || !idToken) return;
+  try {
+    const base = licensesUrl.replace(/\/keys\/?$/, '');
+    await fetch(`${base}/preferences`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ marketingOptIn: optIn }),
+    });
+  } catch {
+    // non-fatal network error
+  }
+}
+
 export interface AppTileSpec {
   id: string;
   title: string;

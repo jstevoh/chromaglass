@@ -7,6 +7,7 @@ import {
   checkPendingRedirect,
 } from '../lib/firebaseAuth';
 import { hasEmailSignInLink } from '../lib/authFlag';
+import { getMarketingOptIn, setMarketingOptIn } from '../lib/tierGates';
 
 interface SignInScreenProps {
   onSignedIn: () => void;
@@ -22,6 +23,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [marketingOptIn, setMarketingOptInState] = useState(() => getMarketingOptIn());
 
   useEffect(() => {
     let cancelled = false;
@@ -84,11 +86,11 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   return (
     <div
       data-cg-signin=""
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 overflow-y-auto"
       style={{ background: 'rgba(5, 5, 8, 0.55)', backdropFilter: 'blur(12px)' }}
     >
-      <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/85 px-5 py-4 text-neutral-100 shadow-2xl">
-        <div className="mb-3 text-center">
+      <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/85 px-5 py-3.5 text-neutral-100 shadow-2xl">
+        <div className="mb-2.5 text-center">
           <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
           <p className="mt-0.5 text-xs text-neutral-400">
             Sign in to enter the studio
@@ -181,7 +183,24 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
           </p>
         )}
 
-        <div className="mt-3 text-center text-[11px] leading-tight text-neutral-400">
+        <label className="mt-2.5 flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] leading-snug text-neutral-300">
+          <input
+            type="checkbox"
+            data-cg-marketing-optin=""
+            checked={marketingOptIn}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setMarketingOptInState(next);
+              setMarketingOptIn(next);
+            }}
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/30 bg-black accent-amber-500"
+          />
+          <span>
+            Email me occasional ChromaGlass updates, new looks &amp; release notes (optional).
+          </span>
+        </label>
+
+        <div className="mt-2 text-center text-[11px] leading-tight text-neutral-400">
           <span>By continuing, you agree to our </span>
           <a
             href="/terms.html"
@@ -200,7 +219,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
           >
             Privacy Policy
           </a>
-          <span> (local session storage only).</span>
+          <span>.</span>
         </div>
       </div>
     </div>

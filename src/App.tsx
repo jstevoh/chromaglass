@@ -296,10 +296,16 @@ const hasAccountOrLicenseUI =
     (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
       new URLSearchParams(window.location.search).get('tierGates') === '1'));
 
+const isUnsubscribeRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/unsubscribe\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
+
 const isProfileRoute = () =>
   typeof window !== 'undefined' &&
-  (/^\/(profile|account)\/?$/i.test(window.location.pathname) ||
-    new URLSearchParams(window.location.search).has('profile'));
+  (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('profile') ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
 
 export default function App() {
   const [isActive, setIsActive] = useState(true);
@@ -309,7 +315,7 @@ export default function App() {
     if (!hasAccountOrLicenseUI) return;
     setShowAccount(true);
     try {
-      if (!/^\/(profile|account)\/?$/i.test(window.location.pathname)) {
+      if (!/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname)) {
         window.history.pushState({ cgProfile: true }, '', `/profile${window.location.search}${window.location.hash}`);
       }
     } catch { /* ignore history errors in sandboxed frames */ }
@@ -318,9 +324,10 @@ export default function App() {
   const closeProfileSheet = useCallback(() => {
     setShowAccount(false);
     try {
-      if (/^\/(profile|account)\/?$/i.test(window.location.pathname)) {
+      if (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname)) {
         const params = new URLSearchParams(window.location.search);
         params.delete('profile');
+        params.delete('unsubscribe');
         const qs = params.toString();
         window.history.replaceState(null, '', `/${qs ? `?${qs}` : ''}${window.location.hash}`);
       }

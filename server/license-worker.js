@@ -67,6 +67,10 @@ export default {
         if (request.method !== 'GET') return json({ error: 'GET only' }, 405, cors);
         return await handleGetKeys(request, env, cors);
       }
+      if (url.pathname === '/preferences') {
+        if (request.method !== 'POST') return json({ error: 'POST only' }, 405, cors);
+        return await handlePostPreferences(request, env, cors);
+      }
       if (url.pathname === '/activate') {
         if (request.method !== 'POST') return json({ error: 'POST only' }, 405, cors);
         return await handleActivate(request, env, cors, true);
@@ -274,7 +278,46 @@ async function handleGetKeys(request, env, cors) {
       maxMachines: k.maxMachines,
     }));
 
-  return json({ ok: true, email: verified.email, keys: active }, 200, cors);
+  let marketingOptIn = null;
+  try {
+    const rawPref = await env.LICENSE_KV.get(`marketing:${verified.email}`);
+    if (rawPref) {
+      const parsedPref = JSON.parse(rawPref);
+      if (typeof parsedPref?.optIn === 'boolean') marketingOptIn = parsedPref.optIn;
+    }
+  } catch { /* ignore */ }
+
+  return json({ ok: true, email: verified.email, keys: active, marketingOptIn }, 200, cors);
+}
+
+// ── POST /preferences ────────────────────────────────────────────
+
+async function handlePostPreferences(request, env, cors) {
+  const authHeader = request.headers.get('Authorization') || '';
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
+  if (!match) return json({ error: 'unauthorised' }, 401, cors);
+
+  const verified = await verifyFirebaseIdToken(match[1].trim(), env);
+  if (!verified) return json({ error: 'unauthorised' }, 401, cors);
+
+  const rawBody = await readCapped(request, MAX_BYTES);
+  if (rawBody == null) return json({ error: 'too large' }, 413, cors);
+
+  let body;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return json({ error: 'not JSON' }, 400, cors);
+  }
+
+  const optIn = Boolean(body?.marketingOptIn);
+  const record = {
+    email: verified.email,
+    optIn,
+    updatedAt: Date.now(),
+  };
+  await env.LICENSE_KV.put(`marketing:${verified.email}`, JSON.stringify(record));
+  return json({ ok: true, email: verified.email, marketingOptIn: optIn }, 200, cors);
 }
 
 // ── POST /activate & /deactivate ─────────────────────────────────

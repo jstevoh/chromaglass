@@ -50,7 +50,7 @@
 </ul>
 <p>If you sign in with Apple and choose to hide your email, we only ever see the relay address Apple gives us.</p>
 <p>While a signed-in show is running with its local show server, your account also holds a short-lived entry for that running show (its name, its local network address and its show key, expiring after 90 seconds once the show closes) so a phone, tablet or laptop signed in to the same account can join it with a tap. Once linked, the remote talks to the show directly over your own network. If you buy a Home or Pro licence, our Cloudflare Worker also keeps your signed licence key and up to two activated machine identifiers under your email address in Workers KV, so signing in restores your licence and lets you move it between machines.</p>
-<p>We use your email to sign you in and, if you buy a licence, to send you your key. We do not send newsletters or hand the address to anyone.</p>
+<p>We use your email to sign you in and, if you buy a licence, to send you your key and receipt. We only send product updates or newsletter emails if you explicitly tick the optional opt-in box on the sign-in screen or in <a href="/profile">Profile &amp; Store</a> (stored as an opt-in flag and timestamp under your email in Workers KV), and you can unsubscribe at any time in <a href="/profile">/profile</a> or at <a href="/unsubscribe">/unsubscribe</a>. We never hand or sell your address to anyone.</p>
 
 <h2>Deleting your account</h2>
 <p>The account sheet (on the desk and on the phone) has <em>Delete account</em>. It deletes your account and everything above from Firebase straight away. Looks and settings saved in your browser stay there until you clear them; they were never ours.</p>

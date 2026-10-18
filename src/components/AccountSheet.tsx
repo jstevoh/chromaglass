@@ -17,6 +17,10 @@ import {
   buildCheckoutUrl,
   getActiveLicenseInfo,
   getEffectiveTier,
+  getMarketingOptIn,
+  hasExplicitMarketingChoice,
+  setMarketingOptIn,
+  syncMarketingPreferenceToServer,
 } from '../lib/tierGates';
 
 async function loadFirebaseAuth() {
@@ -28,6 +32,11 @@ interface AccountSheetProps {
   onClose: () => void;
   onOpenSettings?: () => void;
 }
+
+const isUnsubscribeUrl = () =>
+  typeof window !== 'undefined' &&
+  (/^\/unsubscribe\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
 
 export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSettings }) => {
   const onCloseRef = useRef(onClose);
@@ -42,11 +51,29 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
   const [keyInput, setKeyInput] = useState('');
   const [licenseBusy, setLicenseBusy] = useState(false);
   const [licenseError, setLicenseError] = useState<string | null>(() => getActiveLicenseInfo().error);
+  const [unsubscribedBanner] = useState(() => isUnsubscribeUrl());
+  const [marketingOptIn, setMarketingOptInState] = useState(() => {
+    if (isUnsubscribeUrl()) {
+      setMarketingOptIn(false);
+      return false;
+    }
+    return getMarketingOptIn();
+  });
   const accountShows = useAccountShows();
 
   const refreshLicenseState = () => {
     setLicenseInfo(getActiveLicenseInfo());
     setEffectiveTier(getEffectiveTier());
+  };
+
+  const handleToggleMarketing = async (next: boolean) => {
+    setMarketingOptInState(next);
+    setMarketingOptIn(next);
+    const authMod = await loadFirebaseAuth().catch(() => null);
+    const token = await authMod?.getCurrentIdToken().catch(() => null);
+    if (token) {
+      await syncMarketingPreferenceToServer(token, next);
+    }
   };
 
   useEffect(() => {
@@ -61,16 +88,27 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
       if (licensesUrl) {
         const token = await authMod.getCurrentIdToken();
         if (cancelled || !token) return;
+        if (hasExplicitMarketingChoice()) {
+          void syncMarketingPreferenceToServer(token, getMarketingOptIn());
+        }
         try {
           const res = await fetch(`${licensesUrl.replace(/\/$/, '')}/keys`, {
             headers: { Authorization: `Bearer ${token}` },
             cache: 'no-store',
           });
           if (!res.ok) return;
-          const data = (await res.json()) as { keys?: Array<{ key?: string; tier?: string; revoked?: boolean }> };
-          const activeRemote = (data.keys ?? []).find((k) => k.key && !k.revoked);
-          if (activeRemote?.key && !getActiveLicenseInfo().valid) {
-            await activateLocalLicenseKey(activeRemote.key);
+          const data = (await res.json()) as {
+            keys?: Array<{ key?: string; token?: string; tier?: string; revoked?: boolean }>;
+            marketingOptIn?: boolean | null;
+          };
+          if (typeof data.marketingOptIn === 'boolean' && !hasExplicitMarketingChoice() && !cancelled) {
+            setMarketingOptInState(data.marketingOptIn);
+            setMarketingOptIn(data.marketingOptIn);
+          }
+          const activeRemote = (data.keys ?? []).find((k) => (k.token || k.key) && !k.revoked);
+          const remoteToken = activeRemote?.token || activeRemote?.key;
+          if (remoteToken && !getActiveLicenseInfo().valid) {
+            await activateLocalLicenseKey(remoteToken);
             if (!cancelled) refreshLicenseState();
           }
         } catch {
@@ -381,6 +419,29 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
           )}
         </div>
 
+        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3" data-cg-account-marketing="">
+          {unsubscribedBanner && !marketingOptIn && (
+            <p className="mb-2 rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-2.5 py-1.5 text-xs text-emerald-200">
+              You have been unsubscribed from ChromaGlass marketing &amp; newsletter emails.
+            </p>
+          )}
+          <label className="flex cursor-pointer items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-neutral-100">Newsletter &amp; product updates</div>
+              <p className="mt-0.5 text-[11px] leading-snug text-neutral-400">
+                Occasional emails about new looks, fluid engine updates &amp; release notes. Unsubscribe anytime.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              data-cg-marketing-toggle=""
+              checked={marketingOptIn}
+              onChange={(e) => void handleToggleMarketing(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/30 bg-black accent-amber-500"
+            />
+          </label>
+        </div>
+
         <div className="mt-5 flex flex-col gap-2.5">
           {signedOut ? (
             <div
@@ -526,7 +587,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
             </a>
           </div>
           <p className="mt-2 text-[11px] leading-snug text-neutral-500">
-            Home &amp; Pro are one-time purchases (no recurring subscription). We send only sign-in links and order receipts — never marketing emails.
+            Home &amp; Pro are one-time purchases (no recurring subscription). Marketing emails are strictly opt-in and can be turned off above or at <span className="text-neutral-400">/unsubscribe</span>.
           </p>
         </div>
       </div>
