@@ -508,6 +508,9 @@ jobs:
       - name: The song-ID Worker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run fingerprint-worker
+      - name: The licence-key Worker
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run license-worker
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
@@ -538,6 +541,27 @@ jobs:
       - name: Lamp Ground 0 is the plate before the lamp
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run lampzero
+      # Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):
+      # against the Firebase Auth emulator, Google, Apple and magic-link
+      # sign-in, offline returning sessions, sign-out and account deletion.
+      - name: Sign-in
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run signin
+      # Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):
+      # two signed-in pages on the same account (a show and a phone) list and
+      # join the show in one tap while keeping the QR code, a third page on
+      # another account sees nothing, and losing the internet keeps local
+      # remote control up.
+      - name: Linking devices by account
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run accountlink
+      # Licensing and tiers (PLAN.md 23.2, 23.4, 23.5, 23.6, 23.11,
+      # scripts/tiers.mjs): offline Ed25519 signature verification, 2-machine
+      # limit, Home->Pro upgrade, unlicensed gate, free-tier tiles, 15s/720p
+      # caps + corner mark, and logo mark lock.
+      - name: Licensing and tiers
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run tiers
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout

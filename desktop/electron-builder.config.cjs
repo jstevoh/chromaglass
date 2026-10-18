@@ -32,7 +32,7 @@ module.exports = {
     'preload.cjs',
     'package.json',
     { from: '../dist', to: 'dist', filter: ['**/*'] },
-    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js'] },
+    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'account-shows.js', 'server-license.js', 'license-key.js'] },
   ],
   // All of it in one archive: Electron reads the site (the server's fs calls)
   // and imports the server (an ES module) from inside it. `npm run desktop --
@@ -52,6 +52,7 @@ module.exports = {
     entitlementsInherit: 'resources/entitlements.mac.plist',
     extendInfo: {
       NSMicrophoneUsageDescription: 'ChromaGlass listens to the music to play the plate. The sound is analysed on this Mac and never recorded or sent anywhere.',
+      NSAudioCaptureUsageDescription: 'ChromaGlass listens to your Mac’s system audio so any music or streaming app plays the plate without sharing a browser tab. The sound is analysed on this Mac and never recorded or sent anywhere.',
       NSCameraUsageDescription: 'ChromaGlass can use a camera as a source on the plate (the scene camera and the Mixer).',
       NSLocalNetworkUsageDescription: 'ChromaGlass serves the show to phones (the remote) and network displays on this network, and hears OSC and Art-Net.',
     },

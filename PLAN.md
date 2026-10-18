@@ -5719,82 +5719,79 @@ once the login works (23.14).*
 
 - **23.1** *(owner)*: the merchant account, the Home price ($29–39) and Pro's ($199),
   and the checkout page.
-- **23.2** (one PR, lane B): a hosted-site build flag that shows each paid feature
-  above as an "In the ChromaGlass app" tile with a link, off in the app and in a
-  local `npm run dev`. *Measure:* a check that loads the site build and the app
-  build and lists which controls each shows, against the table.
-- **23.3** (one PR, lane A, after 14o): the song-ID Worker takes a licence key as
+- **23.2** (**shipped**, this PR): a hosted-site build flag (`VITE_FIREBASE_HOSTED_SITE=1`, or `?tierGates=1` for checks) that shows each paid feature
+  above as an "In the ChromaGlass app" tile with a link (`src/lib/tierGates.ts`, `SettingsPanel.tsx`, `DeskPanels.tsx`), off in a licensed app and in a
+  local `npm run dev`. *Measure:* `npm run tiers` (11/11, wired into `checks.yml` `Measure · lab`): loads the gated build and verifies 7 tiles on the free tier, 2 Pro tiles on a Home key, and 0 tiles on a Pro key.
+- **23.3** (**shipped**, this PR): the song-ID Worker (`server/fingerprint-worker.js`) takes an Ed25519-signed `X-ChromaGlass-Key` licence key as
   well as an allowed origin, and the site's manual tag stays. 14o's gates come first
   and stay (origin, size, per-/64 hour, the day's ceiling, in `npm run
-  fingerprint-worker`); a good key can raise the hour's count, not skip the day's. *Measure:* in the
-  manner of `npm run report-worker`: no key refused, a bad signature refused, a good
-  key answered.
-- **23.4** (one PR, `desktop/`): the key in the Mac app: signature check, activation
-  and the two-machine count, the key's tier (Home or Pro) and the features each
-  opens, an upgrade key, and an "unlicensed" app that runs as the site does. Lands
-  in the Windows app with 13-win-app. *Measure:* `npm run desktop` with a good, a
-  bad and no key.
-- **23.5** (one PR, lane B): the site's Record capped to a short clip and Render to
-  720p, each with a small mark the Mixer cannot hide; the app's untouched. *Measure:*
-  a take from each, its length, size and the mark's pixels.
-- **23.6** (one PR, lane B, after 23.2): the site's logo layer shows the ChromaGlass
-  mark only; your own logo is the app's.
-- **23.8** (one PR, `desktop/`, before 23.7): Home's listening features. The app hears
-  whatever the Mac plays with no tab to share (macOS's own system-audio capture, asked
-  for once), and an ambient mode runs the plate full screen on the TV for hours with
-  the frame cap and the quiet of 14j. *Measure:* in `npm run desktop`, a tone played by
-  another process reaches the ear; on the owner's Mac, an album through a streaming app
-  drives the plate (docs/judging.md, next free number at merge).
+  fingerprint-worker`); a good key raises the hour's count (`LICENSED_RATE_PER_HOUR = 300`), not skipping the day's (`DAILY_LIMIT = 1000`). *Measure:*
+  `npm run fingerprint-worker` (23/23): no key refused when `REQUIRE_LICENSE_KEY=1`, a bad signature refused before reading the body or calling the service, a good key answered and allowed past the 30/hr cap while stopping at `DAILY_LIMIT`.
+- **23.4** (**shipped**, this PR): the key in the Mac app and show server (`server/license-key.js`, `server/server-license.js`, `server/remote-server.js`, `src/lib/licenseKey.ts`, `desktop/`): offline Ed25519 signature check, activation
+  and the two-machine count (`/license-activate`, `/license-deactivate`, `/license-info.json` on loopback), the key's tier (Home or Pro) and the features each
+  opens, Home → Pro upgrade keys, and an unlicensed app that runs as the site does (`requireSignIn=1&tierGates=1`). *Measure:* `npm run tiers` (11/11): verified with a valid Home key, a valid Pro upgrade key, tampered/expired keys, 2-machine cap, and no key.
+- **23.5** (**shipped**, this PR): the site's Record capped to a 15-second clip (`FREE_RECORD_MAX_SECONDS = 15`)
+  and Render to 720p (`FREE_RENDER_MAX_HEIGHT = 720`), each with a small ChromaGlass corner mark (`useRecorder.ts`, `useSongRender.ts`) the Mixer cannot hide; the app's untouched. *Measure:*
+  `npm run tiers` (11/11): verifies the 15 s cap, 720p cap, and corner mark pixels on recorded frames.
+- **23.6** (**shipped**, this PR): the site's logo layer shows the ChromaGlass
+  mark only (`SettingsPanel.tsx` and `DeskPanels.tsx`); your own
+  logo is the app's. *Measure:* `npm run tiers` (11/11).
+- **23.8** (**shipped**, this PR, `desktop/`): Home's listening features. The app hears
+  whatever the Mac plays with no tab to share (`desktop/main.js` `setDisplayMediaRequestHandler` with macOS ScreenCaptureKit loopback + local PCM tap, `desktop/preload.cjs`, `desktop/electron-builder.config.cjs` `NSAudioCaptureUsageDescription`, `SoundPanel.tsx` `"System audio"` source), and an ambient TV mode (`Show → Ambient TV Mode (Cool & Quiet)`, `SoundPanel.tsx` toggle, `PhoneStage.tsx` Play sheet tile, `governor.ts`, `drawGate.ts`) runs the plate full screen on the TV for hours with the 60 Hz draw/compositor cap, 30 Hz solver step rate cap, opening rung floor, and doubled retry wait on repeated rung failures (`90 s → 180 s → 360 s`) of 14j. *Measure:* in `npm run desktop` (13/13), a tone played by another process reaches the ear with no tab picker (`ear reads 6, volume 52`) and Ambient TV mode caps the solver at 30 steps/s, the display at 60 Hz, and holds the opening rung; `npm run rungs` (75/75) and `npm run phone` (379/379). On the owner's Mac, an album through a streaming app drives the plate (docs/judging.md, next free number at merge).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
-- **23.9** *(owner)*: in the Firebase console, turn on Authentication with Google, Apple
-  and the emailed link; add the site's domains as authorised. Apple's half needs a
-  Services ID and a key from the Apple Developer account (12.2's). The web config is
-  public (it names the project, it grants nothing) and goes into `deploy.yml` as
-  `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID`.
-- **23.13** *(owner, before 23.10 goes live)*: a privacy page and terms, since the site
-  now keeps an email per person: what is kept (the email, the account's id, later its
-  keys and its devices), that it is not sold, and that deleting the account deletes it.
-  The App Store asks for both. *Drafted 2026-10-17:* `public/privacy.html` and
-  `public/terms.html`, written from what the code sends (the account, song
-  identification, lyrics, fonts, crash reports only on Send, the hosts' logs; the
-  microphone, camera, looks, recordings and phone link stay on the machine), with a
-  flashing-light warning in the terms. *Measure:* `npm run privacy` (CI, part
-  `logic`): every host the code and its servers reach and every `VITE_` service is
-  named on the page, and no `{{OWNER: …}}` mark is left. Red until the owner fills
-  those marks (a contact address that is not a personal one, who runs it, the
-  governing law, the date, how long crash reports are kept) and approves the wording.
-  23.10 links both from the sign-in and account sheets; 23.12 adds keys and devices
-  to the page and the licence's terms (refunds, machines a key) to the terms.
-- **23.10** (one PR, lane B; Antigravity builds, brief `docs/handoff-signin.md`): the
-  sign-in on the hosted site, on the desk and the phone, and the account sheet (the
-  email, sign out, delete the account) on each. *Measure:* `npm run signin`, 14/14,
-  and `startup` on the Mac: a returning visit's first step no later than today's bar.
-- **23.11** (one PR, `desktop/`, with 23.4): the Mac app with no key asks for the
-  same sign-in once, online, then runs as the site does; with a key it never asks.
-  *Measure:* `npm run desktop` with a key, with none and signed in, and with none and
-  signed out.
-- **23.12** (one PR, a Worker in the manner of `server/report-worker.js`): accounts
-  hold the keys. The merchant's webhook files each key under the buyer's email in
-  Workers KV; a signed-in app asks the Worker for its keys with its Firebase ID token,
-  checked against Google's public keys. Then 23.4's key arrives by signing in, not by
-  pasting. A Worker rather than Firestore keeps every server piece in the one pattern
-  the repo already deploys and checks. *Measure:* in the manner of
-  `npm run report-worker`: a bad webhook signature refused, a bad token refused, a
-  good token given its own keys and no one else's, a refunded key gone.
-- **23.14** (one PR, after 23.10 and the QR link of PR #380): linking devices by
-  account. A phone, tablet or laptop signed in to the same account sees the account's
-  running shows in a list and joins one with a tap: the account hands over the
-  show's address and key, which #380's QR carries today. The QR stays for a guest's
-  phone or one not signed in, and for a venue whose Wi-Fi has no internet. Once
-  linked, control stays on the local network either way, so the internet going never
-  drops the remote. *Measure:* in the manner of `npm run phone` with the emulator: two
-  signed-in pages, one a show and one a phone, the show listed and joined with no
-  address typed; a third page on another account sees nothing.
+- **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
+  with Google, Apple and the emailed link; authorised domains configured; web config wired into
+  `deploy.yml` via GitHub Actions repository secrets (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`).
+- **23.13** (**shipped**, #390 and extended in this PR): `public/privacy.html` and `public/terms.html` completed and
+  approved by the owner, including 23.12's licence key, Lemon Squeezy checkout, and 2-machine terms. *Measure:* `npm run privacy` (16/16, CI, part `logic`).
+- **23.10** (**shipped**, this PR; brief `docs/handoff-signin.md`): the sign-in on the
+  hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
+  with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
+  the email, sign out with confirmation, delete the account with confirmation, and links
+  to `/privacy.html` and `/terms.html`) on the desk, the narrow overlay and the phone.
+  Returning visitors start the plate immediately from the local flag while Firebase
+  confirms in the background, and `?remote`, `?cast` and builds without `VITE_FIREBASE_*`
+  never load Firebase. *Measure:* `npm run signin` (14/14, wired into `checks.yml`
+  `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
+  than today's bar.
+- **23.11** (**shipped**, this PR): the Mac app with no key asks for the
+  same sign-in once (`LicenseGate.tsx`, `src/main.tsx`), online, then runs as the site does;
+  with a verified Ed25519 key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
+  and signed in, and with none and signed out.
+- **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`).
+  The merchant's webhook files each Ed25519-signed key under the buyer's email in Workers KV;
+  a signed-in app asks the Worker for its keys with its Firebase ID token, checked against
+  Google's public keys, and activates up to 2 machines per key. *Measure:*
+  `npm run license-worker` (12/12, wired into `checks.yml` `Measure · logic`): `DEFAULT_PUBLIC_JWK.x`
+  matches across `server/license-key.js` and `src/lib/licenseKey.ts` and is not the burned key, a bad webhook
+  signature refused, missing `LICENSE_PRIVATE_KEY` fails closed (500), a bad token refused, a good token given its own keys and no one else's,
+  Home→Pro upgrade, two-machine cap, and a refunded key revoked.
+- **23.14** (**shipped**, this PR): linking devices by
+  account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
+  with `server/remote-server.js` publishes its LAN relay address and show key to
+  `/account-shows` with its Firebase ID token (90 s TTL, isolated by account UID). A phone,
+  tablet or laptop signed in to the same account sees the account's running shows in a list
+  (on `PhonePlay`, `PhoneStage`, `AccountSheet`, `DeskPanels` `Phone · iPad` and
+  `LaptopLink`) and joins one with a single tap: the account hands over the show's address
+  and key, which #380's QR carries today. The QR stays for a guest's phone or one not signed
+  in, and for a venue whose Wi-Fi has no internet. Once linked, control stays on the local
+  network either way, so the internet going never drops the remote. *Measure:*
+  `npm run accountlink` (6/6, wired into `checks.yml` `Measure · lab`): token/store isolation,
+  two signed-in pages on the same account (one a show, one a phone) where the show is listed
+  and joined with a tap and no address typed while the QR code stays on `Phone · iPad`, a
+  third page on another account sees nothing, and cutting off the internet and account
+  service leaves the local remote socket driving the show.
 - **23.15** (with §12's iPhone app): Sign in with Apple native in the iPhone app, and
   deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
   laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
   `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).
+- **23.16**: carry saved state from `web.app` to `.art`, then move returning users.
+  `index.html` currently redirects `chromaglass.web.app` to `chromaglass.art` only when
+  `navigator.onLine` holds, there is no `navigator.serviceWorker.controller`, there is no
+  saved ChromaGlass state in `localStorage` (licence, signed-in flag, settings, set list),
+  and there is no `?remote` or `?cast`, so returning users and offline shows do not lose
+  their origin-scoped state before a handoff moves it across.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free

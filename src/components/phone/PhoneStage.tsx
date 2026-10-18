@@ -5,7 +5,7 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save, Video,
+  Laptop, Save, Video, User,
   Crosshair,
 } from 'lucide-react';
 import { Slider } from '../ui';
@@ -16,6 +16,7 @@ import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
@@ -282,6 +283,9 @@ export interface PhoneStageProps {
   onFullLayout: () => void;
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
+  onOpenAccount?: () => void;
+  ambientMode?: boolean;
+  onAmbientMode?: (on: boolean) => void;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
@@ -372,6 +376,7 @@ export function PhoneStage(p: PhoneStageProps) {
     return () => clearTimeout(t);
   }, [zoomed]);
 
+  const accountShows = useAccountShows();
   const groups = [...new Set(p.looks.map(l => l.group))];
 
   return (
@@ -397,6 +402,18 @@ export function PhoneStage(p: PhoneStageProps) {
           <ChevronDown size={16} className="shrink-0 text-muted" />
         </button>
         <div className="pointer-events-auto flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
+          {p.onOpenAccount && (
+            <button
+              type="button"
+              onClick={p.onOpenAccount}
+              aria-label="Account"
+              data-cg-account-open=""
+              className="flex h-12 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 active:bg-active"
+            >
+              <User size={15} className="shrink-0 text-amber-300" />
+              <span>Account</span>
+            </button>
+          )}
           <button
             onClick={p.onZoom}
             aria-pressed={zoomed}
@@ -452,6 +469,27 @@ export function PhoneStage(p: PhoneStageProps) {
       )}
 
       <div className="flex-1" />
+
+      {accountShows.length > 0 && !sheet && !amountOpen && (
+        <div className="pointer-events-auto mx-3 mb-2 flex flex-col gap-1.5" data-testid="account-shows">
+          {accountShows.map((show) => (
+            <button
+              key={show.id}
+              type="button"
+              onClick={() => joinAccountShow(show)}
+              data-testid="account-show-join"
+              data-cg-account-show={show.id}
+              className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-xl border border-border-strong bg-surface/90 px-3.5 py-2 text-left text-[14px] font-medium text-text backdrop-blur-xl"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                <span className="truncate">{show.name}</span>
+              </span>
+              <span className="shrink-0 text-[13px] font-medium text-accent-text">Join show</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── The tool's Amount, when its button is tapped again ── */}
       {amountOpen && (
@@ -917,6 +955,9 @@ export function PhoneStage(p: PhoneStageProps) {
             {p.tilt.supported && (
               <Tile icon={Smartphone} label={p.tilt.on ? 'Tilting' : 'Tilt'} on={p.tilt.on} onPress={p.tilt.onToggle} testId="phone-tilt" />
             )}
+            {p.onAmbientMode && (
+              <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
+            )}
           </div>
           {(p.show.running || p.show.paused) && (
             <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
@@ -1035,11 +1076,33 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.onPlayScreen && <Tile icon={Waves} label="Play screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
+            {p.onOpenAccount && <Tile icon={Settings} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
           </div>
+          {accountShows.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">
+              <SectionLabel>Running shows on your account</SectionLabel>
+              {accountShows.map((show) => (
+                <button
+                  key={show.id}
+                  type="button"
+                  onClick={() => { close(); joinAccountShow(show); }}
+                  data-testid="account-show-join"
+                  data-cg-account-show={show.id}
+                  className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-lg border border-border-strong bg-elevated px-3.5 py-2 text-left text-[14px] font-medium text-text active:bg-active"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                    <span className="truncate">{show.name}</span>
+                  </span>
+                  <span className="shrink-0 text-[13px] font-medium text-accent-text">Join show</span>
+                </button>
+              ))}
+            </div>
+          )}
           <p className="mt-3 text-[12px] leading-snug text-dim">
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
             {p.onPlayScreen && ' Play screen is the simple one: the plate, the dyes and three hands.'}

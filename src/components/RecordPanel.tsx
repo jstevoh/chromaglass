@@ -18,6 +18,7 @@ import { Sheet, Button, SwitchPill } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
 import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
+import { openAccountSheet } from '../lib/tierGates';
 
 export interface RecordPanelProps {
   onClose: () => void;
@@ -154,6 +155,26 @@ export function RecordPanel({
                   </div>
                 </div>
               </div>
+
+              {recorder.maxDurationSec !== null && (
+                <div
+                  data-cg-app-tile="full-record"
+                  data-cg-record-free-cap={String(recorder.maxDurationSec)}
+                  onClick={openAccountSheet}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+                  className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
+                >
+                  <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
+                    <span>In the ChromaGlass app · Full-length unmarked Record</span>
+                    <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
+                  </div>
+                  <p className="mt-0.5 text-amber-100/90">
+                    On the free site, clips are capped at {recorder.maxDurationSec} seconds and carry the ChromaGlass corner mark. Unlock Home or Pro for full-length unmarked takes.
+                  </p>
+                </div>
+              )}
 
               {/* Status & Primary Control Card */}
               <div className="rounded-xl border border-border bg-surface p-4">

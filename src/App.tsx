@@ -34,7 +34,7 @@ import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide, rideSlot } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
@@ -52,7 +52,8 @@ import type { RemoteMessage } from './lib/remoteProtocol';
 import { runBench, formatBench, readRenderer } from './lib/bench';
 import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
-import type { EngineStatus } from './lib/platform';
+import { isDesktopApp, type EngineStatus } from './lib/platform';
+import { isGlobalAmbientMode, setGlobalAmbientMode, onAmbientModeChange } from './lib/governor';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
 import { PhonePlay } from './components/phone/PhonePlay';
@@ -95,6 +96,9 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
+import { isFreeTierGated } from './lib/tierGates';
+import { syncServerLicense } from './lib/licenseKey';
+import { usePublishAccountShow } from './lib/accountShows';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
@@ -149,8 +153,8 @@ const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 function rememberedSource(): AudioSource {
   try {
     const raw = localStorage.getItem(AUDIO_SOURCE_KEY);
-    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker.
-    if (raw === 'microphone' || raw === 'simulated') return raw;
+    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker in a browser (never in the Mac app).
+    if (raw === 'microphone' || raw === 'simulated' || (raw === 'system' && isDesktopApp())) return raw;
   } catch { /* private */ }
   return 'none';
 }
@@ -284,8 +288,66 @@ interface ArmedLook {
   sequence?: string;
 }
 
+import AccountSheet from './components/AccountSheet';
+
+const hasAccountOrLicenseUI =
+  Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
+  import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' ||
+  (typeof window !== 'undefined' &&
+    (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
+      new URLSearchParams(window.location.search).get('tierGates') === '1'));
+
+const isUnsubscribeRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/unsubscribe\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
+
+const isProfileRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('profile') ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
+
 export default function App() {
   const [isActive, setIsActive] = useState(true);
+  const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
+
+  const openProfileSheet = useCallback(() => {
+    if (!hasAccountOrLicenseUI) return;
+    setShowAccount(true);
+    try {
+      if (!/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname)) {
+        window.history.pushState({ cgProfile: true }, '', `/profile${window.location.search}${window.location.hash}`);
+      }
+    } catch { /* ignore history errors in sandboxed frames */ }
+  }, []);
+
+  const closeProfileSheet = useCallback(() => {
+    setShowAccount(false);
+    try {
+      if (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname)) {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('profile');
+        params.delete('unsubscribe');
+        const qs = params.toString();
+        window.history.replaceState(null, '', `/${qs ? `?${qs}` : ''}${window.location.hash}`);
+      }
+    } catch { /* ignore history errors */ }
+  }, []);
+
+  const openAccount = hasAccountOrLicenseUI ? openProfileSheet : undefined;
+
+  useEffect(() => {
+    if (!hasAccountOrLicenseUI) return;
+    const onOpen = () => openProfileSheet();
+    const onPopState = () => setShowAccount(isProfileRoute());
+    window.addEventListener('cg-open-account', onOpen);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('cg-open-account', onOpen);
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, [openProfileSheet]);
 
   // The laptop driving the projector must not dim, sleep or screensave: what
   // it does, the wall does. Held while the plate is running and dropped the
@@ -437,6 +499,11 @@ export default function App() {
       };
     (window as unknown as { chromaglassGovernor?: () => unknown }).chromaglassGovernor =
       () => wallRef.current?.governor?.() ?? null;
+    (window as unknown as { chromaglassAmbient?: (on?: boolean) => boolean }).chromaglassAmbient =
+      (on?: boolean) => {
+        if (typeof on === 'boolean') setAmbientModeRef.current(on);
+        return isGlobalAmbientMode();
+      };
     (window as unknown as { chromaglassSanitizePatch?: typeof sanitizePatch }).chromaglassSanitizePatch = sanitizePatch;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
@@ -487,6 +554,29 @@ export default function App() {
       (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => wallRef.current?.pourText(rows, opts);
     (window as unknown as { chromaglassBench?: unknown }).chromaglassBench =
       (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
+  }, []);
+
+  // ── Ambient TV mode (PLAN.md 23.8 / 14j): cool & quiet (60 Hz draw, 30 Hz physics) ──
+  const [ambientMode, setAmbientModeState] = useState<boolean>(() => isGlobalAmbientMode());
+  const setAmbientMode = useCallback((on: boolean) => {
+    setGlobalAmbientMode(on);
+    setAmbientModeState(on);
+    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { setAmbient?: (on: boolean) => void } }).__CHROMAGLASS_NATIVE__;
+    native?.setAmbient?.(on);
+  }, []);
+  const setAmbientModeRef = useRef(setAmbientMode);
+  setAmbientModeRef.current = setAmbientMode;
+  useEffect(() => {
+    const unsubGov = onAmbientModeChange((on) => setAmbientModeState(on));
+    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { onAmbientChange?: (fn: (on: boolean) => void) => () => void } }).__CHROMAGLASS_NATIVE__;
+    const unsubNative = native?.onAmbientChange?.((on) => {
+      setGlobalAmbientMode(on);
+      setAmbientModeState(on);
+    });
+    return () => {
+      unsubGov();
+      unsubNative?.();
+    };
   }, []);
 
   /*
@@ -780,6 +870,7 @@ export default function App() {
       setShowSequencer(false);
       setShowSave(false);
       setShowPalette(false);
+      setShowAccount(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -814,6 +905,8 @@ export default function App() {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   /** The synthesised band, when that is what the show is listening to. */
   const simulatedRef = useRef<SimulatedMusic | null>(null);
+  /** The Mac app's system-audio loopback tap (PLAN.md 23.8). */
+  const systemTapRef = useRef<{ stop: () => void } | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   /** The wall's engine, always; `visualizerRef` is the desk's, which in Preview with a wall up is a copy (PLAN.md 8b; see `drafting`). */
   const wallRef = useRef<LiquidVisualizerHandle | null>(null);
@@ -930,6 +1023,7 @@ export default function App() {
       setAudioStream(null);
     }
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
+    if (systemTapRef.current) { systemTapRef.current.stop(); systemTapRef.current = null; }
     // The drone owns an AudioContext and four running oscillators; leaving it
     // behind would keep them sounding under whatever replaced it.
     stopDrone();
@@ -980,21 +1074,73 @@ export default function App() {
     try {
       let stream: MediaStream;
       if (source === 'system') {
-        // Raw, as the microphone below, and in stereo: a shared tab is the
-        // music itself. With plain `audio: true` Chrome shared a music tab as
-        // a call: one channel, with echo cancellation, noise suppression and
-        // auto gain all on. The show heard it processed, and a recording of
-        // it failed outright (the master's 320 kbps is more AAC than one
-        // channel carries). Plain again only if the constraints are refused,
-        // never after the person has said no to sharing.
-        try {
-          stream = await navigator.mediaDevices.getDisplayMedia({
-            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
-            video: true,
+        const nativeTap = (window as unknown as {
+          __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: Float32Array, sampleRate: number) => void) => () => void };
+        }).__CHROMAGLASS_NATIVE__?.onSystemAudioPcm;
+        if (nativeTap) {
+          // Mac app (PLAN.md 23.8): ScreenCaptureKit loopback via setDisplayMediaRequestHandler
+          // (no tab picker) combined with the main-process loopback audio tap.
+          let displayStream: MediaStream | null = null;
+          try {
+            displayStream = await navigator.mediaDevices.getDisplayMedia({
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
+              video: true,
+            });
+          } catch {
+            displayStream = null;
+          }
+          if (ask !== sourceAskRef.current) {
+            displayStream?.getTracks().forEach(t => t.stop());
+            return;
+          }
+          const ctx = new AudioContext();
+          if (ctx.state === 'suspended') void ctx.resume();
+          const dest = ctx.createMediaStreamDestination();
+          if (displayStream && displayStream.getAudioTracks().length > 0) {
+            try {
+              ctx.createMediaStreamSource(displayStream).connect(dest);
+            } catch { /* fallback to PCM tap */ }
+          }
+          let nextTime = 0;
+          const unsubPcm = nativeTap((samples: Float32Array, sampleRate: number) => {
+            if (!samples || samples.length === 0 || ctx.state === 'closed') return;
+            if (ctx.state === 'suspended') void ctx.resume();
+            const sr = sampleRate > 0 ? sampleRate : ctx.sampleRate;
+            const buf = ctx.createBuffer(1, samples.length, sr);
+            buf.getChannelData(0).set(samples);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(dest);
+            const now = ctx.currentTime;
+            if (nextTime < now) nextTime = now + 0.005;
+            src.start(nextTime);
+            nextTime += buf.duration;
           });
-        } catch (e) {
-          if (!(e instanceof TypeError) && (e as Error)?.name !== 'OverconstrainedError') throw e;
-          stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          systemTapRef.current = {
+            stop: () => {
+              unsubPcm();
+              displayStream?.getTracks().forEach(t => t.stop());
+              if (ctx.state !== 'closed') void ctx.close();
+            },
+          };
+          stream = dest.stream;
+        } else {
+          // Raw, as the microphone below, and in stereo: a shared tab is the
+          // music itself. With plain `audio: true` Chrome shared a music tab as
+          // a call: one channel, with echo cancellation, noise suppression and
+          // auto gain all on. The show heard it processed, and a recording of
+          // it failed outright (the master's 320 kbps is more AAC than one
+          // channel carries). Plain again only if the constraints are refused,
+          // never after the person has said no to sharing.
+          try {
+            stream = await navigator.mediaDevices.getDisplayMedia({
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
+              video: true,
+            });
+          } catch (e) {
+            if (!(e instanceof TypeError) && (e as Error)?.name !== 'OverconstrainedError') throw e;
+            stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          }
         }
       } else {
         // Ask for the raw microphone. The browser's defaults — echo
@@ -3312,7 +3458,22 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
 
+  const [, setLicenseTick] = useState(0);
+  useEffect(() => {
+    const onLicense = () => setLicenseTick((n) => n + 1);
+    window.addEventListener('cg-license-changed', onLicense);
+    void syncServerLicense();
+    return () => window.removeEventListener('cg-license-changed', onLicense);
+  }, []);
+
   const loadMark = useCallback((file: File) => {
+    const effectiveFile = isFreeTierGated()
+      ? new File(
+          [`<svg xmlns="http://www.w3.org/2000/svg" width="420" height="80" viewBox="0 0 420 80"><text x="210" y="52" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="38" font-weight="600" letter-spacing="2">ChromaGlass</text></svg>`],
+          'chromaglass-mark.svg',
+          { type: 'image/svg+xml' },
+        )
+      : file;
     const reader = new FileReader();
     reader.onload = () => {
       const url = String(reader.result ?? '');
@@ -3328,7 +3489,7 @@ export default function App() {
       img.onerror = () => setToastRef.current?.('That file would not open as a picture');
       img.src = url;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(effectiveFile);
   }, [castSend]);
 
   const clearMark = useCallback(() => {
@@ -3411,6 +3572,7 @@ export default function App() {
           // Straight from the render rather than from the cast snapshot, which
           // is assembled for a receiver and not for a question.
           isAutomated: l.isAutomated,
+          ambient: isGlobalAmbientMode(),
           settings: settingsRef.current,
           appRenders: appRendersRef.current,
         };
@@ -4019,6 +4181,7 @@ export default function App() {
       }
     },
   });
+  usePublishAccountShow(!phone && remoteLink.status === 'connected', pinnedLookName);
 
   runActionRef.current = runAction;
 
@@ -5588,6 +5751,7 @@ export default function App() {
           onClear={() => setClearTrigger(n => n + 1)}
           recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording, take: recorder.lastTake }}
           onAllControls={() => choosePhoneScreen('stage')}
+          onOpenAccount={openAccount}
         />
         </PanelGuard>
       )}
@@ -5714,12 +5878,15 @@ export default function App() {
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
             recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording }}
+            ambientMode={ambientMode}
+            onAmbientMode={setAmbientMode}
             onHide={hideOverlays}
             onFullLayout={() => {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
               setPhone(false);
             }}
             onPlayScreen={() => choosePhoneScreen('play')}
+            onOpenAccount={openAccount}
           />
           </PanelGuard>
           )}
@@ -5841,6 +6008,8 @@ export default function App() {
             onDrone={changeDrone}
             droneRunning={droneRunning}
             onDroneToggle={toggleDrone}
+            ambientMode={ambientMode}
+            onAmbientMode={setAmbientMode}
             onClose={() => setShowSound(false)}
           />
           </PanelGuard>
@@ -6207,6 +6376,7 @@ export default function App() {
           onMidi={deskOpen.midi}
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
+          onOpenAccount={openAccount}
           showCrumb={
             <>
               <span className="text-muted">Show</span>
@@ -6335,6 +6505,16 @@ export default function App() {
         </PanelGuard>
       )}
 
+      {showAccount && hasAccountOrLicenseUI && (
+        <AccountSheet
+          onClose={closeProfileSheet}
+          onOpenSettings={() => {
+            closeProfileSheet();
+            openAllSettings();
+          }}
+        />
+      )}
+
       {/* The file input the bench's Image dye button reaches for. It lives
           in the narrow-screen toolbar, which is not rendered under a desk. */}
       {(deskUp || phone) && (
@@ -6415,9 +6595,24 @@ export default function App() {
         {showHelp && <GuidePanel focus={helpFocus} onClose={() => { setShowHelp(false); setHelpFocus(null); }} />}
       </AnimatePresence>
 
+      {/* ── Bottom-left Profile & Store pill (when overlayUp) ──── */}
+      {overlayUp && !isMinimized && showControls && openAccount && (
+        <button
+          type="button"
+          data-cg-account-open=""
+          onClick={openAccount}
+          title="Profile, Settings & Store"
+          aria-label="Account"
+          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-amber-400/40 bg-black/75 px-3.5 py-1.5 text-[12px] font-semibold text-amber-100 shadow-xl backdrop-blur-xl transition-all hover:border-amber-400/70 hover:bg-black/90"
+        >
+          <User size={14} className="shrink-0 text-amber-300" />
+          <span>Profile &amp; Store</span>
+        </button>
+      )}
+
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
       {isActive && audioData && !isMinimized && overlayUp && (
-        <div className="absolute bottom-6 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
+        <div className="absolute bottom-16 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
           {[
             { label: 'B', value: audioData.bass },
             { label: 'M', value: audioData.mid },

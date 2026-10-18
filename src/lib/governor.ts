@@ -85,11 +85,37 @@ export type PostLevel = 0 | 1 | 2;
 /** How many fed intervals the governor keeps for a harness: two seconds at 240 Hz and some. */
 const FED_LOG = 600;
 
+import { setGlobalAmbientDrawMode } from './drawGate.ts';
+
+let globalAmbientMode = false;
+const ambientListeners = new Set<(on: boolean) => void>();
+
+export function isGlobalAmbientMode(): boolean {
+  return globalAmbientMode;
+}
+
+export function setGlobalAmbientMode(on: boolean): void {
+  const next = Boolean(on);
+  setGlobalAmbientDrawMode(next);
+  if (globalAmbientMode === next) return;
+  globalAmbientMode = next;
+  for (const fn of ambientListeners) {
+    try { fn(next); } catch { /* ignore listener errors */ }
+  }
+}
+
+export function onAmbientModeChange(fn: (on: boolean) => void): () => void {
+  ambientListeners.add(fn);
+  return () => { ambientListeners.delete(fn); };
+}
+
 export class QualityGovernor {
   private index: number;
   private readonly start: number;
   /** Rung index → when it last failed (seconds). */
   private readonly failed = new Map<number, number>();
+  /** Rung index → how many times it has failed this session (14j: double the wait each time). */
+  private readonly failedCounts = new Map<number, number>();
   private emaFrame = 16.7;
   private emaWork = 4;
   private slowSince: number | null = null;
@@ -106,6 +132,8 @@ export class QualityGovernor {
   private readonly stepsFailed = new Map<number, number>();
   /** Set each frame by the renderer: whether a heavy post pass is on. */
   heavyPost = false;
+  /** Explicit per-governor ambient override (14j / 23.8). */
+  private ambient = false;
 
   /**
    * Held on one rung, for measuring it (`?rung=`).
@@ -124,23 +152,46 @@ export class QualityGovernor {
    * projector, which no laptop's ladder has (PLAN.md §14c), and nothing else
    * says whether the app handed the stage to the ladder at all.
    */
-  constructor(readonly rungs: QualityRung[], start: number, now: number, pin = false) {
+  constructor(readonly rungs: QualityRung[], start: number, now: number, pin = false, ambient = false) {
     this.index = Math.max(0, Math.min(rungs.length - 1, start));
     this.start = this.index;
     this.pinned = pin;
+    this.ambient = ambient;
     this.settleUntil = now + SETTLE_S;
   }
 
+  get ambientMode(): boolean {
+    return this.ambient || globalAmbientMode;
+  }
+
+  setAmbient(on: boolean): void {
+    this.ambient = Boolean(on);
+    if (this.ambientMode && this.index < this.start) {
+      this.index = this.start;
+    }
+  }
+
   get rung(): QualityRung {
-    return this.rungs[this.index];
+    return this.rungs[this.rungIndex];
   }
 
   get rungIndex(): number {
-    return this.index;
+    return this.ambientMode ? Math.max(this.start, this.index) : this.index;
   }
 
   get failedCount(): number {
     return this.failed.size;
+  }
+
+  /**
+   * How long `rungIndex` must wait before being retried after failing (14j):
+   * 90 s after its first failure, doubled on each subsequent failure of the
+   * same rung (180 s, 360 s, 720 s, …) so a warming machine stops hunting.
+   */
+  retryWaitFor(rungIndex: number): number {
+    const count = this.failedCounts.get(rungIndex) ?? 0;
+    if (count <= 1) return RETRY_AFTER_S;
+    return RETRY_AFTER_S * Math.pow(2, Math.min(10, count - 1));
   }
 
   /**
@@ -201,14 +252,15 @@ export class QualityGovernor {
     return this.heavyPost ? this.post : 0;
   }
 
-  /** Solver steps a second to ask the loop for. */
+  /** Solver steps a second to ask the loop for. In ambient mode, capped at 30 Hz (14j / 23.8). */
   get stepRate(): number {
+    if (this.ambientMode) return STEP_RATES[STEP_RATES.length - 1];
     return STEP_RATES[this.steps];
   }
 
   /** Below where this machine started — the signal that it has less room than it looked. */
   get steppedDown(): boolean {
-    return this.everSteppedDown && this.index > this.start;
+    return this.everSteppedDown && this.rungIndex > this.start;
   }
 
   /**
@@ -235,6 +287,9 @@ export class QualityGovernor {
     this.fedCount++;
     this.fedLog.push(frameMs);
     if (this.fedLog.length > FED_LOG) this.fedLog.splice(0, this.fedLog.length - FED_LOG);
+    if (this.ambientMode && this.index < this.start) {
+      this.index = this.start;
+    }
     // Pinned: still average the frame, so the readout and the debug surface
     // report what this rung actually costs, but never move off it.
     if (this.pinned) {
@@ -276,7 +331,7 @@ export class QualityGovernor {
         a half seconds is cheap next to switching off an effect that was
         never the problem.
       */
-      if (now - this.slowSince >= DOWN_AFTER_S && this.steps < STEP_RATES.length - 1) {
+      if (!this.ambientMode && now - this.slowSince >= DOWN_AFTER_S && this.steps < STEP_RATES.length - 1) {
         this.stepsFailed.set(this.steps, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
         this.steps += 1;
         return this.moved(now);
@@ -289,7 +344,10 @@ export class QualityGovernor {
         return this.moved(now);
       }
       if (now - this.slowSince >= DOWN_AFTER_S && this.index < this.rungs.length - 1) {
-        this.failed.set(this.index, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
+        const count = (this.failedCounts.get(this.index) ?? 0) + 1;
+        this.failedCounts.set(this.index, count);
+        const wait = this.retryWaitFor(this.index);
+        this.failed.set(this.index, held ? now - (wait - HELD_RETRY_AFTER_S) : now);
         this.index += 1;
         this.everSteppedDown = true;
         return this.moved(now);
@@ -305,7 +363,8 @@ export class QualityGovernor {
         // where it started, then the effects, then any rung above the start.
         const above = this.index - 1;
         const failedAt = this.failed.get(above);
-        const rungFree = above >= 0 && (failedAt === undefined || now - failedAt >= RETRY_AFTER_S);
+        const wait = this.retryWaitFor(above);
+        const rungFree = above >= (this.ambientMode ? this.start : 0) && (failedAt === undefined || now - failedAt >= wait);
         if (rungFree && this.index > this.start) {
           this.index = above;
           return this.moved(now);
@@ -335,11 +394,11 @@ export class QualityGovernor {
         const faster = this.steps - 1;
         const stepsFailedAt = this.stepsFailed.get(faster);
         const pictureWhole = this.index <= this.start && this.post === 0;
-        if (faster >= 0 && pictureWhole && (stepsFailedAt === undefined || now - stepsFailedAt >= RETRY_AFTER_S)) {
+        if (!this.ambientMode && faster >= 0 && pictureWhole && (stepsFailedAt === undefined || now - stepsFailedAt >= RETRY_AFTER_S)) {
           this.steps = faster;
           return this.moved(now);
         }
-        if (rungFree) {
+        if (rungFree && !this.ambientMode) {
           this.index = above;
           return this.moved(now);
         }

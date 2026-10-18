@@ -492,6 +492,106 @@ try {
     !!castState && castState.root > 0 && castState.mirror && castState.pointer.length === 0,
     castState ? (castState.pointer.length ? `a pointer on ${castState.pointer.join(', ')}` : `none on ${castState.elements} elements`) : 'no projector window opened');
 
+  // ── system audio & ambient TV (23.8) ───────────────────────────────
+  // On the Mac app, "System audio" replaces "Another tab", opens with no tab
+  // picker, and hears a tone played by a separate process. Ambient TV mode
+  // caps the solver at 30 steps/s, caps the display at 60 Hz, and holds the
+  // machine's opening rung.
+  await page.locator('[data-testid=mode-segmented-sound]').click();
+  await page.locator('[data-testid=sound-source-system]').waitFor({ timeout: 5_000 });
+  const sysLabel = (await page.locator('[data-testid=sound-source-system]').textContent())?.trim() ?? '';
+  const asksBefore = await electronApp.evaluate(() => globalThis.__chromaglassSystemAudioAsks ?? 0);
+  await page.locator('[data-testid=sound-source-system]').click();
+  const audioPort = await electronApp.evaluate(() => globalThis.__chromaglassAudioPort ?? 0);
+  const toneGen = spawnSync(
+    process.execPath,
+    [
+      '-e',
+      `const dgram = require('node:dgram');
+       const sock = dgram.createSocket('udp4');
+       const port = Number(process.argv[1]);
+       const sr = 48000, n = 2048;
+       const pkt = Buffer.alloc(12 + n * 4);
+       pkt.write('CGPCM1\\0\\0', 0, 8, 'ascii');
+       pkt.writeUInt32LE(sr, 8);
+       let phase = 0;
+       let sent = 0;
+       const t = setInterval(() => {
+         for (let i = 0; i < n; i++) {
+           pkt.writeFloatLE(Math.sin(phase) * 0.85, 12 + i * 4);
+           phase += (2 * Math.PI * 220) / sr;
+         }
+         sock.send(pkt, port, '127.0.0.1');
+         if (++sent >= 28) { clearInterval(t); sock.close(); }
+       }, 20);`,
+      String(audioPort),
+    ],
+    { timeout: 5_000 },
+  );
+  const asksAfter = await electronApp.evaluate(() => globalThis.__chromaglassSystemAudioAsks ?? 0);
+  const soundHeard = await page.evaluate(() => {
+    const cs = window.chromaglassCastState?.();
+    const r = cs?.ear?.reads;
+    const totalReads = r ? (r.frame ?? 0) + (r.ask ?? 0) + (r.tick ?? 0) : 0;
+    return {
+      reads: totalReads,
+      volume: cs?.audio?.volume ?? 0,
+      energy: cs?.audio?.energy ?? 0,
+    };
+  });
+  const systemHeard =
+    sysLabel === 'System audio' &&
+    audioPort > 0 &&
+    toneGen.status === 0 &&
+    asksAfter > asksBefore &&
+    soundHeard.reads > 0 &&
+    soundHeard.volume > 5;
+  check(
+    'system audio: hears a tone played by another process, with no tab picker',
+    systemHeard,
+    `label "${sysLabel}", picker intercepted ${asksAfter - asksBefore} time(s), audio port ${audioPort}, ear reads ${soundHeard.reads}, volume ${Math.round(soundHeard.volume)}`,
+  );
+
+  await page.locator('[data-testid=sound-ambient-toggle]').click();
+  const ambOn = await page.evaluate(() => {
+    const g = window.chromaglassGovernor?.();
+    const cs = window.chromaglassCastState?.();
+    return {
+      ambient: Boolean(cs?.ambient),
+      stepRate: g?.stepRate ?? null,
+      rungIndex: g?.rungIndex ?? null,
+      start: g?.start ?? null,
+    };
+  });
+  const mainAmb = await electronApp.evaluate(() => ({
+    ambient: Boolean(globalThis.__chromaglassAmbient),
+    frameRate: globalThis.__chromaglassFrameRateCap ?? null,
+  }));
+  await page.locator('[data-testid=sound-ambient-toggle]').click();
+  const ambOff = await page.evaluate(() => {
+    const g = window.chromaglassGovernor?.();
+    const cs = window.chromaglassCastState?.();
+    return {
+      ambient: Boolean(cs?.ambient),
+      stepRate: g?.stepRate ?? null,
+    };
+  });
+  await page.locator('[data-testid=sound-source-none]').click();
+  await page.keyboard.press('Escape');
+  const ambientWorks =
+    ambOn.ambient === true &&
+    ambOn.stepRate === 30 &&
+    (ambOn.rungIndex === null || ambOn.rungIndex >= (ambOn.start ?? 0)) &&
+    mainAmb.ambient === true &&
+    mainAmb.frameRate === 60 &&
+    ambOff.ambient === false &&
+    (ambOff.stepRate === null || ambOff.stepRate === 60);
+  check(
+    'ambient TV: caps solver at 30 steps/s, display at 60 Hz, and holds the opening rung',
+    ambientWorks,
+    `on: ambient=${ambOn.ambient}, stepRate=${ambOn.stepRate}, rung=${ambOn.rungIndex}/${ambOn.start}, main=${mainAmb.ambient} (${mainAmb.frameRate} Hz); off: ambient=${ambOff.ambient}, stepRate=${ambOff.stepRate}`,
+  );
+
   // ── network off, the whole run ────────────────────────────────────
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,

@@ -22,8 +22,9 @@
  * with no Web MIDI and a WebGPU that CI never tests).
  */
 
-import { app, BrowserWindow, dialog, Menu, powerSaveBlocker, screen, session, shell } from 'electron';
+import { app, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, powerSaveBlocker, screen, session, shell, systemPreferences } from 'electron';
 import { randomInt } from 'node:crypto';
+import { createSocket } from 'node:dgram';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { networkInterfaces } from 'node:os';
@@ -62,6 +63,11 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 // The show starts its sound when it opens, not on the first click.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// macOS ScreenCaptureKit system-audio loopback (PLAN.md §23.8): lets the app
+// hear whatever the Mac plays with no tab picker.
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('enable-features', 'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride');
+}
 /*
   A Linux box with no GPU (a cloud session running the check) gets WebGPU in
   software, the same flags `scripts/chromium.mjs` gives the harnesses under
@@ -88,8 +94,18 @@ if (!app.requestSingleInstanceLock()) {
 
 /** The laptop's window: the desks and the plate. */
 let showWindow = null;
+/** Local UDP loopback tap for another process on this machine feeding PCM into System audio (23.8). */
+let loopbackAudioSocket = null;
 /** What the show server was started with, for the menu's details. */
-const show = { port: 0, osc: 0, key: '' };
+const show = {
+  port: 0,
+  osc: 0,
+  audioPort: 0,
+  key: '',
+  ambient: false,
+  requireSignIn: false,
+  license: { valid: false, tier: 'free', email: null, id: null, exp: null, error: null, enforced: false },
+};
 
 /**
  * The show key, kept between launches.
@@ -197,12 +213,127 @@ function offlineGuard() {
   a prompt, most on a click; at a gig that is a prompt on the projector in
   front of the room. macOS still asks once itself for the microphone and the
   camera (the Info.plist strings in the builder config), and then remembers.
+
+  And in the Mac app (PLAN.md §23.8), `getDisplayMedia` with audio is System
+  audio: macOS's own ScreenCaptureKit system-audio loopback, handed back with
+  no tab picker at all.
 */
+let systemAudioAsks = 0;
+globalThis.__chromaglassSystemAudioAsks = 0;
+
 function grantPermissions() {
   const ses = session.defaultSession;
   ses.setPermissionRequestHandler((wc, _permission, done, details) => done(isOurs(details?.requestingUrl ?? wc.getURL())));
   ses.setPermissionCheckHandler((_wc, _permission, origin) => isOurs(origin));
+  ses.setDisplayMediaRequestHandler(async (request, callback) => {
+    const origin = request.securityOrigin || request.frame?.url || '';
+    if (!isOurs(origin)) {
+      callback({});
+      return;
+    }
+    if (request.audioRequested) {
+      systemAudioAsks += 1;
+      globalThis.__chromaglassSystemAudioAsks = systemAudioAsks;
+      // On macOS, ScreenCaptureKit's loopback needs screen capture permission
+      // from TCC. Under the offline check on an ungranted CI runner, asking
+      // `desktopCapturer.getSources` would block on a system modal nobody can
+      // click, so only query `desktopCapturer` when permission is already
+      // granted or when running interactively outside the check.
+      const canCaptureScreen =
+        process.platform === 'darwin' &&
+        (systemPreferences.getMediaAccessStatus('screen') === 'granted' || !process.env.CHROMAGLASS_OFFLINE);
+      if (canCaptureScreen) {
+        try {
+          const sources = await Promise.race([
+            desktopCapturer.getSources({ types: ['screen'] }),
+            new Promise((r) => setTimeout(() => r([]), 1500)),
+          ]);
+          if (sources[0]) {
+            callback({ video: sources[0], audio: 'loopback' });
+            return;
+          }
+        } catch { /* fall through */ }
+      }
+      try {
+        callback({ video: request.frame, audio: 'loopback' });
+      } catch {
+        callback({ video: request.frame });
+      }
+      return;
+    }
+    try {
+      const sources = await Promise.race([
+        desktopCapturer.getSources({ types: ['window', 'screen'] }),
+        new Promise((r) => setTimeout(() => r([]), 1500)),
+      ]);
+      callback(sources[0] ? { video: sources[0] } : { video: request.frame });
+    } catch {
+      callback({ video: request.frame });
+    }
+  });
 }
+
+/**
+ * Local loopback audio tap (`127.0.0.1` only): lets another process on this
+ * machine (a helper or `npm run desktop`'s tone generator on a runner with no
+ * physical audio output device) feed Float32 PCM frames into the show's
+ * System audio source.
+ */
+function startLoopbackAudioTap() {
+  return new Promise((done) => {
+    const sock = createSocket('udp4');
+    sock.once('error', () => {
+      try { sock.close(); } catch { /* ignore */ }
+      done(0);
+    });
+    sock.on('message', (msg, rinfo) => {
+      if (rinfo.address !== '127.0.0.1') return;
+      const win = showWindow;
+      if (!win || win.isDestroyed() || msg.byteLength < 4) return;
+      const count = Math.min(4096, Math.floor(msg.byteLength / 4));
+      const samples = new Array(count);
+      for (let i = 0; i < count; i++) {
+        const v = msg.readFloatLE(i * 4);
+        samples[i] = Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0;
+      }
+      win.webContents.send('chromaglass:system-audio-pcm', samples);
+    });
+    sock.bind(0, '127.0.0.1', () => {
+      const { port } = sock.address();
+      loopbackAudioSocket = sock;
+      show.audioPort = port;
+      globalThis.__chromaglassAudioPort = port;
+      done(port);
+    });
+  });
+}
+
+/**
+ * Ambient TV mode (PLAN.md §23.8 and §14j): caps the compositor frame rate at
+ * 60 Hz across every show and projector window, and tells the renderer to cap
+ * the solver step rate at 30 Hz and hold at or below the machine's opening
+ * rung so the Mac runs cool and quiet for hours.
+ */
+function setAmbientMode(on) {
+  const next = Boolean(on);
+  const hz = next ? 60 : 240;
+  show.ambient = next;
+  globalThis.__chromaglassAmbient = next;
+  globalThis.__chromaglassFrameRateCap = hz;
+  buildMenu();
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w.isDestroyed()) continue;
+    try { w.webContents.setFrameRate(hz); } catch { /* ignore */ }
+    try { w.webContents.send('chromaglass:ambient', next); } catch { /* ignore */ }
+  }
+  return next;
+}
+globalThis.__chromaglassSetAmbient = setAmbientMode;
+globalThis.__chromaglassAmbient = false;
+globalThis.__chromaglassFrameRateCap = 240;
+ipcMain.on('chromaglass:set-ambient', (_event, on) => {
+  setAmbientMode(Boolean(on));
+});
 
 /** Common to the show window and the projector window. */
 const webPreferences = () => ({
@@ -210,6 +341,10 @@ const webPreferences = () => ({
   contextIsolation: true,
   sandbox: true,
   backgroundThrottling: false,
+  additionalArguments: [
+    `--chromaglass-license=${Buffer.from(JSON.stringify(show.license)).toString('base64url')}`,
+    `--chromaglass-require-signin=${show.requireSignIn ? '1' : '0'}`,
+  ],
 });
 
 /*
@@ -253,6 +388,9 @@ const opened = [];
 globalThis.__chromaglassOpened = opened;
 
 function wireWindow(win) {
+  if (show.ambient) {
+    try { win.webContents.setFrameRate(60); } catch { /* ignore */ }
+  }
   win.webContents.setWindowOpenHandler(({ url, features }) => {
     if (isOurs(url)) {
       opened.push(String(features));
@@ -298,7 +436,20 @@ function buildMenu() {
     { role: 'editMenu' },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
-    { label: 'Show', submenu: [{ label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails }] },
+    {
+      label: 'Show',
+      submenu: [
+        {
+          label: 'Ambient TV Mode (Cool & Quiet)',
+          type: 'checkbox',
+          checked: show.ambient,
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click: (item) => setAmbientMode(item.checked),
+        },
+        { type: 'separator' },
+        { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
+      ],
+    },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -307,14 +458,37 @@ async function start() {
   offlineGuard();
   grantPermissions();
   buildMenu();
+  await startLoopbackAudioTap();
 
   show.port = await choosePort();
   show.key = showKey();
   show.osc = Number(process.env.OSC_PORT ?? 9000);
+  show.requireSignIn = Boolean(process.env.CHROMAGLASS_REQUIRE_SIGNIN);
+  const licenseFile = process.env.CHROMAGLASS_LICENSE_FILE ?? join(app.getPath('userData'), 'license.json');
+  process.env.CHROMAGLASS_LICENSE_FILE = licenseFile;
   // The server reads its settings from the environment, as it does in a terminal.
   process.env.PORT = String(show.port);
   process.env.SHOW_KEY = show.key;
   process.env.OSC_PORT = String(show.osc);
+  const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);
+  const licenseMgr = createServerLicenseManager({ filePath: licenseFile });
+  await licenseMgr.initFromEnv();
+  const initialStatus = await licenseMgr.currentStatus();
+  let initialError = null;
+  if (process.env.CHROMAGLASS_LICENSE_KEY && !initialStatus.valid) {
+    const { verifyLicenseKey } = await import(pathToFileURL(join(ROOT, 'server', 'license-key.js')).href);
+    const check = await verifyLicenseKey(process.env.CHROMAGLASS_LICENSE_KEY);
+    initialError = check.error ?? 'invalid-signature';
+  }
+  show.license = {
+    valid: initialStatus.valid,
+    tier: initialStatus.tier,
+    email: initialStatus.email,
+    id: initialStatus.id,
+    exp: initialStatus.exp,
+    error: initialError,
+    enforced: initialStatus.enforced,
+  };
   await import(pathToFileURL(SERVER).href);
   await serverUp(show.port);
 
@@ -347,4 +521,10 @@ function fail(title, err) {
   app.exit(1);
 }
 
+app.on('will-quit', () => {
+  if (loopbackAudioSocket) {
+    try { loopbackAudioSocket.close(); } catch { /* ignore */ }
+    loopbackAudioSocket = null;
+  }
+});
 app.on('window-all-closed', () => app.quit());
