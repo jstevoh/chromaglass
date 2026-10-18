@@ -3335,6 +3335,24 @@ for, and the GPU was asked for only after they had arrived and drawn.
   in nine a fix cannot be judged by its own PR's runs (eight greens in a row happen
   by chance two times in five); it is judged by `npm run flakes -- --check 'no stop
   in the opening'` over the week before its merge against the week after (19aa).
+  **Tried 2026-10-18 (PR #396), and it did not work.** Warming the compiler at boot
+  and holding the app's first render for it went red on all three Mac runs of its
+  own PR, each version on the same line: an empty kernel (stop 2.08 s from 1.99 s),
+  a built fill-shaped kernel (2.13 s from 2.19 s; the warm built in 0.13 s and the
+  opening's own `fill` was still given 2.6 s after it was asked), and that kernel
+  run once with the queue awaited (3.35 s from 3.42 s, the warm costing 0.2 s). At
+  the 11% base rate three reds in a row is about one in 700, so the warm does not
+  help and may hurt, and it was taken out. What the last run showed: the stop is
+  not Metal's compiler starting (the warm started it). It is the opening's own
+  `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside the display's render
+  pipeline (2.64 s) while the frame asked at 3.42 s waited for the GPU process
+  until 6.80 s: long animation frame 3.37 s, rendering delayed, 0.00 s blocked, no
+  script and no long task. A kernel of another shape does not shorten that
+  compile. The next thing to try is not a warm: ask the opening's first fills
+  before the display's pipeline and let the intro's frames wait until they are
+  given (the stop is then at a time nothing is drawn), judged as above. `npm run
+  startup` now prints the page's first compute pipeline ("first compile asked …,
+  given …"), judged by nothing.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
@@ -5715,7 +5733,17 @@ once the login works (23.14).*
 - **23.13** *(owner, before 23.10 goes live)*: a privacy page and terms, since the site
   now keeps an email per person: what is kept (the email, the account's id, later its
   keys and its devices), that it is not sold, and that deleting the account deletes it.
-  The App Store asks for both.
+  The App Store asks for both. *Drafted 2026-10-17:* `public/privacy.html` and
+  `public/terms.html`, written from what the code sends (the account, song
+  identification, lyrics, fonts, crash reports only on Send, the hosts' logs; the
+  microphone, camera, looks, recordings and phone link stay on the machine), with a
+  flashing-light warning in the terms. *Measure:* `npm run privacy` (CI, part
+  `logic`): every host the code and its servers reach and every `VITE_` service is
+  named on the page, and no `{{OWNER: …}}` mark is left. Red until the owner fills
+  those marks (a contact address that is not a personal one, who runs it, the
+  governing law, the date, how long crash reports are kept) and approves the wording.
+  23.10 links both from the sign-in and account sheets; 23.12 adds keys and devices
+  to the page and the licence's terms (refunds, machines a key) to the terms.
 - **23.10** (one PR, lane B; Antigravity builds, brief `docs/handoff-signin.md`): the
   sign-in on the hosted site, on the desk and the phone, and the account sheet (the
   email, sign out, delete the account) on each. *Measure:* `npm run signin`, 14/14,

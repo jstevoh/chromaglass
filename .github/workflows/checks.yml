@@ -407,6 +407,12 @@ jobs:
       - name: Settings survive the sanitiser
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run sanitize
+      # The privacy page names everything that leaves the machine (PLAN.md
+      # 23.13): every host the code reaches, every VITE_ service it is built
+      # with, and no {{OWNER: …}} mark left on it or on the terms.
+      - name: The privacy page matches the code
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run privacy
       # The band moves the liquid, not the frame (Frame Sway, lib/plateRock.ts):
       # through a song's kicks, every shipped look and show stage slides the
       # whole picture 0% a frame, against up to 1% with the cover glass free
