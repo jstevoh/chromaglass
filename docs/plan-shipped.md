@@ -1902,41 +1902,6 @@ renders used to do for it.
   with the markup's `.cg-still` taken out, 83 of 85 moving before the first ask and
   the line red). Left: the device still comes 1.4–1.9 s late with the still intro
   up (14v-6).
-- **Shipped, 14v-6: the GPU's cold start comes before the page's first frame**
-  (2026-10-18). Read over 124 Mac runs' logs (2026-10-11 to 18), "no stop in the
-  opening" went red on 14 (11%), and every red was one wait: 1.3–2.4 s on the adapter
-  or the device, then 2.4–4 s on the first compute pipeline, Chromium's GPU process
-  starting Metal's compiler cold. It went red on 12 of the 56 runs where the adapter
-  answered at 0.5 s or later and 2 of the 68 where it answered sooner: the page had a
-  frame in flight (the desk's first render, the intro moving into the plate's slot)
-  when the process went busy, and rAF stops until it comes back. Asking sooner cannot
-  help (the adapter is asked 0.05–0.53 s in). So `requestGpuEarly` (`gpu/device.ts`)
-  now also builds one small compute pipeline on the early device, asynchronously, and
-  `main.tsx` holds the App's first render (and so `adoptIntro` and the desk's first
-  frame) until that is done, or 3.5 s with no adapter yet, or 7 s in all; the chunk keeps downloading
-  meanwhile. The hold is capped, so a refused or hung GPU never blocks the page; the
-  painted loading rectangle and the still intro are what shows. The cold compile is
-  paid once either way, only earlier, and a warm shader cache makes it milliseconds.
-  The first version built an empty kernel (`fn main() {}`) and its own Mac run went red
-  on the target line: device given 1.52 s, the app's first render 1.61 s (so that
-  compile cost under 0.1 s), builds ahead from 1.65 s, and the stop 2.08 s from 1.99 s
-  with no long task or hold. An empty kernel does not start the compiler the way the
-  opening's `fill` does (a storage-texture write), so the warm is now that shape, and
-  `npm run startup` prints the page's first compute pipeline beside the adapter and the
-  device ("first compile asked …, given …"), which says what the warm cost each run.
-  That row said the second Mac run was red too: the fill-shaped kernel was built in
-  0.13 s (adapter 1.53 s, built 1.66 s) and the opening's own `fill` was still given
-  2.6 s after it was asked, 2.3 s of that its first use, and the stop came again, 2.13 s
-  from 2.19 s. So a build alone does not absorb the cold start: Metal's work on a first
-  command buffer is not in it. The warm now runs its kernel once on an 8×8 texture and
-  waits for the queue to say the work is done, then frees what it made. If that is also
-  red, the first submit is a cost of the GPU process itself and moving it earlier only
-  moves the stop; the next step is then a plan item, not another guess.
-  Cloud numbers only (no GPU): `npm run intro` 13/13 and `npm run loadtime` 4/4, the
-  first frame 0.67 s. The Mac's reading is the flake tracker's: `npm run flakes --
-  --check 'no stop in the opening'` for the week before this merge against the week
-  after, expecting 11% to fall to about nothing. Watch startup's first-step and
-  loadtime numbers too: a cold Mac's first step could land a little later.
 - **Shipped:** the opening asks for its render pipelines first, the display first of
   all (`gpu/prepare.ts`): with three in flight it had been asked forty-fifth, and the
   last 1.34 s of the opening was the display compiling alone with the other lanes dry
