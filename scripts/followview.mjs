@@ -197,14 +197,33 @@ try {
   };
   const SURE = (title) => new RegExp(`^Following ${title ? `“${title}”` : 'the map'}: (\\d+)% sure$`);
   const pctOf = (said) => Number(/(\d+)%/.exec(said)?.[1] ?? NaN);
+  /**
+   * The line is up (`first`, from `until`): is the show sure, at least 50%?
+   * The line comes up the moment the follower's trust crosses its line, and
+   * the percentage on it is that hop's confidence, which then climbs to
+   * about 100 within five seconds (four pages, 45 s each, a reading every
+   * quarter second: the first reading was 55, 54, 60 and 51, with 46 and 49
+   * a second or two after it on one of them, and every reading from five
+   * seconds on was 75 or over). Read the instant it comes up, "at least
+   * 50%" was a coin toss on a good run (47% failed one of six). The bar is
+   * the same; it is read once the line has had five seconds to firm up, three
+   * times a second apart, and all three must say it.
+   */
+  const firm = async (loc, re, first) => {
+    if (!re.test(first)) return { ok: false, detail: first || 'no line' };
+    await new Promise(r => setTimeout(r, 5000));
+    const said = [];
+    for (let i = 0; i < 3; i++) { said.push((await text(loc)).replace(/^·\s*/, '')); await new Promise(r => setTimeout(r, 1000)); }
+    return { ok: said.every(x => re.test(x) && pctOf(x) >= 50), detail: `${first}, then ${said.map(x => x ? `${pctOf(x)}%` : 'no line').join(', ')}` };
+  };
 
   // ── The desk (Perform, 1440 wide): its status bar ─────────────────────
   {
     const { ctx, page } = await laptop(1440, 900);
     const status = page.getByTestId('status-song');
     await tag(page, BAND);
-    const sure = await until(status, SURE(BAND), 40_000);
-    check('desk, the band\'s own song: the status bar names it and follows it, at least 50% sure', SURE(BAND).test(sure) && pctOf(sure) >= 50, sure || 'no line');
+    const deskBand = await firm(status, SURE(BAND), await until(status, SURE(BAND), 40_000));
+    check('desk, the band\'s own song: the status bar names it and follows it, at least 50% sure', deskBand.ok, deskBand.detail);
     await tag(page, OTHER);
     const desk = await staysUnsure(page, status, NOT_SURE(OTHER));
     check('desk, a song the band is not playing: not sure where in it, following its sound, under 50%, after twenty seconds of hearing it', desk.ok, desk.detail);
@@ -225,24 +244,101 @@ try {
     await tag(page, BAND);
     await page.click('[data-testid="track-panel-button"]');
     const line = page.getByTestId('track-follow');
-    const sure = await until(line, SURE(null), 40_000);
-    check('track panel, the band\'s song: under its playhead, following the map, at least 50% sure', SURE(null).test(sure) && pctOf(sure) >= 50, sure || 'no line');
-    // The section on the panel against the part the band is playing.
-    const samples = [];
-    for (let i = 0; i < 5; i++) {
+    // The line is read for its percentage after the section is, so that
+    // the seconds that takes do not push the section readings round to a
+    // moment of the band's score where the clock alone would be right too.
+    const first = await until(line, SURE(null), 40_000);
+    // The section on the panel against the part the band is playing, read
+    // inside one of the band's sections and not across an edge. Where the
+    // five readings fall is set by how long the follower took to be sure
+    // (a few seconds to twenty), so on some runs the second a reading was
+    // taken at was on the edge itself, where the panel is a moment behind
+    // the band (measured over twenty edges on four pages at once: it
+    // changed 0.0 to 1.8 s after the band did, and now and then a second or
+    // so before it) and two readings in five said the old section. That was
+    // the check being run at a moment it did not mean to measure, not the
+    // panel being wrong: the bar, four in five, is the one the check was
+    // written with. So the readings wait until the band is three seconds
+    // into a section (longer than any lag measured) with six left, which is
+    // five readings a second apart and a second to spare.
+    const SETTLE_S = 3, ROOM_S = 6;
+    // And not in the seconds right after the follower first locks, when it
+    // is sure by a hair: probed on eight pages at once, the panel's section
+    // was the wrong one for a second or two after the line first said
+    // "Following" in two of eight (the follower's first place, at 50 to 60%
+    // trust, is corrected a few hops later), and in one full run in twelve
+    // the section went missing for two readings while trust dipped under
+    // the follower's unsure line and came back. The line itself says so,
+    // 40% to 60% for those seconds, and every page was above 75% inside
+    // eight seconds. The section is asked about once the panel says it is
+    // that sure, which is the follower having settled, not the panel being
+    // given an easier question.
+    const SETTLED_PCT = 75;
+    let settled = false;
+    for (const end = Date.now() + 40_000; Date.now() < end && !settled;) {
+      const said = await text(line);
+      settled = SURE(null).test(said.replace(/^·\s*/, '')) && pctOf(said) >= SETTLED_PCT;
+      if (!settled) await new Promise(r => setTimeout(r, 250));
+    }
+    // Where the readings fall is also held off the clock's own section. The
+    // control (the clock since the tag, which says intro here) names the
+    // band's part for a few seconds at the start of some of the band's
+    // sections, the tag having been taken twenty seconds in and a section
+    // lasting a little under sixteen; the skeptic pass on this change found
+    // that a reading placed three seconds into one of those has the clock
+    // agreeing with the band for its first two readings, which would fail a
+    // correct panel on a run that settled at the wrong time. So the spot is
+    // one where the clock disagrees with the band for the whole of the
+    // readings, and `avoid` lets the second group sit in a different
+    // section from the first.
+    const inSection = (avoid, span) => page.waitForFunction(([sections, loop, settle, room, tagged, avoidLabel, spanS]) => {
+      const at = window.__band?.()?.at;
+      if (at == null) return null;
+      const t = at % loop;
+      const s = sections.find(x => t >= x.start && t < x.end);
+      if (!s || t - s.start < settle || s.end - t < room || s.label === avoidLabel) return null;
+      for (let k = 0; k <= spanS; k += 0.5) {
+        const c = ((Date.now() - tagged) / 1000 + k) % loop;
+        if (sections.find(x => c >= x.start && c < x.end)?.label === s.label) return null;
+      }
+      return s.label;
+    }, [bandSections, loopSec, SETTLE_S, ROOM_S, taggedAt, avoid, span], { timeout: 40_000, polling: 100 }).then(h => h.jsonValue(), () => null);
+    const read = async () => {
       const [chip, band] = await Promise.all([
         text(page.getByTestId('track-section')).then(t => t.toLowerCase()),
         page.evaluate(() => window.__band?.()?.at ?? null),
       ]);
       const part = band === null ? null : bandStep(Math.floor((band % loopSec) / BAND_STEP_S)).part;
       const clock = ((Date.now() - taggedAt) / 1000) % loopSec;
-      samples.push({ chip, part, clock: bandSections.find(x => clock >= x.start && clock < x.end)?.label ?? null });
-      await page.waitForTimeout(1000);
-    }
+      return { chip, part, clock: bandSections.find(x => clock >= x.start && clock < x.end)?.label ?? null };
+    };
+    const first1 = settled ? await inSection(null, 5) : null;
+    const samples = [];
+    for (let i = 0; first1 && i < 5; i++) { samples.push(await read()); await page.waitForTimeout(1000); }
     const agree = samples.filter(x => x.part && x.chip === x.part).length;
     const clockWrong = samples.filter(x => x.part && x.clock !== x.part).length;
-    check('… and its section is the one the band is playing, four times in five, where the clock alone would say another four times in five', agree >= 4 && clockWrong >= 4,
-      `panel/band/clock: ${samples.map(x => `${x.chip || '–'}/${x.part ?? '?'}/${x.clock ?? '?'}`).join(', ')}`);
+    // The first reading is the one three seconds after the band changed
+    // section, so it has to agree too: a panel more than three seconds
+    // behind the band (the measured lag is under two) cannot hide in the
+    // one reading in five the bar forgives.
+    const onTime = samples.length > 0 && samples[0].part && samples[0].chip === samples[0].part;
+    check('… and its section is the one the band is playing, four times in five, where the clock alone would say another four times in five', !!first1 && onTime && agree >= 4 && clockWrong >= 4,
+      `${first1 ? `settled (${SETTLED_PCT}%+), inside a section` : 'never settled inside a section'}; panel/band/clock: ${samples.map(x => `${x.chip || '–'}/${x.part ?? '?'}/${x.clock ?? '?'}`).join(', ')}`);
+
+    // And it follows the band across an edge. Every reading above sits inside
+    // one section, which is what keeps the check off the edge's lag, so a
+    // panel stuck on the section it first showed would pass them all (the
+    // skeptic pass: "chorus" always passes the chorus group). The next
+    // section with another name is waited for and read three times, a
+    // second apart, and the panel has to name it each time.
+    const second = first1 ? await inSection(first1, 2) : null;
+    const after = [];
+    for (let i = 0; second && i < 3; i++) { after.push(await read()); await page.waitForTimeout(1000); }
+    check('… and follows the band into its next section, three readings in three', !!second && after.length === 3 && after.every(x => x.part && x.chip === x.part && x.clock !== x.part),
+      `${second ? `into ${second}` : 'no later section found'}; panel/band/clock: ${after.map(x => `${x.chip || '–'}/${x.part ?? '?'}/${x.clock ?? '?'}`).join(', ')}`);
+
+    const panelBand = await firm(line, SURE(null), first);
+    check('track panel, the band\'s song: under its playhead, following the map, at least 50% sure', panelBand.ok, panelBand.detail);
 
     await tag(page, OTHER);
     const panel = await staysUnsure(page, line, NOT_SURE(null));
@@ -279,8 +375,8 @@ try {
 
     const line = page.getByTestId('phone-song-map');
     await tag(page, BAND);
-    const sure = await until(line, SURE(BAND), 40_000);
-    check('phone, the band\'s song: the Sound sheet names it and follows it, at least 50% sure', SURE(BAND).test(sure) && pctOf(sure) >= 50, sure || 'no line');
+    const phoneBand = await firm(line, SURE(BAND), await until(line, SURE(BAND), 40_000));
+    check('phone, the band\'s song: the Sound sheet names it and follows it, at least 50% sure', phoneBand.ok, phoneBand.detail);
     const shape = await page.getByTestId('phone-song-shape').first().boundingBox();
     const map = await line.boundingBox().catch(() => null);
     check('… under the song\'s shape', !!shape && !!map && map.y >= shape.y + shape.height - 0.5,
