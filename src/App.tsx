@@ -296,19 +296,50 @@ const hasAccountOrLicenseUI =
     (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
       new URLSearchParams(window.location.search).get('tierGates') === '1'));
 
+const isProfileRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/(profile|account)\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('profile'));
+
 export default function App() {
   const [isActive, setIsActive] = useState(true);
-  const [showAccount, setShowAccount] = useState(false);
-  const openAccount = hasAccountOrLicenseUI
-    ? () => setShowAccount(true)
-    : undefined;
+  const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
+
+  const openProfileSheet = useCallback(() => {
+    if (!hasAccountOrLicenseUI) return;
+    setShowAccount(true);
+    try {
+      if (!/^\/(profile|account)\/?$/i.test(window.location.pathname)) {
+        window.history.pushState({ cgProfile: true }, '', `/profile${window.location.search}${window.location.hash}`);
+      }
+    } catch { /* ignore history errors in sandboxed frames */ }
+  }, []);
+
+  const closeProfileSheet = useCallback(() => {
+    setShowAccount(false);
+    try {
+      if (/^\/(profile|account)\/?$/i.test(window.location.pathname)) {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('profile');
+        const qs = params.toString();
+        window.history.replaceState(null, '', `/${qs ? `?${qs}` : ''}${window.location.hash}`);
+      }
+    } catch { /* ignore history errors */ }
+  }, []);
+
+  const openAccount = hasAccountOrLicenseUI ? openProfileSheet : undefined;
 
   useEffect(() => {
     if (!hasAccountOrLicenseUI) return;
-    const onOpen = () => setShowAccount(true);
+    const onOpen = () => openProfileSheet();
+    const onPopState = () => setShowAccount(isProfileRoute());
     window.addEventListener('cg-open-account', onOpen);
-    return () => window.removeEventListener('cg-open-account', onOpen);
-  }, []);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('cg-open-account', onOpen);
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, [openProfileSheet]);
 
   // The laptop driving the projector must not dim, sleep or screensave: what
   // it does, the wall does. Held while the plate is running and dropped the
@@ -6380,9 +6411,9 @@ export default function App() {
 
       {showAccount && hasAccountOrLicenseUI && (
         <AccountSheet
-          onClose={() => setShowAccount(false)}
+          onClose={closeProfileSheet}
           onOpenSettings={() => {
-            setShowAccount(false);
+            closeProfileSheet();
             openAllSettings();
           }}
         />
