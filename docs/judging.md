@@ -1382,3 +1382,21 @@ ferrofluid:
   at a deep magnet and then fast at a strong one: slowly it should hold together at
   Darcy's speed; fast it may leave a thin trailing film (29c-8), but its front should
   stay sharp.
+
+## 55. The Turing Print keeps changing (PLAN 26d-6)
+
+Turing Print now has a Drift control (`turingDrift`; the look sets 0.7), which slides the
+reaction's feed and kill across the plate on a 40 to 90 second clock so the maze keeps
+rearranging after the chemicals meet. In the lab a settled maze correlated 0.90 with itself
+fifty seconds later without it, 0.67 with it at 0.7 and 0.50 at 1.0. The Mac's numbers for
+the same line are unmeasured: read them off the first run of the `fifth` shard. On a real GPU:
+- Open Turing Print, pour reagent, and watch for two minutes without touching the plate. The
+  stripes should keep sliding, branching and joining in different parts of the plate at
+  different times, slowly enough that no single frame looks like motion, and with no music
+  playing or with music: the music must not change the pace.
+- Look for a soft grey patch where the stripes fade out (faint at 0.7, clear at 1.0). If it
+  reads as a flaw at 0.7, lower the preset; if it reads as the chemistry running down and
+  coming back, it can stay (PLAN 26d-6a).
+- Drift at 0 should be the print as it was: settled, then only creeping.
+- The control is on the Perform desk's lamp pins, the phone's Settings rail and the remote,
+  and it takes a MIDI knob.

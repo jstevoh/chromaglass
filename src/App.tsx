@@ -5779,6 +5779,7 @@ export default function App() {
               width: settings.chemistryWidth ?? 0.5,
               print: settings.turingPrint ?? 0,
               ink: settings.turingInk ?? 0,
+              drift: settings.turingDrift ?? 0,
             }}
             onReaction={(patch) => updateSettings(patch)}
             lampGround={settings.lampGround ?? 0}

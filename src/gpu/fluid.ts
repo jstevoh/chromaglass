@@ -1978,7 +1978,7 @@ export class WebGPUFluid {
    * unit of time is cut into as many substeps as D needs. The reaction's
    * own terms are the same per unit of time at any substep.
    */
-  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5, bath = 0): void {
+  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5, bath = 0, drift = 0, clock = 0): void {
     if (!this.chemLive) return;
     const s = (this.N / CHEM_REF) ** 2;
     const du = Du * s, dv = Dv * s;
@@ -1989,7 +1989,8 @@ export class WebGPUFluid {
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     // bath: the reagent the whole plate stands in (grayScott), 0 when only pours feed it.
-    const args = this.arg('chem rates', [du, dv, feed, kill, bath, 1 / sub, 0, 0]);
+    // drift: how far the feed/kill map wanders (grayScott), at `clock` seconds on the reaction's slow clock.
+    const args = this.arg('chem rates', [du, dv, feed, kill, bath, 1 / sub, drift, clock]);
     for (let i = 0; i < n; i++) {
       this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
       this.chem.swap();

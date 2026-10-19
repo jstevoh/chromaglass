@@ -3708,6 +3708,38 @@ asked for showing and darkening the paper under the stripes, not a regression, a
 regulator was deliberately left on the pours: reading the plate would count the print and
 hold the pours off again. Whether 0.35 of pours under the print is too dark is judging §46.
 
+**26d-6. The print keeps evolving (shipped 2026-10-19).** The owner said the Turing Print
+"doesn't do anything that interesting once the chemicals come together". It was the
+chemistry: Gray-Scott with one feed and one kill has a steady stripe state, so the maze
+settles and only creeps (in the lab, a settled maze correlates 0.972 with itself 3000
+units on and 0.901 after 9000, fifty seconds of a show at the app's 180 units a second).
+
+The `grayScott` shader now varies the feed across the plate and in time, as the sum of
+three plane waves with periods of 40, 65 and 90 seconds, scaled by the new `turingDrift`
+setting (0, the default, is today's fixed map; the Turing Print preset sets 0.7). The kill
+moves with the feed along the saddle-node curve `k = sqrt(F)/2 - F`, where the reaction's
+non-trivial state vanishes: moving F alone carries a region across it (all substrate, or
+all activator), and keeping k's distance from the curve keeps a region a pattern while
+its stripes rearrange. The clock is the visualizer's own seconds (`sixtieths / 60` a
+frame), so it runs with no music and the sound does not move it; nothing moves the whole
+plate. `turingDrift` is on the Perform desk's lamp pins, the phone's Settings rail, the
+remote and MIDI, and is left out of Evolve's random nudges (Evolve changes the print's look,
+and this is already a slow clock of its own) and out of Lucky.
+
+Named shortcuts: the map is three plane waves, not a noise field, so the regions are broad
+diagonal bands; the curve is the saddle-node line, not Pearson's regime boundaries, so
+how far k can follow F before the pattern changes kind was not mapped; the clock is
+fixed-rate and follows no music.
+
+Measured (`npm run turing` line 9, a 256² maze settled 9000 units, then 9000 more with
+the same seeds): correlation with its settled self 0.901 at drift 0, 0.671 at 0.7 and
+0.497 at 1; the share of cells with activator over 0.1 is 0.706, 0.694 and 0.686, and the
+stripe wavelength stays within 3% of the control's (2.96, 2.98 and 2.99% of the plate). The
+first constant, 0.012 a unit of drift, moved it too gently and became 0.02.
+A soft grey patch opens at 1, where the map pushes the pattern toward a bare plate (the
+flattest 32-pixel tile keeps 0.84 of the control's contrast at 0.7 and 0.76 at 1), so the preset sits at 0.7 (judging §55 asks the owner's eye on it).
+
+
 ## 27. Every control does something you can see
 
 ### 27a-8. The closeup's camera holds still through the song (QA-31)

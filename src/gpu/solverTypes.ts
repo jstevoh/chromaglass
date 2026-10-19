@@ -224,7 +224,7 @@ export interface GpuStepParams {
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
-  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number, drift?: number, clock?: number): void;
   depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number, wetOnly?: number): void;
   /** The print is no longer being drawn: the plate shows the dye itself again (`WebGPUFluid.endPrint`). */
   endPrint?(): void;
@@ -344,7 +344,7 @@ export interface PlateSolver {
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
-  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number, drift?: number, clock?: number): void;
   depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number, wetOnly?: number): void;
   /** The print is no longer being drawn: the plate shows the dye itself again (`WebGPUFluid.endPrint`). */
   endPrint?(): void;

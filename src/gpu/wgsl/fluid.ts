@@ -4342,6 +4342,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   grayScott: `${HEAD}
+const DRIFT_FEED = 0.02;
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -4374,8 +4375,49 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let reagent = max(c.b, A.b.x);
   let own = c.b / max(reagent, 1e-4);
-  let target_feed = mix(A.a.z, 0.03 + c.a * 0.01, own);
-  let target_kill = mix(A.a.w, 0.055 + c.a * 0.005, own);
+  var target_feed = mix(A.a.z, 0.03 + c.a * 0.01, own);
+  var target_kill = mix(A.a.w, 0.055 + c.a * 0.005, own);
+  /*
+    The map drifts (PLAN 26d-6). With one feed and kill the plate settles into
+    a stationary maze, because Gray–Scott at fixed parameters has a steady
+    stripe state; a real dish keeps changing because its chemistry does (the
+    reservoir's flow, the lamp, the temperature). Here F varies across the
+    plate and in time as three slow plane waves (periods of 40, 65 and 90
+    seconds, A.b.w the show's seconds on the reaction's clock), so each
+    region's stripes are fed a little more or less than the next one's and
+    keep rearranging, instead of settling. A.b.z is how far (0 is the fixed
+    map, today's look). Measured in the lab (npm run turing, line 9) on a
+    maze settled for 9000 units and run 9000 more (fifty seconds of a show at
+    the app's 180 units a second), it correlates 0.901 with its settled self
+    at 0, 0.671 at 0.7 and 0.497 at 1, with 0.706, 0.694 and 0.686 of the
+    plate carrying activator and the stripe wavelength within 3% of the
+    control's at all three. DRIFT_FEED is 0.02 because 0.012 moved it too
+    gently.
+
+    k follows F along the curve the pattern lives beside, not by the same
+    step. The reaction's non-trivial state vanishes at k = sqrt(F)/2 - F (the
+    saddle-node, where 4(F+k)^2 = F), and the labyrinth sits just inside it:
+    moving F alone would carry a region across that curve and kill it (all
+    substrate, a blank plate) or fill it (all activator). k keeps its distance
+    from the curve, so a region stays a pattern and only changes which kind.
+
+    Shortcuts, named: the map is three plane waves, not a true noise field,
+    so its regions are broad diagonal bands that slide and never a patchwork;
+    the curve is the saddle-node line, not Pearson's full regime boundaries,
+    so how far k may follow F before the pattern changes kind was not mapped;
+    and the clock is fixed-rate, on purpose: it follows no music.
+  */
+  if (A.b.z > 0.0) {
+    let q = vec2f(p) / f32(S.n);
+    let w = sin(6.2832 * (0.9 * q.x + 0.4 * q.y) + 0.157 * A.b.w)
+          + sin(6.2832 * (-0.5 * q.x + 1.1 * q.y) + 0.097 * A.b.w + 2.1)
+          + sin(6.2832 * (0.3 * q.x - 0.8 * q.y) + 0.070 * A.b.w + 4.2);
+    let df = A.b.z * DRIFT_FEED * clamp(w * 0.5, -1.0, 1.0);
+    let f0 = max(target_feed, 0.002);
+    let f1 = clamp(f0 + df, 0.002, 0.09);
+    target_kill = target_kill + (0.5 * sqrt(f1) - f1) - (0.5 * sqrt(f0) - f0);
+    target_feed = target_feed + (f1 - f0);
+  }
   /*
     The supply saturates at a third of full reagent. Scaling F and k straight
     with the reagent put a tap of it (0.3 to 0.6 where it lands) at F 0.018,

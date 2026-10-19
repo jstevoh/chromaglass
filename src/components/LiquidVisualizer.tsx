@@ -4830,6 +4830,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   // line runs on every render, and a draw from the palette stream here would
   // move every colour after it by however many times React rendered.
   const harmonyRef = useRef(pickHarmony(makeRng(showSeed(), 'plate.palette', 'opening')));
+  // Seconds of the plate's own time the print's feed/kill map has drifted through (turingDrift, 26d-6).
+  const turingClockRef = useRef(0);
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
   const presetContractRef = useRef<number[] | null>(PRESET_CONTRACTS['classic']); // the preset's allowed dyes
   /** The sequencer's window onto the contract (size null = whatever the journey allows), and the hue journey's own lead. */
@@ -7327,10 +7329,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const feed = 0.03 + p * 0.01;
               const kill = 0.055 + p * 0.005;
               const w = Math.pow(2, ((currentSettings.chemistryWidth ?? 0.5) - 0.5) * 4);
-              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0);
+              const print0 = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
+              /*
+                The map drifts (PLAN 26d-6): the clock is plain seconds of the plate's own
+                time, advanced by the frame's share of a second and by nothing the sound
+                does, so a quiet room and a loud one wander the same way and no hit moves
+                the whole frame. Only the print has a drift (turingDrift), and 0 is the
+                constant map every other look and today's print run on.
+              */
+              turingClockRef.current += sixtieths / 60;
+              const drift = print0 > 0 ? Math.max(0, Math.min(1, currentSettings.turingDrift ?? 0)) : 0;
+              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0, drift, turingClockRef.current);
               // The look's palette where the look grows it; the reagent's own product where only a pour does.
               // A print is that product too, starch's complex, whatever the palette (depositChem, 26d).
-              const print = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
+              const print = print0;
               // Its colour is the indicator's (Turing Ink: starch's indigo at 0), laid over the poured dye, not in place of it.
               const c = chemAmt > 0 && print === 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : print > 0 ? turingInk(currentSettings.turingInk ?? 0) : TURING_PRODUCT;
               const seededReef = lead.seedMean !== null && lead.seedMean > 0 && print === 0;
