@@ -6599,7 +6599,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
   by 40 s), and looks on a white ground (Turing Print at luma .85 to .94 for 20 s,
   Sensual Laboratory, Roy at .7).
 
-  - **28i-1. Retire nine** (Antigravity, batch 1): `sensual-laboratory` → `turing-print`, `oil-on-water` → `oil-and-water`,
+  - **28i-1. Retire nine** (Antigravity, batch 1; **claimed 2026-10-18, branch `antigravity/28i-1-retire-looks`**): `sensual-laboratory` → `turing-print`, `oil-on-water` → `oil-and-water`,
     `colorful-cosmos` → `classic`, `agate` → `chemical-clock`, `ferro-maze` →
     `magnet-garden`, `deep-ocean` → `jellyfish-bloom`, `fillmore-1969` → `poster-1969`,
     `timbre-shifter` → `microscopic-chaos`, `oil-wheel` → `clock-glass` (it turned the
