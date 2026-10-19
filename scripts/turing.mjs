@@ -71,6 +71,9 @@
  *      the light paper of a pool rises at least threefold), and the print
  *      stays in the pool (its stripes correlate with the undyed picture's,
  *      against the same read slid along, which they do not)
+ *   8. the drain and the wipe end the print: the plate reads the solver's
+ *      dye again from the first drain step and after the wipe, and the
+ *      print again when the deposit next runs
  */
 import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
@@ -455,6 +458,38 @@ try {
     check('the print still shows in the pool', c > POOL_KEEPS && slid < c - POOL_CONTROL_GAP,
       `brightness of the ${pool.length} pixels of the pool, undyed against with red poured: correlation ${c.toFixed(3)} (over ${POOL_KEEPS}); the same read ${SLIDE} pixels along ${slid.toFixed(3)} (under ${(c - POOL_CONTROL_GAP).toFixed(3)}, the stripes being what lines up)`);
   }
+  // ── The drain and the wipe end the print ────────────────────────────────
+  /*
+    The print is a picture of its own, kept up by the visualizer's deposit
+    every frame. The drain (fifty frames) and the wipe at its end are the
+    times the deposit does not run, so a print left live holds its last
+    picture still over the draining pour, then jumps to the emptied plate
+    (review of the first push, 2026-10-19). The plate must be reading the
+    solver's own dye again from the first drain step, and after a wipe, and
+    must go back to the print when the deposit runs again. What is compared
+    is which texture the plate would draw (fields.dye), against the print
+    on the plate before, so a print that never came up cannot pass.
+  */
+  const drain = await page.evaluate(async ({ FEED, KILL, DU, DV }) => {
+    await lab.create(256);
+    const g = lab.solver();
+    const look = lab.look('turing-print').settings;
+    g.chemLive = true;
+    for (let t = 0; t < 300; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+    for (let k = 0; k < 20; k++) g.seedChemistry(0.2 + 0.03 * k, 0.5, 0.012);
+    for (let t = 0; t < 300; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+    const deposit = () => g.depositChemistry(g.chem.read, 0.02, [0.1, 0.2, 0.6], 0.22, look.turingPrint, 1);
+    const onDye = () => g.fields.dye === g.dye.read;
+    const out = {};
+    deposit(); out.printing = !onDye();
+    g.drainStep(0.1); out.drained = onDye();
+    deposit(); out.again = !onDye();
+    g.clear(); out.wiped = onDye();
+    return out;
+  }, { FEED, KILL, DU, DV });
+  check('the drain and the wipe end the print, and the next deposit brings it back',
+    drain.printing && drain.drained && drain.again && drain.wiped,
+    `plate draws the print while printing: ${drain.printing}; the dye itself after a drain step: ${drain.drained}; the print again on the next deposit: ${drain.again}; the dye itself after the wipe: ${drain.wiped}`);
   // ── The setting reaches the plate ───────────────────────────────────────
   /*
     The lines above measure turingInk()'s colour and the print over the pour;

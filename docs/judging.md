@@ -1245,6 +1245,11 @@ white lamp, every stripe about the same width. Then stir it with a hand or a Blo
 - Print Ink (the lamp pins, the phone's Settings rail): drag it from Starch round the wheel.
   Is each hue a solid colour on the white lamp, with the same stripe edge as the indigo?
   Does a Go between two looks with different inks switch cleanly?
+- Let Turing Print run with music and Evolve for a minute: pours now pile up under the
+  stripes (the dye budget counts the pours, not the print). Is the paper darkening under the
+  print too much by then, so the budget on this look should be lower than 0.35?
+- Drain the plate while Turing Print is on: the print should drop away as the dye drains
+  (it no longer holds still), then the plate empties and the print grows back.
 
 ## 47. The test pattern and Identify on a real wall (PLAN 8e)
 

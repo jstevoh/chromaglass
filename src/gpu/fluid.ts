@@ -1590,6 +1590,9 @@ export class WebGPUFluid {
   /** Wipe the plate: no dye, no motion, the gap at rest. */
   clear(): void {
     this.heatSeconds = 0;
+    // A wiped plate has no print: it is rebuilt from the dye and the reaction
+    // on the next deposit, and until then the plate shows the (empty) dye.
+    this.printLive = false;
     this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
@@ -4702,6 +4705,12 @@ export class WebGPUFluid {
 
   /** One frame of the drain: inward spiral, transport, evaporate. */
   drainStep(t: number): void {
+    // The drain carries the solver's dye, and the print is not in it (it is
+    // laid over the dye in its own texture, 26d-3). While it runs the
+    // visualizer deposits nothing, so a print left live would hold its last
+    // picture still over the draining pour for fifty frames and then jump to
+    // the emptied plate. The plate shows the dye that is draining instead.
+    this.printLive = false;
     const pull = Math.pow(t, 0.4) * 4.0;
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
