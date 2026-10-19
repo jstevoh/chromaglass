@@ -5,8 +5,6 @@
  * for.
  *
  *   npm run ferrohold
- *   npm run ferrohold -- --control momentum    (phaseMomentum off, by hand)
- *   npm run ferrohold -- --control compress    (phaseCompress off, by hand)
  *
  * Why this exists. `ferrodrag` reads the drop after three seconds, by which
  * time the trailing rim has gone into the oil's return flow (29c-8) whatever
@@ -28,25 +26,37 @@
  *     least HALF_BAR. The deficit pass pays back the share the limiter
  *     withheld at the moving edge; without it the edge thins and the body
  *     goes sooner.
- *  3. The control is a dragged drop: it was whole when the window opened (at
+ *  3. Each pass is shown to be the reason, in the same run. The scene is run
+ *     three times in one page, as given, with phaseMomentum off and with
+ *     phaseCompress off, and the pass must be worth something: the lead with
+ *     phaseMomentum off exceeds the lead as given by at least DLAG_BAR, and the
+ *     half-full count as given exceeds the count with phaseCompress off by at
+ *     least DHALF_BAR. The absolute bars alone are one-sided (the review of
+ *     this check ran the scene with the pull 10% stronger and phaseMomentum
+ *     off, and the lead read 2.01R, green: anything that speeds the drop up
+ *     stands in for the pass); the differential says the pass itself is on.
+ *  4. The control is a dragged drop: it was whole when the window opened (at
  *     least 60 half-full cells at step 60, so neither bar is passed by a
- *     drop that was never there), and the magnet had moved.
+ *     drop that was never there), and its centroid, read from the solver's
+ *     phase field and not from the magnet's path, had moved over 0.40 from
+ *     the 0.36 it settled at (0.42 measured), so the lag is of a dragged drop.
  *
- * Controls, measured on the same scene (software WebGPU; the numbers for
- * Metal are in the PR body), mean over the seven readings:
+ * Controls, measured on the same scene (software WebGPU; Metal is not
+ * measured until the first Mac run, and the bars are re-placed between its
+ * on and off runs if they land near them), mean over the seven readings:
  *
  *                       lead of the magnet    half-full cells
  *   both passes on      2.01R                 60.3
  *   phaseMomentum off   2.28R  (bar 2.15)     63.7
  *   phaseCompress off   2.05R                 34.4  (bar 47)
  *
- * so each bar sits between the run it is for and the run it must pass, each
- * control turns red only the line named for the pass it switches off, and
- * the other line stays green with it. The margins are a tenth of a radius
- * and a dozen cells; the lag is the thin one, since the momentum pass is a
- * small share of what keeps the drop up. `phaseCompress` is a lab-only
- * switch in the solver's step options (1 on, the default, so no look
- * changes).
+ * so each absolute bar sits between the run it is for and the run it must
+ * pass, and the two off-runs are the script's own, read by lines 4 and 5 as
+ * differentials of half the gap measured (0.13R, 13 cells). The margins are a
+ * tenth of a radius and a dozen cells; the lag is the thin one, since the
+ * momentum pass is a small share of what keeps the drop up. `phaseCompress`
+ * is a lab-only switch in the solver's step options (1 on, the default, so no
+ * look changes).
  *
  * Lab only (software WebGPU in headless Chrome, or Metal on the Mac).
  */
@@ -58,22 +68,23 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const control = process.argv.includes('--control') ? process.argv[process.argv.indexOf('--control') + 1] : '';
-const extra = control === 'momentum' ? { phaseMomentum: 0 } : control === 'compress' ? { phaseCompress: 0 } : {};
-if (control && !Object.keys(extra).length) throw new Error(`--control ${control}: momentum or compress`);
+if (process.argv.length > 2) throw new Error(`ferrohold takes no arguments (got ${process.argv.slice(2).join(' ')}); its controls run inside it`);
 
 const N = 384;
 const R = 0.022;
 const FROM = 60, TO = 120, EVERY = 10;
 // Midway between the on run and the off run that each bar is for (software
 // WebGPU, see the header): lag 2.01R on, 2.28R with phaseMomentum off; half-full
-// 60.3 on, 34.4 with phaseCompress off.
+// 60.3 on, 34.4 with phaseCompress off. The differentials are half the gap each
+// control measured (0.27R and 25.9 cells).
 const LAG_BAR = 2.15;
 const HALF_BAR = 47;
+const DLAG_BAR = 0.13;
+const DHALF_BAR = 13;
 
 const { page, close } = await openLab();
 try {
-  const rows = await page.evaluate(async ({ N, R, FROM, TO, EVERY, extra }) => {
+  const runs = await page.evaluate(async ({ N, R, FROM, TO, EVERY }) => {
     const stats = async () => {
       const p = await lab.phase();
       if (!p || p.n !== N) throw new Error(`phase: ${p ? `${p.n}² read for ${N}²` : 'no phase field'}`);
@@ -86,32 +97,47 @@ try {
       }
       return { half, cx: sp ? sx / sp : 0, peak };
     };
-    await lab.create(N, N);
-    lab.addPhase(0.36, 0.5, R, 1);
-    for (let k = 0; k < 20; k++) await lab.step(1, { phaseSharp: 0.75, phaseDisplace: 0, thinGap: 1, magnetStrength: 0, ...extra });
-    const out = [];
-    for (let k = 1; k <= TO; k++) {
-      const magX = 0.36 + 0.3 * (k / 180);
-      await lab.step(1, { phaseSharp: 0.75, phaseDisplace: 0, thinGap: 1, magnetX: magX, magnetY: 0.5, magnetHeight: 0.2, magnetStrength: 0.4, magnetSeconds: 1 / 60, ...extra });
-      if (k >= FROM && (k - FROM) % EVERY === 0) out.push({ k, magX, ...(await stats()) });
-    }
-    return out;
-  }, { N, R, FROM, TO, EVERY, extra });
+    const scene = async (extra) => {
+      await lab.create(N, N);
+      lab.addPhase(0.36, 0.5, R, 1);
+      for (let k = 0; k < 20; k++) await lab.step(1, { phaseSharp: 0.75, phaseDisplace: 0, thinGap: 1, magnetStrength: 0, ...extra });
+      const out = [];
+      for (let k = 1; k <= TO; k++) {
+        const magX = 0.36 + 0.3 * (k / 180);
+        await lab.step(1, { phaseSharp: 0.75, phaseDisplace: 0, thinGap: 1, magnetX: magX, magnetY: 0.5, magnetHeight: 0.2, magnetStrength: 0.4, magnetSeconds: 1 / 60, ...extra });
+        if (k >= FROM && (k - FROM) % EVERY === 0) out.push({ k, magX, ...(await stats()) });
+      }
+      return out;
+    };
+    return {
+      on: await scene({}),
+      noMomentum: await scene({ phaseMomentum: 0 }),
+      noCompress: await scene({ phaseCompress: 0 }),
+    };
+  }, { N, R, FROM, TO, EVERY });
 
-  const lags = rows.map((r) => (r.magX - r.cx) / R);
   const mean = (a) => a.reduce((t, x) => t + x, 0) / a.length;
-  const lag = mean(lags), half = mean(rows.map((r) => r.half));
-  console.log(`  ${control ? `control: ${control} off` : 'on'}; steps ${FROM} to ${TO} every ${EVERY}: lag in R ${lags.map((x) => x.toFixed(2)).join(' ')}, half-full ${rows.map((r) => r.half).join(' ')}, peak ${rows.map((r) => r.peak.toFixed(2)).join(' ')}`);
+  const read = (rows) => ({ rows, lags: rows.map((r) => (r.magX - r.cx) / R), lag: mean(rows.map((r) => (r.magX - r.cx) / R)), half: mean(rows.map((r) => r.half)) });
+  const on = read(runs.on), noM = read(runs.noMomentum), noC = read(runs.noCompress);
+  for (const [name, r] of [['on', on], ['phaseMomentum off', noM], ['phaseCompress off', noC]]) {
+    console.log(`  ${name}; steps ${FROM} to ${TO} every ${EVERY}: lag in R ${r.lags.map((x) => x.toFixed(2)).join(' ')}, half-full ${r.rows.map((x) => x.half).join(' ')}, peak ${r.rows.map((x) => x.peak.toFixed(2)).join(' ')}`);
+  }
 
-  check('the drop was whole and the magnet had moved when the window opened',
-    rows[0].half >= 60 && rows[0].magX > 0.43,
-    `${rows[0].half} half-full cells at step ${FROM} (bar >= 60), magnet at ${rows[0].magX.toFixed(3)} from 0.360`);
+  check('the drop was whole and had been carried when the window opened',
+    on.rows[0].half >= 60 && on.rows[0].cx > 0.40,
+    `${on.rows[0].half} half-full cells at step ${FROM} (bar >= 60), centroid at ${on.rows[0].cx.toFixed(3)} from 0.360 (bar > 0.400, 15 cells)`);
   check('the momentum pass keeps the drop up with the hand: the magnet leads its centroid by at most 2.15 drop radii over steps 60 to 120',
-    lag <= LAG_BAR,
-    `mean lead ${lag.toFixed(2)}R (bar <= ${LAG_BAR}R)`);
+    on.lag <= LAG_BAR,
+    `mean lead ${on.lag.toFixed(2)}R (bar <= ${LAG_BAR}R)`);
   check('the compression pass keeps the drop its body: at least 47 half-full cells on average over steps 60 to 120',
-    half >= HALF_BAR,
-    `mean ${half.toFixed(1)} half-full cells (bar >= ${HALF_BAR}; the step-0 drop has 100)`);
+    on.half >= HALF_BAR,
+    `mean ${on.half.toFixed(1)} half-full cells (bar >= ${HALF_BAR}; the step-0 drop has 100)`);
+  check('and it is the momentum pass: with phaseMomentum off in the same scene the lead is at least 0.13 drop radii longer',
+    noM.lag - on.lag >= DLAG_BAR,
+    `lead ${on.lag.toFixed(2)}R on, ${noM.lag.toFixed(2)}R with phaseMomentum off (difference ${(noM.lag - on.lag).toFixed(2)}R, bar >= ${DLAG_BAR}R)`);
+  check('and it is the compression pass: with phaseCompress off in the same scene the body is at least 13 half-full cells fewer',
+    on.half - noC.half >= DHALF_BAR,
+    `${on.half.toFixed(1)} half-full cells on, ${noC.half.toFixed(1)} with phaseCompress off (difference ${(on.half - noC.half).toFixed(1)}, bar >= ${DHALF_BAR})`);
 } finally {
   await close();
 }

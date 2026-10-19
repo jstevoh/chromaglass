@@ -6860,8 +6860,12 @@ the code's entry points, the checks to add and the scenes to match, in
     What CI holds meanwhile is `npm run ferrohold`: the same scene read every 10 steps from step 60
     to 120, while the drop is still whole, the magnet's lead over its centroid at most `2.15R`
     (`2.01R` with both passes on, `2.28R` with `phaseMomentum` off) and at least `47` half-full cells
-    on average (`60.3` on, `34.4` with `phaseCompress` off, the lab-only step option). Each pass off
-    turns red its own line only. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
+    on average (`60.3` on, `34.4` with `phaseCompress` off, the lab-only step option). The script
+    runs the scene three times (as given, `phaseMomentum` off, `phaseCompress` off) and requires each
+    pass to be worth half its measured gap (`0.13R` of `0.27R` of lead; `13` of `25.9` half-full
+    cells), so a stand-in that speeds the drop up cannot pass for the momentum pass; it also reads
+    from the solver that the drop was whole (60 cells) and carried (centroid over `0.40` from `0.36`,
+    `0.42` measured) when the window opened. Metal is unmeasured until the first Mac run. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
     re-read against the whole drag.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye

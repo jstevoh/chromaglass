@@ -1034,10 +1034,11 @@ jobs:
       # edge's limiter withheld paid back (phaseCompress), each held on its own
       # over steps 60 to 120 of `ferrodrag`'s scene, a window before the trailing
       # rim is lost to the oil's return flow. `ferrodrag` reads at three seconds,
-      # red with both passes and without them, so it could not tell. The PR
-      # that added this ran each pass off by hand: the lag check goes red with
-      # momentum off, the half-full check with compress off, neither with
-      # the other. On the fifth shard with `magnetgain`: one scene of 120 steps.
+      # red with both passes and without them, so it could not tell. The script
+      # runs the scene three times (as given, phaseMomentum off, phaseCompress
+      # off) and requires each pass to be worth a margin, so the control is in
+      # the run and not done by hand once. On the fifth shard with
+      # `magnetgain`: three scenes of 120 steps.
       - name: The dragged ferrofluid drop holds together
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run ferrohold

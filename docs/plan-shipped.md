@@ -4095,7 +4095,10 @@ to `+4%` and the weak one to `-6%` (software WebGPU), both under a 20% bar (the 
 `ferrorest` reads a second window (steps 200 to 380: its loss at most half the first's, or 3 cells) and
 calls its centroid line a symmetry guard; `npm run ferrohold` (new, `fifth` shard) holds the momentum
 pass and the compression pass on the dragged drop over steps 60 to 120, each switched off by hand
-turning red its own line (lead `2.01R` → `2.28R` against `2.15R`; half-full `60.3` → `34.4` against `47`);
+turning red its own line (lead `2.01R` → `2.28R` against `2.15R`; half-full `60.3` → `34.4` against `47`),
+and the script runs both off-scenes itself and requires each pass worth half its measured gap
+(`0.13R`, `13` cells), with a solver-read start guard (centroid over `0.40`); `ferrorest` line 5 is
+signed (a second window that gains over 3 cells is red too) and line 3 also holds Σc·h at step 380;
 `docs/judging.md` §54 says what the rim pull and `phaseMomentum` look like.
 
 ## 32. The soap film: a draining film seen in reflection

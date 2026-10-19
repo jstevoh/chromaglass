@@ -108,11 +108,14 @@
  * rim two or three cells wide, the Darcy speed is a sharp disc's in an
  * unbounded cell, so the 20% is the model's own distance from the grid.
  * The line on the weak field's ∇ψ against the linear Kelvin law is a units
- * check on ψ and says so: the gain cancels there. The drop's speed is what
- * holds the gain, and it is red if the force is read in other units than this
- * says (a gain re-tuned through hsPrep's Darcy factor read as 1 in
- * ferrofluid cells, the ×180 of #373's first round, would read 180× the
- * speed), and red if the pull is capped where it should not be
+ * check on ψ and says so: the gain cancels there. It cancels in the two drop
+ * lines too (K.gain is read live and multiplies the prediction and the
+ * solver's force alike), so they hold the mobility, not the gain: the Darcy
+ * speed, the two-phase `inOil` share and the rim factor, and they are red if
+ * the force is read in other units than this says (a hsPrep Darcy factor read
+ * as 1 in ferrofluid cells, the ×180 of #373's first round, would read 180×
+ * the speed, and is caught by the guard clause `steepest < capCells(N)`, not
+ * by the speed ratio), and red if the pull is capped where it should not be
  * (MAGNET_CELLS, printed).
  */
 import { openLab } from './lab.mjs';

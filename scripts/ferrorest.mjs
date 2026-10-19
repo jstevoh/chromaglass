@@ -131,6 +131,7 @@ try {
   const haloGrowth = s1.n01 - s0.n01;
   const volDrift = Math.abs(s1.vol - s0.vol) / s0.vol;
   const volDriftAll = Math.abs(s1.vol - sInit.vol) / sInit.vol;
+  const volDrift2 = Math.abs(s2.vol - sInit.vol) / sInit.vol;
   const moved = Math.hypot(s1.cx - s0.cx, s1.cy - s0.cy);
   const lost1 = s0.halfCount - s1.halfCount, lost2 = s1.halfCount - s2.halfCount;
 
@@ -154,17 +155,18 @@ try {
   // 3. Face-symmetric mob(cp, cq) = 4m(1 - m) keeps Σc·h across every face.
   check(
     'the antisymmetric face mobility conserves the ferrofluid volume Σc·h within 0.1%',
-    s0.vol > 3.0 && volDrift <= 1e-3 && volDriftAll <= 1e-3,
-    `Σc·h ${sInit.vol.toFixed(5)} → ${s0.vol.toFixed(5)} → ${s1.vol.toFixed(5)} (drift ${(volDrift * 100).toFixed(3)}% over 180 steps, ${(volDriftAll * 100).toFixed(3)}% from pour, bar <= 0.1%); Σc ${sInit.sumPhase.toFixed(2)} → ${s1.sumPhase.toFixed(2)}`,
+    s0.vol > 3.0 && volDrift <= 1e-3 && volDriftAll <= 1e-3 && volDrift2 <= 1e-3,
+    `Σc·h ${sInit.vol.toFixed(5)} → ${s0.vol.toFixed(5)} → ${s1.vol.toFixed(5)} → ${s2.vol.toFixed(5)} at step 380 (${(volDrift2 * 100).toFixed(3)}% from pour; drift ${(volDrift * 100).toFixed(3)}% over 180 steps, ${(volDriftAll * 100).toFixed(3)}% from pour, bar <= 0.1%); Σc ${sInit.sumPhase.toFixed(2)} → ${s1.sumPhase.toFixed(2)}`,
   );
 
   // 5. The second window: the loss slows. With constant mobility the drop
   // shed cells at the same pace to the end; with the degenerate mobility the
   // step-20-to-200 loss is the settling of the pour and the next 180 steps
-  // lose at most half as many (or at most 3 cells).
+  // lose at most half as many (or at most 3 cells). The loss is signed: a
+  // second window that gained more than 3 cells is not a drop at rest either.
   check(
     'the resting drop\'s loss slows: steps 200 to 380 lose at most half the cells steps 20 to 200 did (or at most 3)',
-    lost2 <= 3 || lost2 <= lost1 / 2,
+    lost2 >= -3 && (lost2 <= 3 || lost2 <= lost1 / 2),
     `half-full ${s0.halfCount} → ${s1.halfCount} (−${lost1}) → ${s2.halfCount} at step 380 (−${lost2}, bar <= max(${(lost1 / 2).toFixed(1)}, 3)); peak ${s2.peak.toFixed(3)}, cells over 0.01 ${s2.n01}`,
   );
 
