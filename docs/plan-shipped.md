@@ -1900,8 +1900,36 @@ renders used to do for it.
   first to the last render compile still, with some seen before the first compile
   was asked (SwiftShader: 328 frames, none moving, 86 before the first ask at 2.27 s;
   with the markup's `.cg-still` taken out, 83 of 85 moving before the first ask and
-  the line red). Left: the device still comes 1.4–1.9 s late with the still intro
-  up (14v-6).
+  the line red).
+- **Shipped, 14v-6: the opening asks its first fills before the display, after the
+  mount frames settle** (2026-10-18, this PR). Over 2026-10-11 to 18 (`npm run
+  flakes -- --check 'no stop in the opening'`), `startup`'s "no stop in the opening"
+  went red on 17 of 137 Mac runs (12%; 14 of 92, 15%, 10 of 88 excluding #396's 4
+  branch runs over the 7-day window to merge). PR #396 tried warming the compiler at
+  boot (an empty kernel, a built fill-shaped kernel, and that kernel run once) and
+  went red on all three Mac runs of its own PR; its third run showed that the stop is
+  not Metal's compiler starting (the warm started it in 0.13–0.20 s), but the
+  opening's own `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside
+  `plate/display` (2.64 s) while a frame asked at 3.42 s waited for the GPU process
+  until 6.80 s. Two changes (`src/gpu/prepare.ts`, `src/lib/intro.ts`):
+  - `introStill()` now waits two animation frames plus a macrotask even when
+    `#cg-intro` already has `.cg-still` from `index.html` (previously it resolved on
+    the microtask when `.cg-still` was already present, so `buildInTurn` began before
+    the desk's mount and relayout frames had finished committing to the compositor).
+  - `prepareShow` ranks the three `fluid/fill:*` compute kernels ahead of
+    `plate/display` and holds `plate/display` (and the remaining kernels) in
+    `buildInTurn` until all three `fluid/fill:*` builds and their `firstUse` calls
+    settle (`fillLeft`), then immediately asks `plate/display` alongside the
+    remaining compute kernels.
+  Measured cold on the Mac (`STARTUP_COLD=1 npm run startup`, 9/9): first compile
+  asked 3.49 s, given 3.62 s (`fluid/fill:rgba32float`, `fluid/fill:rgba16float`,
+  `fluid/fill:r32float` compiled in 0.13 s and first used in 0.01 s before
+  `plate/display bgra8unorm` is asked); built ahead 3.47 s to 9.12 s, first step
+  9.24 s, longest frame wait 1.60 s from 1.85 s (builds under way in the longest
+  frame gap: none). `npm run intro` 13/13 (0 render compiles asked while another
+  compiled; 95 frames up before the last render compile settled, 0 moving; 100 %
+  covered). Judged over the week after merge against the week before by `npm run
+  flakes -- --check 'no stop in the opening'`.
 - **Shipped:** the opening asks for its render pipelines first, the display first of
   all (`gpu/prepare.ts`): with three in flight it had been asked forty-fifth, and the
   last 1.34 s of the opening was the display compiling alone with the other lanes dry
