@@ -146,6 +146,7 @@
     "ferrodrop": "node scripts/ferrodrop.mjs",
     "ferrorest": "node scripts/ferrorest.mjs",
     "ferrodrag": "node scripts/ferrodrag.mjs",
+    "ferrohold": "node scripts/ferrohold.mjs",
     "magnetgain": "node scripts/magnetgain.mjs",
     "ferropour": "node scripts/ferropour.mjs",
     "regrid": "node scripts/regrid.mjs",

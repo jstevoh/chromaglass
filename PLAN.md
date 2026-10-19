@@ -6744,10 +6744,11 @@ the code's entry points, the checks to add and the scenes to match, in
 - ~~**29c. The drop follows the hand and holds together.**~~ **Partly shipped** (#373; the story in
   `docs/plan-shipped.md` §29c): the rim's force read against the ferrofluid's own drag (`phaseForce`),
   the moving edge compressed back by the flux limiter's deficit from a once-a-step blur (`phaseBlur`,
-  `phaseCompress`, 29c-1), the gain derived in SI and held to the solver (`npm run magnetgain` 5/5,
-  29c-2), the ferrofluid's momentum carried with it (`phaseMomentum`), and degenerate mobility
+  `phaseCompress`, 29c-1), the gain derived in SI and held to the solver (`npm run magnetgain` 5/5, bars 20%, 29c-2), the ferrofluid's momentum carried with it (`phaseMomentum`), and degenerate mobility
   `mob = 4m(1 − m)` in the thin gap's Cahn–Hilliard step (`phaseCHVolume`, 29c-7) with the
-  resting-drop check `npm run ferrorest` (4/4). The dragged drop's trailing rim in the oil's return
+  resting-drop check `npm run ferrorest` (5/5, with a second window), and the dragged drop held
+  while it is dragged by `npm run ferrohold` (each pass switched off by hand turns its own line red;
+  `phaseCompress` is a lab-only step option, 1 by default). The dragged drop's trailing rim in the oil's return
   flow remains open as **29c-8** (`npm run ferrodrag` stays out of CI as known red, 1/3, until
   29c-8). If the closeup's camera ever follows the drop, it follows smoothly and never with the
   sound (the sway work's `frameSway`, default 0, stays the only way sound moves the frame). Still
@@ -6819,8 +6820,9 @@ the code's entry points, the checks to add and the scenes to match, in
     two-liquid law's 0.0130 (-13% apart). The fix is a mobility per cell in the projection,
     ∇·(k(φ)∇p) = ∇·u* with k the inverse of the cell's viscosity, which costs the pressure solve
     its constant coefficient (the same stencil with k on each face, and a multigrid that
-    coarsens it). Until then magnetgain reads the drop's speed against the two-liquid law with
-    a bar of 34%, wide for this.
+    coarsens it). Until then magnetgain reads the drop's speed against the two-liquid law, with
+    the rim's own factor `share·(ν_clear/ν_ff)^(1−φ)` applied per cell as the shader applies it,
+    and a bar of 20% (the weak drop reads about -6% on software WebGPU, the strong one about +4%).
   - ~~**29c-7. A resting drop dissolves into its halo.**~~ **Shipped** (#373; `npm run ferrorest`
     4/4, story in `docs/plan-shipped.md` §29c). On the thin gap, `phaseCHVolume` used a constant
     mobility at Cahn number ≈ 0.5 (an eight-cell drop on 384², `R = 0.022`, `phaseSharp = 0.75`),
@@ -6842,7 +6844,7 @@ the code's entry points, the checks to add and the scenes to match, in
     as on `main` (under **29c-1**).
   - **29c-8. A dragged drop loses its trailing rim to the oil's return flow.** With the
     limiter-matched `phaseCompress` (29c-1) and degenerate mobility in `phaseCHVolume` (29c-7) both
-    in place (`ferropress` 7/7, `magnetgain` 5/5, `ferrorest` 4/4), a drop dragged `0.3` of the
+    in place (`ferropress` 7/7, `magnetgain` 5/5, `ferrorest` 5/5), a drop dragged `0.3` of the
     plate in 3 s under a `0.4` magnet at depth `0.2` (`npm run ferrodrag`) still loses its trailing
     rim to the oil's dipole return flow (`ferrodrag` 1/3: lag `3.24R` against the `2R` bar,
     half-full cells `100 → 0` against the `±15%` bar, cells over `0.01` `324 → 1238`, centroid at
@@ -6855,6 +6857,12 @@ the code's entry points, the checks to add and the scenes to match, in
     sharpening smooth pools under the Press (`ferropress`) or disturbing `spikes`, `maze` and
     `fingers` (the failure modes of 29c-4's attempts). Until then `npm run ferrodrag` stays in
     `scripts/` with its bars and inputs unchanged, out of `checks.yml` as known red.
+    What CI holds meanwhile is `npm run ferrohold`: the same scene read every 10 steps from step 60
+    to 120, while the drop is still whole, the magnet's lead over its centroid at most `2.15R`
+    (`2.01R` with both passes on, `2.28R` with `phaseMomentum` off) and at least `47` half-full cells
+    on average (`60.3` on, `34.4` with `phaseCompress` off, the lab-only step option). Each pass off
+    turns red its own line only. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
+    re-read against the whole drag.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the

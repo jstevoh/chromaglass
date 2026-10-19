@@ -4088,6 +4088,16 @@ under the per-step guard at its steepest cell, `0.262` vs `0.375` plate/s on `38
 `0.968 → 0.981`, volume `0.01570 → 0.01570`). `npm run ferrodrag` (new script, out of CI
 until 29c-8) is 1/3 (`lag 3.24R`, `half-full 100 → 0`, `moved 0.010 cells`).
 
+Fix round after the review of 0580eaa (six asks): `magnetgain`'s weak-field line is renamed to what
+it tests (a units check on ψ, the gain cancels there); the drop checks apply the shader's rim factor
+`share·(ν_clear/ν_ff)^(1−φ)` per cell before the per-step cap, which moved the strong drop from `-22%`
+to `+4%` and the weak one to `-6%` (software WebGPU), both under a 20% bar (the weak one was 34%);
+`ferrorest` reads a second window (steps 200 to 380: its loss at most half the first's, or 3 cells) and
+calls its centroid line a symmetry guard; `npm run ferrohold` (new, `fifth` shard) holds the momentum
+pass and the compression pass on the dragged drop over steps 60 to 120, each switched off by hand
+turning red its own line (lead `2.01R` → `2.28R` against `2.15R`; half-full `60.3` → `34.4` against `47`);
+`docs/judging.md` §54 says what the rim pull and `phaseMomentum` look like.
+
 ## 32. The soap film: a draining film seen in reflection
 
 ### 32a. The CPU reference (this PR, #403)

@@ -95,17 +95,25 @@
  * ferrofluid at rest, a magnet switched on a tenth of the plate from it, and
  * the drop's speed read off its centroid once the drag time has passed
  * (ρh²/12μ, about a tenth of a second for the drop and oil together), against
- * GAIN · ⟨∇ψ⟩ · ν_ref / (ν_ff + ν_clear) with ⟨∇ψ⟩ the shader's own gradient
- * averaged over the drop's cells along the path the centroid took. The check
- * asks the two to agree within a third: the drop is seventeen cells across
- * on 384² with a grey rim two or three cells wide (its ferrofluid at its own
- * mobility: phaseForce raises the force to the complement of hsPrep's drag
- * exponent, so the two cancel cell by cell), the Darcy speed is a sharp
- * disc's in an unbounded cell, and ∇ψ is averaged over the drop's cells. It is
- * red if the force is read in other units than this says (a gain re-tuned
- * through hsPrep's Darcy factor read as 1 in ferrofluid cells, the ×180 of
- * #373's first round, would read 180× the speed), and red if the pull is
- * capped where it should not be (MAGNET_CELLS, printed).
+ * GAIN · ⟨v·rim·∇ψ⟩ · ν_ref / (ν_ff + ν_clear) with ∇ψ the shader's own
+ * gradient and rim the factor phaseForce multiplies it by in each cell, the
+ * 3×3 mean of the share times (ν_clear/ν_ff)^(1−φ) (hsPrep's drag takes the
+ * cell's liquid at its own viscosity, so the force is raised to the
+ * complement of that exponent and the two cancel in a cell of ferrofluid
+ * alone and not in a grey rim cell), averaged over the drop's cells along the
+ * path the centroid took. Without the rim factor the prediction read 22%
+ * under the strong drop; with it the weak drop reads -6% and the strong one
+ * +4% (software WebGPU), and both are held to 20%, where the first round had
+ * a weak bar of 34%. The drop is seventeen cells across on 384² with a grey
+ * rim two or three cells wide, the Darcy speed is a sharp disc's in an
+ * unbounded cell, so the 20% is the model's own distance from the grid.
+ * The line on the weak field's ∇ψ against the linear Kelvin law is a units
+ * check on ψ and says so: the gain cancels there. The drop's speed is what
+ * holds the gain, and it is red if the force is read in other units than this
+ * says (a gain re-tuned through hsPrep's Darcy factor read as 1 in
+ * ferrofluid cells, the ×180 of #373's first round, would read 180× the
+ * speed), and red if the pull is capped where it should not be
+ * (MAGNET_CELLS, printed).
  */
 import { openLab } from './lab.mjs';
 

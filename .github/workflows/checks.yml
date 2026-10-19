@@ -1029,6 +1029,18 @@ jobs:
       - name: The magnet's pull, derived
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run magnetgain
+      # The dragged drop while it is dragged (PLAN 29c-8's neighbour): the
+      # ferrofluid carried along itself (phaseMomentum) and what the moving
+      # edge's limiter withheld paid back (phaseCompress), each held on its own
+      # over steps 60 to 120 of `ferrodrag`'s scene, a window before the trailing
+      # rim is lost to the oil's return flow. `ferrodrag` reads at three seconds,
+      # red with both passes and without them, so it could not tell. The PR
+      # that added this ran each pass off by hand: the lag check goes red with
+      # momentum off, the half-full check with compress off, neither with
+      # the other. On the fifth shard with `magnetgain`: one scene of 120 steps.
+      - name: The dragged ferrofluid drop holds together
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        run: npm run ferrohold
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye
