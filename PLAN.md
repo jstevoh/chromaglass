@@ -6618,6 +6618,11 @@ Turing Print" work (#331), which also made the reaction grow at all.
     least .02 at 20 and 40 s: Velvet Underground, Poster 1969, Home Movie, Clock Glass,
     Crowd Plate, Lava Lamp, Jellyfish, Microscopic Chaos. `gallery` label and
     `film.yml` (`FILM_ONLY` the looks changed).
+    Also for this batch, found in #408: **Poster, 1969's plate runs at about 16 steps a
+    second on the Mac runner** (`squeeze` read 191, 215 and 327 steps in 12 s on it, 320
+    to 350 on the Fillmore), under the 30 a second where the plate stops flowing and
+    starts stepping (`PINNED_STEP_RATE`, `LiquidVisualizer.tsx`). Find what makes Poster
+    that heavy (its layers, its dye budget, its plate size) before it is made to move.
   - **28i-3. Sound on the liquid, not the frame** (Antigravity, batch 3). Eight looks
     still drive the rotation slot from sound (28f-3): Galaxy (energy), Cyberpunk
     (complexity), Acid Trip (energy), Aurora (energy), Solar Flare (bass), Fractal Dream
@@ -6645,7 +6650,11 @@ Turing Print" work (#331), which also made the reaction grow at all.
     0.342; without it the back source is the bare lamp (0.986) and the difference 0.059,
     and the section still passes, because its bars (0.004 and four times the control) do
     not ask what is on the back plate, which was true before this PR too; (c)
-    `squeeze` asks for Beat Squeeze 0.1 by setting, since Poster, 1969 ships it at 0;
+    ~~`squeeze` asks for Beat Squeeze 0.1 by setting, since Poster, 1969 ships it at 0~~
+    (**fixed** in #408: Poster's plate stepped too slowly with the squeeze off to hold the
+    check's 200 steps a window, 191 on one run and 215 on another, so the check measured
+    the governor and not the press; it now runs on Bass Drop at its own 0.8, the one look
+    left that ships the squeeze, the bar unchanged);
     (d) `soundpatch`'s three pattern looks are Cyberpunk, Aurora Borealis and Lava Lamp
     until 28i-3 gives Poster, 1969 patches (the Fillmore had two), and `lampjudge`'s
     owner override for the Sensual Laboratory is gone with it; (e) `evolve`/`replay`
