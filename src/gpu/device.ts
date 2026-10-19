@@ -118,16 +118,27 @@ async function askGpu(): Promise<Gpu | GpuFailure> {
 
   let device: GPUDevice;
   try {
-    // The top rung (1024² particles, 128 MiB buffer) and future passes: request
-    // storage buffer and buffer binding limits up to what the adapter supports.
+    // The top rung (1024² particles, 128 MiB buffer, high-DPR projectors) and
+    // Pro compute passes: request storage buffer, texture dimension and compute
+    // workgroup limits up to what the adapter supports.
     const wantLimits: Record<string, number> = {};
-    if (adapter.limits.maxStorageBufferBindingSize) {
-      wantLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
+    for (const k of [
+      'maxStorageBufferBindingSize',
+      'maxBufferSize',
+      'maxTextureDimension2D',
+      'maxComputeWorkgroupStorageSize',
+      'maxComputeInvocationsPerWorkgroup',
+      'maxComputeWorkgroupSizeX',
+      'maxComputeWorkgroupSizeY',
+    ] as const) {
+      const val = adapter.limits[k];
+      if (typeof val === 'number' && val > 0) wantLimits[k] = val;
     }
-    if (adapter.limits.maxBufferSize) {
-      wantLimits.maxBufferSize = adapter.limits.maxBufferSize;
+    try {
+      device = await settles(adapter.requestDevice({ requiredFeatures: want, requiredLimits: wantLimits }), 'requestDevice');
+    } catch {
+      device = await settles(adapter.requestDevice({ requiredFeatures: want }), 'requestDevice');
     }
-    device = await settles(adapter.requestDevice({ requiredFeatures: want, requiredLimits: wantLimits }), 'requestDevice');
   } catch (e) {
     return { failure: 'no-device', detail: String((e as Error)?.message ?? e) };
   }

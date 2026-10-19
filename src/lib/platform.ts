@@ -10,6 +10,7 @@
  */
 
 import { isPhoneApp } from './appLink';
+import { getCachedLicenseStatus } from './licenseKey';
 
 export type PlatformTier = 'hosted' | 'local' | 'native';
 
@@ -60,6 +61,46 @@ export function detectTier(): PlatformTier {
   if (isPhoneApp()) return 'hosted';
   if (PRIVATE_HOST.test(window.location.hostname)) return 'local';
   return 'hosted';
+}
+
+/**
+ * True when an Ed25519-verified Pro licence is active in browser storage or the
+ * native desktop shell bridge (PLAN.md §23.17).
+ */
+export function isProLicenseUnlocked(): boolean {
+  const cached = getCachedLicenseStatus();
+  if (cached.valid && cached.tier === 'pro') return true;
+  if (typeof window !== 'undefined') {
+    const w = window as unknown as {
+      __CHROMAGLASS_NATIVE__?: { license?: { valid?: boolean; tier?: string } };
+    };
+    if (w.__CHROMAGLASS_NATIVE__?.license?.valid && w.__CHROMAGLASS_NATIVE__.license.tier === 'pro') {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The ladder tier used by the quality governor (PLAN.md §23.17).
+ *
+ * A verified Pro licence on a desktop or laptop browser promotes `'hosted'` to
+ * `'local'`, unlocking the full `768²` and `1024²` fluid grids, native Retina
+ * display pixel ratios (`2x`/`3x`), and projector stage rungs. Explicit
+ * `?tier=hosted` diagnostic runs (`npm run pixels`) and phone apps remain on
+ * `'hosted'` unless `proUnlocked` is explicitly passed as `true`.
+ */
+export function effectiveLadderTier(
+  tier: PlatformTier = detectTier(),
+  proUnlocked?: boolean,
+): PlatformTier {
+  if (tier !== 'hosted') return tier;
+  if (proUnlocked === undefined) {
+    if (override('tier') === 'hosted') return 'hosted';
+    if (typeof window !== 'undefined' && isPhoneApp()) return 'hosted';
+    return isProLicenseUnlocked() ? 'local' : 'hosted';
+  }
+  return proUnlocked ? 'local' : 'hosted';
 }
 
 /**
