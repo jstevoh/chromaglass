@@ -5,6 +5,15 @@ import { install as installCrashLog, record as crashRecord } from './lib/crashLo
 import { isPhoneApp } from './lib/appLink';
 import { requestGpuEarly } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
+import {
+  isSignedInCached,
+  hasEmailSignInLink,
+  getPendingEmail,
+  hasValidLicenseSync,
+  hasStoredLicenseCandidateSync,
+  verifyStoredLicenseOnLoad,
+  requiresDesktopSignInSync,
+} from './lib/authFlag';
 
 // The black box, first: whatever goes wrong from here on has a line
 // (docs/crash-plan.md).
@@ -27,6 +36,11 @@ const Root = params.has('remote')
   : params.has('cast')
     ? lazy(() => import('./components/CastDisplay'))
     : lazy(() => import('./App'));
+
+const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
+  ? lazy(() => import('./components/SignInScreen'))
+  : null;
+const LazyLicenseGate = lazy(() => import('./components/LicenseGate'));
 
 // Installable: the service worker is what lets Chrome and Edge offer
 // "Install app", for a dock icon and a window with no browser chrome. Only
@@ -138,11 +152,74 @@ function Loading() {
   );
 }
 
+function Gate() {
+  const gateActive =
+    show && (Boolean(import.meta.env.VITE_FIREBASE_API_KEY) || requiresDesktopSignInSync());
+  const [phase, setPhase] = useState<'app' | 'verifying-license' | 'completing-link' | 'signin'>(() => {
+    if (!gateActive) return 'app';
+    if (hasValidLicenseSync() || isSignedInCached()) return 'app';
+    if (hasEmailSignInLink() && getPendingEmail()) return 'completing-link';
+    if (hasStoredLicenseCandidateSync()) return 'verifying-license';
+    return 'signin';
+  });
+
+  useEffect(() => {
+    if (!gateActive) return;
+    if (phase === 'app') {
+      if (import.meta.env.VITE_FIREBASE_API_KEY) {
+        void import('./lib/firebaseAuth').then((m) => m.verifyReturningUserInBackground());
+      }
+      return;
+    }
+    if (phase === 'verifying-license') {
+      let cancelled = false;
+      void verifyStoredLicenseOnLoad()
+        .then((valid) => {
+          if (!cancelled) setPhase(valid ? 'app' : 'signin');
+        })
+        .catch(() => {
+          if (!cancelled) setPhase('signin');
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (phase === 'completing-link') {
+      if (import.meta.env.VITE_FIREBASE_API_KEY) {
+        let cancelled = false;
+        void import('./lib/firebaseAuth')
+          .then((m) => m.completeEmailLinkSignIn())
+          .then((res) => {
+            if (cancelled) return;
+            setPhase(res.needsEmail ? 'signin' : 'app');
+          })
+          .catch(() => {
+            if (!cancelled) setPhase('signin');
+          });
+        return () => {
+          cancelled = true;
+        };
+      }
+    }
+  }, [gateActive, phase]);
+
+  if (phase === 'completing-link' || phase === 'verifying-license') {
+    return <Loading />;
+  }
+  if (phase === 'signin') {
+    if (LazySignIn) {
+      return <LazySignIn onSignedIn={() => setPhase('app')} />;
+    }
+    return <LazyLicenseGate onUnlocked={() => setPhase('app')} />;
+  }
+  return <Root />;
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Boot>
       <Suspense fallback={<Loading />}>
-        <Root />
+        <Gate />
       </Suspense>
     </Boot>
   </StrictMode>,

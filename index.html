@@ -23,7 +23,35 @@
       arrived. The remote and a cast are not shows: no intro, decided before
       the first paint so it never flashes there.
     -->
-    <script>if (/[?&](remote|cast)(=|&|$)/.test(location.search)) document.documentElement.classList.add('cg-no-intro');</script>
+    <script>
+      if (/[?&](remote|cast)(=|&|$)/.test(location.search)) document.documentElement.classList.add('cg-no-intro');
+      // Only a fresh, online show visit moves from chromaglass.web.app to
+      // chromaglass.art immediately: localStorage and the service worker belong
+      // to the origin, so an offline browser at a gig, a returning browser with
+      // saved state (licence, signed-in flag, settings, set list), or a ?remote
+      // or ?cast view stays on chromaglass.web.app until 23.16 carries saved
+      // state across.
+      if (
+        location.hostname === 'chromaglass.web.app' &&
+        !location.pathname.startsWith('/__/') &&
+        navigator.onLine &&
+        !(navigator.serviceWorker && navigator.serviceWorker.controller) &&
+        !/[?&](remote|cast)(=|&|$)/.test(location.search)
+      ) {
+        try {
+          var hasSavedState =
+            localStorage.getItem('chromaglass:license-key') ||
+            localStorage.getItem('chromaglass-signed-in') ||
+            localStorage.getItem('chromaglass-music-settings') ||
+            localStorage.getItem('chromaglass-setlist') ||
+            localStorage.getItem('chromaglass-sets') ||
+            Object.keys(localStorage).some(function (k) { return k.indexOf('chromaglass') === 0; });
+          if (!hasSavedState) {
+            location.replace('https://chromaglass.art' + location.pathname + location.search + location.hash);
+          }
+        } catch {}
+      }
+    </script>
     <style>
       html, body { background: #000; }
       .cg-no-intro #cg-intro { display: none; }
