@@ -5781,6 +5781,14 @@ once the login works (23.14).*
   matches across `server/license-key.js` and `src/lib/licenseKey.ts` and is not the burned key, a bad webhook
   signature refused, missing `LICENSE_PRIVATE_KEY` fails closed (500), a bad token refused, a good token given its own keys and no one else's,
   Home→Pro upgrade, two-machine cap, and a refunded key revoked.
+  **23.12-url** (**shipped**): `deploy.yml` never passed `VITE_FIREBASE_LICENSES_URL` to the
+  build, so the live bundle had the account's key fetch and the marketing-choice sync folded away
+  (measured on the live site 2026-10-19: no `/keys` or `/preferences` call in any chunk); a signed-in
+  site never pulled its key from the account. Now passed from a repository secret of that name
+  (the Worker's address with no path). Built with and without it: 0 chunks carry the calls without,
+  1 with. Typing a key by hand never needed it (checked offline). *Open:* `VITE_FIREBASE_SHOWS_URL`
+  is read by `accountShows.ts` and is also not in the build; it falls back to `/account-shows` on the
+  same origin, which the hosted site does not serve, so decide with 23.14 where that endpoint lives.
 - **23.14** (**shipped**, this PR): linking devices by
   account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
   with `server/remote-server.js` publishes its LAN relay address and show key to
