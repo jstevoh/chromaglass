@@ -2,12 +2,13 @@
  * How full the regulator holds a plate that was laid with a composition.
  *
  * A look whose opening picture covers less of the dish than its own Dye Budget
- * (`seedMean < seedBudget`: Jellyfish Bloom lays about 0.14 against the default
- * budget of 0.85, Comet 0.16 against 0.85) holds what it was laid with, not the
+ * (`seedMean < seedBudget`: Jellyfish Bloom lays 0.40 to 0.47 (it varies per load)
+ * against the default budget of 0.85, Comet 0.16 against 0.85) holds what it was laid with, not the
  * budget, so the music turns the bodies over instead of filling the black void
  * up to the slider. That was `min(dyeBudget, seedMean)`, and it made the slider
  * dead from the look's own composition up to its maximum: on Jellyfish Bloom the
- * target was 0.14 for every slider position from 0.14 to 1.2 (review of #401).
+ * target was its laid mass for every slider position from there up to 1.2, and
+ * the slider did nothing across all of it (review of #401).
  *
  * The composition is now the target AT the look's own budget, and the slider
  * scales it on both sides, so the whole range is live:
@@ -17,8 +18,8 @@
  *
  * At `dyeBudget == seedBudget` the first line gives `seedMean`, so a preset left
  * alone behaves exactly as it did. Moved down it dries toward the floor, moved
- * up it fills, in proportion: Jellyfish Bloom at 0.85 holds 0.14 and at 0.14
- * holds 0.023. Moved down between `seedMean` and `seedBudget` it used to sit
+ * up it fills, in proportion: Jellyfish Bloom at 0.85 holds what it laid (0.40 to
+ * 0.47) and at 0.14 holds about 0.07. Moved down between `seedMean` and `seedBudget` it used to sit
  * still; that is the one place a slider position that was dead is now live, and
  * the point of the change. A look laid fuller than its budget is capped by the
  * slider itself, as it always was.

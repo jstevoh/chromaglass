@@ -2031,8 +2031,8 @@ class FluidSimulation {
   /**
    * Hold room on a sparse seeded plate for what a hand just poured.
    *
-   * A seeded look's regulator target is its own opening picture (0.14 on
-   * Jellyfish Bloom), and a hand pour on such a plate is dye the target never
+   * A seeded look's regulator target is its own opening picture (0.40 to 0.47
+   * on Jellyfish Bloom), and a hand pour on such a plate is dye the target never
    * counted: `over` goes up at once, and with `regStepScale` (up to 12.5× at a
    * slow dt) and the surface term the plate takes it back in about a second
    * (review of #401, ask 2). Music pours are held by `pourRoom`; a hand's
@@ -3866,7 +3866,7 @@ class FluidSimulation {
     // not being smooth, "especially at the beginning steps").
     // Named regulator shortcut (PLAN 18g / 28d-A, pending 18c-2): a seeded look
     // whose opening composition covers less of the dish than its `dyeBudget`
-    // slider (`seedMean < seedBudget`, e.g. Jellyfish Bloom 0.14 vs 0.85, Comet
+    // slider (`seedMean < seedBudget`, e.g. Jellyfish Bloom 0.40 to 0.47 vs 0.85, Comet
     // 0.16 vs 0.85, Cyberpunk 0.11 vs 0.50) holds its own picture, scaled by the
     // slider's position against the look's own budget (`lookTarget`, so the
     // slider stays live), so the music turns the bodies over rather than

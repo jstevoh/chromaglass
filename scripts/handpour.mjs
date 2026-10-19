@@ -272,7 +272,7 @@ try {
   // source), and its target at the default slider is that mass, so one load is
   // sparse and the next is not. This first said "not reached" because the run
   // it was written from happened to lay 0.47. What can be asserted is the
-  // fact that makes it unassertable: its target is within a fifth of the cliff.
+  // fact that makes it unassertable: its target is within a quarter of the cliff.
   // Looks like that are left out of the pour A/B below (whether the bank is on
   // would change between its own pages), and Jellyfish's slider test (part 2)
   // holds either way, because the slider is proportional below the cliff too.
@@ -341,12 +341,17 @@ try {
     // two bank-off runs of cell-bloom read 101% and 69% at 10 s, the same look
     // and the same pour 32 points apart, so a two-run mean cannot resolve 2
     // points there and the 6 points it did show (85% off, 79% on) are inside
-    // that spread. The margin is therefore the larger of 2 points and the widest
-    // gap between the two runs of one arm at that time, which is the noise this
-    // look has at this moment measured on the same page. Where the bank matters
-    // the gap is far larger than that (lumia 3 s: 30% off, 101% on; roy 18% vs
-    // 101%), and the 5-point check below still has to hold there.
-    const spread = (a) => Math.max(0.02, ...[false, true].map((on) => {
+    // that spread. The margin is therefore the larger of 2 points and the gap
+    // between the two FIX-OFF runs at that time, which is the noise this look has
+    // at this moment measured on the same page. It is taken from the off arm
+    // only: with the fix on, the plate also runs the new `surf` drain, which the
+    // off arm never runs, so a margin widened by the on arm's own spread would
+    // let the arm under test set its own tolerance (a look off at 96% / 95% and
+    // on at 40% / 80% would pass). The off arm is the control for noise, and the
+    // cell-bloom 101% / 69% above is in it. Where the bank matters the gap is far
+    // larger than that (lumia 3 s: 30% off, 101% on; roy 18% vs 101%), and the
+    // 5-point check below still has to hold there.
+    const spread = (a) => Math.max(0.02, ...[false].map((on) => {
       const v = runs.filter((r) => r.on === on).map((r) => r.left[a]);
       return Math.max(...v) - Math.min(...v);
     }));
@@ -356,7 +361,7 @@ try {
     // If the bank-off arm does drain the pour, the bank has to have held more
     // of it: otherwise this would pass for a bank that does nothing.
     row.drained = row.off[3] < 0.9;
-    if (row.drained) check(`${id}: the pour the old program drained is held better with the bank (3 s, 5 points)`, row.on[3] > row.off[3] + 0.05, `${(row.on[3] * 100).toFixed(0)}% vs ${(row.off[3] * 100).toFixed(0)}%`);
+    if (row.drained) check(`${id}: the pour the old program drained is held better with the bank in every run (3 s, 5 points)`, Math.min(...runs.filter((r) => r.on).map((r) => r.left[3])) > row.off[3] + 0.05, `worst bank-on run ${(Math.min(...runs.filter((r) => r.on).map((r) => r.left[3])) * 100).toFixed(0)}% vs ${(row.off[3] * 100).toFixed(0)}% off`);
     else console.log(`     ${id}: the old program did not drain this pour (${(row.off[3] * 100).toFixed(0)}% left at 3 s); nothing for the bank to hold`);
     await page.close();
   }
