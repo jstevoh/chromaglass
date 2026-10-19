@@ -6632,7 +6632,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
     magenta cells, no rainbow); then four or more hues on the film.
 
   - **28i-6. What retiring nine left a check or a page standing on** (found in 28i-1;
-    Antigravity or Claude). Each is a shortcut or a gap the retirement made, named so it
+    whoever has credit). Each is a shortcut or a gap the retirement made, named so it
     is not found twice: (a) **no look ships the camera pass any more** (`camera: 1`,
     `renderStyle: 'photo'` were Oil on Water's and Colorful Cosmos's alone): `wall`
     section 6 lays them on Oil & Water by hand, `controls` `all` sweeps the camera's
@@ -6642,7 +6642,11 @@ Turing Print" work (#331), which also made the reaction grow at all.
     Two Projectors**: `wall` section 7 raises the layers and the setting itself and lays
     `fillmore-wash` on the back plate by the solver's own `seedPreset`, and nothing in
     the app lays that wash any more, so Two Projectors on another look still starts with
-    an empty back plate; decide whether the setting should lay the wash; (c)
+    an empty back plate; decide whether the setting should lay the wash. Measured on the
+    Mac: with the wash the back source reads 0.575 and the front-from-wall difference
+    0.342; without it the back source is the bare lamp (0.986) and the difference 0.059,
+    and the section still passes, because its bars (0.004 and four times the control) do
+    not ask what is on the back plate, which was true before this PR too; (c)
     `squeeze` asks for Beat Squeeze 0.1 by setting, since Poster, 1969 ships it at 0;
     (d) `soundpatch`'s three pattern looks are Cyberpunk, Aurora Borealis and Lava Lamp
     until 28i-3 gives Poster, 1969 patches (the Fillmore had two), and `lampjudge`'s
