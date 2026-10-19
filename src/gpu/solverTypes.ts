@@ -150,6 +150,10 @@ export interface GpuStepParams {
    * liquid round it.
    */
   ferroViscosity?: number;
+  /** The ferrofluid's momentum carried with it (phaseMomentum), 1 on; 0 is the lab's control, the step without it. */
+  phaseMomentum?: number;
+  /** The moving edge's compression (phaseCompress, PLAN 29c-1) as a share of the strength the step runs at, 1 on; 0 is the lab's control, the step without it. */
+  phaseCompress?: number;
   /**
    * For the lab only: 0 carries the ferrofluid by area under Thin Gap too,
    * as before the Press on the ferrofluid (PLAN 15d), so `npm run

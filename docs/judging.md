@@ -1357,3 +1357,28 @@ at 0 (the default).
    its edge from frame to frame.
 4. Say whether Auto's slow breathing zoom, which is not from the sound, is a signature
    worth keeping or one more move the rig should not make (27a-8-1).
+
+## 54. Ferrofluid halos are blacker and ripening slower in every look (PLAN 29c)
+
+The thin gap's Cahn–Hilliard step (`phaseCHVolume`) now uses a degenerate mobility,
+`4m(1 − m)` at each face's mean share, and `phaseCompress` returns what the flux limiter
+withheld at a moving edge. Because every look opens on Thin Gap, ferrofluid halos are
+blacker (less brown leak into the oil round a drop or domain, `npm run ferrorest`: cells
+over 0.01 grow +94 at rest against +248 before, and the drop holds 90 of 100 half-full
+cells against 84) and Ostwald ripening across the oil is slower in every look with
+ferrofluid:
+- On Magnet Garden, Ferro Maze and Ferro Paint, watch a poured drop and the domains' edges
+  over a minute: the rims should stay blacker with a narrower brown halo, and small drops
+  sitting apart from a pool should hold their size longer instead of bleeding into the oil.
+- A drop dragged fast by hand still sheds its trailing rim into the oil's return flow
+  (PLAN 29c-8).
+- The magnet's pull on a drop is felt at its rim first. The force a cell gets is the
+  Kelvin gradient times the cell's ferrofluid share times (ν_clear/ν_ff)^(1−φ): a cell
+  of ferrofluid alone moves about four and a half times faster than the same push on the
+  oil, and a drop in the oil goes at about 0.8 of the reference speed, so the rim runs
+  ahead of the oil and a drop should lean into the pull and then follow the magnet as a
+  whole, not tear. `phaseMomentum` carries the ferrofluid share along itself, so a
+  dragged drop should keep its edge rather than smearing behind it. Drag a drop slowly
+  at a deep magnet and then fast at a strong one: slowly it should hold together at
+  Darcy's speed; fast it may leave a thin trailing film (29c-8), but its front should
+  stay sharp.
