@@ -5203,6 +5203,13 @@ Not a gate and no bar: a rate depends on what was pushed.
   tried: making the follower's first place better than 50-60% trust (the follower's own
   business, `songfollow`).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
+- **19aa-4. `deploygate.sh` keeps the token off curl's command line.** It passes
+  `-H "Authorization: Bearer $GH_TOKEN"` as an argument (`scripts/deploygate.sh`, the `api()`
+  helper), and the owner runs it locally with `GH_TOKEN=$(gh auth token)`, so any process
+  can read the token through `ps` while curl runs; bash prints nothing of it on a failure
+  and Actions masks it, so it does not reach a log. Give curl the header on stdin
+  (`-K -`, as `scripts/ghapi.mjs` does) and check with `npm run deploygate -- --history 20`
+  that the same merges are trusted. Found by the check-skeptic on 19aa-3.
 
 ## 20. Lace and holes: a pale film torn open over colour
 

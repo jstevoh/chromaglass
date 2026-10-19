@@ -55,15 +55,18 @@ export function curlCall(url) {
   return { args, input: token ? `header = "Authorization: Bearer ${token.replace(/["\\]/g, '')}"\n` : '' };
 }
 
-const failure = (url, code, stderr) => {
-  const e = new Error(redact(`curl ${url} failed (exit ${code}): ${String(stderr).trim()}`));
+// `clean` is `redact` except in the selftest's control, which passes the text
+// through untouched to show that the redaction is what keeps a token in the
+// URL out of the message, and not something else on the way.
+const failure = (url, code, stderr, clean = redact) => {
+  const e = new Error(clean(`curl ${url} failed (exit ${code}): ${String(stderr).trim()}`));
   e.code = code;
-  e.stderr = redact(stderr);
+  e.stderr = clean(String(stderr));
   return e;
 };
 
 /** GET `url` through curl; resolves with the body, rejects with a redacted error. */
-export function ghCurl(url, { maxBuffer = 1 << 28 } = {}) {
+export function ghCurl(url, { maxBuffer = 1 << 28, clean = redact } = {}) {
   const { args, input } = curlCall(url);
   return new Promise((resolve, reject) => {
     const child = spawn('curl', args, { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -75,10 +78,10 @@ export function ghCurl(url, { maxBuffer = 1 << 28 } = {}) {
       else out.push(b);
     });
     child.stderr.on('data', (b) => { err += b; });
-    child.on('error', (e) => reject(failure(url, e.code ?? 'spawn', e.message)));
+    child.on('error', (e) => reject(failure(url, e.code ?? 'spawn', e.message, clean)));
     child.on('close', (code) => {
-      if (size > maxBuffer) reject(failure(url, 'maxBuffer', `more than ${maxBuffer} bytes`));
-      else if (code !== 0) reject(failure(url, code, err));
+      if (size > maxBuffer) reject(failure(url, 'maxBuffer', `more than ${maxBuffer} bytes`, clean));
+      else if (code !== 0) reject(failure(url, code, err, clean));
       else resolve(Buffer.concat(out).toString());
     });
     child.stdin.end(input);
@@ -86,14 +89,14 @@ export function ghCurl(url, { maxBuffer = 1 << 28 } = {}) {
 }
 
 /** The same, synchronously, for a script with no awaits (`macqueue.mjs`). */
-export function ghCurlSync(url, { maxBuffer = 1 << 28 } = {}) {
+export function ghCurlSync(url, { maxBuffer = 1 << 28, clean = redact } = {}) {
   const { args, input } = curlCall(url);
   try {
     return execFileSync('curl', args, { input, maxBuffer, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
   } catch (e) {
-    // execFileSync's error carries the arguments and stdin's neighbours; none
-    // of it leaves, only the code and the stderr, redacted.
-    throw failure(url, e.status ?? e.code, e.stderr ?? e.message);
+    // execFileSync's error carries the arguments (`cmd`, `spawnargs`) and the
+    // raw output; none of it leaves, only the code and the stderr, redacted.
+    throw failure(url, e.status ?? e.code, e.stderr ?? e.message, clean);
   }
 }
 
@@ -113,6 +116,7 @@ async function selftest() {
       if (req.url === '/seen') return res.end(seen);
       seen = req.headers.authorization ?? '';
       if (req.url === '/ok') res.end(JSON.stringify({ ok: true }));
+      else if (req.url.startsWith('/gone')) { res.statusCode = 404; res.end('not found'); }
       else { res.statusCode = 502; res.end('bad gateway; you sent ' + seen); }
     });
     s.listen(0, '127.0.0.1', () => console.log(s.address().port));
@@ -131,6 +135,11 @@ async function selftest() {
   // Everything Node would print for an uncaught error, and a little more.
   const printed = (e) => [inspect(e, { depth: 5, showHidden: true }), String(e), e?.stack, JSON.stringify(e)].join('\n');
   const leaks = (s) => s.includes(FAKE) || s.includes(FAKE.slice(4, 24));
+  // A new Error with only a string stderr, not the child process's own error,
+  // which carries the command line as `cmd` and `spawnargs`.
+  const fresh = (e) => e?.constructor === Error && typeof e.stderr === 'string' && !('spawnargs' in e) && !('cmd' in e);
+  const raw = (s) => String(s);
+  const caught = async (f) => { try { await f(); return null; } catch (x) { return x; } };
   try {
     const body = await ghCurl(`${base}/ok`);
     const sent = await seen();
@@ -139,15 +148,32 @@ async function selftest() {
     check('the token is not on curl\'s command line', !curlCall(`${base}/x`).args.some(leaks),
       `arguments ${curlCall(`${base}/x`).args.join(' ')}`);
 
-    let e = null;
-    try { await ghCurl(`${base}/bad`); } catch (x) { e = x; }
-    check('a 502 rejects, and what it prints carries no token', e != null && !leaks(printed(e)) && /error: 502/.test(e.stderr),
+    let e = await caught(() => ghCurl(`${base}/bad`));
+    check('a 502 rejects with a new error that carries no token', e != null && fresh(e) && !leaks(printed(e)) && /error: 502/.test(e.stderr),
       e ? `printed ${printed(e).length} chars: ${String(e.message).slice(0, 120)}` : 'did not reject');
 
-    e = null;
-    try { ghCurlSync(`${base}/bad`); } catch (x) { e = x; }
-    check('the same, synchronously', e != null && !leaks(printed(e)) && /error: 502/.test(e.stderr),
+    e = await caught(() => ghCurlSync(`${base}/bad`));
+    check('the same, synchronously', e != null && fresh(e) && !leaks(printed(e)) && /error: 502/.test(e.stderr),
       e ? String(e.message).slice(0, 120) : 'did not throw');
+
+    // What flakes.mjs reads to tell an expired log from a real failure: curl's
+    // own "error: 404" line has to survive the redaction.
+    e = await caught(() => ghCurl(`${base}/gone`));
+    check('a 404 still reads as one to flakes.mjs', e != null && /error: (404|410)\b/.test(e.stderr),
+      e ? `stderr ${e.stderr.trim()}` : 'did not reject');
+
+    // A token in the URL, which goes into the message: only the redaction in
+    // `failure` takes it out, and the same calls with it bypassed must leak,
+    // or the check could not see a leak on this path.
+    const inUrl = `${base}/gone?t=${FAKE}`;
+    const a = await caught(() => ghCurl(inUrl));
+    const s = await caught(() => ghCurlSync(inUrl));
+    check('a token in the URL is redacted from the error, both ways', a != null && s != null && !leaks(printed(a)) && !leaks(printed(s)),
+      a ? String(a.message).slice(0, 120) : 'did not reject');
+    const ca = await caught(() => ghCurl(inUrl, { clean: raw }));
+    const cs = await caught(() => ghCurlSync(inUrl, { clean: raw }));
+    check('control: with the redaction bypassed the same errors leak it', ca != null && cs != null && leaks(printed(ca)) && leaks(printed(cs)),
+      ca ? `async ${leaks(printed(ca)) ? 'leaks' : 'clean'}, sync ${cs && leaks(printed(cs)) ? 'leaks' : 'clean'}` : 'did not reject');
 
     // The control: the way both scripts called curl before, on the same
     // server. If this does not leak, the checks above could not see one.

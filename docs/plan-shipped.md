@@ -3364,9 +3364,14 @@ error from curl's exit code and its stderr with tokens of any GitHub shape, and 
 environment's own by value, taken out. `npm run ghapi` (Measure, logic part), against a
 local server that answers 502 and echoes the header back: the header still arrives;
 the arguments hold no token; the async and sync errors, printed every way Node prints
-one, hold none; and, the control, the old way on the same server leaks it and the same
-assertion sees it. 7/7. `deploygate.sh`'s curl was read too: bash prints nothing of its
-arguments on a failure, and on Actions the token is masked, so it is left as it was.
+one, hold none, and both are new errors without `cmd` or `spawnargs`; curl's "error: 404"
+line, which `flakes.mjs` reads to tell an expired log from a failure, survives; a token in
+the URL is taken out of both errors, and with the redaction bypassed the same calls leak
+it; and the old way on the same server leaks it and the same assertion sees it. 10/10.
+The check-skeptic's mutants: `failure` without its redaction fails the URL check, and the
+sync wrapper rethrowing Node's own error fails two. `deploygate.sh` still puts the header
+on curl's command line, readable through `ps` while it runs on the owner's machine:
+19aa-4.
 
 ## 21. Looks after painters
 
