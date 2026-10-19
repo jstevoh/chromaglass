@@ -74,6 +74,17 @@
  *   8. the drain and the wipe end the print: the plate reads the solver's
  *      dye again from the first drain step and after the wipe, and the
  *      print again when the deposit next runs
+ *   9. the print keeps changing (PLAN.md 26d-6): fifty seconds after it has
+ *      settled, at the Drift the Turing Print preset ships it correlates
+ *      under 0.8 with the settled picture and at least 0.1 less than the
+ *      same maze at Drift 0 does, and under 0.7 at Drift 1; it stays alive
+ *      (between half and nine tenths of its cells carry activator, within
+ *      0.05 of the control's), keeps every tile of the plate striped (no
+ *      grey patch) and keeps its stripe width within 15% of the control's;
+ *      Drift 0 is the same field whatever the clock reads; and the
+ *      visualizer advances the clock on its own seconds, not on the sound,
+ *      reads the setting only while the print is on, hands the solver both,
+ *      and ships the setting off by default and on in the Turing Print preset
  */
 import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
@@ -96,6 +107,7 @@ const RUNGS = [256, 384, 512];
 const WIDTH_SPREAD = 1.10, STIR_HELD = 0.10, MOVED = 0.5, SWIRL = 0.3, CARRIED = 0.15;
 const MID_MOST = 0.20, SIDE_LEAST = 0.20, WHERE = 0.7, BUILDS = 0.03;
 const FILLED = 0.001;
+const DRIFT_SETTLE = 9000, DRIFT_RUN = 9000, DRIFT_MOVES = 0.8, DRIFT_GAP = 0.1, DRIFT_FULL_MOVES = 0.7, DRIFT_CONTROL_STILL = 0.8, DRIFT_ALIVE_LO = 0.5, DRIFT_ALIVE_HI = 0.9, DRIFT_ALIVE_NEAR = 0.05, DRIFT_TILE_KEEPS = 0.6, DRIFT_WIDTH = 0.15, ALIVE_ABOVE = 0.1, TILE = 32, DRIFT_UNITS_PER_SECOND = 180;
 const INK_SHOWS = 0.3, INK_PURE = 0.9, INKS_APART = 0.5, POURED_SHOWS = 3, POOL_KEEPS = 0.8, POOL_CONTROL_GAP = 0.3, SLIDE = 5;
 
 /** In-place radix-2 FFT of one row. */
@@ -159,7 +171,8 @@ function correlation(a, b) {
   ma /= n; mb /= n;
   let ab = 0, aa = 0, bb = 0;
   for (let i = 0; i < n; i++) { const x = a[i] - ma, y = b[i] - mb; ab += x * y; aa += x * x; bb += y * y; }
-  return ab / Math.sqrt(aa * bb || 1);
+  if (!(aa > 0 && bb > 0)) throw new Error('correlation of a flat field: a plate with no pattern in it reads as no change, not as a pass');
+  return ab / Math.sqrt(aa * bb);
 }
 
 const pct = (x) => `${(x * 100).toFixed(2)}%`;
@@ -508,6 +521,126 @@ try {
     const defaults = (types.match(/^\s*turingInk: 0,/gm) || []).length;
     check('the visualizer draws the print in the turingInk setting, defaulting to starch', wired && defaults === 1,
       `print branch reads currentSettings.turingInk: ${wired}; "turingInk: 0" in types.ts ${defaults} time (the default)`);
+  }
+  // ── 9. The print keeps changing ─────────────────────────────────────────
+  /*
+    Constant feed and kill settle to a maze that then only creeps (the lab's
+    own control: correlation 0.97 with itself after 3000 units, 0.90 after
+    9000), which is why the print went still once the chemicals met. Drift
+    moves the feed along the saddle-node line across the plate on a slow
+    clock (shader comment, PLAN.md 26d-6). What has to be true: the settled
+    maze, run 9000 units on (fifty seconds at the app's 180 a second: three
+    units a frame at sixty frames), is a different picture at the Drift the
+    Turing Print preset ships than with Drift 0, by a good margin rather
+    than by the creep the control shows, and more so at Drift 1; it is still
+    a pattern, not a plate the drift emptied or filled, and not one with a
+    grey patch in it where the pattern gave out; and its stripes are still
+    the same width, since the drift is a change of where the pattern grows
+    and not a change of what it is. The control runs the same seeds, the
+    same clock and the same stepping with Drift 0, so the clock being fed
+    cannot be what the difference is credited to. The preset's own value is
+    read from presets.ts, not typed here, so the check measures what ships
+    (the script runs under plain node, which cannot load that module, so the
+    number is read from its text).
+    The grey patch does not show in the share of cells that carry activator
+    (grey activator counts as carrying it), only as lost contrast, so the
+    plate is cut into tiles of TILE pixels and the flattest tile of the
+    drifting run must keep DRIFT_TILE_KEEPS of the flattest tile of the
+    control's (measured 0.82 at the preset's Drift, 0.72 at 1).
+  */
+  const presetsSrc = readFileSync(new URL('../src/presets.ts', import.meta.url), 'utf8');
+  const typesSrc = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8');
+  const turingPreset = presetsSrc.slice(presetsSrc.indexOf("id: 'turing-print'"));
+  const presetDrift = Number(/^\s*turingDrift: ([0-9.]+),/m.exec(turingPreset.slice(0, turingPreset.indexOf("id: '", 10)))?.[1] ?? 0);
+  const drift = await page.evaluate(async ({ FEED, KILL, DU, DV, SEEDS, SETTLE, RUN, ABOVE, TILE, PER_SECOND, DRIFTS }) => {
+    const N = 256;
+    const run = async (d) => {
+      await lab.create(N);
+      const g = lab.solver();
+      let s = 777; const rnd = () => (s = s * 16807 % 2147483647) / 2147483647;
+      g.chemLive = true;
+      for (let t = 0; t < 300; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+      for (let k = 0; k < SEEDS; k++) g.seedChemistry(0.1 + rnd() * 0.8, 0.1 + rnd() * 0.8, 0.012);
+      let units = 0;
+      for (let t = 0; t < SETTLE; t += 10) { g.stepChemistry(10, FEED, KILL, DU, DV, 1); units += 10; }
+      const snap = async () => { const f = await g.readChemistry('chem'); return Array.from({ length: f.n * f.n }, (_, i) => f.data[i * 4 + 1]); };
+      const settled = await snap();
+      for (let t = 0; t < RUN; t += 10) { g.stepChemistry(10, FEED, KILL, DU, DV, 1, d, units / PER_SECOND); units += 10; }
+      const later = await snap();
+      // The flattest tile's standard deviation: a grey patch is a tile that lost its stripes.
+      let flattest = Infinity;
+      for (let ty = 0; ty + TILE <= N; ty += TILE) for (let tx = 0; tx + TILE <= N; tx += TILE) {
+        let m = 0, q = 0;
+        for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) { const v = later[(ty + y) * N + tx + x]; m += v; q += v * v; }
+        const c = TILE * TILE; m /= c;
+        flattest = Math.min(flattest, Math.sqrt(Math.max(0, q / c - m * m)));
+      }
+      return { settled, later, flattest, alive: later.filter((x) => x > ABOVE).length / later.length };
+    };
+    const runs = [];
+    for (const d of DRIFTS) runs.push(await run(d));
+    // Drift 0 must ignore the clock: the same 300 units under two clocks.
+    const twice = [];
+    for (const clock of [0, 123.4]) {
+      await lab.create(N);
+      const g = lab.solver();
+      g.chemLive = true;
+      for (let t = 0; t < 300; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+      for (let k = 0; k < 12; k++) g.seedChemistry(0.2 + 0.05 * k, 0.5, 0.012);
+      for (let t = 0; t < 300; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1, 0, clock + t / PER_SECOND);
+      const f = await g.readChemistry('chem');
+      twice.push(Array.from({ length: f.n * f.n }, (_, i) => f.data[i * 4 + 1]));
+    }
+    let apart = 0;
+    for (let i = 0; i < twice[0].length; i++) apart = Math.max(apart, Math.abs(twice[0][i] - twice[1][i]));
+    return { N, runs, apart };
+  }, { FEED, KILL, DU, DV, SEEDS, SETTLE: DRIFT_SETTLE, RUN: DRIFT_RUN, ABOVE: ALIVE_ABOVE, TILE, PER_SECOND: DRIFT_UNITS_PER_SECOND, DRIFTS: [0, presetDrift, 1] });
+  {
+    const [still, shipped, full] = drift.runs;
+    const cStill = correlation(still.settled, still.later);
+    const cShipped = correlation(shipped.settled, shipped.later);
+    const cFull = correlation(full.settled, full.later);
+    check('the settled maze barely creeps without the drift (the control is a control)', cStill > DRIFT_CONTROL_STILL,
+      `Drift 0, ${DRIFT_RUN} units on: correlation with the settled field ${cStill.toFixed(3)} (over ${DRIFT_CONTROL_STILL})`);
+    check('the Turing Print preset ships a Drift that rearranges the settled print, well past the control',
+      presetDrift > 0 && cShipped < DRIFT_MOVES && cShipped < cStill - DRIFT_GAP,
+      `Drift ${presetDrift} (the preset's), the same ${DRIFT_RUN} units: correlation ${cShipped.toFixed(3)} (under ${DRIFT_MOVES}, and ${DRIFT_GAP} under the control's ${cStill.toFixed(3)})`);
+    check('Drift 1 rearranges it further', cFull < DRIFT_FULL_MOVES && cFull < cShipped,
+      `Drift 1: correlation ${cFull.toFixed(3)} (under ${DRIFT_FULL_MOVES}, and under the preset's ${cShipped.toFixed(3)})`);
+    const near = Math.max(Math.abs(shipped.alive - still.alive), Math.abs(full.alive - still.alive));
+    check('the drifting print is still alive, neither emptied nor filled',
+      [still, shipped, full].every((r) => r.alive > DRIFT_ALIVE_LO && r.alive < DRIFT_ALIVE_HI) && near < DRIFT_ALIVE_NEAR,
+      `share of cells with activator over ${ALIVE_ABOVE}: control ${still.alive.toFixed(3)}, Drift ${presetDrift} ${shipped.alive.toFixed(3)}, Drift 1 ${full.alive.toFixed(3)} (each between ${DRIFT_ALIVE_LO} and ${DRIFT_ALIVE_HI}, and within ${DRIFT_ALIVE_NEAR} of the control's)`);
+    check('the drifting print has no grey patch, every tile keeps its stripes',
+      shipped.flattest > DRIFT_TILE_KEEPS * still.flattest,
+      `flattest ${TILE}-pixel tile's contrast (standard deviation): control ${still.flattest.toFixed(3)}, Drift ${presetDrift} ${shipped.flattest.toFixed(3)} = ${(shipped.flattest / still.flattest).toFixed(2)} of it (over ${DRIFT_TILE_KEEPS}); Drift 1 ${full.flattest.toFixed(3)} = ${(full.flattest / still.flattest).toFixed(2)}, shown not asserted`);
+    const w0 = wavelength(still.later, drift.N), w1 = wavelength(shipped.later, drift.N), w2 = wavelength(full.later, drift.N);
+    check('the drifting print keeps its stripe width',
+      Math.abs(w1 / w0 - 1) < DRIFT_WIDTH && Math.abs(w2 / w0 - 1) < DRIFT_WIDTH && w1 > 0.015 && w1 < 0.06,
+      `wavelength ${pct(w0)} for the control, ${pct(w1)} at Drift ${presetDrift}, ${pct(w2)} at Drift 1 (within ${DRIFT_WIDTH * 100}% of the control's, and on the plate)`);
+    check('Drift 0 ignores the clock', drift.apart === 0,
+      `largest difference in the activator after 300 units under clocks 0 and 123.4: ${drift.apart.toExponential(1)} (exactly 0)`);
+  }
+  /*
+    And the wiring, read from the source as the ink's is: the visualizer's
+    clock runs on seconds of its own (sixtieths of a second a frame over 60),
+    advanced in one place and never on a reading of the sound or of the wall
+    clock, since the owner wants the change to go on with no music and
+    nothing to move the whole plate with it; the setting is read only while
+    the print is on, and it and that clock are what the solver is handed; it
+    ships off, and the preset that is the print ships it on (the number read, not just the line).
+  */
+  {
+    const vis = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+    const clock = /turingClockRef\.current \+= sixtieths \/ 60;/.test(vis)
+      && (vis.match(/turingClockRef\.current\s*[-+*/]?=/g) || []).length === 1;
+    const gated = /print0 > 0\s*\?\s*Math\.max\(0,\s*Math\.min\(1,\s*currentSettings\.turingDrift \?\? 0\)\)\s*:\s*0/.test(vis);
+    const handed = /g\.stepChemistry\?\.\([^;]*,\s*drift,\s*turingClockRef\.current\);/.test(vis);
+    const defaults = [...typesSrc.matchAll(/^\s*turingDrift: ([0-9.]+),/gm)].map((m) => Number(m[1]));
+    const off = defaults.length === 1 && defaults[0] === 0;
+    check('the clock runs on seconds, the setting only with the print, off by default and on in the preset',
+      clock && gated && handed && off && presetDrift > 0,
+      `clock advanced once, by sixtieths / 60: ${clock}; setting read only while printing: ${gated}; solver handed the setting and the clock: ${handed}; default ${defaults.join(', ') || 'none'} (one, 0, wanted); the Turing Print preset sets ${presetDrift} (above 0 wanted)`);
   }
 } finally {
   await close();
