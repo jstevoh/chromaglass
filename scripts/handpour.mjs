@@ -12,9 +12,10 @@
  *
  * 1. THE SLIDER, ON PAPER (node, no browser). `lookTarget` is what the regulator
  *    holds a seeded plate at. Before round 2 it was `min(dyeBudget, seedMean)`,
- *    flat from the look's own composition to the slider's top: Jellyfish Bloom
- *    (no `dyeBudget` of its own, so the default 0.85) held 0.14 for every
- *    slider position from 0.14 up. It has to rise with the slider across the
+ *    flat from the look's own composition to the slider's top: a look laid
+ *    thinner than its budget (Jellyfish Bloom lays 0.47 under the default 0.85)
+ *    held 0.47 for every slider position from 0.47 up, and the review's 0.14
+ *    and 0.85 were two slider positions, not its composition. It has to rise with the
  *    whole range, and be the old number at the look's own value for EVERY
  *    preset's budget and a spread of compositions, heavy ones included, so a
  *    preset left alone is the program it was. The "old" number is written out
@@ -23,10 +24,9 @@
  *
  * 2. THE SLIDER, ON THE PLATE (the app). Jellyfish Bloom is opened with the
  *    slider at 0.85 and at 0.14 and left to settle; the low one has to hold
- *    less dye. Before round 2 both held the same 0.14 (this is the number that
- *    was dead). Twice, in both orders, so a plate that drifts reads as drift.
+ *    less dye. Before round 2 the slider was dead above the look's own mass. Twice, in both orders, so a plate that drifts reads as drift.
  *
- * 3. THE HAND POUR (the app). On a look laid sparse (Jellyfish Bloom 0.14, a
+ * 3. THE HAND POUR (the app). On a look laid sparse (galaxy, aurora, a
  *    regulator that works at up to 12.5 x its normal rate on a seeded plate)
  *    dye a hand lays is, to the regulator, an excess to be dried at once. The
  *    fix banks what a hand laid (`FluidSimulation.bankHand`) and lets it raise
@@ -113,7 +113,7 @@ const budgetOf = (id) => PRESETS.find((p) => p.id === id)?.settings.dyeBudget ??
   check('and where the laid picture is thinner than the budget it is live across the whole range', live, 'top over 1.5 x bottom');
   check('and at the look\'s own budget the target is the one it was, for every preset budget and composition, heavy ones included', same, worst[0] ?? '');
   // The two the review named, with the budget the preset really has.
-  for (const [name, seedMean] of [['jellyfish-bloom', 0.14], ['comet', 0.16]]) {
+  for (const [name, seedMean] of [['jellyfish-bloom', 0.47], ['comet', 0.16]]) {
     const sb = budgetOf(name);
     const row = { name, seedMean, seedBudget: sb, before: [first(seedMean, 0.14), first(seedMean, 0.85)], after: [lookTarget(seedMean, 0.14, sb), lookTarget(seedMean, 0.85, sb)] };
     report.slider.push(row);
@@ -266,15 +266,16 @@ try {
   check('the plate\'s own answer matches the one worked out from the preset', disagree.length === 0, disagree.map((l) => l.id).join(', ') || `${report.looks.length} looks agree`);
   console.log(`     the fix reaches ${reached.length} of ${ids.length}: ${reached.join(', ') || 'none'}`);
   check('it reaches at least one look', reached.length >= 1, 'without one, nothing below measures the fix');
-  // Jellyfish Bloom first (the look the review measured), then the others in
-  // preset order. (An older id for Jellyfish Bloom is retired and still opens it;
-  // it is left unnamed here because `plate` fails any quoted retired id in scripts/.)
-  reached.sort((a, b) => (b === 'jellyfish-bloom') - (a === 'jellyfish-bloom'));
+  // Jellyfish Bloom is NOT among them: on the plate it lays 0.47 under the
+  // default 0.85, so at its own slider its target (0.47) is above the 0.45 cliff
+  // and it is not sparse. The review measured it with the slider at 0.14, where
+  // it is (0.077), which part 2 does; the bank, sparkle and surf gates leave it
+  // alone at its default, and this says so rather than assuming it is reached.
   if (!ONLY) {
-    check('it reaches Jellyfish Bloom, the look the review measured', reached.includes('jellyfish-bloom'));
+    check('Jellyfish Bloom at its default is not sparse, so the gated terms leave it as it was', !reached.includes('jellyfish-bloom'));
     check('it reaches at least three looks, so the pour A/B is not one look\'s luck', reached.length >= 3, `${reached.length} reached`);
     const seed = report.looks.find((l) => l.id === 'jellyfish-bloom')?.seedMean;
-    check('Jellyfish Bloom lays about 0.14, the composition the numbers above assume', seed > 0.08 && seed < 0.22, `seedMean ${seed?.toFixed(3)}`);
+    check('Jellyfish Bloom lays a mass under its 0.85 budget, where the slider is proportional', seed > 0 && seed < 0.85, `seedMean ${seed?.toFixed(3)}`);
   }
 
   /* 2. The slider on the plate ----------------------------------------- */
