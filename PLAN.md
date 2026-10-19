@@ -7236,6 +7236,137 @@ phone and the iPad, the film on the wall through Send to wall. *Measure:* `phone
 with the pigment's opacity is 18k's old shortcut, and the reason for this section), Marangoni
 plug flow (named above), and any recorded footage as a texture.
 
+## 33. Bubbles and the closeup, per liquid (asked 2026-10-19)
+
+The owner, 2026-10-19: bubbles still look pixelated around themselves and sometimes
+draw as a donut; bubbles should answer the liquid they are in; and the closeup looks
+like a sheet of biological cells, where what is wanted is the liquid on the plate,
+nearer and in relief. The research behind the bubble items is item 2 of
+`/mnt/project-files/drops/research/bubbles-and-drops.md` (§1.4–1.5, the projected
+bubble), in the project's shared files. Pictures of the report's halo and donut, before
+and after 33a, are in `/mnt/project-files/drops/bubbles-2026-10-19/`.
+
+Every item keeps the standing rule: nothing moves the frame as a whole from sound, and
+each feature ships its phone version in the same PR (the plate shader is shared, so the
+phone and the iPad draw what the desk draws; a new control goes on the phone too).
+
+### ~~33a. No stepped ring round a bubble's hole~~ — **Shipped, this PR** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`: the line moved 8.9–18.3 % of the ring round holes of 1.8–14 cells before, 0 % after, and still draws 52.8 % → 52.8 % and 61.1 % → 58.3 % of the band where two dyes meet; story in `docs/plan-shipped.md` §33a)
+
+### 33b. The soft glow still left round a hole (S)
+
+After 33a a pale soft ring two to four cells wide stays round every hole (the bottom
+row of `zh-sheet.png` in the folder above). Inferred, not yet measured: the relief
+(`sobelGrad`, plate.ts) lighting the one-cell depth ramp the air cuts, as if the dye
+stood in a ridge there. A real hole's edge is the meniscus, which the bubble's own pass
+draws; the dye beside it is flat. Find the term that draws the ring (switch relief,
+lacing and the edge glow off one at a time in the lab) and take it off a hole's cut
+without taking it off a dye's own edge.
+*Check:* `holeline` gains a line: with the bubbles' drawing at 0, the mean of the ring
+1–6 cells past each hole's rim is within 6 levels of the dye 10 cells out (today's
+value printed first, in the header), and a pool's relief at its edge into clear liquid
+still moves at least 0.8 of what it moves today.
+
+### 33c. The lace reads the same lit difference (S)
+
+`lacing()` (plate.ts) compares lit colours across taps 3 cells apart, the pattern that
+drew 33a's ring, so a look with Lacing up likely rings every hole the same way
+(inferred from the code, not rendered). Gate it the way 33a gated `boundaryDiff`.
+*Check:* `holeline` runs its hole plate a second time with Lacing at 1: under 1 % of
+the ring moved, and the lace on its own plate (`npm run lace`) unchanged.
+
+### 33d. A bubble's edge at the screen's resolution (M)
+
+Close up (zoom 3 to 5 in the lab) a bubble's outer edge is faceted: the band is drawn
+from the air field, linear between texels, and its softness is clamped to 0.02–0.3 of
+the curved band, so a small bubble's edge steps with the solver's cells, not the
+screen's pixels. Reconstruct the edge's distance at sub-texel (bicubic of the air
+field, or the bubble list's own circle where a bubble is still round) and antialias
+it over one screen pixel at every zoom. Keep the air field's shape where a bubble is
+deformed: a sheared bubble is not a circle.
+*Check:* new `npm run bubbleedge` (lab): bubbles of 1.8 to 14 cells at zoom 1, 3 and 5,
+the rim's radius found along 64 rays: RMS deviation from a circle under 0.5 screen
+pixel, and the 10–90 % rise of the edge no wider than 1.5 pixels. Today's numbers
+printed first.
+
+### 33e. The bubble as the projector throws it, not a donut (M)
+
+What the research says a gap-spanning bubble on a projected plate is: a clear middle,
+the lamp through a slab of air (nearly the lamp's own colour); a dark band at the rim
+whose width is the share (1 − u*) of the meniscus (about half the gap wide) whose light
+refracts out of the projector's aperture, u* set by the aperture and the index step,
+the band vanishing as |1 − n_out/n_in| falls to NA/(2·n_out); a lens that minifies
+(focal length about −1.5 R), not one that magnifies; and a highlight only from a side
+lamp.
+
+What the plate draws (plate.ts, the bubble's projected branch): the middle is
+`mix(lensCol, tint…, 0.25 + 0.55·clarity)`, the dye's own hue at a quarter to four
+fifths, where the comment beside it says "a breath of the liquid's hue"; and the band
+is a share of the bubble's radius at AIR_DARK 0.9, about a third of R on an 8-cell
+bubble. A dark ring round a dye-coloured disc is the donut. Why the owner sees it only
+"sometimes" is not yet known: find which of the clarity term, the crossing to the
+camera's bubble (dropCam) and a hole cut wider than the drawn bubble sets it, in the lab,
+before changing anything.
+
+Draw instead: the middle as the clear plate there (what the plate shows through a hole
+with the bubbles' drawing at 0), with at most a tenth of the wetting film's tint; the
+band's width from the meniscus in plate units and u*, not from R, so a large bubble
+wears a fine line and a small one is mostly dark, as on a real plate; the lens
+minifying. Shortcut to name: the meniscus as a circular arc of radius gap/2 (a contact
+angle of zero), and one index per cell.
+*Check:* new `npm run bubblelook` (lab), bubbles of 3 to 20 cells: (1) the middle's
+mean within 10 levels of the clear plate at the same point, and its hue not the dye's;
+(2) the dark band's width within 25 % of (1 − u*)·gap/2 in screen pixels, for two
+liquids of different index (two widths); (3) the dark share of the bubble's area
+falls as the bubble grows; (4) Bubbles at 0 is the plate to the bit. `pops`, `straw`,
+`airlens` and a `look` render.
+
+### 33f. Bubbles that know their liquid (M)
+
+The bubbles' motion reads one plate-wide viscosity and surface tension
+(`liquidMu`, `liquidSigma` in `src/lib/bubbles.ts`; 18i), and their drawing one
+index. The species field (`src/lib/liquidProps.ts`, 18d) already carries each cell's
+viscosity, density and index. Read them under each bubble:
+- *Speed and film:* Ca = μU/σ from the cell's μ; Bretherton's speed-up
+  1.5/(1 + 2.26 Ca^(2/3)) (18i) with that Ca, so a bubble in glycerine lags the
+  flow and one in alcohol runs ahead of it.
+- *Shape:* the Saffman–Taylor fingering and a sheared bubble's stretch from the same Ca.
+- *Merging:* the film's drainage time ∝ (μ/σ)·R (18i) per cell, so bubbles in syrup
+  sit touching far longer than in water.
+- *Optics:* 33e's band from the cell's index (oil about 1.47, water 1.33, alcohol
+  1.36, glycerine 1.47); in ferrofluid the liquid is opaque, so a bubble is a bright
+  window in black and its band the meniscus's thinning; in a milky liquid the
+  middle is the brightest thing on the plate.
+- A surface-tension table per liquid (water 72, oils about 30, alcohol 22, soapy
+  water about 30 mN/m) added to the bottle's behaviour, defaulting to today's
+  `liquidSigma` so every look keeps its motion.
+Shortcuts to name: one σ per liquid (no surfactant moving along the rim, no Marangoni
+flow), and the wetting film's thickness not drawn as colour.
+*Check:* `npm run bubblephysics` extended: one bubble pushed through water, oil and
+glycerine: the speed ratios follow Bretherton's law within 10 %, the drainage times
+follow μ/σ within 20 %, and (with 33e) the band width oil against water follows u*
+within 15 %; on the plate's own liquid, every number today's check prints unchanged.
+
+### 33g. The closeup: the liquid nearer and in relief, not cells (L)
+
+The owner wants "a closer and more 3d view of the liquid on the plate". The closeup
+adds invented structure on top of the plate: `cellField` (concentric Voronoi cells
+slid by a flow map, 20c-1's named shortcut), `macroWarp` and `macroDetail`. Those cells
+are what reads as biology. Replace them with the real fields brought nearer: the dye's
+depth and the gap's height magnified smoothly (bicubic, no invented cells), lit as a
+height field by a raking lamp so the dye's thickness and each meniscus stand in
+relief, with a shallow depth of field across a slightly tilted view, the dye's two
+layers parting a little in parallax. `npm run steadycam`'s still camera kept. If a look
+wants the cells as an effect, it opts in; no look gets them by default. 20c-1 closes
+with this.
+*Check:* new `npm run macroview` (lab) at zoom 4 and 6: (1) no lattice: the
+autocorrelation of the render's luminance, less that of the dye field magnified, has
+no secondary peak above 0.15 at lags of 4 to 40 pixels (today's peak printed first);
+(2) the relief follows the dye: its shading's gradient correlates with the dye depth's
+gradient at 0.6 or more; (3) zooming from 1 to 6 moves no hue's mean by more than
+ΔE 5 (the same liquid, nearer); (4) `steadycam` and `cellride` (which then asks that
+no look draws cells by default) green; and a `look` render, on the desk and on the
+phone's pinch.
+
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.

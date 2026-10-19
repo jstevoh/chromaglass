@@ -436,6 +436,36 @@ fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
 
 fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
 
+/*
+  The line between two dyes (Boundary Contrast, 0.35 in every look) is drawn
+  where the lit colour changes across a few cells. The lit colour is the dye's
+  hue *and* its depth: a thin film of one dye is paler than a pool of it. So a
+  bubble's hole, where one dye's depth falls from a pool to nothing over two or
+  three cells, read here as a boundary between two colours, and the line was
+  drawn round every hole. The four taps sit 1.65 cells out on a cross, so on a
+  hole a few cells across the line came out as bright and dark blocks at those
+  offsets, a "+" stamped round each bubble: the owner's "bubbles still look
+  really pixelated around themselves" (2026-10-19). The dye itself was clean;
+  with Boundary Contrast at 0 the halo went (npm run holeline).
+
+  So the line is asked where the dye's colour changes, not its depth. The
+  colour per unit of dye ("unit" in decodeFluid: the absorbances over the
+  density) is the same anywhere one dye lies, however thin, and differs where
+  two meet. The lit difference is kept as it was, for how strong the line is,
+  and gated by how far the hue moves between the same two taps. A line between
+  two dyes, at any depth, is drawn as before; a hole in one dye, or a pool
+  thinning into clear water, draws none. A density ratio was tried first and
+  cleared the holes as well, but it also took the line off two dyes of very
+  different strength where they meet, which is a boundary.
+*/
+const HUE_LO: f32 = 0.03;
+const HUE_HI: f32 = 0.12;
+fn dyeHue(t: texture_2d<f32>, fuv: vec2f) -> vec3f {
+  let raw = textureBicubic(t, fuv);
+  let d = decodeDensity(raw.a);
+  if (d < 0.001 / DENSITY_SCALE) { return vec3f(1.0); }
+  return exp(-vec3f(decodeDensity(raw.r), decodeDensity(raw.g), decodeDensity(raw.b)) / d);
+}
 fn boundaryDiff(t: texture_2d<f32>, fuv: vec2f) -> f32 {
   let cC = decodeFluid(t, fuv, 0.0, false);
   if (cC.a < 0.03) { return 0.0; }
@@ -446,8 +476,10 @@ fn boundaryDiff(t: texture_2d<f32>, fuv: vec2f) -> f32 {
   let cB = decodeFluid(t, fuv + vec2f(0.0, -e), 0.0, false);
   let maskX = min(cR.a, cL.a);
   let maskY = min(cT.a, cB.a);
-  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX);
-  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY);
+  let hueX = smoothstep(HUE_LO, HUE_HI, length(dyeHue(t, fuv + vec2f(e, 0.0)) - dyeHue(t, fuv + vec2f(-e, 0.0))));
+  let hueY = smoothstep(HUE_LO, HUE_HI, length(dyeHue(t, fuv + vec2f(0.0, e)) - dyeHue(t, fuv + vec2f(0.0, -e))));
+  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX) * hueX;
+  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY) * hueY;
   return diffX + diffY;
 }
 `;
