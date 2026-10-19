@@ -94,6 +94,8 @@ struct Sim {
   mags: array<vec4f, 3>,
   // The magnet's radius, every one of them (magnetDisc.ts): Magnet Size's.
   magRadius: f32,
+  // 1 where decayDye clears thin mist first (sparse dark looks only; lib/dyeTarget.ts).
+  surfaceClear: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -3802,9 +3804,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     // solvent-thickness field): uniform d *= S.evap fades thick bodies and thin
     // inter-body mist at the same fractional rate, leaving a grey-pastel veil across
     // the black ground. A surface-to-volume term surf clears thin mist (d.a small)
-    // first while leaving thick dye bodies intact.
+    // first while leaving thick dye bodies intact. It was ungated and moved every
+    // look; only ten were measured (review of #401, ask 4), so it is gated.
+    // Only where S.surfaceClear is set: a sparse dark look laid with a composition.
+    // Every other look keeps the uniform decay it always had (PLAN 28d-A).
     let loss = max(0.0, 1.0 - S.evap);
-    let surf = loss * 0.06 / ((d.a + 0.14) * (d.a + 0.14));
+    let surf = S.surfaceClear * loss * 0.06 / ((d.a + 0.14) * (d.a + 0.14));
     d *= max(0.0, S.evap - surf);
   }
   // Safety cap (PLAN 18g: "A safety cap stays, named as one"):

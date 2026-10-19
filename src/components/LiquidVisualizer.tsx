@@ -7,6 +7,8 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
+import { lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
+import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE, WORKING_DYES, dyesOnPlate } from '../presetPlate';
 import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
 import { plateAreas, areaForBand, areaCentre, areaDye, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
@@ -1057,6 +1059,26 @@ class FluidSimulation {
   meanDensity = 0; // rolling measure of how full the plate is
   /** Mean density inside the dish laid by the most recent `seedPreset` (null if cleared by hand). */
   seedMean: number | null = null;
+  /** The Dye Budget of the look `seedMean` was laid for (`lib/dyeTarget.ts` scales the slider against it). */
+  seedBudget = 0.85;
+  /**
+   * Whether this plate is a look that sits on black with little dye
+   * (`isSparseDark`), set each frame by the loop that reads the settings, so
+   * the solver does not read `lampGround` itself (`npm run panel` keeps every
+   * setting the solver reads on the per-plate list, and this one is the whole
+   * show's, not a plate's).
+   */
+  sparseDarkLook = false;
+  /** Everything `addDensity` has been given, summed, so a frame's hand can be told from the music's. */
+  private laidMass = 0;
+  private handMarkMass = 0;
+  /**
+   * Dye a hand has laid on a seeded plate, as a mean over the dish, that the
+   * regulator still holds room for. It falls away over `HAND_BANK_SECONDS` of
+   * show time (`stepHandBank`). See `bankHand`.
+   */
+  private handBank = 0;
+  static readonly HAND_BANK_SECONDS = 10;
   /**
    * The average colour on this layer, 0..1 per channel.
    *
@@ -2003,9 +2025,45 @@ class FluidSimulation {
     }
   }
 
+  /** Call before a hand lays anything this frame; `bankHand` after reads what it laid. */
+  markHand() { this.handMarkMass = this.laidMass; }
+
+  /**
+   * Hold room on a sparse seeded plate for what a hand just poured.
+   *
+   * A seeded look's regulator target is its own opening picture (0.14 on
+   * Jellyfish Bloom), and a hand pour on such a plate is dye the target never
+   * counted: `over` goes up at once, and with `regStepScale` (up to 12.5× at a
+   * slow dt) and the surface term the plate takes it back in about a second
+   * (review of #401, ask 2). Music pours are held by `pourRoom`; a hand's
+   * stroke is not, so its mass is banked here and added to the target, and
+   * falls away over `HAND_BANK_SECONDS` rather than all at once.
+   *
+   * Only a sparse dark plate banks (`sparseDarkLook`). On a look where the
+   * slider itself is the cap (`seedMean >= dyeBudget`) the target already is
+   * the slider, a hand pour was held at it on main, and banking would raise the
+   * ceiling above what the owner set; those looks stay the program they were.
+   *
+   * Named shortcut (PLAN 28d-A): a mean-over-the-dish bookkeeping, not a
+   * volume. The honest answer is PLAN 18c-2, where a pour adds volume.
+   */
+  bankHand() {
+    if (!this.sparseDarkLook) return;
+    const mass = this.laidMass - this.handMarkMass;
+    if (mass > 0) this.handBank += mass / Math.max(1, this.dishArea);
+  }
+
+  /** The bank for this solver step, decayed by the show seconds the step stands for. */
+  stepHandBank(): number {
+    if (this.handBank > 1e-6) this.handBank *= Math.exp(-this.dtSeconds / FluidSimulation.HAND_BANK_SECONDS);
+    else this.handBank = 0;
+    return this.handBank;
+  }
+
   addDensity(x: number, y: number, amount: number, r = 1, g = 1, b = 1) {
     const index = x + y * this.size;
     this.dirty = true;
+    this.laidMass += amount;
     this.density[index] += amount;
     // Store log-space absorptions for Scott Burns geometric mean mixing.
     // At render time: channel = exp(-densityChannel / density)
@@ -2155,6 +2213,7 @@ class FluidSimulation {
     this.dirty = false;
     this.dyeMovePending = false;
     this.seedMean = null;
+    this.handBank = 0;
     this.gpu?.clear();
   }
 
@@ -2281,6 +2340,7 @@ class FluidSimulation {
     if (areas) {
       this.layAreas(areas, col);
       this.seedMean = Math.max(0, dishSum() - beforeMean);
+      this.seedBudget = findPreset(presetId)?.settings.dyeBudget ?? 0.85;
       return harmony;
     }
 
@@ -2786,6 +2846,7 @@ class FluidSimulation {
     }
 
     this.seedMean = Math.max(0, dishSum() - beforeMean);
+    this.seedBudget = findPreset(presetId)?.settings.dyeBudget ?? 0.85;
     return harmony;
   }
 
@@ -3805,16 +3866,16 @@ class FluidSimulation {
     // not being smooth, "especially at the beginning steps").
     // Named regulator shortcut (PLAN 18g / 28d-A, pending 18c-2): a seeded look
     // whose opening composition covers less of the dish than its `dyeBudget`
-    // slider (`seedMean < dyeBudget`, e.g. Jellyfish Bloom 0.14 vs 0.65, Comet
-    // 0.16 vs 0.85, Cyberpunk 0.11 vs 0.50) holds `min(dyeBudget, seedMean)` so
-    // the music turns the bodies over rather than filling the black void up to
-    // 0.85. And because `stepDecay` runs once per `dt`-scaled solver step while
+    // slider (`seedMean < seedBudget`, e.g. Jellyfish Bloom 0.14 vs 0.85, Comet
+    // 0.16 vs 0.85, Cyberpunk 0.11 vs 0.50) holds its own picture, scaled by the
+    // slider's position against the look's own budget (`lookTarget`, so the
+    // slider stays live), so the music turns the bodies over rather than
+    // filling the black void up to 0.85. And because `stepDecay` runs once per `dt`-scaled solver step while
     // frame-driven injectors run at 60 Hz, `regStepScale` scales the per-step
     // regulator ceiling by `1 / (dt / 0.05)` on seeded plates so slow-`dt` looks
     // (`jellyfish-bloom` dt 0.008, `deep-ocean` dt 0.009) hold their budget.
-    const rawBudget = this.seedMean !== null && this.seedMean > 0
-      ? (this.seedMean > 0.85 && (settings.dyeBudget ?? 0.85) >= 0.85 ? this.seedMean : Math.min(settings.dyeBudget ?? 0.85, this.seedMean))
-      : (settings.dyeBudget ?? 0.85);
+    const handBank = this.stepHandBank();
+    const rawBudget = dyeLookTarget(this.seedMean, settings.dyeBudget ?? 0.85, this.seedBudget) + (this.seedMean !== null && this.seedMean > 0 ? handBank : 0);
     const budget = Math.max(0.06, Math.min(Math.max(1.2, this.seedMean ?? 0), rawBudget));
     const targetMean = budget + (0.28 - budget) * macroAmountOf(settings);
     const over = Math.max(0, this.meanDensity / targetMean - 1);
@@ -4039,6 +4100,7 @@ class FluidSimulation {
       smearX, smearY,
       air: settings.airVelocity > 0.1 ? settings.airVelocity : 0,
       evapFactor, time,
+      surfaceClear: this.seedMean !== null && this.seedMean > 0 && this.sparseDarkLook ? 1 : 0,
       // The lasting current. Damping is its drag per step — the first thing that
       // control has ever visibly done — and the cap keeps a step's travel under
       // ¾ of a cell whatever the Speed and Advection.
@@ -5572,6 +5634,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     }
   };
+  /**
+   * `performGesture` with the dye it laid banked for the regulator
+   * (`FluidSimulation.bankHand`): the remote's pad, OSC, a replayed
+   * performance and the room camera pour as a hand does. A separate function
+   * so `npm run panel` still reads `performGesture`'s own switch for the tools
+   * the engine acts on.
+   */
+  const performGestureBanked = (g: Parameters<typeof performGesture>[0]) => {
+    for (const f of fluidsRef.current) f?.markHand();
+    performGesture(g);
+    for (const f of fluidsRef.current) f?.bankHand();
+  };
 
   /**
    * Clear the plate and lay a preset's look on it: its dye, its liquids, its
@@ -6253,7 +6327,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
       }
     },
-    applyGesture: (g) => performGesture(g),
+    applyGesture: (g) => performGestureBanked(g),
     wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },
   }));
 
@@ -6913,6 +6987,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           phraseRef.current = phrased;
           for (const f of fluidsRef.current) if (f) {
             f.phrase = phraseRef.current; f.dtSeconds = simStepS;
+            f.sparseDarkLook = isSparseDark(currentSettings.lampGround, dyeLookTarget(f.seedMean, currentSettings.dyeBudget ?? 0.85, f.seedBudget));
             f.paceMul = paceNowRef.current.activity;
             f.dropHeight = currentSettings.dropHeight ?? 0;
             f.dropFingering = currentSettings.fingering ?? 0;
@@ -7256,7 +7331,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const print = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
               const c = chemAmt > 0 && print === 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : TURING_PRODUCT;
               const seededReef = lead.seedMean !== null && lead.seedMean > 0 && print === 0;
-              const chemTarget = seededReef ? Math.min(currentSettings.dyeBudget ?? 0.85, lead.seedMean!) : (currentSettings.dyeBudget ?? 0.85);
+              const chemTarget = dyeLookTarget(seededReef ? lead.seedMean : null, currentSettings.dyeBudget ?? 0.85, lead.seedBudget);
               const chemRoom = seededReef ? Math.max(0, Math.min(1, (1.0 - lead.meanDensity / Math.max(0.06, chemTarget)) * 2.5)) : 1;
               const chemDt = seededReef ? Math.min(1, Math.max(0.05, lead.dt / 0.05)) * chemRoom : 1;
               const amount = (chemAmt > 0 ? chemAmt : 0.6) * 0.02 * sixtieths * chemDt;
@@ -7561,6 +7636,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const hands: { hand: Hand; primary: boolean }[] = [];
           if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, laid: dropLaidRef.current, blowDir: blowDirRef.current }, primary: true });
           for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
+          for (const f of fluidsRef.current) f?.markHand();
           for (const { hand, primary } of hands) {
             /*
               Nothing is laid while the plate drains. But a magnet lays
@@ -7903,6 +7979,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             hand.clock++;
             if (primary) { strokeLastRef.current = hand.stroke; blowDirRef.current = hand.blowDir; dropClockRef.current = hand.clock; }
           }
+          for (const f of fluidsRef.current) f?.bankHand();
 
           // ── Automation logic ───────────────────────────────────
           if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
@@ -8015,9 +8092,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   const styles = stylesOf(li);
                   const style = DICE.evolve.pick(styles);
                   const clearPhase = af.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
-                  const lookTarget = af.seedMean !== null && af.seedMean > 0
-                    ? (af.seedMean > 0.85 && (currentSettings.dyeBudget ?? 0.85) >= 0.85 ? af.seedMean : Math.min(currentSettings.dyeBudget ?? 0.85, af.seedMean))
-                    : (currentSettings.dyeBudget ?? 0.85);
+                  const lookTarget = dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget);
                   const evolveRoom = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - af.meanDensity / Math.max(0.06, lookTarget)) * 2.5));
                   const evolveDt = Math.min(1, Math.max(0.08, af.dt / 0.05)) * evolveRoom;
                   // A gust is a bigger pour, not just a more frequent one:
@@ -8447,15 +8522,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // `seedMean === 0`) pour no dye into the ferrofluid cells. On sparse dark
                   // looks (`lampGround < 0.05` and `lookTarget < 0.45`), continuous streams
                   // place coherent drops (`contStyle`) rather than `spray`/`splatter` mist,
-                  // and `treble sparkle` uses `sparkCol` directly rather than mixing 50%
-                  // white (`* 0.5 + 0.5`).
+                  // and only there does `treble sparkle` use the gentle `sparkCol` spark; every
+                  // other look keeps `treble01 * 1.1` in the 50%-white mix it always had.
                   const clearPhase = activeFluid.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
-                  const lookTarget = activeFluid.seedMean !== null && activeFluid.seedMean > 0
-                    ? (activeFluid.seedMean > 0.85 && (currentSettings.dyeBudget ?? 0.85) >= 0.85 ? activeFluid.seedMean : Math.min(currentSettings.dyeBudget ?? 0.85, activeFluid.seedMean))
-                    : (currentSettings.dyeBudget ?? 0.85);
+                  const lookTarget = dyeLookTarget(activeFluid.seedMean, currentSettings.dyeBudget ?? 0.85, activeFluid.seedBudget);
                   const pourRoom = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - activeFluid.meanDensity / Math.max(0.06, lookTarget)) * 2.5));
                   const pourDt = Math.min(1, Math.max(0.04, activeFluid.dt / 0.05)) * pourRoom;
-                  const sparseDark = (currentSettings.lampGround ?? 0) < 0.05 && lookTarget < 0.45;
+                  const sparseDark = isSparseDark(currentSettings.lampGround, lookTarget);
                   const contStyle = () => { const st = aStyle(); return sparseDark && (st === 'spray' || st === 'splatter') ? 'drop' : st; };
 
                   // Center pulse — scales with density mapping
@@ -8573,12 +8646,31 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const sx = sp ? Math.floor(sp.x) : DICE.music.int(GRID_SIZE - 20) + 10;
                       const sy = sp ? Math.floor(sp.y) : DICE.music.int(GRID_SIZE - 20) + 10;
                       activeFluid.addTemp(sx, sy, treble01 * 0.6 * autoAmp);
-                      if (pourDt > 0.001) {
+                      /*
+                        The gentle spark is for the sparse dark looks only. It
+                        was `treble01 * 1.1` in a 50%-white mix on every look,
+                        and the cut to `0.12 * autoAmp * pourDt` in the look's
+                        own colour made every look's sparkle about nine times
+                        weaker without saying so (review of #401, ask 3). A
+                        dark plate laid at 0.1 cannot take 1.1 a speck; a full
+                        plate always could, and keeps what it had.
+                      */
+                      if (sparseDark) {
+                        if (pourDt > 0.001) {
+                          for (let ddy = -1; ddy <= 1; ddy++) {
+                            for (let ddx = -1; ddx <= 1; ddx++) {
+                              const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
+                              activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 0.12 * autoAmp * pourDt * w,
+                                sparkCol.r, sparkCol.g, sparkCol.b);
+                            }
+                          }
+                        }
+                      } else {
                         for (let ddy = -1; ddy <= 1; ddy++) {
                           for (let ddx = -1; ddx <= 1; ddx++) {
                             const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
-                            activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 0.12 * autoAmp * pourDt * w,
-                              sparkCol.r, sparkCol.g, sparkCol.b);
+                            activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 1.1 * w,
+                              sparkCol.r * 0.5 + 0.5, sparkCol.g * 0.5 + 0.5, sparkCol.b * 0.5 + 0.5);
                           }
                         }
                       }
@@ -10088,7 +10180,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /** Where the pointer is on the plate, in grid cells: where a tool acts. */
         pointer: () => ({ ...mousePosRef.current, down: isMouseDownRef.current, grid: GRID_SIZE }),
         /** A gesture from a hand that is not the pointer (a replayed take, the pad, OSC): `npm run bottles`. */
-        gesture: (g: Parameters<typeof performGesture>[0]) => performGesture(g),
+        gesture: (g: Parameters<typeof performGesture>[0]) => performGestureBanked(g),
         /** The tool the hand holds now, once the pick has reached the loop (`npm run bottles` waits on it). */
         tool: () => activeToolRef.current,
         /** Every finger on the glass, the pointer first, and whether two of them are the camera (npm run phone). */

@@ -193,6 +193,7 @@
     "phonelink": "npm run build && node --experimental-strip-types scripts/phonelink.mjs",
     "press": "npm run build && node scripts/press.mjs",
     "drain": "npm run build && node scripts/drain.mjs",
+    "handpour": "npm run build && esbuild scripts/handpour.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/handpour.mjs && node node_modules/.cache/handpour.mjs",
     "finger": "npm run build && node scripts/finger.mjs",
     "gallery": "npm run build && esbuild scripts/gallery.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/gallery.mjs && node node_modules/.cache/gallery.mjs",
     "pixels": "npm run build && esbuild scripts/pixels.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/pixels.mjs && node node_modules/.cache/pixels.mjs",
