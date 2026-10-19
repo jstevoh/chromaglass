@@ -6940,7 +6940,7 @@ a scratch prototype of the model above (not committed) it reads 23 of 23; with n
 `src/lib/soapFilm.ts` it exits 1 and says so. A bar is never moved to get green: if the
 model cannot reach one, the PR says what it reached and asks.
 
-### 32a. The CPU reference (first PR, Antigravity)
+### 32a. The CPU reference (first PR, Antigravity — in progress, this PR)
 
 `src/lib/soapFilm.ts` exports `createSoapFilm({nx, ny, dx, h0, noise, seed})`,
 `stepSoapFilm(f, dt, {g, evap})` and `soapFilmRgb(f, {cosI, gain})`, and
