@@ -512,6 +512,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'chemistryPattern', label: 'Pattern (Spots to Labyrinth)', min: 0, max: 1 },
   { key: 'chemistryWidth',  label: 'Pattern Width',    min: 0.1, max: 1 },
   { key: 'turingPrint',     label: 'Turing Print',     min: 0, max: 1 },
+  { key: 'turingInk',       label: 'Turing Print Ink', min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
   // The mirror rig, which is the one optical trick people reach for mid-song.
   // Folds is a stepped choice and rides a fader as one: the sheet's five

@@ -1239,6 +1239,12 @@ white lamp, every stripe about the same width. Then stir it with a hand or a Blo
   Looks sheet moves it; say where you would set it;
 - On Sensual Laboratory and Neon Coral Reef the coral is now half the size it was, and
   grows where it grew. Better, or did the bigger coral suit those looks?
+- Pour a bottle of colour into Turing Print (PLAN 26d-3): does it show through the
+  stripes, or do they hide it? Where the colour and the dark print meet, is the
+  multiplied look right, or should the print win (26d-3b)?
+- Print Ink (the lamp pins, the phone's Settings rail): drag it from Starch round the wheel.
+  Is each hue a solid colour on the white lamp, with the same stripe edge as the indigo?
+  Does a Go between two looks with different inks switch cleanly?
 
 ## 47. The test pattern and Identify on a real wall (PLAN 8e)
 

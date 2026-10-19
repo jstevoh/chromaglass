@@ -62,6 +62,8 @@ const LIGHT_STACK = new Set([
   // Starch in the dish (PLAN 26d): the reaction printed black on white or
   // deposited in the look's colours, a choice for a look, made by hand.
   'turingPrint',
+  // And the colour it prints in: an indicator is chosen, not wandered to.
+  'turingInk',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',

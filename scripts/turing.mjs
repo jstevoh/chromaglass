@@ -61,8 +61,20 @@
  *      between the picture's darkness and the activator, read cell for cell)
  *   5. printing for as long again changes the picture's dark share by under
  *      0.03: an equilibrium, not a deposit that builds
+ *   6. the print takes another colour (turingInk(), at a green, a blue and a
+ *      red: its dark is a solid of that colour, the three pictures apart);
+ *      the visualizer hands the setting to the print (read from its source,
+ *      since the app's own frames cannot be read here, and the setting's
+ *      default is 0, starch). What is measured of the colour is the ink
+ *      function's depth in the plate's shader, not the setting's path to it
+ *   7. a colour poured under the print shows through it (red over green on
+ *      the light paper of a pool rises at least threefold), and the print
+ *      stays in the pool (its stripes correlate with the undyed picture's,
+ *      against the same read slid along, which they do not)
  */
+import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
+import { turingInk } from '../src/lib/turingInk.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -81,6 +93,7 @@ const RUNGS = [256, 384, 512];
 const WIDTH_SPREAD = 1.10, STIR_HELD = 0.10, MOVED = 0.5, SWIRL = 0.3, CARRIED = 0.15;
 const MID_MOST = 0.20, SIDE_LEAST = 0.20, WHERE = 0.7, BUILDS = 0.03;
 const FILLED = 0.001;
+const INK_SHOWS = 0.3, INK_PURE = 0.9, INKS_APART = 0.5, POURED_SHOWS = 3, POOL_KEEPS = 0.8, POOL_CONTROL_GAP = 0.3, SLIDE = 5;
 
 /** In-place radix-2 FFT of one row. */
 function fft(re, im) {
@@ -342,6 +355,125 @@ try {
   }
   check('the print holds, it does not build', Math.abs(t2.dark - t1.dark) < BUILDS && t2.dark > SIDE_LEAST,
     `dark ${pct(t1.dark)} then ${pct(t2.dark)} thirty frames on (moved under ${BUILDS})`);
+
+  // ── 6, 7. The print over poured colour, and in another colour ───────────
+  /*
+    What was reported (2026-10-19): "the colored liquids don't work on the
+    Turing, and Turing can't be a different color". Two causes, both in
+    depositChem. It wrote the print into the solver's dye, replacing what was
+    there wherever the reaction was fed, so a pour of colour was erased under
+    the print (fed cells are most of the plate), and the print's colour was
+    starch's indigo whatever was asked. The print is now laid over the dye in
+    a texture of its own (fields.dye while it prints), and its colour is the
+    turingInk setting.
+
+    One reaction, grown as in line 4, and the same picture rendered after each
+    change, the print refreshed (a few frames) in between:
+      - the ink at a third and at two thirds of the wheel, nothing poured. The
+        print's dark must be the colour asked for (a solid green, a solid blue,
+        where starch's is black), and the two hues must not be the same picture.
+      - then back to the look's own ink and a red pool poured in the middle. A
+        poured red absorbs green and blue, so the light paper inside the pool
+        must go red: its red over green rises from the undyed plate's, which a
+        print that replaced the dye leaves where it was. And the print must
+        still be there inside the pool (its stripes correlate with the undyed
+        picture's), or the pool has only hidden the print.
+  */
+  // Starch, then a green, a blue and a red (0.02 is the first branch of the hue function, the others are the second and third).
+  const inks = [turingInk(0), turingInk(1 / 3), turingInk(2 / 3), turingInk(0.02)];
+  const colour = await page.evaluate(async ({ FEED, KILL, DU, DV, T, SEEDS, inks }) => {
+    const N = 256, SIZE = 256;
+    await lab.create(N);
+    const g = lab.solver();
+    const look = lab.look('turing-print').settings;
+    let s = 2468; const rnd = () => (s = s * 16807 % 2147483647) / 2147483647;
+    g.chemLive = true;
+    for (let t = 0; t < 300; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+    for (let k = 0; k < SEEDS; k++) g.seedChemistry(0.1 + rnd() * 0.8, 0.1 + rnd() * 0.8, 0.012);
+    for (let t = 0; t < T; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+    const frames = async (n, ink) => {
+      for (let f = 0; f < n; f++) {
+        g.stepChemistry(3, FEED, KILL, DU, DV, 1);
+        g.depositChemistry(g.chem.read, 0.02, [ink.r, ink.g, ink.b], 0.22, look.turingPrint, 1);
+        lab.flush(); await lab.step(1);
+      }
+    };
+    const picture = async () => Array.from(await lab.render(SIZE, look, { zoom: 1, macroAmount: 0, cx: 0.5, cy: 0.5, bubbles: 0 }));
+    const out = { SIZE, pics: [] };
+    for (const ink of inks) { await frames(20, ink); out.pics.push(await picture()); }
+    await frames(20, inks[0]);
+    out.before = await picture();
+    lab.dye(0.5, 0.5, 0.2, [0.1, 1.5, 1.5], 1);
+    lab.flush(); await frames(3, inks[0]);
+    out.after = await picture();
+    return out;
+  }, { FEED, KILL, DU, DV, T, SEEDS, inks });
+  {
+    const { SIZE } = colour;
+    const lumOf = (px, i) => 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+    // The middle half, as in line 4; the pool is read in the middle too.
+    const mid = [];
+    for (let y = SIZE >> 2; y < SIZE - (SIZE >> 2); y++) for (let x = SIZE >> 2; x < SIZE - (SIZE >> 2); x++) mid.push(y * SIZE + x);
+    const white = (px) => [...mid.map((i) => lumOf(px, i))].sort((a, b) => a - b)[Math.floor(mid.length * 0.98)];
+    // Mean colour of the print's darkest fifth, against the plate's white.
+    const darkColour = (px) => {
+      const w = white(px), sorted = [...mid].sort((a, b) => lumOf(px, a) - lumOf(px, b)).slice(0, Math.floor(mid.length / 5));
+      const m = [0, 0, 0];
+      for (const i of sorted) for (let c = 0; c < 3; c++) m[c] += px[i * 4 + c] / w;
+      return m.map((v) => v / sorted.length);
+    };
+    const [d0, d1, d2, d3] = colour.pics.map(darkColour);
+    const away = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+    const tone = (c) => c.map((v) => v.toFixed(2)).join(', ');
+    for (const [k, ink, d] of [[1, inks[1], d1], [2, inks[2], d2], [3, inks[3], d3]]) {
+      const ch = ink.r >= ink.g && ink.r >= ink.b ? 0 : ink.g >= ink.b ? 1 : 2;
+      const share = d[ch] / (d[0] + d[1] + d[2]);
+      check(`the print takes the ink's hue (${k} of 3)`, d[ch] > INK_SHOWS && share > INK_PURE,
+        `ink ${ink.r.toFixed(2)}, ${ink.g.toFixed(2)}, ${ink.b.toFixed(2)}: the print's darkest fifth is ${(d[ch]).toFixed(2)} of the white in channel ${'rgb'[ch]} (over ${INK_SHOWS}; starch's is ${d0[ch].toFixed(2)}) and ${pct(share)} of its light is that channel (over ${INK_PURE * 100}%)`);
+    }
+    check('three hues are three pictures', Math.min(away(d1, d2), away(d1, d3), away(d2, d3)) > INKS_APART, `the dark of the hues ${away(d1, d2).toFixed(3)}, ${away(d1, d3).toFixed(3)} and ${away(d2, d3).toFixed(3)} apart in colour (over ${INKS_APART})`);
+    // The pool: plate disc (0.5, 0.5) radius 0.1, mapped to the screen as in line 4's note.
+    const pool = [];
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+      const fu = 0.5 + ((x + 0.5) / SIZE - 0.5) / 1.5, fv = 0.5 + ((1 - (y + 0.5) / SIZE) - 0.5) / 1.5;
+      if (Math.hypot(fu - 0.5, fv - 0.5) < 0.1) pool.push(y * SIZE + x);
+    }
+    // Light paper in the undyed picture: where the pool's colour has to show.
+    const w = white(colour.before), paper = pool.filter((i) => lumOf(colour.before, i) > 0.75 * w);
+    const redness = (px) => { let r = 0, g = 0; for (const i of paper) { r += px[i * 4]; g += px[i * 4 + 1]; } return r / g; };
+    const r0 = redness(colour.before), r1 = redness(colour.after);
+    check('a poured colour shows under the print', r1 > r0 * POURED_SHOWS,
+      `red over green on the light paper in the pool (${paper.length} pixels): ${r0.toFixed(2)} undyed, ${r1.toFixed(2)} with red poured (over ${POURED_SHOWS}x)`);
+    // The stripes themselves: the pool's picture against the same cells undyed.
+    const c = correlation(pool.map((i) => lumOf(colour.before, i)), pool.map((i) => lumOf(colour.after, i)));
+    // The control: the same pool read a few pixels along, so the stripes no
+    // longer line up. If the stripes are what the correlation measures, this
+    // must come out well under the aligned one; if it came out as high, the
+    // pool's brightness was one smooth disc and the check above would pass on
+    // a pool that had hidden the print.
+    const slid = correlation(pool.map((i) => lumOf(colour.before, i)), pool.map((i) => lumOf(colour.after, i + SLIDE)));
+    check('the print still shows in the pool', c > POOL_KEEPS && slid < c - POOL_CONTROL_GAP,
+      `brightness of the ${pool.length} pixels of the pool, undyed against with red poured: correlation ${c.toFixed(3)} (over ${POOL_KEEPS}); the same read ${SLIDE} pixels along ${slid.toFixed(3)} (under ${(c - POOL_CONTROL_GAP).toFixed(3)}, the stripes being what lines up)`);
+  }
+  // ── The setting reaches the plate ───────────────────────────────────────
+  /*
+    The lines above measure turingInk()'s colour and the print over the pour;
+    they call depositChemistry themselves, so they pass whether or not the
+    visualizer hands the setting to it. This is the one place that is read:
+    the print branch of the chemistry's loop must take its colour from
+    currentSettings.turingInk, and the setting must default to 0, which is
+    starch, the look every saved set was built on. A source assertion, as the
+    panel check's are, because the app's own frames cannot be read in a cloud
+    session.
+  */
+  {
+    const vis = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+    const types = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8');
+    const wired = /print > 0\s*\?\s*turingInk\(currentSettings\.turingInk \?\? 0\)/.test(vis);
+    const defaults = (types.match(/^\s*turingInk: 0,/gm) || []).length;
+    check('the visualizer draws the print in the turingInk setting, defaulting to starch', wired && defaults === 1,
+      `print branch reads currentSettings.turingInk: ${wired}; "turingInk: 0" in types.ts ${defaults} time (the default)`);
+  }
 } finally {
   await close();
 }
