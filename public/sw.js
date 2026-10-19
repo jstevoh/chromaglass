@@ -28,7 +28,7 @@
  * A 200 of HTML under a script URL is a file that is gone. It is never
  * cached, and never served from the cache if an older worker left one there.
  */
-const VERSION = 'chromaglass-v2';   // bumped: v1's caches may hold poisoned entries
+const VERSION = 'chromaglass-v9';   // bumped: newsletter opt-in + /unsubscribe + expanded Terms of Service
 const NEVER = ['/remote-ws', '/remote-info.json'];
 
 /** A response that is HTML where a script or a stylesheet was asked for. */

@@ -104,6 +104,7 @@ export function installIntro(show: boolean): void {
   const cap = setTimeout(() => introOut('cap'), Math.max(0, CAP_MS - performance.now()));
   const skip = (e: Event) => {
     if (out) return;
+    if (document.querySelector('[data-cg-signin]')) return;
     if (e instanceof KeyboardEvent && ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab'].includes(e.key)) return;
     if (e instanceof PointerEvent) {
       // A press on the desk is the desk's, and leaves the plate's intro up:
