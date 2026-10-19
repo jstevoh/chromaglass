@@ -94,6 +94,8 @@ struct Sim {
   mags: array<vec4f, 3>,
   // The magnet's radius, every one of them (magnetDisc.ts): Magnet Size's.
   magRadius: f32,
+  // 1 where decayDye clears thin mist first (sparse dark looks only; lib/dyeTarget.ts).
+  surfaceClear: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -3798,7 +3800,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
     d = vec4f(0.0);
   } else {
-    d *= S.evap;
+    // Named regulator shortcut (PLAN 18g / 28d-A, until 18c-2/18g-4 carry a separate
+    // solvent-thickness field): uniform d *= S.evap fades thick bodies and thin
+    // inter-body mist at the same fractional rate, leaving a grey-pastel veil across
+    // the black ground. A surface-to-volume term surf clears thin mist (d.a small)
+    // first while leaving thick dye bodies intact. It was ungated and moved every
+    // look; only ten were measured (review of #401, ask 4), so it is gated.
+    // Only where S.surfaceClear is set: a sparse dark look laid with a composition.
+    // Every other look keeps the uniform decay it always had (PLAN 28d-A).
+    let loss = max(0.0, 1.0 - S.evap);
+    let surf = S.surfaceClear * loss * 0.06 / ((d.a + 0.14) * (d.a + 0.14));
+    d *= max(0.0, S.evap - surf);
   }
   // Safety cap (PLAN 18g: "A safety cap stays, named as one"):
   if (!finite4(d)) { d = vec4f(0.0); }
@@ -4069,8 +4081,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
    * bicubic reconstruction draws it as a sharp, smooth edge at the
    * screen's resolution rather than the grid's. Where the reaction is fed
    * (the bath, or poured reagent) the liquid is the indicator's, and the
-   * print replaces what was there in proportion to the feed and to Turing
-   * Print; elsewhere the dye is left alone.
+   * print is laid over the dye in proportion to the feed and to Turing
+   * Print; elsewhere the dye is as it is.
+   *
+   * It is laid over, not in place: it replaced the dye on every fed cell,
+   * so a liquid poured on the plate was gone the frame it landed (PLAN
+   * 26d-3, the owner's "the coloured liquids don't work"). Absorbance adds
+   * (lib/dye.ts), so a red liquid under the print is red where the print is
+   * clear and black-red where it is not, as it would be in a stained dish.
+   * The print goes to its own texture, never to the dye: written into the
+   * dye each frame it would pile up, and the flow would carry it.
    */
   depositChem: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
@@ -4087,7 +4107,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let a = c.g;
   if (A.a.z <= 0.0) {
     if (a > A.a.y) {
-      let w = A.a.x * (a - A.a.y);
+      // Named regulator shortcut (PLAN 28d-A): when wetOnly (A.b.w) is set on a
+      // seeded reef look (neon-coral-reef), the whole-plate bath feeds the reaction
+      // inside the coral bodies (d.a) and wherever reagent was poured (c.b),
+      // rather than printing over the empty black water between bodies (showreel:
+      // 30% black to 1% by 30 s, now 23%).
+      let host = select(1.0, max(smoothstep(0.12, 0.55, d.a), smoothstep(0.01, 0.08, c.b)), A.b.w > 0.5);
+      let w = A.a.x * (a - A.a.y) * host;
       d = vec4f(d.rgb + w * A.b.rgb, d.a + w);
     }
     textureStore(dst, p, d);
@@ -4098,13 +4124,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let dens = PRINT_DENSITY * bound;
   let fed = clamp(max(c.b, A.a.w) / 0.3, 0.0, 1.0);
   /*
-    Turing Print is how much of the liquid is the indicator's: at 1 the fed
-    plate is the print alone, below it the print is laid over what is there
-    in that share. As a depth instead, its first notch (or a look fading
-    in) replaced every colour on a fed plate with a print 5% deep, nearly
-    clear, at once.
+    Turing Print is how much of the print the plate carries: the dye as
+    poured at 0, the whole print at 1, and a look fading in is the print
+    coming up over the liquid rather than replacing it.
   */
-  d = mix(d, vec4f(dens * A.b.rgb, dens), fed * min(A.a.z, 1.0));
+  d = d + fed * min(A.a.z, 1.0) * vec4f(dens * A.b.rgb, dens);
   textureStore(dst, p, d);
 }`,
 

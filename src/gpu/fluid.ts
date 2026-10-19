@@ -606,7 +606,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48
+const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49
 
 export class WebGPUFluid {
   readonly N: number;
@@ -621,6 +621,15 @@ export class WebGPUFluid {
   public readonly chem: PingPong;
   public readonly activeMat: PingPong;
   public chemLive = false;
+  /**
+   * The plate's dye while a print is drawn: the dye in the solver with the
+   * print laid over it (depositChem). Separate from the dye so the print is a
+   * picture of the reaction as it stands, never a thing the flow carries or
+   * the dye accumulates, and so liquid poured on the plate stays in the
+   * solver as poured (PLAN 26d-3). Null until the first print.
+   */
+  private printDye: GPUTexture | null = null;
+  private printLive = false;
   /** Turing Reagent has been poured since the chemistry was last cleared: the reaction runs on it even on a look without Chemistry. */
   public reagentLive = false;
   private readonly liquids0: PingPong;
@@ -1573,6 +1582,7 @@ export class WebGPUFluid {
       f[38 + k * 4] = fin(p.magnetHeight, 0.05); f[39 + k * 4] = m ? magStrength : 0;
     }
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
+    f[49] = p.surfaceClear ? 1 : 0;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -1581,6 +1591,9 @@ export class WebGPUFluid {
   /** Wipe the plate: no dye, no motion, the gap at rest. */
   clear(): void {
     this.heatSeconds = 0;
+    // A wiped plate has no print: it is rebuilt from the dye and the reaction
+    // on the next deposit, and until then the plate shows the (empty) dye.
+    this.printLive = false;
     this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
@@ -1932,18 +1945,36 @@ export class WebGPUFluid {
    * looks have always grown. With `print` above 0 the colour is an indicator
    * in the liquid the reaction runs in, starch with the iodine of a CIMA dish
    * (26d, Turing Print): the blue-black complex forms and comes apart with
-   * the activator, so the dye where the reaction is fed is the complex's
+   * the activator, so the print where the reaction is fed is the complex's
    * equilibrium with the field as it stands, `print` its depth, and nothing
-   * piles up. `bath` is the reagent the whole plate stands in, as stepChemistry
+   * piles up. It is drawn over the dye into `printDye`, which the plate then
+   * shows in the dye's place; the solver's dye is left as poured. `bath` is the reagent the whole plate stands in, as stepChemistry
    * takes it, so the print covers what the reaction is fed.
    */
-  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0): void {
-    if (amount <= 0 && print <= 0) return;
+  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0, wetOnly = 0): void {
+    if (amount <= 0 && print <= 0) { this.printLive = false; return; }
     const log = dyeAbsorbances(...colour);
     const enc = this.device.createCommandEncoder({ label: 'chemistry deposit' });
     const pass = enc.beginComputePass({ label: 'chemistry deposit' });
-    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, Math.max(0, print), Math.max(0, bath), ...log, 0]));
-    this.dye.swap();
+    const args = this.arg('deposit', [amount, threshold, Math.max(0, print), Math.max(0, bath), ...log, wetOnly]);
+    if (print > 0) {
+      /*
+        The print is drawn into its own picture and the dye is left as it is.
+        Before it replaced the dye on every fed cell, every frame: a liquid
+        poured on the plate was gone the frame it landed, and since the
+        print was written into the dye the solver carried it as well.
+      */
+      this.printDye ??= this.disposer.track(this.device.createTexture({
+        label: 'print dye', size: [this.N, this.N], format: this.dyeFormat,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+      }));
+      this.run(pass, 'depositChem', this.printDye, [this.dye.read, chem], args);
+      this.printLive = true;
+    } else {
+      this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], args);
+      this.dye.swap();
+      this.printLive = false;
+    }
     pass.end();
     this.device.queue.submit([enc.finish()]);
   }
@@ -4675,6 +4706,12 @@ export class WebGPUFluid {
 
   /** One frame of the drain: inward spiral, transport, evaporate. */
   drainStep(t: number): void {
+    // The drain carries the solver's dye, and the print is not in it (it is
+    // laid over the dye in its own texture, 26d-3). While it runs the
+    // visualizer deposits nothing, so a print left live would hold its last
+    // picture still over the draining pour for fifty frames and then jump to
+    // the emptied plate. The plate shows the dye that is draining instead.
+    this.printLive = false;
     const pull = Math.pow(t, 0.4) * 4.0;
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
@@ -4904,10 +4941,13 @@ export class WebGPUFluid {
    */
   get grainTexture(): GPUTexture | null { return this.grain?.read ?? null; }
 
+  /** The print stops: the plate shows the solver's dye alone again (no reaction on the plate, or a look that does not print). */
+  endPrint(): void { this.printLive = false; }
+
   /** The fields, for the compositor (P3) to read directly. */
   get fields() {
     return {
-      dye: this.dye.read,
+      dye: this.printLive && this.printDye ? this.printDye : this.dye.read,
       vel: this.vel.read,
       velForced: this.velForced,
       grain: this.grain?.read ?? null,

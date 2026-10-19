@@ -3664,6 +3664,50 @@ the three rungs, full floats 4.4e-6, 4.4e-6 and 5.0e-6 (the widths 2.98%, 3.08% 
 3.15%). Half floats stay on a GPU that cannot filter
 full ones (26d-5).
 
+**26d-3. Other colour in a fed print (shipped 2026-10-19).** The owner reported that
+poured colours do not work on Turing Print and that it cannot be a different colour.
+Both were in `depositChem`: on every fed cell it wrote the print into the solver's own dye,
+replacing whatever was poured there (fed cells are most of the plate), and the print's
+colour was `TURING_PRODUCT`, starch's indigo, whatever was asked.
+
+The print is now laid over the dye in a texture of its own (`printDye`), and the dye
+the plate reads is that texture while a print is on (`fields.dye`), so the plate shader
+did not change. The solver's dye is not written while it prints, so the pour moves and
+fades as it would without the reaction, and when the reaction ends (`endPrint`) the plate
+goes back to it. The print's colour is the `turingInk` setting: 0 is starch (every saved
+look), above 0 a hue round the wheel at full strength (`src/lib/turingInk.ts`). The
+plate reads the print's rgb as a colour at a density of 1.6 under multiply, so a hue at
+starch's depth prints black with a thin rim (measured: a green at 0.12, 0.48, 0.12 printed
+black, its darkest fifth at 0.05 of the white; 0.05, 0.95, 0.05 printed a solid green at
+0.79). The ink is on the Perform desk's lamp pins, the phone's Settings rail, the remote,
+MIDI, and fades as a choice at the midpoint (`lookFade.ts`), not as a hue sweep.
+
+`npm run turing` lines 6 and 7: a red pool poured under the print raises red over green
+on the pool's light paper from 1.01 to 22.97 (old code: 1.01, the pour erased); the print
+is still there inside the pool (correlation with the undyed picture 0.983, against
+-0.019 read five pixels along); the print takes a green, a blue and a red solid (0.79,
+0.78, 0.80 of the white, 99.8% to 100% in that channel). The ink checks measure the ink
+function's depth; that the visualizer hands the setting to it is read from its source.
+The lab's render now takes the dye as the app does (`fields.dye`), so the lab draws the
+print over the pour (a check input; named in the PR).
+
+Review of the first push found two things, both from the print leaving the solver's dye.
+The drain and the wipe at its end are the frames the visualizer's deposit does not run, so
+a live print held its last picture still over the draining pour for fifty frames and then
+jumped to the emptied plate; `drainStep` and `clear` now end the print (`npm run turing`
+line 8 fails without it: the plate still read the print after a drain step and after the
+wipe). And the look changes beyond its colour. Pours now pile up under the print, and
+`readbackAsync` (so the dye budget's regulator and the scene reading) still measures the
+solver's dye, which no longer holds the print. Measured on the shipped look in the lab
+(60 and 180 frames of a pour every 15 frames, the print refreshed each frame): the solver
+dye the regulator reads was 1.06 and 1.07 before (the print itself, always over the 0.35
+budget, so every pour was held off) and is 0.08 and 0.21 now (the pours); the share of the
+plate's pixels under a quarter of its white was 58% and 58% before and is 63% and 71% now,
+the mean over white 0.35 and 0.36 before, 0.30 and 0.22 now. That is the colour the owner
+asked for showing and darkening the paper under the stripes, not a regression, and the
+regulator was deliberately left on the pours: reading the plate would count the print and
+hold the pours off again. Whether 0.35 of pours under the print is too dark is judging §46.
+
 ## 27. Every control does something you can see
 
 ### 27a-8. The closeup's camera holds still through the song (QA-31)

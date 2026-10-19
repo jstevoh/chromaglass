@@ -244,8 +244,8 @@ export interface PhoneStageProps {
    * opens on a look with the reaction running, as Ben-Day is, because they
    * are the look's own rather than a hand's.
    */
-  reaction: { on: boolean; pattern: number; width: number; print: number };
-  onReaction: (patch: Partial<Pick<VisualizerSettings, 'chemistryPattern' | 'chemistryWidth' | 'turingPrint'>>) => void;
+  reaction: { on: boolean; pattern: number; width: number; print: number; ink: number };
+  onReaction: (patch: Partial<Pick<VisualizerSettings, 'chemistryPattern' | 'chemistryWidth' | 'turingPrint' | 'turingInk'>>) => void;
   /**
    * Lamp Ground (PLAN 18b): what the dye is seen on, black or the lamp
    * shining up through it. On the Looks sheet, always: it turns a look
@@ -819,7 +819,9 @@ export function PhoneStage(p: PhoneStageProps) {
                 display={`${Math.round(p.reaction.width * 100)}%`} touch testId="phone-reaction-width" midiKey="setting:chemistryWidth" />
               <Slider label="Turing Print" value={p.reaction.print} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingPrint: v })}
                 display={`${Math.round(p.reaction.print * 100)}%`} touch testId="phone-turing-print" midiKey="setting:turingPrint" />
-              <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp.</p>
+              <Slider label="Print Ink" value={p.reaction.ink} min={0} max={1} step={0.01} onChange={(v) => p.onReaction({ turingInk: v })}
+                display={p.reaction.ink > 0 ? `${Math.round(p.reaction.ink * 360)}°` : 'Starch'} touch testId="phone-turing-ink" midiKey="setting:turingInk" />
+              <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp, or another indicator's colour.</p>
             </div>
           )}
           {/* The second projector's look routing (§16a) is temporarily hidden per user request */}

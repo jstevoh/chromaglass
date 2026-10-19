@@ -66,6 +66,13 @@ export interface GpuStepParams {
   */
   magnetRadius?: number;
   /**
+    1 on a sparse dark look laid with a composition, where `decayDye` clears
+    the thin mist between its bodies first (the surface-to-volume term); 0, and
+    the same uniform decay as ever, on every other look. See `sparseDark` in
+    lib/dyeTarget.ts.
+  */
+  surfaceClear?: number;
+  /**
     The other fingers holding a magnet on a touch screen, up to three, in
     plate coordinates; each at this magnet's height and strength. Only read
     while this one is on.
@@ -214,7 +221,9 @@ export interface GpuStepParams {
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
   stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
-  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number): void;
+  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number, wetOnly?: number): void;
+  /** The print is no longer being drawn: the plate shows the dye itself again (`WebGPUFluid.endPrint`). */
+  endPrint?(): void;
   chem?: any;
   /** The Gray–Scott field has been seeded or poured into since it was last cleared. */
   chemLive?: boolean;
@@ -332,7 +341,9 @@ export interface PlateSolver {
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
   stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
-  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number): void;
+  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number, wetOnly?: number): void;
+  /** The print is no longer being drawn: the plate shows the dye itself again (`WebGPUFluid.endPrint`). */
+  endPrint?(): void;
   chem?: any;
   /** The Gray–Scott field has been seeded or poured into since it was last cleared. */
   chemLive?: boolean;
