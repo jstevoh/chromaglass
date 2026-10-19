@@ -267,7 +267,8 @@ try {
   console.log(`     the fix reaches ${reached.length} of ${ids.length}: ${reached.join(', ') || 'none'}`);
   check('it reaches at least one look', reached.length >= 1, 'without one, nothing below measures the fix');
   // Jellyfish Bloom first (the look the review measured), then the others in
-  // preset order. ('deep-ocean' is a retired id that opens Jellyfish Bloom.)
+  // preset order. (An older id for Jellyfish Bloom is retired and still opens it;
+  // it is left unnamed here because `plate` fails any quoted retired id in scripts/.)
   reached.sort((a, b) => (b === 'jellyfish-bloom') - (a === 'jellyfish-bloom'));
   if (!ONLY) {
     check('it reaches Jellyfish Bloom, the look the review measured', reached.includes('jellyfish-bloom'));
