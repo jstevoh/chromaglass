@@ -364,8 +364,15 @@ export function blendLooks(from: VisualizerSettings, to: VisualizerSettings, t: 
  * the film stock's type are rounded where they are used, so faded they
  * stepped through every value between — 2, 3, 4, 5, 6 folds, or slide film,
  * faded negative and Super 8 on the way to the stock asked for.
+ *
+ * `turingInk` is a hue where 0 means "starch indigo" rather than "red": faded
+ * from 0 to a third it passed 0.01 to 0.1, which is saturated red then orange,
+ * a jump away from the indigo at the first frame, and a fade between two hues
+ * would sweep the whole wheel on its way. A print's colour does not have an
+ * in-between that reads as a blend of the two, so it switches at the midpoint
+ * as a choice does.
  */
-const WHOLE_STEPS: ReadonlySet<string> = new Set(['kaleidoscope', 'stockType']);
+const WHOLE_STEPS: ReadonlySet<string> = new Set(['kaleidoscope', 'stockType', 'turingInk']);
 
 const HEX = /^#[0-9a-f]{6}$/i;
 function mixHex(a: string, b: string, k: number): string {

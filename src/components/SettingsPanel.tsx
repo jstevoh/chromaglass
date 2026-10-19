@@ -1615,6 +1615,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="turingPrint"
         />
         <Slider
+          label="↳ Print Ink (0 is Starch)"
+          value={settings.turingInk ?? 0}
+          min={0}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ turingInk: v })}
+          settingKey="turingInk"
+        />
+        <Slider
           label="Gel Wheel"
           value={settings.gelWheel ?? 0}
           min={0}

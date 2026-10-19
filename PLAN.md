@@ -6045,10 +6045,17 @@ Steps:
     soft at a close zoom. The owner's pack is a Karl Sims render through FXAA, harder
     than a dish. If the owner wants that, it is a choice to make, not physics; the plate
     could threshold the reconstructed field at screen resolution, as Ben-Day's edge does.
-  - **26d-3, open: other colour in a fed print.** Where the print is fed, its dye is the
-    complex's equilibrium and replaces what was there, so a bottle of colour poured into
-    Turing Print shows only while it moves. Keeping both needs the complex as its own
-    share of the dye (a channel the plate reads), as the oil's colour has one.
+  - ~~**26d-3. Other colour in a fed print**~~ (**shipped**; story in
+    `docs/plan-shipped.md` §26): a poured colour shows under the print, and the print
+    has its own ink (`turingInk`, desk, phone, remote, MIDI).
+  - **26d-3a, open: the ink is a bright hue, not a depth.** The plate reads the print's
+    rgb as a colour at a fixed density, so starch's own indigo prints black and any hue
+    must be drawn at full strength to print as itself. A hue that printed lighter, as
+    Chemistry's tints do, would need the plate to read the print as absorbance, which
+    means a binding in the plate shader (it is at the 16-binding limit).
+  - **26d-3b, open: the print over a pour is multiplied, not mixed.** Under the print,
+    a pour of red and a green ink print dark where both are, because the plate
+    multiplies. Right for dye on a lamp; the owner may want the print to win (judging §46).
   - **26d-4, open: the dish starts empty of substrate.** The field is cleared to u = 0, so
     on a look with the bath the first seeds die before the bath fills the plate (a third
     of a second); a cleared dish under a bath should start at u = 1. And the reaction's
@@ -6061,6 +6068,16 @@ Steps:
     substrate stops 0.3–0.5% short and its stripe is a little wider. Storing the substrate's
     deficit 1 − u instead of u would give half floats their fine steps where u is near
     1, on every GPU and at half the bandwidth, and would make a cleared dish full (26d-4).
+  - **26d-6, open: it does not keep evolving.** A fixed feed and kill grow a labyrinth that
+    settles into a stationary maze (Gray-Scott with constant f and k has a steady stripe
+    state; the print holds, `npm run turing` line 5), so after the first minute it only
+    moves when stirred. Options, each grounded in the chemistry: a **drifting feed/kill
+    map** (f and k vary in space and glide over 30–90 s, so the stripe phase moves through
+    Pearson's spots, worms and mazes across the plate; a few lines in the `grayScott`
+    shader), a **slow regime glide** (one f and k walked along Pearson's map), **light as
+    the kill** (CIMA is photosensitive; the lamp's level would move k), a **slow ink-hue
+    glide** (26d-3), **periodic reseeds**. Picked: the drifting map, on the slow clock when
+    there is no music, never whole-frame motion. The owner's pick is on the thread's card.
 - **26-colour-a. The relief #327 described: not doing.** #327's message described the
   pattern's gradient as a bump on the plate's normal; the code never reached main (its
   plate shader was not in the diff, and the revert 8278374 had nothing of it to take

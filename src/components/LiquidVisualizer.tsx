@@ -51,7 +51,7 @@ import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { BeadField } from '../lib/beads';
-import { ChemistryField, TURING_PRODUCT } from '../lib/chemistry';
+import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
@@ -7313,6 +7313,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const chemAmt = Math.max(0, Math.min(1, currentSettings.chemistry ?? 0));
           const lead = fluidsRef.current[0];
           const poured = !!leadGpu?.reagentLive;
+          // No reaction on the plate: nothing is printed, and the plate shows the dye itself.
+          if (!(chemAmt > 0 || poured)) leadGpu?.endPrint?.();
           if ((chemAmt > 0 || poured) && lead && isActiveRef.current && drainFrameRef.current === 0) {
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const g = leadGpu;
@@ -7329,7 +7331,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // The look's palette where the look grows it; the reagent's own product where only a pour does.
               // A print is that product too, starch's complex, whatever the palette (depositChem, 26d).
               const print = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
-              const c = chemAmt > 0 && print === 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : TURING_PRODUCT;
+              // Its colour is the indicator's (Turing Ink: starch's indigo at 0), laid over the poured dye, not in place of it.
+              const c = chemAmt > 0 && print === 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : print > 0 ? turingInk(currentSettings.turingInk ?? 0) : TURING_PRODUCT;
               const seededReef = lead.seedMean !== null && lead.seedMean > 0 && print === 0;
               const chemTarget = dyeLookTarget(seededReef ? lead.seedMean : null, currentSettings.dyeBudget ?? 0.85, lead.seedBudget);
               const chemRoom = seededReef ? Math.max(0, Math.min(1, (1.0 - lead.meanDensity / Math.max(0.06, chemTarget)) * 2.5)) : 1;
