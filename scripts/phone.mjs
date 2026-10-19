@@ -830,6 +830,36 @@ try {
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       /*
+        Projector Focus (PLAN 18e), the projector's focus ring, on the Looks
+        sheet beside the lamp's controls: there on every look, at 50 % (no
+        look saves one, so each is in focus, as it was before the setting),
+        and it reaches 0 % and 100 %. Put back to 50 % after, by the
+        keyboard's own steps (ten of 5 %), so the checks below draw the
+        plate in focus as they did before this check was here.
+      */
+      await tap(page, 'phone-open-looks');
+      const focusShown = await visible(page, 'phone-projector-focus');
+      const focusRead = async () => (await page.getByTestId('phone-projector-focus').innerText()).match(/(\d+)%/)?.[1] ?? null;
+      const focusAt = focusShown ? await focusRead() : null;
+      let focusBottom = null, focusTop = null, focusBack = null;
+      if (focusShown) {
+        await page.getByTestId('phone-projector-focus').locator('input').focus();
+        await page.keyboard.press('Home');
+        await page.waitForTimeout(200);
+        focusBottom = await focusRead();
+        await page.keyboard.press('End');
+        await page.waitForTimeout(200);
+        focusTop = await focusRead();
+        for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowLeft');
+        await page.waitForTimeout(200);
+        focusBack = await focusRead();
+      }
+      check('Projector Focus is on the Looks sheet at 50 %, goes to 0 % and 100 %, and back to 50 %',
+        focusShown && focusAt === '50' && focusBottom === '0' && focusTop === '100' && focusBack === '50',
+        focusShown ? `at ${focusAt} %, then ${focusBottom} %, ${focusTop} % and back to ${focusBack} %` : 'missing from the Looks sheet');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
+      /*
         A projector's source (PLAN.md §16b), from the phone: More, Settings,
         Mapping, a shape added, and its source picked. The phone has no
         second screen of its own, but it is the remote at a gig, and the

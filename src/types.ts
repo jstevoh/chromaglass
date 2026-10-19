@@ -734,6 +734,8 @@ export interface VisualizerSettings {
   lampGround?: number;
   dyeBudget: number;          // how full the plate runs (mean density the regulator holds); low = mostly clear glass with dye structures on it
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
+  /** The projector's focal plane across the gap (PLAN 18e): 0.5 is sharp in-focus, defocus shifts Becke lines. */
+  projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
   plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
@@ -1076,6 +1078,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   lampGround: 0,            // dye as light on black, as every look is drawn; the owner picks which looks go on the lamp
   dyeBudget: 0.85,
   edgeRelief: 0.4,
+  projectorFocus: 0.5,
   lacing: 0,
   bubbles: 0.2,
   plateRock: 0.45,
