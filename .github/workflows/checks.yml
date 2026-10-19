@@ -199,6 +199,13 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run closedruns
 
+      # The scripts that read GitHub's API never print the token: a 502 from
+      # it once printed the owner's whole token through flakes.mjs's error.
+      # Against a local server that answers 502, with the old way as control.
+      - name: The API scripts keep the token out of their errors
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run ghapi
+
       # The ear: level traces through the real calibration into the boundary
       # detector, synthetic songs through the real matcher, and the tempo
       # sources through the real beat clock.

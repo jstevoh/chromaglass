@@ -131,6 +131,7 @@
     "reach": "node scripts/reach.mjs",
     "macqueue": "node scripts/macqueue.mjs",
     "flakes": "node scripts/flakes.mjs",
+    "ghapi": "node scripts/ghapi.mjs --selftest",
     "physics": "node scripts/physics.mjs",
     "bodies": "node scripts/bodies.mjs",
     "clockglass": "node scripts/clockglass.mjs",
