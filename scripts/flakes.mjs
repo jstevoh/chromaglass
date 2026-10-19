@@ -60,13 +60,11 @@
 // to what a check measures, and the list to work down, never a reason to
 // pass a PR.
 
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { ghCurl } from './ghapi.mjs';
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const run = promisify(execFile);
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 ? process.argv[i + 1] : dflt;
@@ -80,14 +78,10 @@ const repo = process.env.GITHUB_REPOSITORY || 'jstevoh/chromaglass';
 const API = `https://api.github.com/repos/${repo}`;
 
 // curl rather than fetch: a cloud session's proxy is configured for curl, and
-// Node's fetch does not read HTTPS_PROXY (as in macqueue.mjs).
-async function curl(url) {
-  const auth = process.env.GH_TOKEN ? ['-H', `Authorization: Bearer ${process.env.GH_TOKEN}`] : [];
-  const { stdout } = await run('curl', ['-fsSL', '--retry', '3', ...auth, '-H', 'Accept: application/vnd.github+json', url], {
-    maxBuffer: 1 << 28,
-  });
-  return stdout;
-}
+// Node's fetch does not read HTTPS_PROXY (as in macqueue.mjs). Through
+// ghapi.mjs, which hands curl the token on its stdin and redacts every error:
+// passed as an argument, it was printed whole when a 502 stopped this script.
+const curl = (url) => ghCurl(url);
 const get = async (path) => JSON.parse(await curl(`${API}/${path}`));
 
 // Some hundreds of logs a week, a few seconds each one at a time: eight at

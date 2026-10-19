@@ -2302,29 +2302,6 @@ class FluidSimulation {
         break;
       }
 
-      case 'fillmore-1969': {
-        // The Fillmore dish: a cool core at the centre of the plate (icy
-        // blue over cobalt), a ring of warm blobs round it (orange, yellow,
-        // cherry) that the beads sit in, and green and purple wisps out at
-        // the rim. Amounts stay short of saturation so the ground shows.
-        const cool = [3, 4].map(i => col(i));      // icy blue, emerald in the contract order
-        this.splatBlob(cx, cy, 20, 1.1, cool[0].r, cool[0].g, cool[0].b);
-        this.splatBlob(cx + 6 * k, cy - 4 * k, 9, 1.4, 0.65, 0.95, 0.95);
-        for (let i = 0; i < 11; i++) {
-          const a = (i / 11) * Math.PI * 2 + 0.3;
-          const rr = (30 + (i % 3) * 7) * k;
-          const c = col(i % 3);                     // orange, yellow, cherry
-          this.splatBlob(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 7 + (i % 2) * 3, 1.5, c.r, c.g, c.b);
-        }
-        for (let i = 0; i < 5; i++) {
-          const a = (i / 5) * Math.PI * 2 + 1.1;
-          const rr = 52 * k;
-          const c = col(4 + (i % 2));               // emerald, purple
-          this.splatBlob(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 6, 1.0, c.r, c.g, c.b);
-        }
-        break;
-      }
-
       case 'classic': {
         /*
           Luminous, not thick, and on the screen.
@@ -2349,21 +2326,6 @@ class FluidSimulation {
           const c = col(idx);
           this.splatBlob(fx * S, fy * S, rad, 1.1, c.r, c.g, c.b);
         });
-        break;
-      }
-
-      case 'deep-ocean': {
-        for (let band = 0; band < 5; band++) {
-          const by = S * (0.18 + band * 0.16);
-          const c = col(band);
-          for (let i = 2; i < S - 2; i++) {
-            const wy = by + Math.sin(i * 0.06 + band * 1.5) * 8;
-            this.splatBlob(i, wy, 6, 1.2, c.r, c.g, c.b);
-          }
-        }
-        for (let j = 2; j < S - 2; j += 3)
-          for (let i = 2; i < S - 2; i += 3)
-            this.addVelocity(i, j, 0.04 + Math.sin(j * 0.05) * 0.02, 0);
         break;
       }
 
@@ -2400,16 +2362,6 @@ class FluidSimulation {
           const off = this.rng.centred() * 12;
           this.splatBlob(cx + off, cy + off, 20 - i * 3, 4.0 - i * 0.5, c.r, c.g, c.b);
         }
-        break;
-      }
-
-      case 'timbre-shifter': {
-        for (let j = 2; j < S - 2; j += 2)
-          for (let i = 2; i < S - 2; i += 2) {
-            const n = noise2D(i * 0.03, j * 0.03);
-            const c = col(Math.floor((n + 1) * 2));
-            this.addDensity(i, j, 0.8 + n * 0.4, c.r, c.g, c.b);
-          }
         break;
       }
 
@@ -2789,15 +2741,12 @@ class FluidSimulation {
         break;
       }
 
-      // Boyle's bench starts from clean glass: the pattern is the subject,
-      // not a seed of blobs. (Wilfred's lumia did too, until the owner found
-      // it underwhelming; it is laid by its areas now, above.)
-      case 'sensual-laboratory':
-      // So does Turing Print: its colour is the reaction's alone (depositChem).
+      // Boyle's bench starts from clean glass, as Turing Print does now that the
+      // Sensual Laboratory is retired (PLAN 28i-1): the pattern is the subject,
+      // not a seed of blobs, and its colour is the reaction's alone (depositChem).
+      // (Wilfred's lumia did too, until the owner found it underwhelming; it is
+      // laid by its areas now, above.)
       case 'turing-print':
-      // Ferro Maze is ink on a white light table: the ferrofluid is the
-      // picture, poured with the look (layPhase), and the glass stays clear.
-      case 'ferro-maze':
         break;
       default: {
         for (let i = 0; i < 5; i++) {
@@ -5627,11 +5576,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** Last frame's ferrofluid amount, to catch it being turned up mid-show. */
   const phaseAmountRef = useRef(0);
   const laidPresetRef = useRef<string | null>(null);
-  const laySecondPlate = (fluid: FluidSimulation, presetId: string) => {
-    // The Fillmore look is two projectors: the second plate starts with its own wash.
-    if (presetId === 'fillmore-1969') fluid.seedPreset('fillmore-wash', noise2D);
-  };
-
   const layPlate = (presetId: string, layBack = false, phase?: LookPhase) => {
     /*
       The plate's dice start again, from (seed, stream, this look), before
@@ -5724,7 +5668,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const ownAreas = plateAreas(own.id);
         if (ownAreas) layAreaLiquids(later, 1, ownAreas, 6);
         else for (let i = 0; i < 15; i++) doseLiquid(later, own.liquids, 10 + DICE.lay.float() * (GRID_SIZE - 20), 10 + DICE.lay.float() * (GRID_SIZE - 20), 1.2);
-      } else laySecondPlate(later, presetId);
+      }
     }
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
     plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
@@ -6363,7 +6307,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // A back plate built for a look of its own is built by a Go to Back
         // Plate on a one-plate look (App keeps it on the stage for as long as
         // it has the look), and that Go's handover lays it.
-        if (i > 0 && !backDyesRef.current && laidPresetRef.current) laySecondPlate(fluid, laidPresetRef.current);
         fluidsRef.current.push(fluid);
         rotationAnglesRef.current.push(DICE.lay.angle());
         spinVelRef.current.push(0);
@@ -8184,7 +8127,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     if (!harmonyLockRef.current && !presetContractRef.current) harmonyRef.current = seeded;
                     return seed;
                   }
-                  return id === 'fillmore-1969' ? fluid.captureSeed(() => laySecondPlate(fluid, id)) : null;
+                  return null;
                 });
                 h.dosed = 1;
               }

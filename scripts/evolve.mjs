@@ -52,7 +52,7 @@ const LED = ['#ff2d55', '#34c759', '#0a84ff', '#ffd60a'];
   A start look, and it has to be a real one.
 
   `?? {}` made a missing preset indistinguishable from an empty one, so
-  `fillmore-east-1969` — which is not a preset; the id is `fillmore-1969` —
+  `fillmore-east-1969` — which was not a preset; the id was fillmore-1969, since retired into poster-1969 —
   quietly evolved from DEFAULT_SETTINGS while the report said Fillmore. One of
   the three start looks was never the look it was named after, and the run that
   found a flat plate blamed it on a preset that had not been on the glass.
@@ -98,7 +98,7 @@ try {
     return { share: top / tot, rgb: [(topKey >> 8) * 17, ((topKey >> 4) & 15) * 17, (topKey & 15) * 17] };
   };
 
-  for (const startId of ['classic', 'fillmore-1969', 'oil-wheel']) {
+  for (const startId of ['classic', 'poster-1969', 'clock-glass']) {
     const from = base(startId);
     for (let k = 0; k < ROLLS_EACH; k++) {
       const look = evolvedLook(from, luckyLook(from, LED, rand));

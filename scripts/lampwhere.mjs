@@ -2,7 +2,7 @@
 /**
  * Where a look differs from the plate before the lamp (PLAN.md 18b).
  *
- *   node scripts/lampwhere.mjs [lookId]     (default fillmore-1969)
+ *   node scripts/lampwhere.mjs [lookId]     (default poster-1969)
  *
  * `npm run lampzero` asks every look at Lamp Ground 0 to draw the plate as
  * it was before the lamp, byte for byte, against a second lab built with the
@@ -28,7 +28,7 @@
 import { openLab } from './lab.mjs';
 import { BEFORE_LAMP, POOLS } from './lampcontrol.mjs';
 
-const id = process.argv[2] ?? 'fillmore-1969';
+const id = process.argv[2] ?? 'poster-1969';
 const S = 192;
 
 /** The look at Lamp Ground 0 on the check's plate, as shipped and with each setting off, in one lab. */

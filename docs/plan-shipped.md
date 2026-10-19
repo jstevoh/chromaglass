@@ -1900,8 +1900,44 @@ renders used to do for it.
   first to the last render compile still, with some seen before the first compile
   was asked (SwiftShader: 328 frames, none moving, 86 before the first ask at 2.27 s;
   with the markup's `.cg-still` taken out, 83 of 85 moving before the first ask and
-  the line red). Left: the device still comes 1.4–1.9 s late with the still intro
-  up (14v-6).
+  the line red).
+- **Shipped, 14v-6: the opening asks its first fills before the display, after the
+  mount frames settle** (2026-10-18, this PR). Over 2026-10-11 to 18 (`npm run
+  flakes -- --check 'no stop in the opening'`), `startup`'s "no stop in the opening"
+  went red on 26 of 167 Mac runs (16%; 11 of the 26 green on the same commit). PR #396
+  tried warming the compiler at
+  boot (an empty kernel, a built fill-shaped kernel, and that kernel run once) and
+  went red on all three Mac runs of its own PR; its third run showed that the stop is
+  not Metal's compiler starting (the warm started it in 0.13–0.20 s), but the
+  opening's own `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside
+  `plate/display` (2.64 s) while a frame asked at 3.42 s waited for the GPU process
+  until 6.80 s. This PR's first version (fills first, display held until they settle)
+  still went red on its own first Mac run (39189617869): fills asked at 2.42 s,
+  `fluid/fill` 2.67 s, a frame gap of 2.07 s from 2.59 s, with a long animation frame
+  that began at 2.61 s and did not render until 4.74 s, and the page's frames
+  numbering 8 at 2.25 s and 11 at 2.82 s, so the desk's mount frames were still being
+  presented when the fills were asked. Three changes (`src/hooks/usePreviewFrame.ts`,
+  `src/lib/intro.ts`, `src/gpu/prepare.ts`):
+  - `usePreviewFrame` measures the desk's preview hole in `useLayoutEffect` instead of
+    `useEffect`, so `plate-frame` and `#cg-intro` mount directly in the preview
+    rectangle on `App`'s first paint instead of painting full-window and resizing on
+    the next frame.
+  - `introStill()` waits four animation frames plus a macrotask (with a 1.5 s safety
+    cap for a tab hidden mid-wait, and resolving at once if already hidden) even when
+    `#cg-intro` already has `.cg-still` from `index.html`. On run 39189617869, a 200 ms
+    cap fired at 2.42 s before the first post-mount frame at 2.50 s had rendered,
+    leaving frames at 2.50–2.59 s to wait 2.07 s on `fluid/fill`.
+  - `prepareShow` ranks the three `fluid/fill:*` compute kernels ahead of
+    `plate/display` and holds `plate/display` (and the remaining kernels) in
+    `buildInTurn` until the opening's `fluid/fill:*` kernels are given (`fillLeft`),
+    then asks `plate/display` alongside the remaining compute kernels.
+  Not reproduced locally: the Mac's compiled-shader cache is warm there (the opening
+  took 0.24 s), so `npm run startup`'s "no stop in the opening" passed on the warm
+  cache and proves nothing about the cold stall; emptying that cache
+  (`STARTUP_COLD=1`) is the owner's to allow, and CI's cold runner is the judge. On
+  the Mac: `npm run intro` 13/13, `npm run loadtime` 4/4, `npm run lint`. Judged over
+  the week after merge against the week before by `npm run flakes -- --check 'no stop
+  in the opening'`.
 - **Shipped:** the opening asks for its render pipelines first, the display first of
   all (`gpu/prepare.ts`): with three in flight it had been asked forty-fifth, and the
   last 1.34 s of the opening was the display compiling alone with the other lanes dry
@@ -3314,6 +3350,29 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 - **Found along the way:** the grid's checkerboard filter (`dampGrid`) adds dye at a
   drop's rim, 3.2% in 20 s (18m-5); the check runs with it off.
 
+### 19aa-3. The API scripts never print the token
+
+**Shipped** 2026-10-19. A transient 502 from the Actions API stopped `npm run flakes` on
+the owner's machine, and the error it died with printed the owner's GitHub token whole.
+`flakes.mjs` and `macqueue.mjs` handed the token to curl as an argument
+(`-H "Authorization: Bearer …"`), and a failed child process's error in Node carries the
+whole command line in its message and in `cmd` and `spawnargs`; a top-level await that
+rejects prints all of it. The argument was also readable by any process for as long as
+curl ran. Both now go through `scripts/ghapi.mjs`, which gives curl the header on its
+standard input (`-K -`), so the command line holds nothing to print, and rebuilds every
+error from curl's exit code and its stderr with tokens of any GitHub shape, and the
+environment's own by value, taken out. `npm run ghapi` (Measure, logic part), against a
+local server that answers 502 and echoes the header back: the header still arrives;
+the arguments hold no token; the async and sync errors, printed every way Node prints
+one, hold none, and both are new errors without `cmd` or `spawnargs`; curl's "error: 404"
+line, which `flakes.mjs` reads to tell an expired log from a failure, survives; a token in
+the URL is taken out of both errors, and with the redaction bypassed the same calls leak
+it; and the old way on the same server leaks it and the same assertion sees it. 10/10.
+The check-skeptic's mutants: `failure` without its redaction fails the URL check, and the
+sync wrapper rethrowing Node's own error fails two. `deploygate.sh` still puts the header
+on curl's command line, readable through `ps` while it runs on the owner's machine:
+19aa-4.
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
@@ -3843,6 +3902,41 @@ With the followed place (28g-2, #387): a nudge moves the place the follower hold
 the shows read that place. An identification while the follower is unsure resyncs to
 the fingerprint's offset plus the nudge, so a nudge survives a re-anchor.
 
+## 28i. Every look judged again, after the lamp, the soap film and the breakdown
+
+### 28i-1. Nine looks retired (#408; Antigravity, batch 1 of the overhaul)
+
+The verdicts are PLAN 28i's, from the Mac gallery of 2026-10-19. Nine ids left `PRESETS`,
+`PRESET_CONTRACTS`, the inject styles and the liquid table and entered `RETIRED_PRESETS`,
+each with its reason: `sensual-laboratory` → `turing-print`, `oil-on-water` →
+`oil-and-water`, `colorful-cosmos` → `classic`, `agate` → `chemical-clock`,
+`ferro-maze` → `magnet-garden`, `deep-ocean` → `jellyfish-bloom`, `fillmore-1969` →
+`poster-1969`, `timbre-shifter` → `microscopic-chaos`, `oil-wheel` → `clock-glass`.
+`sunny-side-up` still names Colorful Cosmos and so reaches Classic by two hops; the
+resolver follows the chain. Lumia stays (28i-5). A saved show, a pad, a stage or a
+`?look=` link that names a cut id plays the replacement.
+
+What else moved with them: the dead seed cases of three of them in `LiquidVisualizer`
+(Sensual Laboratory's and Ferro Maze's clean-glass cases went too; Turing Print keeps
+its own), and the one-line hook that laid the Fillmore's second-plate wash
+(`laySecondPlate`: nothing can name that look now; the `fillmore-wash` seed stays,
+because `npm run wall` lays it by hand); the built-in sequences (Set Journey lost its
+second Poster stage, which would have faded Poster into Poster; the stage names that
+named a cut look are the replacements'), the mood buckets in `evolution.ts` (a duplicate
+of a look already in the bucket where the replacement was there, so the bucket's length
+and every song's pick by ISRC stay as they were), the example set, the Guide's one
+sentence, and the scripts, each listed in the PR body under `Check changes:`.
+
+What a replacement did not carry, found by running the checks that named the cut look,
+is PLAN 28i-6: no look ships the camera pass or Two Projectors any more, and Poster, 1969
+ships Beat Squeeze 0 and no patches where the Fillmore had 0.1 and two.
+
+`plate` 5b needed one rewrite. Its last line compared the table's first entry with what
+`findPreset` returns, which is only true while every entry names a live look; it is now
+two lines, one over every retired id against the end of its own chain, written out in the
+check and not taken from `livePresetId`, and one that a chain is followed the whole way.
+With the resolver cut to one hop both are red (`sunny-side-up → nothing (wanted classic)`).
+
 ## 29. The closeup's ferrofluid drop
 
 ### 29a. The drop as a bead with the light on it (this PR)
@@ -3993,3 +4087,31 @@ under the per-step guard at its steepest cell, `0.262` vs `0.375` plate/s on `38
 `0.03`, where #373's third head had `0.049` and main `0.012`; the middle with the glass down
 `0.968 → 0.981`, volume `0.01570 → 0.01570`). `npm run ferrodrag` (new script, out of CI
 until 29c-8) is 1/3 (`lag 3.24R`, `half-full 100 → 0`, `moved 0.010 cells`).
+
+## 32. The soap film: a draining film seen in reflection
+
+### 32a. The CPU reference (this PR, #403)
+
+Built `src/lib/soapFilm.ts` (`createSoapFilm`, `stepSoapFilm`, `soapFilmRgb`), added the
+sixth argument `cosI = 1` to `filmReflectance` (and optional `cosI = 1` to `filmColour`)
+in `src/lib/filmTable.ts`, and wired `npm run soapfilm` into `.github/workflows/checks.yml`
+under `Measure · logic`.
+
+Method: 2D incompressible Darcy buoyancy flow `u = (1/ζ)(−∇p + ρ g (h − h̄) ŷ)` with
+`∇·u = 0` on a staggered MAC grid (`ρ g = 9810`, `ζ = 1.5`, default `dx = 1e-3` m),
+Gauss-Seidel projection with over-relaxation (`f.uf` and `f.vf` exposed on the cell faces,
+zero at all four walls), conservative second-order minmod-limited advection of `h`,
+constant evaporation (`evap` nm/s), and exponential relaxation (`τ = 0.5` s) to the 8 nm
+Newton-black film once a cell thins below 30 nm without refilling. Named shortcuts (a)–(e)
+are documented in `PLAN.md` §32 and `src/lib/soapFilm.ts`.
+
+Measured: `npm run soapfilm` 23/23 (C1 thick patch down 29.4 rows, thin patch up 22.6 rows;
+C2 mass drift 3.3e-15, uniform film 0.0e+0 nm; C3 `g = 0` 0.0e+0 nm, half-gravity ratio
+0.54, reversed gravity −20.9 rows; C4 peak excess at 5 s 663/800 nm, mass ratio 0.77,
+max `|∇·u|` 9.2e-5 /s against 1.9e-3 /s, 0.00% of cells outside face flux interval, wall
+flow 0; C5 550 nm first max 103.5 nm at 0°, 111.5 nm at 30°, 126.5 nm at 50°, Airy
+agreement 8.3e-17, table and angle match 0.00/255; C6 quarter means ordered from 30 s,
+top reaches 10% black first at 115 s, no ruptured cell refills; C7 4 consecutive 5 s
+samples in the photograph window, at t=120 s 5.1% under 30 nm, 23.3% dark, 79% saturated,
+9/12 hue sectors); `npm run filmtable` 8/8; 600 steps of the 32×64 film in 0.69 s.
+

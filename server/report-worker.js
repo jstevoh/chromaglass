@@ -39,6 +39,7 @@
 // (It stops only browsers — curl sends no Origin — which is what the rate
 // limit and the validation are for.)
 const ALLOWED_ORIGINS = [
+  /^https:\/\/(www\.)?chromaglass\.art$/,
   /^https:\/\/chromaglass\.web\.app$/,
   /^https:\/\/chromaglass\.firebaseapp\.com$/,
   /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,

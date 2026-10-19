@@ -3,7 +3,7 @@
  * Every look, rendered to a song with drums in it, as a video to watch.
  *
  *   npm run showreel
- *   SHOWREEL_ONLY=classic,fillmore-1969 npm run showreel
+ *   SHOWREEL_ONLY=classic,poster-1969 npm run showreel
  *   SHOWREEL_SONG=song.mp3 SHOWREEL_FROM=78 SHOWREEL_SECONDS=60 npm run showreel
  *   SHOWREEL_SHARD=2/6 npm run showreel     every sixth look from the second
  *

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Droplets, Laptop } from 'lucide-react';
 import { LOCKUP_URL } from '../brand';
 import { goPlay, parseLaptopAddress, remoteHref, saveLaptop, savedLaptop, type LaptopLink as Link } from '../lib/appLink';
+import { useAccountShows, joinAccountShow } from '../lib/accountShows';
 
 /**
  * The iPhone app asking which laptop to be a remote for (`lib/appLink.ts`).
@@ -17,6 +18,7 @@ export function LaptopLinkForm() {
   const [address, setAddress] = useState(saved?.relay ?? '');
   const [key, setKey] = useState(saved?.key ?? '');
   const [error, setError] = useState<string | null>(null);
+  const accountShows = useAccountShows();
 
   const connect = () => {
     const link: Link | null = parseLaptopAddress(address, key);
@@ -37,6 +39,27 @@ export function LaptopLinkForm() {
     >
       <img src={LOCKUP_URL} alt="ChromaGlass" className="block h-8 w-auto" draggable={false} />
       <h1 className="mt-6 flex items-center gap-2 text-[15px] font-semibold"><Laptop size={18} /> Be the laptop's remote</h1>
+      {accountShows.length > 0 && (
+        <div className="mt-4 flex flex-col gap-2" data-testid="account-shows">
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Running shows on your account</span>
+          {accountShows.map((show) => (
+            <button
+              key={show.id}
+              type="button"
+              onClick={() => joinAccountShow(show)}
+              data-testid="account-show-join"
+              data-cg-account-show={show.id}
+              className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-left text-[14px] font-medium text-white active:bg-white/15"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                <span className="truncate">{show.name}</span>
+              </span>
+              <span className="shrink-0 text-[12px] font-bold uppercase tracking-wider text-amber-300">Join</span>
+            </button>
+          ))}
+        </div>
+      )}
       <p className="mt-2 text-[13px] leading-relaxed text-white/55">
         On the laptop, run the show server (<span className="font-mono">npm run remote</span>). Paste the Phone
         address it prints here, or type the laptop's address. The phone and the laptop must be on the same Wi-Fi.

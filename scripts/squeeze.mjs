@@ -7,13 +7,13 @@
  * index its disc reported was a fraction, and the plate's typed arrays drop a
  * write at a fractional index without a word. From the day it was written
  * until #185 (PLAN §10 step 4), every kick on every look with Beat Squeeze up
- * (Fillmore East, 1969 at 0.9 among them) rocked the plate and pressed
+ * (Fillmore East, 1969, retired since, at 0.9 among them) rocked the plate and pressed
  * nothing. No check asked, because none counted what a kick laid.
  *
  * So this counts it, in the app itself, with the band playing: the cells
  * the lead plate's kick strokes lay (`pressedCells.kick`, counted as the
  * stroke reports them, whole cells only, since a fractional one is the bug)
- * against the show's kicks over the same seconds, on Fillmore East, 1969,
+ * against the show's kicks over the same seconds, on Bass Drop at its own 0.8,
  * on a beat tapped in (why tapped, below). And the control: the same
  * seconds with Beat Squeeze at 0, where the kicks go on and nothing is
  * pressed, which says the count is the squeeze's
@@ -63,12 +63,24 @@ try {
   await page.addInitScript(() => {
     try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
   });
-  await page.goto(`http://localhost:${PORT}/?debug&look=fillmore-1969`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&look=bass-drop`, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.chromaglassDebug === 'function' && window.chromaglassDebug().fluids?.length > 0, null, { timeout: 60_000 });
   const settings = (patch) => page.evaluate((p) => {
     if (typeof window.chromaglassSettings !== 'function') throw new Error('window.chromaglassSettings is gone');
     window.chromaglassSettings(p);
   }, patch);
+  /*
+    Bass Drop, at the Beat Squeeze it ships (0.8): the one look left that
+    carries the squeeze, so the check reads a look's own value again, as it did
+    on the Fillmore (0.9). It was moved to Poster, 1969 at 0.1 laid by setting
+    when the Fillmore retired (PLAN 28i-1), and on the runner that look's plate
+    steps too slowly to hold the check's 200 steps a window with the squeeze
+    off: 191 against 215 and 327 on the next run, 12 s each, so the line
+    measured whether the governor lowers Poster's step rate and not what the
+    squeeze presses. (Poster at about 16 steps a second is its own item, PLAN
+    28i-2.) No setting is laid here: `on.squeeze === 0.8` reads back what the
+    look shipped, and a look that lost its squeeze reads 0 and is red.
+  */
   const read = () => page.evaluate(() => {
     const d = window.chromaglassDebug();
     const lead = d.fluids[0];
@@ -180,7 +192,7 @@ try {
   // as "no tempo", which the check below would only report as a red it
   // could not explain.
   const { clock, tempo } = await page.evaluate(() => ({ clock: window.chromaglassDebug().beat, tempo: window.chromaglassTempo() }));
-  console.log(`  Fillmore East, 1969: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
+  console.log(`  Bass Drop: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
 
   if (errors.length) {
     check('the page runs without errors while the band plays', false, errors[0].slice(0, 200));
@@ -200,8 +212,8 @@ try {
     // The look and the setting it measured, and a plate that stepped: an
     // unknown look falls back to a random one, and a stalled plate presses
     // nothing while the kicks, counted a frame, go on.
-    check('on Fillmore East, 1969 at its Beat Squeeze, then at 0, the plate stepping throughout',
-      on.squeeze === 0.1 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
+    check('on Bass Drop at Beat Squeeze 0.8, then at 0, the plate stepping throughout',
+      on.squeeze === 0.8 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
       `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
     /*
       At the tapped 150 bpm the clock beats every 400 ms, and still does
@@ -258,9 +270,9 @@ try {
       `${on.kicks} and ${off.kicks} kicks in ${on.seconds.toFixed(0)} and ${off.seconds.toFixed(0)} s, of ${beats(on).toFixed(0)} and ${beats(off).toFixed(0)} tapped beats`);
     /*
       And pressed as deep as a kick at this look's squeeze: each disc
-      kickDepth(0.1, the bass /70 capped at 1, the accent 1 at Accent 0),
-      0.005 × 0.1 × (0.6 + 0.4 × the bass) since PLAN 27b, so the softest
-      kick presses 0.0027 at the middle. On a thin gap a disc is a bowl
+      kickDepth(0.8, the bass /70 capped at 1, the accent 1 at Accent 0),
+      0.005 × s × (0.6 + 0.4 × the bass) with s = 0.8 × (0.38 + 0.62 × 0.8)
+      since PLAN 27b, so the softest kick presses 0.0021 at the middle. On a thin gap a disc is a bowl
       (3 × depth × (1 − r²/R²)², squishDisc), whose mean over its own cells
       is the depth itself, and the three nested discs count each cell once
       a disc, so the mean depth a cell is at least half the softest kick's:
@@ -269,7 +281,7 @@ try {
       close the gap are counted).
     */
     const meanDepth = on.depth / Math.max(1, on.cells);
-    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.5 * kickDepth(0.1, 0, 1),
+    check('and Beat Squeeze presses the lead plate on them', on.cells > 0 && perKick > 1000 && meanDepth >= 0.5 * kickDepth(0.8, 0, 1),
       `${on.cells} cells laid by kicks, ${perKick.toFixed(0)} a kick, ${meanDepth.toFixed(5)} deep a cell`);
     check('while at 0 the kicks go on and press nothing', off.kicks >= 0.75 * beats(off) && off.cells === 0, `${off.kicks} kicks, ${off.cells} cells`);
     /*

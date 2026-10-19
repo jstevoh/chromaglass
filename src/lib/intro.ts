@@ -104,6 +104,7 @@ export function installIntro(show: boolean): void {
   const cap = setTimeout(() => introOut('cap'), Math.max(0, CAP_MS - performance.now()));
   const skip = (e: Event) => {
     if (out) return;
+    if (document.querySelector('[data-cg-signin]')) return;
     if (e instanceof KeyboardEvent && ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab'].includes(e.key)) return;
     if (e instanceof PointerEvent) {
       // A press on the desk is the desk's, and leaves the plate's intro up:
@@ -175,27 +176,39 @@ export function introPlateFrame(stepped: boolean): void {
 }
 
 /**
- * Held still while the opening's render pipelines compile (`Quiet` in
- * `gpu/prepare.ts` says why: a moving intro there stopped the page's frames
- * for as long as the display compiled). Paused, not hidden: the picture
- * stays exactly where it was and moves on from there. The first opening
- * finds it still already, from the first paint (the top of this file says
- * why); a later one, a lost device's replacement, holds it here.
+ * Held still while the opening's first fills and render pipelines compile
+ * (`Quiet` in `gpu/prepare.ts` says why: a moving intro there stopped the
+ * page's frames for as long as the display compiled). Paused, not hidden: the
+ * picture stays exactly where it was and moves on from there. The first
+ * opening finds it still already, from the first paint (the top of this file
+ * says why); a later one, a lost device's replacement, holds it here.
  *
- * The promise resolves once the page has drawn two frames with it paused,
- * so the last moving frame is presented before the compile is asked for,
- * and never later than a fifth of a second: a hidden tab draws no frames,
- * and the opening must not wait on one. Nothing to hold (gone, leaving, or
- * never shown) resolves at once.
+ * The promise resolves once the page has drawn four frames with it paused,
+ * so the desk's mount and post-mount relayout frames are all presented before
+ * the first compile is asked for (on CI's Mac, `App` often mounts right as
+ * the GPU hold releases, and its post-mount frames took 0.30–0.39 s across
+ * three to four animation frames; a 200 ms cap fired before the first of them
+ * had even rendered, leaving those frames to stall on the GPU process behind
+ * `fluid/fill`). A hidden tab draws no frames and resolves at once; a 1.5 s
+ * cap guards a tab hidden mid-wait. Nothing to hold (gone, leaving, or never
+ * shown) resolves at once.
  */
 export function introStill(): Promise<void> {
   const el = node();
-  if (out || !el || el.classList.contains('cg-still')) return Promise.resolve();
-  el.classList.add('cg-still');
-  (record.still ??= []).push([performance.now(), null]);
+  if (out || !el) return Promise.resolve();
+  if (!el.classList.contains('cg-still')) {
+    el.classList.add('cg-still');
+    (record.still ??= []).push([performance.now(), null]);
+  }
+  if (document.visibilityState === 'hidden') return Promise.resolve();
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, 200);
-    requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(timer); resolve(); }));
+    const timer = setTimeout(resolve, 1500);
+    let left = 4;
+    const step = () => {
+      if (--left > 0) requestAnimationFrame(step);
+      else setTimeout(() => { clearTimeout(timer); resolve(); }, 0);
+    };
+    requestAnimationFrame(step);
   });
 }
 

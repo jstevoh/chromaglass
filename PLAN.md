@@ -544,7 +544,7 @@ Where each batch stands, as of 2026-09-27:
 | 11 | The mixer | Step 1, the sources there are in one stack with a grade each, **shipped** (#176); step 2, the gel wheel and the lumia as rows, **shipped** (#189); step 3, a blend per row, **shipped** (#193); step 4, a take button and fade time per row, **shipped** (#195); step 5, the desk's Mixer over the rides and not the plate, **shipped** (#196); none yet judged on the Mac; step 6 waits on rig-plan R1 (§16e) |
 | 12 | The App Store and Google Play (at the end of this plan) | An iPhone shell (Capacitor) and an Android one (Trusted Web Activity) planned; step 1, the site on a phone, **passed** on the iPhone (Safari, 2026-09-27), Android not yet run; step 4, the iPhone shell, **built** with the laptop-remote mode (4a), compiled in CI, not yet on a phone |
 | 13 | ChromaGlass in popular VJ software (at the end of this plan) | Planned 2026-09-27: a small native wrapper (Electron) first, with the whole show cached offline and the show server inside, then video out through Syphon, NDI and Spout, OSC control, Ableton Link and video in. Step 1, the Mac app, **shipped** (`desktop/`, `npm run desktop`, built in `desktop.yml`), not yet opened on the owner's Mac with a projector (`docs/judging.md` §26); steps 2 to 8 not started (7, a DAW bridge plugin, and 8, a native renderer core for later, added 2026-10-04); Windows (13-win-smoke, -app, -sign) planned 2026-10-04, never run on a PC |
-| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half **shipped** (the plate reads the ride on its frame and the desk is told ten times a second: 121 App renders a second under a swept fader, now 10; `npm run renders`), not yet counted on the Mac; the reading's byte arrays still new each reading; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v); 14x, the microphone taking the hand's own clicks for kicks, **shipped** (`npm run clicks`); 14v-3, the intro over the opening's black plate, **shipped** (`npm run intro`); 14v-4, the intro held still while the opening's render pipelines compile, **shipped** (`npm run intro` line 9; the Mac's `startup` frame gap); 14v-5, the intro still from the first paint, **shipped** (`npm run intro` line 9b; startup's frame gap 2.13–2.35 s turning, 0.85–1.18 s still); 14v-6, the device late with the intro up, open |
+| 14 | The show at the gig: hearing, timing, speed, the wall (at the end of this plan) | Found 2026-09-27 by reading the code: the show goes deaf behind the projector window (14a), the wall can draw twice a refresh (14b), the projector's pixels come from the laptop's ratio (14c), the beat clock hears smoothed bass (14d). 14a **shipped** (the ear keeps hearing behind the wall, and says when it is deaf; `npm run ears`), not yet seen on the Mac with a real covered window; 14c **shipped** (a wall's pixels are the wall's: a Retina laptop on a 1080p projector opens at 1920×1080, was 960×540, and is offered 1024²; a 4K wall's bottom rung is 2.07 Mpx, was 8.29 like its top; the mirror smooths at 'high'; `npm run rungs` 70/70, was 63/70), whether 1024² holds on a 1080p wall not yet measured on the Mac; 14d **shipped** (the clock hears the kick's onset, by its time; `npm run kicks`), not yet counted in the app on the Mac; 14b **shipped** (one draw a refresh with the wall up, whichever window asks, each offer stamped with its refresh's own time: `npm run wall` 119.1–120.2 draws a second on a 60 Hz display before, 59.8–60.3 after, and 60.0 with 11.7 ms draws where the first version drew 68.7; covered, every ask draws); on the Mac runner, with a renderer, `npm run wall` 187/187, the governor fed a whole refresh of the faster window; 14b-2 **shipped** (on a busy machine the gate no longer turns down a window's own next frame: 23.4 drawn of 29.4 handed before, 29.5 of 29.5 after, `npm run wall`'s busy phase; its floor judged in the same seconds); 14f **shipped for the sound** (the ear tells React ten times a second and the plate asks for each frame's reading itself: the App renders 11 a second with the band, was 70, and a quiet page only its clock, was 5; `npm run renders`; on the Mac the plate heard its own frame's reading on every frame), the MIDI fader's half **shipped** (the plate reads the ride on its frame and the desk is told ten times a second: 121 App renders a second under a swept fader, now 10; `npm run renders`), not yet counted on the Mac; the reading's byte arrays still new each reading; 14v, the load: the opening built three at a time, the app preloaded and the GPU asked for at boot, **shipped** (`npm run loadtime`; `startup`: first step 9.52 s cold on the Mac, was 12.15–17.62 s); 14v-2, the display asked for first and two duplicate kernels merged, **shipped** (Mac numbers in §14v); 14x, the microphone taking the hand's own clicks for kicks, **shipped** (`npm run clicks`); 14v-3, the intro over the opening's black plate, **shipped** (`npm run intro`); 14v-4, the intro held still while the opening's render pipelines compile, **shipped** (`npm run intro` line 9; the Mac's `startup` frame gap); 14v-5, the intro still from the first paint, **shipped** (`npm run intro` line 9b; startup's frame gap 2.13–2.35 s turning, 0.85–1.18 s still); 14v-6, the opening asks its first fills before the display after the mount frames settle, **shipped** (judged over the week after merge by `npm run flakes -- --check 'no stop in the opening'`) |
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, the Finger as a solid that moves every liquid on a thin gap, **shipped** (`npm run fingerflow`), not yet judged on the Mac (judging §33), its Blow, old-plate, inside-the-hand and remote halves open; 15i, picking a bottle lays nothing, **shipped** (`npm run bottles`, Mac); **15g's first part, the moving Blow as air on the film, shipped** (the breath's stress a body force on a thin gap, its carries retired there; `npm run airblow`), not yet judged on the Mac (judging §44); 15e, 15f, 15g-2 to 15g-6, 15j open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16f, add and take off the back plate on every look, **shipped** (#273, `layout`, `phone`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (`npm run lamp`); **18b-1 which looks go on it, shipped** (#262: eleven looks on the lamp, ten picked by a written rule from Mac pictures, `npm run lampjudge`, one by the owner); 18b-2 to 18b-9 left; **18d-1 each poured liquid's viscosity, shipped** (glycerine crawls, syrup runs ahead in a thick look; `npm run thick`); **18c-1 a pour adds liquid and 18d-2 flushing, shipped** (a held bottle pushes the plate out into rings, a poured liquid stays until it is pushed over the rim; `npm run flush`); **18d-11a the poured liquid rides the colour's carry, shipped** (what it adds to a step halved on CI's Mac, 13.54 to 6.73 ms at 768², a whole colour carry to half of one; `npm run thick`); 18c-2 to 18c-5 and 18d-3 to 18d-11 left |
@@ -3319,41 +3319,39 @@ for, and the GPU was asked for only after they had arrived and drawn.
   pipelines are built** (2026-10-10). Turning, it stopped the Mac's frames while
   Chromium started the GPU (startup's "no stop in the opening" red on about half of
   10-10's runs); `npm run intro` line 9b. The story is in `docs/plan-shipped.md`.
-- *The GPU device still comes late with the intro in the page* (14v-6, found with
-  14v-5): still from the first paint, the device was given 1.4 to 1.9 s after it was
-  asked on two of three cold Mac openings, against 0.03 s with no intro at all
-  (PR #335's trials). The frames no longer stop for it, but the opening starts that
-  much later. What the GPU process does for the still intro's first paint (its
-  gradients, the SVGs, the web font) is the question; a still image of it, or
-  painting it only after the device is given, are the two things to try.
-  Read again 2026-10-18 over 124 Mac runs' logs (2026-10-11 to 18): the "no stop in
-  the opening" line went red on 14 (11%), and every red was this wait, 1.3–2.4 s on
-  the adapter or the device and then 2.4–4 s on the first compute pipeline, the
-  Metal compiler starting cold. Asking sooner cannot help: the adapter is already
-  asked 0.05–0.53 s into the page (mean 0.11 s). It went red on 12 of the 56 runs
-  where the adapter answered at 0.5 s or later and on 2 of the 68 where it answered
-  sooner. The intro is still throughout, so nothing on the screen stops. At one red
-  in nine a fix cannot be judged by its own PR's runs (eight greens in a row happen
-  by chance two times in five); it is judged by `npm run flakes -- --check 'no stop
-  in the opening'` over the week before its merge against the week after (19aa).
-  **Tried 2026-10-18 (PR #396), and it did not work.** Warming the compiler at boot
-  and holding the app's first render for it went red on all three Mac runs of its
-  own PR, each version on the same line: an empty kernel (stop 2.08 s from 1.99 s),
-  a built fill-shaped kernel (2.13 s from 2.19 s; the warm built in 0.13 s and the
-  opening's own `fill` was still given 2.6 s after it was asked), and that kernel
-  run once with the queue awaited (3.35 s from 3.42 s, the warm costing 0.2 s). At
-  the 11% base rate three reds in a row is about one in 700, so the warm does not
-  help and may hurt, and it was taken out. What the last run showed: the stop is
-  not Metal's compiler starting (the warm started it). It is the opening's own
-  `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside the display's render
-  pipeline (2.64 s) while the frame asked at 3.42 s waited for the GPU process
-  until 6.80 s: long animation frame 3.37 s, rendering delayed, 0.00 s blocked, no
-  script and no long task. A kernel of another shape does not shorten that
-  compile. The next thing to try is not a warm: ask the opening's first fills
-  before the display's pipeline and let the intro's frames wait until they are
-  given (the stop is then at a time nothing is drawn), judged as above. `npm run
-  startup` now prints the page's first compute pipeline ("first compile asked …,
-  given …"), judged by nothing.
+- **Shipped, 14v-6: the opening asks its first fills before the display, after the
+  mount frames settle** (2026-10-18, this PR). The story and numbers are in
+  `docs/plan-shipped.md` §14v; judged over the week after merge against the week
+  before by `npm run flakes -- --check 'no stop in the opening'` (week before,
+  2026-10-11 to 18: 26 FAIL of 167 Mac startup runs, 16%, 11 of them green on the same
+  commit; this PR's first version went red on its own first run, 2.07 s from 2.59 s,
+  with the 200 ms cap below fired before the mount frame had rendered, so the number
+  after is still owed: one branch's runs cannot judge a one-in-six flake).
+  Named shortcuts and retunes: four animation frames is a heuristic for "the mount
+  frames have been presented" (the compositor keeps up to two frames in flight, and
+  the CI Mac's post-mount frames took 0.30–0.39 s over three to four frames), not a
+  signal that the compositor acknowledged them; the cap went 200 ms → 1.5 s and the
+  frame count 2 → 4, so the opening can start up to that much later in a tab whose
+  frames are held; and the desk's preview hole is measured in `useLayoutEffect`
+  instead of `useEffect` (before the first paint, not after).
+  What it was (found with 14v-5, read over 124 Mac runs' logs 2026-10-11 to 18, and
+  diagnosed on PR #396): the "no stop in the opening" line went red on 14 of 124 runs
+  (11%), and every red was 1.3–2.4 s on the adapter or device and then 2.4–4 s on the
+  first compute pipeline while `plate/display` compiled and drew beside it. Warming the
+  compiler at boot (#396: an empty kernel, a built fill-shaped kernel, and that kernel
+  run once) went red on all three Mac runs of its own PR and was taken out; the third
+  run showed `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside
+  `plate/display` (2.64 s) while a frame asked at 3.42 s waited on the GPU process
+  until 6.80 s. Now `usePreviewFrame` measures the desk's preview hole in
+  `useLayoutEffect` so the plate and intro mount directly at their preview size
+  without a second full-window-to-preview resize frame, `introStill()` waits four
+  animation frames plus a macrotask (with a 1.5 s cap for a tab hidden mid-wait;
+  a 200 ms cap fired at 2.42 s on run 39189617869 before the post-mount frame at
+  2.50 s had rendered) even when `#cg-intro` starts with `.cg-still` from
+  `index.html`, and `prepareShow` asks the opening's `fluid/fill:*` compute kernels
+  before `plate/display` (which still heads the render pipelines and runs alongside
+  the remaining compute kernels). `npm run startup` prints the page's first compute
+  pipeline ("first compile asked …, given …"), judged by nothing.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
@@ -5204,6 +5202,14 @@ Not a gate and no bar: a rate depends on what was pushed.
   measured, and a confidence pinned at 100% while sure would pass the 50% line. Not
   tried: making the follower's first place better than 50-60% trust (the follower's own
   business, `songfollow`).
+- **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
+- **19aa-4. `deploygate.sh` keeps the token off curl's command line.** It passes
+  `-H "Authorization: Bearer $GH_TOKEN"` as an argument (`scripts/deploygate.sh`, the `api()`
+  helper), and the owner runs it locally with `GH_TOKEN=$(gh auth token)`, so any process
+  can read the token through `ps` while curl runs; bash prints nothing of it on a failure
+  and Actions masks it, so it does not reach a log. Give curl the header on stdin
+  (`-K -`, as `scripts/ghapi.mjs` does) and check with `npm run deploygate -- --history 20`
+  that the same merges are trusted. Found by the check-skeptic on 19aa-3.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
@@ -5719,26 +5725,23 @@ once the login works (23.14).*
 
 - **23.1** *(owner)*: the merchant account, the Home price ($29–39) and Pro's ($199),
   and the checkout page.
-- **23.2** (one PR, lane B): a hosted-site build flag that shows each paid feature
-  above as an "In the ChromaGlass app" tile with a link, off in the app and in a
-  local `npm run dev`. *Measure:* a check that loads the site build and the app
-  build and lists which controls each shows, against the table.
-- **23.3** (one PR, lane A, after 14o): the song-ID Worker takes a licence key as
+- **23.2** (**shipped**, this PR): a hosted-site build flag (`VITE_FIREBASE_HOSTED_SITE=1`, or `?tierGates=1` for checks) that shows each paid feature
+  above as an "In the ChromaGlass app" tile with a link (`src/lib/tierGates.ts`, `SettingsPanel.tsx`, `DeskPanels.tsx`), off in a licensed app and in a
+  local `npm run dev`. *Measure:* `npm run tiers` (11/11, wired into `checks.yml` `Measure · lab`): loads the gated build and verifies 7 tiles on the free tier, 2 Pro tiles on a Home key, and 0 tiles on a Pro key.
+- **23.3** (**shipped**, this PR): the song-ID Worker (`server/fingerprint-worker.js`) takes an Ed25519-signed `X-ChromaGlass-Key` licence key as
   well as an allowed origin, and the site's manual tag stays. 14o's gates come first
   and stay (origin, size, per-/64 hour, the day's ceiling, in `npm run
-  fingerprint-worker`); a good key can raise the hour's count, not skip the day's. *Measure:* in the
-  manner of `npm run report-worker`: no key refused, a bad signature refused, a good
-  key answered.
-- **23.4** (one PR, `desktop/`): the key in the Mac app: signature check, activation
-  and the two-machine count, the key's tier (Home or Pro) and the features each
-  opens, an upgrade key, and an "unlicensed" app that runs as the site does. Lands
-  in the Windows app with 13-win-app. *Measure:* `npm run desktop` with a good, a
-  bad and no key.
-- **23.5** (one PR, lane B): the site's Record capped to a short clip and Render to
-  720p, each with a small mark the Mixer cannot hide; the app's untouched. *Measure:*
-  a take from each, its length, size and the mark's pixels.
-- **23.6** (one PR, lane B, after 23.2): the site's logo layer shows the ChromaGlass
-  mark only; your own logo is the app's.
+  fingerprint-worker`); a good key raises the hour's count (`LICENSED_RATE_PER_HOUR = 300`), not skipping the day's (`DAILY_LIMIT = 1000`). *Measure:*
+  `npm run fingerprint-worker` (23/23): no key refused when `REQUIRE_LICENSE_KEY=1`, a bad signature refused before reading the body or calling the service, a good key answered and allowed past the 30/hr cap while stopping at `DAILY_LIMIT`.
+- **23.4** (**shipped**, this PR): the key in the Mac app and show server (`server/license-key.js`, `server/server-license.js`, `server/remote-server.js`, `src/lib/licenseKey.ts`, `desktop/`): offline Ed25519 signature check, activation
+  and the two-machine count (`/license-activate`, `/license-deactivate`, `/license-info.json` on loopback), the key's tier (Home or Pro) and the features each
+  opens, Home → Pro upgrade keys, and an unlicensed app that runs as the site does (`requireSignIn=1&tierGates=1`). *Measure:* `npm run tiers` (11/11): verified with a valid Home key, a valid Pro upgrade key, tampered/expired keys, 2-machine cap, and no key.
+- **23.5** (**shipped**, this PR): the site's Record capped to a 15-second clip (`FREE_RECORD_MAX_SECONDS = 15`)
+  and Render to 720p (`FREE_RENDER_MAX_HEIGHT = 720`), each with a small ChromaGlass corner mark (`useRecorder.ts`, `useSongRender.ts`) the Mixer cannot hide; the app's untouched. *Measure:*
+  `npm run tiers` (11/11): verifies the 15 s cap, 720p cap, and corner mark pixels on recorded frames.
+- **23.6** (**shipped**, this PR): the site's logo layer shows the ChromaGlass
+  mark only (`SettingsPanel.tsx` and `DeskPanels.tsx`); your own
+  logo is the app's. *Measure:* `npm run tiers` (11/11).
 - **23.8** (one PR, `desktop/`, before 23.7): Home's listening features. The app hears
   whatever the Mac plays with no tab to share (macOS's own system-audio capture, asked
   for once), and an ambient mode runs the plate full screen on the TV for hours with
@@ -5747,54 +5750,62 @@ once the login works (23.14).*
   drives the plate (docs/judging.md, next free number at merge).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
-- **23.9** *(owner)*: in the Firebase console, turn on Authentication with Google, Apple
-  and the emailed link; add the site's domains as authorised. Apple's half needs a
-  Services ID and a key from the Apple Developer account (12.2's). The web config is
-  public (it names the project, it grants nothing) and goes into `deploy.yml` as
-  `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID`.
-- **23.13** *(owner, before 23.10 goes live)*: a privacy page and terms, since the site
-  now keeps an email per person: what is kept (the email, the account's id, later its
-  keys and its devices), that it is not sold, and that deleting the account deletes it.
-  The App Store asks for both. *Drafted 2026-10-17:* `public/privacy.html` and
-  `public/terms.html`, written from what the code sends (the account, song
-  identification, lyrics, fonts, crash reports only on Send, the hosts' logs; the
-  microphone, camera, looks, recordings and phone link stay on the machine), with a
-  flashing-light warning in the terms. *Measure:* `npm run privacy` (CI, part
-  `logic`): every host the code and its servers reach and every `VITE_` service is
-  named on the page, and no `{{OWNER: …}}` mark is left. Red until the owner fills
-  those marks (a contact address that is not a personal one, who runs it, the
-  governing law, the date, how long crash reports are kept) and approves the wording.
-  23.10 links both from the sign-in and account sheets; 23.12 adds keys and devices
-  to the page and the licence's terms (refunds, machines a key) to the terms.
-- **23.10** (one PR, lane B; Antigravity builds, brief `docs/handoff-signin.md`): the
-  sign-in on the hosted site, on the desk and the phone, and the account sheet (the
-  email, sign out, delete the account) on each. *Measure:* `npm run signin`, 14/14,
-  and `startup` on the Mac: a returning visit's first step no later than today's bar.
-- **23.11** (one PR, `desktop/`, with 23.4): the Mac app with no key asks for the
-  same sign-in once, online, then runs as the site does; with a key it never asks.
-  *Measure:* `npm run desktop` with a key, with none and signed in, and with none and
-  signed out.
-- **23.12** (one PR, a Worker in the manner of `server/report-worker.js`): accounts
-  hold the keys. The merchant's webhook files each key under the buyer's email in
-  Workers KV; a signed-in app asks the Worker for its keys with its Firebase ID token,
-  checked against Google's public keys. Then 23.4's key arrives by signing in, not by
-  pasting. A Worker rather than Firestore keeps every server piece in the one pattern
-  the repo already deploys and checks. *Measure:* in the manner of
-  `npm run report-worker`: a bad webhook signature refused, a bad token refused, a
-  good token given its own keys and no one else's, a refunded key gone.
-- **23.14** (one PR, after 23.10 and the QR link of PR #380): linking devices by
-  account. A phone, tablet or laptop signed in to the same account sees the account's
-  running shows in a list and joins one with a tap: the account hands over the
-  show's address and key, which #380's QR carries today. The QR stays for a guest's
-  phone or one not signed in, and for a venue whose Wi-Fi has no internet. Once
-  linked, control stays on the local network either way, so the internet going never
-  drops the remote. *Measure:* in the manner of `npm run phone` with the emulator: two
-  signed-in pages, one a show and one a phone, the show listed and joined with no
-  address typed; a third page on another account sees nothing.
+- **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
+  with Google, Apple and the emailed link; authorised domains configured; web config wired into
+  `deploy.yml` via GitHub Actions repository secrets (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`).
+  *(Open console step for the owner: in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Web client `793087423172-fi7d5oq5tisv3is84vvf8e6dtorighql.apps.googleusercontent.com`, add `https://chromaglass.art/__/auth/handler`, `https://www.chromaglass.art/__/auth/handler`, and `https://chromaglass.web.app/__/auth/handler` under Authorised redirect URIs, then update `VITE_FIREBASE_AUTH_DOMAIN` to `chromaglass.art` so `signInWithRedirect` stays same-domain on iPhone Safari.)*
+- **23.13** (**shipped**, #390 and extended in #394): `public/privacy.html` and `public/terms.html` completed and
+  approved by the owner, including 23.12's licence key, Lemon Squeezy checkout, and 2-machine terms. *Measure:* `npm run privacy` (16/16, CI, part `logic`).
+- **23.10** (**shipped**, #394; brief `docs/handoff-signin.md`): the sign-in on the
+  hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
+  with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
+  the email, sign out with confirmation, delete the account with confirmation, and links
+  to `/privacy.html` and `/terms.html`) on the desk, the narrow overlay and the phone.
+  Returning visitors start the plate immediately from the local flag while Firebase
+  confirms in the background, `?remote`, `?cast` and builds without `VITE_FIREBASE_*`
+  never load Firebase, and `getFirebaseAuth()` uses `VITE_FIREBASE_AUTH_DOMAIN` directly
+  rather than overriding it with `window.location.hostname` on `.web.app` (which sent an
+  unauthorised `https://chromaglass.web.app/__/auth/handler` redirect URI on returning
+  iPhones kept on `chromaglass.web.app` by `index.html`). *Measure:* `npm run signin` (14/14, wired into `checks.yml`
+  `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
+  than today's bar.
+- **23.11** (**shipped**, this PR): the Mac app with no key asks for the
+  same sign-in once (`LicenseGate.tsx`, `src/main.tsx`), online, then runs as the site does;
+  with a verified Ed25519 key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
+  and signed in, and with none and signed out.
+- **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`).
+  The merchant's webhook files each Ed25519-signed key under the buyer's email in Workers KV;
+  a signed-in app asks the Worker for its keys with its Firebase ID token, checked against
+  Google's public keys, and activates up to 2 machines per key. *Measure:*
+  `npm run license-worker` (12/12, wired into `checks.yml` `Measure · logic`): `DEFAULT_PUBLIC_JWK.x`
+  matches across `server/license-key.js` and `src/lib/licenseKey.ts` and is not the burned key, a bad webhook
+  signature refused, missing `LICENSE_PRIVATE_KEY` fails closed (500), a bad token refused, a good token given its own keys and no one else's,
+  Home→Pro upgrade, two-machine cap, and a refunded key revoked.
+- **23.14** (**shipped**, this PR): linking devices by
+  account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
+  with `server/remote-server.js` publishes its LAN relay address and show key to
+  `/account-shows` with its Firebase ID token (90 s TTL, isolated by account UID). A phone,
+  tablet or laptop signed in to the same account sees the account's running shows in a list
+  (on `PhonePlay`, `PhoneStage`, `AccountSheet`, `DeskPanels` `Phone · iPad` and
+  `LaptopLink`) and joins one with a single tap: the account hands over the show's address
+  and key, which #380's QR carries today. The QR stays for a guest's phone or one not signed
+  in, and for a venue whose Wi-Fi has no internet. Once linked, control stays on the local
+  network either way, so the internet going never drops the remote. *Measure:*
+  `npm run accountlink` (6/6, wired into `checks.yml` `Measure · lab`): token/store isolation,
+  two signed-in pages on the same account (one a show, one a phone) where the show is listed
+  and joined with a tap and no address typed while the QR code stays on `Phone · iPad`, a
+  third page on another account sees nothing, and cutting off the internet and account
+  service leaves the local remote socket driving the show.
 - **23.15** (with §12's iPhone app): Sign in with Apple native in the iPhone app, and
   deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
   laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
   `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).
+- **23.16**: carry saved state from `web.app` to `.art`, then move returning users.
+  `index.html` currently redirects `chromaglass.web.app` to `chromaglass.art` only when
+  `navigator.onLine` holds, there is no `navigator.serviceWorker.controller`, there is no
+  saved ChromaGlass state in `localStorage` (licence, signed-in flag, settings, set list),
+  and there is no `?remote` or `?cast`, so returning users and offline shows do not lose
+  their origin-scoped state before a handoff moves it across.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free
@@ -6574,6 +6585,103 @@ Turing Print" work (#331), which also made the reaction grow at all.
     maps back to the same section index, so a cue on it fires once; decide with 28g
     whether a repeat should fire its cue again.
 
+- **28i. Every look judged again, after the lamp, the soap film and the breakdown** (the
+  owner, 2026-10-19: "the presets are kinda shitty now that we've made substantial
+  changes ... prune or improve all of them ... really dynamic or emotional. We need to sell
+  some cool stuff now"). The 28a judging was done on the 2026-10-10 gallery; since then the
+  lamp ground (18b), the quieter breakdown (28e), the closeup camera (27a-8), the soap film's
+  reference (32a) and the lamp's background (`lampBg`) all changed what a look draws. Every
+  look is photographed again on the Mac (`gallery.yml`, this PR labelled `gallery`) and
+  given a verdict: keep, rework (with a number and the check that proves it), merge into
+  another, or retire through `RETIRED_PRESETS`. Each kept look is tagged with the art pack
+  it sells in (PLAN 23: Home includes one pack, Pro all). The reworks go to Antigravity as
+  short briefs; this item lists them as they are briefed.
+
+  Judged on the Mac gallery of 2026-10-19 (8, 20 and 40 s, `scripts/judge.mjs`'s numbers)
+  against the 2026-10-11 film. Of 41 looks, 10 retire (nine in batch 1, Lumia after 28i-5), 31 stay, 21 of those reworked. The
+  three faults the photos share: looks that stand still (eight under .01 gallery motion at
+  20 and 40 s, four more by eye; Acid Trip reads .11 to .23), looks that lose the black
+  (Classic, Galaxy, Cell Bloom drains to flat indigo, flat .21 to .81 and luma .52 to .08
+  by 40 s), and looks on a white ground (Turing Print at luma .85 to .94 for 20 s,
+  Sensual Laboratory, Roy at .7).
+
+  - ~~**28i-1. Retire nine**~~ (Antigravity, batch 1, **shipped** in #408; story in
+    `docs/plan-shipped.md` 28i-1): nine ids through `RETIRED_PRESETS`, every check that
+    named one on its replacement. What it found is **28i-6**.
+  - **28i-5. Retire Lumia** (→ `velvet-underground`; Claude first). `'lumia'` is also the
+    lamp's Lumia setting and mixer mover (`plateSources.ts`, `mixer.ts`), and `plate` 5b
+    fails on any quoted retired id in src/, so retiring the look trips it on the layer.
+    5b learns to tell a preset id from a setting key (named under `Check changes:`, its
+    reach unchanged for preset ids), then the look retires.
+  - **28i-2. Give back the black, make the still ones move** (Antigravity, batch 2). Film
+    near black (5th percentile) at least 20% of the time: Classic (and two or more hues),
+    Galaxy, Stardust Collapse (colours at least .3), Jellyfish Bloom (flat at most .4),
+    Bass Drop (peak at least 2.5 × median). Cell Bloom: flat at most .4 and luma at least
+    half its 8 s value at 40 s. Cyberpunk: near black at the 95th percentile at most 60%,
+    three or more hues. Off the white: Turing Print colours at least .3 by 8 s and luma
+    at most .6; Roy flat at most .5, luma at most .6; Red Cabbage luma at most .5 with
+    three hues; Lava Lamp luma at most .6; Milk Marbling's white tamed. Colour: Macro
+    Bead and Lacing Run two or more hues and six colour changes a minute; Chemical Clock
+    six a minute. Microscopic Chaos detail at most half its 10-19 reading. Motion at
+    least .02 at 20 and 40 s: Velvet Underground, Poster 1969, Home Movie, Clock Glass,
+    Crowd Plate, Lava Lamp, Jellyfish, Microscopic Chaos. `gallery` label and
+    `film.yml` (`FILM_ONLY` the looks changed).
+    Also for this batch, found in #408: **Poster, 1969's plate runs at about 16 steps a
+    second on the Mac runner** (`squeeze` read 191, 215 and 327 steps in 12 s on it, 320
+    to 350 on the Fillmore), under the 30 a second where the plate stops flowing and
+    starts stepping (`PINNED_STEP_RATE`, `LiquidVisualizer.tsx`). Find what makes Poster
+    that heavy (its layers, its dye budget, its plate size) before it is made to move.
+  - **28i-3. Sound on the liquid, not the frame** (Antigravity, batch 3). Eight looks
+    still drive the rotation slot from sound (28f-3): Galaxy (energy), Cyberpunk
+    (complexity), Acid Trip (energy), Aurora (energy), Solar Flare (bass), Fractal Dream
+    (treble), Neon Coral Reef (timbre), Stardust (bass); each moves that reading to a
+    liquid target. Every look that hears sound gets two or three patches from hits,
+    bands, onsets and notes only (28f), and Milk Marbling's treble → airVelocity at
+    depth .02, which reads nothing, is fixed. Film: 2 to 3.5 swells a minute, six or
+    more colour changes a minute, r1 between −.13 and .22 (the Dregs and the Sheep).
+  - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
+    magenta cells, no rainbow); then four or more hues on the film.
+
+  - **28i-6. What retiring nine left a check or a page standing on** (found in 28i-1;
+    whoever has credit). Each is a shortcut or a gap the retirement made, named so it
+    is not found twice: (a) **no look ships the camera pass any more** (`camera: 1`,
+    `renderStyle: 'photo'` were Oil on Water's and Colorful Cosmos's alone): `wall`
+    section 6 lays them on Oil & Water by hand, `controls` `all` sweeps the camera's
+    controls (focus, aperture, refraction, bloom) on looks with the camera off, so they
+    read as doing nothing, and `grainedge`'s `CONTROL` names Classic where Colorful
+    Cosmos was, a look nobody has shown the old shader failing on; (b) **no look ships
+    Two Projectors**: `wall` section 7 raises the layers and the setting itself and lays
+    `fillmore-wash` on the back plate by the solver's own `seedPreset`, and nothing in
+    the app lays that wash any more, so Two Projectors on another look still starts with
+    an empty back plate; decide whether the setting should lay the wash. Measured on the
+    Mac: with the wash the back source reads 0.575 and the front-from-wall difference
+    0.342; without it the back source is the bare lamp (0.986) and the difference 0.059,
+    and the section still passes, because its bars (0.004 and four times the control) do
+    not ask what is on the back plate, which was true before this PR too; (c)
+    ~~`squeeze` asks for Beat Squeeze 0.1 by setting, since Poster, 1969 ships it at 0~~
+    (**fixed** in #408: Poster's plate stepped too slowly with the squeeze off to hold the
+    check's 200 steps a window, 191 on one run and 215 on another, so the check measured
+    the governor and not the press; it now runs on Bass Drop at its own 0.8, the one look
+    left that ships the squeeze, the bar unchanged);
+    (d) `soundpatch`'s three pattern looks are Cyberpunk, Aurora Borealis and Lava Lamp
+    until 28i-3 gives Poster, 1969 patches (the Fillmore had two), and `lampjudge`'s
+    owner override for the Sensual Laboratory is gone with it; (e) `evolve`/`replay`
+    start from Poster, 1969 and Clock Glass where they started from the Fillmore and the
+    Oil Wheel, so their seeded rolls are different rolls; (f) the README's gallery
+    pictures (`docs/shots`: the Fillmore, Oil on Water) are of retired looks:
+    `npm run shots` on the Mac for the new set, then the README table; (g) three checks count looks and now sit near their floors: `startup` asks for
+    more than 30 looks (32 ship; 31 after Lumia, 28i-5), and `disc` names its two magnet looks
+    where it asked for three.
+
+  The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening
+  (Aurora, Oil & Water, Milk Marbling, Velvet Underground, Jellyfish Bloom, Cell Bloom,
+  Clock Glass, Lava Lamp), proposed as Home's one fixed pack; Fillmore (Acid Trip,
+  Fractal Dream, Classic, Poster 1969, Home Movie, Crowd Plate, Roy); Neon (Comet River,
+  Solar Flare, Cyberpunk, Bass Drop, Galaxy, Stardust Collapse); Lab (Neon Coral Reef,
+  Microscopic Chaos, Turing Print, Chemical Clock, Red Cabbage, Macro Bead, Lacing Run);
+  Ferro & Film (Ferro Paint, Magnet Garden, Soap Film). None of the batches touches the
+  gallery's grey wash (#401).
+
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
 The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more
@@ -7045,18 +7153,7 @@ a scratch prototype of the model above (not committed) it reads 23 of 23; with n
 `src/lib/soapFilm.ts` it exits 1 and says so. A bar is never moved to get green: if the
 model cannot reach one, the PR says what it reached and asks.
 
-### 32a. The CPU reference (first PR, Antigravity)
-
-`src/lib/soapFilm.ts` exports `createSoapFilm({nx, ny, dx, h0, noise, seed})`,
-`stepSoapFilm(f, dt, {g, evap})` and `soapFilmRgb(f, {cosI, gain})`, and
-`filmReflectance` in `src/lib/filmTable.ts` gains a sixth argument, `cosI`, the cosine of
-the angle of incidence in air (its default, 1, is today's behaviour to the bit, which
-`npm run filmtable` already asks). The contract is in `scripts/soapfilm.mjs`'s header: a
-film is `{nx, ny, dx, h}` with `h` in nm, row 0 at the top, gravity toward +y, closed
-box; it exposes its last flow as `f.uf` (nx+1 by ny) and `f.vf` (nx by ny+1), m/s on the
-cell faces, zero at the walls. Wire `npm run soapfilm` into `checks.yml`'s node part in the
-same PR. *Measure:* `npm run soapfilm` 23 of 23, `npm run filmtable` still green, and the
-step's cost for the 32 by 64 film in a PR comment (the prototype takes 0.8 s for 600 steps).
+### ~~32a. The CPU reference~~ — **Shipped, this PR (#403)** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a; named shortcuts (a)–(e) above stay open for 32b–32d)
 
 ### 32b. The reflected view
 

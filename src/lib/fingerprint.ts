@@ -6,6 +6,7 @@
 
 import { TrackIdentity } from './musicTypes';
 import { pseudoIsrc } from './evolution';
+import { getCachedLicenseStatus } from './licenseKey';
 
 const PROXY_URL: string | undefined = (import.meta as any).env?.VITE_FINGERPRINT_PROXY_URL;
 
@@ -145,7 +146,9 @@ export async function identify(stream: MediaStream): Promise<TrackIdentity | nul
   try {
     const form = new FormData();
     form.append('file', snippet, 'snippet.wav');
-    const res = await fetch(PROXY_URL!, { method: 'POST', body: form });
+    const lic = getCachedLicenseStatus();
+    const headers: Record<string, string> = lic.token ? { 'X-ChromaGlass-Key': lic.token } : {};
+    const res = await fetch(PROXY_URL!, { method: 'POST', headers, body: form });
     if (!res.ok) { console.warn('fingerprint proxy HTTP', res.status); return null; }
     const data = await res.json();
     if (!data || !data.title || !data.artist) return null;

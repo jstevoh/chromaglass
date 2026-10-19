@@ -88,7 +88,7 @@ const N = 256, STEPS = 300, SIZE = 720;
 */
 const FLECK = 40, MAX_FLECKS = 2, MIN_TEXTURE = 0.1, TEXTURE_RATIO = 2, TEXTURE_GRAIN = 0.2;
 /** The looks the grain-before-the-curve shader failed check 1 on (6 to 20%, in the worst channel). */
-const CONTROL = ['colorful-cosmos', 'jellyfish-bloom', 'stardust-collapse', 'oil-and-water', 'velvet-underground'];
+const CONTROL = ['classic', 'jellyfish-bloom', 'stardust-collapse', 'oil-and-water', 'velvet-underground'];
 const only = process.env.GRAINEDGE_ONLY?.split(',').map((x) => x.trim()).filter(Boolean);
 
 const { page, close } = await openLab();
