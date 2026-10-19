@@ -3350,6 +3350,24 @@ The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 - **Found along the way:** the grid's checkerboard filter (`dampGrid`) adds dye at a
   drop's rim, 3.2% in 20 s (18m-5); the check runs with it off.
 
+### 19aa-3. The API scripts never print the token
+
+**Shipped** 2026-10-19. A transient 502 from the Actions API stopped `npm run flakes` on
+the owner's machine, and the error it died with printed the owner's GitHub token whole.
+`flakes.mjs` and `macqueue.mjs` handed the token to curl as an argument
+(`-H "Authorization: Bearer …"`), and a failed child process's error in Node carries the
+whole command line in its message and in `cmd` and `spawnargs`; a top-level await that
+rejects prints all of it. The argument was also readable by any process for as long as
+curl ran. Both now go through `scripts/ghapi.mjs`, which gives curl the header on its
+standard input (`-K -`), so the command line holds nothing to print, and rebuilds every
+error from curl's exit code and its stderr with tokens of any GitHub shape, and the
+environment's own by value, taken out. `npm run ghapi` (Measure, logic part), against a
+local server that answers 502 and echoes the header back: the header still arrives;
+the arguments hold no token; the async and sync errors, printed every way Node prints
+one, hold none; and, the control, the old way on the same server leaks it and the same
+assertion sees it. 7/7. `deploygate.sh`'s curl was read too: bash prints nothing of its
+arguments on a failure, and on Actions the token is masked, so it is left as it was.
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,

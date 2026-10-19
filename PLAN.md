@@ -5202,6 +5202,7 @@ Not a gate and no bar: a rate depends on what was pushed.
   measured, and a confidence pinned at 100% while sure would pass the 50% line. Not
   tried: making the follower's first place better than 50-60% trust (the follower's own
   business, `songfollow`).
+- **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
 
 ## 20. Lace and holes: a pale film torn open over colour
 

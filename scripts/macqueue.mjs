@@ -23,7 +23,7 @@
 // many other PRs were open says nothing about the commit under test. It is the
 // before and after for a change to what the workflows run.
 
-import { execFileSync } from 'node:child_process';
+import { ghCurlSync } from './ghapi.mjs';
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -34,14 +34,10 @@ const repo = process.env.GITHUB_REPOSITORY || 'jstevoh/chromaglass';
 const API = `https://api.github.com/repos/${repo}`;
 
 // curl rather than fetch: a cloud session's proxy is configured for curl, and
-// Node's fetch does not read HTTPS_PROXY.
-function get(path) {
-  const auth = process.env.GH_TOKEN ? ['-H', `Authorization: Bearer ${process.env.GH_TOKEN}`] : [];
-  const out = execFileSync('curl', ['-fsSL', '--retry', '3', ...auth, '-H', 'Accept: application/vnd.github+json', `${API}/${path}`], {
-    maxBuffer: 1 << 28,
-  });
-  return JSON.parse(out.toString());
-}
+// Node's fetch does not read HTTPS_PROXY. Through ghapi.mjs, which hands curl
+// the token on its stdin and redacts every error, so a failed request never
+// prints it (as flakes.mjs once did on a 502).
+const get = (path) => JSON.parse(ghCurlSync(`${API}/${path}`));
 
 const t = (s) => (s ? Date.parse(s) : null);
 const min = (ms) => (ms / 60000).toFixed(0).padStart(5);
