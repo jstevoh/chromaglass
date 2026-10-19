@@ -15,7 +15,7 @@
  * is only one of it.
  *
  *   npm run ab -- --preset macro-bead --set particles=0.8
- *   npm run ab -- --preset fillmore-1969 --set "particles=0.7;particleMix=0.3"
+ *   npm run ab -- --preset poster-1969 --set "particles=0.7;particleMix=0.3"
  *   npm run ab -- --preset macro-bead --set particles=0.8 --settle 10
  *
  * It writes `before.png` and `after.png` and prints what `scripts/detail.mjs`
@@ -43,7 +43,7 @@ const argOf = (name, fallback) => {
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
 
-const PRESET = argOf('preset', 'fillmore-1969');
+const PRESET = argOf('preset', 'poster-1969');
 const SECONDS = Number(argOf('seconds', 34)) || 34;
 const SETTLE = Number(argOf('settle', 6)) || 6;
 const WIDTH = Number(argOf('width', 1400)) || 1400;

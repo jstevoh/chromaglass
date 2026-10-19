@@ -1136,9 +1136,9 @@ try {
     // drained, cleared, zoomed and dragged its way through fifty checks, and
     // the plate it leaves behind is whatever fell out of that — one run
     // measured it at pure black, which made the recovery check below a
-    // comparison of nothing with nothing. The Fillmore look seeds bright and
-    // immediately, so it is a plate that is definitely on.
-    await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
+    // comparison of nothing with nothing. Poster, 1969 is on the lamp, so it is lit
+    // as soon as it is laid and is a plate that is definitely on.
+    await page.evaluate(() => window.chromaglassApplyPreset?.('poster-1969'));
     let before = 0;
     for (let i = 0; i < 15 && !(before > 0.01); i++) { await settle(1000); before = await litness(); }
     check('the wall is lit before the GPU goes away', before > 0.01,
@@ -1760,10 +1760,10 @@ try {
       throughTheHole.ok, `the cursor is over ${throughTheHole.what}`);
 
     // Go must name where it is going, or it is a button you press and hope.
-    await clickOn('cue-oil-on-water');
+    await clickOn('cue-oil-and-water');
     await settle(600);
     const goLabel = (await page.getByTestId('go-button').innerText()).trim();
-    check('and Go names the look it will send', /Oil on Water/i.test(goLabel), goLabel.replace(/\s+/g, ' '));
+    check('and Go names the look it will send', /Oil & Water/i.test(goLabel), goLabel.replace(/\s+/g, ' '));
 
     /*
       ── The screen says what the controller hit ──────────────────
@@ -1784,10 +1784,10 @@ try {
       document.querySelectorAll('[data-midi-hit="true"]').length);
     check('nothing is lit before anything is pressed', (await lit()) === 0, `${await lit()} lit`);
     const pressedAt = Date.now();
-    await page.evaluate(() => window.chromaglassTouch?.('preset:oil-on-water'));
+    await page.evaluate(() => window.chromaglassTouch?.('preset:oil-and-water'));
     await settle(120);
     const onNow = await page.evaluate(() => {
-      const row = document.querySelector('[data-testid="cue-oil-on-water"]');
+      const row = document.querySelector('[data-testid="cue-oil-and-water"]');
       return { hit: row?.getAttribute('data-midi-hit') === 'true', any: document.querySelectorAll('[data-midi-hit="true"]').length };
     });
     check('a controller press lights the row it fired',
@@ -2066,7 +2066,7 @@ try {
     await settle(6000);
     const calm = await jumps(2000);
     const from = await colour();
-    await goTo('deep-ocean', 4);
+    await goTo('jellyfish-bloom', 4);
     const fade = await jumps(4400);
     await settle(3600);
     const faded = await colour();
@@ -2084,7 +2084,7 @@ try {
         ? 'no frame'
         : `largest step in brightness ${fade.worst.toFixed(1)} through the fade, against ${calm.worst.toFixed(1)} on the plate alone `
         + `(fade ${fade.seen.map((v) => (v === null ? 'null' : v.toFixed(0))).join(' ')})`);
-    await goTo('deep-ocean', 0);
+    await goTo('jellyfish-bloom', 0);
     await settle(8000);
     const own = await colour();
     const f = (c) => (c ? c.map((v) => v.toFixed(2)).join('/') : 'n/a');
@@ -2095,7 +2095,7 @@ try {
       okColour,
       isNaN(dFaded) || isNaN(dFrom)
         ? 'no frame'
-        : `Solar Flare ${f(from)}, faded into Deep Ocean ${f(faded)}, Deep Ocean cut to ${f(own)}: `
+        : `Solar Flare ${f(from)}, faded into Jellyfish Bloom ${f(faded)}, Jellyfish Bloom cut to ${f(own)}: `
         + `${dFaded.toFixed(3)} from its own colour against ${dFrom.toFixed(3)} for Solar Flare`);
   }
 

@@ -4,7 +4,7 @@
  *
  *   npm run pixels                     every look, as the website runs them
  *   npm run pixels -- --rung 0         every look held on the ladder's top rung
- *   PIXELS_ONLY=classic,agate npm run pixels
+ *   PIXELS_ONLY=classic,chemical-clock npm run pixels
  *
  * What was reported (2026-10-04): on the laptop's web app, "quite a few of
  * the looks seem very pixelated and look like they are on a computer with

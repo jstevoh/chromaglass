@@ -199,6 +199,13 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run closedruns
 
+      # The scripts that read GitHub's API never print the token: a 502 from
+      # it once printed the owner's whole token through flakes.mjs's error.
+      # Against a local server that answers 502, with the old way as control.
+      - name: The API scripts keep the token out of their errors
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run ghapi
+
       # The ear: level traces through the real calibration into the boundary
       # detector, synthetic songs through the real matcher, and the tempo
       # sources through the real beat clock.
@@ -378,6 +385,12 @@ jobs:
       - name: The film table
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run filmtable
+      # A draining vertical soap film seen in reflection (PLAN 32a): 2D Darcy
+      # buoyancy convection, conservative minmod advection, evaporation to Newton
+      # black, and Airy's reflectance at an angle.
+      - name: The draining soap film
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run soapfilm
       # A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):
       # whole fades driven at the show timer's 16 ms, no step past the curve's
       # steepest, the turn-round, the hand, the cut, and the pads wired.
@@ -508,6 +521,9 @@ jobs:
       - name: The song-ID Worker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run fingerprint-worker
+      - name: The licence-key Worker
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run license-worker
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
@@ -538,6 +554,27 @@ jobs:
       - name: Lamp Ground 0 is the plate before the lamp
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run lampzero
+      # Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):
+      # against the Firebase Auth emulator, Google, Apple and magic-link
+      # sign-in, offline returning sessions, sign-out and account deletion.
+      - name: Sign-in
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run signin
+      # Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):
+      # two signed-in pages on the same account (a show and a phone) list and
+      # join the show in one tap while keeping the QR code, a third page on
+      # another account sees nothing, and losing the internet keeps local
+      # remote control up.
+      - name: Linking devices by account
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run accountlink
+      # Licensing and tiers (PLAN.md 23.2, 23.4, 23.5, 23.6, 23.11,
+      # scripts/tiers.mjs): offline Ed25519 signature verification, 2-machine
+      # limit, Home->Pro upgrade, unlicensed gate, free-tier tiles, 15s/720p
+      # caps + corner mark, and logo mark lock.
+      - name: Licensing and tiers
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run tiers
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout

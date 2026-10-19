@@ -34,7 +34,7 @@ import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide, rideSlot } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
@@ -95,6 +95,9 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
+import { isFreeTierGated } from './lib/tierGates';
+import { syncServerLicense } from './lib/licenseKey';
+import { usePublishAccountShow } from './lib/accountShows';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
@@ -284,8 +287,66 @@ interface ArmedLook {
   sequence?: string;
 }
 
+import AccountSheet from './components/AccountSheet';
+
+const hasAccountOrLicenseUI =
+  Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
+  import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' ||
+  (typeof window !== 'undefined' &&
+    (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
+      new URLSearchParams(window.location.search).get('tierGates') === '1'));
+
+const isUnsubscribeRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/unsubscribe\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
+
+const isProfileRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('profile') ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
+
 export default function App() {
   const [isActive, setIsActive] = useState(true);
+  const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
+
+  const openProfileSheet = useCallback(() => {
+    if (!hasAccountOrLicenseUI) return;
+    setShowAccount(true);
+    try {
+      if (!/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname)) {
+        window.history.pushState({ cgProfile: true }, '', `/profile${window.location.search}${window.location.hash}`);
+      }
+    } catch { /* ignore history errors in sandboxed frames */ }
+  }, []);
+
+  const closeProfileSheet = useCallback(() => {
+    setShowAccount(false);
+    try {
+      if (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname)) {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('profile');
+        params.delete('unsubscribe');
+        const qs = params.toString();
+        window.history.replaceState(null, '', `/${qs ? `?${qs}` : ''}${window.location.hash}`);
+      }
+    } catch { /* ignore history errors */ }
+  }, []);
+
+  const openAccount = hasAccountOrLicenseUI ? openProfileSheet : undefined;
+
+  useEffect(() => {
+    if (!hasAccountOrLicenseUI) return;
+    const onOpen = () => openProfileSheet();
+    const onPopState = () => setShowAccount(isProfileRoute());
+    window.addEventListener('cg-open-account', onOpen);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('cg-open-account', onOpen);
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, [openProfileSheet]);
 
   // The laptop driving the projector must not dim, sleep or screensave: what
   // it does, the wall does. Held while the plate is running and dropped the
@@ -780,6 +841,7 @@ export default function App() {
       setShowSequencer(false);
       setShowSave(false);
       setShowPalette(false);
+      setShowAccount(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -3312,7 +3374,22 @@ export default function App() {
   }, []);
   useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
 
+  const [, setLicenseTick] = useState(0);
+  useEffect(() => {
+    const onLicense = () => setLicenseTick((n) => n + 1);
+    window.addEventListener('cg-license-changed', onLicense);
+    void syncServerLicense();
+    return () => window.removeEventListener('cg-license-changed', onLicense);
+  }, []);
+
   const loadMark = useCallback((file: File) => {
+    const effectiveFile = isFreeTierGated()
+      ? new File(
+          [`<svg xmlns="http://www.w3.org/2000/svg" width="420" height="80" viewBox="0 0 420 80"><text x="210" y="52" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="38" font-weight="600" letter-spacing="2">ChromaGlass</text></svg>`],
+          'chromaglass-mark.svg',
+          { type: 'image/svg+xml' },
+        )
+      : file;
     const reader = new FileReader();
     reader.onload = () => {
       const url = String(reader.result ?? '');
@@ -3328,7 +3405,7 @@ export default function App() {
       img.onerror = () => setToastRef.current?.('That file would not open as a picture');
       img.src = url;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(effectiveFile);
   }, [castSend]);
 
   const clearMark = useCallback(() => {
@@ -4019,6 +4096,7 @@ export default function App() {
       }
     },
   });
+  usePublishAccountShow(!phone && remoteLink.status === 'connected', pinnedLookName);
 
   runActionRef.current = runAction;
 
@@ -5588,6 +5666,7 @@ export default function App() {
           onClear={() => setClearTrigger(n => n + 1)}
           recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording, take: recorder.lastTake }}
           onAllControls={() => choosePhoneScreen('stage')}
+          onOpenAccount={openAccount}
         />
         </PanelGuard>
       )}
@@ -5720,6 +5799,7 @@ export default function App() {
               setPhone(false);
             }}
             onPlayScreen={() => choosePhoneScreen('play')}
+            onOpenAccount={openAccount}
           />
           </PanelGuard>
           )}
@@ -6207,6 +6287,7 @@ export default function App() {
           onMidi={deskOpen.midi}
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
+          onOpenAccount={openAccount}
           showCrumb={
             <>
               <span className="text-muted">Show</span>
@@ -6335,6 +6416,16 @@ export default function App() {
         </PanelGuard>
       )}
 
+      {showAccount && hasAccountOrLicenseUI && (
+        <AccountSheet
+          onClose={closeProfileSheet}
+          onOpenSettings={() => {
+            closeProfileSheet();
+            openAllSettings();
+          }}
+        />
+      )}
+
       {/* The file input the bench's Image dye button reaches for. It lives
           in the narrow-screen toolbar, which is not rendered under a desk. */}
       {(deskUp || phone) && (
@@ -6415,9 +6506,24 @@ export default function App() {
         {showHelp && <GuidePanel focus={helpFocus} onClose={() => { setShowHelp(false); setHelpFocus(null); }} />}
       </AnimatePresence>
 
+      {/* ── Bottom-left Profile & Store pill (when overlayUp) ──── */}
+      {overlayUp && !isMinimized && showControls && openAccount && (
+        <button
+          type="button"
+          data-cg-account-open=""
+          onClick={openAccount}
+          title="Profile, Settings & Store"
+          aria-label="Account"
+          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-amber-400/40 bg-black/75 px-3.5 py-1.5 text-[12px] font-semibold text-amber-100 shadow-xl backdrop-blur-xl transition-all hover:border-amber-400/70 hover:bg-black/90"
+        >
+          <User size={14} className="shrink-0 text-amber-300" />
+          <span>Profile &amp; Store</span>
+        </button>
+      )}
+
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
       {isActive && audioData && !isMinimized && overlayUp && (
-        <div className="absolute bottom-6 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
+        <div className="absolute bottom-16 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
           {[
             { label: 'B', value: audioData.bass },
             { label: 'M', value: audioData.mid },

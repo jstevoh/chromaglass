@@ -1,5 +1,7 @@
 # Fillmore's two projectors: PLAN 18b-5 (the owner, 2026-10-11: fix the projector issue for Fillmore)
 
+> The Fillmore East look retired in PLAN 28i-1, into Poster, 1969, so no look ships with Two Projectors on or lays the 'fillmore-wash' second plate any more (`npm run wall` lays that wash itself). Two Projectors is still a setting. What follows is the 2026-10-11 finding as it was.
+
 Found by the showreel review (PLAN 28c, 28d), in the lab:
 - fillmore-1969 has lampGround 1, layerCount 2, blendMode 'screen'. On the lamp the back plate
   is a second filter in the same light path whatever the Blend Mode says (src/gpu/wgsl/plate.ts,

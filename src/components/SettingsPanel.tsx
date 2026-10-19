@@ -20,6 +20,7 @@ import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
+import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
 
 /**
  * Pinning a control onto a desk.
@@ -2425,32 +2426,74 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className={TITLE}>
           <Image size={12} /> Logo &amp; Titles
         </h3>
-        <div className="flex gap-2 mb-5">
-          <input
-            ref={markInputRef}
-            id="mark-file"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onMarkFile?.(f); e.target.value = ''; }}
-          />
-          <button
-            onClick={() => markInputRef.current?.click()}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-            title="A PNG with transparency sits on the plate; anything else sits in its own rectangle"
-            data-testid="mark-load"
-          >
-            <Image size={13} /> {markLoaded ? 'Replace' : 'Load a mark'}
-          </button>
-          <button
-            onClick={() => onMarkClear?.()}
-            disabled={!markLoaded}
-            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
-            data-testid="mark-clear"
-          >
-            Take it off
-          </button>
-        </div>
+        {isFreeTierGated() ? (
+          <div className="mb-5 flex flex-col gap-2.5">
+            <div
+              data-cg-free-logo-mark="ChromaGlass"
+              data-cg-app-tile="custom-logo"
+              onClick={openAccountSheet}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+              className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
+            >
+              <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
+                <span>In the ChromaGlass app · Custom band logo &amp; text layer</span>
+                <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
+              </div>
+              <p className="mt-0.5 text-amber-100/90">
+                On the free site, the logo layer displays the ChromaGlass mark. Unlock Home or Pro to load your own band mark or SVG.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="80" viewBox="0 0 420 80"><text x="210" y="52" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="38" font-weight="600" letter-spacing="2">ChromaGlass</text></svg>`;
+                  onMarkFile?.(new File([svg], 'chromaglass-mark.svg', { type: 'image/svg+xml' }));
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
+                data-testid="mark-load"
+              >
+                <Image size={13} /> {markLoaded ? 'ChromaGlass mark active' : 'Show ChromaGlass mark'}
+              </button>
+              <button
+                onClick={() => onMarkClear?.()}
+                disabled={!markLoaded}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+                data-testid="mark-clear"
+              >
+                Take it off
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-5">
+            <input
+              ref={markInputRef}
+              id="mark-file"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onMarkFile?.(f); e.target.value = ''; }}
+            />
+            <button
+              onClick={() => markInputRef.current?.click()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
+              title="A PNG with transparency sits on the plate; anything else sits in its own rectangle"
+              data-testid="mark-load"
+            >
+              <Image size={13} /> {markLoaded ? 'Replace' : 'Load a mark'}
+            </button>
+            <button
+              onClick={() => onMarkClear?.()}
+              disabled={!markLoaded}
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+              data-testid="mark-clear"
+            >
+              Take it off
+            </button>
+          </div>
+        )}
         <Slider label="Opacity" value={settings.markMix ?? 1} min={0} max={1} step={0.01}
           onChange={(v: number) => onUpdate({ markMix: v })} settingKey="markMix" />
         <Slider label="Size" value={settings.markScale ?? 0.22} min={0.03} max={1} step={0.01}
@@ -3748,6 +3791,48 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       )}
 
       {sections}
+      {isTierGatingEnforced() && getEffectiveTier() !== 'pro' && (
+        <section
+          data-cg-app-tiles=""
+          data-cg-effective-tier={getEffectiveTier()}
+          className="mt-6 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-amber-200">
+              In the ChromaGlass app
+            </span>
+            <button
+              type="button"
+              onClick={openAccountSheet}
+              className="text-[11px] font-semibold text-amber-200 underline underline-offset-2 hover:text-amber-100"
+            >
+              {getEffectiveTier() === 'home' ? 'Upgrade to Pro →' : 'Get Home or Pro →'}
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {APP_FEATURE_TILES.filter((t) => (getEffectiveTier() === 'home' ? t.tier === 'pro' : true)).map((tile) => (
+              <div
+                key={tile.id}
+                data-cg-app-tile={tile.id}
+                data-cg-tile-tier={tile.tier}
+                onClick={openAccountSheet}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+                className="cursor-pointer rounded-lg border border-white/10 bg-black/40 p-2.5 text-[12px] leading-snug transition-colors hover:border-amber-500/40 hover:bg-black/60"
+              >
+                <div className="flex items-center justify-between gap-2 font-medium text-neutral-100">
+                  <span>{tile.title}</span>
+                  <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-200">
+                    {tile.tier}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-neutral-400">{tile.summary}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {scope === 'stage' && (
         <p className="mt-2 text-[12px] text-dim" data-testid="stage-sheet-rule">
           The room and the machine: nothing here saves into a look.

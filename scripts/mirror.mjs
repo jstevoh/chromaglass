@@ -58,7 +58,11 @@ const REPORTED_OUTPUT = {
   maskLeft: 0, maskFeather: 0, gain: 1.45, gamma: 2.5, flashGuard: true, surfaces: [],
 };
 const PLAIN_OUTPUT = { ...REPORTED_OUTPUT, gain: 1, gamma: 1 };
-const TIMBRE = { look: 'timbre-shifter', rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: {} };
+// Timbre Shifter, the look the owner's report was made on, retired in PLAN 28i-1
+// into Microscopic Chaos; the reported plate is laid on that look now. Printed
+// only (judge: false below), so no bar rides on it; the drift quoted in the
+// next comment was read on Timbre Shifter and has not been read again here.
+const TIMBRE = { look: 'microscopic-chaos', rotation: [4.73, 0.75], output: REPORTED_OUTPUT, settings: {} };
 // Judged: the calm plate, where anything the hand did not do stands out.
 // Printed only (judge: false): the reported plate, which moves by itself far
 // more than a drop does (a drift of 40-160 a cell against 1-5 on Classic, so
@@ -70,7 +74,7 @@ const SCENARIOS = [
   { name: 'Classic, calm, layer 1', look: 'classic', layer: 0, rotation: [0, 0], settings: { layerCount: 2 } },
   { name: 'Classic, calm, layer 2', look: 'classic', layer: 1, rotation: [0, 0], settings: { layerCount: 2 } },
   { name: 'Classic, calm, layer 1 turned a quarter', look: 'classic', layer: 0, rotation: [4.73, 0], settings: { layerCount: 2 } },
-  { ...TIMBRE, name: 'Timbre Shifter as reported, layer 1', layer: 0, judge: false },
+  { ...TIMBRE, name: 'Microscopic Chaos on the reported output, layer 1', layer: 0, judge: false },
   { ...TIMBRE, name: 'the Press, reported plate, layer 1', layer: 0, tool: 'press', judge: false },
 ];
 
