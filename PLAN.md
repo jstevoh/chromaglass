@@ -6605,13 +6605,9 @@ Turing Print" work (#331), which also made the reaction grow at all.
   by 40 s), and looks on a white ground (Turing Print at luma .85 to .94 for 20 s,
   Sensual Laboratory, Roy at .7).
 
-  - **28i-1. Retire nine** (Antigravity, batch 1): `sensual-laboratory` → `turing-print`, `oil-on-water` → `oil-and-water`,
-    `colorful-cosmos` → `classic`, `agate` → `chemical-clock`, `ferro-maze` →
-    `magnet-garden`, `deep-ocean` → `jellyfish-bloom`, `fillmore-1969` → `poster-1969`,
-    `timbre-shifter` → `microscopic-chaos`, `oil-wheel` → `clock-glass` (it turned the
-    whole frame, which only `FRAME_MOVING_LOOKS` may). Through `RETIRED_PRESETS`; every
-    check that names a cut id takes its replacement, each listed under `Check changes:`.
-    `desk`, `setlist`, `panel`, `plate` (5b).
+  - ~~**28i-1. Retire nine**~~ (Antigravity, batch 1, **shipped** in #408; story in
+    `docs/plan-shipped.md` 28i-1): nine ids through `RETIRED_PRESETS`, every check that
+    named one on its replacement. What it found is **28i-6**.
   - **28i-5. Retire Lumia** (→ `velvet-underground`; Claude first). `'lumia'` is also the
     lamp's Lumia setting and mixer mover (`plateSources.ts`, `mixer.ts`), and `plate` 5b
     fails on any quoted retired id in src/, so retiring the look trips it on the layer.
@@ -6630,6 +6626,11 @@ Turing Print" work (#331), which also made the reaction grow at all.
     least .02 at 20 and 40 s: Velvet Underground, Poster 1969, Home Movie, Clock Glass,
     Crowd Plate, Lava Lamp, Jellyfish, Microscopic Chaos. `gallery` label and
     `film.yml` (`FILM_ONLY` the looks changed).
+    Also for this batch, found in #408: **Poster, 1969's plate runs at about 16 steps a
+    second on the Mac runner** (`squeeze` read 191, 215 and 327 steps in 12 s on it, 320
+    to 350 on the Fillmore), under the 30 a second where the plate stops flowing and
+    starts stepping (`PINNED_STEP_RATE`, `LiquidVisualizer.tsx`). Find what makes Poster
+    that heavy (its layers, its dye budget, its plate size) before it is made to move.
   - **28i-3. Sound on the liquid, not the frame** (Antigravity, batch 3). Eight looks
     still drive the rotation slot from sound (28f-3): Galaxy (energy), Cyberpunk
     (complexity), Acid Trip (energy), Aurora (energy), Solar Flare (bass), Fractal Dream
@@ -6640,6 +6641,37 @@ Turing Print" work (#331), which also made the reaction grow at all.
     more colour changes a minute, r1 between −.13 and .22 (the Dregs and the Sheep).
   - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
     magenta cells, no rainbow); then four or more hues on the film.
+
+  - **28i-6. What retiring nine left a check or a page standing on** (found in 28i-1;
+    whoever has credit). Each is a shortcut or a gap the retirement made, named so it
+    is not found twice: (a) **no look ships the camera pass any more** (`camera: 1`,
+    `renderStyle: 'photo'` were Oil on Water's and Colorful Cosmos's alone): `wall`
+    section 6 lays them on Oil & Water by hand, `controls` `all` sweeps the camera's
+    controls (focus, aperture, refraction, bloom) on looks with the camera off, so they
+    read as doing nothing, and `grainedge`'s `CONTROL` names Classic where Colorful
+    Cosmos was, a look nobody has shown the old shader failing on; (b) **no look ships
+    Two Projectors**: `wall` section 7 raises the layers and the setting itself and lays
+    `fillmore-wash` on the back plate by the solver's own `seedPreset`, and nothing in
+    the app lays that wash any more, so Two Projectors on another look still starts with
+    an empty back plate; decide whether the setting should lay the wash. Measured on the
+    Mac: with the wash the back source reads 0.575 and the front-from-wall difference
+    0.342; without it the back source is the bare lamp (0.986) and the difference 0.059,
+    and the section still passes, because its bars (0.004 and four times the control) do
+    not ask what is on the back plate, which was true before this PR too; (c)
+    ~~`squeeze` asks for Beat Squeeze 0.1 by setting, since Poster, 1969 ships it at 0~~
+    (**fixed** in #408: Poster's plate stepped too slowly with the squeeze off to hold the
+    check's 200 steps a window, 191 on one run and 215 on another, so the check measured
+    the governor and not the press; it now runs on Bass Drop at its own 0.8, the one look
+    left that ships the squeeze, the bar unchanged);
+    (d) `soundpatch`'s three pattern looks are Cyberpunk, Aurora Borealis and Lava Lamp
+    until 28i-3 gives Poster, 1969 patches (the Fillmore had two), and `lampjudge`'s
+    owner override for the Sensual Laboratory is gone with it; (e) `evolve`/`replay`
+    start from Poster, 1969 and Clock Glass where they started from the Fillmore and the
+    Oil Wheel, so their seeded rolls are different rolls; (f) the README's gallery
+    pictures (`docs/shots`: the Fillmore, Oil on Water) are of retired looks:
+    `npm run shots` on the Mac for the new set, then the README table; (g) three checks count looks and now sit near their floors: `startup` asks for
+    more than 30 looks (32 ship; 31 after Lumia, 28i-5), and `disc` names its two magnet looks
+    where it asked for three.
 
   The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening
   (Aurora, Oil & Water, Milk Marbling, Velvet Underground, Jellyfish Bloom, Cell Bloom,

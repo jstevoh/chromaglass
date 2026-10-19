@@ -411,7 +411,7 @@ const SECTIONS: Section[] = [
           ['Chemistry', <>Reaction–diffusion that grows coral and cells on the plate, the way Mark Boyle's Sensual Laboratory projected reactions on the platen instead of oil in a dish.</>],
           ['Gel Wheel', <>A rotating colour wheel over the lamp, in revolutions per minute. Half a turn a minute is the Optikinetics look.</>],
           ['Film projector', <>A video file on a loop, a live camera or another window, played <Em>through</Em> the dye rather than beside it. <Em>Film Mix</Em> and <Em>Film Key</Em> set how much and what it keys on; <Em>Film Drive</Em> lets the reel's own motion move the liquid.</>],
-          ['Lamp Warmth / Exposure', <>The halogen grade, for the sealed oil-wheel look, and how hot the whole image is driven.</>],
+          ['Lamp Warmth / Exposure', <>The halogen grade, for the looks that sit under the lamp, and how hot the whole image is driven.</>],
           ['Dish Spread / Round Dish', <>Settings → Look → Show. Each layer gets its own dish on a black screen, circular the way a real clock face is. The Fillmore East, 1969 preset is three of them at once.</>],
         ]} />
       </>

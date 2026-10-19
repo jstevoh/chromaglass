@@ -3902,6 +3902,41 @@ With the followed place (28g-2, #387): a nudge moves the place the follower hold
 the shows read that place. An identification while the follower is unsure resyncs to
 the fingerprint's offset plus the nudge, so a nudge survives a re-anchor.
 
+## 28i. Every look judged again, after the lamp, the soap film and the breakdown
+
+### 28i-1. Nine looks retired (#408; Antigravity, batch 1 of the overhaul)
+
+The verdicts are PLAN 28i's, from the Mac gallery of 2026-10-19. Nine ids left `PRESETS`,
+`PRESET_CONTRACTS`, the inject styles and the liquid table and entered `RETIRED_PRESETS`,
+each with its reason: `sensual-laboratory` → `turing-print`, `oil-on-water` →
+`oil-and-water`, `colorful-cosmos` → `classic`, `agate` → `chemical-clock`,
+`ferro-maze` → `magnet-garden`, `deep-ocean` → `jellyfish-bloom`, `fillmore-1969` →
+`poster-1969`, `timbre-shifter` → `microscopic-chaos`, `oil-wheel` → `clock-glass`.
+`sunny-side-up` still names Colorful Cosmos and so reaches Classic by two hops; the
+resolver follows the chain. Lumia stays (28i-5). A saved show, a pad, a stage or a
+`?look=` link that names a cut id plays the replacement.
+
+What else moved with them: the dead seed cases of three of them in `LiquidVisualizer`
+(Sensual Laboratory's and Ferro Maze's clean-glass cases went too; Turing Print keeps
+its own), and the one-line hook that laid the Fillmore's second-plate wash
+(`laySecondPlate`: nothing can name that look now; the `fillmore-wash` seed stays,
+because `npm run wall` lays it by hand); the built-in sequences (Set Journey lost its
+second Poster stage, which would have faded Poster into Poster; the stage names that
+named a cut look are the replacements'), the mood buckets in `evolution.ts` (a duplicate
+of a look already in the bucket where the replacement was there, so the bucket's length
+and every song's pick by ISRC stay as they were), the example set, the Guide's one
+sentence, and the scripts, each listed in the PR body under `Check changes:`.
+
+What a replacement did not carry, found by running the checks that named the cut look,
+is PLAN 28i-6: no look ships the camera pass or Two Projectors any more, and Poster, 1969
+ships Beat Squeeze 0 and no patches where the Fillmore had 0.1 and two.
+
+`plate` 5b needed one rewrite. Its last line compared the table's first entry with what
+`findPreset` returns, which is only true while every entry names a live look; it is now
+two lines, one over every retired id against the end of its own chain, written out in the
+check and not taken from `livePresetId`, and one that a chain is followed the whole way.
+With the resolver cut to one hop both are red (`sunny-side-up → nothing (wanted classic)`).
+
 ## 29. The closeup's ferrofluid drop
 
 ### 29a. The drop as a bead with the light on it (this PR)
