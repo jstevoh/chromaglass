@@ -7,13 +7,13 @@
  * index its disc reported was a fraction, and the plate's typed arrays drop a
  * write at a fractional index without a word. From the day it was written
  * until #185 (PLAN §10 step 4), every kick on every look with Beat Squeeze up
- * (Fillmore East, 1969 at 0.9 among them) rocked the plate and pressed
+ * (Fillmore East, 1969, retired since, at 0.9 among them) rocked the plate and pressed
  * nothing. No check asked, because none counted what a kick laid.
  *
  * So this counts it, in the app itself, with the band playing: the cells
  * the lead plate's kick strokes lay (`pressedCells.kick`, counted as the
  * stroke reports them, whole cells only, since a fractional one is the bug)
- * against the show's kicks over the same seconds, on Fillmore East, 1969,
+ * against the show's kicks over the same seconds, on Poster, 1969 at 0.1,
  * on a beat tapped in (why tapped, below). And the control: the same
  * seconds with Beat Squeeze at 0, where the kicks go on and nothing is
  * pressed, which says the count is the squeeze's
@@ -63,12 +63,21 @@ try {
   await page.addInitScript(() => {
     try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
   });
-  await page.goto(`http://localhost:${PORT}/?debug&look=fillmore-1969`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&look=poster-1969`, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.chromaglassDebug === 'function' && window.chromaglassDebug().fluids?.length > 0, null, { timeout: 60_000 });
   const settings = (patch) => page.evaluate((p) => {
     if (typeof window.chromaglassSettings !== 'function') throw new Error('window.chromaglassSettings is gone');
     window.chromaglassSettings(p);
   }, patch);
+  /*
+    Beat Squeeze at 0.1, the value the check was written on. It was the
+    Fillmore look's own, and that look retired in PLAN 28i-1; its
+    replacement, Poster, 1969, ships with the squeeze at 0, so the app is
+    asked for the same 0.1 by setting rather than by the look. The line below
+    that reads `on.squeeze === 0.1` is unchanged and still reads the setting
+    back from the app; the kicks, the plate and the control at 0 are the same.
+  */
+  await settings({ beatSqueeze: 0.1 });
   const read = () => page.evaluate(() => {
     const d = window.chromaglassDebug();
     const lead = d.fluids[0];
@@ -180,7 +189,7 @@ try {
   // as "no tempo", which the check below would only report as a red it
   // could not explain.
   const { clock, tempo } = await page.evaluate(() => ({ clock: window.chromaglassDebug().beat, tempo: window.chromaglassTempo() }));
-  console.log(`  Fillmore East, 1969: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
+  console.log(`  Poster, 1969: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
 
   if (errors.length) {
     check('the page runs without errors while the band plays', false, errors[0].slice(0, 200));
@@ -200,7 +209,7 @@ try {
     // The look and the setting it measured, and a plate that stepped: an
     // unknown look falls back to a random one, and a stalled plate presses
     // nothing while the kicks, counted a frame, go on.
-    check('on Fillmore East, 1969 at its Beat Squeeze, then at 0, the plate stepping throughout',
+    check('on Poster, 1969 at Beat Squeeze 0.1, then at 0, the plate stepping throughout',
       on.squeeze === 0.1 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
       `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
     /*

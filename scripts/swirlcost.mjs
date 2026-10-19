@@ -55,7 +55,7 @@ const argOf = (name, fallback) => {
 };
 // The thin looks with music routed to rotation (src/presets.ts): nine when
 // this was written, eight since Boiling Point was retired (PLAN.md 28a).
-const THIN = ['galaxy', 'cyberpunk', 'acid-trip', 'timbre-shifter',
+const THIN = ['galaxy', 'cyberpunk', 'acid-trip', 'microscopic-chaos',
   'aurora-borealis', 'solar-flare', 'fractal-dream', 'stardust-collapse'];
 const LOOKS = argOf('looks', null)?.split(',') ?? THIN;
 /**

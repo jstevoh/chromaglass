@@ -12,7 +12,7 @@
  *   19s  100%  dye 0.00/0.28   step to the next look
  *
  * The closeup looks seed very little by design, and two of them — lumia and
- * sensual-laboratory — seed nothing at all, on purpose. This fills a plate,
+ * turing-print — seed nothing at all, on purpose. This fills a plate,
  * steps into every look in turn, and times how long each one leaves the glass
  * empty after it lands.
  *
