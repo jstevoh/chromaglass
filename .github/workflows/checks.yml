@@ -1013,14 +1013,17 @@ jobs:
       # The closeup's ferrofluid drop at rest on the thin gap (PLAN 29c):
       # degenerate mobility in phaseCHVolume holds its half-full core and
       # halo against Ostwald ripening into the clear oil, conserves Σc·h, and
-      # does not move without a field (`npm run ferrodrag` stays out of CI as
-      # known red until PLAN 29c-8).
+      # does not move without a field, and sheds its half-full cells more
+      # slowly in a second window (steps 200 to 380). `npm run ferrodrag` stays
+      # out of CI as known red until PLAN 29c-8.
       - name: The ferrofluid drop at rest on the thin gap
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run ferrorest
       # The magnet's pull in tesla, metres and seconds (PLAN 29c-2): the
-      # shader's field against Biot–Savart, the gain against EFH1's, and a
-      # drop at the two-phase Darcy speed, under the per-step guard.
+      # shader's field against Biot–Savart, the shader's ∇ψ against the
+      # linear Kelvin law (a units check on ψ, the gain cancels there), the
+      # gain against EFH1's, and a drop at the two-phase Darcy speed with the
+      # rim's (ν_clear/ν_ff)^(1−φ) factor applied, under the per-step guard.
       # On the fifth shard, the lightest (19w), since the open one ran 17.8
       # minutes of its 20 before the split.
       - name: The magnet's pull, derived

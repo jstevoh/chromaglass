@@ -1361,3 +1361,13 @@ ferrofluid:
   sitting apart from a pool should hold their size longer instead of bleeding into the oil.
 - A drop dragged fast by hand still sheds its trailing rim into the oil's return flow
   (PLAN 29c-8).
+- The magnet's pull on a drop is felt at its rim first. The force a cell gets is the
+  Kelvin gradient times the cell's ferrofluid share times (ν_clear/ν_ff)^(1−φ): a cell
+  of ferrofluid alone moves about four and a half times faster than the same push on the
+  oil, and a drop in the oil goes at about 0.8 of the reference speed, so the rim runs
+  ahead of the oil and a drop should lean into the pull and then follow the magnet as a
+  whole, not tear. `phaseMomentum` carries the ferrofluid share along itself, so a
+  dragged drop should keep its edge rather than smearing behind it. Drag a drop slowly
+  at a deep magnet and then fast at a strong one: slowly it should hold together at
+  Darcy's speed; fast it may leave a thin trailing film (29c-8), but its front should
+  stay sharp.

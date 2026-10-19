@@ -34,9 +34,11 @@
  *     352 → 600, with constant mobility).
  *  3. The antisymmetric face mobility conserves volume: Σc·h stays within
  *     0.1% across the 20-step settle and the 180 resting steps.
- *  4. With no magnet, the drop stays where it was poured: its centroid stays
- *     within half a cell of its settled position and within a cell of
- *     (0.36, 0.5).
+ *  4. A symmetry guard (it holds that the step pushes nothing sideways, not
+ *     that the drop holds): with no magnet the centroid stays within half a
+ *     cell of its settled position and within a cell of (0.36, 0.5).
+ *  5. The loss slows: a second window, steps 200 to 380, loses at most half
+ *     the half-full cells the first (20 to 200) did, or at most 3.
  *
  * Lab only (software WebGPU in headless Chrome, or Metal on the Mac).
  */
@@ -112,15 +114,25 @@ try {
     }
     const s1 = await getStats();
 
-    return { sInit, s0, s1 };
+    // A second window, steps 200 to 380, same length as the first: a drop
+    // that is still shedding cells at the same rate in the second window is
+    // dissolving slowly, not resting, and 88 of 100 at step 200 does not
+    // see it.
+    for (let k = 0; k < steps; k++) {
+      await lab.step(1, opts);
+    }
+    const s2 = await getStats();
+
+    return { sInit, s0, s1, s2 };
   }, { N, R });
 
-  const { sInit, s0, s1 } = result;
+  const { sInit, s0, s1, s2 } = result;
   const keptRatio = s1.halfCount / s0.halfCount;
   const haloGrowth = s1.n01 - s0.n01;
   const volDrift = Math.abs(s1.vol - s0.vol) / s0.vol;
   const volDriftAll = Math.abs(s1.vol - sInit.vol) / sInit.vol;
   const moved = Math.hypot(s1.cx - s0.cx, s1.cy - s0.cy);
+  const lost1 = s0.halfCount - s1.halfCount, lost2 = s1.halfCount - s2.halfCount;
 
   // 1. Holds its half-full core and peak share at rest (90 of 100 and 0.975,
   // against 84 of 100 and 0.946 with constant mobility in phaseCHVolume).
@@ -146,9 +158,21 @@ try {
     `Σc·h ${sInit.vol.toFixed(5)} → ${s0.vol.toFixed(5)} → ${s1.vol.toFixed(5)} (drift ${(volDrift * 100).toFixed(3)}% over 180 steps, ${(volDriftAll * 100).toFixed(3)}% from pour, bar <= 0.1%); Σc ${sInit.sumPhase.toFixed(2)} → ${s1.sumPhase.toFixed(2)}`,
   );
 
-  // 4. With no magnet, the drop stays where it was poured.
+  // 5. The second window: the loss slows. With constant mobility the drop
+  // shed cells at the same pace to the end; with the degenerate mobility the
+  // step-20-to-200 loss is the settling of the pour and the next 180 steps
+  // lose at most half as many (or at most 3 cells).
   check(
-    'with no magnet, the resting drop stays within half a cell of where it settled',
+    'the resting drop\'s loss slows: steps 200 to 380 lose at most half the cells steps 20 to 200 did (or at most 3)',
+    lost2 <= 3 || lost2 <= lost1 / 2,
+    `half-full ${s0.halfCount} → ${s1.halfCount} (−${lost1}) → ${s2.halfCount} at step 380 (−${lost2}, bar <= max(${(lost1 / 2).toFixed(1)}, 3)); peak ${s2.peak.toFixed(3)}, cells over 0.01 ${s2.n01}`,
+  );
+
+  // 4. A symmetry guard, not a drop-holding check: with no magnet nothing
+  // pulls the drop anywhere, so this is red only if the step itself pushes
+  // the drop (an asymmetric stencil, a force with no magnet).
+  check(
+    'symmetry guard: with no magnet, the resting drop stays within half a cell of where it settled',
     moved < 0.5 / N && Math.abs(s0.cx - 0.36) < 1 / N && Math.abs(s1.cx - 0.36) < 1 / N && Math.abs(s1.cy - 0.5) < 1 / N && s1.halfCount > 0,
     `moved ${(moved * N).toFixed(3)} cells (${moved.toFixed(6)} plate widths, bar < 0.5 cells) at (${s1.cx.toFixed(4)}, ${s1.cy.toFixed(4)})`,
   );

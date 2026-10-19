@@ -2875,7 +2875,7 @@ export class WebGPUFluid {
         this.run(pass, 'phaseBlur', this.phaseBlurT, [this.phase.read], none);
         // The faces' Courant numbers are the flux step's: the mixture's velocity,
         // which carries the share, over the substeps the carry ran (runPhaseCompress).
-        this.runPhaseCompress(pass, stand, this.arg('phase compress', [PHASE_COMPRESS, disp, volume, subs]));
+        this.runPhaseCompress(pass, stand, this.arg('phase compress', [PHASE_COMPRESS * (p.phaseCompress ?? 1), disp, volume, subs]));
         this.phase.swap();
       }
 
