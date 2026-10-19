@@ -6575,6 +6575,18 @@ Turing Print" work (#331), which also made the reaction grow at all.
     maps back to the same section index, so a cue on it fires once; decide with 28g
     whether a repeat should fire its cue again.
 
+- **28i. Every look judged again, after the lamp, the soap film and the breakdown** (the
+  owner, 2026-10-19: "the presets are kinda shitty now that we've made substantial
+  changes ... prune or improve all of them ... really dynamic or emotional. We need to sell
+  some cool stuff now"). The 28a judging was done on the 2026-10-10 gallery; since then the
+  lamp ground (18b), the quieter breakdown (28e), the closeup camera (27a-8), the soap film's
+  reference (32a) and the lamp's background (`lampBg`) all changed what a look draws. Every
+  look is photographed again on the Mac (`gallery.yml`, this PR labelled `gallery`) and
+  given a verdict: keep, rework (with a number and the check that proves it), merge into
+  another, or retire through `RETIRED_PRESETS`. Each kept look is tagged with the art pack
+  it sells in (PLAN 23: Home includes one pack, Pro all). The reworks go to Antigravity as
+  short briefs; this item lists them as they are briefed. Verdicts: pending the gallery.
+
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
 The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more
