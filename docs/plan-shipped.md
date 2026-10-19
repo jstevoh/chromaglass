@@ -3937,6 +3937,53 @@ two lines, one over every retired id against the end of its own chain, written o
 check and not taken from `livePresetId`, and one that a chain is followed the whole way.
 With the resolver cut to one hop both are red (`sunny-side-up → nothing (wanted classic)`).
 
+## 28j. Changing looks without a jump
+
+### 28j-1. The patch list and the ferrofluid ring cross over, not cut (this PR)
+
+The owner, 2026-10-19: "Transitions between presets are also a little jumpy here and
+there." Found by blending every pair of the 32 looks (992 ordered pairs) in thirty ticks
+and looking for the largest change in one tick of what the plate reads: `blendLooks`
+travels every number and colour on `ease(t)`, but the lists, steps and booleans switch at
+`SWITCH_AT = 0.5`, so anything riding on one of those jumps all at once there.
+
+Two of those jumped on nearly every pair and could be fixed with no GPU:
+
+- **Patches (`sceneMappings`).** The old look's list was the list until the midpoint and
+  the new look's after, so a depth of 0.5 became 0 and another 0.5 appeared in one tick,
+  on 572 pairs. `crossfadePatches` (`lookFade.ts`) matches patches by source, feature,
+  setting and layer; a patch both looks carry moves from one depth to the other on the
+  same ease, a patch only the old one carries fades out and one only the new one carries
+  fades in. The identity includes the layer on purpose: a patch for layer 2 and the
+  same patch for layer 3 are two patches. Measured over all 992 pairs, the largest depth
+  step in one of thirty ticks is **0.500 before and 0.025 after** (bar 0.06, `desk`).
+- **The ferrofluid ring (`phaseAmount`).** The handoff lays the new look's ring in one
+  frame at p = 0.5 (or clears it), while the drawn `phaseAmount` was part-way between the
+  two looks' values, so the plate showed a ring of the wrong strength for the rest of the
+  fade, or none that then appeared whole. `ringDip` (`lookFade.ts`, used by `lookFadeStep`
+  when the change swaps the ring: Go, Back and Send to wall) takes the old look's amount
+  to nothing before the swap, holds it there across a flat bottom (0.1 of the eased fade
+  either side of the middle) and brings it up on the new look's own value after. The bottom
+  is flat because the swap lands on a render frame, drawing whichever 33 ms tick came last,
+  and the handoff's clock starts before the fade's: a pointed V still drew **0.090** of the
+  amount at the swap (Magnet Garden to Classic) one tick before the middle, which a first
+  version of the check missed by sampling only half a tick. Measured as the largest amount
+  drawn anywhere within a tick either side of the swap: **0.852 before (Magnet Garden to
+  Ferro Paint), 0.000 after** (bar 0.01). A slider the player is holding keeps its own
+  value on a Back (`held`, as every other setting does); on a Go it is overwritten, as it
+  was. A fade under a second (a set item can ask for 0.5) keeps its straight line, because
+  the handoff never runs shorter than a second and the dip would be over before the swap.
+  A magnet held over ferrofluid, or a pour from the bottle, turns Ferrofluid up whenever the
+  amount reads 0, so both wait while a look is fading (`magnetInHand`, `ferrofluidPoured`);
+  otherwise they would write 0.6 into the bottom of every dip.
+
+The patch crossfade is in `blendLooks` itself, so a new song's look and Lucky get it too;
+only the ring's dip is limited to the changes that run the handoff. Those unattended changes
+keep the ring's amount on a straight line, since they have no swap to hide, and a control in
+`desk` proves it (the two jump checks fail on the old `lookFade.ts`: 46 of 48 pass there).
+
+What is not fixed is PLAN 28j-2 to 28j-5.
+
 ## 29. The closeup's ferrofluid drop
 
 ### 29a. The drop as a bead with the light on it (this PR)
