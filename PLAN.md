@@ -3322,9 +3322,18 @@ for, and the GPU was asked for only after they had arrived and drawn.
 - **Shipped, 14v-6: the opening asks its first fills before the display, after the
   mount frames settle** (2026-10-18, this PR). The story and numbers are in
   `docs/plan-shipped.md` §14v; judged over the week after merge against the week
-  before by `npm run flakes -- --check 'no stop in the opening'` (19aa: 17 of 137 on
-  2026-10-11 to 18; 14 of 92, 15%, 10 of 88 excluding #396's 4 branch runs over the
-  7-day window to merge).
+  before by `npm run flakes -- --check 'no stop in the opening'` (week before,
+  2026-10-11 to 18: 26 FAIL of 167 Mac startup runs, 16%, 11 of them green on the same
+  commit; this PR's first version went red on its own first run, 2.07 s from 2.59 s,
+  with the 200 ms cap below fired before the mount frame had rendered, so the number
+  after is still owed: one branch's runs cannot judge a one-in-six flake).
+  Named shortcuts and retunes: four animation frames is a heuristic for "the mount
+  frames have been presented" (the compositor keeps up to two frames in flight, and
+  the CI Mac's post-mount frames took 0.30–0.39 s over three to four frames), not a
+  signal that the compositor acknowledged them; the cap went 200 ms → 1.5 s and the
+  frame count 2 → 4, so the opening can start up to that much later in a tab whose
+  frames are held; and the desk's preview hole is measured in `useLayoutEffect`
+  instead of `useEffect` (before the first paint, not after).
   What it was (found with 14v-5, read over 124 Mac runs' logs 2026-10-11 to 18, and
   diagnosed on PR #396): the "no stop in the opening" line went red on 14 of 124 runs
   (11%), and every red was 1.3–2.4 s on the adapter or device and then 2.4–4 s on the
@@ -3333,13 +3342,16 @@ for, and the GPU was asked for only after they had arrived and drawn.
   run once) went red on all three Mac runs of its own PR and was taken out; the third
   run showed `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside
   `plate/display` (2.64 s) while a frame asked at 3.42 s waited on the GPU process
-  until 6.80 s. Now `introStill()` waits two animation frames plus a macrotask even
-  when `#cg-intro` starts with `.cg-still` from `index.html`, so the desk's mount and
-  relayout frames commit to the compositor before `buildInTurn` starts, and
-  `prepareShow` asks and finishes the three `fluid/fill:*` compute kernels before
-  asking `plate/display` (which still heads the render pipelines and runs alongside the
-  remaining compute kernels once the fills settle). `npm run startup` prints the page's
-  first compute pipeline ("first compile asked …, given …"), judged by nothing.
+  until 6.80 s. Now `usePreviewFrame` measures the desk's preview hole in
+  `useLayoutEffect` so the plate and intro mount directly at their preview size
+  without a second full-window-to-preview resize frame, `introStill()` waits four
+  animation frames plus a macrotask (with a 1.5 s cap for a tab hidden mid-wait;
+  a 200 ms cap fired at 2.42 s on run 39189617869 before the post-mount frame at
+  2.50 s had rendered) even when `#cg-intro` starts with `.cg-still` from
+  `index.html`, and `prepareShow` asks the opening's `fluid/fill:*` compute kernels
+  before `plate/display` (which still heads the render pipelines and runs alongside
+  the remaining compute kernels). `npm run startup` prints the page's first compute
+  pipeline ("first compile asked …, given …"), judged by nothing.
 
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
