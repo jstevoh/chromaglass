@@ -255,7 +255,8 @@ try {
     // under 0.45 for the composition the plate reports.
     const expected = s.seedMean > 0 && ((preset?.settings.lampGround ?? 0) < 0.05) &&
       lookTarget(s.seedMean, preset?.settings.dyeBudget ?? 0.85, preset?.settings.dyeBudget ?? 0.85) < 0.45;
-    report.looks.push({ id, ...s, mean: m, expected });
+    const target = s.seedMean > 0 ? lookTarget(s.seedMean, preset?.settings.dyeBudget ?? 0.85, preset?.settings.dyeBudget ?? 0.85) : null;
+    report.looks.push({ id, ...s, mean: m, expected, target });
     if (s.sparse && s.seedMean > 0) reached.push(id);
     console.log(`     ${id.padEnd(24)} ${s.sparse ? 'REACHED  ' : 'unchanged'} (expected ${expected ? 'reached  ' : 'unchanged'}) seedMean ${s.seedMean === null ? '-' : s.seedMean.toFixed(3)} mean ${Number.isFinite(m) ? m.toFixed(3) : 'NaN'}`);
     await page.close();
@@ -266,15 +267,24 @@ try {
   check('the plate\'s own answer matches the one worked out from the preset', disagree.length === 0, disagree.map((l) => l.id).join(', ') || `${report.looks.length} looks agree`);
   console.log(`     the fix reaches ${reached.length} of ${ids.length}: ${reached.join(', ') || 'none'}`);
   check('it reaches at least one look', reached.length >= 1, 'without one, nothing below measures the fix');
-  // Jellyfish Bloom is NOT among them: on the plate it lays 0.47 under the
-  // default 0.85, so at its own slider its target (0.47) is above the 0.45 cliff
-  // and it is not sparse. The review measured it with the slider at 0.14, where
-  // it is (0.077), which part 2 does; the bank, sparkle and surf gates leave it
-  // alone at its default, and this says so rather than assuming it is reached.
+  // Jellyfish Bloom sits ON the 0.45 cliff. The mass it lays is not the same
+  // on every load (0.470 on one Mac run, 0.395 on the next, the same commit's
+  // source), and its target at the default slider is that mass, so one load is
+  // sparse and the next is not. This first said "not reached" because the run
+  // it was written from happened to lay 0.47. What can be asserted is the
+  // fact that makes it unassertable: its target is within a fifth of the cliff.
+  // Looks like that are left out of the pour A/B below (whether the bank is on
+  // would change between its own pages), and Jellyfish's slider test (part 2)
+  // holds either way, because the slider is proportional below the cliff too.
+  const NEAR_CLIFF = [0.45 * 0.75, 0.45 * 1.25];
+  const nearCliff = (l) => l.target !== null && l.target >= NEAR_CLIFF[0] && l.target <= NEAR_CLIFF[1];
+  const steady = reached.filter((id) => !nearCliff(report.looks.find((l) => l.id === id)));
   if (!ONLY) {
-    check('Jellyfish Bloom at its default is not sparse, so the gated terms leave it as it was', !reached.includes('jellyfish-bloom'));
-    check('it reaches at least three looks, so the pour A/B is not one look\'s luck', reached.length >= 3, `${reached.length} reached`);
-    const seed = report.looks.find((l) => l.id === 'jellyfish-bloom')?.seedMean;
+    const jf = report.looks.find((l) => l.id === 'jellyfish-bloom');
+    check('Jellyfish Bloom\'s target at its default is within a quarter of the 0.45 cliff, so whether it is sparse is not asserted',
+      jf && nearCliff(jf), `target ${jf?.target?.toFixed(3)}, ${reached.includes('jellyfish-bloom') ? 'sparse' : 'not sparse'} on this load`);
+    check('it reaches at least three looks away from the cliff, so the pour A/B is not one look\'s luck', steady.length >= 3, `${steady.length} steady of ${reached.length} reached: ${steady.join(', ')}`);
+    const seed = jf?.seedMean;
     check('Jellyfish Bloom lays a mass under its 0.85 budget, where the slider is proportional', seed > 0 && seed < 0.85, `seedMean ${seed?.toFixed(3)}`);
   }
 
@@ -301,7 +311,7 @@ try {
   }
 
   /* 3. Hand pours, ABBA on one page ------------------------------------- */
-  const pourLooks = reached.slice(0, Math.max(3, Math.min(reached.length, 4)));
+  const pourLooks = steady.slice(0, Math.max(3, Math.min(steady.length, 4)));
   for (const id of pourLooks) {
     const page = await open(id);
     if (!page) { check(`${id}: the show opened for the pour`, false); continue; }
@@ -336,7 +346,7 @@ try {
     await page.close();
   }
   if (!ONLY) check('three sparse looks were poured on', report.pours.length >= 3, `${report.pours.length}`);
-  if (reached.length) {
+  if (steady.length) {
     const drained = report.pours.filter((r) => r.drained).length;
     check('the drain the review described shows up without the bank on at least one look', drained >= 1,
       `${drained} of ${report.pours.length} looks lost over 10% of a hand pour in 3 s with the bank off`);
