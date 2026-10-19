@@ -3870,3 +3870,31 @@ right side stands that shoulder 138% and the far one 78%, the volume 101.8%; the
 spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up and left; a
 yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
 bytes different at any relief.
+
+## 32. The soap film: a draining film seen in reflection
+
+### 32a. The CPU reference (this PR, #403)
+
+Built `src/lib/soapFilm.ts` (`createSoapFilm`, `stepSoapFilm`, `soapFilmRgb`), added the
+sixth argument `cosI = 1` to `filmReflectance` (and optional `cosI = 1` to `filmColour`)
+in `src/lib/filmTable.ts`, and wired `npm run soapfilm` into `.github/workflows/checks.yml`
+under `Measure · logic`.
+
+Method: 2D incompressible Darcy buoyancy flow `u = (1/ζ)(−∇p + ρ g (h − h̄) ŷ)` with
+`∇·u = 0` on a staggered MAC grid (`ρ g = 9810`, `ζ = 1.5`, default `dx = 1e-3` m),
+Gauss-Seidel projection with over-relaxation (`f.uf` and `f.vf` exposed on the cell faces,
+zero at all four walls), conservative second-order minmod-limited advection of `h`,
+constant evaporation (`evap` nm/s), and exponential relaxation (`τ = 0.5` s) to the 8 nm
+Newton-black film once a cell thins below 30 nm without refilling. Named shortcuts (a)–(e)
+are documented in `PLAN.md` §32 and `src/lib/soapFilm.ts`.
+
+Measured: `npm run soapfilm` 23/23 (C1 thick patch down 29.4 rows, thin patch up 22.6 rows;
+C2 mass drift 3.3e-15, uniform film 0.0e+0 nm; C3 `g = 0` 0.0e+0 nm, half-gravity ratio
+0.54, reversed gravity −20.9 rows; C4 peak excess at 5 s 663/800 nm, mass ratio 0.77,
+max `|∇·u|` 9.2e-5 /s against 1.9e-3 /s, 0.00% of cells outside face flux interval, wall
+flow 0; C5 550 nm first max 103.5 nm at 0°, 111.5 nm at 30°, 126.5 nm at 50°, Airy
+agreement 8.3e-17, table and angle match 0.00/255; C6 quarter means ordered from 30 s,
+top reaches 10% black first at 115 s, no ruptured cell refills; C7 4 consecutive 5 s
+samples in the photograph window, at t=120 s 5.1% under 30 nm, 23.3% dark, 79% saturated,
+9/12 hue sectors); `npm run filmtable` 8/8; 600 steps of the 32×64 film in 0.69 s.
+

@@ -378,6 +378,12 @@ jobs:
       - name: The film table
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run filmtable
+      # A draining vertical soap film seen in reflection (PLAN 32a): 2D Darcy
+      # buoyancy convection, conservative minmod advection, evaporation to Newton
+      # black, and Airy's reflectance at an angle.
+      - name: The draining soap film
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run soapfilm
       # A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):
       # whole fades driven at the show timer's 16 ms, no step past the curve's
       # steepest, the turn-round, the hand, the cut, and the pads wired.

@@ -6941,18 +6941,7 @@ a scratch prototype of the model above (not committed) it reads 23 of 23; with n
 `src/lib/soapFilm.ts` it exits 1 and says so. A bar is never moved to get green: if the
 model cannot reach one, the PR says what it reached and asks.
 
-### 32a. The CPU reference (first PR, Antigravity)
-
-`src/lib/soapFilm.ts` exports `createSoapFilm({nx, ny, dx, h0, noise, seed})`,
-`stepSoapFilm(f, dt, {g, evap})` and `soapFilmRgb(f, {cosI, gain})`, and
-`filmReflectance` in `src/lib/filmTable.ts` gains a sixth argument, `cosI`, the cosine of
-the angle of incidence in air (its default, 1, is today's behaviour to the bit, which
-`npm run filmtable` already asks). The contract is in `scripts/soapfilm.mjs`'s header: a
-film is `{nx, ny, dx, h}` with `h` in nm, row 0 at the top, gravity toward +y, closed
-box; it exposes its last flow as `f.uf` (nx+1 by ny) and `f.vf` (nx by ny+1), m/s on the
-cell faces, zero at the walls. Wire `npm run soapfilm` into `checks.yml`'s node part in the
-same PR. *Measure:* `npm run soapfilm` 23 of 23, `npm run filmtable` still green, and the
-step's cost for the 32 by 64 film in a PR comment (the prototype takes 0.8 s for 600 steps).
+### ~~32a. The CPU reference~~ — **Shipped, this PR (#403)** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a; named shortcuts (a)–(e) above stay open for 32b–32d)
 
 ### 32b. The reflected view
 
