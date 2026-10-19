@@ -6588,21 +6588,25 @@ Turing Print" work (#331), which also made the reaction grow at all.
   short briefs; this item lists them as they are briefed.
 
   Judged on the Mac gallery of 2026-10-19 (8, 20 and 40 s, `scripts/judge.mjs`'s numbers)
-  against the 2026-10-11 film. Of 41 looks, 10 retire, 31 stay, 21 of those reworked. The
+  against the 2026-10-11 film. Of 41 looks, 10 retire (nine in batch 1, Lumia after 28i-5), 31 stay, 21 of those reworked. The
   three faults the photos share: looks that stand still (eight under .01 gallery motion at
   20 and 40 s, four more by eye; Acid Trip reads .11 to .23), looks that lose the black
   (Classic, Galaxy, Cell Bloom drains to flat indigo, flat .21 to .81 and luma .52 to .08
   by 40 s), and looks on a white ground (Turing Print at luma .85 to .94 for 20 s,
   Sensual Laboratory, Roy at .7).
 
-  - **28i-1. Retire ten** (Antigravity, batch 1): `lumia` → `velvet-underground`,
-    `sensual-laboratory` → `turing-print`, `oil-on-water` → `oil-and-water`,
+  - **28i-1. Retire nine** (Antigravity, batch 1): `sensual-laboratory` → `turing-print`, `oil-on-water` → `oil-and-water`,
     `colorful-cosmos` → `classic`, `agate` → `chemical-clock`, `ferro-maze` →
     `magnet-garden`, `deep-ocean` → `jellyfish-bloom`, `fillmore-1969` → `poster-1969`,
     `timbre-shifter` → `microscopic-chaos`, `oil-wheel` → `clock-glass` (it turned the
     whole frame, which only `FRAME_MOVING_LOOKS` may). Through `RETIRED_PRESETS`; every
     check that names a cut id takes its replacement, each listed under `Check changes:`.
     `desk`, `setlist`, `panel`, `plate` (5b).
+  - **28i-5. Retire Lumia** (→ `velvet-underground`; Claude first). `'lumia'` is also the
+    lamp's Lumia setting and mixer mover (`plateSources.ts`, `mixer.ts`), and `plate` 5b
+    fails on any quoted retired id in src/, so retiring the look trips it on the layer.
+    5b learns to tell a preset id from a setting key (named under `Check changes:`, its
+    reach unchanged for preset ids), then the look retires.
   - **28i-2. Give back the black, make the still ones move** (Antigravity, batch 2). Film
     near black (5th percentile) at least 20% of the time: Classic (and two or more hues),
     Galaxy, Stardust Collapse (colours at least .3), Jellyfish Bloom (flat at most .4),
