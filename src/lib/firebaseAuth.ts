@@ -34,20 +34,45 @@ export function getFirebaseAuth(): Auth {
   if (authInstance) return authInstance;
 
   const emu = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR;
-  const host = typeof window !== 'undefined' ? window.location.hostname : '';
-  const sameOriginDomain =
-    !emu && (host.endsWith('.web.app') || host.endsWith('.firebaseapp.com'))
-      ? host
-      : undefined;
 
+  // Use VITE_FIREBASE_AUTH_DOMAIN directly rather than overriding it with
+  // window.location.hostname on .web.app.
+  //
+  // Reported on the live site after #394: Google sign-in on the owner's iPhone
+  // failed with "Error 400: redirect_uri_mismatch" and request details
+  // "redirect_uri=https://chromaglass.web.app/__/auth/handler,
+  // flowName=GeneralOAuthFlow".
+  //
+  // Measured against the live deployment:
+  //   - Firebase Hosting serves /__/auth/handler directly (HTTP/2 200, 462 B)
+  //     on all four domains (chromaglass.art, www.chromaglass.art,
+  //     chromaglass.web.app, chromaglass.firebaseapp.com).
+  //   - The Firebase-created OAuth 2.0 Web client in Google Cloud Console
+  //     (APIs & Services -> Credentials) is only pre-populated by Firebase with
+  //     https://chromaglass.firebaseapp.com/__/auth/handler until
+  //     https://chromaglass.art/__/auth/handler and
+  //     https://chromaglass.web.app/__/auth/handler are added there by hand.
+  //   - A browser that visited chromaglass.web.app before #394 has an active
+  //     service worker or chromaglass* keys in localStorage, so index.html keeps
+  //     it on chromaglass.web.app until 23.16 migrates saved state.
+  //   - Overriding VITE_FIREBASE_AUTH_DOMAIN with window.location.hostname when
+  //     host.endsWith('.web.app') switched authDomain from the configured
+  //     VITE_FIREBASE_AUTH_DOMAIN to chromaglass.web.app on those returning
+  //     browsers, sending an unauthorised redirect_uri to Google OAuth while
+  //     chromaglass.art used VITE_FIREBASE_AUTH_DOMAIN and succeeded.
+  //
+  // Keeping authDomain on VITE_FIREBASE_AUTH_DOMAIN ensures every origin uses
+  // the domain whose /__/auth/handler is registered on the OAuth client
+  // (chromaglass.firebaseapp.com out of the box, or chromaglass.art once added
+  // in Google Cloud Console so signInWithRedirect stays same-domain on iPhone
+  // Safari).
   const existing = getApps();
   appInstance =
     existing.length > 0
       ? existing[0]
       : initializeApp({
           apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-          authDomain:
-            sameOriginDomain || import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'localhost',
+          authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'localhost',
           projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'demo-chromaglass',
           appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:000000000000:web:000000000000',
         });

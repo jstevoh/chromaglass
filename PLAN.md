@@ -5745,16 +5745,20 @@ once the login works (23.14).*
 - **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
   with Google, Apple and the emailed link; authorised domains configured; web config wired into
   `deploy.yml` via GitHub Actions repository secrets (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`).
-- **23.13** (**shipped**, #390 and extended in this PR): `public/privacy.html` and `public/terms.html` completed and
+  *(Open console step for the owner: in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Web client `793087423172-fi7d5oq5tisv3is84vvf8e6dtorighql.apps.googleusercontent.com`, add `https://chromaglass.art/__/auth/handler`, `https://www.chromaglass.art/__/auth/handler`, and `https://chromaglass.web.app/__/auth/handler` under Authorised redirect URIs, then update `VITE_FIREBASE_AUTH_DOMAIN` to `chromaglass.art` so `signInWithRedirect` stays same-domain on iPhone Safari.)*
+- **23.13** (**shipped**, #390 and extended in #394): `public/privacy.html` and `public/terms.html` completed and
   approved by the owner, including 23.12's licence key, Lemon Squeezy checkout, and 2-machine terms. *Measure:* `npm run privacy` (16/16, CI, part `logic`).
-- **23.10** (**shipped**, this PR; brief `docs/handoff-signin.md`): the sign-in on the
+- **23.10** (**shipped**, #394; brief `docs/handoff-signin.md`): the sign-in on the
   hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
   with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
   the email, sign out with confirmation, delete the account with confirmation, and links
   to `/privacy.html` and `/terms.html`) on the desk, the narrow overlay and the phone.
   Returning visitors start the plate immediately from the local flag while Firebase
-  confirms in the background, and `?remote`, `?cast` and builds without `VITE_FIREBASE_*`
-  never load Firebase. *Measure:* `npm run signin` (14/14, wired into `checks.yml`
+  confirms in the background, `?remote`, `?cast` and builds without `VITE_FIREBASE_*`
+  never load Firebase, and `getFirebaseAuth()` uses `VITE_FIREBASE_AUTH_DOMAIN` directly
+  rather than overriding it with `window.location.hostname` on `.web.app` (which sent an
+  unauthorised `https://chromaglass.web.app/__/auth/handler` redirect URI on returning
+  iPhones kept on `chromaglass.web.app` by `index.html`). *Measure:* `npm run signin` (14/14, wired into `checks.yml`
   `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
   than today's bar.
 - **23.11** (**shipped**, this PR): the Mac app with no key asks for the
@@ -6572,6 +6576,71 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - **28h-6.** A repeated section in a live take (the band plays the chorus twice)
     maps back to the same section index, so a cue on it fires once; decide with 28g
     whether a repeat should fire its cue again.
+
+- **28i. Every look judged again, after the lamp, the soap film and the breakdown** (the
+  owner, 2026-10-19: "the presets are kinda shitty now that we've made substantial
+  changes ... prune or improve all of them ... really dynamic or emotional. We need to sell
+  some cool stuff now"). The 28a judging was done on the 2026-10-10 gallery; since then the
+  lamp ground (18b), the quieter breakdown (28e), the closeup camera (27a-8), the soap film's
+  reference (32a) and the lamp's background (`lampBg`) all changed what a look draws. Every
+  look is photographed again on the Mac (`gallery.yml`, this PR labelled `gallery`) and
+  given a verdict: keep, rework (with a number and the check that proves it), merge into
+  another, or retire through `RETIRED_PRESETS`. Each kept look is tagged with the art pack
+  it sells in (PLAN 23: Home includes one pack, Pro all). The reworks go to Antigravity as
+  short briefs; this item lists them as they are briefed.
+
+  Judged on the Mac gallery of 2026-10-19 (8, 20 and 40 s, `scripts/judge.mjs`'s numbers)
+  against the 2026-10-11 film. Of 41 looks, 10 retire (nine in batch 1, Lumia after 28i-5), 31 stay, 21 of those reworked. The
+  three faults the photos share: looks that stand still (eight under .01 gallery motion at
+  20 and 40 s, four more by eye; Acid Trip reads .11 to .23), looks that lose the black
+  (Classic, Galaxy, Cell Bloom drains to flat indigo, flat .21 to .81 and luma .52 to .08
+  by 40 s), and looks on a white ground (Turing Print at luma .85 to .94 for 20 s,
+  Sensual Laboratory, Roy at .7).
+
+  - **28i-1. Retire nine** (Antigravity, batch 1): `sensual-laboratory` → `turing-print`, `oil-on-water` → `oil-and-water`,
+    `colorful-cosmos` → `classic`, `agate` → `chemical-clock`, `ferro-maze` →
+    `magnet-garden`, `deep-ocean` → `jellyfish-bloom`, `fillmore-1969` → `poster-1969`,
+    `timbre-shifter` → `microscopic-chaos`, `oil-wheel` → `clock-glass` (it turned the
+    whole frame, which only `FRAME_MOVING_LOOKS` may). Through `RETIRED_PRESETS`; every
+    check that names a cut id takes its replacement, each listed under `Check changes:`.
+    `desk`, `setlist`, `panel`, `plate` (5b).
+  - **28i-5. Retire Lumia** (→ `velvet-underground`; Claude first). `'lumia'` is also the
+    lamp's Lumia setting and mixer mover (`plateSources.ts`, `mixer.ts`), and `plate` 5b
+    fails on any quoted retired id in src/, so retiring the look trips it on the layer.
+    5b learns to tell a preset id from a setting key (named under `Check changes:`, its
+    reach unchanged for preset ids), then the look retires.
+  - **28i-2. Give back the black, make the still ones move** (Antigravity, batch 2). Film
+    near black (5th percentile) at least 20% of the time: Classic (and two or more hues),
+    Galaxy, Stardust Collapse (colours at least .3), Jellyfish Bloom (flat at most .4),
+    Bass Drop (peak at least 2.5 × median). Cell Bloom: flat at most .4 and luma at least
+    half its 8 s value at 40 s. Cyberpunk: near black at the 95th percentile at most 60%,
+    three or more hues. Off the white: Turing Print colours at least .3 by 8 s and luma
+    at most .6; Roy flat at most .5, luma at most .6; Red Cabbage luma at most .5 with
+    three hues; Lava Lamp luma at most .6; Milk Marbling's white tamed. Colour: Macro
+    Bead and Lacing Run two or more hues and six colour changes a minute; Chemical Clock
+    six a minute. Microscopic Chaos detail at most half its 10-19 reading. Motion at
+    least .02 at 20 and 40 s: Velvet Underground, Poster 1969, Home Movie, Clock Glass,
+    Crowd Plate, Lava Lamp, Jellyfish, Microscopic Chaos. `gallery` label and
+    `film.yml` (`FILM_ONLY` the looks changed).
+  - **28i-3. Sound on the liquid, not the frame** (Antigravity, batch 3). Eight looks
+    still drive the rotation slot from sound (28f-3): Galaxy (energy), Cyberpunk
+    (complexity), Acid Trip (energy), Aurora (energy), Solar Flare (bass), Fractal Dream
+    (treble), Neon Coral Reef (timbre), Stardust (bass); each moves that reading to a
+    liquid target. Every look that hears sound gets two or three patches from hits,
+    bands, onsets and notes only (28f), and Milk Marbling's treble → airVelocity at
+    depth .02, which reads nothing, is fixed. Film: 2 to 3.5 swells a minute, six or
+    more colour changes a minute, r1 between −.13 and .22 (the Dregs and the Sheep).
+  - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
+    magenta cells, no rainbow); then four or more hues on the film.
+
+  The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening
+  (Aurora, Oil & Water, Milk Marbling, Velvet Underground, Jellyfish Bloom, Cell Bloom,
+  Clock Glass, Lava Lamp), proposed as Home's one fixed pack; Fillmore (Acid Trip,
+  Fractal Dream, Classic, Poster 1969, Home Movie, Crowd Plate, Roy); Neon (Comet River,
+  Solar Flare, Cyberpunk, Bass Drop, Galaxy, Stardust Collapse); Lab (Neon Coral Reef,
+  Microscopic Chaos, Turing Print, Chemical Clock, Red Cabbage, Macro Bead, Lacing Run);
+  Ferro & Film (Ferro Paint, Magnet Garden, Soap Film). None of the batches touches the
+  gallery's grey wash (#401).
 
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
