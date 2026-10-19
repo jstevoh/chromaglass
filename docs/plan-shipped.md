@@ -1900,8 +1900,44 @@ renders used to do for it.
   first to the last render compile still, with some seen before the first compile
   was asked (SwiftShader: 328 frames, none moving, 86 before the first ask at 2.27 s;
   with the markup's `.cg-still` taken out, 83 of 85 moving before the first ask and
-  the line red). Left: the device still comes 1.4–1.9 s late with the still intro
-  up (14v-6).
+  the line red).
+- **Shipped, 14v-6: the opening asks its first fills before the display, after the
+  mount frames settle** (2026-10-18, this PR). Over 2026-10-11 to 18 (`npm run
+  flakes -- --check 'no stop in the opening'`), `startup`'s "no stop in the opening"
+  went red on 26 of 167 Mac runs (16%; 11 of the 26 green on the same commit). PR #396
+  tried warming the compiler at
+  boot (an empty kernel, a built fill-shaped kernel, and that kernel run once) and
+  went red on all three Mac runs of its own PR; its third run showed that the stop is
+  not Metal's compiler starting (the warm started it in 0.13–0.20 s), but the
+  opening's own `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside
+  `plate/display` (2.64 s) while a frame asked at 3.42 s waited for the GPU process
+  until 6.80 s. This PR's first version (fills first, display held until they settle)
+  still went red on its own first Mac run (39189617869): fills asked at 2.42 s,
+  `fluid/fill` 2.67 s, a frame gap of 2.07 s from 2.59 s, with a long animation frame
+  that began at 2.61 s and did not render until 4.74 s, and the page's frames
+  numbering 8 at 2.25 s and 11 at 2.82 s, so the desk's mount frames were still being
+  presented when the fills were asked. Three changes (`src/hooks/usePreviewFrame.ts`,
+  `src/lib/intro.ts`, `src/gpu/prepare.ts`):
+  - `usePreviewFrame` measures the desk's preview hole in `useLayoutEffect` instead of
+    `useEffect`, so `plate-frame` and `#cg-intro` mount directly in the preview
+    rectangle on `App`'s first paint instead of painting full-window and resizing on
+    the next frame.
+  - `introStill()` waits four animation frames plus a macrotask (with a 1.5 s safety
+    cap for a tab hidden mid-wait, and resolving at once if already hidden) even when
+    `#cg-intro` already has `.cg-still` from `index.html`. On run 39189617869, a 200 ms
+    cap fired at 2.42 s before the first post-mount frame at 2.50 s had rendered,
+    leaving frames at 2.50–2.59 s to wait 2.07 s on `fluid/fill`.
+  - `prepareShow` ranks the three `fluid/fill:*` compute kernels ahead of
+    `plate/display` and holds `plate/display` (and the remaining kernels) in
+    `buildInTurn` until the opening's `fluid/fill:*` kernels are given (`fillLeft`),
+    then asks `plate/display` alongside the remaining compute kernels.
+  Not reproduced locally: the Mac's compiled-shader cache is warm there (the opening
+  took 0.24 s), so `npm run startup`'s "no stop in the opening" passed on the warm
+  cache and proves nothing about the cold stall; emptying that cache
+  (`STARTUP_COLD=1`) is the owner's to allow, and CI's cold runner is the judge. On
+  the Mac: `npm run intro` 13/13, `npm run loadtime` 4/4, `npm run lint`. Judged over
+  the week after merge against the week before by `npm run flakes -- --check 'no stop
+  in the opening'`.
 - **Shipped:** the opening asks for its render pipelines first, the display first of
   all (`gpu/prepare.ts`): with three in flight it had been asked forty-fifth, and the
   last 1.34 s of the opening was the display compiling alone with the other lanes dry
