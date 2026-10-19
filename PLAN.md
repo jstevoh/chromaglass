@@ -5747,16 +5747,20 @@ once the login works (23.14).*
 - **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
   with Google, Apple and the emailed link; authorised domains configured; web config wired into
   `deploy.yml` via GitHub Actions repository secrets (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`).
-- **23.13** (**shipped**, #390 and extended in this PR): `public/privacy.html` and `public/terms.html` completed and
+  *(Open console step for the owner: in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Web client `793087423172-fi7d5oq5tisv3is84vvf8e6dtorighql.apps.googleusercontent.com`, add `https://chromaglass.art/__/auth/handler`, `https://www.chromaglass.art/__/auth/handler`, and `https://chromaglass.web.app/__/auth/handler` under Authorised redirect URIs, then update `VITE_FIREBASE_AUTH_DOMAIN` to `chromaglass.art` so `signInWithRedirect` stays same-domain on iPhone Safari.)*
+- **23.13** (**shipped**, #390 and extended in #394): `public/privacy.html` and `public/terms.html` completed and
   approved by the owner, including 23.12's licence key, Lemon Squeezy checkout, and 2-machine terms. *Measure:* `npm run privacy` (16/16, CI, part `logic`).
-- **23.10** (**shipped**, this PR; brief `docs/handoff-signin.md`): the sign-in on the
+- **23.10** (**shipped**, #394; brief `docs/handoff-signin.md`): the sign-in on the
   hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
   with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
   the email, sign out with confirmation, delete the account with confirmation, and links
   to `/privacy.html` and `/terms.html`) on the desk, the narrow overlay and the phone.
   Returning visitors start the plate immediately from the local flag while Firebase
-  confirms in the background, and `?remote`, `?cast` and builds without `VITE_FIREBASE_*`
-  never load Firebase. *Measure:* `npm run signin` (14/14, wired into `checks.yml`
+  confirms in the background, `?remote`, `?cast` and builds without `VITE_FIREBASE_*`
+  never load Firebase, and `getFirebaseAuth()` uses `VITE_FIREBASE_AUTH_DOMAIN` directly
+  rather than overriding it with `window.location.hostname` on `.web.app` (which sent an
+  unauthorised `https://chromaglass.web.app/__/auth/handler` redirect URI on returning
+  iPhones kept on `chromaglass.web.app` by `index.html`). *Measure:* `npm run signin` (14/14, wired into `checks.yml`
   `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
   than today's bar.
 - **23.11** (**shipped**, this PR): the Mac app with no key asks for the
