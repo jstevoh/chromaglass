@@ -606,7 +606,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48
+const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49
 
 export class WebGPUFluid {
   readonly N: number;
@@ -1573,6 +1573,7 @@ export class WebGPUFluid {
       f[38 + k * 4] = fin(p.magnetHeight, 0.05); f[39 + k * 4] = m ? magStrength : 0;
     }
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
+    f[49] = p.surfaceClear ? 1 : 0;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -1937,12 +1938,12 @@ export class WebGPUFluid {
    * piles up. `bath` is the reagent the whole plate stands in, as stepChemistry
    * takes it, so the print covers what the reaction is fed.
    */
-  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0): void {
+  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0, wetOnly = 0): void {
     if (amount <= 0 && print <= 0) return;
     const log = dyeAbsorbances(...colour);
     const enc = this.device.createCommandEncoder({ label: 'chemistry deposit' });
     const pass = enc.beginComputePass({ label: 'chemistry deposit' });
-    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, Math.max(0, print), Math.max(0, bath), ...log, 0]));
+    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, Math.max(0, print), Math.max(0, bath), ...log, wetOnly]));
     this.dye.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
