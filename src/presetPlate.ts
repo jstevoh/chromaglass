@@ -70,7 +70,13 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'neon-coral-reef':    [21, 2, 17, 0, 16, 7],
   'stardust-collapse':  [15, 23, 10, 17, 21, 7],
   'lumia':              [10, 7, 1],
-  'turing-print':       [14, 22],                // graphite and midnight, unused while the print is on: its colour is the indicator's (depositChem)
+  // Clear liquid, like chemical-clock: the print's colour is the indicator's (depositChem), so the
+  // plate pours no dye of its own. It was graphite and midnight on the thought that the contract
+  // is unused while the print is on; it is not. Evolve's drops (LiquidVisualizer's autoInject) take
+  // their colour from it, and the print is multiplied over the solver's dye, so each dark drop
+  // stained the print's paper a soft blue-grey where the pattern was thin (PLAN.md 26d-6a;
+  // npm run turing, "what the look pours leaves the print's paper clean").
+  'turing-print':       [15],
   'poster-1969':        [1, 21, 17, 18, 10],
   'fillmore-wash':      [5, 10, 9],
   // The dye mixes like filters, so a set is chosen for what its overlaps make:

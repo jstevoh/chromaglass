@@ -843,8 +843,10 @@ export const PRESETS: Preset[] = [
         the feed along the saddle-node line across the plate on a 40 to 90
         second clock and rearranges it (0.67 after the same fifty seconds) without
         emptying it (0.69 of the plate carries activator against the
-        control's 0.71). Below 1 because at 1 a soft grey patch opens where
-        the map pushes the pattern toward a bare plate (PLAN.md 26d-6).
+        control's 0.71). 0.7 is not held down by any patch: the soft grey
+        smears once blamed on the map at 0.7 and 1 were the plate's own dark
+        Evolve drops under the print, gone with the clear palette (PLAN.md
+        26d-6a).
       */
       turingDrift: 0.7,
       exposure: 0.7,

@@ -4448,8 +4448,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     Shortcuts, named: the maps are plane waves, not a true noise field, so
     the regions are broad diagonal bands that slide and never a patchwork;
-    the cap on d is a straight line through the sweep above, not Pearson's
-    full regime boundaries; k ignores the look's own k while the drift is on
+    the cap on d is a tent through the sweep above and the held corners, not
+    Pearson's full regime boundaries; k ignores the look's own k while the drift is on
     (only the feed is the look's), so a look's Pattern knob moves feed but
     not the regime; the clock is fixed-rate, on purpose: it follows no
     music; and every number is the lab's (SwiftShader rounds half floats to
@@ -4474,13 +4474,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
            + sin(6.2832 * (-0.4 * q.x - 0.9 * q.y) + 0.079 * A.b.w + 3.7)
            + sin(6.2832 * (1.0 * q.x + 0.2 * q.y) + 0.052 * A.b.w + 5.5);
     let r = clamp(0.5 + A.b.z * clamp(wr * 0.5, -1.0, 1.0), 0.0, 1.0);
-    // How far above the saddle-node the pattern survives, narrowing as F
-    // rises (the lab's sweep, 256^2, 6000 units, grown from 60 seeds: spots
-    // at F 0.03 to d 0.006, at 0.04 to 0.004, at 0.05 to 0.002, and none at
-    // 0.06 past 0.001). The straight line through those is the cap, and the
-    // regime moves between a quarter of it (stripes, so the labyrinth is
-    // never at the curve's edge) and nine tenths of it (spots).
-    let cap = max(0.0105 - 0.15 * f1, 0.0008);
+    // How far above the saddle-node the pattern survives. The lab's sweep (256^2,
+    // 6000 units, grown from 60 seeds) found spots to d 0.006 at F 0.03, 0.004 at
+    // 0.04, 0.002 at 0.05 and none past 0.001 at 0.06, so the cap falls straight
+    // with F from 0.035 up. It does not keep rising below: the first line (0.0105
+    // less 0.15 F) went on to 0.0075 at F 0.02, and a plate held there for 9000
+    // units at nine tenths of it kept only 0.313 of its cells alive (0.42 at F 0.03,
+    // at 0.0054), against 0.483 for the spots held at F 0.04 and a floor of 0.433
+    // (npm run turing, "the held corners of the cap"). Spots that survive a short
+    // sweep are not spots that survive a minute, and the dead zone lies below, so
+    // the cap rises with F to 0.035 and falls after it: 0.15 times the nearer of
+    // F and 0.07 less F, which is the old
+    // line from 0.035 up (0.0045 at 0.04, 0.003 at 0.05, 0.0015 at 0.06) and
+    // 0.003 at F 0.02. It is a tent, not Pearson's boundary: a shortcut, named in
+    // PLAN.md 26d-6a.
+    let cap = max(0.15 * min(f1, 0.07 - f1), 0.0008);
     let above = cap * mix(0.25, 0.9, r);
     target_kill = 0.5 * sqrt(f1) - f1 + above;
     target_feed = f1;

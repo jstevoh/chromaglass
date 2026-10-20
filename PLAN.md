@@ -6126,35 +6126,23 @@ Steps:
     - **Light as the kill** (CIMA is photosensitive; the lamp's level would move k).
     - **A slow ink-hue glide** (26d-3).
     - **Periodic reseeds**.
-    - **Metal's numbers** for the regime glide: the cap line (`0.0105 - 0.15 F`) was fitted on
-      SwiftShader, and Metal rounds half floats toward zero; read `npm run turing` line 9
-      off the `fifth` shard, and ask the watcher for a look if the pieces count differs.
-    - **The cap line is a straight line, and it is too generous at the corners**: the
-      review held each corner of the drift range for 9000 units (stripes settled at F 0.04,
-      k 0.06, 60 seeds, k = curve(F) + share x cap(F), alive share = cells with v over 0.1).
-      F 0.02 collapses to 6–7 % alive at share 0.25 and 0.9 (flat); F 0.05 at share 0.9
-      starts at 0.079 and recovers to 0.228; F 0.06 at share 0.25 recovers 0.089 to 0.392;
-      F 0.06 at share 0.9 stays at 0.061, flat. At F 0.06 and share 0.9 the margin is 0.00135
-      against about 0.001 measured as the limit, and below F 0.03 the cap is extrapolated
-      from no measured point. A corner that collapses leaves a frozen sparse residue that does
-      not regrow while held. The plate reaches those corners only where both waves saturate at
-      once (|w|, |wr| over 2) at Drift 1, a small share of the plate for a few seconds at a time.
-      Two steps: fit the cap through measured points (or Pearson's boundaries) including F
-      below 0.03; and give `npm run turing` a held-corner line, F 0.06 at share 0.9 and
-      F 0.02 for 9000 units, that has to stay over the alive band's floor. Measure the corners
-      on Metal too.
-    - **Grey smears in the app that the lab's grey-patch line cannot see**: on Metal
-      (Apple M4, head dfec25f) `npm run turing` passes all 31 lines twice and the lab plate
-      reads tile contrast 0.93 of the control at Drift 0.7 and 0.78 at Drift 1. But in the
-      app (Turing Print preset, 60 s settle, frames at 0, 30, 60 and 90 s) the watcher saw
-      soft blue-grey smears where the stripes lose contrast, 10–20 % of the plate in places,
-      drifting about (upper-middle at Drift 1 at 60 s; centre-right at Drift 0.7 at 60 and
-      90 s). The glide itself is clearly visible within a minute. Not known yet whether the
-      smears are the look's poured dye showing under the print or the reaction going flat.
-      The gap in the check: the line runs on the lab's plain plate (activator only), never
-      on the app's poured look. Next step: in the app, read the chemistry field itself off the
-      GPU at those frames and the same cells' contrast, to say which; then make the check
-      read the app's plate, or the field in the app, so it can see this. Start here.
+    - **Metal's numbers** for the regime glide and the corners: the cap (`0.15 min(F, 0.07 - F)`)
+      was fitted on SwiftShader, and Metal rounds half floats toward zero; read the held-corner
+      line (F 0.02, 0.03, 0.06) and line 9 off the `fifth` shard, and ask the watcher for a
+      look if the pieces count differs.
+    - ~~**The cap line was too generous at the corners**~~ (**shipped**; story in
+      `docs/plan-shipped.md` §26, 26d-6b): the cap is a tent, `0.15 min(F, 0.07 - F)` with a
+      floor of 0.0008, and `npm run turing` holds each corner of the feed range for 9000
+      units. Still shortcuts, named: the tent is fitted to the lab's sweep and the held
+      corners, not Pearson's boundaries; Metal's corner numbers are owed (below).
+    - ~~**Grey smears in the app that the lab's grey-patch line cannot see**~~ (**shipped**;
+      story in `docs/plan-shipped.md` §26, 26d-6b): not the reaction going flat. The look's
+      own contract was Graphite and Midnight, so Evolve's automated drops poured dark dye that
+      the multiplied print left showing. The contract is now clear (Pure White, as in
+      `chemical-clock`), and `npm run turing` has a line that pours the contract's colour
+      under the print and wants the paper to keep its brightness. Open: the dye budget still
+      counts a white drop's density, so Evolve's drops thicken the plate a little under a
+      clear print; whether that should be skipped for a clear contract is not decided.
     - **The Pattern knob does not steer the drifting regime**: while the drift is on k is
       the curve plus the margin and ignores the look's own k, so only its feed counts. A
       look that wants more spots than stripes needs a "spots share" input, not a k.
