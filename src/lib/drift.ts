@@ -116,6 +116,10 @@ const NOT_THE_LOOK = new Set([
   // start the frame sliding under the viewer by itself, the very thing the
   // owner turned off (2026-10-11).
   'frameSway',
+  // How far a tilt sloshes the liquid (lib/slosh.ts): the owner's hand on the
+  // tilt, like the direction above, and a dial that would set the plate
+  // slopping by itself in a look that was still.
+  'slosh',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*

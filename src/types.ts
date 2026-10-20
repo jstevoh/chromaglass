@@ -557,6 +557,18 @@ export interface VisualizerSettings {
    * where it is on the stage while the dish turns under it.
    */
   tiltDirection: number;
+  /**
+   * How far a tilt sloshes the liquid: the dish's own momentum (lib/slosh.ts,
+   * PLAN 18a-13). Tipped one way and then the other, the colour runs downhill,
+   * piles on the low edge, and the reversal sends a wave back across it that
+   * rings off the rim and mixes. 0 (the default) is the plate as it was: the
+   * gap's drag has no inertia, so a held tilt changes the level and nothing
+   * else. It follows the tilt (Gravity and Tilt Direction, the phone's tilt)
+   * wherever Gravity's value came from, never the sound directly (PLAN 18a-13e),
+   * and never moves the frame.
+   * Optional so a look saved before it reads as 0.
+   */
+  slosh?: number;
   /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
@@ -994,6 +1006,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
+  slosh: 0,                 // the plate as it was: a tilt changes the level and the liquid does not slop (lib/slosh.ts)
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
   mazeDetail: 0,            // the maze as it always was (MAZE_PERIOD)

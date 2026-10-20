@@ -302,6 +302,7 @@ const SECTIONS: Section[] = [
           ['Lacing', <>The dark dendritic threads that outline a boundary, drawn by the strain across it.</>],
           ['Bubbles', <>Air between the plates. A bubble is not drawn over the dye — it is a standing squeeze on its own footprint, so the dye pumps out to its rim and the field flows round it.</>],
           ['Plate Rock', <>The beat tips the whole plate and a damped spring rocks it back, so the field sloshes instead of only churning.</>],
+          ['Slosh', <>Tip the plate one way and then back (Gravity and Tilt Direction, or the phone's tilt) and the liquid piles to the low side, runs back past the middle and mixes. Only your hand drives it, never the sound; thin liquid rings, thick liquid creeps.</>],
           ['Boundary Glow', <>A bright line where two distinct dyes meet — the oil-water interface, without a multi-fluid solve.</>],
           ['Saturation / Glossiness / Post Blur', <>The final grade. Glossiness defaults to zero: flat, evenly lit matte dye is the projected look, and a specular highlight makes it read as glossy 3D spheres instead.</>],
         ]} />

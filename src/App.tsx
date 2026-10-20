@@ -2150,6 +2150,8 @@ export default function App() {
   const lookPhase = (s: Partial<VisualizerSettings>) => ({ phaseAmount: s.phaseAmount ?? 0, phaseScale: s.phaseScale ?? DEFAULT_SETTINGS.phaseScale });
   const ferrofluidPoured = () => {
     if ((settingsRef.current.phaseAmount ?? 0) > 0.002) return;
+    // A fading look has the amount at nothing at the ring's swap on purpose (lib/lookFade's ringDip).
+    if (lookFadeRef.current) return;
     updateSettings({ phaseAmount: 0.6 });
   };
 
@@ -2195,7 +2197,9 @@ export default function App() {
     const s = settingsRef.current;
     const patch: Partial<VisualizerSettings> = {};
     if ((s.magnetStrength ?? 0) <= 0) patch.magnetStrength = 0.8;
-    if (ferrofluid && (s.phaseAmount ?? 0) <= 0.002) patch.phaseAmount = 0.6;
+    // Not while a look is fading: the fade takes the amount to nothing at the ring's swap
+    // (lib/lookFade's ringDip), and this would read that as "turned down" and write 0.6 over it.
+    if (ferrofluid && (s.phaseAmount ?? 0) <= 0.002 && !lookFadeRef.current) patch.phaseAmount = 0.6;
     if (Object.keys(patch).length) updateSettings(patch);
   };
 
@@ -2558,7 +2562,8 @@ export default function App() {
     if (wallFadeRef.current) clearShowInterval(wallFadeRef.current);
     const started = showNow();
     const ms = Math.max(1, fadeSeconds) * 1000;
-    const step = lookFadeStep(false);
+    // The handoff above swaps the ring in one frame, so the fade dips its amount there (lib/lookFade's ringDip).
+    const step = lookFadeStep(false, true);
     wallFadeRef.current = showInterval(() => {
       const t = Math.min(1, (showNow() - started) / ms);
       setWallLook(prev => prev && { ...prev, settings: step(from, to, t, prev.settings), target: t >= 1 ? null : prev.target });
@@ -2791,14 +2796,18 @@ export default function App() {
     What a hand wrote after the Back began is left where the hand put it,
     and so is whatever `hold` names (the dimmer, while a blackout is on).
   */
-  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = []) => {
+  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = [], swapsRing = false) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     lookTakesLevels();
     flushRide();
     evolveLetsGo();
     // From where a fader has the plate now, not where React last heard it.
     const from = ride.lay(settingsRef.current as unknown as Record<string, unknown>, () => true, rideSlot()) as unknown as VisualizerSettings;
-    const step = lookFadeStep(back);
+    // `swapsRing`: the caller ran the visualizer's handoff, which swaps the
+    // ferrofluid ring in one frame at the middle; the amount dips to nothing there (lib/lookFade's ringDip).
+    // The handoff never runs shorter than a second, so a fade under a second would dip and come
+    // back before the swap and then swap the ring at full strength: it keeps its straight line.
+    const step = lookFadeStep(back, swapsRing && seconds >= 1);
     if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
     const started = showNow();
     const ms = seconds * 1000;
@@ -2841,7 +2850,7 @@ export default function App() {
     // evaporate for minutes under the new ones. A cut still gets a second.
     const target = targetLook(from, next.settings);
     visualizerRef.current?.handoff(Math.max(1, seconds), lookPhase(target));
-    fadeSettingsTo(target, seconds);
+    fadeSettingsTo(target, seconds, false, [], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
 
@@ -2927,7 +2936,7 @@ export default function App() {
     if (rowFades.handOn(FADE_LEVEL_KEYS)) setRowFading(rowFades.running());
     // A blackout on stays on: a Back that faded the dimmer up would light the
     // wall with the Blackout button still lit.
-    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : []);
+    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : [], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
@@ -5788,6 +5797,8 @@ export default function App() {
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
+            slosh={settings.slosh ?? 0}
+            onSlosh={(v) => updateSettings({ slosh: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}
