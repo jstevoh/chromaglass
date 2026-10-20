@@ -554,6 +554,18 @@ jobs:
       - name: Lamp Ground 0 is the plate before the lamp
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run lampzero
+      # No line round a bubble's hole in one dye (PLAN.md 33a,
+      # scripts/holeline.mjs). The owner saw bubbles drawn with a blocky dark
+      # outline: the edge line between two dyes fired on the depth step at a
+      # hole's rim, sampled on the solver's cell grid. The line now waits for
+      # the dye's colour to change, and this check builds a second lab with
+      # that gate cut out, so the halo it measures away is found again in the
+      # same run, and the line between two real dyes is still drawn. It reads
+      # pictures from the lab, which SwiftShader renders as the shader's text,
+      # so it sits here beside lampzero rather than in the Mac queue.
+      - name: No line round a bubble's hole
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run holeline
       # Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):
       # against the Firebase Auth emulator, Google, Apple and magic-link
       # sign-in, offline returning sessions, sign-out and account deletion.

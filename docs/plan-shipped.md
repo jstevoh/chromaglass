@@ -4255,3 +4255,31 @@ top reaches 10% black first at 115 s, no ruptured cell refills; C7 4 consecutive
 samples in the photograph window, at t=120 s 5.1% under 30 nm, 23.3% dark, 79% saturated,
 9/12 hue sectors); `npm run filmtable` 8/8; 600 steps of the 32×64 film in 0.69 s.
 
+
+## 33. Bubbles and the closeup, per liquid
+
+### 33a. No stepped ring round a bubble's hole (this PR)
+
+*Reported* (the owner, 2026-10-19): "bubbles still look really pixelated around
+themselves". In the lab every hole the air cut in the dye wore a stepped halo a couple
+of cells out, bright and dark blocks on a cross, a "+" stamped round each small bubble.
+The dye field under it was clean, and with Boundary Contrast at 0 the halo went.
+
+*Cause:* the line drawn between two dyes (`boundaryDiff` in `src/gpu/wgsl/plate.ts`,
+on at 0.35 in every look) is drawn where the lit colour changes across a four-tap
+cross, and the lit colour carries the dye's depth as well as its hue. One dye thinning
+to nothing at a hole's edge read as two colours meeting; the taps' offsets drew the
+cross.
+
+*Fix:* the line is gated by how far the dye's colour per unit of dye moves between the
+same taps (`dyeHue`, the unit colour exp(−rgb/a) of the decoded dye, white where the
+dye is empty), smoothstep 0.03 to 0.12. A hole in one dye does not move it; two dyes
+meeting do, at any pair of depths. A gate on the density ratio was tried first and took
+the line off two dyes meeting at depths five times apart, so it was dropped.
+
+*Measured* (`npm run holeline`, the lab on SwiftShader, each picture against the same
+plate with Boundary Contrast at 0): the share of a ring round holes of 1.8, 3, 5, 8 and
+14 cells that the line moves by more than 24 levels went from 8.9, 8.9, 11.5, 13.6 and
+18.3 % to 0 % each; the band where two dyes meet kept 52.8 % → 52.8 % at one depth and
+61.1 % → 58.3 % at depths five times apart; a pool's rim into clear liquid, printed not
+judged, 16.8 % → 0 %. The bubble's own drawing, which is the donut, is 33e.
