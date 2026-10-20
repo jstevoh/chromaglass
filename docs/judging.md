@@ -1434,6 +1434,7 @@ On a real GPU:
 - Where two dyes meet beside a bubble the relief may be weaker within a few cells of the
   bubble (PLAN 33b-2); say whether that shows.
 
+
 ## 58. Tilting sloshes the liquid (PLAN 18a-13)
 
 The new **Slosh** dial (0 by default) makes a tilt send the liquid across the plate, pile
@@ -1454,3 +1455,19 @@ real GPU:
 - On the phone, a held tilt fades out of the remote 2.5 s after the last reading, so the
   liquid runs back to level on its own while the phone is held still: the same fade Plate
   Rock has, now visible as a slop. Say whether it reads wrong.
+
+## 59. The closeup is the liquid, not cells (PLAN 33g)
+
+Paint Cells and Macro Lacing now default to 0, and the closeup's relief is lit by a lower
+lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmeasured
+(`macroview` runs on software WebGPU). On a real GPU:
+- Pour a dye, stir it, and zoom in to 4x and 6x (the pinch, the Auto camera) on `classic`,
+  `jellyfish-bloom` and a dark look. It should read as the same liquid seen nearer: a
+  glossy, domed surface with a raking highlight, no ring-packed cells and no dark
+  filaments.
+- Say whether it is 3d enough. If not, the next steps are PLAN 33g-2 (refraction, depth of
+  field, parallax); the lamp's lowering and the dome gain (×14) are the two numbers to move.
+- Say whether the highlight burns out on a bright pool, and whether a pool's edge reads
+  as relief without a drawn outline.
+- `macro-bead`, `cell-bloom` and `lace-run` still draw cells, by name. Say whether they
+  should (PLAN 33g-3).

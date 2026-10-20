@@ -182,6 +182,7 @@
     "dispersion": "node scripts/dispersion.mjs",
     "benday": "node scripts/benday.mjs",
     "grainedge": "node scripts/grainedge.mjs",
+    "macroview": "node scripts/macroview.mjs",
     "turing": "node scripts/turing.mjs",
     "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",

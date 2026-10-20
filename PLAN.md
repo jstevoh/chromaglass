@@ -5461,7 +5461,7 @@ the film's thickness at the edge over its far thickness, stays under 1.2, where 
 prototype's h³ film reaches about 2. A sheared hole stretches along the flow by at
 least 2:1 before it meets another.
 
-- **20c-1. Macro closeup cell field is a look-alike shortcut (retained pending physical Rayleigh–Bénard / Marangoni simulation).** The procedural `cellField` in `src/gpu/wgsl/plate.ts` (evaluated at 6x zoom and timed on `cellClock`, verified by `npm run cellride`) draws concentric circular Voronoi cells and slides them with a flow map rather than physically simulating buoyancy-driven or Marangoni surface-tension-gradient convection cells and silicone phase separation (§25f). While 20c introduces physical viscous film drag in the Hele-Shaw solver (`thinGap.ts`), the sub-grid macro cellular structure remains a procedural camera-pass effect until physical density-inversion and micro-droplet solver passes are available.
+- **20c-1. Macro closeup cell field is a look-alike shortcut (opt-in since 33g: no look draws it by default; retained pending physical Rayleigh–Bénard / Marangoni simulation).** The procedural `cellField` in `src/gpu/wgsl/plate.ts` (evaluated at 6x zoom and timed on `cellClock`, verified by `npm run cellride`) draws concentric circular Voronoi cells and slides them with a flow map rather than physically simulating buoyancy-driven or Marangoni surface-tension-gradient convection cells and silicone phase separation (§25f). While 20c introduces physical viscous film drag in the Hele-Shaw solver (`thinGap.ts`), the sub-grid macro cellular structure remains a procedural camera-pass effect until physical density-inversion and micro-droplet solver passes are available.
 
 - **20c-2. Settings tabs on the phone (shipped in #348's review).** The Settings rail is a strip across the top on a phone, and each tab took its group's whole width and lay under the next group: 13 of the 26 tabs took no tap, Patches among them, so the room's two new patch features (How sudden, How busy lately) could not be reached from a phone. The tabs are full width only in the desk's column now; `npm run phone` taps every tab where it is drawn, and patches each new feature from the phone.
 
@@ -7452,26 +7452,25 @@ glycerine: the speed ratios follow Bretherton's law within 10 %, the drainage ti
 follow μ/σ within 20 %, and (with 33e) the band width oil against water follows u*
 within 15 %; on the plate's own liquid, every number today's check prints unchanged.
 
-### 33g. The closeup: the liquid nearer and in relief, not cells (L)
+### ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped, this PR** (Paint Cells and Macro Lacing now default to 0, so no look draws cells it did not name; the relief is lit by a raking lamp with a rolled-off glint and a thinner boundary line, `src/gpu/wgsl/plate.ts`; `npm run macroview`: the cells' share of the frame was 0.14 at 4x and 0.17 at 6x before, 0 after, bar 0.01; the relief is 0.033–0.051 of the frame, 0.99 of it smooth, and the colour keeps within chroma distance 3.1 of the 1x frame, bar 5; story in `docs/plan-shipped.md` §33g; 20c-1 is closed by it)
 
-The owner wants "a closer and more 3d view of the liquid on the plate". The closeup
-adds invented structure on top of the plate: `cellField` (concentric Voronoi cells
-slid by a flow map, 20c-1's named shortcut), `macroWarp` and `macroDetail`. Those cells
-are what reads as biology. Replace them with the real fields brought nearer: the dye's
-depth and the gap's height magnified smoothly (bicubic, no invented cells), lit as a
-height field by a raking lamp so the dye's thickness and each meniscus stand in
-relief, with a shallow depth of field across a slightly tilted view, the dye's two
-layers parting a little in parallax. `npm run steadycam`'s still camera kept. If a look
-wants the cells as an effect, it opts in; no look gets them by default. 20c-1 closes
-with this.
-*Check:* new `npm run macroview` (lab) at zoom 4 and 6: (1) no lattice: the
-autocorrelation of the render's luminance, less that of the dye field magnified, has
-no secondary peak above 0.15 at lags of 4 to 40 pixels (today's peak printed first);
-(2) the relief follows the dye: its shading's gradient correlates with the dye depth's
-gradient at 0.6 or more; (3) zooming from 1 to 6 moves no hue's mean by more than
-ΔE 5 (the same liquid, nearer); (4) `steadycam` and `cellride` (which then asks that
-no look draws cells by default) green; and a `look` render, on the desk and on the
-phone's pinch.
+- **33g-2. The closeup is still lit, not refracted.** The relief is the dye's own
+  gradient read as a dome under a lowered lamp (shortcut: not a physical height field,
+  the gap's thickness is not magnified), and the boundary line is thinned by 80 % at
+  full closeup so it does not read as an outline. Not done from the first plan: the
+  substrate seen through the surface's normal (refraction), a shallow depth of field
+  and the dye's two layers parting in parallax. Each is a camera-pass term; take them
+  one at a time with a `look` render, and keep `steadycam` green.
+- **33g-3. Three looks keep their cells by name.** `macro-bead`, `cell-bloom` and
+  `lace-run` set Paint Cells and Macro Lacing themselves, so they still draw cells at
+  the closeup. The owner to say whether they should stay (they are named for them) or
+  lose them too; `macroview` does not ask them.
+- **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
+  shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
+  old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma
+  distance 1.21 to 3.11, half-turned crop least 9.25, 1x chroma least 7.62. These match
+  SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
+  line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

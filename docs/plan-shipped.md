@@ -4461,3 +4461,48 @@ of the plate shows through the band and the band read 25–28 % where it is draw
 and its flat-window chroma bar compares the window with the plate's own chroma plus 4
 (the lamp's warm white is 8.8 levels apart by itself; the bar was 4 when the ground was
 grey). Every other `airlens` line and its numbers are unchanged: 10 of 10.
+
+### 33g. The closeup: the liquid nearer and in relief, not cells (this PR)
+
+*Reported* (the owner, 2026-10-19): "Macro zoom is also still not great. Things look like
+a bunch of biological cells when you zoom in - this isn't right. I just want a closer and
+more 3d view of the liquid on the plate."
+
+*Cause:* the closeup drew `cellField` (concentric, packed Voronoi-like cells slid by a
+flow map, 20c-1's named shortcut) and the lacing (dark filaments) over the dye, and both
+were on in every look that did not name its own: `macroCells` 0.75 and `macroLacing` 0.55
+were the defaults in `types.ts` (and random in the lucky roll). At 4x and 6x that is a
+texture laid over whatever the dye was, which is exactly what reads as cells under a
+microscope. The relief under it was also weak (the dye's normal ×5 under the plate's lamp
+at its normal height), so what was left of the "3d" was the cells' own domes.
+
+*Fix:* Paint Cells and Macro Lacing default to 0 (`types.ts`, `lucky.ts`). The code and
+the sliders stay: a look that wants cells names them (`macro-bead`, `cell-bloom` and
+`lace-run` still do). The relief block in `macroDetail` is relit as a surface seen
+nearer: the lamp is lowered to 0.6 of its height so it rakes, the dye's normal is read
+×14, the glint rolls off (`1 - exp(-1.6·spec)`) so a bright pool does not burn out, and
+the boundary line is thinned by up to 80 % at full closeup, so a pool's edge is its
+relief and not an outline. Nothing moves: the camera and its clock are as before
+(`steadycam`, `cellride`).
+
+*Shortcuts named:* the relief is the dye's gradient read as a dome under a lowered lamp,
+not a physical height field (33g-2); the thinned boundary line is a taste choice; the
+cells that remain are 20c-1's look-alike, opt-in.
+
+*Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
+256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
+and lacing's own contribution to the frame (the frame against the same frame with both
+at 0, over the frame's mean) was 0.14 at 4x and 0.17 at 6x on the old defaults, and is 0
+on every shipped case (bar 0.01; the old defaults are the control, which must read over
+five times the bar). The relief's contribution (against Macro Relief at 0) is 0.033–0.051
+of the frame, and 0.99 of it lives at scales over 17 px, so it is a swell and a sheen,
+not grain (bars 0.02 and 0.5; the old defaults' 0.76 smooth was the cells' grain). The
+colour is the dye's: the mean CIE76 distance on (a*, b*) from the middle sixth of the 1x
+frame to the 6x frame is 1.2–3.1 (bar 5; the control 3.25).
+
+*The first draft of the check measured nothing,* and is why the final one is a
+contribution test: an autocorrelation's secondary peak read 0.02 on the old defaults,
+under its own 0.15 line, because the cells are irregular and have no lattice; a "relief
+follows the dye" correlation came out negative; and a ΔE that includes lightness moved
+14 on `lava-lamp` from the relief alone. Each was dropped for a line that failed on the
+control before it was trusted on the fix.
