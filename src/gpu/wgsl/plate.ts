@@ -1713,6 +1713,36 @@ fn dropLens(uv: vec2f, cam: f32) -> vec4f {
   let push = mix(upright, turned, cam) * cover;
   return vec4f(toC * (push / max(r, 1e-3)), r, R);
 }
+
+/*
+  How near this pixel is to the air of a bubble, 0 beyond the reach of the
+  dye's relief and 1 inside it (33b). A hole in the dye is the bubble's own
+  edge, and the bubble pass draws that edge as the meniscus it is; the dye
+  beside it is flat. The relief below reads a ramp in the density though, and
+  the ramp the air cuts is steep (the air field's rim is about a texel and a
+  half) so it was lit as if it were a pool's edge into clear liquid: a pale
+  ring on the lamp's side and a dark one opposite, a few cells wide, round
+  every hole. This is the reach of that ramp, the Sobel taps (3 cells) and
+  the bicubic spread under each (about 2), looked for in air: the biggest
+  coverage anywhere a tap of the relief could have read, taken at 4.5 cells
+  and at the pixel. The 1x1 blank a layer without bubbles carries gives 0
+  without a sample.
+*/
+fn airNear(fuv: vec2f) -> f32 {
+  if (textureDimensions(air0).x <= 1u) { return 0.0; }
+  let r = 4.5 / U.logicalGrid;
+  var m = textureSampleLevel(air0, samp, fuv, 0.0).r;
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(r, 0.0), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(r, 0.0), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(0.0, r), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(0.0, r), 0.0).r);
+  let d = r * 0.7071;
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(d, d), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(-d, d), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(d, -d), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(d, d), 0.0).r);
+  return smoothstep(0.02, 0.3, m);
+}
 `;
 
 /*
@@ -2426,6 +2456,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   var normal0 = vec3f(0.0, 0.0, 1.0);
   if (sharp0) {
     if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
+    // A hole the air cut is the bubble's edge, not the dye's (33b, airNear).
+    normal0 = normalize(mix(normal0, vec3f(0.0, 0.0, 1.0), airNear(fuv0)));
   }
   fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0), fluid0.a);
   if (darkBlend) { fluid0.a *= 0.6; film0 *= 0.6; }
@@ -2950,6 +2982,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     var normal1 = vec3f(0.0, 0.0, 1.0);
     if (sharp1) {
       if (U.derivedOn > 0.5) { normal1 = gradNormal(near1.xy); } else { normal1 = sobelNormal(layer1, fuv1); }
+      // A hole the air cut is the bubble's edge, not the dye's (33b, airNear).
+      normal1 = normalize(mix(normal1, vec3f(0.0, 0.0, 1.0), airNear(fuv1)));
     }
     fluid1 = vec4f(applyLighting(fluid1.rgb, normal1, darkBlend, fuv1), fluid1.a);
     if (darkBlend) { fluid1.a *= 0.6; }

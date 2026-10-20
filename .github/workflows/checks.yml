@@ -113,8 +113,10 @@ jobs:
     name: Measure · ${{ matrix.part }}
     runs-on: ubuntu-latest
     # The browser part ran 11:47 on main before the switches step (two to three
-    # minutes in CI); 15 left it no headroom.
-    timeout-minutes: 20
+    # minutes in CI); 15 left it no headroom. 25 since PLAN 33b: the lab part ran
+    # 13.8 minutes on a recent PR and `holeline` now builds a third lab (the
+    # control with the air mask taken out), so 20 left the same thin margin.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:

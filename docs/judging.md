@@ -1415,3 +1415,17 @@ shard on software WebGPU). On a real GPU:
   (PLAN 33e, third bullet); say whether that reads as a flaw.
 - Zoom in past the middle of the zoom's fade: the closeup's bubble is lit and domed, as
   before, and the change between the two views is as smooth as it was.
+
+## 57. No soft glow round a bubble's hole (PLAN 33b)
+
+The dye beside the hole a bubble cuts was lit like a ridge, a pale soft ring two to four
+cells wide. The dye's normal is now flat beside the air. The lab's numbers are in
+`docs/plan-shipped.md` §33b; the Mac's are unmeasured (`holeline` runs on software WebGPU).
+On a real GPU:
+- Pour a dye with Edge Relief at the default, blow bubbles and look at the dye round a
+  small and a large one on a dark look and on a lamp-ground look. There should be no pale
+  ring outside the bubble's own dark edge.
+- Look at the pool's own edge into clear liquid: it should keep its relief as before.
+- Where two dyes meet beside a bubble the relief may be weaker within a few cells of the
+  bubble (PLAN 33b-2); say whether that shows.
+

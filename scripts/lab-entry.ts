@@ -545,11 +545,14 @@ const api = {
    * radians, as the motor does. The plate reads the solver's packed view
    * field (the gap, the mix, the reactions) as the app does; `view: false`
    * hands it none, and it reads a blank one, a flat gap at rest.
+   * `airField: true` hands the plate the bubbles' air field with `bubbles` at 0:
+   * the dye is drawn beside its holes without the bubbles drawn in them, which
+   * is how `npm run holeline` reads what the dye does at a hole's edge.
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
     cam: {
       magnets?: { x: number; y: number; height: number; strength: number }[];
-      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
+      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; airField?: boolean; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
       /*
         The other pictures the plate composites, for the mixer's check
         (`npm run mixer`): a film frame, a logo, and a second plate. The
@@ -623,7 +626,7 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species };
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a
