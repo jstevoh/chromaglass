@@ -6081,14 +6081,26 @@ Steps:
     on a 40–90 s clock (desk, phone, remote, MIDI; the Turing Print preset sets 0.7).
     Shortcuts named: three plane waves, not a noise field; the saddle-node line, not
     Pearson's full regime boundaries; a fixed-rate clock that follows no music.
-  - **26d-6a, open: more ways for the print to evolve.** Each is grounded in the chemistry and
-    is its own step: a **true noise field** for the map (patches, not diagonal bands), a
-    **slow regime glide** (one f and k walked along Pearson's map, so the whole print turns
-    from worms to spots), **light as the kill** (CIMA is photosensitive; the lamp's level
-    would move k), a **slow ink-hue glide** (26d-3), **periodic reseeds**. The grey patch the
-    drift opens at 1 (the pattern dissolving where the map pushes toward a bare plate) could
-    be mapped and avoided with the regime boundaries. Whether the preset's 0.7 is the right
-    pace is judging §55.
+  - **26d-6a. More ways for the print to evolve** (grey patch and regime glide **shipped**;
+    story in `docs/plan-shipped.md` §26): the drift's k is now the saddle-node curve plus a
+    margin that glides each region between stripes and spots on slower waves (50, 80 and
+    120 s), which also removed the grey patch at Drift 1. Still open, each its own step:
+    - **The Drift slews, it does not step**: the visualizer hands the solver the setting
+      moved at 0.025 a second (`TURING_DRIFT_PER_SECOND`), because 0.7 handed to a settled
+      print at once starved a tile for about 20 s. A faster slew needs that number
+      re-measured with `npm run turing`, which reads the rate from the source.
+    - **A true noise field** for both maps (patches, not diagonal bands).
+    - **Light as the kill** (CIMA is photosensitive; the lamp's level would move k).
+    - **A slow ink-hue glide** (26d-3).
+    - **Periodic reseeds**.
+    - **Metal's numbers** for the regime glide: the cap line (`0.0105 - 0.15 F`) was fitted on
+      SwiftShader, and Metal rounds half floats toward zero; read `npm run turing` line 9
+      off the `fifth` shard, and ask the watcher for a look if the pieces count differs.
+    - **The Pattern knob does not steer the drifting regime**: while the drift is on k is
+      the curve plus the margin and ignores the look's own k, so only its feed counts. A
+      look that wants more spots than stripes needs a "spots share" input, not a k.
+    - Whether the preset's 0.7 is the right pace, and whether the stripe-to-spot glide
+      reads as chemistry or as the plate falling apart, is judging §55.
 - **26-colour-a. The relief #327 described: not doing.** #327's message described the
   pattern's gradient as a bump on the plate's normal; the code never reached main (its
   plate shader was not in the diff, and the revert 8278374 had nothing of it to take

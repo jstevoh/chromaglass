@@ -3739,6 +3739,57 @@ first constant, 0.012 a unit of drift, moved it too gently and became 0.02.
 A soft grey patch opens at 1, where the map pushes the pattern toward a bare plate (the
 flattest 32-pixel tile keeps 0.84 of the control's contrast at 0.7 and 0.76 at 1), so the preset sits at 0.7 (judging §55 asks the owner's eye on it).
 
+**26d-6a. The grey patch and the stripe-to-spot glide (shipped 2026-10-20).** The grey
+patch had a cause: the shipped point (F 0.04, k 0.06) sits exactly on the saddle-node curve
+`k = sqrt(F)/2 - F`, so the drift's excursion in k carried some regions under it, where
+the reaction has no non-trivial state and the plate is flat grey. The shader now picks the
+distance above the curve, `d = k - curve(F)`, and keeps it positive: a quarter of a cap
+for stripes, nine tenths of it for spots. The cap is the largest d that still holds a
+pattern, and it shrinks as F rises (the lab's sweep, 256², 6000 units, 60 seeds: spots to
+d 0.006 at F 0.03, 0.004 at 0.04, 0.002 at 0.05, under 0.002 at 0.06), so it is the
+straight line `0.0105 - 0.15 F` through those. A second map of three plane waves (50, 80
+and 120 s) moves each region between the two ends, and the drift setting scales how much of
+that range the plate uses.
+
+A sudden step between the two ends collapses the plate (stripes, then nearly empty, then
+slow regrowth as spots); the same move over about 33 s is smooth, which is why the glide
+is on slow waves. The Drift setting itself is subject to the same thing: handed to a
+settled print in one step at 0.7, a 32-pixel tile where the feed falls goes dead (mean 0)
+for about 3500 units, 20 s. A preset load or a slider jump is such a step, so the visualizer
+slews the Drift it hands the solver at 0.025 a second (`TURING_DRIFT_PER_SECOND`; the
+setting itself still moves as it did) and the print that is off starts the next one from 0.
+Not a control, so no phone change.
+
+Named shortcuts: plane waves, not a true noise field; the cap is a straight line through
+a sweep, not Pearson's full regime boundaries; k ignores the look's own k while the drift
+is on; the clock is fixed-rate and follows no music; every number is the lab's (SwiftShader),
+none yet Metal's.
+
+Measured (`npm run turing` line 9, same seeds and stepping as 26d-6): correlation with the
+settled self 0.901 at Drift 0, 0.641 at 0.7 and 0.591 at 1 (0.867 and 0.814 through the
+shipped #413 shader on the same ramp); the flattest 32-pixel tile over six reads keeps 0.95
+and 0.89 of the control's contrast (0.81 and 0.74 through the #413 shader on the ramp;
+stepped, not ramped, Drift 1 left a dead tile and measured 0.20); stripe wavelength within
+1.5% of the control's; the share of cells with activator 0.706 for held stripes, 0.483 for
+held spots, 0.55 to 0.58 for the drifting runs; connected pieces of activator 14 for held
+stripes, 389 and 374 at the last read of Drift 0.7 and 1, 608 for held spots (the #413
+shader: 12 and 16).
+
+Check changes: the alive-share bar (within 0.05 of the stripes' share alone) became a band
+between a held-spots plate's share and the held-stripes plate's, each with 0.05 of room,
+since spots cover less of the plate by design; Drift 1's tile contrast is now asserted
+(it was shown); a new line counts connected pieces of activator and wants the drifting
+runs and a held-spots control to show over ten times the held stripes' pieces. Drift 1's tile
+contrast and the alive share are tested at every one of six reads, not the last; the held
+spots' share and cap are read from the shader, so the check follows it; the lab now ramps
+Drift at the rate it reads from `LiquidVisualizer.tsx`, as the app does, which is a change
+of input, and the wiring check wants the slew in the visualizer. The ramp is why the #413
+shader no longer meets the movement bars (0.867 against under 0.8). The tile bar (0.6)
+is unchanged and no longer separates the two shaders on the ramp (0.81 against 0.95); the
+glide line and the movement lines do. The bars for stripe width and the Drift 0 clock are
+unchanged. Not tested: where a grey patch sits (a speckle of dead cells would still show in
+the width line, not the tile line).
+
 
 ## 27. Every control does something you can see
 

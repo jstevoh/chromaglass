@@ -4388,24 +4388,44 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     keep rearranging, instead of settling. A.b.z is how far (0 is the fixed
     map, today's look). Measured in the lab (npm run turing, line 9) on a
     maze settled for 9000 units and run 9000 more (fifty seconds of a show at
-    the app's 180 units a second), it correlates 0.901 with its settled self
-    at 0, 0.671 at 0.7 and 0.497 at 1, with 0.706, 0.694 and 0.686 of the
-    plate carrying activator and the stripe wavelength within 3% of the
-    control's at all three. DRIFT_FEED is 0.02 because 0.012 moved it too
+    the app's 180 units a second, Drift brought up at the app's own slew, see
+    below), it correlates 0.901 with its settled self at 0, 0.641 at 0.7 and
+    0.591 at 1 (the same ramp through the shader before the regime glide
+    below gave 0.867 and 0.814), with the stripe wavelength within 1.5% of
+    the control's at all three. DRIFT_FEED is 0.02 because 0.012 moved it too
     gently.
 
-    k follows F along the curve the pattern lives beside, not by the same
-    step. The reaction's non-trivial state vanishes at k = sqrt(F)/2 - F (the
-    saddle-node, where 4(F+k)^2 = F), and the labyrinth sits just inside it:
-    moving F alone would carry a region across that curve and kill it (all
-    substrate, a blank plate) or fill it (all activator). k keeps its distance
-    from the curve, so a region stays a pattern and only changes which kind.
+    k is no longer the base k moved along the curve; it is the curve plus a
+    margin. The reaction's non-trivial state vanishes at k = sqrt(F)/2 - F
+    (the saddle-node, where 4(F+k)^2 = F), and below that curve the plate is
+    flat grey. The shipped point (F 0.04, k 0.06) sits exactly on it, so the
+    old form (base k plus the curve's own excursion) dipped under it in some
+    regions at some times, and the owner saw a soft grey patch at Drift 1.
+    Now d = k - curve(F) is chosen, always above zero. Measured in the lab
+    (256^2, 6000 units, 60 seeds): d near 0 is a labyrinth, +0.002 broken
+    stripes, +0.004 mixed, +0.005 spots at F 0.035, and the d that still
+    holds a pattern shrinks as F rises (spots to 0.006 at F 0.03, 0.004 at
+    0.04, 0.002 at 0.05, under 0.002 at 0.06). A step between regimes
+    collapses the plate (stripes to nearly empty, then slow regrowth as
+    spots); the same move made over about 33 s is smooth, which is why the
+    second map below runs on slow waves. The same holds for Drift itself:
+    handed to a settled print in one step, full amplitude starves a 32-pixel
+    tile where the feed falls (mean 0, contrast 0) for about 3500 units, 20 s,
+    so the app slews the Drift it hands here at 0.025 a second
+    (TURING_DRIFT_PER_SECOND in LiquidVisualizer.tsx) and the lab check
+    ramps the same way. Over six reads the flattest 32-pixel tile keeps 0.95
+    of the control's contrast at Drift 0.7 and 0.89 at 1 (0.81 and 0.74 for
+    the shader before the glide, on the same ramp), and 0.55 to 0.58 of the
+    cells carry activator (0.706 for held stripes, 0.483 for held spots).
 
-    Shortcuts, named: the map is three plane waves, not a true noise field,
-    so its regions are broad diagonal bands that slide and never a patchwork;
-    the curve is the saddle-node line, not Pearson's full regime boundaries,
-    so how far k may follow F before the pattern changes kind was not mapped;
-    and the clock is fixed-rate, on purpose: it follows no music.
+    Shortcuts, named: the maps are plane waves, not a true noise field, so
+    the regions are broad diagonal bands that slide and never a patchwork;
+    the cap on d is a straight line through the sweep above, not Pearson's
+    full regime boundaries; k ignores the look's own k while the drift is on
+    (only the feed is the look's), so a look's Pattern knob moves feed but
+    not the regime; the clock is fixed-rate, on purpose: it follows no
+    music; and every number is the lab's (SwiftShader rounds half floats to
+    nearest, Metal toward zero), none yet measured on Metal.
   */
   if (A.b.z > 0.0) {
     let q = vec2f(p) / f32(S.n);
@@ -4415,8 +4435,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let df = A.b.z * DRIFT_FEED * clamp(w * 0.5, -1.0, 1.0);
     let f0 = max(target_feed, 0.002);
     let f1 = clamp(f0 + df, 0.002, 0.09);
-    target_kill = target_kill + (0.5 * sqrt(f1) - f1) - (0.5 * sqrt(f0) - f0);
-    target_feed = target_feed + (f1 - f0);
+    /*
+      A second map, of how far above the curve k sits, glides each region
+      between stripes and spots (PLAN 26d-6a). Three more plane waves, on
+      other directions and slower clocks (periods of 50, 80 and 120 s), give
+      r from 0 (stripes) to 1 (spots); A.b.z is how much of that range the
+      plate uses.
+    */
+    let wr = sin(6.2832 * (0.6 * q.x - 0.7 * q.y) + 0.126 * A.b.w + 1.3)
+           + sin(6.2832 * (-0.4 * q.x - 0.9 * q.y) + 0.079 * A.b.w + 3.7)
+           + sin(6.2832 * (1.0 * q.x + 0.2 * q.y) + 0.052 * A.b.w + 5.5);
+    let r = clamp(0.5 + A.b.z * clamp(wr * 0.5, -1.0, 1.0), 0.0, 1.0);
+    // How far above the saddle-node the pattern survives, narrowing as F
+    // rises (the lab's sweep, 256^2, 6000 units, grown from 60 seeds: spots
+    // at F 0.03 to d 0.006, at 0.04 to 0.004, at 0.05 to 0.002, and none at
+    // 0.06 past 0.001). The straight line through those is the cap, and the
+    // regime moves between a quarter of it (stripes, so the labyrinth is
+    // never at the curve's edge) and nine tenths of it (spots).
+    let cap = max(0.0105 - 0.15 * f1, 0.0008);
+    let above = cap * mix(0.25, 0.9, r);
+    target_kill = 0.5 * sqrt(f1) - f1 + above;
+    target_feed = f1;
   }
   /*
     The supply saturates at a third of full reagent. Scaling F and k straight
