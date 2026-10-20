@@ -3209,9 +3209,17 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           bubble a point is comes from a linear field (wgsl/air.ts), good to
           well under a texel of the air, so a texel of the air would blur a
           small bubble's core away.
-        - **A clear middle**, the lamp through a slab of air with a breath of
-          the liquid's hue from the wetting film on the glass: what the
-          camera's bubble is at its very centre, held flat across the window.
+        - **A middle that is the plate there**, not a disc of its own. Light
+          that crosses a slab of air is the light the plate would show with
+          no bubble at all, so the middle is outColor (the plate under the
+          bubble, the lamp where the ground is the lamp, black where it is
+          black) with at most a tenth of the wetting film's hue, which is
+          all the film on the glass can carry. It used to be the dye's own
+          normalised hue at 41 to 77 per cent of full strength, which on the
+          dark ground is a dim dye-coloured disc inside a black band: a
+          donut, the owner's report of 2026-10-19, in every one of the eight
+          clarities (k1 only moved its brightness). Measured in the lab
+          before and after, scripts/bubblelook.mjs.
         - **No film colour unless asked for.** Iridescence at its default,
           a quarter, is what every look has always had, and the camera's
           bubble still wears it; the plate takes only what is asked above
@@ -3232,7 +3240,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let curvedB = max((1.0 - flatB) * R, spx);
         let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
-        cp = mix(lensCol, mix(tint, vec3f(1.0), 0.18) * (0.95 + 0.55 * ground), 0.25 + 0.55 * clarity);
+        cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);
         let cp0 = cp;
         let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
         cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));

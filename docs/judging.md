@@ -1400,3 +1400,18 @@ the same line are unmeasured: read them off the first run of the `fifth` shard. 
 - Drift at 0 should be the print as it was: settled, then only creeping.
 - The control is on the Perform desk's lamp pins, the phone's Settings rail and the remote,
   and it takes a MIDI knob.
+
+## 56. A bubble's middle is the plate, not a tinted disc (PLAN 33e)
+
+Bubbles were drawn with a dim dye-coloured disc inside a dark band, the donut. The middle
+is now the plate itself with at most a tenth of the film's tint. The lab's numbers are in
+`docs/plan-shipped.md` §33e; the Mac's are unmeasured (`bubblelook` runs in the open
+shard on software WebGPU). On a real GPU:
+- Pour a dye, blow bubbles with Bubbles at the default, and look at a small and a large
+  bubble on a dark look and on a lamp-ground look. A large one should be a clear window
+  edged in a thin dark line; a small one a dark dot with a pin-point; neither a coloured
+  disc inside a ring.
+- A bubble in clear water should not be a grey disc. It is drawn at 70 % strength there
+  (PLAN 33e, third bullet); say whether that reads as a flaw.
+- Zoom in past the middle of the zoom's fade: the closeup's bubble is lit and domed, as
+  before, and the change between the two views is as smooth as it was.

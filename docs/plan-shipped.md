@@ -4232,3 +4232,39 @@ plate with Boundary Contrast at 0): the share of a ring round holes of 1.8, 3, 5
 18.3 % to 0 % each; the band where two dyes meet kept 52.8 % → 52.8 % at one depth and
 61.1 % → 58.3 % at depths five times apart; a pool's rim into clear liquid, printed not
 judged, 16.8 % → 0 %. The bubble's own drawing, which is the donut, is 33e.
+
+### 33e. The bubble as the projector throws it, not a donut (this PR)
+
+The owner: bubbles "sometimes" draw as a donut. The report's picture is
+`/mnt/project-files/drops/bubbles-2026-10-19/zh-sheet.png`.
+
+*Cause:* the projected bubble (the plate's view, `plate.ts`) drew its clear middle as
+the dye's own normalised hue at 41–77 % strength, in all eight clarities, inside the
+dark band. On the default dark ground (dye is light on black) that is a dim dye-coloured
+disc inside a black ring; on the lamp ground a tinted disc over a white hole; in clear
+water a grey disc. Why it is "sometimes": a bubble in dye is a donut, a bubble in clear
+water is a grey disc, and the closeup (the camera's bubble, a different branch) is
+unaffected, so it depends on what the bubble sits in and on the zoom's crossing
+(`dropCam`).
+
+*Fix:* a slab of air does not tint light, so the middle is the plate there
+(`outColor`), with at most a tenth of the wetting film's tint (`0.1·k1`). The band and
+its width are unchanged (the big bubble's band was already half the gap, `airlens`).
+
+*Measured* (`npm run bubblelook`, the lab on SwiftShader, bubbles of 3, 4.5, 7, 10 and
+13 cells, the middle fifth of each radius against the same plate with Bubbles at 0): the
+old line, put back by the check's second lab, left the middle 116–195 levels off the
+plate on the dark ground (172, 151, 140, 119, 195 in green) and 174 or more on the lamp
+ground; the shader leaves 0 on the dark ground and 0–21 on the lamp ground (the tenth of
+the tint). The dark share of a bubble's area falls as it grows, 80, 85, 60, 46, 34 %
+on the lamp ground. Bubbles at 0 and the closeup's bubble are byte-identical to the
+control on both grounds.
+
+*`airlens` had to move,* declared under *Check changes*: its plate is now the lamp ground
+(`lampGround: 1`), because the window is the plate and on the dark ground a window is
+black, so there was nothing lit to measure the lens against; its `on` render uses
+Bubbles 1 (the compositing weight is `strength·mix(0.7, 1, filmT)`, so at 0.8 a quarter
+of the plate shows through the band and the band read 25–28 % where it is drawn 10 %);
+and its flat-window chroma bar compares the window with the plate's own chroma plus 4
+(the lamp's warm white is 8.8 levels apart by itself; the bar was 4 when the ground was
+grey). Every other `airlens` line and its numbers are unchanged: 10 of 10.
