@@ -6076,16 +6076,19 @@ Steps:
     substrate stops 0.3–0.5% short and its stripe is a little wider. Storing the substrate's
     deficit 1 − u instead of u would give half floats their fine steps where u is near
     1, on every GPU and at half the bandwidth, and would make a cleared dish full (26d-4).
-  - **26d-6, open: it does not keep evolving.** A fixed feed and kill grow a labyrinth that
-    settles into a stationary maze (Gray-Scott with constant f and k has a steady stripe
-    state; the print holds, `npm run turing` line 5), so after the first minute it only
-    moves when stirred. Options, each grounded in the chemistry: a **drifting feed/kill
-    map** (f and k vary in space and glide over 30–90 s, so the stripe phase moves through
-    Pearson's spots, worms and mazes across the plate; a few lines in the `grayScott`
-    shader), a **slow regime glide** (one f and k walked along Pearson's map), **light as
-    the kill** (CIMA is photosensitive; the lamp's level would move k), a **slow ink-hue
-    glide** (26d-3), **periodic reseeds**. Picked: the drifting map, on the slow clock when
-    there is no music, never whole-frame motion. The owner's pick is on the thread's card.
+  - ~~**26d-6. The print keeps evolving**~~ (**shipped**; story in `docs/plan-shipped.md`
+    §26): `turingDrift` slides the feed and kill along the saddle-node curve across the plate
+    on a 40–90 s clock (desk, phone, remote, MIDI; the Turing Print preset sets 0.7).
+    Shortcuts named: three plane waves, not a noise field; the saddle-node line, not
+    Pearson's full regime boundaries; a fixed-rate clock that follows no music.
+  - **26d-6a, open: more ways for the print to evolve.** Each is grounded in the chemistry and
+    is its own step: a **true noise field** for the map (patches, not diagonal bands), a
+    **slow regime glide** (one f and k walked along Pearson's map, so the whole print turns
+    from worms to spots), **light as the kill** (CIMA is photosensitive; the lamp's level
+    would move k), a **slow ink-hue glide** (26d-3), **periodic reseeds**. The grey patch the
+    drift opens at 1 (the pattern dissolving where the map pushes toward a bare plate) could
+    be mapped and avoided with the regime boundaries. Whether the preset's 0.7 is the right
+    pace is judging §55.
 - **26-colour-a. The relief #327 described: not doing.** #327's message described the
   pattern's gradient as a bump on the plate's normal; the code never reached main (its
   plate shader was not in the diff, and the revert 8278374 had nothing of it to take

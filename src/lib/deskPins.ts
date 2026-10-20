@@ -128,6 +128,7 @@ const SECTION_OF: Record<string, string> = {
   chemistryWidth: 'lamp',
   turingPrint: 'lamp',
   turingInk: 'lamp',
+  turingDrift: 'lamp',
   gelWheel: 'lamp',
   beatLead: 'audio-input',
   filmDrive: 'film',
