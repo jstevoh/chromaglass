@@ -1251,10 +1251,13 @@ jobs:
       # The closeup is the liquid seen closer, not a field of cells (PLAN 33g):
       # the defaults carry no cell or lacing texture at 4x and 6x, the old
       # defaults (the control) carry plenty, and the relief is a smooth swell
-      # and sheen that keeps the dye's chroma. The lab only, a minute or two on
-      # SwiftShader, so beside grainedge in the open shard.
+      # and sheen that keeps the dye's chroma. The lab only; it runs on the
+      # runner's own adapter (Metal on a Mac), so its time is the Mac's to
+      # measure (npm run macqueue after the first PR run), and the step
+      # carries a timeout of its own so a stuck lab cannot take the shard.
       - name: The closeup is the liquid, not cells
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 8
         run: npm run macroview
       # The Turing pattern (PLAN 26): one stripe width on every rung, carried
       # with the colour and healed after a stir, grown only where it is fed,
