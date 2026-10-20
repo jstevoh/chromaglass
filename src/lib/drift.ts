@@ -64,6 +64,9 @@ const LIGHT_STACK = new Set([
   'turingPrint',
   // And the colour it prints in: an indicator is chosen, not wandered to.
   'turingInk',
+  // And how far its chemistry wanders: a look's choice, and Evolve's own slow
+  // changes would be a second clock on a clock already slow (PLAN 26d-6).
+  'turingDrift',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',

@@ -1357,3 +1357,80 @@ at 0 (the default).
    its edge from frame to frame.
 4. Say whether Auto's slow breathing zoom, which is not from the sound, is a signature
    worth keeping or one more move the rig should not make (27a-8-1).
+
+## 54. Ferrofluid halos are blacker and ripening slower in every look (PLAN 29c)
+
+The thin gap's Cahn–Hilliard step (`phaseCHVolume`) now uses a degenerate mobility,
+`4m(1 − m)` at each face's mean share, and `phaseCompress` returns what the flux limiter
+withheld at a moving edge. Because every look opens on Thin Gap, ferrofluid halos are
+blacker (less brown leak into the oil round a drop or domain, `npm run ferrorest`: cells
+over 0.01 grow +94 at rest against +248 before, and the drop holds 90 of 100 half-full
+cells against 84) and Ostwald ripening across the oil is slower in every look with
+ferrofluid:
+- On Magnet Garden, Ferro Maze and Ferro Paint, watch a poured drop and the domains' edges
+  over a minute: the rims should stay blacker with a narrower brown halo, and small drops
+  sitting apart from a pool should hold their size longer instead of bleeding into the oil.
+- A drop dragged fast by hand still sheds its trailing rim into the oil's return flow
+  (PLAN 29c-8).
+- The magnet's pull on a drop is felt at its rim first. The force a cell gets is the
+  Kelvin gradient times the cell's ferrofluid share times (ν_clear/ν_ff)^(1−φ): a cell
+  of ferrofluid alone moves about four and a half times faster than the same push on the
+  oil, and a drop in the oil goes at about 0.8 of the reference speed, so the rim runs
+  ahead of the oil and a drop should lean into the pull and then follow the magnet as a
+  whole, not tear. `phaseMomentum` carries the ferrofluid share along itself, so a
+  dragged drop should keep its edge rather than smearing behind it. Drag a drop slowly
+  at a deep magnet and then fast at a strong one: slowly it should hold together at
+  Darcy's speed; fast it may leave a thin trailing film (29c-8), but its front should
+  stay sharp.
+
+## 55. The Turing Print keeps changing (PLAN 26d-6)
+
+Turing Print now has a Drift control (`turingDrift`; the look sets 0.7), which slides the
+reaction's feed and kill across the plate on a 40 to 90 second clock so the maze keeps
+rearranging after the chemicals meet. In the lab a settled maze correlated 0.90 with itself
+fifty seconds later without it, 0.64 with it at 0.7 and 0.59 at 1.0 (0.67 and 0.50 before the
+stripes-to-spots glide of PLAN 26d-6a). The Mac's numbers for
+the same line are unmeasured: read them off the first run of the `fifth` shard. On a real GPU:
+- Open Turing Print, pour reagent, and watch for two minutes without touching the plate. The
+  stripes should keep sliding, branching and joining in different parts of the plate at
+  different times, slowly enough that no single frame looks like motion, and with no music
+  playing or with music: the music must not change the pace.
+- The grey patch should be gone, at 0.7 and at 1.0: the lab's flattest tile (searched every
+  16 pixels) keeps 0.93 and 0.77 of the stripes' contrast. If a soft grey area still shows on the Mac, that is Metal's
+  rounding and the cap line needs refitting there (PLAN 26d-6a).
+- Watch for stripes breaking into dots in some regions and dots running back into stripes
+  in others, over a minute or two. It should read as the chemistry changing, not the plate
+  emptying and refilling; if a region goes nearly bare for a moment between the two, the
+  glide is too fast. Is Drift 0.7 the right pace, or too busy?
+- Drift at 0 should be the print as it was: settled, then only creeping.
+- The control is on the Perform desk's lamp pins, the phone's Settings rail and the remote,
+  and it takes a MIDI knob.
+
+## 56. A bubble's middle is the plate, not a tinted disc (PLAN 33e)
+
+Bubbles were drawn with a dim dye-coloured disc inside a dark band, the donut. The middle
+is now the plate itself with at most a tenth of the film's tint. The lab's numbers are in
+`docs/plan-shipped.md` §33e; the Mac's are unmeasured (`bubblelook` runs in the open
+shard on software WebGPU). On a real GPU:
+- Pour a dye, blow bubbles with Bubbles at the default, and look at a small and a large
+  bubble on a dark look and on a lamp-ground look. A large one should be a clear window
+  edged in a thin dark line; a small one a dark dot with a pin-point; neither a coloured
+  disc inside a ring.
+- A bubble in clear water should not be a grey disc. It is drawn at 70 % strength there
+  (PLAN 33e, third bullet); say whether that reads as a flaw.
+- Zoom in past the middle of the zoom's fade: the closeup's bubble is lit and domed, as
+  before, and the change between the two views is as smooth as it was.
+
+## 57. No soft glow round a bubble's hole (PLAN 33b)
+
+The dye beside the hole a bubble cuts was lit like a ridge, a pale soft ring two to four
+cells wide. The dye's normal is now flat beside the air. The lab's numbers are in
+`docs/plan-shipped.md` §33b; the Mac's are unmeasured (`holeline` runs on software WebGPU).
+On a real GPU:
+- Pour a dye with Edge Relief at the default, blow bubbles and look at the dye round a
+  small and a large one on a dark look and on a lamp-ground look. There should be no pale
+  ring outside the bubble's own dark edge.
+- Look at the pool's own edge into clear liquid: it should keep its relief as before.
+- Where two dyes meet beside a bubble the relief may be weaker within a few cells of the
+  bubble (PLAN 33b-2); say whether that shows.
+

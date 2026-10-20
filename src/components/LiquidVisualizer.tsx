@@ -298,6 +298,26 @@ const GRID_SIZE = 192;                    // sim resolution — higher = smoothe
 const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 /** Turbulence 1.0 as an rms speed in solver units (the GPU shader has the same 0.5). */
 const TURB_SPEED = 0.5;
+/**
+ * How fast the print's Drift, as the solver is handed it, may move: a share of the
+ * full range a second. The feed map's amplitude arrives all at once otherwise, and
+ * measured in the lab (scripts/turing.mjs) a settled print handed Drift 0.7 in one
+ * frame starves where the feed falls, and a 32-pixel tile of the plate stays dead
+ * for about twenty seconds: the grey patch again. Reaching 0.7 over twenty-eight
+ * seconds (0.025 a second) leaves no tile flatter than the still print's. The
+ * check reads this number from here, and the iteration count below, so what it ramps
+ * by is what the app does.
+ */
+const TURING_DRIFT_PER_SECOND = 0.025;
+/**
+ * The solver iterations a second the rate above is counted in: a frame of one sixtieth
+ * runs round(2.5) = 3 of them, 60 frames a second. The slew moves by the iterations a
+ * frame really ran, not by the frame's seconds, because a slow machine runs fewer
+ * steps a frame and a fast display alternates frames of one and none: counted in
+ * seconds the Drift would reach a settled print faster (or slower) per iteration than
+ * the lab, which ramps by iterations, ever measured. The check reads this too.
+ */
+const TURING_ITERATIONS_PER_SECOND = 180;
 /*
   How far the dye actually moves per unit of velocity, relative to what the
   beads and bubbles assume. Both of them turn a velocity into cells with a
@@ -4830,6 +4850,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   // line runs on every render, and a draw from the palette stream here would
   // move every colour after it by however many times React rendered.
   const harmonyRef = useRef(pickHarmony(makeRng(showSeed(), 'plate.palette', 'opening')));
+  // Seconds of the plate's own time the print's feed/kill map has drifted through (turingDrift, 26d-6).
+  const turingClockRef = useRef(0);
+  /** The Drift the solver is handed: the setting's, moved toward by TURING_DRIFT_PER_SECOND. */
+  const turingDriftRef = useRef(0);
   const harmonyLockRef = useRef<number[] | null>(null); // user-pinned palette
   const presetContractRef = useRef<number[] | null>(PRESET_CONTRACTS['classic']); // the preset's allowed dyes
   /** The sequencer's window onto the contract (size null = whatever the journey allows), and the hue journey's own lead. */
@@ -7314,7 +7338,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const lead = fluidsRef.current[0];
           const poured = !!leadGpu?.reagentLive;
           // No reaction on the plate: nothing is printed, and the plate shows the dye itself.
-          if (!(chemAmt > 0 || poured)) leadGpu?.endPrint?.();
+          if (!(chemAmt > 0 || poured)) { leadGpu?.endPrint?.(); turingDriftRef.current = 0; }
           if ((chemAmt > 0 || poured) && lead && isActiveRef.current && drainFrameRef.current === 0) {
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const g = leadGpu;
@@ -7327,10 +7351,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const feed = 0.03 + p * 0.01;
               const kill = 0.055 + p * 0.005;
               const w = Math.pow(2, ((currentSettings.chemistryWidth ?? 0.5) - 0.5) * 4);
-              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0);
+              const print0 = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
+              /*
+                The map drifts (PLAN 26d-6): the clock is plain seconds of the plate's own
+                time, advanced by the frame's share of a second and by nothing the sound
+                does, so a quiet room and a loud one wander the same way and no hit moves
+                the whole frame. Only the print has a drift (turingDrift), and 0 is the
+                constant map every other look and today's print run on.
+              */
+              turingClockRef.current += sixtieths / 60;
+              const driftWanted = print0 > 0 ? Math.max(0, Math.min(1, currentSettings.turingDrift ?? 0)) : 0;
+              // Slewed, never stepped (TURING_DRIFT_PER_SECOND); a print that is off starts the next one from 0.
+              const chemIterations = Math.max(1, Math.min(10, Math.round(sixtieths * 2.5)));
+              const driftStep = TURING_DRIFT_PER_SECOND / TURING_ITERATIONS_PER_SECOND * chemIterations;
+              turingDriftRef.current = print0 > 0
+                ? turingDriftRef.current + Math.max(-driftStep, Math.min(driftStep, driftWanted - turingDriftRef.current))
+                : 0;
+              const drift = turingDriftRef.current;
+              g.stepChemistry?.(chemIterations, feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0, drift, turingClockRef.current);
               // The look's palette where the look grows it; the reagent's own product where only a pour does.
               // A print is that product too, starch's complex, whatever the palette (depositChem, 26d).
-              const print = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
+              const print = print0;
               // Its colour is the indicator's (Turing Ink: starch's indigo at 0), laid over the poured dye, not in place of it.
               const c = chemAmt > 0 && print === 0 ? harmonyCycle(harmonyRef.current, time * 0.08) : print > 0 ? turingInk(currentSettings.turingInk ?? 0) : TURING_PRODUCT;
               const seededReef = lead.seedMean !== null && lead.seedMean > 0 && print === 0;

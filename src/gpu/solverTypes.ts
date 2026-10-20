@@ -150,6 +150,10 @@ export interface GpuStepParams {
    * liquid round it.
    */
   ferroViscosity?: number;
+  /** The ferrofluid's momentum carried with it (phaseMomentum), 1 on; 0 is the lab's control, the step without it. */
+  phaseMomentum?: number;
+  /** The moving edge's compression (phaseCompress, PLAN 29c-1) as a share of the strength the step runs at, 1 on; 0 is the lab's control, the step without it. */
+  phaseCompress?: number;
   /**
    * For the lab only: 0 carries the ferrofluid by area under Thin Gap too,
    * as before the Press on the ferrofluid (PLAN 15d), so `npm run
@@ -220,7 +224,7 @@ export interface GpuStepParams {
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
-  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number, drift?: number, clock?: number): void;
   depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number, wetOnly?: number): void;
   /** The print is no longer being drawn: the plate shows the dye itself again (`WebGPUFluid.endPrint`). */
   endPrint?(): void;
@@ -340,7 +344,7 @@ export interface PlateSolver {
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
-  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number, drift?: number, clock?: number): void;
   depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number, wetOnly?: number): void;
   /** The print is no longer being drawn: the plate shows the dye itself again (`WebGPUFluid.endPrint`). */
   endPrint?(): void;

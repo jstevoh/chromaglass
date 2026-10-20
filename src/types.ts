@@ -753,6 +753,7 @@ export interface VisualizerSettings {
   chemistryWidth: number;
   turingPrint: number;        // the reaction drawn as starch's blue-black complex with it, in equilibrium, black on the lamp (26d); 0 deposits colour as the coral looks do
   turingInk: number;          // the print's colour: 0 is starch's own indigo (what a CIMA dish is), above 0 a hue round the wheel, as another indicator would make it (26d-3)
+  turingDrift: number;        // how far the print's feed and kill wander across the plate over 30 to 90 s, so the pattern keeps changing once it has grown (26d-6); 0 is the constant map
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
@@ -1113,6 +1114,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   chemistryWidth: 0.5,
   turingPrint: 0,
   turingInk: 0,
+  turingDrift: 0,
   gelWheel: 0,
   gelSpeed: 0.5,
   filmMix: 0.7,

@@ -104,6 +104,8 @@ export function luckyLook(
     // The print's ink goes with it (PLAN 26d-3): left at a hue, the next look
     // that turns the print on would inherit a colour nobody chose for it.
     turingInk: 0,
+    // And its drift (PLAN 26d-6) goes with it for the same reason: it is the print's.
+    turingDrift: 0,
     // Lamp Ground (PLAN 18b) is kept: a roll is a variation on the look on
     // the plate, and which ground it is seen on is that look's choice.
     // Clear Film (PLAN §20b) is kept as the lamp is: it is liquid on the

@@ -64,6 +64,9 @@
  * less inertia than real water would. That is a shortcut kept for the step's
  * time (an advection and a projection, the largest part of it), and PLAN §18a
  * has it as its own item to measure on the Water looks.
+ * The ferrofluid's share of the carry is taken (phaseMomentum, wgsl/fluid.ts):
+ * its drag time in the rest gap is 0.6 s, so a drop dragged at the hand's speed
+ * outran its own momentum and fell behind the magnet (PLAN 29c).
  *
  * And the rim is open. The old projection was a closed box, so every source
  * had to be balanced by a uniform sink over the whole plate, and a press pushed

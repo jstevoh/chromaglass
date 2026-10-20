@@ -836,6 +836,17 @@ export const PRESETS: Preset[] = [
       chemistryPattern: 1,
       chemistryWidth: 0.5,
       turingPrint: 1,
+      /*
+        The print that goes on changing: a labyrinth under constant feed and
+        kill settles into one picture and only creeps (the lab's control:
+        correlation 0.90 with itself after fifty seconds), while 0.7 here moves
+        the feed along the saddle-node line across the plate on a 40 to 90
+        second clock and rearranges it (0.67 after the same fifty seconds) without
+        emptying it (0.69 of the plate carries activator against the
+        control's 0.71). Below 1 because at 1 a soft grey patch opens where
+        the map pushes the pattern toward a bare plate (PLAN.md 26d-6).
+      */
+      turingDrift: 0.7,
       exposure: 0.7,
       audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
     }

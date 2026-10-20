@@ -3708,6 +3708,94 @@ asked for showing and darkening the paper under the stripes, not a regression, a
 regulator was deliberately left on the pours: reading the plate would count the print and
 hold the pours off again. Whether 0.35 of pours under the print is too dark is judging §46.
 
+**26d-6. The print keeps evolving (shipped 2026-10-19).** The owner said the Turing Print
+"doesn't do anything that interesting once the chemicals come together". It was the
+chemistry: Gray-Scott with one feed and one kill has a steady stripe state, so the maze
+settles and only creeps (in the lab, a settled maze correlates 0.972 with itself 3000
+units on and 0.901 after 9000, fifty seconds of a show at the app's 180 units a second).
+
+The `grayScott` shader now varies the feed across the plate and in time, as the sum of
+three plane waves with periods of 40, 65 and 90 seconds, scaled by the new `turingDrift`
+setting (0, the default, is today's fixed map; the Turing Print preset sets 0.7). The kill
+moves with the feed along the saddle-node curve `k = sqrt(F)/2 - F`, where the reaction's
+non-trivial state vanishes: moving F alone carries a region across it (all substrate, or
+all activator), and keeping k's distance from the curve keeps a region a pattern while
+its stripes rearrange. The clock is the visualizer's own seconds (`sixtieths / 60` a
+frame), so it runs with no music and the sound does not move it; nothing moves the whole
+plate. `turingDrift` is on the Perform desk's lamp pins, the phone's Settings rail, the
+remote and MIDI, and is left out of Evolve's random nudges (Evolve changes the print's look,
+and this is already a slow clock of its own) and out of Lucky.
+
+Named shortcuts: the map is three plane waves, not a noise field, so the regions are broad
+diagonal bands; the curve is the saddle-node line, not Pearson's regime boundaries, so
+how far k can follow F before the pattern changes kind was not mapped; the clock is
+fixed-rate and follows no music.
+
+Measured (`npm run turing` line 9, a 256² maze settled 9000 units, then 9000 more with
+the same seeds): correlation with its settled self 0.901 at drift 0, 0.671 at 0.7 and
+0.497 at 1; the share of cells with activator over 0.1 is 0.706, 0.694 and 0.686, and the
+stripe wavelength stays within 3% of the control's (2.96, 2.98 and 2.99% of the plate). The
+first constant, 0.012 a unit of drift, moved it too gently and became 0.02.
+A soft grey patch opens at 1, where the map pushes the pattern toward a bare plate (the
+flattest 32-pixel tile keeps 0.84 of the control's contrast at 0.7 and 0.76 at 1), so the preset sits at 0.7 (judging §55 asks the owner's eye on it).
+
+**26d-6a. The grey patch and the stripe-to-spot glide (shipped 2026-10-20).** The grey
+patch had a cause: the shipped point (F 0.04, k 0.06) sits exactly on the saddle-node curve
+`k = sqrt(F)/2 - F`, so the drift's excursion in k carried some regions under it, where
+the reaction has no non-trivial state and the plate is flat grey. The shader now picks the
+distance above the curve, `d = k - curve(F)`, and keeps it positive: a quarter of a cap
+for stripes, nine tenths of it for spots. The cap is the largest d that still holds a
+pattern, and it shrinks as F rises (the lab's sweep, 256², 6000 units, 60 seeds: spots to
+d 0.006 at F 0.03, 0.004 at 0.04, 0.002 at 0.05, under 0.002 at 0.06), so it is the
+straight line `0.0105 - 0.15 F` through those. A second map of three plane waves (50, 80
+and 120 s) moves each region between the two ends, and the drift setting scales how much of
+that range the plate uses.
+
+A sudden step between the two ends collapses the plate (stripes, then nearly empty, then
+slow regrowth as spots); the same move over about 33 s is smooth, which is why the glide
+is on slow waves. The Drift setting itself is subject to the same thing: handed to a
+settled print in one step at 0.7, a 32-pixel tile where the feed falls goes dead (mean 0)
+for about 3500 units, 20 s. A preset load or a slider jump is such a step, so the visualizer
+slews the Drift it hands the solver at 0.025 a second (`TURING_DRIFT_PER_SECOND`; the
+setting itself still moves as it did) and the print that is off starts the next one from 0.
+Not a control, so no phone change.
+
+Named shortcuts: plane waves, not a true noise field; the cap is a straight line through
+a sweep, not Pearson's full regime boundaries; k ignores the look's own k while the drift
+is on; the clock is fixed-rate and follows no music; every number is the lab's (SwiftShader),
+none yet Metal's.
+
+Measured (`npm run turing` line 9, same seeds and stepping as 26d-6): correlation with the
+settled self 0.901 at Drift 0, 0.641 at 0.7 and 0.591 at 1 (0.867 and 0.814 through the
+shipped #413 shader on the same ramp); the flattest 32-pixel tile over six reads, looked
+for every 16 pixels, keeps 0.93 and 0.77 of the control's contrast (0.95 and 0.89 on the
+first grid of whole tiles; 0.81 and 0.74 through the #413 shader on that grid and the ramp;
+stepped, not ramped, Drift 1 left a dead tile and measured 0.20); stripe wavelength within
+1.5% of the control's; the share of cells with activator 0.706 for held stripes, 0.483 for
+held spots, 0.55 to 0.58 for the drifting runs; connected pieces of activator 14 for held
+stripes, 389 and 374 at the last read of Drift 0.7 and 1, 608 for held spots (the #413
+shader: 12 and 16).
+
+Check changes: the alive-share bar (within 0.05 of the stripes' share alone) became a band
+between a held-spots plate's share and the held-stripes plate's, each with 0.05 of room,
+since spots cover less of the plate by design; Drift 1's tile contrast is now asserted
+(it was shown); a new line counts connected pieces of activator and wants the drifting
+runs and a held-spots control to show over ten times the held stripes' pieces. Drift 1's tile
+contrast and the alive share are tested at every one of six reads, not the last; the held
+spots' share and cap are read from the shader, so the check follows it; the lab now ramps
+Drift at the rate it reads from `LiquidVisualizer.tsx`, as the app does, which is a change
+of input, and the wiring check wants the slew in the visualizer. The ramp is why the #413
+shader no longer meets the movement bars (0.867 against under 0.8). The tile bar (0.6)
+is unchanged and did not separate the two shaders on the ramp (0.81 against 0.95, on the whole-tile
+grid); the glide line and the movement lines do. The tile search now steps half a tile, and a new
+line plants a flattened 32-pixel patch 16 pixels off the grid in the held stripes' last read and
+wants the line to see it (0.000 of the clean read's 0.104), so the line is shown able to go red.
+The app counts the slew in solver iterations (`TURING_ITERATIONS_PER_SECOND`, 180), not seconds,
+as the lab does, and the check reads both numbers and refuses a rate outside (0, 1]. The bars for stripe width and the Drift 0 clock are
+unchanged. Not tested: where a grey patch sits (a speckle of dead cells would still show in
+the width line, not the tile line).
+
+
 ## 27. Every control does something you can see
 
 ### 27a-8. The closeup's camera holds still through the song (QA-31)
@@ -4056,6 +4144,142 @@ spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up a
 yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
 bytes different at any relief.
 
+### 29c. The drop follows the hand and holds together (#373)
+
+Reported 2026-10-11 (the handoff's `drag-today.png`): a magnet at 0.35–0.5, height 0.2,
+walked at a tenth of the plate a second turned the closeup's drop into a crescent, then
+smeared it to brown with no cell over half full within two seconds; a look's own magnet
+left it behind. A real 6 mm drop under a dragged magnet holds together and heaps toward
+the field.
+
+Found, in three rounds of review and a takeover:
+- **The rim held the drop back.** The force on a cell is φ·∇ψ (the Kelvin force on the
+  ferrofluid's share) but hsPrep's drag is the two liquids' geometric mean by share, right
+  for the pressure's flow across a mixed cell and wrong for a force on one liquid alone: a
+  half-full rim cell was driven at a quarter of a full cell's speed per unit of ferrofluid
+  (ν_clear/ν_ff 4.5: 0.5·4.5^0.5 against 4.5). Measured in the lab (the handoff's
+  `dropdiag`, a drop eight cells across, 384², main's gain): the core went at Darcy's speed
+  for a sharp drop, 0.0123 of the plate a second under a weak magnet, the rim at 0.55 of
+  it, the centroid at 0.44 of the pull asked; under a strong one 0.085, 0.76 and 0.29, the
+  back rim drawn into the crescent. Two liquids side by side in the gap each go at their own
+  Darcy speed under the one pressure, so the force is now read against the ferrofluid's own
+  drag, (ν_clear/ν_ff)^(1−φ) on phaseForce's force: the rim at 0.81 of the core, the
+  centroid at 0.68 of the pull asked (0.83 of the sharp drop's) under the weak magnet, and
+  0.101 of the plate a second under the strong one where it was 0.075.
+- **The flux step spread the moving edge** (MUSCL with minmod, half a cell times the
+  cells moved): 100 cells past half → 0 over a 0.3-plate drag, which steepening the
+  double well 2.9 times did not hold. Weller's interface compression takes it back along
+  the edge's normal at the flow's own speed (phaseCompress, 29c-1), from the field blurred
+  once a step (phaseBlur; blurred face by face it read 216 cells a cell and cost every
+  ferrofluid look a fifth of its step on the Mac, 29.2 → 35.7 ms). Its first form compressed
+  every moving face alike and sharpened a smooth pool the limiter had not spread:
+  `ferropress`'s pool came back fuller after the lift (worst ring 0.049 against the 0.03 bar;
+  main's 0.012; 0.008 with the compression off), the same in every arm of the drift and the
+  momentum tried. Each face's compression is now scaled by the share of its slope the
+  limiter withheld (`withheld`: 1 − minmod(Δ_up, Δ_f)/Δ_f, the same two slopes phaseAdvect
+  limits; a few per cent on a smooth pool, 1 at a drop's shoulders), and the ring is
+  0.003. Run on the deep plate too, the first form broke spikes (2/6), maze (3/4) and
+  fingers (3/4) on the Mac, whose bars were measured with the spreading; so the compression
+  is the thin gap's only and the deep plate is main's step (open under 29c-1).
+- **The gain.** Antigravity's 1.04e-4 (17× main's) passed `ferrodrag` by running on the
+  per-step guard, which makes the force uniform over the drop (every cell at the cap, so the
+  drop moves as a body at 0.42 of the cap), and turned `fingers` 1/4, `ferrodye` 4/5 and
+  `ferropour` 7/8 red on the Mac. `npm run magnetgain` works the pull out in SI from the
+  shader's own field (held to Biot–Savart within 0.004%): EFH1's far-field gain is 5.8e-5
+  at Ferrotec's χ 2.64, and the near field is the guard at any gain the plate has had (the
+  hand's magnet asks 7.8 plate widths a second at 6e-6 against the guard's 0.375 on 384²).
+  MAGNET_GAIN stays 6e-6, a tenth of the physics, named with its reason (29c-2: the looks'
+  far pools, and the contact line's pinning the solver lacks); the guard is named as the
+  hand's speed limit (29c-5); the saturation knee (29c-3) and the projection's one
+  mobility (29c-6) are the shortcuts left.
+- **The ferrofluid's momentum stayed behind.** With the rim's force in, the dragged drop
+  still fell behind, 2.78R at 3 s and 5.8R at 6 s with no equilibrium: it topped out at 0.09
+  of the plate a second under a pull whose Darcy speed was 0.19, where under a weak magnet,
+  slow enough to keep up with its own momentum, it went at 0.95 of Darcy's. A thin gap does
+  not carry the velocity along itself (`wgsl/thinGap.ts`, right for the oils, whose drag
+  takes a push in a few steps), but the ferrofluid's drag time in the rest gap is 0.6 s, 36
+  steps, and a drop dragged at the hand's speed crosses its own width in 30: every cell it
+  entered held the oil's velocity, and the pull brought it up at 2.8% of the shortfall a
+  step. Weighed against the drag the dropped term, ρ(u·∇)u, is Uτ/R, 2.5 for this drop
+  where the oils are under a tenth. phaseMomentum carries the velocity along itself by the
+  ferrofluid's share of each cell, before the step's forces (its momentum φu over its share
+  where the trace lands; the oil's part reads as it was; a look without ferrofluid runs the
+  step as before): the drop reaches the magnet's speed, 0.099 of the plate a second, and its
+  lag settles at 1.85R. `phaseMomentum: 0` runs the step without it, the lab's control.
+- **The resting drop leaked into its halo (`phaseCHVolume`, 29c-7).** The thin gap's
+  Cahn–Hilliard step used a constant mobility at Cahn number ≈ 0.5 (an eight-cell drop on
+  384², `R = 0.022`, `phaseSharp = 0.75`), so the curved interface's Gibbs–Thomson chemical
+  potential shifted the bulk equilibrium to `c_eq ≈ 0.021` and drove ferrofluid out through
+  the clear oil at `2·M·dt` per substep. At rest with no magnet (`npm run ferrorest`), the
+  drop's half-full cells fell `100 → 84` over the 180 steps after the 20-step settle
+  (`116 → 84` from pour), its peak fell `0.996 → 0.946`, and its halo of cells over `0.01`
+  grew by `+248` (`352 → 600`, from `222` as poured), step for step as on `main` with
+  `thinGap: 1`; a dragged drop continually left that halo behind in fresh oil and re-made it
+  as it moved, losing about half its ferrofluid (`352 → 1602` cells over `0.01`).
+  `phaseCHVolume` now multiplies each face's flux by the degenerate mobility
+  `mob = 4m(1 − m)` at the face's mean share `m = ½(c_p + c_q)`, with no floor (Elliott &
+  Garcke 1996): antisymmetric across each face so `Σc·h` is conserved (to `0.011%` over 180
+  steps, against a `9.8%` loss when evaluated at `c_p` alone), at most `1` so the explicit
+  stability limit (`≤ M_0`) is unchanged, and zero in pure oil and pure ferrofluid. At rest
+  (`npm run ferrorest`, 4/4) the drop holds `90` of `100` half-full cells, its peak holds
+  `0.975`, and its halo grows by `+94` (`324 → 418`), while on the dragged drop the cells
+  over `0.01` fall from `1602` to `1238`. The deep plate's `phaseCH` stays as on `main`
+  (29c-1).
+- **The carry's wake and the trailing rim (29c-4, 29c-8).** With the limiter-matched
+  compression and degenerate mobility in place, a dragged drop (`npm run ferrodrag`: `0.3` of
+  the plate in 3 s under a `0.4` magnet at depth `0.2`) still loses its trailing rim to the
+  oil's dipole return flow (`ferrodrag` 1/3: lag `3.24R`, half-full cells `100 → 0`, cells
+  over `0.01` `324 → 1238`). The step has one velocity a cell, the mixture's
+  `u_mix = φu_ff + (1 − φ)u_oil`, and where the back rim thins the oil closing in behind the
+  drop dominates `u_mix` and carries that faint ferrofluid into the wake. Two forms of a
+  separate ferrofluid carry were tried and dropped (29c-4). The first was a switch, the
+  body's Gaussian mean in place of the mixture's velocity in every rim cell (`phaseVelocity`),
+  and it failed the press: a mean is biased towards where the body is, and under the glass's
+  squeeze (`u ∝ r`) a rim cell read the body's slower velocity from inside it and was carried
+  slower than the liquid it is part of, so the pool packed (`ferropress`'s middle `1.025` of
+  full with the glass down, main `0.960`, the bar 3% of `0.956`; the lift's ring `0.046`, bar
+  `0.03`), and on the Mac's GPU the switch's patchy field raised 23 domes with no magnet
+  (`spikes`) and lost a finger and a maze (3 of 4 each). The second was a first-order
+  least-squares fit of the body's velocity and its two gradients (exact for a translation, a
+  squeeze and a rotation), applied as a drift flux `φ(1 − φ)(u_ff − u_mix)` (`phaseDrift`):
+  the compression's first form hid its shortfall by packing the shed rim back on (lag `1.62R`,
+  half-full area `102` of `100`); matched to the limiter, the blend's drop shed three fifths
+  of itself (lag `2.49R`, half-full area `32`). So the carry is the mixture's velocity again,
+  and the trailing-rim loss is open as **29c-8** (`npm run ferrodrag` stays out of CI as
+  known red until 29c-8).
+- `phaseMu` and `mazeReady` run as on main (maze and spikes only); the first rounds had them
+  on every ferrofluid look.
+
+Checks: `npm run ferrorest` (new, lab, on the Mac's `open` shard; 4/4: half-full cells
+`116 → 100 → 90` over 20 settling and 180 resting steps, `90.0%` kept against the `>= 88%`
+bar where constant mobility falls to `84`; peak `0.996 → 1.000 → 0.975`, bar `>= 0.96` where
+constant mobility falls to `0.946`; halo cells over `0.01` `222 → 324 → 418`, `+94` against
+the `<= +120` bar where constant mobility grows `+248`, `352 → 600`; volume `Σc·h`
+`3.36244 → 3.36248 → 3.36286`, `+0.011%` drift against `0.1%` bar where cell-centred mobility
+loses `9.8%`; centroid moved `0.010` cells, bar `< 0.5` cells) and `npm run magnetgain` (new,
+lab, on `fifth`; 5/5: the field within `0.004%` of Biot–Savart over 905 points, the weak
+field's ∇ψ the linear Kelvin force within `5%` at `11.461` against `11.461`, `MAGNET_GAIN`
+`6e-6` at `0.104` of `GAIN_phys` `5.775e-5` s, the drop at `0.0114` vs `0.0130` plate/s
+(`-13%`, bar `34%`) of the two-phase Darcy speed under a weak magnet, and the dragged magnet
+under the per-step guard at its steepest cell, `0.262` vs `0.375` plate/s on `384²`).
+`npm run ferropress` is 7/7 (`worst ring 0.002` on the Mac, `0.004` on software WebGPU, bar
+`0.03`, where #373's third head had `0.049` and main `0.012`; the middle with the glass down
+`0.968 → 0.981`, volume `0.01570 → 0.01570`). `npm run ferrodrag` (new script, out of CI
+until 29c-8) is 1/3 (`lag 3.24R`, `half-full 100 → 0`, `moved 0.010 cells`).
+
+Fix round after the review of 0580eaa (six asks): `magnetgain`'s weak-field line is renamed to what
+it tests (a units check on ψ, the gain cancels there); the drop checks apply the shader's rim factor
+`share·(ν_clear/ν_ff)^(1−φ)` per cell before the per-step cap, which moved the strong drop from `-22%`
+to `+4%` and the weak one to `-6%` (software WebGPU), both under a 20% bar (the weak one was 34%);
+`ferrorest` reads a second window (steps 200 to 380: its loss at most half the first's, or 3 cells) and
+calls its centroid line a symmetry guard; `npm run ferrohold` (new, `fifth` shard) holds the momentum
+pass and the compression pass on the dragged drop over steps 60 to 120, each switched off by hand
+turning red its own line (lead `2.01R` → `2.28R` against `2.15R`; half-full `60.3` → `34.4` against `47`),
+and the script runs both off-scenes itself and requires each pass worth half its measured gap
+(`0.13R`, `13` cells), with a solver-read start guard (centroid over `0.40`); `ferrorest` line 5 is
+signed (a second window that gains over 3 cells is red too) and line 3 also holds Σc·h at step 380;
+`docs/judging.md` §54 says what the rim pull and `phaseMomentum` look like.
+
 ## 32. The soap film: a draining film seen in reflection
 
 ### 32a. The CPU reference (this PR, #403)
@@ -4083,3 +4307,110 @@ top reaches 10% black first at 115 s, no ruptured cell refills; C7 4 consecutive
 samples in the photograph window, at t=120 s 5.1% under 30 nm, 23.3% dark, 79% saturated,
 9/12 hue sectors); `npm run filmtable` 8/8; 600 steps of the 32×64 film in 0.69 s.
 
+
+## 33. Bubbles and the closeup, per liquid
+
+### 33a. No stepped ring round a bubble's hole (this PR)
+
+*Reported* (the owner, 2026-10-19): "bubbles still look really pixelated around
+themselves". In the lab every hole the air cut in the dye wore a stepped halo a couple
+of cells out, bright and dark blocks on a cross, a "+" stamped round each small bubble.
+The dye field under it was clean, and with Boundary Contrast at 0 the halo went.
+
+*Cause:* the line drawn between two dyes (`boundaryDiff` in `src/gpu/wgsl/plate.ts`,
+on at 0.35 in every look) is drawn where the lit colour changes across a four-tap
+cross, and the lit colour carries the dye's depth as well as its hue. One dye thinning
+to nothing at a hole's edge read as two colours meeting; the taps' offsets drew the
+cross.
+
+*Fix:* the line is gated by how far the dye's colour per unit of dye moves between the
+same taps (`dyeHue`, the unit colour exp(−rgb/a) of the decoded dye, white where the
+dye is empty), smoothstep 0.03 to 0.12. A hole in one dye does not move it; two dyes
+meeting do, at any pair of depths. A gate on the density ratio was tried first and took
+the line off two dyes meeting at depths five times apart, so it was dropped.
+
+*Measured* (`npm run holeline`, the lab on SwiftShader, each picture against the same
+plate with Boundary Contrast at 0): the share of a ring round holes of 1.8, 3, 5, 8 and
+14 cells that the line moves by more than 24 levels went from 8.9, 8.9, 11.5, 13.6 and
+18.3 % to 0 % each; the band where two dyes meet kept 52.8 % → 52.8 % at one depth and
+61.1 % → 58.3 % at depths five times apart; a pool's rim into clear liquid, printed not
+judged, 16.8 % → 0 %. The bubble's own drawing, which is the donut, is 33e.
+
+### 33b. The soft glow round a hole (this PR)
+
+*Reported* (the owner, 2026-10-19, via 33a's picture): after the stepped ring went, a pale
+soft ring two to four cells wide stayed round every hole the air cuts in the dye.
+
+*Cause, measured not inferred:* the lab's radial profile round a hole of 8 cells (green
+channel, the real solver and plate shader, the bubbles' drawing at 0 and the air field
+handed to the plate) was +9 to +15 levels over a 194 baseline at 9 to 13 cells, and flat
+with Edge Relief at 0. It is the dye's own edge relief (`meniscus()`, and the lit slope
+`applyLighting` takes from `sobelGrad`): the air's cut leaves a steep density ramp over
+its 1.5-texel rim, and the relief lights that ramp as if the dye stood in a ridge. A
+real hole's edge is the bubble's meniscus, which the bubble pass draws; the dye beside
+it is flat. The boundary line and the lace contribute nothing to this glow (the line was
+33a's).
+
+*Fix:* `airNear` (`src/gpu/wgsl/plate.ts`, in the display-only `VIEW` part, because the
+derive pass's module has no `air0`) is the air field's largest coverage over nine taps
+within 4.5 cells (the Sobel taps at 3 cells plus the bicubic's spread), smoothstepped
+0.02 to 0.3. Both layers' dye normals are blended to flat by it before they reach the
+lighting and the meniscus. A dye's own edge into clear liquid is far from the air field
+and is untouched.
+
+*Measured* (`npm run holeline`, the lab on SwiftShader): the mean deviation of the dye
+1 to 6 cells past a hole's rim from the dye 10 cells out, for holes of 1.8, 3, 5, 8 and
+14 cells, went from 4.2, 6.0, 9.6, 11.0 and 10.4 levels (the check's second lab, with the
+mask taken out) to 3.2, 2.4, 2.6, 2.4 and 2.5 (bar 6). Edge Relief itself, asked of the
+first 3 cells beside the rim of the holes of 3 cells or more, moved the dye 11.9 to 22.9
+levels before and 0.00 to 0.02 after (bar 1). A pool's edge relief into clear liquid moves
+a pixel by 16.06 levels both ways (bar 0.8 of today's). `airlens` found its bubble box by
+differencing a render with the bubbles on against one with them at 0, and the flattened
+relief then showed in that difference; its off render now hands the plate the air field
+too (`airField`), so it differences the bubbles alone.
+
+*Named shortcuts:* `airNear` is a fixed reach, not one derived from the taps' real
+footprint; the normal is flattened wholesale, so a real dye-to-dye step right beside a
+bubble also loses its relief within the reach; only the lead layer's normal is masked
+(the app cuts air in the lead layer's dye alone, and the back layer's coordinates differ
+under a zoom or drift); the aside hole of `holeline` is a coarse guard on the mask's reach;
+the lace (33c) and the boundary line
+at a hole are not masked; the hole of 1.8 cells is only partly flattened (its relief
+moves 4.6 levels where the control moves 5.5), because the nine taps find a hole that
+small along few directions (PLAN 33b-3).
+
+### 33e. The bubble as the projector throws it, not a donut (this PR)
+
+The owner: bubbles "sometimes" draw as a donut. The report's picture is
+`/mnt/project-files/drops/bubbles-2026-10-19/zh-sheet.png`.
+
+*Cause:* the projected bubble (the plate's view, `plate.ts`) drew its clear middle as
+the dye's own normalised hue at 41–77 % strength, in all eight clarities, inside the
+dark band. On the default dark ground (dye is light on black) that is a dim dye-coloured
+disc inside a black ring; on the lamp ground a tinted disc over a white hole; in clear
+water a grey disc. Why it is "sometimes": a bubble in dye is a donut, a bubble in clear
+water is a grey disc, and the closeup (the camera's bubble, a different branch) is
+unaffected, so it depends on what the bubble sits in and on the zoom's crossing
+(`dropCam`).
+
+*Fix:* a slab of air does not tint light, so the middle is the plate there
+(`outColor`), with at most a tenth of the wetting film's tint (`0.1·k1`). The band and
+its width are unchanged (the big bubble's band was already half the gap, `airlens`).
+
+*Measured* (`npm run bubblelook`, the lab on SwiftShader, bubbles of 3, 4.5, 7, 10 and
+13 cells, the middle fifth of each radius against the same plate with Bubbles at 0): the
+old line, put back by the check's second lab, left the middle 116–195 levels off the
+plate on the dark ground (172, 151, 140, 119, 195 in green) and 174 or more on the lamp
+ground; the shader leaves 0 on the dark ground and 0–21 on the lamp ground (the tenth of
+the tint). The dark share of a bubble's area falls as it grows, 80, 85, 60, 46, 34 %
+on the lamp ground. Bubbles at 0 and the closeup's bubble are byte-identical to the
+control on both grounds.
+
+*`airlens` had to move,* declared under *Check changes*: its plate is now the lamp ground
+(`lampGround: 1`), because the window is the plate and on the dark ground a window is
+black, so there was nothing lit to measure the lens against; its `on` render uses
+Bubbles 1 (the compositing weight is `strength·mix(0.7, 1, filmT)`, so at 0.8 a quarter
+of the plate shows through the band and the band read 25–28 % where it is drawn 10 %);
+and its flat-window chroma bar compares the window with the plate's own chroma plus 4
+(the lamp's warm white is 8.8 levels apart by itself; the bar was 4 when the ground was
+grey). Every other `airlens` line and its numbers are unchanged: 10 of 10.
