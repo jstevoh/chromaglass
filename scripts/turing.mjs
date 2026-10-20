@@ -550,14 +550,18 @@ try {
     plate is cut into tiles of TILE pixels and the flattest tile of the
     drifting run must keep DRIFT_TILE_KEEPS of the flattest tile of the
     control's, at each of six reads and at Drift 1 as well as the preset's
-    (measured 0.95 and 0.89 over the six; the kill rate no longer dips under
-    the saddle-node line, 26d-6a, which was 0.82 and 0.72 before, and Drift 1
-    was shown and not asserted). Drift is brought up at the rate the app
-    hands it to the solver (TURING_DRIFT_PER_SECOND, read from the
-    visualizer): handed whole to a settled print it starves a 32-pixel tile
+    (measured 0.93 and 0.77 over the six, tiles looked for every TILE / 2
+    pixels so a patch cannot sit between them; 0.95 and 0.89 on a grid of whole
+    tiles; the kill rate no longer dips under the saddle-node line, 26d-6a,
+    which was 0.82 and 0.72 before, and Drift 1 was shown and not asserted). Drift is brought up at the rate the app
+    hands it to the solver (TURING_DRIFT_PER_SECOND over
+    TURING_ITERATIONS_PER_SECOND, both read from the visualizer, and counted
+    in iterations because a frame's seconds do not say how many ran):
+    handed whole to a settled print it starves a 32-pixel tile
     dead for about 3500 units (mean 0, contrast 0), a transient the app
-    never produces now. Run on the ramp, the tile bar no longer separates
-    this shader from the one before the glide (0.81 and 0.74, over 0.6); the
+    never produces now. Run on the ramp, the tile bar did not separate
+    this shader from the one before the glide (0.81 and 0.74, over 0.6, on
+    the grid of whole tiles); the
     movement and pieces lines do (correlation 0.867 and 0.814 against under
     0.8 and 0.7; pieces 12 and 16 against over 140). Where a grey patch sits
     is not tested; a speckle of dead cells would show in the width line.
@@ -597,6 +601,11 @@ try {
   const rateM = /const TURING_DRIFT_PER_SECOND = ([0-9.]+);/.exec(visSrc);
   if (!rateM) throw new Error('turing: TURING_DRIFT_PER_SECOND was not found in LiquidVisualizer.tsx');
   const DRIFT_RATE = Number(rateM[1]);
+  // A "." parses to NaN, which Math.min would hand the shader without a word.
+  if (!(Number.isFinite(DRIFT_RATE) && DRIFT_RATE > 0 && DRIFT_RATE <= 1)) throw new Error(`turing: TURING_DRIFT_PER_SECOND read as ${rateM[1]}, wanted a number in (0, 1]`);
+  // The app counts the rate in solver iterations (a slow machine runs fewer a frame), and so does the lab.
+  const iterM = /const TURING_ITERATIONS_PER_SECOND = ([0-9.]+);/.exec(visSrc);
+  if (!iterM || Number(iterM[1]) !== DRIFT_UNITS_PER_SECOND) throw new Error(`turing: TURING_ITERATIONS_PER_SECOND in LiquidVisualizer.tsx is ${iterM ? iterM[1] : 'missing'}, the lab ramps at ${DRIFT_UNITS_PER_SECOND}`);
   const drift = await page.evaluate(async ({ FEED, KILL, DU, DV, SEEDS, SETTLE, RUN, ABOVE, TILE, PER_SECOND, RATE, DRIFTS, SPOT_KILL, SNAPS }) => {
     const N = 256;
     // Connected pieces of the activator (over ABOVE, four-way, the plate's outer 16 pixels left out
@@ -618,6 +627,20 @@ try {
       }
       return n;
     };
+    // The flattest tile's standard deviation: a grey patch is a tile that lost its stripes. Tiles
+    // step by half a tile, so a dead patch of a tile's size is seen wherever it sits, not only
+    // where it lines up with the grid (a patch shifted 16 pixels read 0.87 of the clean plate
+    // on a grid of whole tiles, and passed).
+    const flattestOf = (v) => {
+      let flattest = Infinity;
+      for (let ty = 0; ty + TILE <= N; ty += TILE / 2) for (let tx = 0; tx + TILE <= N; tx += TILE / 2) {
+        let m = 0, q = 0;
+        for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) { const w = v[(ty + y) * N + tx + x]; m += w; q += w * w; }
+        const c = TILE * TILE; m /= c;
+        flattest = Math.min(flattest, Math.sqrt(Math.max(0, q / c - m * m)));
+      }
+      return flattest;
+    };
     const run = async (d, kill = KILL) => {
       await lab.create(N);
       const g = lab.solver();
@@ -630,17 +653,6 @@ try {
       const snap = async () => { const f = await g.readChemistry('chem'); if (f.n !== N) throw new Error(`readChemistry gave ${f.n} wide, wanted ${N}`); return Array.from({ length: f.n * f.n }, (_, i) => f.data[i * 4 + 1]); };
       const settled = await snap();
       const counts = [], flats = [], alives = [];
-      // The flattest tile's standard deviation: a grey patch is a tile that lost its stripes.
-      const flattestOf = (v) => {
-        let flattest = Infinity;
-        for (let ty = 0; ty + TILE <= N; ty += TILE) for (let tx = 0; tx + TILE <= N; tx += TILE) {
-          let m = 0, q = 0;
-          for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) { const w = v[(ty + y) * N + tx + x]; m += w; q += w * w; }
-          const c = TILE * TILE; m /= c;
-          flattest = Math.min(flattest, Math.sqrt(Math.max(0, q / c - m * m)));
-        }
-        return flattest;
-      };
       for (let t = 0; t < RUN; t += 10) {
         g.stepChemistry(10, FEED, kill, DU, DV, 1, Math.min(d, RATE * (t + 10) / PER_SECOND), units / PER_SECOND); units += 10;
         if ((t + 10) % (RUN / SNAPS) === 0) {
@@ -670,7 +682,17 @@ try {
     }
     let apart = 0;
     for (let i = 0; i < twice[0].length; i++) apart = Math.max(apart, Math.abs(twice[0][i] - twice[1][i]));
-    return { N, runs, spots, apart };
+    // The instrument, shown red once per run: one tile-sized patch of the held stripes' last read
+    // flattened to its own mean, 16 pixels off the grid of whole tiles. The tile line below must
+    // read it as a grey patch, or its 0.6 bar could be passing on a plate it cannot see into.
+    const patched = Array.from(runs[0].later);
+    {
+      const y0 = 80 + TILE / 2, x0 = 80 + TILE / 2; let m = 0;
+      for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) m += patched[(y0 + y) * N + x0 + x];
+      m /= TILE * TILE;
+      for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) patched[(y0 + y) * N + x0 + x] = m;
+    }
+    return { N, runs, spots, apart, instrument: { clean: flattestOf(runs[0].later), patched: flattestOf(patched) } };
   }, { FEED, KILL, DU, DV, SEEDS, SETTLE: DRIFT_SETTLE, RUN: DRIFT_RUN, ABOVE: ALIVE_ABOVE, TILE, PER_SECOND: DRIFT_UNITS_PER_SECOND, RATE: DRIFT_RATE, DRIFTS: [0, presetDrift, 1], SPOT_KILL: Math.sqrt(FEED) / 2 - FEED + SPOT_SHARE * SPOT_CAP, SNAPS: DRIFT_SPOT_SNAPS });
   {
     const [still, shipped, full] = drift.runs;
@@ -702,6 +724,9 @@ try {
     check('the drifting print has no grey patch, every tile keeps its stripes, at every read',
       shipped.flattest > DRIFT_TILE_KEEPS * still.flattest && full.flattest > DRIFT_TILE_KEEPS * still.flattest,
       `flattest ${TILE}-pixel tile's contrast (standard deviation) over six reads: control ${still.flattest.toFixed(3)}, Drift ${presetDrift} ${shipped.flattest.toFixed(3)} = ${(shipped.flattest / still.flattest).toFixed(2)} of it, Drift 1 ${full.flattest.toFixed(3)} = ${(full.flattest / still.flattest).toFixed(2)} (each over ${DRIFT_TILE_KEEPS}); reads at Drift ${presetDrift}: ${shipped.flats.map((x) => x.toFixed(3)).join(' ')}, at Drift 1: ${full.flats.map((x) => x.toFixed(3)).join(' ')}`);
+    check('the grey-patch line can see a patch that sits off its grid (the instrument goes red)',
+      drift.instrument.patched < DRIFT_TILE_KEEPS * drift.instrument.clean,
+      `the held stripes' last read, flattest tile ${drift.instrument.clean.toFixed(3)}; with one ${TILE}-pixel patch flattened ${TILE / 2} pixels off the tile grid ${drift.instrument.patched.toFixed(3)} = ${(drift.instrument.patched / drift.instrument.clean).toFixed(2)} of it (under ${DRIFT_TILE_KEEPS})`);
     const w0 = wavelength(still.later, drift.N), w1 = wavelength(shipped.later, drift.N), w2 = wavelength(full.later, drift.N);
     check('the drifting print keeps its stripe width',
       Math.abs(w1 / w0 - 1) < DRIFT_WIDTH && Math.abs(w2 / w0 - 1) < DRIFT_WIDTH && w1 > 0.015 && w1 < 0.06,
@@ -729,8 +754,12 @@ try {
     // Slewed: moved toward the setting by at most the rate a second times the frame's share of one,
     // and zeroed with the print, so what the solver is handed is never a step.
     const slewed = /turingDriftRef\.current = print0 > 0\s*\?\s*turingDriftRef\.current \+ Math\.max\(-driftStep, Math\.min\(driftStep, driftWanted - turingDriftRef\.current\)\)\s*:\s*0;/.test(vis)
-      && /const driftStep = TURING_DRIFT_PER_SECOND \* sixtieths \/ 60;/.test(vis)
-      && /const drift = turingDriftRef\.current;/.test(vis);
+      && /const driftStep = TURING_DRIFT_PER_SECOND \/ TURING_ITERATIONS_PER_SECOND \* chemIterations;/.test(vis)
+      && /const drift = turingDriftRef\.current;/.test(vis)
+      // Two writers only: the slew and the reset with the print. A third (a preset load setting
+      // the Drift outright) would step it and leave the text above intact.
+      && (vis.match(/turingDriftRef\.current\s*=/g) || []).length === 2
+      && /endPrint\?\.\(\); turingDriftRef\.current = 0;/.test(vis);
     const defaults = [...typesSrc.matchAll(/^\s*turingDrift: ([0-9.]+),/gm)].map((m) => Number(m[1]));
     const off = defaults.length === 1 && defaults[0] === 0;
     check('the clock runs on seconds, the setting only with the print, off by default and on in the preset',

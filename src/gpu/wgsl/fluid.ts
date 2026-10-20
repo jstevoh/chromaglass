@@ -4413,9 +4413,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     tile where the feed falls (mean 0, contrast 0) for about 3500 units, 20 s,
     so the app slews the Drift it hands here at 0.025 a second
     (TURING_DRIFT_PER_SECOND in LiquidVisualizer.tsx) and the lab check
-    ramps the same way. Over six reads the flattest 32-pixel tile keeps 0.95
-    of the control's contrast at Drift 0.7 and 0.89 at 1 (0.81 and 0.74 for
-    the shader before the glide, on the same ramp), and 0.55 to 0.58 of the
+    ramps the same way, by solver iterations (TURING_ITERATIONS_PER_SECOND).
+    Over six reads the flattest 32-pixel tile, looked for every 16 pixels so
+    a patch off the tile grid cannot hide between tiles, keeps 0.93 of the
+    control's contrast at Drift 0.7 and 0.77 at 1 (the whole-tile grid read
+    0.95 and 0.89, and 0.81 and 0.74 for the shader before the glide), and 0.55 to 0.58 of the
     cells carry activator (0.706 for held stripes, 0.483 for held spots).
 
     Shortcuts, named: the maps are plane waves, not a true noise field, so

@@ -3767,8 +3767,9 @@ none yet Metal's.
 
 Measured (`npm run turing` line 9, same seeds and stepping as 26d-6): correlation with the
 settled self 0.901 at Drift 0, 0.641 at 0.7 and 0.591 at 1 (0.867 and 0.814 through the
-shipped #413 shader on the same ramp); the flattest 32-pixel tile over six reads keeps 0.95
-and 0.89 of the control's contrast (0.81 and 0.74 through the #413 shader on the ramp;
+shipped #413 shader on the same ramp); the flattest 32-pixel tile over six reads, looked
+for every 16 pixels, keeps 0.93 and 0.77 of the control's contrast (0.95 and 0.89 on the
+first grid of whole tiles; 0.81 and 0.74 through the #413 shader on that grid and the ramp;
 stepped, not ramped, Drift 1 left a dead tile and measured 0.20); stripe wavelength within
 1.5% of the control's; the share of cells with activator 0.706 for held stripes, 0.483 for
 held spots, 0.55 to 0.58 for the drifting runs; connected pieces of activator 14 for held
@@ -3785,8 +3786,12 @@ spots' share and cap are read from the shader, so the check follows it; the lab 
 Drift at the rate it reads from `LiquidVisualizer.tsx`, as the app does, which is a change
 of input, and the wiring check wants the slew in the visualizer. The ramp is why the #413
 shader no longer meets the movement bars (0.867 against under 0.8). The tile bar (0.6)
-is unchanged and no longer separates the two shaders on the ramp (0.81 against 0.95); the
-glide line and the movement lines do. The bars for stripe width and the Drift 0 clock are
+is unchanged and did not separate the two shaders on the ramp (0.81 against 0.95, on the whole-tile
+grid); the glide line and the movement lines do. The tile search now steps half a tile, and a new
+line plants a flattened 32-pixel patch 16 pixels off the grid in the held stripes' last read and
+wants the line to see it (0.000 of the clean read's 0.104), so the line is shown able to go red.
+The app counts the slew in solver iterations (`TURING_ITERATIONS_PER_SECOND`, 180), not seconds,
+as the lab does, and the check reads both numbers and refuses a rate outside (0, 1]. The bars for stripe width and the Drift 0 clock are
 unchanged. Not tested: where a grey patch sits (a speckle of dead cells would still show in
 the width line, not the tile line).
 

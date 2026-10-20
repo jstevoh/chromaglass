@@ -1395,8 +1395,8 @@ the same line are unmeasured: read them off the first run of the `fifth` shard. 
   stripes should keep sliding, branching and joining in different parts of the plate at
   different times, slowly enough that no single frame looks like motion, and with no music
   playing or with music: the music must not change the pace.
-- The grey patch should be gone, at 0.7 and at 1.0: the lab's flattest tile keeps 0.95 and
-  0.89 of the stripes' contrast. If a soft grey area still shows on the Mac, that is Metal's
+- The grey patch should be gone, at 0.7 and at 1.0: the lab's flattest tile (searched every
+  16 pixels) keeps 0.93 and 0.77 of the stripes' contrast. If a soft grey area still shows on the Mac, that is Metal's
   rounding and the cap line needs refitting there (PLAN 26d-6a).
 - Watch for stripes breaking into dots in some regions and dots running back into stripes
   in others, over a minute or two. It should read as the chemistry changing, not the plate

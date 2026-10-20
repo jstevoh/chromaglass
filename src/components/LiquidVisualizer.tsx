@@ -305,9 +305,19 @@ const TURB_SPEED = 0.5;
  * frame starves where the feed falls, and a 32-pixel tile of the plate stays dead
  * for about twenty seconds: the grey patch again. Reaching 0.7 over twenty-eight
  * seconds (0.025 a second) leaves no tile flatter than the still print's. The
- * check reads this number from here, so what it ramps by is what the app does.
+ * check reads this number from here, and the iteration count below, so what it ramps
+ * by is what the app does.
  */
 const TURING_DRIFT_PER_SECOND = 0.025;
+/**
+ * The solver iterations a second the rate above is counted in: a frame of one sixtieth
+ * runs round(2.5) = 3 of them, 60 frames a second. The slew moves by the iterations a
+ * frame really ran, not by the frame's seconds, because a slow machine runs fewer
+ * steps a frame and a fast display alternates frames of one and none: counted in
+ * seconds the Drift would reach a settled print faster (or slower) per iteration than
+ * the lab, which ramps by iterations, ever measured. The check reads this too.
+ */
+const TURING_ITERATIONS_PER_SECOND = 180;
 /*
   How far the dye actually moves per unit of velocity, relative to what the
   beads and bubbles assume. Both of them turn a velocity into cells with a
@@ -7352,12 +7362,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               turingClockRef.current += sixtieths / 60;
               const driftWanted = print0 > 0 ? Math.max(0, Math.min(1, currentSettings.turingDrift ?? 0)) : 0;
               // Slewed, never stepped (TURING_DRIFT_PER_SECOND); a print that is off starts the next one from 0.
-              const driftStep = TURING_DRIFT_PER_SECOND * sixtieths / 60;
+              const chemIterations = Math.max(1, Math.min(10, Math.round(sixtieths * 2.5)));
+              const driftStep = TURING_DRIFT_PER_SECOND / TURING_ITERATIONS_PER_SECOND * chemIterations;
               turingDriftRef.current = print0 > 0
                 ? turingDriftRef.current + Math.max(-driftStep, Math.min(driftStep, driftWanted - turingDriftRef.current))
                 : 0;
               const drift = turingDriftRef.current;
-              g.stepChemistry?.(Math.max(1, Math.min(10, Math.round(sixtieths * 2.5))), feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0, drift, turingClockRef.current);
+              g.stepChemistry?.(chemIterations, feed, kill, 0.16 * w, 0.08 * w, chemAmt > 0 ? 1 : 0, drift, turingClockRef.current);
               // The look's palette where the look grows it; the reagent's own product where only a pour does.
               // A print is that product too, starch's complex, whatever the palette (depositChem, 26d).
               const print = print0;
