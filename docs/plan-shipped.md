@@ -4462,6 +4462,54 @@ and its flat-window chroma bar compares the window with the plate's own chroma p
 (the lamp's warm white is 8.8 levels apart by itself; the bar was 4 when the ground was
 grey). Every other `airlens` line and its numbers are unchanged: 10 of 10.
 
+### 33f. Bubbles that know their liquid (this PR)
+
+*Reported* (the owner, 2026-10-19): "We need better bubble physics and visualizations
+that account for liquid types as well."
+
+*Cause:* every bubble in `src/lib/bubbles.ts` read one liquid, a light mineral oil
+(`LIQUID_MU` 17 mPa·s, `LIQUID_SIGMA` 30 mN/m, 850 kg/m³), whatever the Thickness dial
+said and whatever had been poured. A bubble in glycerine ran as far ahead of the flow as
+one in water, drained its film as fast, climbed a tilted plate as fast.
+
+*Change:* `src/lib/bubbleLiquid.ts` says what the liquid is where a bubble is, in SI:
+- `plateLiquid(thickness)`: the clear liquid the dial stands for. Viscosity is the dial's
+  (`thicknessViscosity`); σ and ρ are lines between three real liquids (water 72 mN/m and
+  1000 kg/m³ at 0, the default oil at 0.45, glycerine 63.4 mN/m and 1261 at 1). μ is
+  anchored, ρν scaled by the one factor that makes the default exactly 17 mPa·s: water
+  comes out 0.89 mPa·s and glycerine 1.13 Pa·s (real 1.0 and 1.41; the dial's
+  glycerine is a kinematic 1.0 St, the real liquid 1.12).
+- `liquidAtCell`: the clear liquid with the poured liquid mixed in from the species
+  field, which the fluid already reads back about once a second (`speciesSnapshot()`
+  on the solver, dropped when the plate is cleared): ln ν by Arrhenius (the poured
+  part's log ratio bounded to ±9 as in the thin gap), and ρ and σ from the last-poured
+  bottle (`pouredRho`, and `Species.tension`, CPU only, in `liquidProps.ts`), because
+  the field's channels are share, ln ν, scatter and index, with no density. Only on the
+  thin gap: off it the bubbles keep the reference liquid they always had.
+- The scalings are ratios to the reference liquid, so they are 1 at the default:
+  the Bretherton speed ratio takes Ca = μU/σ from the bubble's own liquid; drainage
+  takes the mean μ/σ of the two bubbles touching (Stefan–Reynolds); the tilt climb is
+  ∝ Δρ/μ (Darcy in the gap); the stretch under drag is ∝ μ/σ; a wobble's damping ∝ μ/ρ;
+  Ostwald ripening ∝ σ (the Laplace pressure).
+
+*Measured* (`npm run bubblephysics`): the 11 lines the check printed before are
+unchanged to the digit at the default; five new lines hold the liquid to real numbers
+written in the script, not the module's own: the dial's μ, σ, ρ each within a stated
+miss of water, oil and glycerine (worst 20 %, glycerine's μ; the default is the old
+literals); Bretherton's ratio within 10 % (water 1.485 vs 1.484, oil 1.330 vs 1.330,
+glycerine 1.279 vs 1.250 at Ca 0.002); drainage time against the real liquids'
+Stefan–Reynolds time (water 0.28 s vs 0.31, oil 12.75 vs 12.75, glycerine 400 vs 500;
+0.0–1.5 % off the law on the dial's own μ and σ); the climb (0.089 of the oil's at
+Thickness 0.8 against the law's 0.089, glycerine 0.022 against the real 0.018, water at
+the 4x ceiling); and the species field in its real layout, a glycerine cell off the
+diagonal of an oil plate reading 1.26 Pa·s and 1261 kg/m³, its transpose staying oil,
+half and half 158 mm²/s against the geometric mean 158, and a bubble run in that cell
+climbing 0.141 of the oil's against the law's 0.141. A review of the first version
+caught that it read density from a channel that holds scatter, and a check that wrote
+the layout the GPU does not; both are fixed. `pops` 9 of 9 and
+`bubblelook` 10 of 10 unchanged. `holeline`, `airlens` and `lampzero` close their browser
+in a cloud session before printing anything, on a clean tree too; CI runs them.
+
 ### 33g. The closeup: the liquid nearer and in relief, not cells (this PR)
 
 *Reported* (the owner, 2026-10-19): "Macro zoom is also still not great. Things look like

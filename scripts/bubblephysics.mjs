@@ -219,6 +219,166 @@ const N = 192, dt = 1 / 60;
     `ratio ${ratio.toFixed(3)} matches physical ratio 0.625 (moved ${movedViscous.toFixed(1)} vs ${movedDefault.toFixed(1)} cells)`);
 }
 
+// ── 7. Each liquid's own bubbles (PLAN 33f) ────────────────────────────
+// The plate's clear liquid is the Thickness dial: water at 0, the default light
+// oil at 0.45, glycerine at 1. Bubbles read it for their speed (Bretherton),
+// their film drainage (Stefan-Reynolds, ∝ μ/σ), their climb (Darcy, ∝ Δρ/μ),
+// and how far drag stretches them. The theory below is written out here from
+// the REAL liquids' numbers and the textbook laws, not read back from the
+// module, so a module that agreed with itself would not pass.
+{
+  const outLiquid = 'node_modules/.cache/bubblephysics-liquid.mjs';
+  await build({ entryPoints: ['src/lib/bubbleLiquid.ts'], bundle: true, format: 'esm', platform: 'node', outfile: outLiquid, logLevel: 'warning' });
+  const { plateLiquid, liquidAtCell } = await import(`../${outLiquid}`);
+  const REAL = { water: { t: 0, mu: 0.0010, sigma: 0.0728, rho: 998 }, oil: { t: 0.45, mu: 0.017, sigma: 0.030, rho: 850 }, glycerine: { t: 1, mu: 1.41, sigma: 0.0634, rho: 1261 } };
+
+  // 7a. The plate's liquids are the real ones to within what the dial can be
+  // (its glycerine is a kinematic 1.0 St against the real 1.12, so its μ is
+  // 20% under 1.41 Pa·s; water's is 11% under), and the default's numbers
+  // are the bubbles' old numbers exactly: the literals bubbles.ts held before
+  // 33f, not the module's own constants.
+  {
+    const bar = { water: { mu: 0.13, sigma: 0.03, rho: 0.03 }, oil: { mu: 0, sigma: 0, rho: 0 }, glycerine: { mu: 0.22, sigma: 0.03, rho: 0.03 } };
+    let worst = 0, over = [];
+    for (const [n, r] of Object.entries(REAL)) {
+      const l = plateLiquid(r.t);
+      for (const k of ['mu', 'sigma', 'rho']) {
+        const miss = Math.abs(l[k] / r[k] - 1);
+        worst = Math.max(worst, miss);
+        if (miss > bar[n][k]) over.push(`${n} ${k} ${(miss * 100).toFixed(0)}%`);
+      }
+    }
+    const d = plateLiquid(0.45);
+    const ref = new BubbleField(N);
+    const typesDefault = (await import('node:fs')).readFileSync('src/types.ts', 'utf8').match(/^\s*gapThickness:\s*([0-9.]+),/m);
+    check('the Thickness dial stands for water, oil and glycerine: μ, σ, ρ each within its stated miss of the real liquid, the default exactly the old numbers',
+      over.length === 0 && d.mu === 0.017 && d.sigma === 0.030 && d.rho === 850 && ref.liquidMu === 0.017 && ref.liquidSigma === 0.030 && ref.liquidRho === 850 && Number(typesDefault?.[1]) === 0.45,
+      `worst miss ${(worst * 100).toFixed(0)}%${over.length ? ', over: ' + over.join(', ') : ''}; default ${(d.mu * 1000).toFixed(1)} mPa·s ${(d.sigma * 1000).toFixed(1)} mN/m ${d.rho} kg/m³ (types.ts default ${typesDefault?.[1]}); glycerine ${plateLiquid(1).mu.toFixed(2)} Pa·s`);
+  }
+
+  // 7b. Speed ahead of the flow: Bretherton's 1.5/(1 + 2.26 Ca^(2/3)), floored at 1,
+  // for the real liquid's Ca. Water barely feels its film, glycerine is slowed
+  // to the flow itself; the same flow, three liquids.
+  {
+    const run = (t, uFlow) => {
+      const f = new BubbleField(N);
+      f.setLiquid(t);
+      f.spawn(96, 96, 4, 1, 0);
+      const b = f.bubbles[0];
+      const x0 = b.x;
+      for (let k = 0; k < 60; k++) f.step(dt, () => [uFlow, 0], 0, 0, 1, 0);
+      return (b.x - x0) / (uFlow * (0.05 * 190 * 60));
+    };
+    const theory = (r, uFlow) => {
+      const U = uFlow * (0.05 * 190 * 60) * (0.2 / N);
+      const Ca = r.mu * U / r.sigma;
+      return Math.max(1, 1.5 / (1 + 2.26 * Math.cbrt(Ca * Ca)));
+    };
+    const cases = [['water', 0.04], ['oil', 0.04], ['glycerine', 0.002], ['glycerine', 0.04]];
+    const rows = cases.map(([n, u]) => ({ n, u, got: run(REAL[n].t, u), want: theory(REAL[n], u) }));
+    const within = rows.every((r) => Math.abs(r.got / r.want - 1) < 0.10);
+    // Ordered: at one flow water runs furthest ahead, glycerine not at all.
+    const ordered = rows[0].got > rows[1].got && rows[1].got > rows[3].got - 1e-9 && rows[3].got >= 1 - 1e-9;
+    check('bubble speed ahead of the flow follows Bretherton for each liquid within 10% of the real liquid\'s Ca, and water > oil > glycerine',
+      within && ordered,
+      rows.map((r) => `${r.n}@${r.u} ${r.got.toFixed(3)} vs ${r.want.toFixed(3)}`).join(', '));
+  }
+
+  // 7c. Film drainage between two touching bubbles, t ∝ μ/σ: water in a
+  // third of a second, the oil's 13 s, glycerine minutes. Against the same
+  // Stefan-Reynolds expression evaluated with the real liquids, and (a tight
+  // bar, the law's form) with the plate's own μ and σ.
+  {
+    const FACTOR = 7200;
+    const drain = (t, r) => {
+      const f = new BubbleField(N);
+      f.timedPops = false;
+      f.setLiquid(t);
+      f.spawn(80, 80, r, 1, 0);
+      f.spawn(85, 80, r, 1, 0);
+      const [b1, b2] = f.bubbles;
+      b1.r = r; b2.r = r; b1.age = 2.5; b2.age = 2.5;
+      b2.x = b1.x + (b1.r + b2.r) * 0.94; b2.y = b1.y;
+      let frames = 0;
+      while (f.bubbles.length > 1 && frames < 60000) { f.step(dt, (x) => [x < 82.5 ? 0.02 : -0.02, 0], 0, 0, 1, 0); frames++; }
+      return frames * dt;
+    };
+    const Re = 3, ReM = Re * (0.2 / N);
+    const rows = Object.entries(REAL).map(([n, real]) => ({ n, got: drain(real.t, 2 * Re), want: FACTOR * (real.mu / real.sigma) * ReM }));
+    const within = rows.every((r) => Math.abs(r.got / r.want - 1) < 0.25 || Math.abs(r.got - r.want) < 2 * dt);
+    const ordered = rows[0].got < rows[1].got && rows[1].got < rows[2].got;
+    // The law's form, against the dial's own μ and σ: the bar a bubble that
+    // ignored either would miss by a factor, not a few per cent.
+    const form = rows.map((r) => { const l = plateLiquid(REAL[r.n].t); return Math.abs(r.got / (FACTOR * (l.mu / l.sigma) * ReM) - 1); });
+    check('film drainage time follows μ/σ across water, oil and glycerine (within 25% of the real liquids\' Stefan-Reynolds time, 5% of the law on the dial\'s own μ and σ)',
+      within && ordered && form.every((e, i) => e < 0.05 || Math.abs(rows[i].got - FACTOR * (plateLiquid(REAL[rows[i].n].t).mu / plateLiquid(REAL[rows[i].n].t).sigma) * ReM) < 2 * dt),
+      rows.map((r, i) => `${r.n} ${r.got.toFixed(2)}s vs ${r.want.toFixed(2)}s real, ${(form[i] * 100).toFixed(1)}% off the law`).join(', '));
+  }
+
+  // 7d. Climb up a tilted plate, ∝ Δρ/μ (Darcy in the gap), against the oil's.
+  // Two lines: the law's form where nothing is clamped (a syrup between the
+  // oil and glycerine, against the ratio of the dial's own ρ and μ, 5%), and
+  // the ends against the real liquids, glycerine within 40% of the real
+  // ratio and water held at the 4x ceiling, which is a named shortcut.
+  const climb = (t, species = null, at = [96, 96], poured = {}) => {
+    const f = new BubbleField(N);
+    f.setLiquid(t);
+    if (species) { f.species = species; f.pouredRho = poured.rho; f.pouredSigma = poured.sigma; }
+    f.spawn(at[0], at[1], 4, 1, 0);
+    const b = f.bubbles[0];
+    const y0 = b.y;
+    for (let k = 0; k < 30; k++) f.step(dt, () => [0, 0], 0, -0.004, 1, 0);
+    return (b.y - y0);
+  };
+  {
+    const oil = climb(0.45), water = climb(0), gly = climb(1), mid = climb(0.8);
+    const lo = plateLiquid(0.8), l0 = plateLiquid(0.45);
+    const wantMid = (lo.rho / l0.rho) * (l0.mu / lo.mu);
+    const wantGly = (REAL.glycerine.rho / REAL.oil.rho) * (REAL.oil.mu / REAL.glycerine.mu);
+    check('a bubble climbs a tilted plate as Δρ/μ: the law within 5% unclamped, glycerine within 40% of the real ratio to the oil, water at the 4x ceiling',
+      Math.abs((mid / oil) / wantMid - 1) < 0.05 && wantMid > 0.05 && wantMid < 3
+        && Math.abs((gly / oil) / wantGly - 1) < 0.40 && Math.abs(water / oil - 4) < 0.05 && gly < oil,
+      `at Thickness 0.8 ${(mid / oil).toFixed(3)} of the oil's (law ${wantMid.toFixed(3)}); glycerine ${(gly / oil).toFixed(3)} (real ${wantGly.toFixed(3)}), water ${(water / oil).toFixed(2)}x`);
+  }
+
+  // 7e. Poured liquid, in the species field's real layout: share, Σ share·
+  // ln(ν/ν_w), Σ share·μs′ (scatter, 0 for glycerine), Σ share·index. There
+  // is no density in it, so the poured part's comes from the liquid last
+  // poured. A cell off the diagonal of a plate of oil, so a transposed read
+  // or a plate term left out shows; then a bubble run in it.
+  {
+    const L = 8;
+    const NU_W = 1e-6, NU_G = 1.12e-3, RHO_G = 1261;
+    const cellAt = (cx, cy) => (cx + cy * L) * 4;
+    const mk = (share) => {
+      const data = new Float32Array(L * L * 4);
+      const at = cellAt(5, 2);
+      data[at] = share; data[at + 1] = share * Math.log(NU_G / NU_W); data[at + 2] = 0; data[at + 3] = share * 1.4746;
+      return { L, data };
+    };
+    const oil = plateLiquid(0.45);
+    const out = { mu: 0, sigma: 0, rho: 0, nu: 0 };
+    const px = (c) => ((c + 0.5) / L) * N;
+    const read = (snap, cx, cy) => ({ ...liquidAtCell(oil, snap, px(cx), px(cy), N, 0.0634, RHO_G, out) });
+    const full = read(mk(1), 5, 2);
+    const away = read(mk(1), 2, 5);
+    const half = read(mk(0.5), 5, 2);
+    // Arrhenius on the oil plate: half glycerine is the geometric mean of the two ν.
+    const geoNu = Math.sqrt(oil.nu * NU_G), geoRho = (oil.rho + RHO_G) / 2;
+    const geoMu = oil.mu * (geoNu / oil.nu) * (geoRho / oil.rho);
+    // A bubble in the half-glycerine cell climbs at Δρ/μ of that cell against the oil's.
+    const here = [px(5), px(2)];
+    const slow = climb(0.45, mk(0.5), here, { rho: RHO_G, sigma: 0.0634 }) / climb(0.45, null, here);
+    const wantSlow = (geoRho / oil.rho) * (oil.mu / geoMu);
+    check('poured liquid changes the bubble\'s liquid where it lies: a glycerine cell off the diagonal is glycerine (density from the last pour), the transposed cell stays oil, half and half mixes by Arrhenius and slows a bubble in it by Δρ/μ',
+      Math.abs(full.nu / NU_G - 1) < 0.02 && Math.abs(full.rho - RHO_G) < 1 && Math.abs(full.mu / (oil.mu * (NU_G / oil.nu) * (RHO_G / oil.rho)) - 1) < 0.02 && Math.abs(full.sigma - 0.0634) < 1e-9
+        && away.mu === oil.mu && away.sigma === oil.sigma && away.rho === oil.rho
+        && Math.abs(half.nu / geoNu - 1) < 0.02 && Math.abs(half.rho - geoRho) < 1
+        && Math.abs(slow / wantSlow - 1) < 0.10 && wantSlow > 0.05 && wantSlow < 0.5,
+      `glycerine cell ${full.mu.toFixed(2)} Pa·s ${full.rho.toFixed(0)} kg/m³, transposed cell ${(away.mu * 1000).toFixed(1)} mPa·s, half-half ν ${(half.nu * 1e6).toFixed(0)} mm²/s vs geometric mean ${(geoNu * 1e6).toFixed(0)}; a bubble there climbs ${slow.toFixed(3)} of the oil's (law ${wantSlow.toFixed(3)})`);
+  }
+}
+
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
 process.exit(failed.length ? 1 : 0);

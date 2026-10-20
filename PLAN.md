@@ -7426,31 +7426,27 @@ Left from it, so none of it is lost:
   Whether the 0.7 is a choice to keep, or a bug (a hole in clear water should be as dark
   at its rim as one in dye), is for 33f's per-liquid pass to settle with a picture.
 
-### 33f. Bubbles that know their liquid (M)
+### ~~33f. Bubbles that know their liquid~~ — **Shipped, this PR** (the bubbles' motion now reads the liquid they are in: the Thickness dial's clear liquid, and the poured liquid under each bubble from the species field, `src/lib/bubbleLiquid.ts`; `npm run bubblephysics` 11 of 11 unchanged at the default, 16 of 16 with the five new lines: Bretherton's speed ratio, film drainage, tilt climb and the species mix for water, oil and glycerine; story in `docs/plan-shipped.md` §33f)
 
-The bubbles' motion reads one plate-wide viscosity and surface tension
-(`liquidMu`, `liquidSigma` in `src/lib/bubbles.ts`; 18i), and their drawing one
-index. The species field (`src/lib/liquidProps.ts`, 18d) already carries each cell's
-viscosity, density and index. Read them under each bubble:
-- *Speed and film:* Ca = μU/σ from the cell's μ; Bretherton's speed-up
-  1.5/(1 + 2.26 Ca^(2/3)) (18i) with that Ca, so a bubble in glycerine lags the
-  flow and one in alcohol runs ahead of it.
-- *Shape:* the Saffman–Taylor fingering and a sheared bubble's stretch from the same Ca.
-- *Merging:* the film's drainage time ∝ (μ/σ)·R (18i) per cell, so bubbles in syrup
-  sit touching far longer than in water.
-- *Optics:* 33e's band from the cell's index (oil about 1.47, water 1.33, alcohol
-  1.36, glycerine 1.47); in ferrofluid the liquid is opaque, so a bubble is a bright
-  window in black and its band the meniscus's thinning; in a milky liquid the
-  middle is the brightest thing on the plate.
-- A surface-tension table per liquid (water 72, oils about 30, alcohol 22, soapy
-  water about 30 mN/m) added to the bottle's behaviour, defaulting to today's
-  `liquidSigma` so every look keeps its motion.
-Shortcuts to name: one σ per liquid (no surfactant moving along the rim, no Marangoni
-flow), and the wetting film's thickness not drawn as colour.
-*Check:* `npm run bubblephysics` extended: one bubble pushed through water, oil and
-glycerine: the speed ratios follow Bretherton's law within 10 %, the drainage times
-follow μ/σ within 20 %, and (with 33e) the band width oil against water follows u*
-within 15 %; on the plate's own liquid, every number today's check prints unchanged.
+- **33f-2. The bubble's drawing does not yet know its liquid.** What is open from the
+  first plan: the optics (33e's band from the cell's index, a bright window in
+  ferrofluid, the milky liquid's lit middle) and a per-bubble look. The bubble's air
+  alpha is an 11-bit pack (size 4 bits, age 4, id 3) and the plate pass is at the
+  16-sampled-texture ceiling, so a per-bubble index or liquid id has no channel to ride
+  and no slot for a species texture. Needs the pack widened or the bubbles' own small
+  texture; take it with a `look` render of water, oil and glycerine side by side. Also
+  open: whether the clear-water bubble should keep 33e's 70 % strength.
+- **33f-3. Named shortcuts of the motion, to retire one at a time.** One σ per plate
+  position (the last-poured bottle's, for the poured share; a plate with two poured
+  liquids is approximate); the dial's σ and ρ are straight lines between water, the
+  default oil and glycerine, where the real family is not a line; the species field is
+  read about once a second, so a bubble that crosses a front sees the old liquid for up
+  to a second; the climb, the stretch and the wobble's damping are clamped (4x and
+  0.02x; 0.3x and 3x); spawn size and the capillary length still read the plate's one
+  liquid. Marangoni flow and a surfactant moving on the rim are not modelled. Not
+  measured on a GPU: that the readback's rows run the same way as the bubbles' y (the
+  check holds the module's own orientation); pour glycerine off the diagonal on the Mac
+  and read a bubble's μ there.
 
 ### ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped, this PR** (Paint Cells and Macro Lacing now default to 0, so no look draws cells it did not name; the relief is lit by a raking lamp with a rolled-off glint and a thinner boundary line, `src/gpu/wgsl/plate.ts`; `npm run macroview`: the cells' share of the frame was 0.14 at 4x and 0.17 at 6x before, 0 after, bar 0.01; the relief is 0.033–0.051 of the frame, 0.99 of it smooth, and the colour keeps within chroma distance 3.1 of the 1x frame, bar 5; story in `docs/plan-shipped.md` §33g; 20c-1 is closed by it)
 
