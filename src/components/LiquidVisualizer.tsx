@@ -46,7 +46,7 @@ import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../li
 import { stirOf } from '../lib/stir';
 import { kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
-import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
+import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
@@ -6426,6 +6426,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
+    const onLicenseChanged = () => {
+      reladderRef.current();
+      resizeRef.current();
+    };
+    window.addEventListener('chromaglass:license-changed', onLicenseChanged);
+    window.addEventListener('cg-license-changed', onLicenseChanged);
+    return () => {
+      window.removeEventListener('chromaglass:license-changed', onLicenseChanged);
+      window.removeEventListener('cg-license-changed', onLicenseChanged);
+    };
+  }, []);
+
+  useEffect(() => {
     const currentCount = fluidsRef.current.length;
     // Whole layers only, whatever arrives (a fade, a fader, a saved show): a
     // fractional count here builds a solver on one change and drops it on the next.
@@ -10327,9 +10340,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         */
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
+        forceStepDown: (steppedDown = true) => {
+          if (steppedDown) governorRef.current?.failRung(performance.now() * 0.001);
+          const prev = engineStatusRef.current;
+          const next: EngineStatus = {
+            label: prev?.label ?? 'WebGPU · 384² · 1.0x',
+            engine: prev?.engine ?? 'webgpu',
+            grid: prev?.grid ?? 384,
+            dpr: prev?.dpr ?? 1,
+            tier,
+            gpu: prev?.gpu ?? 'mid',
+            renderer: prev?.renderer ?? 'WebGPU',
+            governed: true,
+            steppedDown,
+            gpuUnavailable: false,
+            frameMs: prev?.frameMs ?? 24,
+            simMs: prev?.simMs ?? 12,
+            layers: prev?.layers ?? 1,
+            stepsPerSec: prev?.stepsPerSec ?? 30,
+            stepRate: prev?.stepRate ?? 30,
+            otherMs: prev?.otherMs ?? 4,
+          };
+          engineStatusRef.current = next;
+          engineStatusAtRef.current = performance.now() * 0.001;
+          onEngineStatusRef.current?.(next);
+        },
         errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
         ambientSeed: (on: boolean) => { ambientSeedRef.current = !!on; },
         gridCap: () => gridCapRef.current,
+        ladderRungs: () => governorRef.current?.rungs ?? [],
         ...(renderer?.debug?.() ?? {}),
       });
     if (!isDraftRef.current && new URLSearchParams(window.location.search).has('debug')) {
@@ -10486,7 +10525,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     let ladderKey = '';
     const govern = (r: PlateRenderer, fresh: boolean) => {
-      const ladder = qualityLadder(tier, r.info.gpuClass, stageRef.current, gridCapRef.current);
+      const ladderTier = effectiveLadderTier(tier);
+      const ladder = qualityLadder(ladderTier, r.info.gpuClass, stageRef.current, gridCapRef.current);
       const key = ladder.rungs.map((x) => `${x.grid}@${x.dpr}`).join(' ');
       if (!fresh && key === ladderKey && governorRef.current) return;
       ladderKey = key;

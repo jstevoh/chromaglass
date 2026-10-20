@@ -420,6 +420,66 @@ try {
       `proTileSectionCount=${proTileSectionCount}`,
     );
 
+    // 12. Step-down nudge suggests upgrading to Pro (never git clone) and hides when Pro is active
+    await page.evaluate(() => {
+      const w = window;
+      w.chromaglassDebug?.()?.forceStepDown?.(true);
+    });
+    await page.waitForTimeout(300);
+    const proGridNudgeWhilePro = await page.locator('[data-cg-grid-upgrade-pro]').count();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    const floatingNudgeWhilePro = await page.locator('[data-cg-upgrade-pro-nudge]').count();
+
+    // Deactivate Pro key so we are back on the free tier, then trigger step-down
+    await page.click('[data-cg-account-open]');
+    await waitFor(
+      () => page.locator('[data-cg-account]').isVisible().catch(() => false),
+      10_000,
+    );
+    await page.click('[data-cg-license-deactivate]');
+    await waitFor(
+      async () =>
+        (await page.locator('[data-cg-license-tier]').getAttribute('data-cg-license-tier')) === 'free',
+      10_000,
+    );
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      try {
+        localStorage.removeItem('chromaglass-run-locally-dismissed');
+      } catch {
+        // ignore
+      }
+      const w = window;
+      w.chromaglassDebug?.()?.forceStepDown?.(true);
+    });
+    await waitFor(
+      () => page.locator('[data-cg-upgrade-pro-nudge]').isVisible().catch(() => false),
+      10_000,
+    );
+    const nudgeText = (await page.locator('[data-cg-upgrade-pro-nudge]').textContent()) ?? '';
+    const nudgeCtaHref =
+      (await page.locator('[data-cg-upgrade-pro-cta]').getAttribute('href')) ?? '';
+    await page.click('[data-testid="open-all-settings"]');
+    await waitFor(
+      () => page.locator('[data-cg-grid-upgrade-pro]').isVisible().catch(() => false),
+      10_000,
+    );
+    const has1024Option =
+      (await page.locator('#settings-simulation option[value="1024"]').count()) === 1;
+    check(
+      '12. slower framerates suggest upgrading to Pro with 768²/1024² GPU headroom (no git clone) and hide when Pro is active',
+      proGridNudgeWhilePro === 0 &&
+        floatingNudgeWhilePro === 0 &&
+        nudgeText.includes('ChromaGlass Pro') &&
+        !nudgeText.includes('git clone') &&
+        !nudgeText.includes('Run it locally') &&
+        nudgeCtaHref.includes('lemonsqueezy.com/checkout/buy/') &&
+        has1024Option,
+      `proGridWhilePro=${proGridNudgeWhilePro} floatWhilePro=${floatingNudgeWhilePro} has1024=${has1024Option} href=${nudgeCtaHref}`,
+    );
+
     await ctx.close();
   }
 } catch (err) {

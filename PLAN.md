@@ -5814,6 +5814,7 @@ once the login works (23.14).*
   saved ChromaGlass state in `localStorage` (licence, signed-in flag, settings, set list),
   and there is no `?remote` or `?cast`, so returning users and offline shows do not lose
   their origin-scoped state before a handoff moves it across.
+- **23.17** (**shipped**, this PR): when slower frame rates cause the governor to step down (`status.steppedDown`) or the GPU solver is unavailable (`status.gpuUnavailable`), replace the old "Run it locally" `git clone` card (`src/components/RunLocallyCard.tsx`) and add a matching phone/desk `Fluid Grid` callout (`src/components/SettingsPanel.tsx`) suggesting an upgrade to **ChromaGlass Pro** (`CHECKOUT_PRO_URL` / `CHECKOUT_UPGRADE_URL` and `AccountSheet`), hidden once a Pro key is active; and unlock the full local GPU/CPU quality ladder (`768²` and `1024²` grids, native Retina display DPR, projector `stageLadder`, and full WebGPU adapter limits in `src/gpu/device.ts`) whenever a verified Pro licence is active (`effectiveLadderTier` in `src/lib/platform.ts`, `LiquidVisualizer.tsx`), plus pass `VITE_FIREBASE_LICENSES_URL` in `.github/workflows/deploy.yml`. *Measure:* `npm run tiers` (12/12) and `npm run rungs` (74/74).
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free
