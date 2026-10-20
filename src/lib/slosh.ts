@@ -55,6 +55,18 @@
  *   (g) A wave that breaks is a quadratic drag and a speed wall (SLOSH_BREAKING,
  *       SLOSH_FROUDE_MAX), not a shock-capturing bore: the energy a real wave
  *       spends in foam is taken out by the drag, and the front is not sharp.
+ *   (h) The drag is the covered gap's, not an open layer's. sloshDrag is 12 nu/h^2,
+ *       Poiseuille between two no-slip walls, which is what the thin solver
+ *       assumes of the plate. A layer whose top is free would drag at half
+ *       Poiseuille, 3 nu/h^2, four times weaker, and at slosh frequencies water's
+ *       Stokes layer is thinner than the gap so the steady profile is itself an
+ *       approximation (about 0.25/s from a Stokes estimate against the 0.33/s
+ *       used). It moves the pace, so name it before tuning SLOSH_LEAN against it
+ *       (PLAN 18a-13b).
+ *   (i) A phone's tilt reaches the dish in screen axes. Gravity's direction is
+ *       turned by the turntable's angle and the remote's tilt is not, so with
+ *       the plate turned a phone tipped right sloshes at that angle. The rock
+ *       takes the phone's tilt the same way (PLAN 18a-13e).
  *
  * The tilt is the dish's, nothing the sound does. The caller hands `a` from
  * the user's Gravity and Tilt Direction (and a held phone's tilt), and from
@@ -87,7 +99,11 @@ export const SLOSH_C = Math.sqrt(SLOSH_G * SLOSH_REST_DEPTH);
 export const SLOSH_LEAN = 0.01;
 /** The depth the liquid is not let below, a share of the rest depth. The dye is not drawn through a dry patch. */
 export const SLOSH_FLOOR = 0.12;
-/** The largest substep, seconds: Courant at c plus a fast flow stays under 0.45. */
+/**
+ * The largest substep, seconds. The Courant number is about 0.39 at c alone and
+ * about 0.70 at the speed wall (1.8c), under the 2-D forward-backward limit of
+ * about 0.71, so a fast flow is close to it, which is why the wall is where it is.
+ */
 export const SLOSH_DT_MAX = 0.005;
 /**
  * Wave breaking, as a drag that grows with the speed: 1/s per unit of Froude
