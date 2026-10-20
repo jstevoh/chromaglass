@@ -1174,9 +1174,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroAimX: 0.5,
   macroAimY: 0.5,
   macroSync: 0.5,
-  macroCells: 0.75,
+  macroCells: 0,           // opt-in since 33g: the default closeup is the liquid, not packed cells
   macroCellScale: 0.5,
-  macroLacing: 0.55,
+  macroLacing: 0,
   macroDepth: 0.5,
   macroEdgeDetail: 0.6,
   macroRelief: 0.7,
