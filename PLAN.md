@@ -6754,6 +6754,37 @@ Turing Print" work (#331), which also made the reaction grow at all.
   Ferro & Film (Ferro Paint, Magnet Garden, Soap Film). None of the batches touches the
   gallery's grey wash (#401).
 
+- **28j. Changing looks without a jump** (the owner, 2026-10-19: "transitions between
+  presets are also a little jumpy here and there"). `blendLooks` fades every number and
+  colour but switches lists, steps and booleans at the midpoint, and the handoff in
+  `LiquidVisualizer` lays the new look's ferrofluid ring in one frame. ~~**28j-1. The two
+  jumps a Go, a Back and a Send to wall made on every pair**~~ (**shipped**; story in
+  `docs/plan-shipped.md` 28j-1): the patch list (`sceneMappings`) now crossfades by depth,
+  and the ring's `phaseAmount` dips to nothing at the swap and rises on the new look's own
+  value. Open, each named so it is not found twice:
+  - **28j-2. The handoff's first frame.** `clearChemistry` and the fluids' `liquid.clear`
+    run on frame one of every Go, so the dye's chemistry cuts while the dye thins. Needs a
+    fade of the clear (the readbacks only exist on a GPU): measure the first-frame step of
+    the chemistry fields on the Mac, before and after.
+  - **28j-3. The paths that do not hand off.** MIDI program changes, `preset-next` and
+    `preset-prev`, sound triggers and the set list's own steps call `adoptPreset` with
+    no `handoff` and no `lookFadeStep` at all; a song's new look (`evolvedLook`) travels
+    the numbers but not the ring. `arrive` times the black after a step; it does not
+    measure a jump, so a new measure (the frame-to-frame change of the plate across the
+    swap, `PW_WEBGPU=1` is not enough: it needs the app's frames) is part of this item.
+  - **28j-4. The midpoint switches that show.** Of 992 look pairs the midpoint switches
+    `layerCount` on 510, `blendMode` on 498, `ledPlatform` 494, `turbulenceDetail` 450,
+    `viscosity` 414, `ledMode` 278, `macroMode` 174, `macroCamera` 120, `kaleidoscope` 62
+    and `stockType` 62. Each is a different kind of jump (a layer appearing, a blend
+    changing, the solver's viscosity stepping); none is fixed by one rule, so take the
+    most-seen first and look at each on the Mac.
+  - **28j-5. `audioMappings` switch at the midpoint** on 944 of 992 pairs, so the sound
+    drives the old look's settings until 0.5 and the new look's after. The numbers they
+    drive are mid-blend at that moment, so a mapping that swaps can pull a setting off
+    its blended value by its full depth in one tick. Crossfade the depths as 28j-1 does
+    the patches, and add the same step-per-tick bar to `desk`.
+
+
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
 The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more
