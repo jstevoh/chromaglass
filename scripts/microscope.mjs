@@ -33,7 +33,10 @@ try {
     lab.flush(); await lab.step(30);
     const S = 256, out = {};
     for (const z of ZOOMS) {
-      const px = await lab.render(S, { macroMode: z > 1.05, macroZoom: z }, { zoom: z, cx: 0.45, cy: 0.5 });
+      // Cells and lacing are opt-in since PLAN 33g (default 0); the ramp this
+      // check holds is theirs, so the frame asks for them as a look like Cell
+      // Bloom does, at the strengths that were the default when it was written.
+      const px = await lab.render(S, { macroMode: z > 1.05, macroZoom: z, macroCells: 0.75, macroLacing: 0.55 }, { zoom: z, cx: 0.45, cy: 0.5 });
       const L = (x, y) => { const i = (y * S + x) * 4; return 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2]; };
       let e = 0, n = 0;
       for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {

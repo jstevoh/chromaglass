@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Closeup is the liquid, not cells (PLAN 33g)
+
+- **Paint Cells** (`macroCells`) and **Macro Lacing** (`macroLacing`) default to 0 and Lucky
+  no longer rolls them, so the macro closeup at 4× and above shows the dye you poured, not a
+  field of concentric rings and dark filaments over it. **Relief** is relit: a lower lamp, a
+  stronger swell from the dye's own gradient, a softer glint and a thinner boundary line, so
+  the closeup reads as a thick film seen closer. Macro Bead, Cell Bloom and Lace Run keep
+  their cells by name, and a saved look that stored 0.75 and 0.55 keeps them. New check:
+  `npm run macroview`.
+
 ### Added — Print Drift (PLAN 26d-6)
 
 - **Print Drift** (`turingDrift`, Settings → Lamp & Light under Chemistry; MIDI, the desks,
