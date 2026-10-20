@@ -7401,8 +7401,12 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   `lace-run` set Paint Cells and Macro Lacing themselves, so they still draw cells at
   the closeup. The owner to say whether they should stay (they are named for them) or
   lose them too; `macroview` does not ask them.
-- **33g-4. A Metal run.** `macroview`'s numbers are SwiftShader's. The relief's
-  numbers (and the lamp's look) want one run on the Mac.
+- **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
+  shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
+  old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma
+  distance 1.21 to 3.11, half-turned crop least 9.25, 1x chroma least 7.62. These match
+  SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
+  line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

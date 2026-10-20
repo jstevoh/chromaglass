@@ -4395,7 +4395,7 @@ relief and not an outline. Nothing moves: the camera and its clock are as before
 not a physical height field (33g-2); the thinned boundary line is a taste choice; the
 cells that remain are 20c-1's look-alike, opt-in.
 
-*Measured* (`npm run macroview`, the lab on SwiftShader, nine seeded pools stirred at
+*Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
 and lacing's own contribution to the frame (the frame against the same frame with both
 at 0, over the frame's mean) was 0.14 at 4x and 0.17 at 6x on the old defaults, and is 0
