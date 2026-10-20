@@ -297,6 +297,8 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
   // Frame Sway is a hand's alone (the owner, 2026-10-11): a kick routed to it would slide the whole frame on the beat (lib/plateRock.ts).
   'frameSway',
+  // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
+  'slosh',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
@@ -470,6 +472,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
   { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
+  { key: 'slosh',           label: 'Slosh',            min: 0, max: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   // A knob: a verse wants every kick, a chorus the one.
   { key: 'beatAccent',      label: 'Accent the One',   min: 0, max: 1 },

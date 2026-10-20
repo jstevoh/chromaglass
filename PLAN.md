@@ -4201,6 +4201,39 @@ its frame rate live. "Free" means no new passes or texture reads.
     numbers every Thin Gap result shipped on. So the clear is gone and the warm start
     is the choice, said where the solve begins (`thinProject`). Open: whether
     `hsCycles` from cold should converge on a grid that is not a power of two.
+  - **18a-13, tilt sloshes the liquid: shipped** (the owner, 2026-10-20: tip it one way
+    and then the other and the colour should slop and mix). A shallow-water dish on the
+    CPU (`lib/slosh.ts`) fed by the owner's tilt alone, its flow added to the thin solve's
+    velocity after the solve, behind a new **Slosh** dial at 0 (the plate as it was, bit
+    for bit; `npm run slosh`). How it was found and measured is in
+    [`docs/plan-shipped.md`](docs/plan-shipped.md) §18a-13; the owner's eyes on the pace
+    are `docs/judging.md` §58. Shortcuts, each named in the code, and the items that
+    replace them:
+    - **18a-13a. Two layers.** One layer of liquid slops; oil and water would slosh at
+      different speeds and shear past each other. Needs the dish to carry two depths
+      and the oil's interface, which the oil's own fields (`oilBodies`) could seed.
+    - **18a-13b. The rim's boundary layer.** The rim is free-slip; a real dish's wall
+      holds a thin layer still and sheds a vortex when the wave turns there. The
+      drag too is the covered gap's (12ν/h², Poiseuille between two walls), where a
+      layer with a free top drags at 3ν/h², four times weaker, and water's Stokes
+      layer at slosh frequencies is thinner than the gap (about 0.25/s against the
+      0.33/s used). It moves the pace the owner judges in §58, so replace it before
+      tuning `SLOSH_LEAN` against it.
+    - **18a-13c. Drawing the depth.** The dye does not feel the depth (the dish moves
+      it, it does not thin where the liquid is shallow), so a wave never shows as a
+      brighter crest or a lamp-lit slope.
+    - **18a-13d. A shock-capturing scheme.** Breaking is quadratic drag and a speed
+      wall, with upwind (diffusive) momentum advection; a bore is not resolved. Needs
+      a Riemann-solved or MUSCL flux. Also: no Coriolis or centrifugal term (the
+      plate does not turn fast enough to matter), and the CPU film ignores the slosh.
+    - **18a-13e. Hold Gravity's moves out of the slosh.** The dial is hand-only, but the
+      tilt it follows is Gravity × Tilt Direction as the plate sees them, so a look
+      (Lava Lamp has Gravity 1), Evolve or a patch on Gravity slops the liquid too. If
+      the owner wants only the hand's own tilt, keep the hand's value apart from the
+      applied one and feed `sloshAccel` that. Also the phone's tilt reaches the dish in
+      screen axes while Gravity's direction is turned by the turntable's angle, so with
+      the plate turned a tipped phone slops at that angle; Plate Rock's `ext.x * 1.1`
+      does the same. Turn both into the fluid frame together.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

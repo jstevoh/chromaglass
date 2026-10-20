@@ -2994,6 +2994,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="tiltDirection"
         />
         <Slider
+          label="Slosh"
+          value={settings.slosh ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ slosh: v })}
+          settingKey="slosh"
+        />
+        <Slider
           label="Heat Spread"
           value={settings.doubleDiffusion ?? 0}
           min={0}

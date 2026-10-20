@@ -19,7 +19,8 @@ import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
-import { WebGPUFluid, THIN_GAP_THICKNESS } from '../gpu/fluid';
+import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
+import { SloshDish, sloshAccel, sloshDrag, SLOSH_N } from '../lib/slosh';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
@@ -1120,6 +1121,19 @@ class FluidSimulation {
   /** The cover glass's slide over the film, m/s (lib/plateRock.ts, stepCover): drags the liquid at half its speed on a thin gap. */
   coverX = 0;
   coverY = 0;
+  /**
+    The phone's tilt, −1..1 and faded as the link drops (the frame loop sets it
+    beside tiltX): the one part of the plate's motion the slosh follows, since
+    it is the owner's hand and not the music. Not `tiltX`, which carries the
+    sound's swing, and not `rockX` (stepSlosh).
+  */
+  extTiltX = 0;
+  extTiltY = 0;
+  /** The dish of liquid the tilt sloshes (lib/slosh.ts), built on the first tilt, one to a layer. */
+  private slosh: SloshDish | null = null;
+  private sloshField = new Float32Array(SLOSH_N * SLOSH_N * 4);
+  /** Whether the solver holds a slosh field now, so a rest is told to it once. */
+  private sloshOn = false;
   // The lasting current on the CPU engine — the twin of GpuFluid.stepCurrent,
   // at half the logical grid: velocity, warm pressure and divergence.
   private readonly CM = GRID_SIZE / 2;
@@ -3629,6 +3643,7 @@ class FluidSimulation {
     if (this.gpu) {
       const applied = this.dirty;
       if (applied) this.flushDeltas(p.dt);
+      this.stepSlosh(settings, p);
       this.gpu.step(p, applied);
       return;
     }
@@ -3775,6 +3790,30 @@ class FluidSimulation {
       gravityY: -dx * s + dy * c,
       gravityReach: Math.abs(dx) * this.viewHalfW + Math.abs(dy) * this.viewHalfH,
     };
+  }
+
+  /**
+    The tilt's slosh: the dish of liquid (lib/slosh.ts) stepped one frame and
+    its flow handed to the solver. Led only by what the owner's hand sets, the
+    Gravity and Tilt Direction faders and the phone's tilt, never by the sound
+    or the frame's sway (`npm run slosh`). With no Slosh, or no tilt and the
+    dish at rest, it does nothing at all and the solver is told once, so the
+    default plate is the same bits it was.
+  */
+  private stepSlosh(settings: VisualizerSettings, p: GpuStepParams) {
+    const gpu = this.gpu;
+    if (!gpu) return;
+    const [ax, ay] = sloshAccel(settings.slosh ?? 0, p.plateUpright ?? 0, p.gravityX ?? 0, p.gravityY ?? 0, this.extTiltX, this.extTiltY);
+    const dish = this.slosh;
+    // The CPU film and the other layers' solvers without a thin gap ignore it (PLAN 18a-13).
+    if (!this.thinGap || (!dish && ax === 0 && ay === 0)) {
+      if (this.sloshOn) { dish?.rest(); gpu.setSlosh(null); this.sloshOn = false; }
+      return;
+    }
+    const d = dish ?? (this.slosh = new SloshDish());
+    const moving = d.step(p.magnetSeconds ?? 1 / 60, ax, ay, sloshDrag(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS)));
+    if (moving) { gpu.setSlosh(d.field(this.sloshField)); this.sloshOn = true; }
+    else if (this.sloshOn) { gpu.setSlosh(null); this.sloshOn = false; }
   }
 
   private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
@@ -8861,6 +8900,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             for (const fluid of fluidsRef.current) {
               fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
               fluid.coverX = cover.vx; fluid.coverY = cover.vy;
+              fluid.extTiltX = ext.x * extK; fluid.extTiltY = ext.y * extK;
             }
 
             // ── Oil beads ───────────────────────────────────────
