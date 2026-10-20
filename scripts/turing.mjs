@@ -73,7 +73,9 @@
  *      against the same read slid along, which they do not)
  *   7b. what the look's own automation pours does not stain the print
  *      (PLAN.md 26d-6a): the colours in the look's contract (presetPlate.ts),
- *      poured as Evolve pours them, leave the light paper of the print at
+ *      poured by hand as Evolve's automated drops take them (not the music's
+ *      harmony, a lyric's trigger or a hand's own pick, which this does not
+ *      reach), leave the light paper of the print at
  *      least nine tenths as bright, where graphite poured in the same
  *      picture takes it under half (the control that the measure can see
  *      dye at all)
@@ -524,7 +526,9 @@ try {
     await frames(20);
     const before = await picture();
     const contract = lab.contractColours('turing-print');
-    // Two pools of what the look pours (its colours in turn) and two of graphite, apart from each other.
+    // Two pools of what the look pours (its contract colours in turn, which is where Evolve's
+    // automated drops take theirs; the music's harmony, a lyric's trigger and a hand's own pick
+    // are not poured here) and two of graphite, apart from each other.
     const own = [[0.35, 0.5], [0.65, 0.5]], control = [[0.5, 0.35], [0.5, 0.65]];
     own.forEach(([x, y], i) => lab.dye(x, y, R, lab.dyeOf(contract[i % contract.length]), 1));
     control.forEach(([x, y]) => lab.dye(x, y, R, lab.dyeOf(GRAPHITE), 1));
@@ -679,6 +683,10 @@ try {
   const capM = /let cap = max\(([0-9.]+) \* min\(f1, ([0-9.]+) - f1\), ([0-9.]+)\);/.exec(fluidSrc);
   const shareM = /let above = cap \* mix\(([0-9.]+), ([0-9.]+), r\);/.exec(fluidSrc);
   if (!capM || !shareM) throw new Error('turing: the regime lines (cap, above) were not found in fluid.ts');
+  // The held-corner line below rebuilds the shader's kill from the saddle-node and the cap, so
+  // the line it copies is asserted to be there as written: a shader that changes how the target
+  // is made stops this check, rather than leaving it measuring a kill the shader no longer uses.
+  if (!fluidSrc.includes('target_kill = 0.5 * sqrt(f1) - f1 + above;')) throw new Error('turing: the shader\'s target_kill line was not found as the held-corner line copies it');
   // The cap is a tent in the feed (rising to half of capM[2], falling after it), floored.
   const capAt = (f) => Math.max(Number(capM[1]) * Math.min(f, Number(capM[2]) - f), Number(capM[3]));
   const SPOT_CAP = capAt(FEED), SPOT_SHARE = Number(shareM[2]);
@@ -801,7 +809,9 @@ try {
     DRIFT_ALIVE_SLACK, the same floor the drifting run is held to). The instrument
     goes red on a corner pushed to twice the cap at F 0.02, which the line must
     read as emptied. Measured, lab, first fit: F 0.02 0.313, F 0.03 0.42, F 0.06
-    0.609; after the tent fit: see the line.
+    0.609; after the tent fit: F 0.02 0.462 to 0.473, F 0.03 0.491 to 0.495, F 0.06 0.609
+    to 0.611, against a floor of 0.433, so the margin at F 0.02 is thin (0.03): a Metal read
+    that finds it under the floor means the cap wants refitting, not the bar lowering.
   */
   const driftFeedM = /const DRIFT_FEED = ([0-9.]+);/.exec(fluidSrc);
   if (!driftFeedM) throw new Error('turing: DRIFT_FEED was not found in fluid.ts');
