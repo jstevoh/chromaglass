@@ -294,6 +294,10 @@ const api = {
   lookIds() { return PRESETS.map(p => p.id); },
   /** A palette colour as the app lays it: the dye's absorbance per unit (lib/dye.ts). */
   dyeOf(rgb: [number, number, number]) { return dyeAbsorbances(...rgb); },
+  /** The colours a look's own automation pours (its contract in presetPlate.ts), as r, g, b: what Evolve's drops are made of. */
+  contractColours(id: string) {
+    return (PRESET_CONTRACTS[id] ?? []).map(i => [PALETTE_RGB[i].r, PALETTE_RGB[i].g, PALETTE_RGB[i].b]);
+  },
   /** The palette, and each look's dyes with how many of them are on its plate at once (presetPlate.ts). */
   palette() {
     return {

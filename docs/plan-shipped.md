@@ -3843,6 +3843,37 @@ unchanged. Not tested: where a grey patch sits (a speckle of dead cells would st
 the width line, not the tile line).
 
 
+**26d-6b. The grey smears and the cap's corners (shipped 2026-10-20).** The soft blue-grey
+smears the owner's plate showed at Drift 0.7 and 1, which the lab's grey-patch line passed,
+were not the reaction going flat. The read off the GPU showed the print's own layer clean
+and the smears in the solver's dye under it: Evolve's automated drops take their colour from
+the look's contract (`PRESET_CONTRACTS`), which for Turing Print was Graphite and Midnight, and
+the print is multiplied over the dye, so wherever the print is light and thin a dark drop
+showed through. The contract is now Pure White (index 15), clear liquid, as the precedent
+`chemical-clock`. The lab never poured the contract's colour, which is why it could not see
+it; a new line (7b) pours it under the print and wants the light paper to keep 0.9 of its
+brightness (0.971 now, 0.107 with the old contract), and a control pours graphite and wants
+it under 0.5 (0.139), so the clean read is shown able to see a stain.
+
+The cap on d, the distance above the saddle-node curve, was the straight line
+`0.0105 - 0.15 F`, extrapolated below F 0.03 from no measured point. Held for 9000 units at
+0.9 of the line, F 0.02 kept 0.313 of the cells alive and F 0.03 kept 0.42, against 0.483
+for held spots and a floor of 0.433; F 0.06 kept 0.609 and passed. It is now a tent,
+`max(0.15 min(F, 0.07 - F), 0.0008)`, which keeps the lab's sweep (spots to d 0.006 at F 0.03,
+0.004 at 0.04, 0.002 at 0.05, none past 0.001 at 0.06) and lowers the cap where it was too
+generous. Measured on the same hold (0.9 of the cap, after a 3000-unit slew): F 0.02 0.462,
+0.472, 0.473; F 0.03 0.495, 0.495, 0.491; F 0.06 0.611, 0.610, 0.609, all over 0.433. Named
+shortcut: a tent fitted to the sweep and the held corners, not Pearson's boundaries. Every
+number is the lab's (SwiftShader); Metal's are owed.
+
+Check changes: new line 7b and its graphite control (bars 0.9 and 0.5, which are new); the
+cap regex in `scripts/turing.mjs` now reads the tent (`min(f1, 0.07 - f1)`), which moves the
+spots cap the drift line reads from the shader; two new lines hold the corners of the feed
+range (F 0.02, 0.03, 0.06 for 9000 units after a 3000-unit slew, three reads each, over the
+spots' alive floor 0.433) and show the held-corner line able to go red (F 0.02 at twice the
+cap reads 0.373, 0.371, 0.368, under the floor). No existing bar moved.
+
+
 ## 27. Every control does something you can see
 
 ### 27a-8. The closeup's camera holds still through the song (QA-31)
