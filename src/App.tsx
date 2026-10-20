@@ -5797,6 +5797,8 @@ export default function App() {
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
+            slosh={settings.slosh ?? 0}
+            onSlosh={(v) => updateSettings({ slosh: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}

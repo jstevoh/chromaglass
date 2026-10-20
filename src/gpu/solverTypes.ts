@@ -329,6 +329,12 @@ export interface PlateSolver {
    * (PLAN 15g; lib/breath.ts, hsBody).
    */
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null): void;
+  /**
+   * The slosh dish's flow for the next step (lib/slosh.ts `SloshDish.field`:
+   * 64 by 64 RGBA32F, plate widths a second), or null for none: laid over the
+   * flow the dye rides on a thin gap, after the gap's solve (PLAN 18a-13).
+   */
+  setSlosh(field: Float32Array | null): void;
   /** Start a read and take whatever has landed; false before the first. */
   readbackAsync(): boolean;
   readonly rbDyeView: Float32Array;

@@ -4196,6 +4196,32 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The slosh (PLAN 18a-13) laid over the flow the dye rides.
+
+    `scaleDye`'s copy of the thin gap's velocity, plus the dish's own: a
+    64 by 64 grid of velocities in plate widths a second (lib/slosh.ts,
+    its `field`) read by uv, bilinear, and turned into this solver's own
+    unit by the scale in A.a.w (the step's seconds over the step's
+    displacement, as the swirl's is). It is added here, after the solve and
+    before the dye rides it, and not as a force in front of it, because the
+    gap's drag would take it straight out again: the drag is 12ν/h² on a flow
+    with no inertia, and a wave that keeps going after the push stopped is
+    just the inertia the gap does not have. So the dish keeps the inertia and
+    the gap keeps the rim and the liquid's conservation.
+  */
+  addSlosh: `${HEAD}
+${BILERP_N}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var slosh: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let v = textureLoad(src, vec2i(id.xy), 0);
+  let s = bilerpN(slosh, uvOf(id), A.a.z).xy * A.a.w;
+  textureStore(dst, vec2i(id.xy), vec4f(v.xy + s, v.zw));
+}`,
+
+  /*
     Take the grid's own pattern out of the dye, and nothing else.
 
     What was reported: on Red Cabbage at 2.8x, a fine blue and white lattice

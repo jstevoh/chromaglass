@@ -33,6 +33,7 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
+import { SLOSH_N } from '../lib/slosh';
 import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
@@ -720,6 +721,13 @@ export class WebGPUFluid {
   private readonly divMean: GPUBuffer;
   private readonly curDiv: GPUTexture;
   private readonly velForced: GPUTexture;
+  /**
+    The slosh dish's flow (lib/slosh.ts, PLAN 18a-13), 64 by 64 in plate widths a
+    second, while the dial is up and the dish is moving; null otherwise, and the
+    thin stage then copies the gap's velocity exactly as it always did.
+  */
+  private sloshTex: GPUTexture | null = null;
+  private sloshStore: GPUTexture | null = null;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
   private readonly velRide: GPUTexture;
   private readonly scratchA: GPUTexture;
@@ -1072,6 +1080,8 @@ export class WebGPUFluid {
       ['liquidForces', [VEL], true],
       ['squeezeUpdate', [RG32], true],
       ['scaleDye', [dye], true],
+      // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
+      ['addSlosh', [VEL], false],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
@@ -1715,6 +1725,25 @@ export class WebGPUFluid {
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.grainAge = 0;
+  }
+
+  /**
+    Hand the solver the slosh dish's flow for the coming step (a `SloshDish.field`,
+    SLOSH_N² RGBA32F), or null to leave it out: the texture is made the first
+    time it is wanted, and null keeps it for the next, so a dial turned up and
+    down does not allocate on a frame. Left out, the thin stage is the one it
+    was before this existed.
+  */
+  setSlosh(field: Float32Array | null): void {
+    if (!field) { this.sloshTex = null; return; }
+    if (!this.sloshStore) {
+      this.sloshStore = this.disposer.track(this.device.createTexture({
+        label: 'slosh', size: [SLOSH_N, SLOSH_N], format: RGBA32,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      }));
+    }
+    this.device.queue.writeTexture({ texture: this.sloshStore }, field, { bytesPerRow: SLOSH_N * 16 }, [SLOSH_N, SLOSH_N]);
+    this.sloshTex = this.sloshStore;
   }
 
   /**
@@ -2529,7 +2558,13 @@ export class WebGPUFluid {
       stage('thin gap', (pass) => {
         this.thinProject(pass, p, disp, hands);
         // What the dye rides is the flow itself: the current is in it now.
-        this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
+        if (this.sloshTex && this.pipeline('addSlosh', VEL)) {
+          // And the dish's own flow over it, when the dial is up (setSlosh): the unit is the swirl's, plate widths a second to this solver's.
+          const sloshScale = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
+          this.run(pass, 'addSlosh', this.velForced, [this.vel.read, this.sloshTex], this.arg('add slosh', [0, 0, SLOSH_N, sloshScale]));
+        } else {
+          this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
+        }
         // Less the glass's drift for the carries, when it has one (driftCells).
         const [wx, wy, fx, fy] = this.driftCells;
         this.riding = (wx !== 0 || wy !== 0 || fx !== 0 || fy !== 0) && this.driftIsReady();

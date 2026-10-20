@@ -116,6 +116,7 @@
     "spin": "npm run build && node scripts/spin.mjs",
     "dish": "node scripts/dish.mjs",
     "turntable": "node --experimental-strip-types scripts/turntable.mjs",
+    "slosh": "node --experimental-strip-types scripts/slosh.mjs",
     "flick": "npm run build && node scripts/flick.mjs",
     "swirlcost": "npm run build && node scripts/swirlcost.mjs",
     "plates": "npm run build && node scripts/plates.mjs",

@@ -267,6 +267,9 @@ export interface PhoneStageProps {
    */
   clearFilm: number;
   onClearFilm: (v: number) => void;
+  // Slosh: how far a tilt sloshes the liquid (lib/slosh.ts), beside the Tilt tile.
+  slosh: number;
+  onSlosh: (v: number) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -969,7 +972,11 @@ export function PhoneStage(p: PhoneStageProps) {
               <SongScore {...p.score} touch />
             </>
           )}
-          {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level.</p>}
+          {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level. Tip it one way and then the other, and with Slosh up it slops across.</p>}
+          <div className="mt-3">
+            <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
+              display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
+          </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>

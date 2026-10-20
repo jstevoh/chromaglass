@@ -21,7 +21,7 @@ This file is the brief for step 2 (the looks' own patches); step 1 is the engine
   know: bass-drop kick->plateRock, microscopic-chaos hats->beads, aurora-borealis note->
   cometSpeed and tonalMid->hueJourney. comet's timbre->cometAngle has depth 45 against a
   documented range of -1..1.
-- The patch bay (`PATCH_TARGETS`, src/lib/sceneMap.ts) refuses only `frameSway`; Evolve's
+- The patch bay (`PATCH_TARGETS`, src/lib/sceneMap.ts) refuses `frameSway` and `slosh` (both hand-only); Evolve's
   `FRAME_MOTION` hold-out (src/lib/drift.ts) is not applied to patches, so oil-wheel's
   mid->rotationSpeed turns the whole dish with the music.
 - Song shape (src/lib/songShape.ts: section, intensity, build tension, drop, breakdown),

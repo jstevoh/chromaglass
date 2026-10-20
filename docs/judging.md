@@ -1434,3 +1434,23 @@ On a real GPU:
 - Where two dyes meet beside a bubble the relief may be weaker within a few cells of the
   bubble (PLAN 33b-2); say whether that shows.
 
+## 58. Tilting sloshes the liquid (PLAN 18a-13)
+
+The new **Slosh** dial (0 by default) makes a tilt send the liquid across the plate, pile
+on the low side and come back when the tilt is reversed. The CPU half's numbers are in
+`docs/plan-shipped.md` §18a-13 (`npm run slosh`); the GPU half is unmeasured here. On a
+real GPU:
+- Pour two or three dyes, raise Slosh to about half, then tip with Tilt Direction (or
+  the phone's Tilt) one way and, a second later, the other. The colour should slop across
+  and back and mix. Say whether the pace is right: the top of the dial is the fastest the
+  scheme is stable at (`SLOSH_LEAN`), and the owner may want it faster.
+- At the default Thickness the liquid does not ring, it flows to the new level (about 1%
+  overshoot). Lower Thickness to about 0.3 and tip again: it should now run past the
+  level and return. Say whether the default should be thinner for this.
+- With Slosh at 0, and with no tilt, the plate should look exactly as before.
+- Shake or music: nothing should slosh from sound, Plate Rock or Frame Sway. (Gravity itself
+  can be moved by a look, Evolve or a patch on it, and the slosh follows that tilt; say if
+  that should be held out.)
+- On the phone, a held tilt fades out of the remote 2.5 s after the last reading, so the
+  liquid runs back to level on its own while the phone is held still: the same fade Plate
+  Rock has, now visible as a slop. Say whether it reads wrong.

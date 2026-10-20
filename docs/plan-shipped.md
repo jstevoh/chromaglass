@@ -2531,6 +2531,53 @@ M_f·ΔP) keeps both.
     - The phone: nothing new to build. No setting was added; the phone's Settings
       tile opens the same panel, where Rain Drip, Glass Smear, Updraft and Thickness
       are, and its solver is the same.
+- **18a-13, tilt sloshes the liquid (shipped 2026-10-20; the owner: tip it one way and
+  then the other and the colour should slop and mix).**
+  - Why nothing sloshed. The thin plate's drag is 12ν/h² with an open rim and no
+    inertia, so a uniform tilt is cancelled by the surface's own slope the moment it is
+    applied: the liquid has no momentum to carry past the new level and nothing to
+    reflect. The tilt controls themselves (Gravity, Tilt Direction, the phone's Tilt and
+    the remote's tilt) only ever fed the lean and the dye's fall.
+  - What it is. A shallow-water dish on the CPU (`src/lib/slosh.ts`, `SloshDish`): 64² on
+    a staggered grid inside a round rim that is a wall, mass kept, depth kept at 12% of
+    rest at least, implicit linear friction at the gap's own rate (`sloshDrag`, 12ν/h²)
+    with a quadratic breaking drag and a Froude speed wall at 0.8, upwind advection and
+    substeps of at most 5 ms. Its flow is bilerped to the plate by `addSlosh`
+    (`wgsl/fluid.ts`) and added to the thin solve's velocity after the solve, so the dye,
+    the oil and the pressure all see it as a current. Fed only by the tilt
+    (Gravity × Tilt Direction, the remote's tilt), wherever Gravity's value came from (a
+    look, Evolve or a patch on it moves it too: PLAN 18a-13e): never by sound itself,
+    Plate Rock, Frame Sway or the cover. The frame and the camera do not move.
+  - The dial. **Slosh**, 0 to 1, default 0, on the sheet, the desks, MIDI, the remote and
+    the phone's Play sheet; a hand-only dial (not a patch or scene target, and Evolve
+    never moves the dial itself). At 0, and with no tilt, the dish is dormant at no cost and the plate
+    is bit for bit what it was. At the top the lean is `SLOSH_LEAN` (0.01) of g, 0.49
+    plate widths/s² at full Gravity: 0.02 blew the scheme up, so the pace is a stability
+    limit and wants the owner's eyes.
+  - Measured (`npm run slosh`, CPU, 24 lines): the lowest mode rings at 1.415 s over 16
+    half-swings (theory 1.407 s); a held tilt settles to the slope a/g (0.3333 against
+    0.3333 of rest depth per plate width) and comes to rest (4.8e-7 plate widths/s); the
+    ring dies at e^(-rt/2) (0.300/s against 0.300/s); mass is conserved to 1e-7 and no
+    cell dries under a worst-case resonant rocking at half-periods of 0.35, 0.5, 0.7 and
+    1 s (fastest 0.56 plate widths/s, Froude 0.46 at most, shallowest 0.58 of rest); half
+    the dial is half the response; +x and +y are the same by a quarter turn; the dye is
+    carried 4.2% of the plate's width by one rock and left 0.6% displaced after a tilt
+    turned round, the ring gone; no tilt for ten minutes moves nothing.
+  - A finding the owner should know. At the default Thickness (0.45) the drag is 7.46/s,
+    just under critical: the liquid flows to its new level and overshoots it by 1%, it
+    does not ring. It sloshes past the level by over 5% of the swing only at Thickness 0.3
+    and thinner (overshoot 69% at 0, 31% at 0.3, 1% at 0.45, none above), as water does
+    against honey. Which the owner will meet first when trying the dial on the default.
+  - Shortcuts, named in `slosh.ts`: (a) one layer; (b) a free-slip rim; (c) the dye does
+    not feel the depth; (d) upwind momentum advection, which is diffusive; (e) no Coriolis
+    or centrifugal term; (f) the CPU film (a non-thin plate) ignores the slosh; (g)
+    breaking is a quadratic drag and a speed wall, not a bore. Open items 18a-13a to
+    18a-13d in PLAN.md replace them.
+  - Not measured here: the GPU half (`addSlosh`, the thin stage's branch) has no GPU in a
+    cloud session; the Mac's run is `docs/judging.md` §58 and the Metal shard.
+  - The phone: the Play sheet carries Slosh under Tilt (`phone-slosh`), and the remote's
+    sheet carries it too; the phone's own tilt (`useDeviceTilt`) writes the same settings
+    the dish reads, so a tilted phone sloshes the plate it shows.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 

@@ -181,6 +181,12 @@ jobs:
       - name: The turntable
         run: npm run turntable
 
+      # The tilt slosh's CPU half: a shallow-water dish that rings, reflects and
+      # damps under a user's tilt, and stays bounded (PLAN §18a).
+      - name: The slosh
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run slosh
+
       # The two lists that have to agree about what a control is: the settings
       # panel's own markup, and the registry the desks pin from.
       - name: The panel
