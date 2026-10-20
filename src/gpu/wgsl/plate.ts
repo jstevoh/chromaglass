@@ -374,6 +374,7 @@ fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
 
 fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
+  dyeUnit = vec3f(1.0);
   let raw = textureBicubic(t, fuv);
   var rawAlpha = raw.a;
   if (useBlur) { rawAlpha = blurAlpha(t, fuv, blurFluid); }
@@ -390,6 +391,7 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
     exp(-decodeDensity(raw.g) * norm),
     exp(-decodeDensity(raw.b) * norm),
   );
+  dyeUnit = unit;
   let lt = lightThrough(unit, absTotalDensity);
 
   let darkness = 1.0 - max(lt.r, max(lt.g, lt.b));
@@ -436,18 +438,62 @@ fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
 
 fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
 
+/*
+  The line between two dyes (Boundary Contrast, 0.35 in every look) is drawn
+  where the lit colour changes across a few cells. The lit colour is the dye's
+  hue *and* its depth: a thin film of one dye is paler than a pool of it. So a
+  bubble's hole, where one dye's depth falls from a pool to nothing over two or
+  three cells, read here as a boundary between two colours, and the line was
+  drawn round every hole. The four taps sit 1.65 cells out on a cross, so on a
+  hole a few cells across the line came out as bright and dark blocks at those
+  offsets, a "+" stamped round each bubble: the owner's "bubbles still look
+  really pixelated around themselves" (2026-10-19). The dye itself was clean;
+  with Boundary Contrast at 0 the halo went (npm run holeline).
+
+  So the line is asked where the dye's colour changes, not its depth. The
+  colour per unit of dye ("unit" in decodeFluid: the absorbances over the
+  density) is the same anywhere one dye lies, however thin, and differs where
+  two meet. The lit difference is kept as it was, for how strong the line is,
+  and gated by how far the hue moves between the same two taps. A line between
+  two dyes, at any depth, is drawn as before; a hole in one dye, or a pool
+  thinning into clear water, draws none. A density ratio was tried first and
+  cleared the holes as well, but it also took the line off two dyes of very
+  different strength where they meet, which is a boundary.
+*/
+const HUE_LO: f32 = 0.03;
+const HUE_HI: f32 = 0.12;
+/*
+  The hue is the "unit" decodeFluid already works out from the very sample
+  it lights, so it is left here by that decode (as dyeThrough is) and read
+  after each of the four taps, rather than sampled again. Sampling it again
+  was the first version of this gate: four more bicubic reads (five filtered
+  taps each, so twenty more) on every pixel of the plate, while a laptop
+  window in the Mac runner's sound-render check drew 9.9 frames a second
+  (2026-10-20; not shown to be the cause, but the reads bought nothing).
+  Read this way the line costs what it did before the gate, five bicubic
+  reads, and draws the same picture (npm run holeline, to the percent).
+  Clear water, where decodeFluid returns before any hue, leaves 1, which is
+  clear water's hue.
+*/
+var<private> dyeUnit: vec3f = vec3f(1.0);
 fn boundaryDiff(t: texture_2d<f32>, fuv: vec2f) -> f32 {
   let cC = decodeFluid(t, fuv, 0.0, false);
   if (cC.a < 0.03) { return 0.0; }
   let e = (3.0 / U.logicalGrid) * 0.55;
   let cR = decodeFluid(t, fuv + vec2f(e, 0.0), 0.0, false);
+  let uR = dyeUnit;
   let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), 0.0, false);
+  let uL = dyeUnit;
   let cT = decodeFluid(t, fuv + vec2f(0.0, e), 0.0, false);
+  let uT = dyeUnit;
   let cB = decodeFluid(t, fuv + vec2f(0.0, -e), 0.0, false);
+  let uB = dyeUnit;
   let maskX = min(cR.a, cL.a);
   let maskY = min(cT.a, cB.a);
-  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX);
-  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY);
+  let hueX = smoothstep(HUE_LO, HUE_HI, length(uR - uL));
+  let hueY = smoothstep(HUE_LO, HUE_HI, length(uT - uB));
+  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX) * hueX;
+  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY) * hueY;
   return diffX + diffY;
 }
 `;
