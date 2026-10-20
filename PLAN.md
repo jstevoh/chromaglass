@@ -6081,14 +6081,52 @@ Steps:
     on a 40–90 s clock (desk, phone, remote, MIDI; the Turing Print preset sets 0.7).
     Shortcuts named: three plane waves, not a noise field; the saddle-node line, not
     Pearson's full regime boundaries; a fixed-rate clock that follows no music.
-  - **26d-6a, open: more ways for the print to evolve.** Each is grounded in the chemistry and
-    is its own step: a **true noise field** for the map (patches, not diagonal bands), a
-    **slow regime glide** (one f and k walked along Pearson's map, so the whole print turns
-    from worms to spots), **light as the kill** (CIMA is photosensitive; the lamp's level
-    would move k), a **slow ink-hue glide** (26d-3), **periodic reseeds**. The grey patch the
-    drift opens at 1 (the pattern dissolving where the map pushes toward a bare plate) could
-    be mapped and avoided with the regime boundaries. Whether the preset's 0.7 is the right
-    pace is judging §55.
+  - **26d-6a. More ways for the print to evolve** (grey patch and regime glide **shipped**;
+    story in `docs/plan-shipped.md` §26): the drift's k is now the saddle-node curve plus a
+    margin that glides each region between stripes and spots on slower waves (50, 80 and
+    120 s), which also removed the grey patch at Drift 1. Still open, each its own step:
+    - **The Drift slews, it does not step**: the visualizer hands the solver the setting
+      moved at 0.025 a second (`TURING_DRIFT_PER_SECOND`), because 0.7 handed to a settled
+      print at once starved a tile for about 20 s. A faster slew needs that number
+      re-measured with `npm run turing`, which reads the rate from the source.
+    - **A true noise field** for both maps (patches, not diagonal bands).
+    - **Light as the kill** (CIMA is photosensitive; the lamp's level would move k).
+    - **A slow ink-hue glide** (26d-3).
+    - **Periodic reseeds**.
+    - **Metal's numbers** for the regime glide: the cap line (`0.0105 - 0.15 F`) was fitted on
+      SwiftShader, and Metal rounds half floats toward zero; read `npm run turing` line 9
+      off the `fifth` shard, and ask the watcher for a look if the pieces count differs.
+    - **The cap line is a straight line, and it is too generous at the corners**: the
+      review held each corner of the drift range for 9000 units (stripes settled at F 0.04,
+      k 0.06, 60 seeds, k = curve(F) + share x cap(F), alive share = cells with v over 0.1).
+      F 0.02 collapses to 6–7 % alive at share 0.25 and 0.9 (flat); F 0.05 at share 0.9
+      starts at 0.079 and recovers to 0.228; F 0.06 at share 0.25 recovers 0.089 to 0.392;
+      F 0.06 at share 0.9 stays at 0.061, flat. At F 0.06 and share 0.9 the margin is 0.00135
+      against about 0.001 measured as the limit, and below F 0.03 the cap is extrapolated
+      from no measured point. A corner that collapses leaves a frozen sparse residue that does
+      not regrow while held. The plate reaches those corners only where both waves saturate at
+      once (|w|, |wr| over 2) at Drift 1, a small share of the plate for a few seconds at a time.
+      Two steps: fit the cap through measured points (or Pearson's boundaries) including F
+      below 0.03; and give `npm run turing` a held-corner line, F 0.06 at share 0.9 and
+      F 0.02 for 9000 units, that has to stay over the alive band's floor. Measure the corners
+      on Metal too.
+    - **Grey smears in the app that the lab's grey-patch line cannot see**: on Metal
+      (Apple M4, head dfec25f) `npm run turing` passes all 31 lines twice and the lab plate
+      reads tile contrast 0.93 of the control at Drift 0.7 and 0.78 at Drift 1. But in the
+      app (Turing Print preset, 60 s settle, frames at 0, 30, 60 and 90 s) the watcher saw
+      soft blue-grey smears where the stripes lose contrast, 10–20 % of the plate in places,
+      drifting about (upper-middle at Drift 1 at 60 s; centre-right at Drift 0.7 at 60 and
+      90 s). The glide itself is clearly visible within a minute. Not known yet whether the
+      smears are the look's poured dye showing under the print or the reaction going flat.
+      The gap in the check: the line runs on the lab's plain plate (activator only), never
+      on the app's poured look. Next step: in the app, read the chemistry field itself off the
+      GPU at those frames and the same cells' contrast, to say which; then make the check
+      read the app's plate, or the field in the app, so it can see this. Start here.
+    - **The Pattern knob does not steer the drifting regime**: while the drift is on k is
+      the curve plus the margin and ignores the look's own k, so only its feed counts. A
+      look that wants more spots than stripes needs a "spots share" input, not a k.
+    - Whether the preset's 0.7 is the right pace, and whether the stripe-to-spot glide
+      reads as chemistry or as the plate falling apart, is judging §55.
 - **26-colour-a. The relief #327 described: not doing.** #327's message described the
   pattern's gradient as a bump on the plate's normal; the code never reached main (its
   plate shader was not in the diff, and the revert 8278374 had nothing of it to take
