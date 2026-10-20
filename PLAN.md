@@ -6096,6 +6096,20 @@ Steps:
     - **Metal's numbers** for the regime glide: the cap line (`0.0105 - 0.15 F`) was fitted on
       SwiftShader, and Metal rounds half floats toward zero; read `npm run turing` line 9
       off the `fifth` shard, and ask the watcher for a look if the pieces count differs.
+    - **The cap line is a straight line, and it is too generous at the corners**: the
+      review held each corner of the drift range for 9000 units (stripes settled at F 0.04,
+      k 0.06, 60 seeds, k = curve(F) + share x cap(F), alive share = cells with v over 0.1).
+      F 0.02 collapses to 6–7 % alive at share 0.25 and 0.9 (flat); F 0.05 at share 0.9
+      starts at 0.079 and recovers to 0.228; F 0.06 at share 0.25 recovers 0.089 to 0.392;
+      F 0.06 at share 0.9 stays at 0.061, flat. At F 0.06 and share 0.9 the margin is 0.00135
+      against about 0.001 measured as the limit, and below F 0.03 the cap is extrapolated
+      from no measured point. A corner that collapses leaves a frozen sparse residue that does
+      not regrow while held. The plate reaches those corners only where both waves saturate at
+      once (|w|, |wr| over 2) at Drift 1, a small share of the plate for a few seconds at a time.
+      Two steps: fit the cap through measured points (or Pearson's boundaries) including F
+      below 0.03; and give `npm run turing` a held-corner line, F 0.06 at share 0.9 and
+      F 0.02 for 9000 units, that has to stay over the alive band's floor. Measure the corners
+      on Metal too.
     - **The Pattern knob does not steer the drifting regime**: while the drift is on k is
       the curve plus the margin and ignores the look's own k, so only its feed counts. A
       look that wants more spots than stripes needs a "spots share" input, not a k.
