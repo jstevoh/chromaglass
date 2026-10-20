@@ -291,6 +291,8 @@ export interface PlateSolver {
   pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number } | null, volume?: boolean): void;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
   speciesShare?(): Promise<number>;
+  /** The species field as the last share read found it (PLAN 33f): the bubbles' view of what liquid is where. Null with none poured. */
+  speciesSnapshot?(): { L: number; data: Float32Array } | null;
   /** A pour onto the clear film (PLAN §20b): clear oil thickens it, a solvent lands where it can open a hole. Plate units. Nothing without a film. */
   addFilm?(x: number, y: number, radius: number, what: { film?: number; solvent?: number }): void;
   /** How much of the plate the oil poured since the last clear covers, 0..1 (Oil Bodies' budget). */

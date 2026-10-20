@@ -50,6 +50,7 @@ import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
+import { REF_THICKNESS } from '../lib/bubbleLiquid';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { BeadField } from '../lib/beads';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
@@ -1396,6 +1397,17 @@ class FluidSimulation {
   */
   private shareSteps = 0;
   private shareReading = false;
+  /**
+   * What liquid is where, for the bubbles (PLAN 33f): the species field as
+   * the share read last found it, riding on that read rather than costing
+   * one of its own, and the tension of the liquid last poured, N/m (the
+   * field carries the viscosity, density and index; the bubbles' film also
+   * wants the tension, and takes it from the last bottle).
+   */
+  get speciesNow(): { L: number; data: Float32Array } | null { return this.gpu?.speciesSnapshot?.() ?? null; }
+  pouredSigma: number | null = null;
+  /** Density of the liquid last poured, kg/m³, beside pouredSigma: the species field holds neither (PLAN 33f). */
+  pouredRho: number | null = null;
   private readPouredShare(): void {
     const g = this.gpu;
     if (!this.liquid.thickOnGpu || !g?.speciesShare) { this.liquid.gpuShare = null; return; }
@@ -1474,7 +1486,10 @@ class FluidSimulation {
       if (this.thinGap && g.pour) {
         const L = this.size;
         const r = Math.max(1.5, radius) / L;
-        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what));
+        const sp = speciesOf(what);
+        if (sp?.tension) this.pouredSigma = sp.tension / 1000;
+        if (sp) this.pouredRho = sp.density * 1000;
+        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), sp);
       }
       if (('active' in what) && (g as any).addActive) {
         (g as any).addActive(cx / this.size, cy / this.size, Math.max(1.5, radius) / this.size, (what.active as number) * amount);
@@ -9019,6 +9034,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const vx = lead?.readVx, vy = lead?.readVy;
               const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
               const qk = particleFlowScale(lead, currentSettings);
+              // Each bubble is in the liquid the Thickness dial stands for,
+              // with whatever has been poured into it where it is (PLAN 33f).
+              // Only on the thin gap, which is where the dial and the species
+              // field act on the liquid; off it the plate is not that liquid,
+              // and the bubbles keep the reference they always had.
+              const thinPlate = !!lead?.thinGap;
+              bubbles.setLiquid(thinPlate ? (currentSettings.gapThickness ?? THIN_GAP_THICKNESS) : REF_THICKNESS);
+              bubbles.species = thinPlate ? (lead?.speciesNow ?? null) : null;
+              if (lead?.pouredSigma) bubbles.pouredSigma = lead.pouredSigma;
+              if (lead?.pouredRho) bubbles.pouredRho = lead.pouredRho;
               bubbles.step(simStepS, (bx, by) => {
                 if (!vx || !vy) return [0, 0];
                 const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));

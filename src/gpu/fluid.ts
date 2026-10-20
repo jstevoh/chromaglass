@@ -1711,6 +1711,7 @@ export class WebGPUFluid {
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.dropSpeciesSnap();
     // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
     if (this.hsPour) this.clearBuffer(pass, this.hsPour, 'clear pours');
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
@@ -3401,6 +3402,7 @@ export class WebGPUFluid {
   async speciesShare(): Promise<number> {
     if (!this.species || !this.speciesLive) return 0;
     const pours = this.speciesQuiet;
+    const wipes = this.speciesWipes;
     const f = await this.readField('species');
     const L = this.L;
     let sum = 0, cells = 0;
@@ -3411,8 +3413,20 @@ export class WebGPUFluid {
     }
     const share = sum / Math.max(1, cells);
     if (share < 1e-6 && pours === this.speciesQuiet) this.speciesLive = false;
+    // The same read, kept for the bubbles (PLAN 33f): what liquid is where, as of this read.
+    // Not if the plate was cleared while the read was in flight: that is the old plate's liquid.
+    this.speciesSnap = this.speciesLive && wipes === this.speciesWipes ? { L, data: f } : null;
     return share;
   }
+
+  /** The species field as speciesShare last read it, for the bubbles to ask what liquid they are in; null with none poured. */
+  speciesSnapshot(): { L: number; data: Float32Array } | null {
+    return this.speciesLive ? this.speciesSnap : null;
+  }
+  private speciesSnap: { L: number; data: Float32Array } | null = null;
+  /** Counts the plate's clears, so a species read that began before one is not kept after it. */
+  private speciesWipes = 0;
+  private dropSpeciesSnap(): void { this.speciesSnap = null; this.speciesWipes++; }
 
   /**
    * The species' stage (PLAN 18d): its carry in the colour's substeps, unless
@@ -3790,6 +3804,7 @@ export class WebGPUFluid {
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.dropSpeciesSnap();
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;

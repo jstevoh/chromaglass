@@ -14,6 +14,10 @@
  */
 import { stream, type Rng } from './rng';
 import { DISH_METRES, DISH_REST_GAP } from './turntable';
+import {
+  REF_MU, REF_RHO, REF_SIGMA, plateLiquid, liquidAtCell, riseScale, stretchScale, dampScale, ripenScale,
+  type BubbleLiquid, type SpeciesSnapshot,
+} from './bubbleLiquid';
 
 export { DISH_METRES, DISH_REST_GAP };
 
@@ -51,6 +55,13 @@ export interface Bubble {
   held?: boolean;
   /** Micro-satellite daughter spawned from a pop spray. */
   daughter?: boolean;
+  /**
+   * The liquid it was in at its last step, Pa·s and N/m (PLAN 33f): what a
+   * pair reads for the film between them. Unset until its first step, when
+   * the plate's own are read.
+   */
+  mu?: number;
+  sig?: number;
 }
 
 export const MAX_BUBBLES = 128;
@@ -58,15 +69,16 @@ export const MAX_BUBBLES = 128;
 /**
  * Dynamic viscosity μ of typical light show liquid (Pa·s):
  * ~17 mPa·s for light mineral oil (THICK_NU = 2e-5 m²/s, ρ ≈ 850 kg/m³ in turntable.ts).
- * Fixed at light mineral oil for bubbles, pending per-liquid property coupling (PLAN 18d).
+ * The reference liquid: the bubbles read the plate's own through `setLiquid` and
+ * `liquidAt` (PLAN 33f), and every scaling is a ratio to this one.
  */
-export const LIQUID_MU = 0.017;
+export const LIQUID_MU = REF_MU;
 
 /**
  * Surface tension σ (N/m):
  * ~30 mN/m (0.030 N/m) for air/mineral oil interface.
  */
-export const LIQUID_SIGMA = 0.030;
+export const LIQUID_SIGMA = REF_SIGMA;
 
 /**
  * Reynolds/Chesters film drainage geometry factor (R_film / h_crit)².
@@ -112,17 +124,55 @@ export class BubbleField {
   private nextId = 1;
 
   /**
-   * Liquid dynamic viscosity μ (Pa·s) of the carrier fluid.
-   * Fixed at light mineral oil (17 mPa·s) matching the show's carrier fluid,
-   * pending per-liquid property coupling in 18d.
+   * Liquid dynamic viscosity μ (Pa·s) of the plate's clear liquid: 17 mPa·s,
+   * a light mineral oil, at the Thickness dial's default. `setLiquid` sets
+   * it, with the three below, from the dial (PLAN 33f).
    */
   liquidMu = LIQUID_MU;
 
   /**
-   * Surface tension σ (N/m) at the liquid/air interface.
+   * Surface tension σ (N/m) of the clear liquid at the liquid/air interface.
    * Defaults to 0.030 N/m.
    */
   liquidSigma = LIQUID_SIGMA;
+
+  /** The clear liquid's density, kg/m³ (850 at the default). */
+  liquidRho = REF_RHO;
+
+  /** The clear liquid's kinematic viscosity, m²/s, which the poured liquid's mixes against. */
+  liquidNu = plateLiquid(0.45).nu;
+
+  /**
+   * The poured liquid on the plate, as the GPU's species field was last read
+   * (lib/liquidProps.ts), and the tension of the liquid last poured, N/m.
+   * With none, every bubble is in the clear liquid. The field is read about
+   * once a second, so a bubble reads where the poured liquid was a moment
+   * ago: a liquid moves much more slowly than a bubble rises through it.
+   */
+  species: SpeciesSnapshot | null = null;
+  pouredSigma = LIQUID_SIGMA;
+  /** Density of the liquid last poured, kg/m³ (the species field carries no density), for the poured part of a cell. */
+  pouredRho = REF_RHO;
+
+  /** The plate's clear liquid, from the Thickness dial (lib/bubbleLiquid.ts). */
+  setLiquid(thickness: number): void {
+    // Once a frame from the show: skip the work (and its two small objects) when the dial has not moved.
+    if (thickness === this.liquidThickness) return;
+    this.liquidThickness = thickness;
+    const l = plateLiquid(thickness);
+    this.liquidMu = l.mu; this.liquidSigma = l.sigma; this.liquidRho = l.rho; this.liquidNu = l.nu;
+  }
+
+  private liquidThickness = NaN;
+  private readonly plateNow: BubbleLiquid = { mu: LIQUID_MU, sigma: LIQUID_SIGMA, rho: REF_RHO, nu: 0 };
+  private readonly here: BubbleLiquid = { mu: LIQUID_MU, sigma: LIQUID_SIGMA, rho: REF_RHO, nu: 0 };
+
+  /** The liquid at (x, y) now: the clear liquid with the poured liquid mixed in. Valid until the next call. */
+  private liquidAt(x: number, y: number): BubbleLiquid {
+    const plate = this.plateNow;
+    plate.mu = this.liquidMu; plate.sigma = this.liquidSigma; plate.rho = this.liquidRho; plate.nu = this.liquidNu;
+    return liquidAtCell(plate, this.species, x, y, this.grid, this.pouredSigma, this.pouredRho, this.here);
+  }
 
   /**
    * Film drainage contact time (seconds) between touching bubble pairs (PLAN 18i).
@@ -308,7 +358,8 @@ export class BubbleField {
     // Capillary number Ca = μ * U / σ.
     if (speed > 0.1) {
       const uMps = speed * (DISH_METRES / N);
-      const Ca = Math.max(1e-4, (this.liquidMu * uMps) / this.liquidSigma);
+      const liq = this.liquidAt(b.x, b.y);
+      const Ca = Math.max(1e-4, (liq.mu * uMps) / liq.sigma);
       // Effective meniscus neck gap b_eff ≈ 0.091 cells (0.095 mm) is a tuned shortcut:
       // about 63x smaller than the real 6 mm plate gap (DISH_REST_GAP * DISH_METRES).
       // If the physical 6 mm gap (b ≈ 5.76 cells) were used directly, m ≈ (2R/b)*sqrt(Ca) ~ 0.5 lobes,
@@ -386,6 +437,10 @@ export class BubbleField {
       if (!b.held) b.fing *= Math.exp(-dt / 1.2);
       if (b.held) { b.held = false; b.age += dt; b.wph += b.wvel * dt; continue; }
       const [vx, vy] = velocity(b.x, b.y);
+      // The liquid it is in: the clear liquid, or the clear liquid mixed with
+      // what has been poured where it is (PLAN 33f).
+      const liq = this.liquidAt(b.x, b.y);
+      b.mu = liq.mu; b.sig = liq.sigma;
       // Bretherton lubrication: an air pancake in a Hele-Shaw cell runs ahead
       // of the depth-mean liquid velocity U_mean (Taylor & Saffman 1959, Bretherton 1961).
       // An inviscid bubble spanning a Hele-Shaw cell in potential Darcy flow has theoretical
@@ -400,7 +455,7 @@ export class BubbleField {
       // Capillary number Ca = μ * U / σ.
       const vMag = Math.hypot(vx, vy) * CELLS_PER_UNIT;
       const uMps = vMag * (DISH_METRES / N);
-      const Ca = Math.max(1e-5, (this.liquidMu * uMps) / this.liquidSigma);
+      const Ca = Math.max(1e-5, (liq.mu * uMps) / liq.sigma);
       const filmCorrection = 2.26 * Math.cbrt(Ca * Ca);
       const speedRatio = Math.max(1.0, 1.5 / (1 + filmCorrection));
       // In the absence of audio agitation, millimeter air pancakes between plates
@@ -411,8 +466,12 @@ export class BubbleField {
       const wanderScale = agitation * 2.0;
       const wx = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
       const wy = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
-      const dx = vx * CELLS_PER_UNIT * speedRatio - tiltX * 900 + b.kx + wx;
-      const dy = vy * CELLS_PER_UNIT * speedRatio - tiltY * 900 + b.ky + wy;
+      // Climbing a tilted plate: Darcy's law in the gap, ∝ Δρ/μ, so a bubble
+      // rises quickly through water and hardly at all through syrup (the
+      // reference, 900 cells/s a unit of tilt, is the light oil).
+      const rise = 900 * riseScale(liq);
+      const dx = vx * CELLS_PER_UNIT * speedRatio - tiltX * rise + b.kx + wx;
+      const dy = vy * CELLS_PER_UNIT * speedRatio - tiltY * rise + b.ky + wy;
       b.x += dx * dt;
       b.y += dy * dt;
       b.kx *= Math.exp(-dt / 0.22);
@@ -425,13 +484,16 @@ export class BubbleField {
       // a large one stretches under drag, and it takes a couple of seconds.
       const speed = Math.hypot(dx, dy);
       const bigness = Math.max(0, Math.min(1, (b.r - 3) / 4));
-      const want = Math.min(0.4, speed * 0.2) * bigness;
+      // How far surface tension lets it stretch goes as the capillary number,
+      // so with the viscosity over the tension: a thick liquid drags a bubble
+      // long, water holds it round.
+      const want = Math.min(0.4, speed * 0.2 * stretchScale(liq)) * bigness;
       const ax = speed > 1e-3 ? dx / speed : 0, ay = speed > 1e-3 ? dy / speed : 0;
       const k = 1 - Math.exp(-dt * 0.7);
       b.sx += (ax * want - b.sx) * k;
       b.sy += (ay * want - b.sy) * k;
       const wobTarget = Math.min(0.1, speed * 0.002 + agitation * 0.02) * bigness;
-      b.wob += (wobTarget - b.wob) * (1 - Math.exp(-dt * (b.wob > wobTarget ? 0.5 : 1.0)));
+      b.wob += (wobTarget - b.wob) * (1 - Math.exp(-dt * (b.wob > wobTarget ? 0.5 * dampScale(liq) : 1.0)));
       b.wph += b.wvel * dt;
     }
 
@@ -456,7 +518,11 @@ export class BubbleField {
           // Stefan-Reynolds thin-film drainage: t_drain = DRAINAGE_FILM_FACTOR * (μ / σ) * Re_metres.
           // In physical units with μ/σ ≈ 0.567 s/m, Re = 1.0 cell (1.04 mm) drains in ~4.25 s.
           // DRAINAGE_FILM_FACTOR provides the dimensionless (R_film / h_crit)² geometry scaling.
-          const tDrain = DRAINAGE_FILM_FACTOR * (this.liquidMu / this.liquidSigma) * ReMetres;
+          // The film between a pair is the liquid between them: the mean of
+          // the two bubbles' own (the clear liquid's, with no poured liquid).
+          const muPair = ((a.mu ?? this.liquidMu) + (c.mu ?? this.liquidMu)) / 2;
+          const sigPair = ((a.sig ?? this.liquidSigma) + (c.sig ?? this.liquidSigma)) / 2;
+          const tDrain = DRAINAGE_FILM_FACTOR * (muPair / sigPair) * ReMetres;
           const contact = (this.contactDrain.get(key) ?? 0) + dt;
           this.contactDrain.set(key, contact);
           if (contact >= tDrain) {
@@ -523,7 +589,7 @@ export class BubbleField {
         const reach = 1.2 * (a.r + c.r);
         if (gap > reach) continue;
         const [sm, lg] = a.r < c.r ? [a, c] : [c, a];
-        const dA = RIPEN * dt * (1 / Math.max(0.5, sm.r) - 1 / Math.max(0.5, lg.r)) * (1 - Math.max(0, gap) / reach);
+        const dA = RIPEN * ripenScale(((sm.sig ?? this.liquidSigma) + (lg.sig ?? this.liquidSigma)) / 2) * dt * (1 / Math.max(0.5, sm.r) - 1 / Math.max(0.5, lg.r)) * (1 - Math.max(0, gap) / reach);
         if (!(dA > 0)) continue;
         const take = Math.min(dA, sm.r * sm.r);
         sm.r = Math.sqrt(Math.max(0, sm.r * sm.r - take));
