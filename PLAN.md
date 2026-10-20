@@ -6110,6 +6110,18 @@ Steps:
       below 0.03; and give `npm run turing` a held-corner line, F 0.06 at share 0.9 and
       F 0.02 for 9000 units, that has to stay over the alive band's floor. Measure the corners
       on Metal too.
+    - **Grey smears in the app that the lab's grey-patch line cannot see**: on Metal
+      (Apple M4, head dfec25f) `npm run turing` passes all 31 lines twice and the lab plate
+      reads tile contrast 0.93 of the control at Drift 0.7 and 0.78 at Drift 1. But in the
+      app (Turing Print preset, 60 s settle, frames at 0, 30, 60 and 90 s) the watcher saw
+      soft blue-grey smears where the stripes lose contrast, 10–20 % of the plate in places,
+      drifting about (upper-middle at Drift 1 at 60 s; centre-right at Drift 0.7 at 60 and
+      90 s). The glide itself is clearly visible within a minute. Not known yet whether the
+      smears are the look's poured dye showing under the print or the reaction going flat.
+      The gap in the check: the line runs on the lab's plain plate (activator only), never
+      on the app's poured look. Next step: in the app, read the chemistry field itself off the
+      GPU at those frames and the same cells' contrast, to say which; then make the check
+      read the app's plate, or the field in the app, so it can see this. Start here.
     - **The Pattern knob does not steer the drifting regime**: while the drift is on k is
       the curve plus the margin and ignores the look's own k, so only its feed counts. A
       look that wants more spots than stripes needs a "spots share" input, not a k.
