@@ -4324,8 +4324,10 @@ too (`airField`), so it differences the bubbles alone.
 
 *Named shortcuts:* `airNear` is a fixed reach, not one derived from the taps' real
 footprint; the normal is flattened wholesale, so a real dye-to-dye step right beside a
-bubble also loses its relief within the reach; layer 1 reads `air0` at its own `fuv1`
-(the air field is one, drawn for the front plate); the lace (33c) and the boundary line
+bubble also loses its relief within the reach; only the lead layer's normal is masked
+(the app cuts air in the lead layer's dye alone, and the back layer's coordinates differ
+under a zoom or drift); the aside hole of `holeline` is a coarse guard on the mask's reach;
+the lace (33c) and the boundary line
 at a hole are not masked; the hole of 1.8 cells is only partly flattened (its relief
 moves 4.6 levels where the control moves 5.5), because the nine taps find a hole that
 small along few directions (PLAN 33b-3).

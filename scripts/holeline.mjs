@@ -76,7 +76,7 @@
  *      the size of the deviation, not the signed mean, so the lit side's
  *      pale ring and the opposite dark one do not cancel. Pixels near another
  *      hole are left out. The control (CONTROL_AIR: the shader with airNear's
- *      call taken out of both normals) must find the glow: over CONTROL_GLOW
+ *      call taken out of the lead layer's normal) must find the glow: over CONTROL_GLOW
  *      on every hole of 5 cells or more (a hole of 3 or 1.8 cells is smaller
  *      than the relief's own tap, so what the glow is there is printed)
  *   5. the pool's rim into clear liquid keeps its relief: what Edge Relief
@@ -103,7 +103,7 @@ const N = 256, SIZE = 768;
 const MOVED = 24, MAX_HALO = 1, MAX_MOVE = 4, HALO_OUT = 6, KEEP = 0.8, MIN_LINE = 10;
 const CONTROL_WORST = 5, CONTROL_EACH = 3, RIM_SLACK = 1.5;
 const SIZES = [1.8, 3, 5, 8, 14];
-const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.8, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
+const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.98, KEEP_ARC = 0.95, ARC_REACH = 24, PART_SMALL = 0.9, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
 
 /*
   The control: wgsl/plate.ts with the hue gate taken off the line, so the line
@@ -128,9 +128,9 @@ const CONTROL = {
 };
 
 /*
-  The 33b control: wgsl/plate.ts with the air's mask taken off both layers'
-  normals, so the dye's relief is drawn at a hole as it was. As above, each
-  edit is found once or it throws.
+  The 33b control: wgsl/plate.ts with the air's mask taken off the lead layer's
+  normal, so the dye's relief is drawn at a hole as it was. As above, the edit
+  is found once or it throws.
 */
 const CONTROL_AIR = {
   name: 'no-air-mask',
@@ -138,12 +138,10 @@ const CONTROL_AIR = {
     b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]plate\.ts$/ }, async (a) => {
       const { readFileSync } = await import('node:fs');
       let s = readFileSync(a.path, 'utf8');
-      for (const k of ['0', '1']) {
-        const cut = `vec3f(0.0, 0.0, 1.0), airNear(fuv${k})`;
-        const found = s.split(cut).length - 1;
-        if (found !== 1) throw new Error(`holeline: the air control found ${found} of 1 "${cut}" in wgsl/plate.ts`);
-        s = s.replace(cut, 'vec3f(0.0, 0.0, 1.0), 0.0');
-      }
+      const cut = 'vec3f(0.0, 0.0, 1.0), airNear(fuv0)';
+      const found = s.split(cut).length - 1;
+      if (found !== 1) throw new Error(`holeline: the air control found ${found} of 1 "${cut}" in wgsl/plate.ts`);
+      s = s.replace(cut, 'vec3f(0.0, 0.0, 1.0), 0.0');
       return { contents: s, loader: 'ts' };
     });
   },
@@ -230,7 +228,7 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   Edge Relief is the setting under test: a render at the look's own value
   against one at 0, so the pool's rim has something to be compared with.
 */
-const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF }) => {
+const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH }) => {
   await lab.create(N);
   const F = 1.5, W = SIZE;
   const pink = [1.2, 0.3, 0.8];
@@ -250,9 +248,14 @@ const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO
   const holes = ORDER.map((r, i) => ({ x: 0.27 + i * 0.11, y: 0.5, r: r / N }));
   // One more hole, 16 cells inside the pool's rim: its reach (3 + 4.5 cells)
   // ends 8.5 cells from the rim, outside the rim ring measured below (6 cells),
-  // so a mask that grew past its reach would take the rim's relief and the
-  // rim line would no longer be equal to the control's by construction. It is
-  // in the list so no ring of the row reaches it, but it is not reported.
+  // so the rim line stays equal to the control's by construction. A mask
+  // reaching far past 4.5 cells would take the relief of the rim beside it,
+  // but that arc is only about 13 % of the ring, so the ring's mean moves by a
+  // few percent (a dense 12-cell mask: 0.93 of the control's on the ring, 0.49
+  // on the arc). Both are read below: the ring at KEEP_RIM and the arc within
+  // ARC_REACH cells of the hole at KEEP_ARC. The lab draws it at the mirror of
+  // where its v says (the display's rows), so the pixel it was cut at is found
+  // by asking which of the two candidates is not dye. It is not reported as a hole.
   holes.push({ x: C, y: C - R + 16 / N, r: 3 / N, aside: true });
   lab.solver().setBubbles(new Float32Array(holes.flatMap((h) => [h.x, h.y, h.r, 1])), holes.length, 0.25, new Float32Array(holes.length * 4));
   await lab.step(2, { bubbleClear: 1 });
@@ -260,6 +263,18 @@ const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO
   const rgb = (p, i) => [p[4 * i], p[4 * i + 1], p[4 * i + 2]];
   const idx = (u, v) => Math.floor((0.5 + (u - 0.5) * F) * W) + Math.floor((0.5 + (v - 0.5) * F) * W) * W;
   const dev = (a, b) => Math.max(...a.map((v, k) => Math.abs(v - b[k])));
+  const dyeAt = (u, v) => {
+    const ref = [0, 0, 0];
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const c = rgb(on, idx(u, v) + dx + dy * W);
+      for (let k = 0; k < 3; k++) ref[k] += c[k] / 25;
+    }
+    return ref;
+  };
+  const aside = holes.find((h) => h.aside);
+  const askew = [[aside.x, aside.y], [aside.x, 1 - aside.y]].filter(([u, v]) => dev(rgb(on, idx(u, v)), dyeAt(u, v + (v < 0.5 ? 10 : -10) / N)) > 24);
+  if (askew.length !== 1) throw new Error(`holeline: the aside hole is cut at ${askew.length} of its two candidate places, not one`);
+  const [au, av] = askew[0];
   const out = holes.filter((h) => !h.aside).map((h) => {
     // The dye ten cells out, above the hole: the mean of a 5 x 5 block of
     // pixels, so a dither on one pixel is not the reference.
@@ -296,15 +311,18 @@ const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO
   });
   // The pool's rim: what Edge Relief moves a pixel on the ring across it, away
   // from the row of holes.
-  let rn = 0, rsum = 0;
+  let rn = 0, rsum = 0, an = 0, asum = 0;
   for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
     const u = 0.5 + ((x + 0.5) / W - 0.5) / F, v = 0.5 + ((y + 0.5) / W - 0.5) / F;
     if (Math.abs(Math.hypot(u - C, v - C) - R) > 6 / N || Math.abs(v - 0.5) < 0.1) continue;
-    rn++; rsum += dev(rgb(on, x + y * W), rgb(off, x + y * W));
+    const e = dev(rgb(on, x + y * W), rgb(off, x + y * W));
+    rn++; rsum += e;
+    if (Math.hypot(u - au, v - av) < ARC_REACH / N) { an++; asum += e; }
   }
   if (rn < 1000) throw new Error(`holeline: the pool's rim ring picked only ${rn} pixels`);
-  return { holes: out, rim: rsum / rn, rimN: rn };
-}, { N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF });
+  if (an < 500) throw new Error(`holeline: the rim arc beside the aside hole picked only ${an} pixels`);
+  return { holes: out, rim: rsum / rn, rimN: rn, arc: asum / an, arcN: an };
+}, { N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH });
 
 const t0 = Date.now(), lap = (what) => console.log(`   (${what}: ${((Date.now() - t0) / 1000).toFixed(0)} s in)`);
 const plain = await openLab();
@@ -350,25 +368,37 @@ for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'une
 for (const [name, r] of [['the shader', glowNow], ['the control (no air mask)', glowThen]]) {
   console.log(`   ${name}, the dye ${HOLE_FROM} to ${HOLE_TO} cells past a hole's rim, from the dye ${HOLE_REF} cells out:`);
   for (const h of r.holes) console.log(`     hole ${h.cells.toFixed(1)} cells: mean ${h.mean.toFixed(2)} levels, at most ${h.worst.toFixed(1)} levels (${h.n} pixels); Edge Relief moves it ${h.moved.toFixed(2)}; within 3 cells: mean ${h.mean3.toFixed(2)}, moved ${h.moved3.toFixed(2)}`);
-  console.log(`     pool rim into water: Edge Relief moves a pixel by ${r.rim.toFixed(2)} levels on average (${r.rimN} pixels)`);
+  console.log(`     pool rim into water: Edge Relief moves a pixel by ${r.rim.toFixed(2)} levels on average (${r.rimN} pixels); within ${ARC_REACH} cells of the aside hole ${r.arc.toFixed(2)} (${r.arcN} pixels)`);
 }
-const bigNow = glowNow.holes.filter((h) => h.cells >= 5), bigThen = glowThen.holes.filter((h) => h.cells >= 5);
+const some = (hs, want) => {
+  if (hs.length !== want) throw new Error(`holeline: ${hs.length} holes picked, not ${want}`);
+  return hs;
+};
+const bigThen = some(glowThen.holes.filter((h) => h.cells >= 5), 3);
 const meanOf = (hs) => Math.max(...hs.map((h) => h.mean));
 const leastOf = (hs) => Math.min(...hs.map((h) => h.mean));
 check(`the control finds the glow (least ${leastOf(bigThen).toFixed(1)} levels > ${CONTROL_GLOW} on the holes of 5 cells or more)`, leastOf(bigThen) > CONTROL_GLOW);
-check(`no glow round a hole (worst mean ${meanOf(glowNow.holes).toFixed(2)} levels < ${MAX_GLOW}, every size)`, meanOf(glowNow.holes) < MAX_GLOW, `the control: ${meanOf(glowThen.holes).toFixed(1)}`);
+check(`no glow round a hole (worst mean ${meanOf(glowNow.holes).toFixed(2)} levels < ${MAX_GLOW}; the control reads it on the holes of 5 cells or more, the smaller two are printed)`, meanOf(glowNow.holes) < MAX_GLOW, `the control: ${meanOf(glowThen.holes).toFixed(1)}`);
 /*
   The same line asked of Edge Relief itself, on the three cells beside the rim
   where the glow is brightest, and on the holes of 3 cells or more: the
-  1.8-cell hole is left out because its mask is only partly there (PLAN 33b-4,
+  1.8-cell hole is left out because its mask is only partly there (PLAN 33b-3,
   the control moves it 5.5 levels and the shader 4.6).
 */
-const nearNow = glowNow.holes.filter((h) => h.cells >= 3), nearThen = glowThen.holes.filter((h) => h.cells >= 3);
+const nearNow = some(glowNow.holes.filter((h) => h.cells >= 3), 4), nearThen = some(glowThen.holes.filter((h) => h.cells >= 3), 4);
 const nearMax = (hs) => Math.max(...hs.map((h) => h.moved3)), nearMin = (hs) => Math.min(...hs.map((h) => h.moved3));
 check(`the control's Edge Relief lights the first 3 cells (least ${nearMin(nearThen).toFixed(1)} levels > ${CONTROL_NEAR}, holes of 3 cells or more)`, nearMin(nearThen) > CONTROL_NEAR);
 check(`and the shader's does not (most ${nearMax(nearNow).toFixed(2)} levels < ${MAX_NEAR})`, nearMax(nearNow) < MAX_NEAR);
+/*
+  The 1.8-cell hole has to be reached at all: the nine taps find it along few
+  directions so it is only partly flattened (0.83 of the control's relief at
+  3 cells), but with the mask taken out it is all of it (1.0).
+*/
+const smallNow = glowNow.holes.find((h) => h.cells < 2), smallThen = glowThen.holes.find((h) => h.cells < 2);
+check(`the smallest hole is partly flattened (${smallNow.moved3.toFixed(2)} ≤ ${PART_SMALL} × the control's ${smallThen.moved3.toFixed(2)} within 3 cells)`, smallNow.moved3 <= PART_SMALL * smallThen.moved3);
 check(`the pool's relief into water is there (the control moves a pixel ${glowThen.rim.toFixed(1)} levels > ${MIN_RIM})`, glowThen.rim > MIN_RIM);
 check(`and kept (${glowNow.rim.toFixed(2)} ≥ ${KEEP_RIM} × the control's ${glowThen.rim.toFixed(2)})`, glowNow.rim >= KEEP_RIM * glowThen.rim);
+check(`and kept beside a bubble (the arc within ${ARC_REACH} cells of the aside hole ${glowNow.arc.toFixed(2)} ≥ ${KEEP_ARC} × the control's ${glowThen.arc.toFixed(2)})`, glowNow.arc >= KEEP_ARC * glowThen.arc);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(failed ? `\n${failed} FAIL` : `\nall ${checks.length} ok`);

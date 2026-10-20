@@ -2982,8 +2982,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     var normal1 = vec3f(0.0, 0.0, 1.0);
     if (sharp1) {
       if (U.derivedOn > 0.5) { normal1 = gradNormal(near1.xy); } else { normal1 = sobelNormal(layer1, fuv1); }
-      // A hole the air cut is the bubble's edge, not the dye's (33b, airNear).
-      normal1 = normalize(mix(normal1, vec3f(0.0, 0.0, 1.0), airNear(fuv1)));
+      // No airNear here: the bubbles' air is cut in the lead layer's dye only
+      // (the app hands the back layer no air), and airNear reads the front
+      // plate's air in this layer's own coordinates, which differ under a
+      // layer zoom or drift, so it would flatten relief where no bubble is.
     }
     fluid1 = vec4f(applyLighting(fluid1.rgb, normal1, darkBlend, fuv1), fluid1.a);
     if (darkBlend) { fluid1.a *= 0.6; }
