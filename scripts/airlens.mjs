@@ -24,8 +24,11 @@
  * middle, and the check stops rather than measuring the plate beside it.
  *
  * Brightness is read against the bubble's own middle, not the plain frame:
- * the plain frame has no liquid there, and on the lab's plate, as on every
- * look with a dark ground, no liquid is black.
+ * the plain frame has no liquid there, and no liquid is black on the dark
+ * ground. The plate is drawn on the lamp ground (lampGround 1) because the
+ * window is the plate itself, not a tint of the dye (scripts/bubblelook.mjs
+ * holds that on both grounds): on the default black ground the window is
+ * black and there is nothing lit to hold the lens against.
  */
 import { openLab } from './lab.mjs';
 import { readFileSync } from 'node:fs';
@@ -93,7 +96,11 @@ try {
     const DIM = [0.6, 0.6, 0.6];
     // The closeup's own paint detail is laid over the whole frame, bubble or
     // none; what is asked is the bubble, so it is off in both views.
-    const QUIET = { macroCells: 0, macroLacing: 0, macroDepth: 0, macroEdgeDetail: 0, macroRelief: 0 };
+    // The lamp ground too: a bubble's clear middle is the plate there, not a
+    // tint of the dye, so on the default black ground (dye is light on black)
+    // the window is black and there is nothing lit to measure the lens against.
+    // The lamp ground makes the window the lamp, as a projector shows it.
+    const QUIET = { macroCells: 0, macroLacing: 0, macroDepth: 0, macroEdgeDetail: 0, macroRelief: 0, lampGround: 1 };
     const lum = (px, i) => 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2];
     /*
       One bubble of r cells at (x, y) on the grey plate, the glasses bowed by
@@ -113,7 +120,10 @@ try {
       const gap = sq.gap[Math.floor(y * sq.n) * sq.n + Math.floor(x * sq.n)];
       if (!(gap > 0.001)) throw new Error(`the gap under the bubble reads ${gap}`);
       const view = { zoom: ZOOM, macroAmount: 0, view: true, cx: x, cy: y, ...cam };
-      const on = await lab.render(S, { ...QUIET, iridescence: IRID, ...set }, { ...view, bubbles: 0.8 });
+      // Bubbles at full strength: the bubble is composited at strength times
+      // 0.7..1 (the film term), so at 0.8 a fifth to a quarter of the plate
+      // shows through the band and the band measures 25% where it is drawn dark.
+      const on = await lab.render(S, { ...QUIET, iridescence: IRID, ...set }, { ...view, bubbles: 1 });
       const off = await lab.render(S, { ...QUIET, iridescence: IRID, ...set }, { ...view, bubbles: 0 });
       let x0 = S, x1 = -1, y0 = S, y1 = -1;
       for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) {
@@ -180,7 +190,7 @@ try {
       };
       // The liquid round it, from the frame without the bubbles' shading, in the same units as mid.
       const liquid = ring(1.4, 1.7, off).mean * Math.max(1, mid);
-      return { gap, mid, rad, found, liquid, edge, crossings, ring };
+      return { gap, mid, rad, found, liquid, edge, crossings, ring, off };
     };
     const out = {};
     // A small bubble: 2.5 cells, a ball (under half the gap at rest, 3 cells).
@@ -210,7 +220,7 @@ try {
         where in it each point is, so the window has a grain of a few
         percent (measured, 151 to 164 against a middle of 157).
       */
-      const win = (s) => { const w = s.ring(0, 0.6); return { dome: s.ring(0, 0.2).mean / s.ring(0.4, 0.6).mean, glint: w.top / w.median, peak: w.max / w.median, rgb: w.rgb, chroma: w.chroma }; };
+      const win = (s) => { const w = s.ring(0, 0.6); return { dome: s.ring(0, 0.2).mean / s.ring(0.4, 0.6).mean, glint: w.top / w.median, peak: w.max / w.median, rgb: w.rgb, chroma: w.chroma, plateChroma: s.ring(0, 0.6, s.off).chroma }; };
       const s = await shoot(0.5, 0.5, 12);
       out.big = { gap: s.gap, mid: s.mid, rad: s.rad, found: s.found, liquid: s.liquid, edge: s.edge, ...win(s), band: s.ring(0.86, 0.9).mean };
       out.bigCam = win(await shoot(0.5, 0.5, 12, { cam: { macroAmount: 1 } }));
@@ -290,15 +300,17 @@ try {
     outward); its brightest pixel in a hundred within six percent of the
     median, and its brightest within ten (the lab plate's grain tops out at
     1.045), so a highlight too small to move a hundredth of the window still
-    shows. And as grey as the grey plate, at the default Iridescence: each
-    pixel's brightest channel within four levels of its dimmest on average
+    shows. And as grey as the plate under it, at the default Iridescence: each
+    pixel's brightest channel within four levels of its dimmest on average,
+    more than the same pixels have without the bubble (the lamp ground's own
+    warm white is nine levels apart; the bar was four when the ground was grey)
     (the film the camera's bubble wears at the default moved the window's
     mean channels twelve apart, 144,166,156). The camera's bubble, printed
     beside it, has a dome and a highlight.
   */
   check('and its window is flat: no highlight, no film colour, no dome',
-    Math.abs(m.big.dome - 1) < 0.03 && m.big.glint < 1.06 && m.big.peak < 1.1 && m.big.chroma < 4,
-    `middle ×${m.big.dome.toFixed(3)} its outer part, brightest in a hundred ×${m.big.glint.toFixed(3)} the median and brightest ×${m.big.peak.toFixed(3)} (the closeup's bubble: ×${m.bigCam.dome.toFixed(2)}, ×${m.bigCam.glint.toFixed(2)}, ×${m.bigCam.peak.toFixed(2)}); chroma ${m.big.chroma.toFixed(1)} a pixel at Iridescence ${IRID}`);
+    Math.abs(m.big.dome - 1) < 0.03 && m.big.glint < 1.06 && m.big.peak < 1.1 && m.big.chroma < m.big.plateChroma + 4,
+    `middle ×${m.big.dome.toFixed(3)} its outer part, brightest in a hundred ×${m.big.glint.toFixed(3)} the median and brightest ×${m.big.peak.toFixed(3)} (the closeup's bubble: ×${m.bigCam.dome.toFixed(2)}, ×${m.bigCam.glint.toFixed(2)}, ×${m.bigCam.peak.toFixed(2)}); chroma ${m.big.chroma.toFixed(1)} a pixel against the plate's ${m.big.plateChroma.toFixed(1)} at Iridescence ${IRID}`);
   /*
     Iridescence asks for soap film. Turned up it must still colour the
     window on the plate, or the setting would do nothing at 1x: colour, a

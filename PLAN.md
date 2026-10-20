@@ -7261,7 +7261,10 @@ After 33a a pale soft ring two to four cells wide stays round every hole (the bo
 row of `zh-sheet.png` in the folder above). Inferred, not yet measured: the relief
 (`sobelGrad`, plate.ts) lighting the one-cell depth ramp the air cuts, as if the dye
 stood in a ridge there. A real hole's edge is the meniscus, which the bubble's own pass
-draws; the dye beside it is flat. Find the term that draws the ring (switch relief,
+draws; the dye beside it is flat. (Measured in 33e: the air field's antialiased rim is about
+1.5 texels, about 8 px at the lab's 256 cells and zoom 1.5, so the dye a hole clears
+fades over about 14 px, 253 → 48 levels on the lamp ground; the plate under a small
+bubble's band is a gradient, not a flat. That may be the ring.) Find the term that draws the ring (switch relief,
 lacing and the edge glow off one at a time in the lab) and take it off a hole's cut
 without taking it off a dye's own edge.
 *Check:* `holeline` gains a line: with the bubbles' drawing at 0, the mean of the ring
@@ -7291,37 +7294,27 @@ the rim's radius found along 64 rays: RMS deviation from a circle under 0.5 scre
 pixel, and the 10–90 % rise of the edge no wider than 1.5 pixels. Today's numbers
 printed first.
 
-### 33e. The bubble as the projector throws it, not a donut (M)
+### ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped, this PR** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`: the middle was 116–195 levels off the plate on the dark ground before, 0 after, and 0–21 on the lamp ground against a tenth-of-the-tint bar; story in `docs/plan-shipped.md` §33e)
 
-What the research says a gap-spanning bubble on a projected plate is: a clear middle,
-the lamp through a slab of air (nearly the lamp's own colour); a dark band at the rim
-whose width is the share (1 − u*) of the meniscus (about half the gap wide) whose light
-refracts out of the projector's aperture, u* set by the aperture and the index step,
-the band vanishing as |1 − n_out/n_in| falls to NA/(2·n_out); a lens that minifies
-(focal length about −1.5 R), not one that magnifies; and a highlight only from a side
-lamp.
-
-What the plate draws (plate.ts, the bubble's projected branch): the middle is
-`mix(lensCol, tint…, 0.25 + 0.55·clarity)`, the dye's own hue at a quarter to four
-fifths, where the comment beside it says "a breath of the liquid's hue"; and the band
-is a share of the bubble's radius at AIR_DARK 0.9, about a third of R on an 8-cell
-bubble. A dark ring round a dye-coloured disc is the donut. Why the owner sees it only
-"sometimes" is not yet known: find which of the clarity term, the crossing to the
-camera's bubble (dropCam) and a hole cut wider than the drawn bubble sets it, in the lab,
-before changing anything.
-
-Draw instead: the middle as the clear plate there (what the plate shows through a hole
-with the bubbles' drawing at 0), with at most a tenth of the wetting film's tint; the
-band's width from the meniscus in plate units and u*, not from R, so a large bubble
-wears a fine line and a small one is mostly dark, as on a real plate; the lens
-minifying. Shortcut to name: the meniscus as a circular arc of radius gap/2 (a contact
-angle of zero), and one index per cell.
-*Check:* new `npm run bubblelook` (lab), bubbles of 3 to 20 cells: (1) the middle's
-mean within 10 levels of the clear plate at the same point, and its hue not the dye's;
-(2) the dark band's width within 25 % of (1 − u*)·gap/2 in screen pixels, for two
-liquids of different index (two widths); (3) the dark share of the bubble's area
-falls as the bubble grows; (4) Bubbles at 0 is the plate to the bit. `pops`, `straw`,
-`airlens` and a `look` render.
+Left from it, so none of it is lost:
+- **33e-2. The band's width from the meniscus, for small bubbles too.** The old text
+  here said the band is "a share of R"; that is wrong past R = half the gap (the big
+  bubble's band is already half the gap, and `airlens` holds it there), so only a
+  bubble under a few cells is mostly dark, and the dark share does fall as the bubble
+  grows (`bubblelook`, 80 → 34 %). What is not done is the width against the liquid's
+  index (u* from the cell's index), which waits on 33f's per-liquid index.
+- **Shortcuts, named.** (a) The lens is not drawn minifying (focal length about
+  −1.5 R): the middle is flat, which is the lamp through a slab of air and right for
+  a pancake, and a little wrong for a bubble that is nearly a sphere. (b) The meniscus
+  is a circular arc of radius gap/2 (a contact angle of zero). (c) One index per cell
+  (33f). (d) The middle takes at most a tenth of the wetting film's tint (`0.1·k1`),
+  a choice, not a measurement.
+- **A bubble in clear water is drawn at 70 % of the strength of one in dye** (found
+  here, not changed): the compositing weight is `bubbleStrength·mix(0.7, 1, filmT)` and
+  `filmT` is the dye's alpha at the rim, so with no dye the band can never be darker
+  than 30 % of the plate, and with Bubbles at 0.8 and dye it is 28 %, at 1 and dye 10 %.
+  Whether the 0.7 is a choice to keep, or a bug (a hole in clear water should be as dark
+  at its rim as one in dye), is for 33f's per-liquid pass to settle with a picture.
 
 ### 33f. Bubbles that know their liquid (M)
 

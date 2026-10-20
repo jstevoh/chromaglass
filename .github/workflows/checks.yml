@@ -566,6 +566,17 @@ jobs:
       - name: No line round a bubble's hole
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run holeline
+      # A bubble's clear middle is the plate (PLAN.md 33e, scripts/bubblelook.mjs).
+      # The owner saw bubbles as donuts: the projected middle was the dye's
+      # hue at 41-77 % strength, so a dim dye-coloured disc sat inside a black
+      # band. This check builds a second lab with the old line put back, so
+      # the donut it measures away is found again in the same run, on the
+      # dark ground and the lamp ground, at five sizes. Pictures from the lab,
+      # which SwiftShader renders as the shader's text, so it sits beside
+      # holeline in the open shard.
+      - name: A bubble's middle is the plate
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run bubblelook
       # Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):
       # against the Firebase Auth emulator, Google, Apple and magic-link
       # sign-in, offline returning sessions, sign-out and account deletion.
