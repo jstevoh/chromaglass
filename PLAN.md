@@ -7293,22 +7293,30 @@ phone and the iPad draw what the desk draws; a new control goes on the phone too
 
 ### ~~33a. No stepped ring round a bubble's hole~~ — **Shipped, this PR** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`: the line moved 8.9–18.3 % of the ring round holes of 1.8–14 cells before, 0 % after, and still draws 52.8 % → 52.8 % and 61.1 % → 58.3 % of the band where two dyes meet; story in `docs/plan-shipped.md` §33a)
 
-### 33b. The soft glow still left round a hole (S)
+### ~~33b. The soft glow still left round a hole~~ — **Shipped, this PR** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`: the dye 1–6 cells past a hole's rim was 6.0–11.0 levels from the dye 10 cells out before (4.2 at the smallest hole), 2.4–3.2 after, bar 6; Edge Relief moved the first 3 cells 11.9–22.9 levels before, 0.00–0.02 after, bar 1; a pool's edge relief into water kept 16.06 → 16.06; story in `docs/plan-shipped.md` §33b)
 
-After 33a a pale soft ring two to four cells wide stays round every hole (the bottom
-row of `zh-sheet.png` in the folder above). Inferred, not yet measured: the relief
-(`sobelGrad`, plate.ts) lighting the one-cell depth ramp the air cuts, as if the dye
-stood in a ridge there. A real hole's edge is the meniscus, which the bubble's own pass
-draws; the dye beside it is flat. (Measured in 33e: the air field's antialiased rim is about
-1.5 texels, about 8 px at the lab's 256 cells and zoom 1.5, so the dye a hole clears
-fades over about 14 px, 253 → 48 levels on the lamp ground; the plate under a small
-bubble's band is a gradient, not a flat. That may be the ring.) Find the term that draws the ring (switch relief,
-lacing and the edge glow off one at a time in the lab) and take it off a hole's cut
-without taking it off a dye's own edge.
-*Check:* `holeline` gains a line: with the bubbles' drawing at 0, the mean of the ring
-1–6 cells past each hole's rim is within 6 levels of the dye 10 cells out (today's
-value printed first, in the header), and a pool's relief at its edge into clear liquid
-still moves at least 0.8 of what it moves today.
+Left from it, so none of it is lost:
+- **33b-2. A fixed reach and a wholesale flatten.** `airNear` looks 4.5 cells out and
+  flattens the dye's whole normal there, so a real dye-to-dye step beside a bubble loses
+  its relief inside that reach. Derive the reach from the Sobel and bicubic taps, and
+  flatten only the air's own contribution (the slope of the density the air removed)
+  once 33g's closeup changes how the relief is read.
+  *Check:* `holeline` with two dyes meeting beside a hole: the step's relief at 4 cells
+  from the rim at least 0.8 of its relief far from any hole.
+- **33b-3. The smallest hole is only partly flattened.** At the hole of 1.8 cells the
+  worst pixel in the ring is still 22 levels from the dye 10 cells out (the control's
+  worst is the same 22, with the bubbles at 0), and Edge Relief still moves its first 3
+  cells 4.6 levels (the control 5.5): `airNear`'s nine taps reach 4.5 cells out and
+  find a hole that small only along a few directions, so the mask is patchy. Sample
+  the air at the radius of the hole's own coverage (a blurred air mip), or take the
+  taps from the Sobel's own footprint, and bring `holeline` to cover the 1.8-cell hole
+  at the same bar (1 level) as the others; then find what draws the 22-level pixel.
+- **33b-4. The lace and the boundary line at a hole** are not masked by `airNear`; 33c is
+  the lace, and the boundary line is 33a's hue gate. Apply `airNear` there only if 33c's
+  check finds a ring.
+- For 33g (the closeup): the closeup is a different branch (`dropCam`); `airNear` applies
+  to the shared normal so the closeup's dye beside a hole is flattened too. Check the
+  closeup's meniscus on a bubble in `look` pictures before reshaping it.
 
 ### 33c. The lace reads the same lit difference (S)
 

@@ -4289,6 +4289,49 @@ plate with Boundary Contrast at 0): the share of a ring round holes of 1.8, 3, 5
 61.1 % → 58.3 % at depths five times apart; a pool's rim into clear liquid, printed not
 judged, 16.8 % → 0 %. The bubble's own drawing, which is the donut, is 33e.
 
+### 33b. The soft glow round a hole (this PR)
+
+*Reported* (the owner, 2026-10-19, via 33a's picture): after the stepped ring went, a pale
+soft ring two to four cells wide stayed round every hole the air cuts in the dye.
+
+*Cause, measured not inferred:* the lab's radial profile round a hole of 8 cells (green
+channel, the real solver and plate shader, the bubbles' drawing at 0 and the air field
+handed to the plate) was +9 to +15 levels over a 194 baseline at 9 to 13 cells, and flat
+with Edge Relief at 0. It is the dye's own edge relief (`meniscus()`, and the lit slope
+`applyLighting` takes from `sobelGrad`): the air's cut leaves a steep density ramp over
+its 1.5-texel rim, and the relief lights that ramp as if the dye stood in a ridge. A
+real hole's edge is the bubble's meniscus, which the bubble pass draws; the dye beside
+it is flat. The boundary line and the lace contribute nothing to this glow (the line was
+33a's).
+
+*Fix:* `airNear` (`src/gpu/wgsl/plate.ts`, in the display-only `VIEW` part, because the
+derive pass's module has no `air0`) is the air field's largest coverage over nine taps
+within 4.5 cells (the Sobel taps at 3 cells plus the bicubic's spread), smoothstepped
+0.02 to 0.3. Both layers' dye normals are blended to flat by it before they reach the
+lighting and the meniscus. A dye's own edge into clear liquid is far from the air field
+and is untouched.
+
+*Measured* (`npm run holeline`, the lab on SwiftShader): the mean deviation of the dye
+1 to 6 cells past a hole's rim from the dye 10 cells out, for holes of 1.8, 3, 5, 8 and
+14 cells, went from 4.2, 6.0, 9.6, 11.0 and 10.4 levels (the check's second lab, with the
+mask taken out) to 3.2, 2.4, 2.6, 2.4 and 2.5 (bar 6). Edge Relief itself, asked of the
+first 3 cells beside the rim of the holes of 3 cells or more, moved the dye 11.9 to 22.9
+levels before and 0.00 to 0.02 after (bar 1). A pool's edge relief into clear liquid moves
+a pixel by 16.06 levels both ways (bar 0.8 of today's). `airlens` found its bubble box by
+differencing a render with the bubbles on against one with them at 0, and the flattened
+relief then showed in that difference; its off render now hands the plate the air field
+too (`airField`), so it differences the bubbles alone.
+
+*Named shortcuts:* `airNear` is a fixed reach, not one derived from the taps' real
+footprint; the normal is flattened wholesale, so a real dye-to-dye step right beside a
+bubble also loses its relief within the reach; only the lead layer's normal is masked
+(the app cuts air in the lead layer's dye alone, and the back layer's coordinates differ
+under a zoom or drift); the aside hole of `holeline` is a coarse guard on the mask's reach;
+the lace (33c) and the boundary line
+at a hole are not masked; the hole of 1.8 cells is only partly flattened (its relief
+moves 4.6 levels where the control moves 5.5), because the nine taps find a hole that
+small along few directions (PLAN 33b-3).
+
 ### 33e. The bubble as the projector throws it, not a donut (this PR)
 
 The owner: bubbles "sometimes" draw as a donut. The report's picture is

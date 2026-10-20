@@ -124,7 +124,13 @@ try {
       // 0.7..1 (the film term), so at 0.8 a fifth to a quarter of the plate
       // shows through the band and the band measures 25% where it is drawn dark.
       const on = await lab.render(S, { ...QUIET, iridescence: IRID, ...set }, { ...view, bubbles: 1 });
-      const off = await lab.render(S, { ...QUIET, iridescence: IRID, ...set }, { ...view, bubbles: 0 });
+      // The off picture is handed the air field too (airField), because the
+      // plate lays the air over the dye's relief (33b, airNear): flat dye
+      // beside a bubble's hole. Without it the difference between the two is
+      // the bubble's drawing plus that relief going flat, and the box found
+      // below is lopsided by the dye's own light (the middle read 7 px off).
+      // With it, the difference is only what the bubble pass draws.
+      const off = await lab.render(S, { ...QUIET, iridescence: IRID, ...set }, { ...view, bubbles: 0, airField: true });
       let x0 = S, x1 = -1, y0 = S, y1 = -1;
       for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) {
         const i = (yy * S + xx) * 4;

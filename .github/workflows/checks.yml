@@ -113,8 +113,10 @@ jobs:
     name: Measure · ${{ matrix.part }}
     runs-on: ubuntu-latest
     # The browser part ran 11:47 on main before the switches step (two to three
-    # minutes in CI); 15 left it no headroom.
-    timeout-minutes: 20
+    # minutes in CI); 15 left it no headroom. 25 since PLAN 33b: the lab part ran
+    # 13.8 minutes on a recent PR and `holeline` now builds a third lab (the
+    # control with the air mask taken out), so 20 left the same thin margin.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -560,8 +562,10 @@ jobs:
       # hole's rim, sampled on the solver's cell grid. The line now waits for
       # the dye's colour to change, and this check builds a second lab with
       # that gate cut out, so the halo it measures away is found again in the
-      # same run, and the line between two real dyes is still drawn. It reads
-      # pictures from the lab, which SwiftShader renders as the shader's text,
+      # same run, and the line between two real dyes is still drawn. It also
+      # holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab
+      # with airNear's mask taken off finds the glow again), and a pool's edge
+      # into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,
       # so it sits here beside lampzero rather than in the Mac queue.
       - name: No line round a bubble's hole
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
