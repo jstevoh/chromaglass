@@ -14,6 +14,8 @@ import { useWakeLock } from '../hooks/useWakeLock';
 import { PIN_RANGE } from '../lib/deskPins';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { MixerPanel } from './MixerPanel';
+import { TiltPad } from './ui/TiltPad';
+import { bearingName, readSpring, writeSpring } from '../lib/tiltPad';
 import { curveOf, handValueAt, travelOf } from '../lib/midi';
 import { LOCKUP_URL } from '../brand';
 import { AlphaBadge } from './AlphaBadge';
@@ -252,6 +254,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     }, 400);
   }, [patchThrottled]);
   useEffect(() => () => { if (mixerHoldRef.current) clearTimeout(mixerHoldRef.current); }, []);
+
+  const [tiltSpring, setTiltSpring] = useState(readSpring);
 
   const action = useCallback((a: RemoteAction) => send({ type: 'action', action: a }), [send]);
 
@@ -775,6 +779,43 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          {/*
+            The tilt pad (PLAN 18a-13f): the laptop's Gravity and Tilt Direction
+            under a thumb, sent as one patch like the mixer's so the two never
+            reach the plate out of step. Held locally until a moment after the
+            last move, as onMixerSetting does, so the laptop's snapshots do not
+            drag the puck back under the finger.
+          */}
+          <div className="mb-5 flex flex-col items-center gap-2" data-testid="remote-tilt-pad-block">
+            <div className="flex w-full items-baseline justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Tilt</span>
+              <span className="font-mono text-xs text-white/40" data-testid="remote-tilt-says">
+                {((value('plateUpright') as number | undefined) ?? 0) > 0
+                  ? `${Math.round(((value('plateUpright') as number | undefined) ?? 0) * 100)}% · runs ${bearingName((value('tiltDirection') as number | undefined) ?? 180)}`
+                  : 'Level'}
+              </span>
+            </div>
+            <TiltPad
+              upright={(value('plateUpright') as number | undefined) ?? 0}
+              direction={(value('tiltDirection') as number | undefined) ?? 180}
+              onTilt={(t) => onMixerSetting({ plateUpright: t.upright, tiltDirection: t.direction })}
+              spring={tiltSpring}
+              size={240}
+              disabled={!connected}
+              testId="remote-tilt-pad"
+            />
+            <button
+              type="button"
+              onClick={() => { setTiltSpring(!tiltSpring); writeSpring(!tiltSpring); }}
+              role="switch"
+              aria-checked={tiltSpring}
+              disabled={!connected}
+              className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[0.2em] text-white/70 disabled:opacity-30"
+              data-testid="remote-tilt-spring"
+            >
+              Spring back <SwitchPill on={tiltSpring} />
+            </button>
+          </div>
           <Slider label="Slosh" field="slosh" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
           {/*

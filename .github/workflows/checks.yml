@@ -689,6 +689,13 @@ jobs:
       - name: The phone link
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/phonelink.mjs
+      # The tilt pad (scripts/tiltpad.mjs, PLAN 18a-13f): the joystick's map, the
+      # real desk's pad, a real touch on the phone's, and a phone linked to a
+      # display through the show server, every question asked of the display's
+      # own settings. No GPU; dist/ is the phone step's build.
+      - name: The tilt pad
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node --experimental-strip-types scripts/tiltpad.mjs
       # The show key (scripts/showkey.mjs, PLAN.md 14m): the show server and a
       # phone and a laptop in browsers. A phone without the key, with a wrong
       # one, or past three wrong ones is refused; only the laptop is handed

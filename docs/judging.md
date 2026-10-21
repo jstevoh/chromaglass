@@ -1454,3 +1454,22 @@ real GPU:
 - On the phone, a held tilt fades out of the remote 2.5 s after the last reading, so the
   liquid runs back to level on its own while the phone is held still: the same fade Plate
   Rock has, now visible as a slop. Say whether it reads wrong.
+
+## 59. The tilt pad (PLAN 18a-13f)
+
+A joystick for Gravity and Tilt Direction: the **Tilt** panel on the Gig desk (right column,
+under Rides; the panel browser opens it on any layout), the phone's Play sheet, and the
+remote. `npm run tiltpad` measures the mapping and the wiring; how it feels under a hand is
+yours. With Slosh at about half and a few dyes poured:
+- Drag the puck to one side and flick it across to the other, then let go. Does the liquid
+  slop the way a tipped dish does? Does the Spring return feel like a stick (quick, to where
+  you took it) or too snappy or too slow? (`PAD_SPRING_MS`, 220 ms.)
+- Is Gravity too sharp near the rim for a mouse? The throw from the dead ring to the rim is
+  the whole 0 to 1; say if a hard flick should stop short of 1.
+- Turn Spring off and hold the puck at an angle: it should be a held tilt, the same as the
+  Gravity and Tilt Direction faders.
+- On a look with Gravity already up (Lava Lamp), grab the pad and let go: the look's own
+  tilt should come back, not level.
+- On the phone, a thumb on the pad: is it big enough, and does the page stay still under the
+  drag? With the phone's own Tilt on, the pad only shows where the plate is.
+

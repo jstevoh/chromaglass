@@ -2581,6 +2581,20 @@ M_f·ΔP) keeps both.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
+- **18a-13f, the tilt pad (shipped 2026-10-21; the owner: a tipping control on desktop, a
+  joystick maybe).** Gravity and Tilt Direction are a length and a bearing, so a disc is
+  their natural control: the puck is where the liquid runs. Mapping in `lib/tiltPad.ts`
+  (dead ring 0.06 of the radius, Gravity linear to the rim, the bearing the plate's own
+  compass: 0 the top, 90 the right; 1,440 settings round-trip within 0.01 and 1 degree),
+  the drag, spring and keys in `components/ui/TiltPad.tsx`. Two choices that were not
+  obvious. First, the spring returns to where the puck was **grabbed**, not to the middle:
+  the first draft levelled on release, which took away Lava Lamp's own Gravity the first
+  time anyone touched the pad (caught by starting the phone and remote checks from a look
+  with the plate stood up; started level, they passed a pad that levelled). Second, both
+  settings go in one patch, so no frame sees a new bearing at the old Gravity (the check
+  watches every state the pad rendered during a sweep). `npm run tiltpad` reads the
+  display's own settings through its debug hook, not the pad's echo of them.
+
 - **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the
   dye is composited with `mix(outColor, fluid0.rgb, fluid0.a)`. `decodeFluid` makes
   the opacity from the total density with a darkness fudge (×1.7 for dark dyes),

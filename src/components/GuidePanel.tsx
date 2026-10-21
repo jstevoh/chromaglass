@@ -303,6 +303,7 @@ const SECTIONS: Section[] = [
           ['Bubbles', <>Air between the plates. A bubble is not drawn over the dye — it is a standing squeeze on its own footprint, so the dye pumps out to its rim and the field flows round it.</>],
           ['Plate Rock', <>The beat tips the whole plate and a damped spring rocks it back, so the field sloshes instead of only churning.</>],
           ['Slosh', <>Tip the plate one way and then back (Gravity and Tilt Direction, or the phone's tilt) and the liquid piles to the low side, runs back past the middle and mixes. Only your hand drives it, never the sound; thin liquid rings, thick liquid creeps.</>],
+          ['Tilt pad', <>A joystick for Gravity and Tilt Direction: the Tilt panel on the Gig desk, the phone&apos;s Play sheet and the remote. Put the puck where the liquid should run; the farther from the middle, the steeper the plate. With Spring back on, letting go returns it to the tilt the look had; off, it holds. Double-click or Escape levels it.</>],
           ['Boundary Glow', <>A bright line where two distinct dyes meet — the oil-water interface, without a multi-fluid solve.</>],
           ['Saturation / Glossiness / Post Blur', <>The final grade. Glossiness defaults to zero: flat, evenly lit matte dye is the projected look, and a specular highlight makes it read as glossy 3D spheres instead.</>],
         ]} />

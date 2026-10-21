@@ -5799,6 +5799,9 @@ export default function App() {
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
             slosh={settings.slosh ?? 0}
             onSlosh={(v) => updateSettings({ slosh: v })}
+            gravity={settings.plateUpright ?? 0}
+            tiltDirection={settings.tiltDirection ?? 180}
+            onTilt={(t) => updateSettings({ plateUpright: t.upright, tiltDirection: t.direction })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}

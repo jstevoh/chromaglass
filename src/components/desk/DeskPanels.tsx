@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
 import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
+import { TiltPad } from '../ui/TiltPad';
+import { bearingName, readSpring, writeSpring } from '../../lib/tiltPad';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
@@ -1001,6 +1003,58 @@ function QrCodeImage({ text }: { text: string }) {
   );
 }
 
+/*
+  The tilt pad (PLAN 18a-13f): the joystick the desk did not have. Tipping the
+  plate was the phone's motion sensor or two faders (Gravity, then Tilt
+  Direction), and a laptop with no motion sensor could not tip one way and then
+  the other, which is the gesture that makes the liquid slop. The pad writes
+  those same two settings, so a controller's Gravity fader and the phone's tilt
+  move it and it moves them.
+*/
+function TiltBody({ p }: { p: DeskProps }) {
+  const s = p.settings;
+  const upright = s.plateUpright ?? 0;
+  const direction = s.tiltDirection ?? 180;
+  const slosh = s.slosh ?? 0;
+  const [spring, setSpring] = useState(readSpring);
+  return (
+    <div className="flex flex-col items-center gap-3 px-1 pb-1 pt-2" data-testid="tilt-panel">
+      <TiltPad
+        upright={upright}
+        direction={direction}
+        onTilt={t => p.onSetting({ plateUpright: t.upright, tiltDirection: t.direction })}
+        spring={spring}
+      />
+      <div className="font-mono text-[12px] text-text-2" data-testid="tilt-says">
+        {upright > 0 ? `${Math.round(upright * 100)}% · runs ${bearingName(direction)}` : 'Level'}
+      </div>
+      <div className="w-full">
+        <Toggle
+          label="Spring back"
+          on={spring}
+          onChange={v => { setSpring(v); writeSpring(v); }}
+          testId="tilt-spring"
+          title="Let go and the stick returns to where it was when you took it. Off, it stays where you leave it."
+        />
+        <Button onClick={() => p.onSetting({ plateUpright: 0 })} disabled={upright === 0} testId="tilt-level" full height={32}>Level</Button>
+      </div>
+      <div className="w-full">
+        <Slider
+          label="Slosh"
+          value={slosh}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={v => p.onSetting({ slosh: v })}
+          display={`${Math.round(slosh * 100)}%`}
+          midiKey="setting:slosh"
+          resetTo={0}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Which body ───────────────────────────────────────────────────────
 
 export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
@@ -1012,6 +1066,7 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'dyes': return <DyesBody p={p} />;
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
+    case 'tilt': return <TiltBody p={p} />;
     case 'score': return p.score ? <SongScore {...p.score} /> : null;
   }
   const spec = PANEL_BY_ID.get(id);
@@ -1036,6 +1091,7 @@ export function panelMeta(id: string, p: DeskProps): string | null {
     case 'dyes': return p.paletteLock === null ? 'auto' : null;
     case 'tools': return `layer ${p.layer + 1}`;
     case 'phone': return p.status.phone === 0 ? 'not linked' : `${p.status.phone} linked`;
+    case 'tilt': return (p.settings.plateUpright ?? 0) > 0 ? `${Math.round((p.settings.plateUpright ?? 0) * 100)}%` : 'level';
     case 'score': return p.score?.songName ?? null;
   }
   const spec = PANEL_BY_ID.get(id);
