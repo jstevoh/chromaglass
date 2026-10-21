@@ -1471,3 +1471,12 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   as relief without a drawn outline.
 - `macro-bead`, `cell-bloom` and `lace-run` still draw cells, by name. Say whether they
   should (PLAN 33g-3).
+
+## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
+
+Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
+throw a burst of dye droplets that breaks into two or three uneven clumps at different angles
+and distances, some small and some large, not an even wreath round one circle. Kick Bloom
+(Show section; remote; MIDI) at 0 should stop it entirely and Beat Squeeze 0 and Plate Rock
+unchanged should leave only the tilt; at 1 it should be as much dye as before, at 1.5 more.
+Check that the burst reads as the kick, not as the plate being pressed.
