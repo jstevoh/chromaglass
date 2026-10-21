@@ -84,7 +84,6 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['globalSpeed', 0.005],
   ['plateRock', 0.05],
   ['beatSqueeze', 0.05],
-  ['kickBloom', 0.05],
   // How the kick's press follows the bar: a stage can ask for every kick
   // in a verse and the one in a chorus, and glide between them.
   ['beatAccent', 0.05],
