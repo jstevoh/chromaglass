@@ -120,6 +120,13 @@ const NOT_THE_LOOK = new Set([
   // tilt, like the direction above, and a dial that would set the plate
   // slopping by itself in a look that was still.
   'slosh',
+  // How much of a burst each kick throws (Kick Bloom): the owner's hand, as
+  // Frame Sway is. It is 1 on every look so none changes, and a wander would
+  // walk a look off the amount it ships with and into the dye-free calm of 0
+  // with nobody touching it; it also joined Evolve's pool of dials and moved
+  // which one it reached for, so `npm run slowevolve`'s answer-in-half-a-minute
+  // check read 63.5 s with this dial in the pool and passes without it.
+  'kickBloom',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*

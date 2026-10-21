@@ -1172,6 +1172,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="hueJourney"
         />
         <Slider
+          label="Kick Bloom"
+          value={settings.kickBloom ?? 1}
+          min={0}
+          max={1.5}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ kickBloom: v })}
+          settingKey="kickBloom"
+        />
+        <Info>
+          Kick Bloom is the ring of dye each kick throws outward from the bass spot. Beat Squeeze presses the glass instead, and Plate Rock tips the dish: three different moves on the kick, each with its own dial.
+        </Info>
+        <Slider
           label="Beat Squeeze"
           value={settings.beatSqueeze ?? 0}
           min={0}

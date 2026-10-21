@@ -6403,6 +6403,28 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     Rock) and the stir's music term at most doubles it; Lumia at Sound Drive 0.12 hears
     almost nothing. Whether one dial should be the music's reach on all of them is a
     question for the owner once 27e-2 says which reads weakest.
+- **27f. The kick's three moves told apart (2026-10-21).** The owner: Beat Squeeze "doesn't do
+  a whole lot", yet "something that looks like beat squeeze" shows on many looks even turned
+  down, and Plate Rock feels the same in practice. Cause: Beat Squeeze has been 0 on every look
+  but Bass Drop since a direct commit on 10-08 (`beatSqueeze` 0.03–0.10 before it, already about a
+  tenth of the default's press after 27b-3), so what was seen was the *kick's dye burst* (a ring of
+  6–12 droplets pushed outward on every kick, gated only by Audio Impact) and Plate Rock's tilt shove.
+  - **27f-1. Kick Bloom (shipped, awaiting a Mac read).** `kickBloom` (default 1, the burst as every
+    look had it) is the burst's own dial: 0 none, up to 1.5; on the desk, the remote and MIDI.
+    Evolve never moves it (`NOT_THE_LOOK`; in its pool it shifted `slowevolve`'s timing). The burst is no longer a ring: two or three lobes at random angles, a fifth of
+    the droplets anywhere, distances a third of the radius to past it, sizes 0.33–1.5 of a mean
+    droplet, the burst off-centre by up to a third of the radius, each droplet pushed with a wide
+    swirl and its own speed. Fewer droplets on average (5–11 against 6–12), about the same dye.
+    `npm run panel` greps the source for both (the picture is judging.md §60).
+  - **27f-2, open. Plate Rock distinct from the squeeze.** Rock shoves the spring on every kick like
+    the burst does, so the two read as one pulse. The idea: a slower spring that wallows across
+    several kicks, or a shove on the bar's one only (`beatAccent` already weighs it), with the
+    shove halved to keep the peak tilt. Changes numbers `npm run rides` holds (it kicks the spring
+    as the app does), so it wants the owner's eyes on a Mac first. Stays inside Frame Sway's rule:
+    it tips the liquid, not the frame.
+  - **27f-3, open.** Beat Squeeze itself (the glass press, 4.1 cells at the default, 11 at full) is
+    the dish-wide press 27a-8 lists among frame moves; whether to keep, localise (the press in the
+    kick's bass area) or remove it is the owner's call.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)

@@ -1757,6 +1757,22 @@ check('and neither starts over the limit',
     undead.length ? undead.join(', ') : `${RETIRED.size} retired`);
 }
 
+// ── Kick Bloom ──
+// The kick's outward dye burst has its own dial, and is not a ring. This reads
+// the frame loop's source (the burst is inline there, so the lab cannot reach
+// it; the picture itself is for a Mac read, docs/judging.md): the dial gates
+// the burst, scales the dye each droplet lays and the push it is given, and
+// the droplets no longer sit at (d / drops) of a turn on one circle.
+{
+  const vis = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
+  const burst = vis.slice(vis.indexOf('const bloomGain'), vis.indexOf('// The beat dose'));
+  check('Kick Bloom gates the kick\'s dye burst and scales its dye and push',
+    /kickBloom \?\? 1/.test(burst) && /bloomGain > 0/.test(burst) && /autoAmp \* pourDt \* bloomGain/.test(burst) && /bloomGain;/.test(burst.slice(burst.indexOf('const speed'))),
+    'src/components/LiquidVisualizer.tsx');
+  check('and the burst is clumps at random angles, not droplets evenly round one circle',
+    burst.includes('lobeAt') && !/\(d \/ drops\) \* Math\.PI \* 2/.test(burst));
+}
+
 // ── Result ──────────────────────────────────────────────────────────
 const failed = checks.filter(c => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

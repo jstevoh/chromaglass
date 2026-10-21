@@ -841,6 +841,15 @@ export interface VisualizerSettings {
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
   beatSqueeze: number;        // the rhythm plate: a squeeze pulse pressed into the lead plate on every kick
   /**
+   * Kick Bloom: how far each kick throws a ring of dye outward from the bass
+   * spot, and the little push on each droplet. 1 is the ring every look has
+   * always had; 0 is none. It is the kick's visible outward pulse, apart from
+   * Beat Squeeze (the glass pressed, 0 on every look but Bass Drop) and Plate
+   * Rock (the dish tipped); before this dial all three read alike and only
+   * the first could be turned off.
+   */
+  kickBloom: number;
+  /**
    * Accent the One: how far the kick's press (Beat Squeeze) and push (Plate
    * Rock) follow the kick's place in the bar, as a projectionist plays a
    * rhythm plate: the one pressed hardest, three lighter, two, four and the
@@ -1098,6 +1107,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   layerScaleVariety: 0.5,
   hueJourney: 3,
   beatSqueeze: 0.0,
+  kickBloom: 1,               // the ring each kick has always thrown
   beatAccent: 0,            // off: every kick pressed alike, as every look had it
   backgroundLoop: 0.5,
   kaleidoscope: 0,

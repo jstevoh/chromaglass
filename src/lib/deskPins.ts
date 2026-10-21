@@ -87,6 +87,7 @@ const SECTION_OF: Record<string, string> = {
   frameSway: 'look',
   slosh: 'physics',
   beatSqueeze: 'show',
+  kickBloom: 'show',
   beatAccent: 'show',
   fingering: 'show',
   beads: 'show',
