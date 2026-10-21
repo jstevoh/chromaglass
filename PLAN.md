@@ -6410,8 +6410,8 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   tenth of the default's press after 27b-3), so what was seen was the *kick's dye burst* (a ring of
   6–12 droplets pushed outward on every kick, gated only by Audio Impact) and Plate Rock's tilt shove.
   - **27f-1. Kick Bloom (shipped, awaiting a Mac read).** `kickBloom` (default 1, the burst as every
-    look had it) is the burst's own dial: 0 none, up to 1.5; on the desk, the remote, MIDI and the
-    set list's glides. The burst is no longer a ring: two or three lobes at random angles, a fifth of
+    look had it) is the burst's own dial: 0 none, up to 1.5; on the desk, the remote and MIDI.
+    Evolve never moves it (`NOT_THE_LOOK`; in its pool it shifted `slowevolve`'s timing). The burst is no longer a ring: two or three lobes at random angles, a fifth of
     the droplets anywhere, distances a third of the radius to past it, sizes 0.33–1.5 of a mean
     droplet, the burst off-centre by up to a third of the radius, each droplet pushed with a wide
     swirl and its own speed. Fewer droplets on average (5–11 against 6–12), about the same dye.
