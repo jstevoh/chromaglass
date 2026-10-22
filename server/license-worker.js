@@ -134,11 +134,12 @@ async function handleWebhook(request, env, cors) {
 
   // A test-mode order is one nobody paid for: Lemon Squeezy's checkout takes its published test
   // card, so anyone who finds the buy link could otherwise mint a real signed key for nothing. A
-  // test order (`meta.test_mode`) files nothing unless the buyer's email is on `TEST_MODE_EMAILS`
+  // test order (`meta.test_mode`, or the order's own `test_mode`) files nothing unless the buyer's email is on `TEST_MODE_EMAILS`
   // (comma separated, a Worker secret, never committed), which is how the owner proves the path
   // end to end. It answers 200 so the store does not retry; a payload without the flag (our own
   // direct JSON) is untouched.
-  if (body.meta?.test_mode === true || body.meta?.test_mode === 'true') {
+  const flagged = (v) => v === true || v === 'true';
+  if (flagged(body.meta?.test_mode) || flagged(lsAttr.test_mode)) {
     const allowed = String(env.TEST_MODE_EMAILS || '')
       .split(',')
       .map((e) => e.trim().toLowerCase())

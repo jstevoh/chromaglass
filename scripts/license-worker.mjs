@@ -413,13 +413,18 @@ let bobProToken = '';
   const noneEnv = makeEnv();
   await postWebhook(noneEnv, lsOrder('stranger@example.com', 8005, true));
   const noneKeys = (await (await getKeys(noneEnv, await mintFirebaseToken({ email: 'stranger@example.com' }))).json()).keys?.length;
+  // The flag may sit on the order itself rather than in meta; it must count either way.
+  const onOrder = { ...lsOrder('attr@example.com', 8006, false), };
+  onOrder.data.attributes.test_mode = true;
+  await postWebhook(e8, onOrder);
+  const attrKeys = await keysOf('attr@example.com');
   const strangerKeys = await keysOf('stranger@example.com');
   const ownerKeys = await keysOf('owner@example.com');
   const liveKeys = await keysOf('buyer@example.com');
   check(
     '8. a test-mode order files no key unless its email is on TEST_MODE_EMAILS; a live order always does',
-    stranger.status === 200 && strangerKeys === 0 && ownerKeys === 1 && liveKeys === 1 && noneKeys === 0,
-    `stranger keys=${strangerKeys}, allow-listed keys=${ownerKeys}, live keys=${liveKeys}, no allow-list keys=${noneKeys}`,
+    stranger.status === 200 && strangerKeys === 0 && ownerKeys === 1 && liveKeys === 1 && noneKeys === 0 && attrKeys === 0,
+    `stranger keys=${strangerKeys}, allow-listed keys=${ownerKeys}, live keys=${liveKeys}, no allow-list keys=${noneKeys}, flag on the order keys=${attrKeys}`,
   );
 }
 
