@@ -323,7 +323,7 @@ export function PhonePlay(p: PhonePlayProps) {
               className="pointer-events-auto flex h-12 min-w-12 items-center justify-center"
             >
               <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[13px] font-medium text-text ${GLASS_PILL}`}>
-                <User size={15} className="shrink-0 text-amber-300" />
+                <User size={15} className="shrink-0 text-muted" />
                 <span>Account</span>
               </span>
             </button>

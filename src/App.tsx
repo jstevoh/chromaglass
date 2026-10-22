@@ -6527,9 +6527,9 @@ export default function App() {
           onClick={openAccount}
           title="Profile, Settings & Store"
           aria-label="Account"
-          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-amber-400/40 bg-black/75 px-3.5 py-1.5 text-[12px] font-semibold text-amber-100 shadow-xl backdrop-blur-xl transition-all hover:border-amber-400/70 hover:bg-black/90"
+          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-border-strong bg-black/75 px-3.5 py-1.5 text-[12px] font-medium text-text-2 shadow-xl backdrop-blur-xl transition-all hover:bg-black/90 hover:text-text"
         >
-          <User size={14} className="shrink-0 text-amber-300" />
+          <User size={14} className="shrink-0 text-muted" />
           <span>Profile &amp; Store</span>
         </button>
       )}

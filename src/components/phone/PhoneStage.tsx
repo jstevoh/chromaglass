@@ -411,7 +411,7 @@ export function PhoneStage(p: PhoneStageProps) {
               data-cg-account-open=""
               className="flex h-12 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 active:bg-active"
             >
-              <User size={15} className="shrink-0 text-amber-300" />
+              <User size={15} className="shrink-0 text-muted" />
               <span>Account</span>
             </button>
           )}
