@@ -370,7 +370,8 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
             aria-expanded={tip.open}
             aria-describedby={tip.open ? tip.id : undefined}
             data-info="name"
-            className="select-none text-left [-webkit-touch-callout:none] text-[13px] font-medium text-text underline decoration-dotted decoration-white/25 underline-offset-4"
+            /* 48 px each way, the touch rule, taken from the margins so the row keeps its height; the slider below sits over the overlap. */
+            className="-mx-3 -my-[14px] select-none px-3 py-[14px] text-left [-webkit-touch-callout:none] text-[13px] font-medium text-text underline decoration-dotted decoration-white/25 underline-offset-4"
           >{label}</button>
         ) : (
           <span className="text-[13px] font-medium text-text">{label}</span>
