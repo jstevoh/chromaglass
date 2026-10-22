@@ -63,7 +63,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { BarGrid, Accent, accentGain, barLine, OFF_THE_BEAT, STRONG_BEAT, WEAK_BEAT } from '../src/lib/barGrid.ts';
 import { arrange, rng, SR } from './arrangement.mjs';
-import { kickRock, rockShove, stepRock, ROCK_BAR_SHOVE } from '../src/lib/plateRock.ts';
+import { kickRock } from '../src/lib/plateRock.ts';
 import { kickDepth } from '../src/lib/squish.ts';
 
 let failed = 0, passed = 0;
@@ -291,11 +291,8 @@ function listen(readings, kicks, { amount = 1, offset = 0 } = {}) {
       heard.push({ ...kk, heard: place, gain: accent.kick(grid, kk.t + offset, amount) });
     }
   }
-  kickAsks.push(heard.map((h) => h.heard));
   return { ticks, heard, estimateMs, states };
 }
-/** Every listen's kicks, as the grid placed each when the plate asked: Plate Rock's shove is checked against them (below). */
-const kickAsks = [];
 
 /** Whether a tick's latest beat is a real one, within TOL, at the song's period within PERIOD_TOL. */
 const onTheBeat = (truth, x) => truth.beats.some(b => Math.abs(b - x.beatAt) < TOL);
@@ -672,66 +669,10 @@ console.log('\nWiring');
   const shoveScales = shove(1) > 0 && Math.abs(shove(1.5) / shove(1) - 1.5) < 1e-9;
   const depthScales = kickDepth(0.9, 0.8, 1) > 0 && Math.abs(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1) - 1.5) < 1e-9;
   check('and the weight reaches the rock, the squeeze and the beads',
-    /if \(shove > 0\) kickRock\(rock, bass01, accent \* shove\);/.test(vis)
+    /if \(R > 0 && kickStep\) kickRock\(rock, bass01, accent\);/.test(vis)
     && /const a = kickDepth\(squeezeAmt, bass01, accent\);/.test(vis) && /0\.4 \* squeezeAmt \* bass01 \* accent\)/.test(vis)
     && shoveScales && depthScales,
     `the rock's shove ×${(shove(1.5) / shove(1)).toFixed(3)} and the squeeze's depth ×${(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1)).toFixed(3)} at an accent of 1.5`);
-  /*
-    Plate Rock on the bar's one (PLAN 27f-2, lib/plateRock.ts rockShove): the
-    rock is shoved on the one and on no other beat the grid names, once a bar's
-    worth of kicks where it knows only the half bar or nothing, never left more
-    than eight kicks unshoved, and on every kick where Frame Sway lets the frame
-    move. Asked of the grid as the frame loop asks it, on the groove's kicks of
-    every song above, and of the rule on its own; then the swing it makes, on the
-    rock's own spring, against every kick's.
-  */
-  {
-    const askAll = (sway) => {
-      let ones = 0, onesShoved = 0, others = 0, othersShoved = 0, longest = 0;
-      for (const ask of kickAsks) {
-        const bar = { since: 0 };
-        let gap = 0;
-        for (const place of ask) {
-          const g = rockShove(bar, sway, place === 0, place === STRONG_BEAT, place !== null && place !== 0 && place !== STRONG_BEAT);
-          gap = g > 0 ? 0 : gap + 1;
-          longest = Math.max(longest, gap);
-          if (place === 0) { ones++; if (g > 0) onesShoved++; }
-          else if (place !== null && place !== STRONG_BEAT) { others++; if (g > 0) othersShoved++; }
-        }
-      }
-      return { ones, onesShoved, others, othersShoved, longest };
-    };
-    const held = askAll(0), swaying = askAll(0.35);
-    check('Plate Rock is shoved on every one the grid names, and on under a tenth of the other beats it names (the ones it falls back to after eight kicks)',
-      held.ones > 0 && held.onesShoved === held.ones && held.othersShoved <= 0.1 * held.others && held.longest <= 8,
-      `${held.onesShoved}/${held.ones} ones, ${held.othersShoved}/${held.others} others; at most ${held.longest} kicks between shoves`);
-    check('and where Frame Sway lets the frame move, every kick shoves, at the kick\'s own weight',
-      swaying.onesShoved === swaying.ones && swaying.othersShoved === swaying.others && rockShove({ since: 0 }, 0.35, false, false, true) === 1);
-    const unsure = { since: 0 }, half = { since: 0 };
-    const unsureRun = [1, 2, 3, 4, 5, 6, 7, 8].map(() => rockShove(unsure, 0, false, false, false) > 0);
-    const halfRun = [true, false, true, false, true, false, true, false].map((strong) => rockShove(half, 0, false, strong, !strong) > 0);
-    check('a grid that knows nothing shoves every fourth kick, one that knows only the half bar every other strong beat, each at ROCK_BAR_SHOVE',
-      unsureRun.join() === [false, false, false, true, false, false, false, true].join() && halfRun.join() === [false, false, true, false, false, false, true, false].join()
-      && rockShove({ since: 0 }, 0, true, false, false) === ROCK_BAR_SHOVE,
-      `unsure ${unsureRun.map((b) => (b ? 'X' : '.')).join('')}, half bar ${halfRun.map((b) => (b ? 'X' : '.')).join('')}`);
-    // The swing: the rock's spring shoved by a bass of 0.8, from ten seconds on, on every kick at 1 and on the one at ROCK_BAR_SHOVE.
-    const swing = (bpm, every) => {
-      const r = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 };
-      let peak = 0, sq = 0, m = 0, next = 0, kicks = 0;
-      for (let k = 0; k < 3600; k++) {
-        const t = k / 60;
-        if (t >= next) { if (kicks % every === 0) kickRock(r, 0.8, every > 1 ? ROCK_BAR_SHOVE : 1); kicks++; next += 60 / bpm; }
-        stepRock(r, 1 / 60);
-        if (t > 10) { const a = Math.hypot(r.x, r.y); peak = Math.max(peak, a); sq += a * a; m++; }
-      }
-      return { peak, rms: Math.sqrt(sq / m) };
-    };
-    const rows = [96, 120, 128, 140].map((bpm) => ({ bpm, kick: swing(bpm, 1), bar: swing(bpm, 4) }));
-    for (const w of rows) console.log(`  ${w.bpm} bpm: every kick swings to ${w.kick.peak.toFixed(3)} (mean square ${w.kick.rms.toFixed(3)}), the one alone to ${w.bar.peak.toFixed(3)} (${w.bar.rms.toFixed(3)})`);
-    check('the one alone swings the glass as far as every kick did, within a tenth, and holds it swinging less of the bar (mean square under two thirds)',
-      rows.every((w) => Math.abs(w.bar.peak / w.kick.peak - 1) < 0.1 && w.bar.rms < (2 / 3) * w.kick.rms),
-      rows.map((w) => `${w.bpm}: ${(w.bar.peak / w.kick.peak).toFixed(2)}, ${(w.bar.rms / w.kick.rms).toFixed(2)}`).join('; '));
-  }
   check('the app reads what the grid knows for the phone', /const bar = report \? barLine\(report\.bar\) : '';/.test(app)
     && /bar: \{ \.\.\.barGridRef\.current\.now \}/.test(vis));
 }

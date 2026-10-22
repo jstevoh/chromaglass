@@ -45,7 +45,7 @@ import { AutoSpin, GRIP_SECONDS, OPEN_RIM, SpinHand, carrierViscosity, dishFollo
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { kickRock, rockShove, stepRock, rockSwing, swayAt, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -62,7 +62,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
-import { BarGrid, Accent, STRONG_BEAT, type BarNow } from '../lib/barGrid';
+import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, KICK_HOLD, KICK_RELEASE, kickDepth, BassPress, bassPressFor, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -5018,8 +5018,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const beadsRef = useRef(new BeadField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
   const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
-  // Kicks since Plate Rock last shoved (lib/plateRock.ts rockShove: the bar's one, PLAN 27f-2).
-  const rockBarRef = useRef({ since: 0 });
   const coverRef = useRef<CoverGlass>({ x: 0, y: 0, vx: 0, vy: 0 });
   /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
@@ -8883,18 +8881,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const accentAt = songClockRef.current + (kickRef.current.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
             const accent = kickStep ? accentRef.current.kick(barGridRef.current, accentAt, currentSettings.beatAccent ?? 0) : 1;
-            /*
-              The hand's spring and sway, the slider applied once (lib/plateRock.ts,
-              PLAN 27a), shoved on the bar's one and not on every kick, harder
-              (rockShove, PLAN 27f-2), so the rock and the squeeze stop reading as
-              one thump; on every kick still where Frame Sway lets the frame move.
-            */
-            let shove = 0;
-            if (R > 0 && kickStep) {
-              const place = barGridRef.current.placeAt(accentAt);
-              shove = rockShove(rockBarRef.current, frameSway(currentSettings.frameSway), place === 0, place === STRONG_BEAT, place !== null && place !== 0 && place !== STRONG_BEAT);
-            }
-            if (shove > 0) kickRock(rock, bass01, accent * shove);
+            // The hand's spring and sway, the slider applied once (lib/plateRock.ts, PLAN 27a).
+            if (R > 0 && kickStep) kickRock(rock, bass01, accent);
             // The rhythm plate: on a kick the projectionist presses the top
             // glass and the dye spreads out in a ring, then relaxes back.
             const squeezeAmt = Math.max(0, Math.min(1, currentSettings.beatSqueeze ?? 0));

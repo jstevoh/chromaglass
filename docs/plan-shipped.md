@@ -2600,6 +2600,10 @@ M_f·ΔP) keeps both.
   - The presses. Beat Squeeze's glass on the kick presses the dish too, as a pressure head
     over three nested discs (`KICK_RADII`), held and let go on the gap's own envelope
     (`glassHeld`): the ring runs out at the wave speed and back off the rim.
+  - The rock. Plate Rock's swing tips the dish only as far as Frame Sway lets the music move
+    the frame (`rockAccel`: the Slosh dial's top lean times Frame Sway), because a rocked dish
+    moves all its liquid one way and back and the whole picture sways. So not at all at Frame
+    Sway's default 0; on Bass Drop (0.35) at a third of the dial's lean.
   - Where it runs. The GPU (`gpu/slosh.ts`, kernels in `wgsl/slosh.ts`), before the solver's
     step on its encoder: the oil is a GPU field, and the dish is ten million flops a frame.
     Never read back: `SloshClock` runs it while driven and for its ring time after
@@ -3939,21 +3943,6 @@ its controls (the gate removed, the random walk restored, the snap removed) turn
 `npm run drops`' fingerprint is pinned again (the two rng draws a step gone: 341 drops
 where there were 336). The desk and the phone share the camera, and Frame Sway is on
 both; the Guide's Music Sync line says what rides it.
-
-- **27f-2. Plate Rock distinct from the squeeze (shipped 2026-10-22).** The owner,
-  2026-10-21: "make plate rock and beat squeeze much more distinctive". Both answered every
-  kick, so they read as one thump. Plate Rock is now shoved on the bar's one (`BarGrid.placeAt`
-  0) and on no other beat the grid names; where it knows only the half bar, every other strong
-  beat; where it knows nothing, every fourth kick; never more than eight kicks unshoved
-  (`rockShove`, lib/plateRock.ts). One shove a bar put in less than four: on the spring, the
-  furthest swing fell to 0.70–0.77 of every kick's at 96–140 bpm, so the one shoves 1.45 times
-  harder (`ROCK_BAR_SHOVE`) and swings as far (1.01 of it at every tempo) while the bar's mean
-  square swing is 0.55–0.57 of what it was: the glass swings and settles through the bar. On a
-  look whose frame may move (Frame Sway above 0, Bass Drop), every kick still shoves and the
-  rock tips the slosh dish at the Slosh dial's top lean times Frame Sway (`rockAccel`). Measured
-  by `npm run downbeat` on its synthesised songs: 669 of 669 ones the grid named were shoved and
-  0 of 1437 other named beats, at most 5 kicks between shoves. The owner's card on how far
-  Plate Rock may move the picture was open when it shipped; this is its recommended option.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 

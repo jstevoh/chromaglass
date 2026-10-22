@@ -4211,8 +4211,10 @@ its frame rate live. "Free" means no new passes or texture reads.
     replace them:
     - **18a-13a. Two layers: shipped** (2026-10-22). Oil lenses ride the water at their
       capillary thickness, read from the plate's own oil each frame, with the two-layer
-      laminar drag between them; the dish moved to the GPU (`gpu/slosh.ts`). Story in
-      `docs/plan-shipped.md` §18a-13a; `npm run slosh`, `npm run sloshgpu`.
+      laminar drag between them; the dish moved to the GPU (`gpu/slosh.ts`). Plate Rock's
+      swing tips it where Frame Sway lets the frame move (`rockAccel`; how the rock itself is
+      driven is 27f-2's). Story in `docs/plan-shipped.md` §18a-13a; `npm run slosh`,
+      `npm run sloshgpu`.
     - **18a-13b. The rim's boundary layer.** The rim is free-slip; a real dish's wall
       holds a thin layer still and sheds a vortex when the wave turns there. The
       drag too is the covered gap's (12ν/h², Poiseuille between two walls), where a
@@ -6436,11 +6438,12 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     droplet, the burst off-centre by up to a third of the radius, each droplet pushed with a wide
     swirl and its own speed. Fewer droplets on average (5–11 against 6–12), about the same dye.
     `npm run panel` greps the source for both (the picture is judging.md §60).
-  - **27f-2. Plate Rock distinct from the squeeze: shipped** (2026-10-22, the owner's card's
-    recommended option until the owner picks). Shoved on the bar's one, 1.45 times harder, and on
-    no other beat the grid names (`rockShove`); on every kick still where Frame Sway lets the frame
-    move, and there it sloshes the whole dish too (`rockAccel`). Story in `docs/plan-shipped.md`
-    §27f-2; `npm run downbeat`; the look is `docs/judging.md` §61.
+  - **27f-2, open. Plate Rock distinct from the squeeze.** Rock shoves the spring on every kick like
+    the burst does, so the two read as one pulse. The idea: a slower spring that wallows across
+    several kicks, or a shove on the bar's one only (`beatAccent` already weighs it), with the
+    shove halved to keep the peak tilt. Changes numbers `npm run rides` holds (it kicks the spring
+    as the app does), so it wants the owner's eyes on a Mac first. Stays inside Frame Sway's rule:
+    it tips the liquid, not the frame.
   - **27f-3, open.** Beat Squeeze itself (the glass press, 4.1 cells at the default, 11 at full) is
     the dish-wide press 27a-8 lists among frame moves; whether to keep, localise (the press in the
     kick's bass area) or remove it is the owner's call.

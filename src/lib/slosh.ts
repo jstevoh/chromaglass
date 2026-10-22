@@ -249,7 +249,8 @@ export function sloshAccel(slosh: number, upright: number, dirX: number, dirY: n
 }
 
 /**
- * The acceleration Plate Rock's swing gives the dish (PLAN 27f-1), plate widths
+ * The acceleration Plate Rock's swing gives the dish (PLAN 18a-13a; how the rock is
+ * driven is lib/plateRock.ts's, 27f-2), plate widths
  * per second squared: the rock's swing (lib/plateRock.ts rockSwing, about ±1 at
  * full) as a tilt at the Slosh dial's top lean, times Frame Sway. A rocked dish
  * moves all of its liquid one way and back, so the whole picture sways with
