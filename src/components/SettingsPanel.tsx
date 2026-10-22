@@ -2688,7 +2688,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="macroAimY"
         />
                 <Info>
-                  Alt-drag (Option-drag) on the plate pans the camera; Alt-click fixes it on the spot under the pointer.
+                  Arrow keys pan the camera (Shift for a whole frame); Alt-drag (Option-drag) on the plate pans it too; Alt-click fixes it on the spot under the pointer.
                   {(settings.macroCamera ?? 'hold') === 'follow' ? ' Follow locks onto the liquid there and rides with it.' : ''}
                   {' '}With Random Evolve on, the aim wanders slowly.
                 </Info>
@@ -2714,7 +2714,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="macroHold"
         />
             )}
+            {/* Honest about what it does: with Frame Sway at 0 the music times Auto's cuts and
+                moves nothing else, so in Hold and Follow there is nothing for it to do until Frame Sway is up. */}
             <Slider
+              disabled={(settings.macroCamera ?? 'hold') !== 'auto' && (settings.frameSway ?? 0) <= 0.001 && 'needs Frame Sway'}
               label="Music Sync"
               value={settings.macroSync ?? 0.6}
               min={0}

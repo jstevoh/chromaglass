@@ -462,6 +462,11 @@ jobs:
       - name: The closeup holds still
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run steadycam
+      # The closeup camera answers a hand (PLAN.md 27d): Chase Speed's throw in
+      # Hold, Macro Zoom's travel, the arrow-key pan, and Music Sync's label.
+      - name: The closeup camera answers a hand
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run camerahand
       # The same seed plays the same show (PLAN.md §6, lib/rng.ts): nothing in
       # src draws from Math.random outside a short allowlist of ids, and the
       # beads, bubbles, closeup camera, chemistry, palette and automation run

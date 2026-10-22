@@ -1504,3 +1504,13 @@ the maker" is something you would sign, and the 14-day refund line matches what 
 the Free, Home and Pro cards promise only what the app does today. Then sign in, sign out and come
 back: the page should not flash for a returning visit.
 
+
+## 63. The closeup camera answers your hand (PLAN 27d, "Camera controls feel weak")
+
+Zoom in past 2x on Classic, set the camera to Hold and pan with the arrow keys: a tap moves a
+quarter of the frame, Shift a whole frame, a held key a slow drift; it should feel like a heavy
+rig on a slider, never a lurch. Then drag Chase Speed from 0 to 1 while pressing an arrow or
+Alt-clicking elsewhere on the plate: at 0 the frame should glide across in about three seconds,
+at 0.4 (the default) as it always did, at 1 snap there. Macro Zoom's slider (desk, phone, remote,
+Settings) should now spend its first two thirds on 1x to 8x. Music Sync is greyed in Hold and
+Follow until Frame Sway is up; nothing the sound does should move the frame meanwhile.

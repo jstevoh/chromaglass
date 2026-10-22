@@ -9,7 +9,7 @@ import { songShapeLine } from './lib/songShape';
 import { followLine } from './lib/followedPlace';
 import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
-import { holdWhereItIs, shotLabel } from './lib/macroCamera';
+import { holdWhereItIs, panAim, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { SETTINGS_SECTIONS, sectionSearchText, resolveSection } from './lib/settingsMap';
@@ -3664,6 +3664,19 @@ export default function App() {
       if (e.key === '?') setShowHelp(h => !h);
       if (e.key === '+' || e.key === '=') zoomMacro(1);
       if (e.key === '-' || e.key === '_') zoomMacro(-1);
+      // The arrows pan the closeup (lib/macroCamera.ts panAim): the same aim Alt-drag
+      // moves, from where the camera is looking now, so a Follow or an Auto pans on
+      // from its own frame rather than jumping back to a stale aim.
+      const arrow = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] } as Record<string, [number, number] | undefined>)[e.key];
+      if (arrow && (settingsRef.current.macroZoom ?? 1) > 1.05) {
+        e.preventDefault();
+        const cur = settingsRef.current;
+        const here = (cur.macroCamera ?? 'hold') === 'hold'
+          ? { x: cur.macroAimX ?? 0.5, y: cur.macroAimY ?? 0.5 }
+          : visualizerRef.current?.macroCentre() ?? { x: cur.macroAimX ?? 0.5, y: cur.macroAimY ?? 0.5 };
+        const to = panAim(here, { dx: arrow[0], dy: arrow[1] }, cur.macroZoom ?? 1, { repeat: e.repeat, big: e.shiftKey });
+        aimMacro(to.x, to.y);
+      }
       // The tool in hand's Amount, a step at a time, at any width.
       if (e.key === '[' || e.key === ']') {
         const tool = activeToolRef.current;
@@ -3686,7 +3699,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
-  }, [toggleBlackout, zoomMacro]);
+  }, [toggleBlackout, zoomMacro, aimMacro]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.

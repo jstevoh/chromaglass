@@ -504,7 +504,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
-  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16 },
+  // Squared, so the slider's travel is spent where the closeup is: 1x to 8x is
+  // the first two thirds of it (the solver's grid has little left to show past
+  // 8x), where it was the first 47% and 1x to 4x the first fifth. The stored
+  // zoom is unchanged. PLAN 27d.
+  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
   { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 1 },
   { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 10 },
