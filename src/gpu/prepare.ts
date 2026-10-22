@@ -57,6 +57,7 @@ import { WebGPUFluid } from './fluid';
 import { WebGPUPlate } from './plate';
 import { WebGPUFrameProbe } from './probe';
 import { WebGPUAir } from './air';
+import { WebGPUSlosh } from './slosh';
 import { WebGPUParticles } from './particles';
 import { WebGPUCamera } from './camera';
 import { WebGPUOutput } from './output';
@@ -395,6 +396,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUPlate.prepare(device, format, PICTURE_FORMAT, open),
     ...WebGPUFrameProbe.prepare(device),
     ...WebGPUAir.prepare(device),
+    ...WebGPUSlosh.prepare(device),
     ...WebGPUParticles.prepare(device, open),
     ...WebGPUCamera.prepare(device, format, open),
     ...WebGPUOutput.prepare(device, format),

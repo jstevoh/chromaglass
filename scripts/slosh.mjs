@@ -42,8 +42,54 @@
  *      tilt makes the dish swirl), and does not move at all with no tilt.
  */
 import { readFileSync } from 'node:fs';
-import { SloshDish, sloshAccel, sloshDrag, SLOSH_C, SLOSH_G, SLOSH_FLOOR, SLOSH_LEAN, SLOSH_FROUDE_MAX, SLOSH_N } from '../src/lib/slosh.ts';
+import { spawn } from 'node:child_process';
+import {
+  SloshDish, SloshClock, sloshAccel, sloshDrag, sloshNu, sloshRingSeconds, twoLayerDrag, pressHead,
+  SLOSH_C, SLOSH_G, SLOSH_FLOOR, SLOSH_LEAN, SLOSH_COURANT_MAX, SLOSH_N, SLOSH_LENS, SLOSH_OIL_DENSITY, SLOSH_OIL_NU, SLOSH_REST_DEPTH, SLOSH_DT,
+} from '../src/lib/slosh.ts';
 import { thicknessViscosity } from '../src/lib/turntable.ts';
+
+/*
+  Four workers. The scheme is a second-order Riemann solve, two stages a step and
+  five steps a frame, and this runs some twelve minutes of dish; one after another
+  that is about fifteen minutes of node. Each numbered part is independent of the
+  others, so the parent runs four copies of this file side by side, each doing its
+  own parts (WORKERS), and prints what they found in the parts' order. The checks
+  are the same checks; only which process runs each changes.
+*/
+const ORDER = ['1', '2', '3', '4', '7a', '7b', '7c', '7d', '7e', '8', '9', '10', '11', '12', '13', '14', '15'];
+const WORKERS = [['3', '12'], ['1', '2', '4', '7c', '15'], ['7a', '7b', '9', '13', '14'], ['7d', '7e', '8', '10', '11']];
+const PART = process.env.SLOSH_PART;
+if (PART === undefined) {
+  const outs = await Promise.all(WORKERS.map((_, k) => new Promise((done) => {
+    const child = spawn(process.execPath, [...process.execArgv, new URL(import.meta.url).pathname], { env: { ...process.env, SLOSH_PART: String(k) }, stdio: ['ignore', 'pipe', 'inherit'] });
+    let out = '';
+    child.stdout.on('data', (b) => { out += b; });
+    child.on('close', (code) => done({ out, code }));
+  })));
+  const chunks = new Map();
+  let failed = 0;
+  for (const { out, code } of outs) {
+    let key = null;
+    for (const line of out.split('\n')) {
+      const m = /^§(\S+)$/.exec(line);
+      if (m) { key = m[1]; chunks.set(key, []); continue; }
+      const b = /^§§ (\d+)$/.exec(line);
+      if (b) { failed += Number(b[1]); continue; }
+      if (key) chunks.get(key).push(line);
+    }
+    if (code !== 0 && !/^§§ /m.test(out)) { failed++; console.log(`FAIL a worker stopped (exit ${code})`); }
+  }
+  for (const k of ORDER) for (const line of chunks.get(k) ?? []) console.log(line);
+  console.log(failed ? `\n${failed} failed` : '\nall passed');
+  process.exit(failed ? 1 : 0);
+}
+/** Whether this worker runs part `key`; says so first, for the parent to put its lines in order. */
+function mine(key) {
+  if (!WORKERS[Number(PART)].includes(key)) return false;
+  console.log(`§${key}`);
+  return true;
+}
 
 let bad = 0;
 function check(name, pass, detail = '') {
@@ -88,7 +134,7 @@ const nuOf = (thickness) => thicknessViscosity(thickness);
 const dragOf = (thickness) => sloshDrag(nuOf(thickness));
 
 // 1. the period.
-{
+if (mine('1')) {
   // A small, brief tip at almost no drag, then let go and time the ring by the centre's zero crossings.
   const d = new SloshDish();
   const small = sloshAccel(0.1, 1, 1, 0)[0];
@@ -109,7 +155,7 @@ const dragOf = (thickness) => sloshDrag(nuOf(thickness));
 }
 
 // 2. a held tilt settles to the slope a/g, piled on the downhill side.
-{
+if (mine('2')) {
   const d = new SloshDish();
   const r = dragOf(DEFAULT_THICKNESS);
   run(d, 12, () => [AX, 0], r);
@@ -126,6 +172,7 @@ const dragOf = (thickness) => sloshDrag(nuOf(thickness));
 }
 
 // 3 & 4. reversal on several Thicknesses: overshoot, crossings, damping.
+if (mine('3')) {
 const rows = [];
 for (const [name, thickness] of [['water', 0], ['0.1', 0.1], ['0.2', 0.2], ['0.3', 0.3], [`${DEFAULT_THICKNESS} (default)`, DEFAULT_THICKNESS], ['0.6', 0.6], ['1 (glycerine)', 1]]) {
   const r = dragOf(thickness);
@@ -170,9 +217,10 @@ console.log('');
   const sloshing = rows.filter((w) => w.over > 0.05).map((w) => w.thickness);
   console.log(`  note: it sloshes visibly (past the new level by over 5% of the swing) up to Thickness ${Math.max(...sloshing)}\n`);
 }
+}
 
 // 4. the ring decays at the drag's own rate.
-{
+if (mine('4')) {
   const r = 0.6;
   const d = new SloshDish();
   const small = sloshAccel(0.05, 1, 1, 0)[0];
@@ -193,16 +241,18 @@ console.log('');
     `${rate.toFixed(3)} /s measured over ${a.length} peaks, r/2 = ${(r / 2).toFixed(3)} /s`);
 }
 
-// 5, 6, 7. resonance: mass, floor, stability.
-{
-  console.log('  resonant tilting at water\'s drag, a tilt rocked each half-period, the worst case a dish can be given:');
-  for (const half of [0.35, 0.5, 0.7, 1]) {
+// 5, 6, 7. resonance: mass, floor, stability. One worker's part per half-period, and the last at twice the dial's lean.
+for (const [key, half, lean] of [['7a', 0.35, 1], ['7b', 0.5, 1], ['7c', 0.7, 1], ['7d', 1, 1], ['7e', 0.7, 2]]) {
+  if (!mine(key)) continue;
+  if (key === '7a') console.log('  resonant tilting at water\'s drag, a tilt rocked each half-period, the worst case a dish can be given:');
+  {
+    const AXL = AX * lean;
     const d = new SloshDish();
     const r = dragOf(0);
     const m0 = d.mass();
     let peakSpeed = 0, lowest = 9, peakE = 0, Emid = 0;
-    const secs = half === 0.7 ? 120 : 60;
-    run(d, secs, (t) => [(Math.floor(t / half) % 2 ? -1 : 1) * AX, 0], r, (t) => {
+    const secs = half === 0.7 && lean === 1 ? 120 : 60;
+    run(d, secs, (t) => [(Math.floor(t / half) % 2 ? -1 : 1) * AXL, 0], r, (t) => {
       peakSpeed = Math.max(peakSpeed, d.maxSpeed());
       lowest = Math.min(lowest, minDepth(d));
       const e = d.energy();
@@ -211,15 +261,17 @@ console.log('');
     });
     const massErr = Math.abs(d.mass() - m0) / m0;
     const fr = peakSpeed / SLOSH_C;
-    console.log(`  half-period ${String(half).padEnd(4)} ${String(secs).padStart(3)} s: fastest ${peakSpeed.toFixed(3)} plate widths/s (Froude ${fr.toFixed(2)}), shallowest ${lowest.toFixed(2)} of rest, peak energy ${peakE.toExponential(1)}, mass off by ${massErr.toExponential(1)}, ${d.blowups} resets`);
-    check(`half-period ${half} s: mass conserved, no dry cell, finite, below the speed wall`,
-      massErr < 1e-5 && lowest >= SLOSH_FLOOR - 1e-6 && d.blowups === 0 && fr < SLOSH_FROUDE_MAX - 1e-6 && peakE < 1e-2,
-      `mass ${massErr.toExponential(1)}, depth ≥ ${lowest.toFixed(2)}, Froude ${fr.toFixed(2)} < ${SLOSH_FROUDE_MAX}`);
+    console.log(`  half-period ${String(half).padEnd(4)}${lean > 1 ? ` x${lean} lean` : ''} ${String(secs).padStart(3)} s: fastest ${peakSpeed.toFixed(3)} plate widths/s (Froude ${fr.toFixed(2)}), shallowest ${lowest.toFixed(2)} of rest, peak energy ${peakE.toExponential(1)}, mass off by ${massErr.toExponential(1)}, ${d.blowups} resets`);
+    check(`half-period ${half} s${lean > 1 ? `, at ${lean} times the dial's lean: mass conserved, no dry cell, finite` : ': mass conserved, no dry cell, finite, inside the scheme\'s Courant limit'}`,
+      // At twice the dial's lean the claim is only that it holds (the lean is a choice now, not the scheme's limit); a lean that big
+      // would want a shorter step (its Courant number is printed), so that is not asked of it.
+      massErr < 1e-5 && lowest >= SLOSH_FLOOR - 1e-6 && d.blowups === 0 && (lean > 1 || d.courant < SLOSH_COURANT_MAX) && peakE < 1e-2,
+      `mass ${massErr.toExponential(1)}, depth ≥ ${lowest.toFixed(2)}, Froude ${fr.toFixed(2)}, Courant ${d.courant.toFixed(2)}${lean > 1 ? `, past the limit of ${SLOSH_COURANT_MAX} at this lean and not asked of it` : ` < ${SLOSH_COURANT_MAX}`}`);
   }
 }
 
 // 8. the dial.
-{
+if (mine('8')) {
   const resp = (dial) => {
     const d = new SloshDish();
     const a = sloshAccel(dial, 1, 1, 0)[0];
@@ -242,17 +294,17 @@ console.log('');
     if (!d.step(DT, 0, 0, r)) { dormant = k * DT; break; }
     t += DT;
   }
-  const exact = d.h.every((x, k) => x === (d.wet[k] ? Math.fround(d.restDepth) : 0)) && d.u.every((x) => x === 0) && d.v.every((x) => x === 0);
-  check('a dial taken to 0 mid-wave lets the ring run down by itself, to exact rest', live && dormant > 0 && dormant < 90 && exact,
-    `moving at the hand-off, dormant after ${dormant.toFixed(1)} s, flat and still: ${exact}`);
+  const exact = d.h.every((x, k) => x === (d.wet[k] ? Math.fround(d.restDepth) : 0)) && d.qx.every((x) => x === 0) && d.qy.every((x) => x === 0);
+  check('a dial taken to 0 mid-wave lets the ring run down by itself, to exact rest, inside the time the GPU\'s dish is given for it (sloshRingSeconds)', live && dormant > 0 && dormant < 90 && dormant <= sloshRingSeconds(r) && exact,
+    `moving at the hand-off, dormant after ${dormant.toFixed(1)} s of ${sloshRingSeconds(r).toFixed(1)}, flat and still: ${exact}`);
 }
 
 // 9. nothing where nothing tilts.
-{
+if (mine('9')) {
   const d = new SloshDish();
   let live = false;
   for (let k = 0; k < 60 * 600; k++) live = d.step(DT, 0, 0, dragOf(DEFAULT_THICKNESS)) || live;
-  const exact = d.h.every((x, k) => x === (d.wet[k] ? Math.fround(d.restDepth) : 0)) && d.u.every((x) => x === 0) && d.v.every((x) => x === 0);
+  const exact = d.h.every((x, k) => x === (d.wet[k] ? Math.fround(d.restDepth) : 0)) && d.qx.every((x) => x === 0) && d.qy.every((x) => x === 0);
   const out = new Float32Array(SLOSH_N * SLOSH_N * 4);
   d.field(out);
   check('no tilt for ten minutes: no flow, bit for bit, never live', !live && exact && out.every((x, k) => (k % 4 === 2 ? true : x === 0)),
@@ -263,13 +315,13 @@ console.log('');
   const e = new SloshDish();
   e['resting'] = false;
   for (let k = 0; k < 60 * 30; k++) e.step(DT, 0, 0, dragOf(DEFAULT_THICKNESS));
-  const flat = e.h.every((x, k) => x === (e.wet[k] ? Math.fround(e.restDepth) : 0)) && e.u.every((x) => x === 0) && e.v.every((x) => x === 0);
+  const flat = e.h.every((x, k) => x === (e.wet[k] ? Math.fround(e.restDepth) : 0)) && e.qx.every((x) => x === 0) && e.qy.every((x) => x === 0);
   check('and with the dormant shortcut taken away the stepped dish still stays exactly flat for thirty seconds', flat,
     `fastest ${e.maxSpeed().toExponential(1)}, rise ${e.maxRise().toExponential(1)}`);
 }
 
 // 10. the plate's axes.
-{
+if (mine('10')) {
   const dx = new SloshDish(), dy = new SloshDish();
   const r = dragOf(0.3);
   run(dx, 3, () => [AX, 0], r);
@@ -304,7 +356,7 @@ console.log('');
 }
 
 // 11. mixing: dye carried by the slosh.
-{
+if (mine('11')) {
   const n = SLOSH_N;
   const out = new Float32Array(n * n * 4);
   const sample = (d, x, y) => {
@@ -363,5 +415,186 @@ console.log('');
     `turned: peak ${turn.peak.toFixed(3)}, left ${turn.final.toFixed(3)}; rocked: peak ${rock.peak.toFixed(3)}, left ${rock.final.toFixed(3)}`);
 }
 
-console.log(bad ? `\n${bad} failed` : '\nall passed');
-process.exit(bad ? 1 : 0);
+// 12. two layers: the drag, a lens floating, oil and water moving apart.
+if (mine('12')) {
+  // The two-layer drag against the Stokes problem solved by numbers: the profile across the gap, a few thousand
+  // points, each layer's viscosity, no-slip at both glasses, driven by one layer's force at a time.
+  const stokes = (h1, h, mu1, mu2) => {
+    const H = h1 + h, M = 4000, dz = H / M;
+    const K = [[0, 0], [0, 0]];
+    for (let col = 0; col < 2; col++) {
+      // Finite volumes: cell m spans [m dz, (m + 1) dz]; water below h, oil above. (μ w')' = −G, w = 0 at both walls.
+      const a = new Float64Array(M), b = new Float64Array(M), c = new Float64Array(M), rhs = new Float64Array(M);
+      const muAt = (m) => ((m + 0.5) * dz < h ? mu2 : mu1);
+      for (let m = 0; m < M; m++) {
+        const muL = m === 0 ? muAt(0) : 2 / (1 / muAt(m - 1) + 1 / muAt(m));
+        const muR = m === M - 1 ? muAt(M - 1) : 2 / (1 / muAt(m) + 1 / muAt(m + 1));
+        const wL = m === 0 ? 2 * muL : muL, wR = m === M - 1 ? 2 * muR : muR;
+        a[m] = m === 0 ? 0 : -wL; c[m] = m === M - 1 ? 0 : -wR; b[m] = wL + wR;
+        const water = (m + 0.5) * dz < h;
+        rhs[m] = (water ? (col === 1 ? 1 : 0) : (col === 0 ? 1 : 0)) * dz * dz;
+      }
+      for (let m = 1; m < M; m++) { const f = a[m] / b[m - 1]; b[m] -= f * c[m - 1]; rhs[m] -= f * rhs[m - 1]; }
+      const w = new Float64Array(M);
+      w[M - 1] = rhs[M - 1] / b[M - 1];
+      for (let m = M - 2; m >= 0; m--) w[m] = (rhs[m] - c[m] * w[m + 1]) / b[m];
+      let s1 = 0, s2 = 0;
+      for (let m = 0; m < M; m++) { if ((m + 0.5) * dz < h) s2 += w[m] * dz; else s1 += w[m] * dz; }
+      K[0][col] = s1 / h1; K[1][col] = s2 / h;
+    }
+    const kd = K[0][0] * K[1][1] - K[0][1] * K[1][0];
+    return [h1 * K[1][1] / kd, -h1 * K[0][1] / kd, -h * K[1][0] / kd, h * K[0][0] / kd];
+  };
+  const mu2 = sloshNu(dragOf(DEFAULT_THICKNESS)), mu1 = SLOSH_OIL_DENSITY * SLOSH_OIL_NU;
+  let worst = 0;
+  for (const [h1, h] of [[0.017, 0.015], [0.005, 0.025], [0.025, 0.004]]) {
+    const exact = [0, 0, 0, 0];
+    twoLayerDrag(h1, h, mu1, mu2, exact);
+    const num = stokes(h1, h, mu1, mu2);
+    for (let q = 0; q < 4; q++) worst = Math.max(worst, Math.abs(exact[q] - num[q]) / Math.max(Math.abs(num[0]), Math.abs(num[3])));
+  }
+  check('the two-layer drag is the laminar flow of oil over water between two glasses, as the profile solved by numbers gives it', worst < 2e-3,
+    `worst entry off by ${(worst * 100).toFixed(3)}% of the diagonal, three oil-and-water depths`);
+  // One liquid in both layers, driven alike (the same force per volume through the gap): the column's mean speed is the
+  // one-layer dish's, its drag 12 nu / h^2, the pace the owner judges.
+  const one = [0, 0, 0, 0], nu = 1e-6 / 0.04, a1 = 0.012, a2 = 0.018, G = 1;
+  twoLayerDrag(a1, a2, nu, nu, one);
+  // Solve M U = (h1 G, h G) for the layers' speeds.
+  const det = one[0] * one[3] - one[1] * one[2];
+  const U1 = (one[3] * a1 * G - one[1] * a2 * G) / det, U2 = (one[0] * a2 * G - one[2] * a1 * G) / det;
+  const mean = (a1 * U1 + a2 * U2) / (a1 + a2), rate = G / mean, want = 12 * nu / ((a1 + a2) * (a1 + a2));
+  check('and with one liquid in both layers, driven alike, the column flows as the one-layer dish does: its drag 12 nu / h^2', near(rate, want, 1e-9),
+    `${rate.toExponential(6)} against ${want.toExponential(6)} per second`);
+  // A lens laid on still water floats: the water under it is shallower by its weight, the head at the floor is level, nothing moves.
+  const lensShare = new Float32Array(SLOSH_N * SLOSH_N);
+  for (let j = 0; j < SLOSH_N; j++) for (let i = 0; i < SLOSH_N; i++) {
+    const dd = Math.hypot((i + 0.5) / SLOSH_N - 0.5, (j + 0.5) / SLOSH_N - 0.5);
+    lensShare[j * SLOSH_N + i] = dd < 0.15 ? 1 : 0;
+  }
+  const still = new SloshDish();
+  still.setOil(lensShare);
+  still.rest();
+  still['resting'] = false;
+  const mid = (SLOSH_N >> 1) * SLOSH_N + (SLOSH_N >> 1);
+  const under = still.h[mid], beside = still.h[(SLOSH_N >> 1) * SLOSH_N + 6];
+  let fastest = 0;
+  run(still, 10, () => [0, 0], dragOf(0), () => { fastest = Math.max(fastest, still.maxSpeed()); still['resting'] = false; });
+  check('a lens laid on still water floats on it, the water under it shallower by its weight, and nothing moves for ten seconds',
+    near(beside - under, SLOSH_OIL_DENSITY * SLOSH_LENS, 1e-5) && fastest < 1e-5,
+    `the water ${(under / SLOSH_REST_DEPTH).toFixed(3)} of rest under the lens (${(SLOSH_LENS * 200).toFixed(1)} mm of oil), ${(beside / SLOSH_REST_DEPTH).toFixed(3)} beside it; fastest ${fastest.toExponential(1)} plate widths/s`);
+
+  // Rocked, the lens and the water under it go at different speeds: the oil, fifty times as viscous and against the
+  // cover glass, is held back; the water slides under it. The lens is held where it was laid (the plate moves it in
+  // the app, shortcut a), so this is its speed, not where it goes.
+  const rocked = new SloshDish();
+  rocked.setOil(lensShare);
+  rocked.rest();
+  let s1 = 0, s2 = 0, ds = 0;
+  const lensCells = [];
+  for (let k = 0; k < lensShare.length; k++) if (lensShare[k] > 0 && rocked.wet[k]) lensCells.push(k);
+  run(rocked, 6, (t) => [AX * Math.sin((2 * Math.PI * t) / 1.43), 0], dragOf(0), () => {
+    for (const k of lensCells) {
+      const u2 = rocked.qx[k] / rocked.h[k], u1 = rocked.ox[k];
+      s1 += u1 * u1; s2 += u2 * u2; ds += (u1 - u2) ** 2;
+    }
+  });
+  const ratio = Math.sqrt(s1 / s2), shear = Math.sqrt(ds / s2);
+  check('rocked, the oil lens and the water under it move at different speeds: the oil held back by its viscosity and the cover glass',
+    ratio < 0.9 && shear > 0.1 && s2 > 0,
+    `the lens at ${(ratio * 100).toFixed(0)}% of the water's rms speed under it; the two layers shear at ${(shear * 100).toFixed(0)}% of it`);
+}
+
+// 13. bores: the Riemann flux resolves a jump (PLAN 18a-13d).
+if (mine('13')) {
+  // A dam break across the middle: twice the depth on one side, no drag, against Stoker's exact solution.
+  const hL = 1.5 * SLOSH_REST_DEPTH, hR = 0.75 * SLOSH_REST_DEPTH, g = SLOSH_G;
+  const cL = Math.sqrt(g * hL);
+  let lo = hR, hi = hL;
+  const f = (hm) => 2 * (cL - Math.sqrt(g * hm)) - (hm - hR) * Math.sqrt((g * (hm + hR)) / (2 * hm * hR));
+  for (let it = 0; it < 200; it++) { const m = 0.5 * (lo + hi); if (f(m) > 0) lo = m; else hi = m; }
+  const hm = 0.5 * (lo + hi), um = 2 * (cL - Math.sqrt(g * hm)), S = (hm * um) / (hm - hR);
+  const d = new SloshDish();
+  for (let j = 0; j < SLOSH_N; j++) for (let i = 0; i < SLOSH_N; i++) {
+    const k = j * SLOSH_N + i;
+    d.setDepth(k, i < SLOSH_N / 2 ? hL : hR);
+  }
+  d['resting'] = false;
+  const T = 0.12;
+  const e0 = d.energy();
+  d.step(T, 0, 0, 0);
+  const row = SLOSH_N >> 1;
+  const at = (i) => d.h[row * SLOSH_N + i];
+  // The front: the last cell, coming in from the still side, where the depth is past half the jump.
+  let front = -1;
+  for (let i = SLOSH_N - 1; i > SLOSH_N / 2; i--) if (at(i) > 0.5 * (hm + hR)) { front = i; break; }
+  const x = (front + 1) / SLOSH_N, want = 0.5 + S * T;
+  // The jump's width: cells between 10% and 90% of it.
+  let wide = 0;
+  for (let i = SLOSH_N / 2; i < SLOSH_N; i++) { const q = (at(i) - hR) / (hm - hR); if (q > 0.1 && q < 0.9) wide++; }
+  const plateau = at(Math.round((0.5 + 0.5 * S * T) * SLOSH_N));
+  check('a dam break runs a bore at the speed Stoker\'s exact solution gives it, within a cell and a half', Math.abs(x - want) < 1.5 / SLOSH_N,
+    `front at ${x.toFixed(4)}, exact ${want.toFixed(4)} (bore speed ${S.toFixed(3)} plate widths/s, ${(S / SLOSH_C).toFixed(2)} of the rest wave speed)`);
+  check('the bore is a jump, not a slope: from a tenth to nine tenths of its height in three cells or fewer, and the depth behind it is Stoker\'s',
+    wide <= 3 && near(plateau, hm, 0.02), `${wide} cells; behind it ${(plateau / SLOSH_REST_DEPTH).toFixed(4)} of rest against ${(hm / SLOSH_REST_DEPTH).toFixed(4)}`);
+  // And it loses energy at the jump, as a real bore does, and nothing in the dish ever makes energy: with no drag and
+  // no forcing the total never rises, frame to frame, while the bore runs into the rim and back for three seconds.
+  let grew = 0, prevE = d.energy();
+  run(d, 3, () => [0, 0], 0, () => { const e = d.energy(); grew = Math.max(grew, (e - prevE) / prevE); prevE = e; d['resting'] = false; });
+  check('with no drag the bore spends energy and nothing makes any: the total never rises a frame, through three seconds of bores off the rim',
+    grew < 1e-6 && prevE < e0, `largest rise ${grew.toExponential(1)} of the total; ${(100 * (1 - prevE / e0)).toFixed(1)}% spent`);
+}
+
+// 14. a glass pressed on the liquid (Beat Squeeze's physics): a ring that runs out at the wave speed.
+if (mine('14')) {
+  const d = new SloshDish();
+  const m0 = d.mass();
+  const probe = (rr) => {
+    const i = Math.round((0.5 + rr) * SLOSH_N - 0.5), j = SLOSH_N >> 1;
+    return d.h[j * SLOSH_N + i];
+  };
+  const first = { 0.2: -1, 0.4: -1 };
+  const lowest = { 0.2: Infinity, 0.4: Infinity };
+  let t = 0;
+  for (let k = 0; k < 90; k++) {
+    d.press(0, t < 0.1 ? { x: 0.5, y: 0.5, radius: 0.08, depth: 0.2 * SLOSH_REST_DEPTH } : null);
+    d.step(DT, 0, 0, dragOf(0));
+    t += DT;
+    for (const rr of [0.2, 0.4]) {
+      const h = probe(rr);
+      // The ring's crest: the first time the depth there rises a tenth of the press's depth above rest.
+      if (first[rr] < 0 && h > SLOSH_REST_DEPTH * (1 + 0.02)) first[rr] = t;
+      lowest[rr] = Math.min(lowest[rr], h);
+    }
+  }
+  const speed = (0.4 - 0.2) / (first[0.4] - first[0.2]);
+  check('a glass pressed on the liquid pushes it out in a ring that runs across the dish at the wave speed, sqrt(g h)',
+    first[0.2] > 0 && first[0.4] > first[0.2] && near(speed, SLOSH_C, 0.12),
+    `the crest at 0.2 of the plate from the press at ${first[0.2].toFixed(3)} s, at 0.4 at ${first[0.4].toFixed(3)} s: ${speed.toFixed(3)} plate widths/s against ${SLOSH_C.toFixed(3)}`);
+  check('and the press moves the liquid, it does not make or take any', Math.abs(d.mass() - m0) / m0 < 1e-5, `mass off by ${(Math.abs(d.mass() - m0) / m0).toExponential(1)}`);
+  const head = pressHead({ x: 0.5, y: 0.5, radius: 0.1, depth: 1 }, 0.5, 0.5) === 1 && pressHead({ x: 0.5, y: 0.5, radius: 0.1, depth: 1 }, 0.61, 0.5) === 0;
+  check('a press is its depth in the middle of its footprint and nothing past its rim', head, String(head));
+}
+
+// 15. the GPU's dish is not read back: the clock that stops it after its ring has gone.
+if (mine('15')) {
+  const c = new SloshClock();
+  const seq = [c.tick(DT, false, 1), c.tick(DT, true, 1), c.tick(DT, true, 1), c.tick(DT, false, 1)];
+  let after = 0;
+  while (c.tick(DT, false, 1) && after < 1e5) after++;
+  check('the clock runs the dish only once something drives it, lays it level the first time, and stops it its ring time after the last drive',
+    seq[0] === null && seq[1]?.level === true && seq[2]?.level === false && seq[3]?.level === false && Math.abs((after + 1) * DT - sloshRingSeconds(1)) < 2 * DT,
+    `stopped ${((after + 1) * DT).toFixed(2)} s after, ring time ${sloshRingSeconds(1).toFixed(2)} s`);
+  // On water, the slowest to ring down: the reference dish is at rest by its own measure within the ring time.
+  for (const thickness of [0, DEFAULT_THICKNESS]) {
+    const d = new SloshDish();
+    const r = dragOf(thickness);
+    run(d, 2, () => [AX, 0], r);
+    let dormant = -1;
+    for (let k = 0; k < 60 * 95; k++) if (!d.step(DT, 0, 0, r)) { dormant = (k + 1) * DT; break; }
+    check(`Thickness ${thickness}: the dish let go is at rest within the ring time the GPU's dish is given`, dormant > 0 && dormant <= sloshRingSeconds(r),
+      `at rest after ${dormant.toFixed(1)} s of ${sloshRingSeconds(r).toFixed(1)}`);
+  }
+}
+
+console.log(`§§ ${bad}`);
+process.exit(0);

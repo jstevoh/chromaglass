@@ -44,6 +44,58 @@ export function kickRock(rock: RockSpring, bass01: number, accent: number): void
   rock.phase += 2.4;
 }
 
+/*
+  Which kicks shove the glass (PLAN 27f-2). The owner, 2026-10-21: "make plate
+  rock and beat squeeze much more distinctive". Both answered the same kick:
+  Beat Squeeze pressed the glass on it and Plate Rock shoved the plate on it,
+  so the two read as one thump. A projectionist rocking a dish to a band does
+  not tip it on every kick either; the hand finds the bar and leans into its
+  one, and the liquid swings through the bar on its own spring (0.9 Hz, so
+  about one and a half swings a bar at 120 bpm, rung down to a tenth by the
+  next one).
+
+  So the rock is shoved on the one (`BarGrid.placeAt` 0), and on no other beat
+  the grid can name. Where the grid knows only the half bar, or nothing, it is
+  shoved on the first strong beat (or kick) a bar's worth of kicks after the
+  last shove, so a song the grid cannot place still rocks once a bar and not on
+  every kick, and a fill or a missed one never leaves the plate still for long:
+  past eight kicks without a shove, the next kick shoves whatever the grid says.
+  The squeeze keeps every kick.
+
+  Where the frame may move (Frame Sway above 0: Bass Drop, FRAME_MOVING_LOOKS),
+  every kick still shoves, as it always has on that look: the kick throwing the
+  plate is that look's idea, and its rock now sloshes the whole dish too
+  (lib/slosh.ts rockAccel).
+
+  The shove on the one is harder than a kick's was, ROCK_BAR_SHOVE times. One
+  shove a bar puts in less than four a beat apart: measured on the spring at
+  96 to 140 bpm, the glass swung to 0.70–0.77 of the kicks' running swing at
+  its furthest (1.00–1.10 at a bass of 0.8, full Plate Rock), and its swing
+  over the bar's mean square fell to 0.27–0.35. A hand leaning into the one
+  pushes harder than it tapped each kick, and 1.45 brings the furthest swing
+  back to the dial's (1.01–1.12) while the glass still spends most of the bar
+  swinging down, which is the difference that reads. `npm run downbeat` holds
+  both: the furthest swing within a tenth of every kick's, the mean square
+  under two thirds of it.
+*/
+/** How much harder the bar's one shoves than a kick did, on looks that hold the frame still. */
+export const ROCK_BAR_SHOVE = 1.45;
+/** Kicks since the rock was last shoved (`rockShove` keeps it). */
+export type RockBar = { since: number };
+/**
+ * How hard this kick shoves the rock, × the kick's own (0 for not at all):
+ * `one` when the grid names it the bar's one, `strong` when it can say only that
+ * it is a strong beat (one or three), `placed` when it names some other beat or
+ * the "and"; `sway` the Frame Sway dial.
+ */
+export function rockShove(bar: RockBar, sway: number, one: boolean, strong: boolean, placed: boolean): number {
+  if (sway > 0) { bar.since = 0; return 1; }
+  bar.since++;
+  if (!(one || bar.since > 8 || (!placed && bar.since >= 4) || (strong && bar.since >= 3))) return 0;
+  bar.since = 0;
+  return ROCK_BAR_SHOVE;
+}
+
 /** One step of `dt` seconds: a 0.9 Hz spring, damped to a fifth. */
 export function stepRock(rock: RockSpring, dt: number): void {
   const w = 2 * Math.PI * 0.9, z = 0.22;
