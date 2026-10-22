@@ -98,6 +98,8 @@
     "codecblip": "node scripts/codecblip.mjs",
     "moving": "npm run build && node scripts/moving.mjs",
     "showreel": "npm run build && esbuild scripts/showreel.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/showreel.mjs && node node_modules/.cache/showreel.mjs",
+    "landingfilm": "npm run build && esbuild scripts/landingfilm.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/landingfilm.mjs && node node_modules/.cache/landingfilm.mjs",
+    "landinglooks": "npm run build && esbuild scripts/landinglooks.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/landinglooks.mjs && node node_modules/.cache/landinglooks.mjs",
     "film": "npm run build && esbuild scripts/film.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/film.mjs && node node_modules/.cache/film.mjs",
     "report-worker": "node scripts/report-worker.mjs",
     "fingerprint-worker": "node scripts/fingerprint-worker.mjs",

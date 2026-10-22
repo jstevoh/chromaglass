@@ -9063,28 +9063,28 @@ a grid of generic stock thumbnails: ours are the plate itself.
   "Play free" opens the sign-in over it; a returning visit, `?remote`, `?cast`, the iPhone app,
   a desktop launch and a visit part way through a redirect or an emailed link never see it.
   `npm run signin` holds it (3a, 3, 6, 7, 10, 11b).
-- **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
-  video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
-  the app's own frames, because a cloud session cannot film the app and the lab's plate barely
-  moves in a hero's seconds. A 10 to 15 second loop of the real show (`npm run film` records
-  through `scripts/recorder.mjs`), 1280 wide, under 1.5 MB as WebM and MP4, would replace it: the
-  page then loads it after its first paint and keeps the stills for reduced motion. The loop is
-  filmed with the track it was filmed to (the recorder takes the audio, and the show's own music in
-  `public/music` is ours to use), and a browser will not start sound on its own: the video starts
-  muted, and a "Sound on" button (and a tap on the video) unmutes it, with the sound off again when
-  the visitor leaves for the sign-in. More than one clip (a ferrofluid, a dye pour, a close macro)
-  would be the "video examples" row under the hero, each its own filmed look with its sound.
-  *Measure:*
-  the loop's first and last frames differ by less than a frame of motion; `npm run signin` 3a still
-  true with the plate not up.
-- **34a-3. Sharper looks in the grid.** *(S.)* The cards are 480 × 300 frames from the preset
-  contact sheets (28i-1) and are soft where a Retina screen draws them at 2x. `pixels.yml` renders
-  every look one to one at a laptop's size: take the eight from it and keep the file sizes under
-  60 KB each.
-- **34a-4. Buy buttons, when the Lemon Squeezy webhook is set (23).** *(S.)* The page prints the
-  prices and says "Buying opens soon". When 23's webhook issues a key from a test purchase, the
-  tier cards get Buy buttons (`CHECKOUT_HOME_URL`, `CHECKOUT_PRO_URL` in `lib/tierGates.ts`) and
-  the "opens soon" line goes. Until a test purchase has been made, no button.
+- **34a-2. A filmed hero with its music, from a Mac.** *Shipped (2026-10-22), story in
+  `docs/plan-shipped.md` §34a-2.* `npm run landingfilm` films the hero loop (12 s of Jellyfish
+  Bloom, 1280 wide, folded so it loops) and three example clips (ferrofluid, dye pour, a close
+  macro) with AmbiSphere (public domain, `public/music`), as WebM and MP4 under `public/landing/clips`.
+  They start muted with a "Sound on" button; one film has sound at a time and it stops when the
+  visitor scrolls away, leaves the tab or opens the sign-in. Reduced motion, Data Saver and slow links
+  get the poster and a "Play with sound" button. *Open:* the hero's loop seam measures 1.2 against a
+  typical frame-to-frame change of 0.3 (codec noise sits at that level, so it is not a visible jump
+  but the "less than a frame" bar is not met by this measure); the macro clip is grain-heavy and costs
+  875 KB WebM where the others cost 170 to 490 KB; the music is one public-domain album, and a
+  licensed track would need the owner's rights check.
+- **34a-3. Sharper looks in the grid.** *Shipped (2026-10-22).* `npm run landinglooks` takes each
+  of the eight looks at 1440 × 900 after 20 s and writes a 960 × 600 WebP (was 480 × 300), under
+  60 KB each, except the macro bead at 95 KB (its cells and grain do not compress).
+- **34a-4. Buy buttons.** *Shipped (2026-10-22).* The Home and Pro cards carry Buy buttons that open
+  the Lemon Squeezy checkout in a new tab (`src/lib/checkoutLinks.ts`, shared with the account sheet),
+  and the page says to buy with the email the visitor signs in with, because the licence worker keys
+  on the order email. *Open:* the store (501059) is still in **test mode** (`test_mode: true` on the
+  store), so the buttons open a test checkout until the owner takes it live; no test purchase has been
+  made from this session (it may not move money), so the webhook, key issue and licence unlock after a
+  real checkout are unproven end to end. Add the buyer's sign-in email to the checkout URL on the
+  landing too, once a visitor is signed in (it is today only on the account sheet).
 - **34a-5. The owner's words and the share card.** *(S; owner.)* "From the maker" and the refund
   line are drafts in plain words for the owner to rewrite or sign. `og-card.png` is still the old
   card; a new one would be the hero's frame with the name and the one line.

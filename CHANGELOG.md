@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - On projected looks the oil's painted rim is gone; a clear oil drop or a clear pour with no
   dye across its edge draws no rim line until PLAN 18e-2 deflects light by the optical path.
 
+### Added — Landing page films, sharp looks and Buy buttons (PLAN 34a-2, 34a-3, 34a-4)
+
+- The landing page now plays a filmed hero loop and a "See it move" row of three clips (ferrofluid, dye pour, close macro), filmed from the app with public-domain music. They start muted with a "Sound on" button; one film has sound at a time and it stops on scroll-away, a hidden tab and the sign-in. Reduced motion, Data Saver and slow links get posters and a "Play with sound" button. `npm run landingfilm`.
+- The eight look cards are 960 × 600 (were 480 × 300), under 60 KB each bar the macro bead. `npm run landinglooks`.
+- Home and Pro have Buy buttons to the Lemon Squeezy checkout in a new tab; the page asks buyers to use their sign-in email. The store is still in test mode.
+
 ### Added — Slosh (PLAN 18a-13)
 
 - **Slosh** (`slosh`, Settings → Physics beside Tilt Direction; MIDI, the desks, the remote and the phone's Play sheet): tip the plate one way and then the other and the liquid slops across it and back, piles on the low side and reflects off the rim, mixing the colour. A shallow-water dish on the CPU (`src/lib/slosh.ts`) fed only by the tilt (Gravity and Tilt Direction, the remote's tilt), its flow added to the thin solve's velocity. Default 0, the plate exactly as before; the dial itself is never moved by sound, a look or Evolve; the frame does not move. At the default Thickness the liquid flows to its new level and barely overshoots; it rings at Thickness 0.3 and thinner. `npm run slosh`.
