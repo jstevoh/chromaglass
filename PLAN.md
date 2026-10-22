@@ -6416,15 +6416,28 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     droplet, the burst off-centre by up to a third of the radius, each droplet pushed with a wide
     swirl and its own speed. Fewer droplets on average (5–11 against 6–12), about the same dye.
     `npm run panel` greps the source for both (the picture is judging.md §60).
-  - **27f-2, open. Plate Rock distinct from the squeeze.** Rock shoves the spring on every kick like
-    the burst does, so the two read as one pulse. The idea: a slower spring that wallows across
-    several kicks, or a shove on the bar's one only (`beatAccent` already weighs it), with the
-    shove halved to keep the peak tilt. Changes numbers `npm run rides` holds (it kicks the spring
-    as the app does), so it wants the owner's eyes on a Mac first. Stays inside Frame Sway's rule:
-    it tips the liquid, not the frame.
-  - **27f-3, open.** Beat Squeeze itself (the glass press, 4.1 cells at the default, 11 at full) is
-    the dish-wide press 27a-8 lists among frame moves; whether to keep, localise (the press in the
-    kick's bass area) or remove it is the owner's call.
+  - **27f-2. Plate Rock leans on the one and three (shipped; story in docs/plan-shipped.md §27f-2).**
+    A hand's minimum-jerk reach to the other side of a turning axis on the strong beats, never a
+    shove on each kick; `npm run rides` holds it (judging.md §61).
+  - **27f-3. Beat Squeeze presses a sheet, locally (shipped pending the owner's pick on the
+    thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
+    lays one dent as wide as a 0.1 mm sheet bends over the liquid in the kick's hold
+    (elastohydrodynamic bending length); Bass Drop keeps the glass. `npm run rides` holds it.
+  - **27f-4, open. The sheet solved, not stamped.** 27f-3 lays the dent's held shape (a clamped
+    bowl, within a tenth of the true profile) and gives it back over KickRelease's third of a
+    second. The real sheet is w_t = (h³/12μ)∇²(D∇⁴w − F): linear at these depths, so exactly
+    solvable per Fourier mode on its own grid (an exponential integrator, unconditionally
+    stable), which would also give the release its true pace (the dent spreading as t^(1/6)
+    and shallowing as t^(−1/3), slow on syrup) and the ring the dent lifts round itself (13% of
+    its depth at 3.4ℓ). That ring needs the gap opened past rest, which the shader's
+    squeezeUpdate never does (a lift stops at rest): the same item as the lift's ceiling.
+  - **27f-5, open. The rock tips the layers, not only the dye.** The hand's tilt drives the
+    dye's weight down the plate (Darcy–Boussinesq in the gap). A dish of oil on water tipped
+    the same way also sloshes at the layers' interface (reduced gravity, a wave of several
+    seconds across the dish, underdamped in water, overdamped in the default oil): once the
+    two-layer slosh (18a-13a) lands, the rock's tilt should drive its internal mode. Not the
+    single-layer slosh's surface mode, which moves the whole picture together and would be a
+    frame move from the sound (the owner's rule); a design call for the owner when 18a-13a ships.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)

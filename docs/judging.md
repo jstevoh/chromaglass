@@ -1480,3 +1480,15 @@ and distances, some small and some large, not an even wreath round one circle. K
 (Show section; remote; MIDI) at 0 should stop it entirely and Beat Squeeze 0 and Plate Rock
 unchanged should leave only the tilt; at 1 it should be as much dye as before, at 1.5 more.
 Check that the burst reads as the kick, not as the plate being pressed.
+
+## 61. Plate Rock rocks with the bar, Beat Squeeze presses where the kick lands (PLAN 27f-2, 27f-3)
+
+Play Classic with a band at 120 bpm or so, Plate Rock at its 0.45 and Beat Squeeze at 0.5,
+Kick Bloom at 0, then at 1. Plate Rock should be the slow move: the heavier colour sliding one
+way across a half bar and back across the next, the direction turning a little each time, and
+nothing jolting on the kick itself. Beat Squeeze should be the quick one: each kick a dent
+where it lands, a fifth of the dish across on the default oil, the colour pushed out of it and
+running back in a third of a second later (fingering back in where Fingering is up). Turn
+Thickness up: the dent should tighten to a fingertip; down toward water, it should widen.
+Bass Drop should still press the whole glass. Say whether the rock's pace (one lean every two
+beats) is right or wants one a bar, and whether the dent wants to be bigger.

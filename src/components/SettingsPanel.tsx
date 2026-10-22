@@ -1181,7 +1181,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="kickBloom"
         />
         <Info>
-          Kick Bloom is the ring of dye each kick throws outward from the bass spot. Beat Squeeze presses the glass instead, and Plate Rock tips the dish: three different moves on the kick, each with its own dial.
+          Kick Bloom is the dye each kick throws outward from the bass spot. Beat Squeeze presses a thin sheet on the liquid where the kick lands: a dent as wide as the sheet bends over this liquid, wide on thin oil, a fingertip on syrup. Plate Rock is the slow one: a hand tipping the dish on the one and three, the heavier colour running downhill each way.
         </Info>
         <Slider
           label="Beat Squeeze"
