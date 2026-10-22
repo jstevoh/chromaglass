@@ -7565,6 +7565,15 @@ a grid of generic stock thumbnails: ours are the plate itself.
   made from this session (it may not move money), so the webhook, key issue and licence unlock after a
   real checkout are unproven end to end. Add the buyer's sign-in email to the checkout URL on the
   landing too, once a visitor is signed in (it is today only on the account sheet).
+- **34a-4b. The licence Worker accepted test-mode orders.** *Found in review 2026-10-22, fixed in
+  the same PR.* The webhook never read Lemon Squeezy's `meta.test_mode`, so while the store is in test
+  mode anyone paying with the public test card got a real signed key (the account sheet's Buy buttons
+  have exposed this since #394). `server/license-worker.js` now files nothing for a test-mode order
+  unless the buyer's email is in the `TEST_MODE_EMAILS` Worker secret (comma separated, never committed;
+  how the owner proves the path), and `npm run license-worker` check 8 holds it (it fails without the fix:
+  stranger keys=1). **Open:** the Worker must be deployed (`wrangler deploy`, production) and the secret
+  set before the buy links are safe; keys already minted from test orders should be listed in KV
+  (`keys:*`) and revoked.
 - **34a-5. The owner's words and the share card.** *(S; owner.)* "From the maker" and the refund
   line are drafts in plain words for the owner to rewrite or sign. `og-card.png` is still the old
   card; a new one would be the hero's frame with the name and the one line.
