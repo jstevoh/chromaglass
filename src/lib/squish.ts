@@ -396,6 +396,75 @@ export function kickDepth(squeeze: number, bass01: number, accent: number): numb
 }
 /** How long a kick's press stays down before the glass lets go (s): the same pause that tells a hand's press from its lift. */
 export const KICK_HOLD = RELEASE_MS / 1000;
+
+/*
+  Where the kick presses, and how far its press reaches (PLAN 27f-3).
+
+  KICK_RADII above is a rigid glass pressed: a glass bends so little over a
+  dish that the gap closes across most of it at once, and the liquid under
+  all of it goes out toward the rim and back, which is the whole picture
+  breathing in and out on every kick. That is a frame move (PLAN 27a-8),
+  which is why Beat Squeeze sat at 0 on every look but Bass Drop.
+
+  A press that stays where it is pressed needs a cover that bends: a thin
+  sheet laid on the liquid (the rhythm sheet, 0.1 mm of polyester film, an
+  overhead projector's transparency) under a fingertip. How far a pressed
+  sheet's dent spreads is elastohydrodynamics: the sheet's bending against
+  the film's lubrication flow, w_t = (h³/12μ)∇²(D∇⁴w − F), a sixth-order
+  diffusion whose only length after a press held for T is the bending length
+
+      ℓ = (D h³ T / 12 μ)^(1/6)
+
+  (Hosoi and Mahadevan 2004; Lister, Peng and Neufeld 2013), D the sheet's
+  bending stiffness E t³/12(1 − ν²). The dent a held point force leaves is,
+  in Fourier, (F/D)(1 − e^(−(kℓ)⁶))/k⁴: it crosses zero at 2.28ℓ (DENT_REACH,
+  integrated numerically), and inside that it is within a tenth of the
+  clamped bowl (1 − r²/R²)² that squishDisc already lays on a thin gap, with
+  0.29 of its cylinder's volume against the bowl's third. So the kick lays one
+  such bowl of radius 2.28ℓ.
+
+  The liquid sets the reach. On the default oil (Thickness 0.45) the dent is
+  28 cells of a 128 plate across its radius, a fifth of the dish; in water 47,
+  most of the middle; in glycerine 15, a fingertip's dimple. A thin liquid
+  runs out from under the sheet fast enough for the bend to spread before the
+  kick lets go, a thick one holds the sheet up round the finger.
+
+  Named shortcuts: (a) the ring the dent lifts round itself (the sheet rising
+  13% of the dent's depth at 3.4ℓ, the liquid pushed out from under the
+  finger) is not laid, because the gap is never opened past rest (the
+  shader's squeezeUpdate): that volume leaves toward the rim instead; (b) the
+  reach is read at the plate's 6 mm middle, not the bowl's own depth under
+  the press; (c) the dent is laid at its held shape and given back by
+  KickRelease over a third of a second, where the sheet's own relaxation
+  (the same equation with F gone) is slower and spreads as it goes. PLAN
+  27f-4 is the sheet solved as that equation, by FFT on its own grid.
+*/
+/** The rhythm sheet's bending stiffness, N·m: 0.1 mm of polyester (E 4 GPa, ν 0.4). */
+export const SHEET_D = (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4));
+/** Where the dent of a held point force on an elastic sheet over a thin film crosses zero, in bending lengths. */
+export const DENT_REACH = 2.28;
+/**
+ * The sheet's dent radius, in plate widths, for a liquid of kinematic
+ * viscosity `nu` (m²/s; lib/turntable.ts thicknessViscosity) under a press
+ * held `hold` seconds, at a gap `gapMetres` deep, on a plate `plateMetres` across.
+ */
+export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = 0.006, plateMetres = 0.2, density = 1000): number {
+  const mu = density * Math.max(1e-7, Number.isFinite(nu) ? nu : 1e-6);
+  const l = Math.pow((SHEET_D * gapMetres ** 3 * hold) / (12 * mu), 1 / 6);
+  return (DENT_REACH * l) / plateMetres;
+}
+/**
+ * The discs a kick presses, in cells of a 128-cell plate, and each one's
+ * share of the press: the glass's three across the dish where the look may
+ * move the frame (Frame Sway above 0, the cover loose; lib/plateRock.ts
+ * FRAME_MOVING_LOOKS), and otherwise the sheet's one dent, as deep in the
+ * middle as the glass's three stacked (each bowl's middle is three times its
+ * amount, so the one dent carries all three's).
+ */
+export function kickPress(nu: number, sway: number): { radii: number[]; share: number } {
+  if (Number.isFinite(sway) && sway > 0) return { radii: KICK_RADII, share: 1 };
+  return { radii: [Math.max(4, Math.round(dentRadius(nu) * 128))], share: KICK_RADII.length };
+}
 /** How long the glass takes to give a kick's press back (s): a third of a second, done before the next kick at 120 bpm. */
 export const KICK_RELEASE = 1 / 3;
 

@@ -45,7 +45,7 @@ import { AutoSpin, GRIP_SECONDS, OPEN_RIM, SpinHand, carrierViscosity, dishFollo
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -63,7 +63,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, kickDepth, BassPress, bassPressFor, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, kickPress, kickDepth, BassPress, bassPressFor, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
@@ -2963,16 +2963,18 @@ class FluidSimulation {
   }
 
   /**
-   * Beat Squeeze's kick: the top glass pressed over three nested discs
-   * across most of the dish (KICK_RADII: a rough dome, so the dye spreads
-   * from the middle instead of only at one hard ring), remembered for the lift like a hand's press, and let go a
-   * moment later (`kickRelease`). `amount` is each disc's press.
+   * Beat Squeeze's kick (lib/squish.ts `kickPress`): the rhythm sheet's one
+   * dent, as wide as the sheet bends over this liquid in the time the kick
+   * holds it, or on a look that may move the frame the glass over three
+   * nested discs across most of the dish. `radii` in cells of a 128 plate,
+   * `amount` each disc's press. Remembered for the lift like a hand's press,
+   * and let go a moment later (`kickRelease`).
    */
-  pressKick(x: number, y: number, amount: number, fingering: number): void {
+  pressKick(x: number, y: number, amount: number, fingering: number, radii: readonly number[]): void {
     x = Math.round(x);
     y = Math.round(y);
-    KICK_RADII.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
-    this.kickRelease.kick(x, y, KICK_RADII.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
+    radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
+    this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
   }
 
   /**
@@ -4990,7 +4992,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const bubbleDebugRef = useRef({ count: 0, strength: 0, amount: 0 });
   const beadsRef = useRef(new BeadField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
-  const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
+  const rockRef = useRef<RockHand & { lastBass: number }>({ ...restingHand(), lastBass: 0 });
   const coverRef = useRef<CoverGlass>({ x: 0, y: 0, vx: 0, vy: 0 });
   /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
@@ -8828,9 +8830,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
 
           // ── Rock the plate ─────────────────────────────────────
-          // A hand on the clock face: the beat tips the whole plate one way
-          // and a damped spring rocks it back, so the field sloshes instead
-          // of only churning. Between beats a slow sway keeps it alive.
+          // A hand on the clock face: on the one and on three it tips the
+          // dish to its other side, and the colour runs downhill through the
+          // clear liquid each way (lib/plateRock.ts, PLAN 27f-2). Between
+          // leans a small sway keeps it alive.
           {
             const rock = rockRef.current;
             const R = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
@@ -8854,8 +8857,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const accentAt = songClockRef.current + (kickRef.current.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
             const accent = kickStep ? accentRef.current.kick(barGridRef.current, accentAt, currentSettings.beatAccent ?? 0) : 1;
-            // The hand's spring and sway, the slider applied once (lib/plateRock.ts, PLAN 27a).
-            if (R > 0 && kickStep) kickRock(rock, bass01, accent);
+            /*
+              The hand's lean and sway, the slider applied once (lib/plateRock.ts,
+              PLAN 27a). The hand leans on the strong beats only, so it is told
+              where in the bar this kick fell, at the same beat the accent means,
+              and the grid's tempo for when the grid is unsure (27f-2).
+            */
+            if (R > 0 && kickStep) kickRock(rock, bass01, accent, barGridRef.current.placeAt(accentAt), barGridRef.current.now.period);
             // The rhythm plate: on a kick the projectionist presses the top
             // glass and the dye spreads out in a ring, then relaxes back.
             const squeezeAmt = Math.max(0, Math.min(1, currentSettings.beatSqueeze ?? 0));
@@ -8865,8 +8873,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // On an area look, the press lands on the kick's bass area.
                 const sqAreas = areasOf(0);
                 const sqArea = sqAreas ? areaForBand(sqAreas, 'bass', areaKicksRef.current) : null;
+                /*
+                  The press is the rhythm sheet's dent, as wide as the sheet bends
+                  over this liquid, or the glass's across the dish where the look
+                  may move the frame (lib/squish.ts kickPress, PLAN 27f-3). The
+                  dent lands anywhere in the middle half of the dish, a finger
+                  finding the glass where it falls; the glass about the middle.
+                */
+                const press = kickPress(thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), currentSettings.frameSway ?? 0);
+                const sheet = press.radii.length === 1;
                 const sqAt = sqArea ? areaCentre(sqArea, GRID_SIZE) : { x: GRID_SIZE / 2, y: GRID_SIZE / 2 };
-                const sqSpread = sqArea ? sqArea.r * GRID_SIZE : 30 * GRID_SCALE;
+                const sqSpread = sqArea ? sqArea.r * GRID_SIZE : (sheet ? GRID_SIZE / 2 : 30 * GRID_SCALE);
                 const cx = sqAt.x + DICE.music.centred() * sqSpread;
                 const cy = sqAt.y + DICE.music.centred() * sqSpread;
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
@@ -8888,8 +8905,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   deep as a hard one; now two thirds (kickDepth).
                 */
                 const a = kickDepth(squeezeAmt, bass01, accent);
-                leadPlate.pressKick(cx, cy, a, currentSettings.fingering ?? 0);
-                if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
+                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii);
+                if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, (sheet ? press.radii[0] : 30) * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }
             stepRock(rock, simStepS);
@@ -9957,7 +9974,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         and the closeup slew toward what they read, and a finger stroke
         Evolve had begun would have carried on into the film.
       */
-      rockRef.current = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 };
+      rockRef.current = { ...restingHand(), lastBass: 0 };
       /*
         And the cover glass the rock slides (PLAN 27a-1), which carries its
         own swing from frame to frame: left where the live show had swung it,
