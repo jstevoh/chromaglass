@@ -15,7 +15,7 @@ import { layOut, wgslStruct, type Field } from '../uniforms';
 
 export const CAMERA_FIELDS: Field[] = [
   { name: 'resolution', type: 'vec2f' },
-  { name: 'amount', type: 'f32', note: 'the camera as a whole, 0..1 (0 = pass-through)' },
+  { name: 'amount', type: 'f32', note: 'the sensor’s look (roll-off, vignette, grain), 0..1; the optics act at their own settings' },
   { name: 'aperture', type: 'f32', note: 'how fast things go soft away from the focal plane' },
   { name: 'bloom', type: 'f32', note: 'glow around the highlights' },
   { name: 'chromatic', type: 'f32', note: 'colour fringing at refracting edges and the frame’s corners' },

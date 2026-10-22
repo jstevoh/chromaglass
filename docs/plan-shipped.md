@@ -4553,6 +4553,49 @@ follows the dye" correlation came out negative; and a ΔE that includes lightnes
 14 on `lava-lamp` from the relief alone. Each was dropped for a line that failed on the
 control before it was trusted on the fix.
 
+### 33i. The camera's dials do something (this PR)
+
+*Reported* (the owner, 2026-10-22, relayed): "the camera controls don't really do much".
+
+Measured on Metal before any change (`npm run lens`, the old pass as `origin/main` has it,
+384 px, nine pours): with Lens at 0 the four optics changed the frame by exactly nothing,
+because the pass multiplied them by Lens and the panel greyed them out until Lens was up;
+with Lens at 1 a full dial moved the frame by a mean of 3.6 levels (refraction), 4.4
+(aperture), 8.8 (bloom) and 0.5 (chromatic aberration) out of 255, a pixel or two of motion.
+
+What was wrong was three things. The gate: `camera` was the master, so the optics could not
+be reached alone, and Focus did nothing without the aperture. The strength: refraction
+multiplied the slope by the dye's height a second time, the blur was a few pixels, the fringe
+a fraction of one. And the model: the blur was sized by the pixel's own height, the glow a
+Gaussian.
+
+Changed, on the physics. Refraction is a thin prism (Snell for small angles, n−1 of 0.4, a
+throw of a quarter of the frame): the plate's normal is already the slope, scaled by how
+much liquid there is. Dispersion is the prism's spread of 1/V of the deviation, plus the
+lens's lateral colour growing with the distance from its axis. Depth of field is a thin
+lens's blur circle, linear in distance from the focal plane and in aperture, with a field
+curvature, gathered as a scatter (each neighbour's disc weighted by one over its area, so a
+sharp ring over a blur stays sharp and a blurred dome bleeds over a sharp ground). The glow
+is a power-law point spread (about r⁻³, a tight halo and a faint wide one). Lens is now only
+the sensor's look (roll-off, vignette, grain); `cameraWanted()` turns the pass on for Lens or
+any one optic, and Focus alone does not (it has nothing to blur). The four optics default to
+0, a saved look or set list at the old version with Lens at 0 reads with them at 0 (they
+were inert), Lucky rolls them only with the lens on, and the shipped looks keep their
+cameras. Refraction and Chromatic Aberration are now MIDI-learnable, and they and Focus glide in a
+sequence stage.
+
+After: a full dial with Lens at 0 moves the frame by a mean of 11.7 (refraction), 8.1
+(aperture), 21.9 (bloom) and 4.8 (chromatic) levels; at Lens 1 10.5, 7.5, 21.7, 4.1. Where
+they work is checked as physics: refraction moves 54% of the steep pixels and 13% of the flat,
+chromatic aberration leaves green alone, bloom only adds light, every dial at 0 draws the
+plate as no pass would, and a plate with no dye gives them nothing to work on. The check
+fails on the old pass on 14 lines. The bars were first set as shares of pixels moved, which
+the skeptic showed an old pass at Lens 1 nearly met; they are means now, between the old
+pass's and the new.
+
+Left open as 33i-1 to 33i-5 in `PLAN.md`: the Abbe-8 exaggeration, the 8-bit glow knee, the
+64-tap cost and edge hair at aperture 1, and Lens-up at the defaults.
+
 ## 34. What a competitor's page showed
 
 ### 34a. A landing page before the sign-in wall (2026-10-22)

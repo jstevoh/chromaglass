@@ -35,8 +35,26 @@ export const USER_PRESETS_KEY = 'chromaglass-user-presets';
   saved before version 2 with Thin Gap off is read with it on; one saved
   from version 2 on keeps whatever it was saved with, off included, since
   off was then a choice.
+
+  3 since the camera's four optics (Aperture, Bloom, Chromatic Aberration,
+  Refraction) began to act with Lens at 0 (PLAN.md 33i). They used to be
+  multiplied by Lens, so a look with Lens at 0 held their old defaults (0.5,
+  0.4, 0.3, 0.6) and showed none of them. Read as saved, every look the owner
+  had saved would open blurred, glowing, fringed and refracted. So a look
+  saved before version 3 with Lens at 0 is read with the four at 0, which is
+  how it looked; one with Lens up keeps its values, which it was shown with.
 */
-export const PRESET_VERSION = 2;
+export const PRESET_VERSION = 3;
+
+/** The optics of a look saved before they acted on their own, read as they looked (PRESET_VERSION). */
+const OPTICS = ['aperture', 'bloom', 'chromaticAberration', 'refraction'] as const;
+function inertOptics<T extends Partial<VisualizerSettings>>(version: unknown, settings: T): T {
+  if (Number(version) >= 3 || (settings.camera ?? 0) > 0.001) return settings;
+  if (OPTICS.every((k) => !(settings[k] ?? 0))) return settings;
+  const out = { ...settings };
+  for (const k of OPTICS) out[k] = 0;
+  return out;
+}
 
 export interface UserPreset {
   format: typeof PRESET_FORMAT;
@@ -125,7 +143,8 @@ export function serializePreset(p: UserPreset): string {
  */
 export function upgradeSaved(p: UserPreset): UserPreset {
   const old = !(Number(p.version) >= 2) && p.settings?.thinGap === 0;
-  return { ...p, version: PRESET_VERSION, settings: old ? { ...p.settings, thinGap: 1 } : p.settings };
+  const thin = old ? { ...p.settings, thinGap: 1 } : p.settings;
+  return { ...p, version: PRESET_VERSION, settings: p.settings ? inertOptics(p.version, thin) : thin };
 }
 
 export function parsePresetFile(text: string): UserPreset {
@@ -138,6 +157,7 @@ export function parsePresetFile(text: string): UserPreset {
   const settings = cleanSettings(o.settings);
   // Off as the old default, not as a choice (PRESET_VERSION says why).
   if (!(Number(o.version) >= 2) && settings.thinGap === 0) settings.thinGap = 1;
+  const upgraded = inertOptics(o.version, settings);
   return {
     format: PRESET_FORMAT,
     version: PRESET_VERSION,
@@ -145,7 +165,7 @@ export function parsePresetFile(text: string): UserPreset {
     name,
     description: typeof o.description === 'string' ? o.description : undefined,
     createdAt: typeof o.createdAt === 'string' ? o.createdAt : new Date().toISOString(),
-    settings,
+    settings: upgraded,
     contract: Array.isArray(o.contract) ? o.contract.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < PALETTE.length).slice(0, 8) : undefined,
     injectStyles: Array.isArray(o.injectStyles) ? o.injectStyles.filter((s): s is string => typeof s === 'string').slice(0, 6) : undefined,
     liquids: Array.isArray(o.liquids) ? o.liquids.filter((s): s is string => typeof s === 'string').slice(0, 8) : undefined,

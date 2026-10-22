@@ -7508,6 +7508,30 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
   line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
 
+### ~~33i. The camera's dials do something~~ — **Shipped, this PR** (Settings → Camera: Refraction, Aperture, Bloom and Chromatic Aberration act at their own settings with Lens at 0, and are no longer greyed; the shader rebuilt on thin-prism refraction, a thin lens's blur circle, a power-law glow and Abbe dispersion, `src/gpu/wgsl/camera.ts`; the four default to 0 and saved looks and set lists are read as they looked, `PRESET_VERSION` 3; `npm run lens`: mean change of the frame at a full dial, Lens at 0, was 0.0 for all four on the old pass, now refraction 11.7, aperture 8.1, bloom 21.9, chromatic 4.8 levels; story in `docs/plan-shipped.md` §33i)
+
+- **33i-1. Shortcuts to replace with the real thing.** (a) Dispersion runs at an Abbe
+  number of about 8, the densest flints; real oils sit near 50 and would show nothing.
+  Replace with per-wavelength refraction of the dye's real index (the plate's liquid
+  table) and let the knob scale the exposure, not the physics. (b) The glow scatters what
+  is over a 0.5 knee because the plate is stored in 8 bits and clips at 1; draw the plate
+  in half floats and scatter true radiance. (c) Refraction displaces the picture by the
+  surface slope; the light's path through the film's thickness is not traced, and the
+  height the lens focuses on is the dye's column (`aux.z`), not the gap's real depth.
+- **33i-2. Depth of field costs 64 taps a pixel and leaves hair at aperture 1.** Where a
+  sharp dye ramp sits over a defocused ground the stochastic disc leaves a faint noise
+  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §63); if it
+  costs frames, gather at half resolution for the wide discs.
+- **33i-3. Lens up on a look still at the defaults is now only the sensor look.** The old
+  defaults (aperture 0.5, bloom 0.4, refraction 0.6) came on with Lens; they no longer
+  do. The shipped looks keep their cameras (checked, 32 looks); Lucky rolls the optics
+  only when it takes the lens, so its output for a given seed moves once.
+- **33i-4. Idea: the cyberpunk look's colour fringing.** It stored 0.35 that never drew
+  (its Lens is 0); the dead value was removed. Give it a visible 0.2 if the owner wants
+  the fringe on that look.
+- **33i-5. `sceneMap.ts` has no keys for the camera's dials**, so a scene cannot ride
+  them; add them if a scene should (the frame must not move with sound).
+
 ## 34. What Photism showed: the page and the app (asked 2026-10-22)
 
 *Asked 2026-10-22: the owner shared a phone screenshot of photism.app (an audio-reactive
