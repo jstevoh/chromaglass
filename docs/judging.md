@@ -2548,3 +2548,12 @@ can say whether the words read when they land and how a look's own flow carries 
 4. Bad: letters too small to read from across a room, words that never break up on a still
    look (37x-10d's wash is the fix, not a fade), a pour that clears or dims the plate around
    the words, a second pour inside 1.5 s landing on top of the first.
+
+## 118. The closeup camera answers your hand (PLAN 27d)
+
+Zoom in past 2x on Classic with the camera on Hold and pan with the arrow keys: a tap moves a
+quarter of the frame, Shift a whole frame, a held key a slow drift; it should feel like a heavy
+rig on a slider, never a lurch. Then move Chase Speed from 0 to 3 while pressing an arrow or
+Alt-clicking elsewhere on the plate: at 0 the frame should glide across in about three seconds,
+at 0.4 (the default) as it always did, at 3 snap there. Music Sync is greyed in Hold and Follow
+until Frame Sway is up; nothing the sound does should move the frame meanwhile.
