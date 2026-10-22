@@ -530,7 +530,7 @@ Where each batch stands, as of 2026-09-27:
 
 | | Batch | State |
 |---|---|---|
-| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
+| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; the Finger's own "adds none" reds traced to the ambient seeder being left on in that one section (2026-10-22: off, the plate's idle drift falls from +35 to 1 and the hand adds nothing on pools of 357 and 611; thin pools still unmeasured); it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
@@ -566,29 +566,86 @@ stop for a second or two either (#181); the magnet stays where the hand leaves i
 
 `src/gpu/wgsl/fluid.ts` (advection), `scripts/tools.mjs`
 
-*Found 2026-09-27, not yet done:* **"adds none" still goes red on runs that do not
-touch the Finger.** #182's tools shard (a Pacing change; the same code had passed the
-shard one commit earlier) read 50 → 64 against −12 before and +9 after, red by 1.5.
-The check allows |Δ − d| < 0.15·total + 5 + |d| with d the larger-magnitude idle
-reading, signed. So when the plate's two idle readings have opposite signs, the
-allowance is centred on one of them rather than spanning both, which is not the
-bracket its comment describes ("a Finger that makes dye still has to beat both").
-Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
-for the check's owner, taken with §0's "what the check should mean" below, since on
-the positive side it is looser whenever the larger idle reading is the negative one.
-*Measured 2026-09-27 over 40 Mac tools shards, and not a flake:* the Finger adds dye
-on a thin plate. The pool the check strokes is laid by holding Drop for 1.5 s of wall
-time, so its size follows the runner's speed: 49 to 279 across the 40. On all 12 pools
-under 150 the stroke added +11 to +21 while the plate alone had lost 1 to 34 before it
-(and gained 7 to 11 after); on settled pools it read about what the plate did alone.
-That is up to a third of a thin pool, §0's fault at a smaller size, and the three reds
-(106 → 127, 50 → 66, 73 → 90) were all thin pools. Bracketing would have made all 40
-pass, which is why it was not done (the check-skeptic review: the after window carries
-the stroke's own aftermath). Two things follow, in order: a control on the Mac (the
-same timing with the Finger picked and no stroke) to settle whether the after window
-is the plate or the stroke; then the advection fix below, which is what makes this
-check green for good. Laying the pool by solver steps rather than milliseconds would
-make it one size every run, but only after the fault is fixed, or it hides it.
+*Found 2026-09-27, **cause found 2026-10-22**:* **"adds none" went red on runs that did
+not touch the Finger, because the window it was measured against was the ambient
+seeder, not the plate.** #182's tools shard (a Pacing change; the same code had passed
+the shard one commit earlier) read 50 → 64 against −12 before and +9 after, red by 1.5:
+the allowance was centred on the larger-magnitude idle reading rather than spanning
+both, which is not the bracket its comment described. That part is bracketed now
+(`fMinIdle`/`fMaxIdle`, spanning both readings and 0), and bracketing alone made the
+reds stop without explaining them.
+
+The explanation is that the Finger section, alone among the tool checks, left the
+ambient seeding on. The Blow and the Press both turn it off and say why ("so 'left
+alone' was the seeder's drift, not the plate's"). Measured on the Mac with the seeder
+on and **nothing dropped at all**, the plate reads 64 and gains +26 then +18 over the
+two idle windows — so "what the plate did alone" was mostly the seeder's rate. That is
+why the idle reading sat at +31 to +36 whether the pool was 66 or 728, an eleven-fold
+range: a window dominated by a term that does not depend on how much dye is on the
+plate. And a bracket built from it is wide in proportion to nothing: at a pool of 66 it
+accepted any Δ in [−15, +46], so a Finger that created 70% of the pool again in new dye
+would have passed (check-skeptic).
+
+Two findings are withdrawn rather than confirmed. The 2026-09-27 reading — 40 Mac
+shards, pools 49 to 279, the stroke adding +11 to +21 on all 12 pools under 150 — was
+read through those seeded windows, and at that size the seeder alone lays about as much
+as the Drop does, so it is not evidence about the Finger. And a Mac sweep at four pool
+sizes (728, 176, 152, 66) that put the hand's own contribution at +3 to +5 by
+subtracting a no-stroke control is measured on the same seeded plate, so it bounds the
+hand only against a background it did not control.
+
+*Done:* the seeder is off for the Finger section now, as for the Blow and the Press,
+with a new `quiet` check: left alone, the pool may not *gain* more than 5% of itself, or
+5, over an idle window. Gains only, because the fault is dye arriving from something the
+check does not control — a window that loses dye only narrows the bracket downward and
+cannot excuse a hand, and the Mac's after window reads −1, so a two-sided bar would
+charge it for nothing. It is ANDed into `adds none`, as the Press ANDs its own guard
+into both of its claims, so a plate the harness has declared unquiet cannot also print
+"adds none: ok".
+
+The idle windows fell from +35 to about 1, so the bracket closes on nothing and the
+check measures the hand. On the owner's Mac, four runs: idle +1 before and −1 to −0
+after, on pools of 357 and 611, and **the hand adds nothing** — Δ under ±0.5 every
+time. Thin pools are still unmeasured (below).
+
+A control (`TOOLS_FINGER_CONTROL=1`) runs the same shape with the mouse never going
+down, on the same helpers, and prints the hand's own contribution by subtraction: +0.1
+to −1.1 across three runs, against a slack of ±59 to ±97. It waits out the stroke in
+solver steps rather than milliseconds, because the real path pays 30 `mouse.move` round
+trips the control does not: at equal wall time the stroke ran 274 steps against the
+control's 122, a factor of two apart in the pool's age, and the comparison was void —
+the same fault the Hover check was rewritten to fix. Step-matched it reads 273 against
+272 on a pool of 611, and 138 against 137 on a pool of 357, and it prints both spans
+with the verdict, so a run that is not comparable, that timed out, or whose span did not
+read says nothing instead of implying the opposite. It reports and does not gate: with
+no pool it says so and stands down rather than throwing, because a reporting-only block
+that can end the run is a gate whatever its comment claims. And it states the narrower
+claim it can support — the second window is not biased by where it sits in the run — not
+the broader one it cannot, that the window is unbiased *when a stroke happened*. For
+that, the `fIdle`/`fIdleAfter` pair in the check's own detail is the evidence, and the
+control calibrates that pair rather than replacing it.
+
+*A decision for the check's owner:* `fSlack` is still `0.15 * total + 5`, chosen when
+the idle windows were the seeder's +35. They are now about 1, and the hand's own
+contribution is under a unit, so on a pool of 357 the check grants ±59 — it would still
+pass a Finger that created a sixth of the pool. Something nearer 2–3% would be five to
+seven times sharper and still twenty times the measured noise. The same holds for the
+new `quiet` bar, deliberately set at 5% rather than the 2% the Mac alone would justify.
+What stops either being tightened here is that CI's pool is 49 to 279 and the idle
+variance across 40 shards *with the seeder off* has never been measured; only the shards
+can measure it, and a bar resting on an unmeasured quantity is the flake this repo keeps
+relearning.
+
+*Open:* whether the Finger adds dye on a genuinely thin pool, which is now measurable
+for the first time and has not been measured. `TOOLS_POOL_MS` shortens the Drop hold to
+put a CI-sized pool on a fast machine; it is floored at 100 ms because under that the
+Blow's pool comes out at single figures and its checks measure nothing. Laying the pool
+by solver steps rather than milliseconds would make it one size every run. Also open,
+and unrelated to the seeder: `and draws it back when the hand lets go` read 78%, 76%,
+80% and 48% back on four Mac runs against its 50% `backOf` bar, so it sits on its
+threshold. Its detail labels only `cameIn`'s quarter ("a quarter needed") and leaves the
+50% bar unlabelled, so the 48% red reads like a pass to anyone who has not read the
+condition.
 
 *Found 2026-10-03 (#225), open:* **with presses that move the dye, the grid pass
 holds less of the grid-band detail.** `npm run grating`'s pressed plate (gap −0.3 in a
@@ -5244,6 +5301,107 @@ Not a gate and no bar: a rate depends on what was pushed.
   and Actions masks it, so it does not reach a log. Give curl the header on stdin
   (`-K -`, as `scripts/ghapi.mjs` does) and check with `npm run deploygate -- --history 20`
   that the same merges are trusted. Found by the check-skeptic on 19aa-3.
+
+### 19ab. The ubuntu shards fetch their tools inside the same budget as their checks
+
+- **19ab-1. Any slow download on an ubuntu shard is a red, whatever the PR changed.**
+  Seen twice in one afternoon on PR #429, on two different shards, at two different
+  steps, against the same `timeout-minutes: 25` (`.github/workflows/checks.yml`):
+
+  | run | shard | the step that ate it | same step, a lucky run |
+  |---|---|---|---|
+  | 39833566465 | `browser`, cancelled 25m09s | Install Chromium **650s** | 33s |
+  | 39842870003 | `sound`, cancelled 25m19s | ffmpeg, for the shelf **1474s** | 22s |
+
+  Neither was a check being slow or wrong. On the browser shard every harness matched a
+  sibling PR's green run of the same afternoon to within five seconds — the layout 173s
+  against 168, the phone 195 against 192, the switches 99 against 96, the renders 89
+  against 89, the clicks 64 against 64 — and the checks it reached were green, 20/20 on
+  the renders and 11/11 on the clicks, before the wall. On the sound shard the wall came
+  during `apt`, before a single sound check ran: the turntable and the ear, then nothing.
+
+  The shape of the fault: a shard's **tool fetches share one clock with its measuring**.
+  The browser shard does about eighteen minutes of work, so eleven minutes of cold
+  Chromium puts it at 29 against a limit of 25; the sound shard does about three, so a
+  twenty-five-minute `apt` buries it on its own. The limit is sized for the work and the
+  fetch is unbounded, so the red says nothing about the diff — it reports GitHub's
+  mirrors. 19w moved the *Mac* shards off their timeouts for the same reason; the ubuntu
+  shards were never costed the same way, because their own work is steady and nobody
+  counted the downloads that precede it.
+
+  Three fixes, cheapest first. **Cache the tools** — `actions/cache` on
+  `~/.cache/ms-playwright` keyed on the Playwright version in the lockfile, and the apt
+  archives (or a prebuilt image) for ffmpeg — so a cold path is paid once per version
+  instead of once per runner. **Or take the fetches out of the timed budget**, giving each
+  install step its own `timeout-minutes` and the job a limit covering both, so a slow
+  mirror fails as itself with a legible message instead of cancelling the harnesses.
+  **Or raise the job to 35**, which hides the fault rather than fixing it and makes a
+  genuinely hung harness cost ten more minutes before anyone hears about it. Prefer the
+  cache, then the split budget: between them they make the run shorter and the red
+  honest, where the third only makes the limit longer.
+
+  Check it with the step's own seconds over three runs after the change, and bust the
+  cache key once to prove the cold path still works.
+
+  **The apt hang is not luck, and that is the sharper half of this.** The browser shard's
+  cold install cleared on a re-run; the sound shard's did not. `Measure · sound` on this
+  repo, by the minute (UTC, 2026-10-22):
+
+  | run started | sound shard | ffmpeg step |
+  |---|---|---|
+  | 15:58 | pass | 22s |
+  | 18:41 | pass | 22s |
+  | 19:13 | pass | — |
+  | 19:45 | cancelled | 1474s |
+  | 20:13 | cancelled | 1471s |
+
+  | 20:24 | cancelled | hung |
+  | 20:26 | cancelled | hung |
+  | 20:36 | pass | — |
+  | 20:48 | pass | — |
+  | 21:01 | pass | — |
+
+  Two hangs within three seconds of each other, both stopped by the job's wall rather
+  than by finishing, and the last three rows are other sessions' runs on their own
+  branches: the outage ran from about 19:30 to about 20:30 UTC and then lifted on its
+  own. An hour of it, and while it lasts **no PR in this repo can go green**, whatever
+  it changes — the shard dies before its first sound check runs. So this item is not a
+  tidying job for later: it is the difference between an afternoon when the mirrors are
+  slow costing nobody anything, and one where every session re-rolls a 25-minute shard
+  and burns the Mac queue behind it. A bounded fetch with its own timeout would have
+  said "apt did not answer" in two minutes instead of cancelling the harnesses at
+  twenty-five, and a cache would have skipped it.
+
+  Note for whoever takes it: a retry is not a fix, and the two cases show why from both
+  ends. The browser's cleared on a re-run, so green by luck read the same as green by
+  merit; the sound's never cleared, so three full runs were spent proving that the thing
+  which failed was not the diff. Found while measuring 0-tap (PR #429).
+
+### 19ac. The phone's double tap on Speed is judged on two taps landing in time
+
+- **19ac-1. `Play: a double tap on Speed puts it back to the look's own speed` has no
+  grip on the window it depends on.** `scripts/phone.mjs:1159`. Red once on PR #429
+  (`377/378`, the Mac `show` shard) and green on four other runs of the same afternoon,
+  on a PR that touches neither the phone nor the app. The detail it printed was
+  `0.009 → 0.28 → 0.005`: the slider was moved to 0.28 by the first part of the test,
+  then the two taps at three-tenths of the track left it at 0.005 rather than back at
+  0.009. 0.005 is where a *single* tap at three-tenths puts it, so what failed is not
+  the reset — the app never saw a double tap at all. The second tap fell outside its
+  window.
+
+  The check waits 60 ms between the taps and asserts `reset === before` as strings, and
+  that is the whole of its grip: nothing asserts that the app registered a double tap, so
+  a missed window and a broken reset are the same red, and the printed line reads like
+  the reset went to the wrong value when in fact it never ran. Under a loaded runner a
+  synthetic `touchscreen.tap` pair can straddle any fixed window, which is the flake.
+  Two things to do, and the first matters more than the fixing of the flake: have the
+  check read whatever the app exposes for "a double tap was seen" (or the edited flag
+  clearing) and fail *separately* when the gesture did not land, so the red names its
+  own cause; then make the gap deterministic against the app's own window rather than a
+  bare 60 ms — read the constant the phone uses instead of guessing under it. Do not
+  simply widen the tolerance on `reset`: a value that is close to the look's speed is
+  not the same claim as the look's speed, and the check is right to compare exactly.
+  Found while measuring 0-tap (PR #429).
 
 ## 20. Lace and holes: a pale film torn open over colour
 
