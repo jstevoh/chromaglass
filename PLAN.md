@@ -5341,11 +5341,67 @@ Not a gate and no bar: a rate depends on what was pushed.
   honest, where the third only makes the limit longer.
 
   Check it with the step's own seconds over three runs after the change, and bust the
-  cache key once to prove the cold path still works. Note for whoever takes it: a retry
-  is not a fix here. Both reds went away on a re-run, which is exactly what makes this
-  the flake this repo keeps relearning — green by luck reads the same as green by merit,
-  and the only difference is how many times the next session re-runs before it believes
-  the shard. Found while measuring 0-tap (PR #429).
+  cache key once to prove the cold path still works.
+
+  **The apt hang is not luck, and that is the sharper half of this.** The browser shard's
+  cold install cleared on a re-run; the sound shard's did not. `Measure · sound` on this
+  repo, by the minute (UTC, 2026-10-22):
+
+  | run started | sound shard | ffmpeg step |
+  |---|---|---|
+  | 15:58 | pass | 22s |
+  | 18:41 | pass | 22s |
+  | 19:13 | pass | — |
+  | 19:45 | cancelled | 1474s |
+  | 20:13 | cancelled | 1471s |
+
+  | 20:24 | cancelled | hung |
+  | 20:26 | cancelled | hung |
+  | 20:36 | pass | — |
+  | 20:48 | pass | — |
+  | 21:01 | pass | — |
+
+  Two hangs within three seconds of each other, both stopped by the job's wall rather
+  than by finishing, and the last three rows are other sessions' runs on their own
+  branches: the outage ran from about 19:30 to about 20:30 UTC and then lifted on its
+  own. An hour of it, and while it lasts **no PR in this repo can go green**, whatever
+  it changes — the shard dies before its first sound check runs. So this item is not a
+  tidying job for later: it is the difference between an afternoon when the mirrors are
+  slow costing nobody anything, and one where every session re-rolls a 25-minute shard
+  and burns the Mac queue behind it. A bounded fetch with its own timeout would have
+  said "apt did not answer" in two minutes instead of cancelling the harnesses at
+  twenty-five, and a cache would have skipped it.
+
+  Note for whoever takes it: a retry is not a fix, and the two cases show why from both
+  ends. The browser's cleared on a re-run, so green by luck read the same as green by
+  merit; the sound's never cleared, so three full runs were spent proving that the thing
+  which failed was not the diff. Found while measuring 0-tap (PR #429).
+
+### 19ac. The phone's double tap on Speed is judged on two taps landing in time
+
+- **19ac-1. `Play: a double tap on Speed puts it back to the look's own speed` has no
+  grip on the window it depends on.** `scripts/phone.mjs:1159`. Red once on PR #429
+  (`377/378`, the Mac `show` shard) and green on four other runs of the same afternoon,
+  on a PR that touches neither the phone nor the app. The detail it printed was
+  `0.009 → 0.28 → 0.005`: the slider was moved to 0.28 by the first part of the test,
+  then the two taps at three-tenths of the track left it at 0.005 rather than back at
+  0.009. 0.005 is where a *single* tap at three-tenths puts it, so what failed is not
+  the reset — the app never saw a double tap at all. The second tap fell outside its
+  window.
+
+  The check waits 60 ms between the taps and asserts `reset === before` as strings, and
+  that is the whole of its grip: nothing asserts that the app registered a double tap, so
+  a missed window and a broken reset are the same red, and the printed line reads like
+  the reset went to the wrong value when in fact it never ran. Under a loaded runner a
+  synthetic `touchscreen.tap` pair can straddle any fixed window, which is the flake.
+  Two things to do, and the first matters more than the fixing of the flake: have the
+  check read whatever the app exposes for "a double tap was seen" (or the edited flag
+  clearing) and fail *separately* when the gesture did not land, so the red names its
+  own cause; then make the gap deterministic against the app's own window rather than a
+  bare 60 ms — read the constant the phone uses instead of guessing under it. Do not
+  simply widen the tolerance on `reset`: a value that is close to the look's speed is
+  not the same claim as the look's speed, and the check is right to compare exactly.
+  Found while measuring 0-tap (PR #429).
 
 ## 20. Lace and holes: a pale film torn open over colour
 
