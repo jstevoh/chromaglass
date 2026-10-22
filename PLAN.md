@@ -5302,6 +5302,34 @@ Not a gate and no bar: a rate depends on what was pushed.
   (`-K -`, as `scripts/ghapi.mjs` does) and check with `npm run deploygate -- --history 20`
   that the same merges are trusted. Found by the check-skeptic on 19aa-3.
 
+### 19ab. The browser shard's headroom is a Chromium download wide
+
+- **19ab-1. `Measure · browser` goes red when Chromium is not cached.** PR #429's run
+  was cancelled at 25m9s against `timeout-minutes: 25` (`.github/workflows/checks.yml`)
+  with every check it reached green: 20/20 on the sound's renders, 11/11 on the clicks,
+  and then the wall. The checks were not slow. Step by step against a sibling PR's green
+  run on the same afternoon, the harnesses matched to within five seconds — the layout
+  173s against 168, the phone 195 against 192, the switches 99 against 96, the renders
+  89 against 89, the clicks 64 against 64. The whole difference was one step:
+  **Install Chromium took 650s, against 33s on the green run.** A cache hit costs half a
+  minute and a cold download eleven minutes, and the shard's own work is about eighteen,
+  so the budget is 18 + 11 = 29 against a 25-minute limit: every cold install is a red,
+  on any PR, whatever it changed. 19w moved the Mac shards off their timeouts for this
+  exact reason; the ubuntu shards were never given the same look, because their own
+  work is steady and nobody costed the install that precedes it.
+  Three ways, cheapest first: cache the browser (`actions/cache` on
+  `~/.cache/ms-playwright`, keyed on the Playwright version in the lockfile), so the cold
+  path is paid once per version rather than per runner; or move the install out of the
+  timed budget by giving the step its own `timeout-minutes` and the job a limit that
+  covers both; or raise the job to 35, which hides it rather than fixing it and makes a
+  genuinely hung harness cost ten more minutes. Prefer the cache: it is the only one of
+  the three that makes the run shorter rather than the limit longer. Measure it with
+  `npm run macqueue -- --hours 24`'s ubuntu equivalent, or simply the step's own seconds
+  on three runs after the change, and check the cold path still works by busting the key.
+  A red that has nothing to do with the diff is the flake this repo keeps relearning,
+  and this one is not the instrument being wrong — it is the clock starting too early.
+  Found while measuring 0-tap (PR #429).
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
