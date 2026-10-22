@@ -220,10 +220,29 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
   const checkoutEmail = email || licenseInfo.email;
   const currentTier = licenseInfo.valid ? licenseInfo.tier : effectiveTier;
 
+  const paid = currentTier === 'home' || currentTier === 'pro';
+
+  /*
+    Reported 2026-10-22 as janky: the old sheet was one 955px column on a 900px
+    laptop and a 844px phone, centred in a scrolling overlay, so its top edge
+    (the title and the close button) sat above the screen with no way to scroll
+    up to it. Now the frame never grows past the viewport (`max-h`, in dvh so a
+    phone's address bar does not hide the bottom), the title and the footer
+    links stay put and only the middle scrolls. Wide screens get two columns
+    (who you are and your key on the left, what to buy and what you hear on the
+    right) so a laptop at 1280×720 shows all of it with no scroll; a phone gets
+    one column as a bottom sheet, with 48px rows for a thumb. Surfaces, hairlines
+    and the single violet accent are the desk's (tokens in index.css): amber was
+    this sheet's own colour and meant nothing on the desk.
+  */
+  const sectionLabel = 'text-[11px] font-medium uppercase tracking-wider text-dim';
+  const card = 'rounded-lg border border-border bg-elevated p-3';
+  const ghostBtn =
+    'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-50';
+
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-y-auto"
-      style={{ background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)' }}
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -233,235 +252,271 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
         role="dialog"
         aria-modal="true"
         aria-label="Account"
-        className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950 p-5 text-neutral-100 shadow-2xl"
+        className="flex max-h-[92dvh] w-full sm:max-h-[calc(100dvh-2rem)] max-w-[720px] flex-col overflow-hidden rounded-t-xl border border-border bg-surface text-text shadow-palette sm:rounded-xl"
       >
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <h2 className="text-base font-medium text-neutral-100">Profile &amp; Store</h2>
+        <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-border pl-4 pr-2">
+          <h2 className="text-[16px] font-medium text-text">Profile &amp; Store</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close account"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/10 hover:text-neutral-200"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-text"
           >
             ✕
           </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wider text-neutral-500">Signed in as</div>
-            <div className="mt-1 truncate text-sm font-medium text-neutral-100">
-              {email || licenseInfo.email || 'Signed-in user'}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:items-start">
+            <div className="flex min-w-0 flex-col gap-4 max-md:contents">
+              <div className={`${card} order-1`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className={sectionLabel}>Signed in as</div>
+                    <div className="mt-1 truncate text-[14px] font-medium text-text">
+                      {email || licenseInfo.email || 'Signed-in user'}
+                    </div>
+                  </div>
+                  <span
+                    data-cg-license-tier={currentTier}
+                    className={`shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-medium uppercase tracking-wider ${
+                      paid
+                        ? 'border border-accent-border bg-accent-bg text-accent-text'
+                        : 'border border-border-strong text-muted'
+                    }`}
+                  >
+                    {tierLabel}
+                  </span>
+                </div>
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    data-cg-account-settings=""
+                    className="mt-3 flex min-h-10 pointer-coarse:min-h-12 w-full items-center justify-between rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover"
+                  >
+                    <span>Studio &amp; Stage Settings</span>
+                    <span className="text-muted">Open →</span>
+                  </button>
+                )}
+              </div>
+
+              <div className={`${card} order-3`}>
+                <div className="flex items-center justify-between">
+                  <span className={sectionLabel}>License key</span>
+                  {licenseInfo.valid && (
+                    <button
+                      type="button"
+                      data-cg-license-deactivate=""
+                      disabled={licenseBusy}
+                      onClick={handleDeactivateKey}
+                      className="text-[12px] text-muted underline decoration-faint underline-offset-2 hover:text-text"
+                    >
+                      Deactivate machine
+                    </button>
+                  )}
+                </div>
+                <form onSubmit={handleActivateKey} className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    data-cg-license-input=""
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    placeholder={
+                      licenseInfo.valid
+                        ? `Active (${licenseInfo.tier.toUpperCase()}) · paste key to upgrade`
+                        : 'Paste license key (cg1...)'
+                    }
+                    aria-label="License key"
+                    className="min-h-10 pointer-coarse:min-h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-bg px-3 font-mono text-[12px] text-text placeholder-dim focus:border-accent focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    data-cg-license-activate=""
+                    disabled={licenseBusy || !keyInput.trim()}
+                    className="min-h-10 pointer-coarse:min-h-12 shrink-0 rounded-lg bg-primary px-4 text-[13px] font-medium text-on-primary transition-opacity hover:opacity-90 disabled:opacity-30"
+                  >
+                    {licenseInfo.valid ? 'Upgrade' : 'Activate'}
+                  </button>
+                </form>
+                {licenseError && (
+                  <p data-cg-license-error="" className="mt-2 text-[12px] text-live">
+                    {licenseError}
+                  </p>
+                )}
+              </div>
+
+              <div className={`${card} order-4`}>
+                <div className={sectionLabel}>Running shows</div>
+                {accountShows.length > 0 ? (
+                  <div className="mt-2 flex flex-col gap-1.5" data-testid="account-shows">
+                    {accountShows.map((show) => (
+                      <button
+                        key={show.id}
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          joinAccountShow(show);
+                        }}
+                        data-testid="account-show-join"
+                        data-cg-account-show={show.id}
+                        className="flex min-h-10 pointer-coarse:min-h-12 w-full items-center justify-between gap-2 rounded-lg border border-border-strong bg-surface px-3 text-left text-[13px] font-medium text-text transition-colors hover:bg-hover"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-ok" />
+                          <span className="truncate">{show.name}</span>
+                        </span>
+                        <span className="shrink-0 text-[12px] text-accent-text">Join</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[12px] text-dim" data-testid="account-shows-empty">
+                    No running shows on this account.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-4 max-md:contents">
+              {currentTier !== 'pro' && (
+                <div data-cg-account-store="" className={`${card} order-2`}>
+                  <div className={sectionLabel}>
+                    {currentTier === 'home' ? 'Upgrade to Pro' : 'Get the ChromaGlass app'}
+                  </div>
+                  {currentTier === 'home' ? (
+                    <div className="mt-2 flex flex-col gap-3">
+                      <p className="text-[12px] leading-relaxed text-muted">
+                        Pay only the difference ($164) to unlock multi-projector edge blend, Syphon/Spout/NDI, Art-Net DMX, OSC &amp; custom band logos on this account.
+                      </p>
+                      <a
+                        href={buildCheckoutUrl(CHECKOUT_UPGRADE_URL, checkoutEmail)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-cg-buy-upgrade=""
+                        className="flex min-h-10 pointer-coarse:min-h-12 items-center justify-between rounded-lg bg-primary px-3.5 text-[14px] font-medium text-on-primary transition-opacity hover:opacity-90"
+                      >
+                        <span>Upgrade Home → Pro</span>
+                        <span className="font-mono text-[12px]">$164</span>
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex flex-col gap-2">
+                      <a
+                        href={buildCheckoutUrl(CHECKOUT_HOME_URL, checkoutEmail)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-cg-buy-home=""
+                        className="flex flex-col rounded-lg border border-border-strong bg-surface p-3 text-left transition-colors hover:bg-hover"
+                      >
+                        <div className="flex items-center justify-between text-[13px] font-medium text-text">
+                          <span>ChromaGlass Home</span>
+                          <span className="text-[12px] text-muted"><span className="font-mono font-medium text-text-2">$35</span> once</span>
+                        </div>
+                        <p className="mt-1 text-[12px] leading-snug text-muted">
+                          System audio capture, ambient TV mode, full-length unmarked recordings, 1080p/4K song renders &amp; phone remote (2 machines).
+                        </p>
+                      </a>
+                      <a
+                        href={buildCheckoutUrl(CHECKOUT_PRO_URL, checkoutEmail)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-cg-buy-pro=""
+                        className="flex flex-col rounded-lg border border-accent-border bg-accent-bg p-3 text-left transition-colors hover:bg-accent/30"
+                      >
+                        <div className="flex items-center justify-between text-[13px] font-medium text-text">
+                          <span>ChromaGlass Pro</span>
+                          <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$199</span> once</span>
+                        </div>
+                        <p className="mt-1 text-[12px] leading-snug text-text-2">
+                          Everything in Home + multi-projector edge blend, Syphon/Spout/NDI video out, Art-Net DMX, OSC &amp; your own band logo.
+                        </p>
+                      </a>
+                    </div>
+                  )}
+                  {checkoutEmail && (
+                    <p className="mt-2 text-[12px] leading-snug text-dim">
+                      Checkout pre-fills <span className="text-text-2">{checkoutEmail}</span> so your key links to this account.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className={`${card} order-5`} data-cg-account-marketing="">
+                {unsubscribedBanner && !marketingOptIn && (
+                  <p className="mb-2 rounded-md border border-ok/30 bg-ok/10 px-2.5 py-1.5 text-[12px] text-ok">
+                    You have been unsubscribed from ChromaGlass marketing &amp; newsletter emails.
+                  </p>
+                )}
+                <label className="flex cursor-pointer items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-medium text-text">Newsletter &amp; product updates</div>
+                    <p className="mt-0.5 text-[12px] leading-snug text-muted">
+                      Occasional emails about new looks, fluid engine updates &amp; release notes. Unsubscribe anytime.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    data-cg-marketing-toggle=""
+                    checked={marketingOptIn}
+                    onChange={(e) => void handleToggleMarketing(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-strong bg-bg accent-accent"
+                  />
+                </label>
+              </div>
             </div>
           </div>
-          <span
-            data-cg-license-tier={currentTier}
-            className="shrink-0 rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-200"
-          >
-            {tierLabel}
-          </span>
-        </div>
 
-        {onOpenSettings && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            data-cg-account-settings=""
-            className="mt-3 flex min-h-[38px] w-full items-center justify-between rounded-xl border border-white/15 bg-white/[0.05] px-3.5 py-2 text-xs font-medium text-neutral-100 transition hover:bg-white/10"
-          >
-            <span>Studio &amp; Stage Settings</span>
-            <span className="text-neutral-400">Open →</span>
-          </button>
-        )}
-
-        {currentTier !== 'pro' && (
-          <div
-            data-cg-account-store=""
-            className="mt-4 rounded-xl border border-amber-400/25 bg-amber-500/[0.06] p-3"
-          >
-            <div className="text-xs font-semibold uppercase tracking-wider text-amber-200">
-              {currentTier === 'home' ? 'Upgrade to Pro' : 'Get the ChromaGlass App'}
-            </div>
-            {currentTier === 'home' ? (
-              <div className="mt-2 flex flex-col gap-2">
-                <p className="text-xs leading-relaxed text-neutral-300">
-                  Pay only the difference ($164) to unlock multi-projector edge blend, Syphon/Spout/NDI, Art-Net DMX, OSC &amp; custom band logos on this account.
+          <div className="mt-4 flex flex-col gap-2.5">
+            {signedOut ? (
+              <div data-cg-signin="" className={`${card} text-center`}>
+                <p className="text-[13px] text-text-2">
+                  Signed out on this browser. The plate and show stay running; the next load will ask to sign in.
                 </p>
-                <a
-                  href={buildCheckoutUrl(CHECKOUT_UPGRADE_URL, checkoutEmail)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-cg-buy-upgrade=""
-                  className="flex min-h-[38px] items-center justify-between rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-neutral-950 transition hover:bg-amber-400"
-                >
-                  <span>Upgrade Home → Pro</span>
-                  <span>$164</span>
-                </a>
+                <button type="button" onClick={onClose} className={`${ghostBtn} mt-3 w-full`}>
+                  Return to show
+                </button>
+              </div>
+            ) : confirmMode === 'signout' ? (
+              <div className="rounded-lg border border-border-strong bg-elevated p-3">
+                <p className="mb-2 text-[13px] text-text-2">Sign out of ChromaGlass on this device?</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    data-cg-account-signout-confirm=""
+                    disabled={busy}
+                    onClick={handleConfirmSignOut}
+                    className="min-h-10 pointer-coarse:min-h-12 flex-1 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary hover:opacity-90 disabled:opacity-50"
+                  >
+                    Confirm sign out
+                  </button>
+                  <button type="button" disabled={busy} onClick={() => setConfirmMode('none')} className={ghostBtn}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : confirmMode === 'delete' ? (
+              <div className="rounded-lg border border-live-border bg-live-bg p-3">
+                <p className="mb-2 text-[13px] text-live">
+                  Permanently delete your ChromaGlass account? This cannot be undone.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    data-cg-account-delete-confirm=""
+                    disabled={busy}
+                    onClick={handleConfirmDelete}
+                    className="min-h-10 pointer-coarse:min-h-12 flex-1 rounded-lg bg-live px-3 text-[13px] font-medium text-on-primary hover:opacity-90 disabled:opacity-50"
+                  >
+                    Confirm delete account
+                  </button>
+                  <button type="button" disabled={busy} onClick={() => setConfirmMode('none')} className={ghostBtn}>
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="mt-2 flex flex-col gap-2">
-                <a
-                  href={buildCheckoutUrl(CHECKOUT_HOME_URL, checkoutEmail)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-cg-buy-home=""
-                  className="flex flex-col rounded-lg border border-white/15 bg-black/40 p-2.5 text-left transition hover:border-amber-400/50 hover:bg-black/60"
-                >
-                  <div className="flex items-center justify-between text-xs font-semibold text-neutral-100">
-                    <span>ChromaGlass Home</span>
-                    <span className="rounded bg-amber-500/20 px-2 py-0.5 text-amber-200">$35 · once</span>
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-neutral-400">
-                    System audio capture, ambient TV mode, full-length unmarked recordings, 1080p/4K song renders &amp; phone remote (2 machines).
-                  </p>
-                </a>
-                <a
-                  href={buildCheckoutUrl(CHECKOUT_PRO_URL, checkoutEmail)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-cg-buy-pro=""
-                  className="flex flex-col rounded-lg border border-amber-400/30 bg-black/50 p-2.5 text-left transition hover:border-amber-400/70 hover:bg-black/70"
-                >
-                  <div className="flex items-center justify-between text-xs font-semibold text-amber-200">
-                    <span>ChromaGlass Pro</span>
-                    <span className="rounded bg-amber-500 px-2 py-0.5 text-neutral-950">$199 · once</span>
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-neutral-300">
-                    Everything in Home + multi-projector edge blend, Syphon/Spout/NDI video out, Art-Net DMX, OSC &amp; your own band logo.
-                  </p>
-                </a>
-              </div>
-            )}
-            {checkoutEmail && (
-              <p className="mt-2 text-[11px] text-neutral-400">
-                Checkout pre-fills <span className="text-neutral-200">{checkoutEmail}</span> so your key links to this account automatically.
-              </p>
-            )}
-          </div>
-        )}
-
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-neutral-400">License Key</span>
-            {licenseInfo.valid && (
-              <button
-                type="button"
-                data-cg-license-deactivate=""
-                disabled={licenseBusy}
-                onClick={handleDeactivateKey}
-                className="text-[11px] text-neutral-400 underline hover:text-neutral-200"
-              >
-                Deactivate machine
-              </button>
-            )}
-          </div>
-          <form onSubmit={handleActivateKey} className="mt-2 flex gap-1.5">
-            <input
-              type="text"
-              data-cg-license-input=""
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              placeholder={
-                licenseInfo.valid
-                  ? `Active (${licenseInfo.tier.toUpperCase()}) — paste key to upgrade`
-                  : 'Paste license key (cg1...)'
-              }
-              aria-label="License key"
-              className="min-h-[36px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-neutral-100 placeholder-neutral-500 focus:border-amber-400/60 focus:outline-none"
-            />
-            <button
-              type="submit"
-              data-cg-license-activate=""
-              disabled={licenseBusy || !keyInput.trim()}
-              className="min-h-[36px] shrink-0 rounded-lg bg-amber-500/90 px-3 py-1.5 text-xs font-medium text-neutral-950 transition hover:bg-amber-400 disabled:opacity-40"
-            >
-              {licenseInfo.valid ? 'Upgrade' : 'Activate'}
-            </button>
-          </form>
-          {licenseError && (
-            <p
-              data-cg-license-error=""
-              className="mt-1.5 text-xs text-red-300"
-            >
-              {licenseError}
-            </p>
-          )}
-        </div>
-
-        <div className="mt-4">
-          <div className="text-xs uppercase tracking-wider text-neutral-500">Running shows</div>
-          {accountShows.length > 0 ? (
-            <div className="mt-2 flex flex-col gap-1.5" data-testid="account-shows">
-              {accountShows.map((show) => (
-                <button
-                  key={show.id}
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    joinAccountShow(show);
-                  }}
-                  data-testid="account-show-join"
-                  data-cg-account-show={show.id}
-                  className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-left text-sm font-medium text-neutral-100 transition hover:bg-white/15"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-                    <span className="truncate">{show.name}</span>
-                  </span>
-                  <span className="shrink-0 text-xs font-medium text-amber-300">Join</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-neutral-500" data-testid="account-shows-empty">
-              No running shows on this account.
-            </p>
-          )}
-        </div>
-
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3" data-cg-account-marketing="">
-          {unsubscribedBanner && !marketingOptIn && (
-            <p className="mb-2 rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-2.5 py-1.5 text-xs text-emerald-200">
-              You have been unsubscribed from ChromaGlass marketing &amp; newsletter emails.
-            </p>
-          )}
-          <label className="flex cursor-pointer items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs font-medium text-neutral-100">Newsletter &amp; product updates</div>
-              <p className="mt-0.5 text-[11px] leading-snug text-neutral-400">
-                Occasional emails about new looks, fluid engine updates &amp; release notes. Unsubscribe anytime.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              data-cg-marketing-toggle=""
-              checked={marketingOptIn}
-              onChange={(e) => void handleToggleMarketing(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/30 bg-black accent-amber-500"
-            />
-          </label>
-        </div>
-
-        <div className="mt-5 flex flex-col gap-2.5">
-          {signedOut ? (
-            <div
-              data-cg-signin=""
-              className="rounded-xl border border-white/15 bg-white/[0.04] p-3.5 text-center"
-            >
-              <p className="text-xs text-neutral-200">
-                Signed out on this browser. The plate and show stay running; the next load will ask to sign in.
-              </p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="mt-2.5 min-h-[40px] w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-neutral-100 hover:bg-white/15"
-              >
-                Return to show
-              </button>
-            </div>
-          ) : (
-            <>
-              {confirmMode !== 'signout' ? (
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   data-cg-account-signout=""
@@ -470,38 +525,10 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
                     setConfirmMode('signout');
                     setError(null);
                   }}
-                  className="min-h-[44px] w-full rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15"
+                  className={ghostBtn}
                 >
                   Sign out
                 </button>
-              ) : (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 p-3">
-                  <p className="mb-2 text-xs text-amber-200">
-                    Sign out of ChromaGlass on this device?
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      data-cg-account-signout-confirm=""
-                      disabled={busy}
-                      onClick={handleConfirmSignOut}
-                      className="min-h-[40px] flex-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-neutral-950 hover:bg-amber-400 disabled:opacity-50"
-                    >
-                      Confirm sign out
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setConfirmMode('none')}
-                      className="min-h-[40px] rounded-lg border border-white/15 px-3 py-2 text-xs text-neutral-300 hover:bg-white/10"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {confirmMode !== 'delete' ? (
                 <button
                   type="button"
                   data-cg-account-delete=""
@@ -510,84 +537,40 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
                     setConfirmMode('delete');
                     setError(null);
                   }}
-                  className="min-h-[44px] w-full rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-2.5 text-sm font-medium text-red-200 transition hover:bg-red-950/50"
+                  className="flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-live-border px-3 text-[13px] font-medium text-live transition-colors hover:bg-live-bg disabled:opacity-50"
                 >
                   Delete account
                 </button>
-              ) : (
-                <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-3">
-                  <p className="mb-2 text-xs text-red-200">
-                    Permanently delete your ChromaGlass account? This cannot be undone.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      data-cg-account-delete-confirm=""
-                      disabled={busy}
-                      onClick={handleConfirmDelete}
-                      className="min-h-[40px] flex-1 rounded-lg bg-red-500 px-3 py-2 text-xs font-semibold text-neutral-950 hover:bg-red-400 disabled:opacity-50"
-                    >
-                      Confirm delete account
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setConfirmMode('none')}
-                      className="min-h-[40px] rounded-lg border border-white/15 px-3 py-2 text-xs text-neutral-300 hover:bg-white/10"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
+              </div>
+            )}
+            {error && (
+              <p className="rounded-lg border border-live-border bg-live-bg px-3 py-2 text-[12px] text-live">{error}</p>
+            )}
+          </div>
         </div>
 
-        {error && (
-          <p className="mt-3 rounded-lg border border-red-500/30 bg-red-950/50 px-3 py-2 text-xs text-red-200">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-5 border-t border-white/10 pt-3 text-center">
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-neutral-400">
+        <div className="shrink-0 border-t border-border px-4 py-3 text-center pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[12px] text-muted">
             <a
               href="https://chromaglass.lemonsqueezy.com/billing"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
+              className="underline decoration-faint underline-offset-2 hover:text-text"
             >
               Orders &amp; Invoices
             </a>
-            <span>·</span>
-            <a
-              href="mailto:support@chromaglass.art"
-              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-            >
+            <a href="mailto:support@chromaglass.art" className="underline decoration-faint underline-offset-2 hover:text-text">
               Support
             </a>
-            <span>·</span>
-            <a
-              href="/privacy.html"
-              target="_blank"
-              rel="noopener"
-              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-            >
+            <a href="/privacy.html" target="_blank" rel="noopener" className="underline decoration-faint underline-offset-2 hover:text-text">
               Privacy
             </a>
-            <span>·</span>
-            <a
-              href="/terms.html"
-              target="_blank"
-              rel="noopener"
-              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-            >
+            <a href="/terms.html" target="_blank" rel="noopener" className="underline decoration-faint underline-offset-2 hover:text-text">
               Terms
             </a>
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-neutral-500">
-            Home &amp; Pro are one-time purchases (no recurring subscription). Marketing emails are strictly opt-in and can be turned off above or at <span className="text-neutral-400">/unsubscribe</span>.
+          <p className="mt-1.5 text-[11px] leading-snug text-dim">
+            Home &amp; Pro are one-time purchases, no subscription. Marketing emails are opt-in; turn them off above or at <span className="text-muted">/unsubscribe</span>.
           </p>
         </div>
       </div>

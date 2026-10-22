@@ -530,13 +530,13 @@ export function Desk(p: DeskProps) {
               type="button"
               data-cg-account-open=""
               onClick={p.onOpenAccount}
-              className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-2.5 font-sans text-[11px] font-semibold text-amber-100 transition-colors hover:border-amber-400/70 hover:bg-amber-500/25"
+              className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
               title="Profile, Settings & Store"
               aria-label="Account"
             >
-              <User size={12} className="shrink-0 text-amber-300" />
+              <User size={12} className="shrink-0 text-muted" />
               <span>Profile &amp; Store</span>
-              <span className="rounded bg-amber-500/25 px-1 py-px font-mono text-[9px] uppercase tracking-wider text-amber-200">
+              <span className="rounded-sm bg-accent-bg px-1 py-px font-mono text-[9px] uppercase tracking-wider text-accent-text">
                 {getEffectiveTier()}
               </span>
             </button>
