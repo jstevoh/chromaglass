@@ -63,7 +63,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, kickPress, kickDepth, BassPress, bassPressFor, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
@@ -8504,7 +8504,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // the density route gated this whole block, so setting density to
               // "none" silenced every reaction to the music, bursts included.
               const velRoute = currentSettings.audioMappings.velocity as AudioFeatureKey;
-              const velRaw = getAudioValue(currentAudioData, velRoute);
+              /*
+                Bass Boost (squish.ts, `bassBoostGain`, PLAN 27g): the reading
+                carries the slider as a multiplier, which pins every hand that
+                reads it at its ceiling (and getAudioValue clips it at 100), so
+                the hands take it back off the bass and lay it as a gain on the
+                force instead. 1 at the default, and on a route that is not
+                the bass.
+              */
+              const boostGain = bassBoostGain(currentSettings.bassBoost);
+              const bassGain = velRoute === 'bass' ? boostGain : 1;
+              const velRaw = velRoute === 'bass' ? bassRouteValue(currentAudioData.bass, boostGain) : getAudioValue(currentAudioData, velRoute);
               // Same scale as bass01 below (feature / 70) so the default route,
               // bass, behaves exactly as before; energy is already 0–1.
               const vel01 = velRoute === 'energy' ? velRaw : Math.min(1, velRaw * (100 / 70));
@@ -8639,14 +8649,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bassPressAt = {
                     x: bassX, y: bassY,
                     r: Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
-                    depth: bassPressFor(velRaw, velRoute === 'energy', currentSettings.audioImpact ?? 0.45, currentAudioData.passage),
+                    depth: bassPressFor(velRaw, velRoute === 'energy', currentSettings.audioImpact ?? 0.45, currentAudioData.passage, bassGain),
                   };
                   // A hit on the velocity route: radial burst — scales with impact + auto mode (the old plate's)
                   if (vel01 > 0.25 && !activeFluid.thinGap) {
                     // In an area, no wider than the area: the push is that well's, not the plate's.
                     const burstR = Math.round(Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity,
                       18 * GRID_SCALE * Math.max(0.4, impactMul)));
-                    const bassStr = (vel01 - 0.25) * autoAmp;
+                    const bassStr = (vel01 - 0.25) * autoAmp * bassGain;
                     for (let bj = -burstR; bj <= burstR; bj += 3) {
                       for (let bi = -burstR; bi <= burstR; bi += 3) {
                         const dist = Math.sqrt(bi * bi + bj * bj);
@@ -8707,11 +8717,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const rx2 = Math.floor(bx0 + Math.cos(a) * rad);
                       const ry2 = Math.floor(by0 + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * (0.33 + 1.17 * DICE.music.float()) * autoAmp * pourDt * bloomGain;
+                        const dropStr = bass01 * boostGain * (0.33 + 1.17 * DICE.music.float()) * autoAmp * pourDt * bloomGain;
                         if (dropStr > 0.001) activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
                         // Outward from the burst's own centre, with a wide swirl and a speed of its own
                         const swirl = 0.9 * (DICE.music.float() - 0.5);
-                        const speed = (0.1 + 0.3 * DICE.music.float()) * bass01 * bloomGain;
+                        const speed = (0.1 + 0.3 * DICE.music.float()) * bass01 * boostGain * bloomGain;
                         activeFluid.addVelocity(rx2, ry2, (Math.cos(a) - Math.sin(a) * swirl) * speed, (Math.sin(a) + Math.cos(a) * swirl) * speed);
                       }
                     }
