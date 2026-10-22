@@ -759,6 +759,14 @@ jobs:
       - name: The input picker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run inputpick
+      # The app opens with the sound Source on Off (scripts/opensource.mjs,
+      # PLAN.md 14y): on the desk and the phone, on three looks, a click starts
+      # no sound and opens no device, the Band when chosen is kept through a
+      # reload of the tab, and a new tab opens on Off again. The sound the show
+      # hears and the controls' state, not the plate, so no GPU; on the same dist/.
+      - name: The Source opens on Off
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run opensource
 
       # Following a known song by ear (PLAN.md 28g-2): the app's own band
       # playing, its map made from its score, and the Perform desk's status

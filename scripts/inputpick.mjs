@@ -67,7 +67,7 @@ try {
   page.setDefaultTimeout(30_000);
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.addInitScript(() => {
-    localStorage.setItem('chromaglass-audio-source', 'microphone');
+    sessionStorage.setItem('chromaglass-audio-source', 'microphone');
     localStorage.setItem('chromaglass-desk-mode', 'perform');
     // Every ask and every stream it was answered with, in order.
     window.__asks = [];

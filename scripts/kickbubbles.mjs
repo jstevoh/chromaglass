@@ -120,8 +120,11 @@ try {
     });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-    // A browser that has never chosen a source, so the first gesture starts
-    // the band, exactly as on a first visit. Nothing about the sound is written.
+    // The band is chosen as a reload keeps it (PLAN.md 14y: a fresh browser opens
+    // on Source Off, so without this nothing would play), but the browser holds
+    // its audio until the first gesture, so the first click below is still the
+    // moment the band starts.
+    await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&play=0${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.chromaglassSettings === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
     await page.waitForTimeout(6000);
@@ -142,7 +145,7 @@ try {
     const where = c.screen.touch ? 'the phone layout' : "the laptop's layout, not the phone's";
     check(`${c.name}: the page is ${where}`, c.screen.touch ? after.phone : !after.phone, after.phone ? 'phone-stage present' : 'no phone-stage');
     check(`${c.name}: the first ${c.screen.touch ? 'tap' : 'click'} starts the band and its kicks reach the bubbles' decision`,
-      !before.band && !!after.band && chances >= CHANCE_FLOOR,
+      !(before.band?.kicks > 0) && !!after.band && chances >= CHANCE_FLOOR,
       `the band ${after.band ? `played ${after.band.kicks} kicks` : 'never started'}, ${kicks} reached the plate, ${chances} the bubbles with room (at least ${CHANCE_FLOOR})`);
     check(`${c.name}: the plate ran with Bubbles full and the Audio Impact asked for`,
       m1.amount === 1 && (c.impact === null ? m1.impact >= 0.45 && m1.drive === 1 : m1.impact === c.impact),

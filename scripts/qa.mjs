@@ -440,16 +440,21 @@ try {
   check('the page has a title', !!title && title.length > 0, title);
 
   // ── The first five seconds ────────────────────────────────────────
-  // A stranger's first visit has to *show* what this is, and what this is is a
-  // light show played by music. It used to land on a plate with nothing
-  // driving it until the visitor found a button. The band is silent and opens
-  // no device, so it costs a permission prompt of nothing — but the browser
-  // will not run audio before a gesture, so the earliest it can start is the
-  // first click anywhere, which is what this checks.
+  // The app opens with the sound Source on Off (PLAN.md 14y, the owner's word
+  // 2026-10-22): a click anywhere used to start the band for a first visit, and
+  // that is what a stranger no longer gets. This asks that the click chooses
+  // nothing, then chooses the band the way a hand does, by its button, so every
+  // check below still meets a plate played by the band. The browser will not run
+  // audio before a gesture, so the click is also what lets the analyser open.
   {
     const heard = () => page.evaluate(() => window.chromaglassCastState?.().audio?.volume ?? null);
     check('nothing is listening before the first gesture', (await heard()) === null);
     await page.mouse.click(5, 5);
+    await settle(3000);
+    check('and a click anywhere does not start the band: the Source opens on Off',
+      (await heard()) === null,
+      `volume ${await heard()}`);
+    await clickOn(firstVisible('simulated-audio-button'));
     // The analyser has to open and the room calibration has to learn a floor
     // before a level means anything, which takes seconds by design (and more
     // of them under software rasterisation). This waits for a reading rather
@@ -459,7 +464,7 @@ try {
       await settle(1000);
       playing = await heard();
     }
-    check('a first visit is driven by the band after one click',
+    check('the band button then drives the show',
       playing > 0,
       playing === null ? 'no audio reaching the show at all' : `volume ${Number(playing).toFixed(1)}`);
     check('and it still opened no device to do it',
@@ -979,8 +984,8 @@ try {
   await page.keyboard.press('Escape');
   await settle(500);
   //
-  // The band is already playing by now — a first visit starts it on the first
-  // gesture — so this checks the button *toggles*, which is the thing that can
+  // The band is already playing by now — the first-five-seconds block above chose
+  // it — so this checks the button *toggles*, which is the thing that can
   // break, rather than assuming it starts from off. Clicking it once must stop
   // the band, and clicking it again must start it, and neither may open a
   // device.

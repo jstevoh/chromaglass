@@ -126,7 +126,7 @@ try {
     if (!pg.band) {
       // A chosen silence, so the page's first click starts no band (scripts/mirror.mjs).
       await page.addInitScript(() => {
-        try { localStorage.setItem('chromaglass-audio-source', 'none'); } catch { /* none */ }
+        try { sessionStorage.setItem('chromaglass-audio-source', 'none'); } catch { /* none */ }
       });
     }
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });

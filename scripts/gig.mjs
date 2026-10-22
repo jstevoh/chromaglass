@@ -160,7 +160,7 @@ try {
     ...(FILM ? { recordVideo: { dir: FILM_DIR, size: { width: 1060, height: 700 } } } : {}) });
   filmed = page.video();
   filmT0 = Date.now();
-  await page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
+  await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
   await installFrameReader(page);
   await page.goto(`http://localhost:${port}/?debug&gpu=mid&tier=local&look=${LOOK}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
