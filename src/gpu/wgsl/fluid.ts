@@ -4199,8 +4199,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     The slosh (PLAN 18a-13) laid over the flow the dye rides.
 
     `scaleDye`'s copy of the thin gap's velocity, plus the dish's own: a
-    64 by 64 grid of velocities in plate widths a second (lib/slosh.ts,
-    its `field`) read by uv, bilinear, and turned into this solver's own
+    64 by 64 grid of velocities in plate widths a second (the GPU dish's
+    flow, gpu/slosh.ts) read by uv, bilinear, and turned into this solver's own
     unit by the scale in A.a.w (the step's seconds over the step's
     displacement, as the swirl's is). It is added here, after the solve and
     before the dye rides it, and not as a force in front of it, because the
@@ -4213,11 +4213,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${BILERP_N}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var slosh: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(4) var mixT: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let v = textureLoad(src, vec2i(id.xy), 0);
-  let s = bilerpN(slosh, uvOf(id), A.a.z).xy * A.a.w;
+  // The dish's two layers (lib/slosh.ts): the water's flow in xy, the oil's in zw. Where the plate holds oil (the mix's
+  // red, A.a.y on), that share of the cell rides the oil's: an oil body slides over the water as the raft it is.
+  let f = bilerpN(slosh, uvOf(id), A.a.z);
+  let c = select(0.0, clamp(textureLoad(mixT, vec2i(id.xy), 0).r, 0.0, 1.0), A.a.y > 0.5);
+  let s = mix(f.xy, f.zw, c) * A.a.w;
   textureStore(dst, vec2i(id.xy), vec4f(v.xy + s, v.zw));
 }`,
 

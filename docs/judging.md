@@ -1480,3 +1480,22 @@ and distances, some small and some large, not an even wreath round one circle. K
 (Show section; remote; MIDI) at 0 should stop it entirely and Beat Squeeze 0 and Plate Rock
 unchanged should leave only the tilt; at 1 it should be as much dye as before, at 1.5 more.
 Check that the burst reads as the kick, not as the plate being pressed.
+
+## 62. Oil sloshes on water, and bores (PLAN 18a-13a, 13d)
+
+The slosh dish is two layers now, oil lenses riding on water, solved on the GPU with a
+Riemann flux, so a hard tip makes a running jump (a bore) instead of a smooth slope. The
+numbers are in `docs/plan-shipped.md` §18a-13a (`npm run slosh`, `sloshgpu`); the Metal run
+is the plate shard. On a real GPU:
+- On a look with oil on the plate, raise Slosh to about half and tip one way,
+  then the other. The water should run ahead and the oil lag behind it and shear past it:
+  two speeds, not one sheet. Say whether the oil reads as floating.
+- Lower Thickness to about 0.2 and tip hard and fast: the first wave should steepen into a
+  sharp front that runs to the rim and back. Say whether it reads as a wave or as a jolt.
+- Bass Drop with music: its Beat Squeeze should now send a ring out from each kick that runs
+  to the rim and back, and its Plate Rock should slosh the whole dish, a little (Frame Sway
+  0.35). Say whether the whole-dish slosh is too much (the frame-motion rule).
+- Any other look (Frame Sway 0) with Plate Rock up: the rock should tip the dye as it did,
+  and not slosh the whole dish.
+- With Slosh at 0, Plate Rock at 0 and Beat Squeeze at 0, the plate should look exactly as
+  before.
