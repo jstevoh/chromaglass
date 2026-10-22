@@ -7543,11 +7543,18 @@ a grid of generic stock thumbnails: ours are the plate itself.
   "Play free" opens the sign-in over it; a returning visit, `?remote`, `?cast`, the iPhone app,
   a desktop launch and a visit part way through a redirect or an emailed link never see it.
   `npm run signin` holds it (3a, 3, 6, 7, 10, 11b).
-- **34a-2. A filmed hero, from a Mac.** *(S; owner's Mac.)* The hero is a cross-fade of five of
+- **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
+  video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
   the app's own frames, because a cloud session cannot film the app and the lab's plate barely
   moves in a hero's seconds. A 10 to 15 second loop of the real show (`npm run film` records
   through `scripts/recorder.mjs`), 1280 wide, under 1.5 MB as WebM and MP4, would replace it: the
-  page then loads it after its first paint and keeps the stills for reduced motion. *Measure:*
+  page then loads it after its first paint and keeps the stills for reduced motion. The loop is
+  filmed with the track it was filmed to (the recorder takes the audio, and the show's own music in
+  `public/music` is ours to use), and a browser will not start sound on its own: the video starts
+  muted, and a "Sound on" button (and a tap on the video) unmutes it, with the sound off again when
+  the visitor leaves for the sign-in. More than one clip (a ferrofluid, a dye pour, a close macro)
+  would be the "video examples" row under the hero, each its own filmed look with its sound.
+  *Measure:*
   the loop's first and last frames differ by less than a frame of motion; `npm run signin` 3a still
   true with the plate not up.
 - **34a-3. Sharper looks in the grid.** *(S.)* The cards are 480 × 300 frames from the preset
