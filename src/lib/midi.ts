@@ -396,7 +396,12 @@ export const valueAt = (t: number, min: number, max: number, curve = 1): number 
  */
 export const handValueAt = (t: number, min: number, max: number, curve: number): number => {
   const v = valueAt(t, min, max, curve);
-  return v === 0 ? 0 : Number(v.toPrecision(3));
+  // Three figures of the distance from the bottom, so a range that starts above
+  // 0 (Macro Zoom, 1 to 16) is as smooth at its bottom as Speed is at 0: three
+  // figures of 1.0049 are 1.00, which is a notch of 0.01 and a knob that sits
+  // at 0 or 2.6% of the travel and nowhere between (`npm run rungs`).
+  const d = v - min;
+  return d === 0 ? min : min + Number(d.toPrecision(3));
 };
 
 /** The inverse: where a value sits on the control, 0..1. */
@@ -504,7 +509,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
-  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16 },
+  // Squared, so the slider's travel is spent where the closeup is: 1x to 8x is
+  // the first two thirds of it (the solver's grid has little left to show past
+  // 8x), where it was the first 47% and 1x to 4x the first fifth. The stored
+  // zoom is unchanged. PLAN 27d.
+  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
   { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 1 },
   { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 10 },

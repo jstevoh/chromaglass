@@ -6361,6 +6361,25 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     on (a gel wheel, a second plate, a camera, the ferrofluid); the sweep sorts gated
     from dead, then fixes, folds or retires each with saved looks, set lists, MIDI and
     the remote migrated.
+  - **Camera controls (shipped, "Camera controls feel weak", `npm run camerahand`).** The
+    owner, 2026-10-22: "the camera controls don't really do much." The closeup's, measured
+    with the real `MacroCamera`: Chase Speed in Hold took 0.37 s to 0.18 s to cover nine
+    tenths of an aim jump (a twofold throw, and Macro Chase read nothing on the Mac's `all`
+    shard), and in Follow it is a no-op by design (the lead cancels the lag); Macro Zoom's
+    slider was linear over 1x to 16x, so 1x to 4x was a fifth of it and the soft 8x to 16x
+    half (edge detail 6.4 at 6x, 1.9 at 12x, 1.2 at 16x in the lab); Music Sync did nothing
+    in Hold and Follow at Frame Sway 0 and said nothing; the only pan was Alt-drag. Now:
+    Chase is Hold's weight, 3 s at 0, 0.27 s at the default 0.4 (unchanged), 0.05 s at 1;
+    Macro Zoom has a squared curve in `LEARNABLE_SETTINGS` (desk, phone, remote, MIDI all
+    bend alike; stored zooms unchanged); the arrow keys pan by the frame; Music Sync is
+    greyed with its reason; the remote has Chase Speed. No sound moves the frame (Frame
+    Sway stays 0). Open: **27d-c1** the aim sliders' outer ends are clamp (at 4x 8% each
+    side does nothing); **27d-c2** Follow's Chase has no visible effect, so it wants a
+    different meaning or a fold into Hold's; **27d-c3** the Lens section (Camera in
+    Settings: Lens, Focus, Aperture, Bloom, Chromatic Aberration, Refraction) is off by
+    default, gated on Lens, and each moves only 1 to 5 px at 1440 wide by the shader's
+    arithmetic: it needs a Mac measurement before a fix (the camera pass cannot be
+    photographed in a cloud session).
   - Heat is not carried on a thin gap (the velocity's self-advection is gone and vel.z
     rides with it), so Buoyancy, Heat Decay and Double Diffusion are weaker than their
     dials say.
