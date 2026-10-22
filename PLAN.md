@@ -3455,9 +3455,11 @@ Mic or Band pick came back on every launch from `localStorage`.
   tab, and a new tab opens on Off again. Before: a fresh page's first click started the
   band; a remembered Mic reopened on launch.
 - **Check changes:** `qa`'s "a first visit is driven by the band after one click" now
-  asks that the click starts nothing, and the band is then chosen with its button; the
-  harnesses that played the band from the first click (`gallery`, `pixels`, `shots`,
-  `swirlcost`, `kickbubbles`) and the sixteen that set the remembered source write it to
+  asks that the click starts nothing, and the band is then chosen with its button;
+  `kickbubbles` chooses the band by the Sound control after its dials are set (a band
+  started at load would play before Audio Impact 0 is held, and the Mac runner's Chromium
+  plays without a gesture); `gallery`, `pixels`, `shots`, `swirlcost`, `ferrodrift`'s band
+  pages and the sixteen harnesses that set the remembered source write it to
   `sessionStorage` now.
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if

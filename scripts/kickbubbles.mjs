@@ -120,11 +120,6 @@ try {
     });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-    // The band is chosen as a reload keeps it (PLAN.md 14y: a fresh browser opens
-    // on Source Off, so without this nothing would play), but the browser holds
-    // its audio until the first gesture, so the first click below is still the
-    // moment the band starts.
-    await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&play=0${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.chromaglassSettings === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
     await page.waitForTimeout(6000);
@@ -133,6 +128,19 @@ try {
     const before = await read(page);
     const plate = await page.locator('canvas').first().boundingBox();
     const at = plate ? { x: plate.x + plate.width / 2, y: plate.y + plate.height / 2 } : { x: c.screen.viewport.width / 2, y: c.screen.viewport.height / 3 };
+    // The app opens on Source Off (PLAN.md 14y), so the band is chosen the way a
+    // hand does, by its control, after the dials above are set and before the
+    // click on the plate: what is counted still begins with the band.
+    if (c.screen.touch) {
+      await page.getByTestId('phone-open-sound').first().tap();
+      await page.getByTestId('phone-sound-band').first().tap();
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+    } else {
+      await page.getByTestId('dot-sound').click();
+      await page.getByTestId('audio-source-simulated').click();
+      await page.keyboard.press('Escape');
+    }
+    await page.waitForTimeout(500);
     if (c.screen.touch) await page.touchscreen.tap(at.x, at.y);
     else await page.mouse.click(at.x, at.y);
     await page.waitForTimeout(c.listenMs ?? LISTEN_MS);
@@ -145,7 +153,7 @@ try {
     const where = c.screen.touch ? 'the phone layout' : "the laptop's layout, not the phone's";
     check(`${c.name}: the page is ${where}`, c.screen.touch ? after.phone : !after.phone, after.phone ? 'phone-stage present' : 'no phone-stage');
     check(`${c.name}: the first ${c.screen.touch ? 'tap' : 'click'} starts the band and its kicks reach the bubbles' decision`,
-      !(before.band?.kicks > 0) && !!after.band && chances >= CHANCE_FLOOR,
+      !before.band && !!after.band && chances >= CHANCE_FLOOR,
       `the band ${after.band ? `played ${after.band.kicks} kicks` : 'never started'}, ${kicks} reached the plate, ${chances} the bubbles with room (at least ${CHANCE_FLOOR})`);
     check(`${c.name}: the plate ran with Bubbles full and the Audio Impact asked for`,
       m1.amount === 1 && (c.impact === null ? m1.impact >= 0.45 && m1.drive === 1 : m1.impact === c.impact),
