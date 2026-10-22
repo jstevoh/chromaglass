@@ -256,7 +256,7 @@ const STEP = /* wgsl */ `${HEAD}${SCHEME}
   if (S.a.w > 1.5) {
     let wb = textureLoad(Wb, vec2i(i, j), 0);
     let ob = textureLoad(Ob, vec2i(i, j), 0);
-    W = vec4f(W.xyz, 0.0);
+    W = vec4f(0.5 * wb.xyz + 0.5 * W.xyz, 0.0);
     O = vec4f(0.5 * ob.xy + 0.5 * O.xy, o.z, 0.0);
   }
   if (S.c.y + W.x < 0.0) { W.x = -S.c.y; }
