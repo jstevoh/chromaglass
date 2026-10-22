@@ -457,9 +457,9 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
         double-click puts each back at 1, untouched.
       */}
       <div className="mb-3 flex gap-3" data-testid="output-grade">
-        <Knob label="Output gain" value={output.gain} min={0.2} max={3} step={0.05} display={`${output.gain.toFixed(2)}×`}
+        <Knob label="Output gain" help="Overall brightness of what goes to the projector. One leaves the picture as drawn." value={output.gain} min={0.2} max={3} step={0.05} display={`${output.gain.toFixed(2)}×`}
           onChange={v => set({ gain: v })} resetTo={1} size={56} testId="output-gain" />
-        <Knob label="Gamma" value={output.gamma} min={0.5} max={2.5} step={0.05} display={output.gamma.toFixed(2)}
+        <Knob label="Gamma" help="Bends the middle tones for the room and the projector. Higher deepens the shadows and mid tones, lower lifts them." value={output.gamma} min={0.5} max={2.5} step={0.05} display={output.gamma.toFixed(2)}
           onChange={v => set({ gamma: v })} resetTo={1} size={56} testId="output-gamma" />
       </div>
 

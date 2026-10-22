@@ -1206,6 +1206,21 @@ Open from Desk v2, each its own thread (the UI lane):
     purpose (`settingsMap.ts`); the other two are the owner's call if three still reads
     as too thin on a deck.
 
+- ~~**8j** What a knob is called, and what it does~~ (the owner, 2026-10-22: the names
+  on the deck's knobs were cut to the knob's width, and a drag swapped the name for the
+  value under a chip laid over the row above, so a hand could not tell which knob it
+  had). A hover or focus card with the whole name, one plain line on what it does and
+  the live value, drawn into the body so no panel clips it and never over the knob; it
+  stays up through a drag, and the knob keeps its own name while it is turned. One line
+  for each of the 205 controls in `src/lib/controlHelp.ts` (`npm run panel` fails on a
+  pinnable control without one). On the phone there is no hover: the name is the button,
+  dotted underlined, and a tap or a hold opens the same card (`TouchSlider`, the touch
+  `Slider`, a knob's label on a coarse pointer). Checks: `npm run panel`, `npm run
+  layout` (hover, drag, release), `npm run phone` (the tap). Not changed: what any
+  control does.
+  - **8j-1** (S) The remote page (`RemoteControl.tsx`) has its own sliders and no card;
+    its names are whole, but the line would help there too.
+
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
 pick lists). `gallery.yml` already photographs every preset; ship those photographs as

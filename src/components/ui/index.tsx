@@ -3,6 +3,8 @@ import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { useEscape } from '../../hooks/useEscape';
 import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
 import { KNOB_PX, onRing, ringTravel } from '../../lib/knobDrag';
+import { helpFor } from '../../lib/controlHelp';
+import { useControlTip } from './ControlTip';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -307,9 +309,11 @@ export interface SliderProps extends Keyed {
   midiKey?: string | null;
   /** Where a double-click puts it back to: the look's own value (PLAN.md 8c), as a knob does. */
   resetTo?: number;
+  /** What it does, one line. A setting's own line is found by `midiKey`. */
+  help?: string;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -344,10 +348,33 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     ride jumped on every message would be unreadable.
   */
   const hit = useMidiTouch(midiKey ?? null);
+  /*
+    The name is whole on a fader, so the card is only what the name cannot
+    say. On a phone there is no hover: the name is the button, and a tap on
+    it (or a hold, which a touch browser sends as the same click) opens it.
+  */
+  const line = help ?? helpFor(midiKey);
+  const tip = useControlTip({
+    name: label, help: line, value: display,
+    hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
+  });
   return (
-    <div className="mb-5" data-testid={testId} data-midi-hit={hit ? 'true' : undefined}>
+    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} {...tip.bind}>
+      {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <span className="text-[13px] font-medium text-text">{label}</span>
+        {touch && line ? (
+          <button
+            type="button"
+            onClick={tip.toggle}
+            onContextMenu={e => e.preventDefault()}
+            aria-expanded={tip.open}
+            aria-describedby={tip.open ? tip.id : undefined}
+            data-info="name"
+            className="select-none text-left [-webkit-touch-callout:none] text-[13px] font-medium text-text underline decoration-dotted decoration-white/25 underline-offset-4"
+          >{label}</button>
+        ) : (
+          <span className="text-[13px] font-medium text-text">{label}</span>
+        )}
         <span className="flex items-center gap-2">
           {cc != null && (
             <span className={`rounded-xs px-1 font-mono text-[11px] transition-colors duration-[120ms] ${
@@ -470,13 +497,15 @@ export interface KnobProps extends Keyed {
   testId?: string;
   /** 40 on the desk; 56 in Load-in and the Stage sheet. */
   size?: number;
+  /** What it does, one line, for the hover card. A setting's own line is found by `midiKey`. */
+  help?: string;
 }
 
 /** The ring's geometry, from the design (`tokens.css`): 270° of a radius-16 circle. */
 const RING = 2 * Math.PI * 16;          // 100.53
 const SWEEP = RING * 0.75;              // 75.4
 
-export function Knob({ label, value, min, max, step, onChange, display, mapping, resetTo, disabled, midiKey, testId, size = 40 }: KnobProps) {
+export function Knob({ label, value, min, max, step, onChange, display, mapping, resetTo, disabled, midiKey, testId, size = 40, help }: KnobProps) {
   const settingKey = settingKeyOf(midiKey);
   const curve = settingKey ? curveOf(settingKey) : 1;
   const travel = (v: number) => Math.max(0, Math.min(1, curve === 1 ? (v - min) / (max - min || 1) : travelOf(v, min, max, curve)));
@@ -495,6 +524,22 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   const grab = useRef<{ y: number; t: number; id: number; ring: boolean; at: [number, number]; cx: number; cy: number } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const hit = useMidiTouch(midiKey ?? null);
+  /*
+    The name is cut to the knob's width, so the card carries the whole of it
+    and stays up through a drag: the value used to replace the name while a
+    hand was on the knob, and a chip over the row above hid the next one, so
+    a hand could not tell which knob it had.
+  */
+  const tip = useControlTip({
+    name: label,
+    help: help ?? helpFor(midiKey),
+    value: disabled ? 'off' : display,
+    held: !!drag,
+    disabled,
+    hint: drag
+      ? (drag.fine ? 'Fine adjust: a tenth of the travel' : '⌥ held while dragging goes fine')
+      : `Drag up or down, or round the ring. ⌥ for fine${resetTo !== undefined ? '. Double-click for the look\'s value' : ''}`,
+  });
 
   // A wheel turns it a notch. Not passive, so the deck does not scroll as well.
   useEffect(() => {
@@ -512,18 +557,14 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   const steps = step ? Math.round((max - min) / step) : 0;
   return (
     <div
+      ref={el => { tip.anchor.current = el; }}
       className={`relative flex w-[58px] flex-col items-center ${disabled ? 'opacity-40' : ''}`}
-      // The label is cut to the knob's width; the whole name is a hover away.
-      title={label}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       data-knob
+      {...tip.bind}
     >
-      {drag && (
-        <span className="pointer-events-none absolute -top-6 z-10 whitespace-nowrap rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[11px] text-text shadow-[0_1px_3px_rgba(0,0,0,.6)]">
-          {display}{drag.fine ? ' · fine' : ' · ⌥ fine'}
-        </span>
-      )}
+      {tip.card}
       <span className={`group relative block ${hit ? `rounded-full ${MIDI_HIT}` : ''}`} style={{ width: size, height: size }}>
         <svg viewBox="0 0 40 40" width={size} height={size} aria-hidden className="block">
           <circle cx="20" cy="20" r="16" fill="none" strokeWidth="3" strokeLinecap="round"
@@ -551,6 +592,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           ref={inputRef}
           type="range"
           aria-label={label}
+          aria-describedby={tip.open ? tip.id : undefined}
           disabled={disabled}
           min={curve === 1 ? min : 0}
           max={curve === 1 ? max : 1}
@@ -597,13 +639,13 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           className="absolute inset-0 h-full w-full cursor-ns-resize touch-none appearance-none rounded-full opacity-0"
         />
       </span>
-      {drag ? (
-        <span className="mt-1 max-w-full truncate text-[13px] font-medium text-text">{display}</span>
-      ) : (
-        <span className="mt-1 max-w-full truncate text-[11px] font-medium text-text-2" title={label}>{label}</span>
-      )}
+      {/* A finger has no hover: the name is the button there, marked like the phone's sliders. */}
+      <span
+        onClick={tip.toggle}
+        className={`mt-1 max-w-full truncate text-[11px] font-medium [@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4 ${drag ? 'text-text' : 'text-text-2'}`}
+      >{label}</span>
       <span className="max-w-full truncate font-mono text-[10px] leading-tight">
-        <span className="text-dim">{disabled ? 'off' : display}</span>
+        <span className={drag ? 'text-text-2' : 'text-dim'}>{disabled ? 'off' : display}</span>
         {mapping && <span className="text-faint"> {mapping}</span>}
       </span>
     </div>

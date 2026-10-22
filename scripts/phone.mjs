@@ -1157,6 +1157,37 @@ try {
       await page.waitForTimeout(400);
       const reset = await speedText();
       check('Play: a double tap on Speed puts it back to the look\'s own speed', reset === before && after !== before, `${before} → ${after} → ${reset}`);
+      /*
+        8j: a phone has no hover, so the name is the button. A tap on Soap's
+        name opens the card with what it does and the value as printed on
+        the row, inside the screen; a second tap shuts it, and neither
+        counts as half of the double tap that resets the value.
+      */
+      {
+        const row = page.getByTestId('play-slider-soap');
+        const soapText = () => row.locator('span').last().textContent();
+        const soapBefore = await soapText();
+        const readTip = () => page.evaluate(() => {
+          const t = document.querySelector('[data-control-tip]');
+          if (!t) return null;
+          const r = t.getBoundingClientRect();
+          return { name: t.querySelector('[data-tip=name]')?.textContent ?? '', help: t.querySelector('[data-tip=help]')?.textContent ?? '', value: t.querySelector('[data-tip=value]')?.textContent ?? '', inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight };
+        });
+        const nameBtn = row.locator('[data-info="name"]');
+        const nb = await nameBtn.boundingBox();
+        const none = await readTip();
+        await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+        await page.waitForTimeout(250);
+        const tipped = await readTip();
+        check('Play: a tap on a slider\'s name opens a card with what it does and the value, on screen',
+          !none && !!tipped && tipped.name === 'Soap' && tipped.help.length > 20 && tipped.value === soapBefore?.trim() && tipped.inside,
+          tipped ? `"${tipped.help.slice(0, 40)}…", ${tipped.value}, ${tipped.inside ? 'on screen' : 'off screen'}` : 'no card');
+        await shot(page, 'Play-portrait-name-card');
+        await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+        await page.waitForTimeout(250);
+        check('Play: a second tap shuts it, and two taps on a name leave the value alone', !(await readTip()) && (await soapText()) === soapBefore,
+          `${soapBefore} → ${await soapText()}`);
+      }
       // A look from the strip comes in, named on the pill.
       // One that is not up already, or the pill would read right with nothing done.
       const other = page.locator('[data-testid="play-look-tile"][aria-pressed="false"]').nth(1);
