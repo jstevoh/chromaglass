@@ -396,7 +396,12 @@ export const valueAt = (t: number, min: number, max: number, curve = 1): number 
  */
 export const handValueAt = (t: number, min: number, max: number, curve: number): number => {
   const v = valueAt(t, min, max, curve);
-  return v === 0 ? 0 : Number(v.toPrecision(3));
+  // Three figures of the distance from the bottom, so a range that starts above
+  // 0 (Macro Zoom, 1 to 16) is as smooth at its bottom as Speed is at 0: three
+  // figures of 1.0049 are 1.00, which is a notch of 0.01 and a knob that sits
+  // at 0 or 2.6% of the travel and nowhere between (`npm run rungs`).
+  const d = v - min;
+  return d === 0 ? min : min + Number(d.toPrecision(3));
 };
 
 /** The inverse: where a value sits on the control, 0..1. */
