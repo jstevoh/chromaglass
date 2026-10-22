@@ -4552,3 +4552,33 @@ under its own 0.15 line, because the cells are irregular and have no lattice; a 
 follows the dye" correlation came out negative; and a ΔE that includes lightness moved
 14 on `lava-lamp` from the relief alone. Each was dropped for a line that failed on the
 control before it was trusted on the fix.
+
+## 34. What a competitor's page showed
+
+### 34a. A landing page before the sign-in wall (2026-10-22)
+
+What was reported: a first visit loaded the app ("Warming the lamp") and landed on a name over
+three sign-in buttons. It said nothing of what ChromaGlass is or costs, and asked for an account
+before the visitor had seen a drop of dye. A competitor's page (PLAN 34) showed the gap: a promise,
+a price, pictures of the product, and a way in that needs no account.
+
+What changed: `Landing.tsx` (its own chunk; the entry chunk grew 517 B gzipped against a 6000 B
+bar, and the engine and Firebase are not in it) is drawn in the sign-in's place on a first visit to
+the hosted site. A headline, one plain line, "Play free", the prices ("Home $35 · Pro $199 · one-time
+payment, no subscription"), eight real looks from the app's own renders, four steps, what the free
+site includes and what the app adds (read from `APP_FEATURE_TILES` and the free caps in
+`tierGates.ts`, so the page says what the code does), a note from the maker and the refund line
+(14 days, from the Terms). "Play free" mounts the sign-in over the page; the tab remembers it
+(sessionStorage) because Google and Apple sign in by a redirect that reloads the page and the
+sign-in is what collects it. The never-lock-out rule is untouched: the page exists only in the
+gate's "signin" phase, before the app, and nothing after it unmounts the plate.
+
+What was tried first and set aside: a looping video of the lab's plate for the hero. The lab lays
+a few drops that barely move in a hero's seconds (four frames 150 solver steps apart were
+near-identical), and a render took four minutes on SwiftShader. A cross-fade of five real frames
+costs 40 KB and moves only by opacity and transform. A filmed loop is PLAN 34a-2.
+
+Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is 48 px tall at
+1024 × 768, 390 × 844 and 844 × 390, with nothing wider than the screen; a returning visit's plate
+comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
+returning visit nor for `?remote` and `?cast`.

@@ -553,7 +553,7 @@ Where each batch stands, as of 2026-09-27:
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
-| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
+| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -7537,20 +7537,30 @@ dropped picture or 3D model driven by the music as its own look does not.
 because our free site asks for a login and needs its own reason to (saves your looks);
 a grid of generic stock thumbnails: ours are the plate itself.
 
-- **34a. A landing page before the sign-in wall.** *(S–M; page only, no engine change.)*
-  Today a first visit loads the app ("Warming the lamp") and meets
-  `SignInScreen.tsx`: a name and three sign-in buttons, and `index.html`'s description
-  is one generic line. The page: the plate running behind a one-line promise, a
-  "Play free" button that goes to sign-in, "Home $35 · Pro $199, one payment, no
-  subscription" under it (the Buy button waits on 23's webhook, so "Play free" ships
-  first), a grid of real looks, a three-step "how it works" (play music, pick a liquid,
-  send it to the TV or projector, with the phone as remote), the free-site rule in one
-  line (the whole plate is free to play; the app adds the TV, projector, show features),
-  a note from the owner and a refund line. A better share card (`og-card.png`, the
-  description). *Measure:* `npm run layout` at phone and desktop widths with the page's
-  first paint timed against today's. No made-up counts or quotes: social proof only
-  from real beta users. The phone version is the page itself (it is a page, built
-  mobile first). Belongs with 23.16's address move.
+- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version; the
+  story is in `docs/plan-shipped.md` §34a, the owner's look is `docs/judging.md` §62.* A first
+  visit meets `src/components/Landing.tsx` (its own lazy chunk, no Firebase, no engine) and
+  "Play free" opens the sign-in over it; a returning visit, `?remote`, `?cast`, the iPhone app,
+  a desktop launch and a visit part way through a redirect or an emailed link never see it.
+  `npm run signin` holds it (3a, 3, 6, 7, 10, 11b).
+- **34a-2. A filmed hero, from a Mac.** *(S; owner's Mac.)* The hero is a cross-fade of five of
+  the app's own frames, because a cloud session cannot film the app and the lab's plate barely
+  moves in a hero's seconds. A 10 to 15 second loop of the real show (`npm run film` records
+  through `scripts/recorder.mjs`), 1280 wide, under 1.5 MB as WebM and MP4, would replace it: the
+  page then loads it after its first paint and keeps the stills for reduced motion. *Measure:*
+  the loop's first and last frames differ by less than a frame of motion; `npm run signin` 3a still
+  true with the plate not up.
+- **34a-3. Sharper looks in the grid.** *(S.)* The cards are 480 × 300 frames from the preset
+  contact sheets (28i-1) and are soft where a Retina screen draws them at 2x. `pixels.yml` renders
+  every look one to one at a laptop's size: take the eight from it and keep the file sizes under
+  60 KB each.
+- **34a-4. Buy buttons, when the Lemon Squeezy webhook is set (23).** *(S.)* The page prints the
+  prices and says "Buying opens soon". When 23's webhook issues a key from a test purchase, the
+  tier cards get Buy buttons (`CHECKOUT_HOME_URL`, `CHECKOUT_PRO_URL` in `lib/tierGates.ts`) and
+  the "opens soon" line goes. Until a test purchase has been made, no button.
+- **34a-5. The owner's words and the share card.** *(S; owner.)* "From the maker" and the refund
+  line are drafts in plain words for the owner to rewrite or sign. `og-card.png` is still the old
+  card; a new one would be the hero's frame with the name and the one line.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
