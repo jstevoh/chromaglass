@@ -43,6 +43,9 @@
  *      then the account deleted on the server leave the plate up and the
  *      sign-in undrawn for HOLD_MS
  *   9. the next load after that asks for a sign-in again
+ *  3a. before that, a first visit meets the landing page (PLAN.md 34a): Play free
+ *      on it, and neither the sign-in nor the plate drawn behind it; Play free
+ *      is what opens the sign-in (3). A returning visit (6, 7) never draws it.
  *  10. the remote (?remote) and a cast (?cast) never ask, nor fetch Firebase
  *  11. the sign-in fits a laptop (1024×768) and a phone, upright and on its
  *      side: nothing wider than the screen, every button a thumb's height
@@ -220,13 +223,34 @@ const signinShown = (page) => page.evaluate(() => {
   return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0;
 }).catch(() => false);
 /**
+ * The sign-in, from wherever a visit starts. A first visit meets the landing
+ * page first (PLAN.md 34a) and its "Play free" opens the sign-in over it; a
+ * visit already part way through signing in meets the sign-in itself. Either
+ * way this is true once the sign-in is drawn, and a visit that never asks
+ * (a returning one) is never clicked for.
+ */
+const signinOpen = async (page) => {
+  if (await signinShown(page)) return true;
+  await page.click('[data-cg-landing-play]', { timeout: 500 }).catch(() => {});
+  return signinShown(page);
+};
+/** The landing page, drawn: its own box, like the sign-in's, so a frame of it is not a blank page's. */
+const landingShown = (page) => page.evaluate(() => {
+  const el = document.querySelector('[data-cg-landing]');
+  if (!el) return false;
+  const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+  return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0;
+}).catch(() => false);
+/**
  * Watch a page from before its first script for the sign-in ever being drawn:
  * a MutationObserver and a per-frame look, so a sign-in shown for one frame
  * and taken away is still caught (a returning visit must never flash it).
  */
 const WATCH = () => {
   window.__cgSigninSeen = false;
+  window.__cgLandingSeen = false;
   const look = () => {
+    if (document.querySelector('[data-cg-landing]')) window.__cgLandingSeen = true;
     const el = document.querySelector('[data-cg-signin]');
     if (el) { const r = el.getBoundingClientRect(); if (r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' && Number(getComputedStyle(el).opacity) > 0) window.__cgSigninSeen = true; }
   };
@@ -310,9 +334,19 @@ try {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
   await page.goto(ON);
-  const asked = await waitFor(() => signinShown(page), 30_000);
+  // 3a. The landing page comes first: it says what this is before it asks
+  // for anything. Neither the sign-in nor the plate is up behind it, and its
+  // "Play free" is what opens the sign-in (3).
+  const landed = await waitFor(() => landingShown(page), 30_000);
   await page.waitForTimeout(3000);
-  check('3. a first visit sees the sign-in, and the plate does not start behind it', asked && !(await appUp(page)), asked ? '' : 'no [data-cg-signin] within 30 s');
+  const landing = landed ? await page.evaluate(() => {
+    const b = document.querySelector('[data-cg-landing-play]')?.getBoundingClientRect();
+    return { play: !!b, h: b ? b.height : 0, signin: !!document.querySelector('[data-cg-signin]') };
+  }) : { play: false, h: 0, signin: false };
+  check('3a. a first visit meets the landing page first, with Play free on it, and neither the sign-in nor the plate behind it', landed && landing.play && landing.h >= 44 && !landing.signin && !(await appUp(page)), landed ? `Play free ${Math.round(landing.h)} px tall, sign-in drawn ${landing.signin}` : 'no [data-cg-landing] within 30 s');
+  const asked = await waitFor(() => signinOpen(page), 30_000);
+  await page.waitForTimeout(3000);
+  check('3. Play free opens the sign-in over the landing page, and the plate does not start behind it', asked && !(await appUp(page)), asked ? '' : 'no [data-cg-signin] within 30 s');
 
   const providers = await page.evaluate(() => [...document.querySelectorAll('[data-cg-signin-provider]')].map((b) => b.getAttribute('data-cg-signin-provider')));
   const asksFor = {};
@@ -330,7 +364,7 @@ try {
       return u;
     }), nav]);
     asksFor[id] = !!p && p.startsWith(`${EMU}/emulator/auth/handler`) && p.includes('apiKey=demo-key') && p.includes(id);
-    if (!page.url().startsWith(ORIGIN)) { await page.goto(ON); await waitFor(() => signinShown(page), 30_000); }
+    if (!page.url().startsWith(ORIGIN)) { await page.goto(ON); await waitFor(() => signinOpen(page), 30_000); }
   }
   check('4. Google, Apple and an emailed link are offered, and Google and Apple go to their provider', ['google.com', 'apple.com', 'email'].every((p) => providers.includes(p)) && asksFor['google.com'] && asksFor['apple.com'], `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}`);
 
@@ -346,14 +380,14 @@ try {
   await page.reload();
   const back = await waitFor(() => appUp(page), inTime());
   const backMs = Date.now() - t;
-  check('6. a returning visit goes straight to the plate, the sign-in never drawn', back && !(await page.evaluate(() => window.__cgSigninSeen)), `up in ${(backMs / 1000).toFixed(1)} s, today's build ${(bootMs / 1000).toFixed(1)} s`);
+  check('6. a returning visit goes straight to the plate, the sign-in and the landing page never drawn', back && !(await page.evaluate(() => window.__cgSigninSeen || window.__cgLandingSeen)), `up in ${(backMs / 1000).toFixed(1)} s, today's build ${(bootMs / 1000).toFixed(1)} s`);
 
   await cutGoogle(ctx);
   t = Date.now();
   await page.reload();
   const offline = await waitFor(() => appUp(page), inTime());
   const offMs = Date.now() - t;
-  check('7. a returning visit with Google never answering still goes straight to the plate', offline && !(await page.evaluate(() => window.__cgSigninSeen)), `up in ${(offMs / 1000).toFixed(1)} s, today's build ${(bootMs / 1000).toFixed(1)} s`);
+  check('7. a returning visit with Google never answering still goes straight to the plate', offline && !(await page.evaluate(() => window.__cgSigninSeen || window.__cgLandingSeen)), `up in ${(offMs / 1000).toFixed(1)} s, today's build ${(bootMs / 1000).toFixed(1)} s`);
 
   // 8. The account goes away under a running show. Google is still cut off
   // (the gig's venue Wi-Fi); a second tab signs out, which Firebase tells
@@ -374,7 +408,7 @@ try {
   await other.click('[data-cg-account-signout]').catch(() => {});
   // The sign-out asks first (the brief): on the page, or the browser's own confirm, accepted above.
   await other.click('[data-cg-account-signout-confirm]', { timeout: 5000 }).catch(() => {});
-  const otherOut = await waitFor(() => signinShown(other), 15_000);
+  const otherOut = await waitFor(() => signinOpen(other), 15_000);
   await ctx.unrouteAll({ behavior: 'ignoreErrors' });
   const had = (await accounts()).some((u) => u.email === EMAIL);
   await deleteAccount(EMAIL);
@@ -390,7 +424,7 @@ try {
   await page.close();
   const next = await ctx.newPage();
   await next.goto(ON);
-  check('9. the next load asks for a sign-in again', await waitFor(() => signinShown(next), 30_000) && !(await appUp(next)));
+  check('9. the next load asks for a sign-in again', await waitFor(() => signinOpen(next), 30_000) && !(await appUp(next)));
   await ctx.close();
 
   // 10. The remote and a cast never ask.
@@ -408,7 +442,7 @@ try {
       await p.waitForTimeout(15_000);
       // The remote's surface is position: fixed, so #root itself has no height: read what it put on the screen.
       const drew = await p.evaluate(() => (document.getElementById('root')?.childElementCount ?? 0) > 0 && (document.body.innerText.trim().length > 0 || !!document.querySelector('#root canvas')));
-      seen[q] = { signin: await p.evaluate(() => window.__cgSigninSeen), firebase: fetched.length, drew };
+      seen[q] = { signin: await p.evaluate(() => window.__cgSigninSeen || window.__cgLandingSeen), firebase: fetched.length, drew };
     }
     check('10. the remote and a cast never ask for a sign-in nor fetch Firebase', ['?remote', '?cast'].every((q) => !seen[q].signin && !seen[q].firebase && seen[q].drew), JSON.stringify(seen));
     await c.close();
@@ -425,7 +459,7 @@ try {
     const c = await browser.newContext({ viewport: s.viewport, isMobile: s.touch, hasTouch: s.touch, deviceScaleFactor: 2 });
     const p = await c.newPage();
     await p.goto(ON);
-    await waitFor(() => signinShown(p), 30_000);
+    await waitFor(() => signinOpen(p), 30_000);
     const f = await fits(p);
     fit.push(`${s.name}: ${f.n} buttons, ${f.bad} outside or under 44 px (shortest ${Math.round(f.minH)} px)${f.over ? ', wider than the screen' : ''}`);
     s.ok = f.n >= 3 && f.bad === 0 && !f.over;
@@ -433,13 +467,35 @@ try {
   }
   check('11. the sign-in fits a laptop and a phone, upright and on its side', sizes.every((s) => s.ok), fit.join('; '));
 
+  // 11b. The landing page on the same screens: nothing wider than the screen,
+  // however far it scrolls sideways inside (the phone's row of looks is meant
+  // to), and Play free a thumb's height and inside the width.
+  const landFit = [];
+  for (const s of sizes) {
+    const c = await browser.newContext({ viewport: s.viewport, isMobile: s.touch, hasTouch: s.touch, deviceScaleFactor: 2 });
+    const p = await c.newPage();
+    await p.goto(ON);
+    const up = await waitFor(() => landingShown(p), 30_000);
+    await p.waitForTimeout(500);
+    const f = up ? await p.evaluate(() => {
+      const W = innerWidth;
+      const box = document.querySelector('[data-cg-landing]');
+      const b = document.querySelector('[data-cg-landing-play]').getBoundingClientRect();
+      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5 };
+    }) : null;
+    s.landOk = !!f && !f.over && !f.outside && f.h >= 44;
+    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}` : 'landing page not drawn'}`);
+    await c.close();
+  }
+  check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));
+
   const sheet = {};
   for (const s of [sizes[0], sizes[1]]) {
     await deleteAccount(EMAIL);
     const c = await browser.newContext({ viewport: s.viewport, isMobile: s.touch, hasTouch: s.touch, deviceScaleFactor: 2 });
     const p = await c.newPage();
     await p.goto(ON);
-    await waitFor(() => signinShown(p), 30_000);
+    await waitFor(() => signinOpen(p), 30_000);
     const r = await signInByEmail(p, ORIGIN);
     let named = false;
     if (r.up) {
