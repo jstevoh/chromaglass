@@ -32,7 +32,7 @@
  * cannot pass by agreeing.
  */
 import { openLab } from './lab.mjs';
-import { SloshDish, SLOSH_N, SLOSH_PRESSES, SLOSH_C, SLOSH_REST_DEPTH, sloshAccel, sloshDrag, sloshNu } from '../src/lib/slosh.ts';
+import { SloshDish, SLOSH_N, SLOSH_PRESSES, SLOSH_C, SLOSH_REST_DEPTH, SLOSH_LENS, sloshAccel, sloshDrag, sloshNu } from '../src/lib/slosh.ts';
 import { thicknessViscosity } from '../src/lib/turntable.ts';
 
 let bad = 0;
@@ -82,9 +82,18 @@ async function both(name, seconds, f, share = null) {
     }
     dOil = Math.max(dOil, Math.abs(gpu.oil[o + 2] - ref.h1[c]) / SLOSH_REST_DEPTH);
     if (ref.wet[c] && ref.h1[c] > 0) dOil = Math.max(dOil, Math.abs(gpu.oil[o] - ref.ox[c]) / SLOSH_C, Math.abs(gpu.oil[o + 1] - ref.oy[c]) / SLOSH_C);
+    // What the plate is handed (sloshOut), every channel it reads: the water's velocity (xy), the oil's (zw, the
+    // water's where there is no oil), the depth of both layers over rest and the oil's share of the lens.
+    // Reading only the first of each let a flipped flow.y, the water's speed in the oil's place and a halved share
+    // all pass (the check's own review, 2026-10-22).
     if (ref.wet[c] && h > 1e-4) {
-      dFlow = Math.max(dFlow, Math.abs(gpu.flow[o] - ref.qx[c] / h) / SLOSH_C);
-      dDepth = Math.max(dDepth, Math.abs(gpu.depth[o] - (h + ref.h1[c]) / SLOSH_REST_DEPTH));
+      const ux = ref.qx[c] / h, uy = ref.qy[c] / h;
+      const oil = ref.h1[c] > 0;
+      dFlow = Math.max(dFlow,
+        Math.abs(gpu.flow[o] - ux) / SLOSH_C, Math.abs(gpu.flow[o + 1] - uy) / SLOSH_C,
+        Math.abs(gpu.flow[o + 2] - (oil ? ref.ox[c] : ux)) / SLOSH_C, Math.abs(gpu.flow[o + 3] - (oil ? ref.oy[c] : uy)) / SLOSH_C);
+      dDepth = Math.max(dDepth, Math.abs(gpu.depth[o] - (h + ref.h1[c]) / SLOSH_REST_DEPTH),
+        Math.abs(gpu.depth[o + 1] - ref.h1[c] / SLOSH_LENS));
     }
   }
   const worst = Math.max(dh, du, dOil, dFlow, dDepth);

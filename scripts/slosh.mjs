@@ -532,7 +532,9 @@ if (mine('13')) {
   let wide = 0;
   for (let i = SLOSH_N / 2; i < SLOSH_N; i++) { const q = (at(i) - hR) / (hm - hR); if (q > 0.1 && q < 0.9) wide++; }
   const plateau = at(Math.round((0.5 + 0.5 * S * T) * SLOSH_N));
-  check('a dam break runs a bore at the speed Stoker\'s exact solution gives it, within a cell and a half', Math.abs(x - want) < 1.5 / SLOSH_N,
+  // Any scheme that conserves mass and momentum puts the jump where the jump conditions say, sharp or smeared,
+  // so this line holds the scheme to conservation through a shock; the next holds it to resolving one.
+  check('a dam break runs a bore at the speed Stoker\'s exact solution gives it, within a cell and a half (conservation through a shock)', Math.abs(x - want) < 1.5 / SLOSH_N,
     `front at ${x.toFixed(4)}, exact ${want.toFixed(4)} (bore speed ${S.toFixed(3)} plate widths/s, ${(S / SLOSH_C).toFixed(2)} of the rest wave speed)`);
   check('the bore is a jump, not a slope: from a tenth to nine tenths of its height in three cells or fewer, and the depth behind it is Stoker\'s',
     wide <= 3 && near(plateau, hm, 0.02), `${wide} cells; behind it ${(plateau / SLOSH_REST_DEPTH).toFixed(4)} of rest against ${(hm / SLOSH_REST_DEPTH).toFixed(4)}`);
@@ -570,7 +572,21 @@ if (mine('14')) {
   check('a glass pressed on the liquid pushes it out in a ring that runs across the dish at the wave speed, sqrt(g h)',
     first[0.2] > 0 && first[0.4] > first[0.2] && near(speed, SLOSH_C, 0.12),
     `the crest at 0.2 of the plate from the press at ${first[0.2].toFixed(3)} s, at 0.4 at ${first[0.4].toFixed(3)} s: ${speed.toFixed(3)} plate widths/s against ${SLOSH_C.toFixed(3)}`);
-  check('and the press moves the liquid, it does not make or take any', Math.abs(d.mass() - m0) / m0 < 1e-5, `mass off by ${(Math.abs(d.mass() - m0) / m0).toExponential(1)}`);
+  /*
+    And off the middle, where the ring meets the rim on one side first: a press in the middle sends equal
+    fluxes out each way, so a face that leaked on one side would cancel itself there and pass (the check's own
+    review, 2026-10-22: the middle press read 5.6e-7 with every face's mass flux cut a thousandth on one side).
+  */
+  const e = new SloshDish();
+  const e0 = e.mass();
+  for (let k = 0; k < 90; k++) {
+    e.press(0, k * DT < 0.1 ? { x: 0.32, y: 0.62, radius: 0.08, depth: 0.2 * SLOSH_REST_DEPTH } : null);
+    e.step(DT, 0, 0, dragOf(0));
+  }
+  const off = Math.max(Math.abs(d.mass() - m0) / m0, Math.abs(e.mass() - e0) / e0);
+  // A ten-millionth: the dish holds its water to 6e-10 here since the depth is stored as its departure from rest, and
+  // the leaking face above read 5.6e-7 in the middle and 3.4e-6 off it, both under the old 1e-5.
+  check('and the press moves the liquid, it does not make or take any, in the middle of the dish or off it', off < 1e-7, `mass off by ${(Math.abs(d.mass() - m0) / m0).toExponential(1)} in the middle, ${(Math.abs(e.mass() - e0) / e0).toExponential(1)} off it`);
   const head = pressHead({ x: 0.5, y: 0.5, radius: 0.1, depth: 1 }, 0.5, 0.5) === 1 && pressHead({ x: 0.5, y: 0.5, radius: 0.1, depth: 1 }, 0.61, 0.5) === 0;
   check('a press is its depth in the middle of its footprint and nothing past its rim', head, String(head));
 }
