@@ -12,10 +12,12 @@ import { FADE_CHOICES } from '../../lib/lookFade';
 import { PINNABLE, PIN_RANGE, type DeskSpec } from '../../lib/deskPins';
 import { PANEL_BY_ID, whereIs } from '../../lib/deskLayout';
 import { relayInfo, type RelayInfo } from '../../lib/remoteProtocol';
+import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { encodeQr, qrPath } from '../../lib/qr';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import type { VisualizerSettings } from '../../types';
 import { PickList } from './PickList';
+import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 
@@ -880,6 +882,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
   const [info, setInfo] = useState<RelayInfo | null | undefined>(undefined);
   const [copied, setCopied] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const accountShows = useAccountShows();
 
   useEffect(() => {
     let live = true;
@@ -892,6 +895,17 @@ function PhoneBody({ p }: { p: DeskProps }) {
   }, [p.status.phone]);
 
   const hasRelay = Boolean(info && info.hosts && info.hosts.length > 0 && info.hosts[0]);
+  /*
+    PLAN 14m-lan: a relay answered but handed this page no display key, which
+    it gives only to the laptop at its own name (localhost). So this is the
+    laptop's page opened at its Wi-Fi address (or another computer's), and it
+    stays off the relay by design: phones would see no laptop. It used to draw
+    a code anyway, of the remote with no key in it, which a phone could scan
+    and never join with. Now it says where to open the page instead, and draws
+    no code.
+  */
+  const notLaptop = hasRelay && !!info && !info.displayKey;
+  const localUrl = info ? `http://localhost:${info.port}/` : '';
   const url = hasRelay && info
     ? `http://${info.hosts[0]}:${info.port}/?remote=1${info.key ? `&key=${info.key}` : ''}`
     : `${window.location.origin}/`;
@@ -907,8 +921,33 @@ function PhoneBody({ p }: { p: DeskProps }) {
         />
         {p.status.phone === 0 ? 'No phone linked.' : `${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked.`}
       </p>
+      {accountShows.length > 0 && (
+        <div className="flex flex-col gap-1" data-testid="account-shows">
+          <span className="text-[11px] uppercase tracking-wider text-dim">Running shows on your account</span>
+          {accountShows.map((show) => (
+            <button
+              key={show.id}
+              type="button"
+              onClick={() => joinAccountShow(show)}
+              data-testid="account-show-join"
+              data-cg-account-show={show.id}
+              className="flex min-h-[34px] w-full items-center justify-between gap-2 rounded-md border border-border-strong bg-elevated px-2.5 py-1.5 text-left text-[12px] font-medium text-text hover:bg-hover"
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                <span className="truncate">{show.name}</span>
+              </span>
+              <span className="shrink-0 text-[11px] font-medium text-accent-text">Join</span>
+            </button>
+          ))}
+        </div>
+      )}
       {info === undefined ? (
         <p className="text-dim">Looking for the show server…</p>
+      ) : notLaptop ? (
+        <p className="leading-relaxed text-dim" data-testid="phone-link-local">
+          The show server is running, but this page was opened at its Wi-Fi address, so it cannot link phones. On the laptop running the show, open <span className="font-mono text-[12px] text-text-2">{localUrl}</span> instead.
+        </p>
       ) : (
         <>
           {p.status.phone > 0 && (
@@ -988,6 +1027,7 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'dyes': return <DyesBody p={p} />;
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
+    case 'score': return p.score ? <SongScore {...p.score} /> : null;
   }
   const spec = PANEL_BY_ID.get(id);
   if (!spec) return null;
@@ -1011,6 +1051,7 @@ export function panelMeta(id: string, p: DeskProps): string | null {
     case 'dyes': return p.paletteLock === null ? 'auto' : null;
     case 'tools': return `layer ${p.layer + 1}`;
     case 'phone': return p.status.phone === 0 ? 'not linked' : `${p.status.phone} linked`;
+    case 'score': return p.score?.songName ?? null;
   }
   const spec = PANEL_BY_ID.get(id);
   if (spec?.kind === 'knobs') return ccs(SECTION_KEYS.get(id) ?? []);

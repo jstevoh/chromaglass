@@ -908,7 +908,7 @@ try {
       const patchAt = patchesBefore ?? 0;
       const featureSelect = page.getByTestId(`patch-feature-${patchAt}`);
       const featurePicked = [];
-      let featureFits = false;
+      let featureFits = false, hitPicked = null;
       if (await visible(page, `patch-feature-${patchAt}`)) {
         const fb = await box(page, `patch-feature-${patchAt}`);
         featureFits = !!fb && fb.x >= 0 && fb.x + fb.width <= (page.viewportSize()?.width ?? 0);
@@ -917,6 +917,19 @@ try {
           await page.waitForTimeout(200);
           featurePicked.push((await mappings())?.[patchAt]?.feature ?? null);
         }
+        /*
+          And the hits (PLAN 28f): the same patch switched to the Hits source
+          and pointed at the kick's hit, read back from the show's patch as
+          the source and the feature together, since a select that changed
+          only its own words, or a source left on the room with a hit's name,
+          would read nothing at all.
+        */
+        await page.getByTestId(`patch-source-${patchAt}`).selectOption('hits');
+        await page.waitForTimeout(200);
+        await featureSelect.selectOption('kickHit');
+        await page.waitForTimeout(200);
+        const m = (await mappings())?.[patchAt];
+        hitPicked = m ? `${m.source}:${m.feature}` : null;
         await page.getByLabel('Remove mapping').nth(patchAt).tap();
         await page.waitForTimeout(250);
       }
@@ -926,6 +939,8 @@ try {
       check('the room\'s How sudden and How busy, lately are patched from the phone\'s Settings: each lands in the show\'s patch, the select inside the screen, and the patch comes off again',
         patchesBefore !== null && featureFits && featurePicked.join() === 'motionHighFreq,motionOverTime' && patchesAfter === patchesBefore,
         `${patchesBefore} patches before; ${featureFits ? 'the select fits' : 'the select is off the screen or missing'}; the show's patch says ${featurePicked.join(', ') || 'nothing'}; ${patchesAfter} patches after`);
+      check('and a hit is patched from the phone too: the Hits source, Kick hit, lands in the show\'s patch as both',
+        hitPicked === 'hits:kickHit', `the show's patch says ${hitPicked ?? 'nothing'}`);
 
       /*
         A back plate added and taken off from the Play sheet, on a look with
@@ -1142,6 +1157,37 @@ try {
       await page.waitForTimeout(400);
       const reset = await speedText();
       check('Play: a double tap on Speed puts it back to the look\'s own speed', reset === before && after !== before, `${before} → ${after} → ${reset}`);
+      /*
+        8j: a phone has no hover, so the name is the button. A tap on Soap's
+        name opens the card with what it does and the value as printed on
+        the row, inside the screen; a second tap shuts it, and neither
+        counts as half of the double tap that resets the value.
+      */
+      {
+        const row = page.getByTestId('play-slider-soap');
+        const soapText = () => row.locator('span').last().textContent();
+        const soapBefore = await soapText();
+        const readTip = () => page.evaluate(() => {
+          const t = document.querySelector('[data-control-tip]');
+          if (!t) return null;
+          const r = t.getBoundingClientRect();
+          return { name: t.querySelector('[data-tip=name]')?.textContent ?? '', help: t.querySelector('[data-tip=help]')?.textContent ?? '', value: t.querySelector('[data-tip=value]')?.textContent ?? '', inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight };
+        });
+        const nameBtn = row.locator('[data-info="name"]');
+        const nb = await nameBtn.boundingBox();
+        const none = await readTip();
+        await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+        await page.waitForTimeout(250);
+        const tipped = await readTip();
+        check('Play: a tap on a slider\'s name opens a card with what it does and the value, on screen',
+          !none && !!tipped && tipped.name === 'Soap' && tipped.help.length > 20 && tipped.value === soapBefore?.trim() && tipped.inside,
+          tipped ? `"${tipped.help.slice(0, 40)}…", ${tipped.value}, ${tipped.inside ? 'on screen' : 'off screen'}` : 'no card');
+        await shot(page, 'Play-portrait-name-card');
+        await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+        await page.waitForTimeout(250);
+        check('Play: a second tap shuts it, and two taps on a name leave the value alone', !(await readTip()) && (await soapText()) === soapBefore,
+          `${soapBefore} → ${await soapText()}`);
+      }
       // A look from the strip comes in, named on the pill.
       // One that is not up already, or the pill would read right with nothing done.
       const other = page.locator('[data-testid="play-look-tile"][aria-pressed="false"]').nth(1);

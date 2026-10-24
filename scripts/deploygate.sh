@@ -124,6 +124,37 @@ api() {
 
 treeof() { api "git/commits/$1" | jq -r '.tree.sha // empty'; }
 
+# The Mac shards, read from checks.yml's matrix rather than written out here.
+# The list used to be written here by hand, four names, and when PLAN.md 19w
+# gave checks.yml a fifth shard (`fifth`, 2026-10-11) nothing told this file:
+# from then on every PR run had five green shards, "five" is not "these four",
+# and the gate trusted none of them. `npm run deploygate -- --history 20` on
+# 2026-10-17 read "0 of 20" with every merge since 19w answering "did not run
+# the Mac shards (fifth=success,open=success,plate=success,show=success,
+# tools=success)", so each of those deploys re-ran the whole Mac, about 55
+# minutes from merge to live, on a tree that had just passed it. Reading the
+# names from the workflow makes the next shard count without anyone
+# remembering this file. It is the checked-out tree's checks.yml, the one being
+# deployed: a run whose own matrix was different (rule 5, a run on an older
+# main before a shard was added or renamed) does not match it and is not
+# trusted, which costs that one deploy the Mac and never trusts a run that
+# skipped a shard. No shard line, or more than one, stops the script, which in
+# deploy.yml runs the checks in full.
+MACSHARDS=$(sed -n 's/^[[:space:]]*shard:[[:space:]]*\[\(.*\)\][[:space:]]*$/\1/p' \
+  "$(dirname "$0")/../.github/workflows/checks.yml")
+[ -n "$MACSHARDS" ] && [ "$(printf '%s\n' "$MACSHARDS" | wc -l)" -eq 1 ] \
+  || { echo "checks.yml has no single 'shard: [...]' line to read the Mac shards from" >&2; exit 1; }
+MACSHARDS=$(printf '%s\n' "$MACSHARDS" | tr ',' '\n' | tr -d ' "'"'"'' | grep -v '^$' | sort \
+  | jq -Rnc '[inputs | "\(.)=success"]')
+
+# "ran" when run $1's Mac jobs are exactly the shards above and every one is
+# green; otherwise what it ran, joined ("none" for a run that skipped them).
+macrun() {
+  api "actions/runs/$1/jobs?per_page=100&filter=latest" \
+    | jq -r --argjson want "$MACSHARDS" '[.jobs[] | select(.name | startswith("WebGPU (macOS) ·")) | "\(.name | ltrimstr("WebGPU (macOS) · "))=\(.conclusion)"] | sort
+      | if . == $want then "ran" else (join(",") | if . == "" then "none" else . end) end'
+}
+
 # The paths whose blobs differ between two trees, one a line, sorted: added,
 # removed and changed alike. From the API's recursive listing, so the deploy
 # needs no history; a listing GitHub truncated is an error, never a short diff.
@@ -152,7 +183,7 @@ scriptsonly() {
 }
 
 # Rule 5, the owner's choice of 2026-10-04: the PR's run tested its head merged
-# into an older main, and main has moved since. Re-running all four Mac shards
+# into an older main, and main has moved since. Re-running all the Mac shards
 # over the deployed tree added about fifty minutes from merge to live, and on
 # 2026-10-03 went red 4 times in 9, every time on a line the merge never
 # touched (PLAN.md 19h-3). So the Mac is trusted when what the PR changed and
@@ -303,11 +334,9 @@ judge() {
     fi
     while read -r url tested; do
       run_id="${url##*/}"
-      # The four shards by name, every one green: a run that skipped them, or
-      # ran fewer, is not a Mac run. A new shard in checks.yml goes here too.
-      shards=$(api "actions/runs/$run_id/jobs?per_page=100&filter=latest" \
-        | jq -r '[.jobs[] | select(.name | startswith("WebGPU (macOS) ·")) | "\(.name | ltrimstr("WebGPU (macOS) · "))=\(.conclusion)"] | sort
-          | if . == ["open=success", "plate=success", "show=success", "tools=success"] then "ran" else (join(",") | if . == "" then "none" else . end) end')
+      # Every shard checks.yml names, every one green: a run that skipped
+      # them, or ran fewer, is not a Mac run.
+      shards=$(macrun "$run_id")
       if [ "$shards" != ran ]; then
         # Check if the run carried the Mac shards from an earlier run (PLAN.md 19i)
         carried_job=$(api "actions/runs/$run_id/jobs?per_page=100&filter=latest" \
@@ -323,9 +352,7 @@ judge() {
           fi
         fi
         if [ -n "$carried_run" ] && [ -n "$carried_tested" ]; then
-          carried_shards=$(api "actions/runs/$carried_run/jobs?per_page=100&filter=latest" \
-            | jq -r '[.jobs[] | select(.name | startswith("WebGPU (macOS) ·")) | "\(.name | ltrimstr("WebGPU (macOS) · "))=\(.conclusion)"] | sort
-              | if . == ["open=success", "plate=success", "show=success", "tools=success"] then "ran" else (join(",") | if . == "" then "none" else . end) end')
+          carried_shards=$(macrun "$carried_run")
           if [ "$carried_shards" = ran ]; then
             url="https://github.com/$REPO/actions/runs/$carried_run"
             tested="$carried_tested"

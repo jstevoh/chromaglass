@@ -63,7 +63,7 @@ jobs:
   # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
   # push of only PLAN.md, the docs, the sessions' skills, a workflow that
   # never runs a Mac shard or the scripts that check the workflows does not
-  # queue the four Mac shards: it proves
+  # queue the Mac shards: it proves
   # nothing new there, and on 2026-10-03 each such push still waited twenty
   # to thirty minutes for a Mac and then held one for forty-five runner-minutes
   # in front of PRs that did change the plate. Measure always runs. A deploy
@@ -97,24 +97,30 @@ jobs:
           CALL_MAC: ${{ inputs.mac }}
         run: node scripts/reach.mjs --diff
 
-  # Measure, in three parts side by side. As one job it took a median 14.3
+  # Measure, in four parts side by side. As one job it took a median 14.3
   # minutes and at most 14.9 over 87 green runs on 2026-10-03 against its
   # 15-minute timeout, so the next slow runner would have turned it red with
   # nothing wrong; and its first red step skipped every step after it, so a
   # push with two things wrong found one (PLAN.md 19b). Split by what each
   # step needs: the arithmetic (`logic`, about four minutes, most of it the
-  # drops), the sound harnesses that want ffmpeg (`sound`, about six), and
-  # the ones that want Chromium (`browser`, about five). Every step runs
-  # whatever failed before it in its part. GitHub's ubuntu runners are not
-  # the queue the Mac's are, so three at once cost the queue nothing.
+  # drops), the sound harnesses that want ffmpeg (`sound`, about six), the
+  # ones that want Chromium (`browser`, about twelve), and the lab on the
+  # CPU rasteriser (`lab`, about six: Chromium, then `lampzero` drawing every
+  # look in two labs). Every step runs whatever failed before it in its part.
+  # GitHub's ubuntu runners are not the queue the Mac's are, so four at once
+  # cost the queue nothing.
   measure-part:
     name: Measure · ${{ matrix.part }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The browser part ran 11:47 on main before the switches step (two to three
+    # minutes in CI); 15 left it no headroom. 25 since PLAN 33b: the lab part ran
+    # 13.8 minutes on a recent PR and `holeline` now builds a third lab (the
+    # control with the air mask taken out), so 20 left the same thin margin.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        part: [logic, sound, browser]
+        part: [logic, sound, browser, lab]
     steps:
       - uses: actions/checkout@v5
       # 22, not 20: `music`, `scene`, `liquids` and `wall` all run their
@@ -175,11 +181,23 @@ jobs:
       - name: The turntable
         run: npm run turntable
 
+      # The tilt slosh's CPU half: a shallow-water dish that rings, reflects and
+      # damps under a user's tilt, and stays bounded (PLAN §18a).
+      - name: The slosh
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run slosh
+
       # The two lists that have to agree about what a control is: the settings
       # panel's own markup, and the registry the desks pin from.
       - name: The panel
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run panel
+
+      # The guard on a check's bars and inputs, against #362's two real cases
+      # and the things it must not fire on (comments, names, prose, printing).
+      - name: The check-change guard
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run checkguard
 
       # The workflows' own wiring: closed.yml cancels a merged PR's runs by
       # joining their concurrency groups, which it spells by hand, and the
@@ -188,6 +206,13 @@ jobs:
       - name: A closed PR stops its runs
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run closedruns
+
+      # The scripts that read GitHub's API never print the token: a 502 from
+      # it once printed the owner's whole token through flakes.mjs's error.
+      # Against a local server that answers 502, with the old way as control.
+      - name: The API scripts keep the token out of their errors
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run ghapi
 
       # The ear: level traces through the real calibration into the boundary
       # detector, synthetic songs through the real matcher, and the tempo
@@ -252,6 +277,16 @@ jobs:
       - name: The kicks
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run kicks
+
+      # A breakdown is quieter on the plate (PLAN 28d): the band's chorus, its
+      # verse 8 dB down, the chorus, through the ear a render uses. The old
+      # bass press changes more a second in the breakdown (the control, as on
+      # the showreel), the new one at most three quarters as much as in the
+      # groove, the hands fall with the passage, and a song quiet all through
+      # or a volume turned down is learned as the new level. Ten seconds.
+      - name: The breakdown
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run breakdown
 
       # A click is not a beat (PLAN.md 14x): the ear in arithmetic, a click a
       # tick and a thump, in a quiet room and under the band. With no gesture
@@ -358,6 +393,12 @@ jobs:
       - name: The film table
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run filmtable
+      # A draining vertical soap film seen in reflection (PLAN 32a): 2D Darcy
+      # buoyancy convection, conservative minmod advection, evaporation to Newton
+      # black, and Airy's reflectance at an angle.
+      - name: The draining soap film
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run soapfilm
       # A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):
       # whole fades driven at the show timer's 16 ms, no step past the curve's
       # steepest, the turn-round, the hand, the cut, and the pads wired.
@@ -374,12 +415,25 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # The score (PLAN 28h): each of a song show's cues drawn where the
+      # scheduler fires it, a cue pinned to a section firing on that section
+      # through a stretched live take, and the nudge putting a late map's cue
+      # back on the song's turn without firing a section's cue twice.
+      - name: The song's score
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run score
       # A setting from a menu, the phone or a saved look survives sanitizePatch
       # (PLAN.md QA-29, 14n): every value every choice setting can take, every
       # preset intact, malformed patches, gestures and MIDI maps dropped.
       - name: Settings survive the sanitiser
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run sanitize
+      # The privacy page names everything that leaves the machine (PLAN.md
+      # 23.13): every host the code reaches, every VITE_ service it is built
+      # with, and no {{OWNER: …}} mark left on it or on the terms.
+      - name: The privacy page matches the code
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run privacy
       # The band moves the liquid, not the frame (Frame Sway, lib/plateRock.ts):
       # through a song's kicks, every shipped look and show stage slides the
       # whole picture 0% a frame, against up to 1% with the cover glass free
@@ -387,12 +441,27 @@ jobs:
       - name: The frame holds still
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run framesway
+      # The looks' sound patches read something, and a patch can hear the
+      # hits (PLAN 28f): every shipped patch moves its control (four named a
+      # drum on a source without one and read 0), and each drum's hit reaches
+      # a patch on its frame, at its strength, and is gone between hits.
+      - name: The looks' sound patches
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run soundpatch
       # Hold stays where the closeup is (PLAN.md QA-12): the real closeup
       # camera on a made-up plate, switched to Hold from Auto and from Follow,
       # moves the frame on main's Hold and not on this one.
       - name: Hold keeps the closeup
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run holdjump
+      # The closeup holds still (PLAN.md 27a-8, QA-30): the real closeup camera
+      # through a song at 6x gives the same centre and zoom as in silence on
+      # every shipped look with Frame Sway at 0, and sways and pumps with it at
+      # full; a kick's press under the drop no longer throws the lead; a drop on
+      # still paint does not shiver.
+      - name: The closeup holds still
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run steadycam
       # The same seed plays the same show (PLAN.md §6, lib/rng.ts): nothing in
       # src draws from Math.random outside a short allowlist of ids, and the
       # beads, bubbles, closeup camera, chemistry, palette and automation run
@@ -450,13 +519,27 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run report-worker
 
+      # The song-ID Worker (scripts/fingerprint-worker.mjs, PLAN.md 14o): every
+      # lookup it passes on is paid for from the owner's account and its
+      # address is in the public bundle, so what is checked is mostly what it
+      # refuses (another site, no Origin, an oversized or unsized body, the
+      # 31st an hour from one address or /64, the day's ceiling, no counter
+      # store), each read twice: the status, and that the service was never
+      # called. Node's Request and FormData only, so `logic`.
+      - name: The song-ID Worker
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run fingerprint-worker
+      - name: The licence-key Worker
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run license-worker
+
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
       # mode switch stays put. The same measurements run again inside the show
       # night on macOS; here they fail in two minutes rather than fifteen, and
       # before the GPU shards have a chance to hide them behind another step.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
         run: npx playwright install --with-deps chromium
       # Every shader compiles, on SwiftShader, in two seconds (PLAN.md 19b).
       # It runs again on the Mac's show shard, against Metal; here it is found
@@ -464,6 +547,67 @@ jobs:
       - name: The shaders compile
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run wgsl
+      # Lamp Ground 0 is the plate as it was before the lamp, byte for byte,
+      # every look (PLAN 18b, 19z): two labs, one built with the lamp's lines
+      # taken out, compared on SwiftShader, which lampzero reads back from the
+      # adapter rather than trusting the flags. Here and not on the Mac
+      # because it compares two compiled programs: Metal on an M4 fused a
+      # multiply-add on the back plate's painted path differently in the two,
+      # and one pixel of Fillmore read 2 levels off (2026-10-11, main at
+      # b2ca7d7), while the CPU rasteriser's arithmetic is the shader's text.
+      # Its own part: `logic` has no Chromium (this step's first run failed
+      # there on the launch, 2026-10-12), and `browser` already runs twelve of
+      # its fifteen minutes. About five minutes; the lamp's physics stay on
+      # the open shard (`lamp`).
+      - name: Lamp Ground 0 is the plate before the lamp
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run lampzero
+      # No line round a bubble's hole in one dye (PLAN.md 33a,
+      # scripts/holeline.mjs). The owner saw bubbles drawn with a blocky dark
+      # outline: the edge line between two dyes fired on the depth step at a
+      # hole's rim, sampled on the solver's cell grid. The line now waits for
+      # the dye's colour to change, and this check builds a second lab with
+      # that gate cut out, so the halo it measures away is found again in the
+      # same run, and the line between two real dyes is still drawn. It also
+      # holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab
+      # with airNear's mask taken off finds the glow again), and a pool's edge
+      # into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,
+      # so it sits here beside lampzero rather than in the Mac queue.
+      - name: No line round a bubble's hole
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run holeline
+      # A bubble's clear middle is the plate (PLAN.md 33e, scripts/bubblelook.mjs).
+      # The owner saw bubbles as donuts: the projected middle was the dye's
+      # hue at 41-77 % strength, so a dim dye-coloured disc sat inside a black
+      # band. This check builds a second lab with the old line put back, so
+      # the donut it measures away is found again in the same run, on the
+      # dark ground and the lamp ground, at five sizes. Pictures from the lab,
+      # which SwiftShader renders as the shader's text, so it sits beside
+      # holeline in the open shard.
+      - name: A bubble's middle is the plate
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run bubblelook
+      # Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):
+      # against the Firebase Auth emulator, Google, Apple and magic-link
+      # sign-in, offline returning sessions, sign-out and account deletion.
+      - name: Sign-in
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run signin
+      # Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):
+      # two signed-in pages on the same account (a show and a phone) list and
+      # join the show in one tap while keeping the QR code, a third page on
+      # another account sees nothing, and losing the internet keeps local
+      # remote control up.
+      - name: Linking devices by account
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run accountlink
+      # Licensing and tiers (PLAN.md 23.2, 23.4, 23.5, 23.6, 23.11,
+      # scripts/tiers.mjs): offline Ed25519 signature verification, 2-machine
+      # limit, Home->Pro upgrade, unlicensed gate, free-tier tiles, 15s/720p
+      # caps + corner mark, and logo mark lock.
+      - name: Licensing and tiers
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run tiers
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
@@ -493,6 +637,14 @@ jobs:
       - name: Saving presets
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/saves.mjs
+      # Every switch and chosen state reads on and off (scripts/switches.mjs,
+      # PLAN.md QA-30): on the desk, every Settings section, the phone's sheets,
+      # Play and the remote, each control that says it has a state is read in
+      # both, from computed styles. A knob against its track at 3:1, on against
+      # off at ΔE 20. Colours, so no GPU; the site the steps above built.
+      - name: Switches read on and off
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/switches.mjs
       # The load (scripts/loadtime.mjs, PLAN.md 14v): the built site served
       # with Brotli over a slowed network, and the page asks for the app's
       # chunks alongside its entry and for the GPU before the app has
@@ -537,6 +689,16 @@ jobs:
       - name: The phone link
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/phonelink.mjs
+      # The show key (scripts/showkey.mjs, PLAN.md 14m): the show server and a
+      # phone and a laptop in browsers. A phone without the key, with a wrong
+      # one, or past three wrong ones is refused; only the laptop is handed
+      # either key; a page on another site, a flood of sockets and a frame
+      # over the cap are turned away; and the server restarted under a linked
+      # phone and laptop comes back without anyone touching either. No GPU;
+      # dist/ is the phone step's build.
+      - name: The show key
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/showkey.mjs
       # Draw, the remote's first screen (scripts/draw.mjs, PLAN.md 8-draw): a
       # stand-in laptop on the show server's relay hears every touch, tool,
       # dye and button a phone and an iPad send, and where a touch lands in
@@ -597,6 +759,23 @@ jobs:
       - name: The input picker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run inputpick
+      # The app opens with the sound Source on Off (scripts/opensource.mjs,
+      # PLAN.md 14y): on the desk and the phone, on three looks, a click starts
+      # no sound and opens no device, the Band when chosen is kept through a
+      # reload of the tab, and a new tab opens on Off again. The sound the show
+      # hears and the controls' state, not the plate, so no GPU; on the same dist/.
+      - name: The Source opens on Off
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run opensource
+
+      # Following a known song by ear (PLAN.md 28g-2): the app's own band
+      # playing, its map made from its score, and the Perform desk's status
+      # bar, the track panel and the phone's Sound sheet each saying which
+      # song is followed and how sure, the track panel's section the band's.
+      # The ear and the DOM, not the plate, so no GPU; on the same dist/.
+      - name: Following a song, on the desk and the phone
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run followview
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon
   # runners give Chromium a Metal GPU, where a Linux runner's software WebGPU
@@ -628,6 +807,24 @@ jobs:
   #
   # The tools shard also takes the Press's let-go on a thin gap with its two
   # controls (about 35 s more; #228).
+  #
+  # A fifth shard since 2026-10-11 (PLAN.md 19w). Checks had gathered on all
+  # four until, by the medians of 41 green runs from 10-09 to 10-11, plate ran
+  # 16.7 minutes (19.8 at most), open 16.4, tools 15.9 and show 15.3: 64
+  # minutes of work in four 20-minute jobs, so moving plate's heaviest steps
+  # to another shard would only have moved the timeout there. One plate run
+  # (#353's) was killed at 20:16 after every check in it had passed. `fifth`
+  # takes two to five minutes from each: from plate the drop map, the
+  # magnet and the grating (the noisiest step there, 81 s median and up to
+  # 143); from open Audio Impact 0 and the colours; from tools depth and the
+  # flick; from show the mixer, the kick's press and the Turing pattern.
+  # Replayed on the 11 of those runs where each shard ran once, the steps'
+  # own times put in their new shards: the longest shard went from 18.4
+  # minutes to 15.0 (plate 10.7 median, 13.7 at most; open 13.4, 15.0;
+  # tools 13.6, 14.1; show 13.2, 14.2; fifth 12.8, 13.4). A shard's own
+  # setup is about half a minute (checkout, Node, npm ci, Chromium, the
+  # build), so a run costs that much more Mac time and needs five runners
+  # at once rather than four, but holds each for less.
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
     needs: reach
@@ -637,7 +834,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [show, tools, plate, open]
+        shard: [show, tools, plate, open, fifth]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -757,6 +954,14 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         timeout-minutes: 6
         run: npm run musicforce
+      # Bass Boost is a gain on the bass's hand (PLAN 27g): the old arithmetic
+      # pinned the press and calmed the plate as the slider rose; now the
+      # glass presses deeper and the kicks still press and let go, in the
+      # ear, in the frame loop's source, and on the thin gap in the lab.
+      - name: Bass Boost presses harder
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 6
+        run: npm run bassboost
       # Each poured liquid as thick as it is (PLAN 18d): on a thin gap a pool
       # of glycerine falls under Rain Drip at Darcy's 2λ/(1+λ) of a pool of
       # colour, syrup in a thick look runs ahead of it, a liquid as thin as
@@ -854,6 +1059,38 @@ jobs:
       - name: The ferrofluid drop in the closeup
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run ferrodrop
+      # The closeup's ferrofluid drop at rest on the thin gap (PLAN 29c):
+      # degenerate mobility in phaseCHVolume holds its half-full core and
+      # halo against Ostwald ripening into the clear oil, conserves Σc·h, and
+      # does not move without a field, and sheds its half-full cells more
+      # slowly in a second window (steps 200 to 380). `npm run ferrodrag` stays
+      # out of CI as known red until PLAN 29c-8.
+      - name: The ferrofluid drop at rest on the thin gap
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run ferrorest
+      # The magnet's pull in tesla, metres and seconds (PLAN 29c-2): the
+      # shader's field against Biot–Savart, the shader's ∇ψ against the
+      # linear Kelvin law (a units check on ψ, the gain cancels there), the
+      # gain against EFH1's, and a drop at the two-phase Darcy speed with the
+      # rim's (ν_clear/ν_ff)^(1−φ) factor applied, under the per-step guard.
+      # On the fifth shard, the lightest (19w), since the open one ran 17.8
+      # minutes of its 20 before the split.
+      - name: The magnet's pull, derived
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        run: npm run magnetgain
+      # The dragged drop while it is dragged (PLAN 29c-8's neighbour): the
+      # ferrofluid carried along itself (phaseMomentum) and what the moving
+      # edge's limiter withheld paid back (phaseCompress), each held on its own
+      # over steps 60 to 120 of `ferrodrag`'s scene, a window before the trailing
+      # rim is lost to the oil's return flow. `ferrodrag` reads at three seconds,
+      # red with both passes and without them, so it could not tell. The script
+      # runs the scene three times (as given, phaseMomentum off, phaseCompress
+      # off) and requires each pass to be worth a margin, so the control is in
+      # the run and not done by hand once. On the fifth shard with
+      # `magnetgain`: three scenes of 120 steps.
+      - name: The dragged ferrofluid drop holds together
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        run: npm run ferrohold
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye
@@ -871,12 +1108,19 @@ jobs:
       # No grating over the dye: the grid's one-cell checkerboard goes in a
       # second, in every look, and edges, blobs and fine diagonals stay.
       - name: No grating over the dye
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run grating
-      # Lamp Ground (PLAN 18b): every look at 0 is the plate as it was before
-      # the lamp, byte for byte; on the lamp a clear pool throws the whole lamp,
+      # Dye spreads along the flow via shear dispersion (PLAN 18h): streaks
+      # along flow lines while holding sharp cross-stream edges, conserved exactly.
+      - name: Dye dispersion along the flow
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run dispersion
+      # Lamp Ground (PLAN 18b): on the lamp a clear pool throws the whole lamp,
       # twice the dye lets through the square, a gel and the back plate filter
       # through the dye. In the open shard: the plate shard is near its timeout.
+      # "Every look at 0 is the plate as it was before the lamp, byte for byte"
+      # is Measure's (lampzero): it compares two compiled programs, which a
+      # GPU's compiler rounds differently (one pixel of Fillmore on an M4).
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
@@ -890,7 +1134,7 @@ jobs:
       # plate; a dye is paler thin than deep and a deep yellow turns orange; two
       # neighbouring dyes meeting walk between their hues; the grade keeps hue.
       - name: Enough colours, and the hues between them
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run colours
       # A pour is liquid (PLAN 18c, 18d-2): water poured at the middle pushes a
       # ring of colour out by its volume, glycerine poured is all accounted
@@ -932,10 +1176,10 @@ jobs:
       # passes the front plate from lamp to beam, every grade does what its
       # name says, and every one of the 31 controls changes the picture; the
       # gel wheel and the lumia in the lamp, over the lens and among the rest.
-      # On the show shard (a median 8.8 minutes) rather than the plate shard
-      # (11.2), to even them (PLAN.md 19h); it is the lab, so any shard will do.
+      # On the fifth shard since PLAN.md 19w (on show before that, to even it
+      # with plate, 19h); it is the lab, so any shard will do.
       - name: The mixer's order and grades
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run mixer
       # Beams: two projectors of different sources add where they cross, two
       # carrying one picture sum to it across their overlap with no seam
@@ -988,7 +1232,7 @@ jobs:
       # fraction of a cell off the grid and laid nothing, and no check
       # counted.
       - name: The rhythm plate presses on the kick
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: SQUEEZE_GPU=1 node scripts/squeeze.mjs
       # Render this song in the app itself (PLAN.md §6): a synthetic song
       # rendered ten ways through the visualizer's own frame loop, frame by
@@ -1032,14 +1276,25 @@ jobs:
       - name: The grain inside the dye, not at its edge
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run grainedge
+      # The closeup is the liquid seen closer, not a field of cells (PLAN 33g):
+      # the defaults carry no cell or lacing texture at 4x and 6x, the old
+      # defaults (the control) carry plenty, and the relief is a smooth swell
+      # and sheen that keeps the dye's chroma. The lab only; it runs on the
+      # runner's own adapter (Metal on a Mac), so its time is the Mac's to
+      # measure (npm run macqueue after the first PR run), and the step
+      # carries a timeout of its own so a stuck lab cannot take the shard.
+      - name: The closeup is the liquid, not cells
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 8
+        run: npm run macroview
       # The Turing pattern (PLAN 26): one stripe width on every rung, carried
       # with the colour and healed after a stir, grown only where it is fed,
       # and Turing Print black on white where the reaction is, not piling up.
       # The lab only; five or six minutes on SwiftShader, so on a Mac rather
-      # than in Measure, and on the show shard, which had the most room under
-      # the job's twenty minutes (13.2 against open's 16.8 on #331's run).
+      # than in Measure, and on the fifth shard (PLAN.md 19w; it went to show
+      # first, which had the most room then, 13.2 against open's 16.8 on #331's run).
       - name: The Turing pattern and its print
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'show' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run turing
       # The show keeps hearing while its window is hidden behind the wall's
       # (scripts/ears.mjs, PLAN.md §14a): its own frames withheld, a second
@@ -1062,17 +1317,16 @@ jobs:
       # On the laptop and the phone at 0, and at the default, where they still
       # must (listened to for a minute there, for enough chances). About three minutes.
       - name: Audio Impact 0 drops no bubbles
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: node scripts/kickbubbles.mjs
       # A flicked plate's liquid trails the glass (scripts/flick.mjs, PLAN.md
       # 22h): the look's own turning goes through the liquid's drag time like
       # the Spin tool's, the picture turns with the liquid, and the flick no
       # longer stirs the current with a term of its own. It reads the plate's
       # refs, not its frames, but the frame loop only steps on a GPU that
-      # draws. About twenty-five seconds, on the tools shard, the shortest by
-      # the medians above.
+      # draws. About twenty-five seconds, on the fifth shard (PLAN.md 19w).
       - name: A flicked plate's liquid trails the glass
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: node scripts/flick.mjs
       # The plate's own depth, which until F reached nothing (bubbles-plan.md
       # F): a domed plate's tight rim has to run slower than its deep centre,
@@ -1082,7 +1336,7 @@ jobs:
       # the gate asks for 10% — because what it guards is a sign and a place,
       # not a tuning.
       - name: Depth reaches the flow
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run depth
       # The Magnet in the hand (reported: "magnet tool isn't really
       # working", then "a giant black hole as soon as you pick it"): picked
@@ -1091,7 +1345,7 @@ jobs:
       # Size reaches the solver, and a new grid (the governor stepping down)
       # lays nothing but that pool, never the look's ring.
       - name: The magnet moves the ferrofluid
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run magnet
       # The ferrofluid poured round Classic's middle, watched with the band
       # playing and its bubbles on the plate (PLAN.md, found by #238): on the
@@ -1140,7 +1394,7 @@ jobs:
       # the cell under the hand changes and its mirror image across the middle
       # does not (reported: an echo of the gesture "in the mirrored section").
       - name: A drop lands only where it is dropped
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: node scripts/mirror.mjs
 
       # And the physics under it: the ferrofluid gathers where the magnet is
@@ -1193,11 +1447,39 @@ jobs:
             test "${{ needs.reach.outputs.mac }}" = false &&
             test "${{ needs.webgpu.result }}" = skipped; }
 
-  # The one name for the three Measure parts: green only when all three are.
+  # A pull request that moves a check's bar or input names it (PLAN.md 19x,
+  # scripts/checkguard.mjs). Its own job so that it answers in seconds, and so
+  # that after the body gains its "Check changes:" section, re-running the
+  # failed jobs re-reads the body (the script asks the API for it, not the
+  # event the run started with) without a push or the Mac queue. It reads the
+  # merge commit against its first parent, as `reach` does, and passes with
+  # nothing to name against on a deploy.
+  check-changes:
+    name: Check changes named
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Every change to a check's bar or input is named in the PR's body
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/checkguard.mjs --diff
+
+  # The one name for the four Measure parts and the check-change guard: green
+  # only when all of them are. The guard is under this name because the branch
+  # rule requires Measure, so a PR cannot merge past an unnamed change.
   measure:
     name: Measure
-    needs: measure-part
+    needs: [measure-part, check-changes]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - run: test "${{ needs.measure-part.result }}" = success
+      - run: test "${{ needs.measure-part.result }}" = success && test "${{ needs.check-changes.result }}" = success

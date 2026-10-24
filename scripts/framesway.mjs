@@ -26,6 +26,13 @@
  *      slides, the lamp never follows the rock, the beat turns nothing.
  *      And nothing but a hand turns it on: no look routes sound or a scene to
  *      it, no sound or scene patch can, Evolve never drifts it, Lucky never rolls it.
+ *      Except the few looks named in FRAME_MOVING_LOOKS (lib/plateRock.ts;
+ *      the owner, the next morning: "it's ok if the whole plate moves ...
+ *      with a small subset of presets. I just don't want this kind of look to
+ *      be a default across all presets"). Only those may set Frame Sway or
+ *      patch the sound onto a dial that moves the whole frame (FRAME_MOTION);
+ *      the list holds a handful at most, names only shipped looks that use
+ *      it, and each one does move the frame on the song.
  *   2. And it is the dial doing that, not a song that never kicked: the same
  *      look with Frame Sway at full slides the picture as #347 did (the
  *      default look at least 0.05% of the plate a frame at its peak), half
@@ -58,6 +65,7 @@ await build({
       "export { luckyLook } from './src/lib/lucky.ts';",
       "export { soundMappable } from './src/lib/midi.ts';",
       "export { PATCH_TARGETS } from './src/lib/sceneMap.ts';",
+      "export { FRAME_MOTION } from './src/lib/drift.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
   },
@@ -109,25 +117,69 @@ function song(S) {
 const pc = (x) => `${(100 * x).toFixed(3)}%`;
 
 // ── 1. Every look and every show stage, as shipped ────────────────────
-const looks = L.PRESETS.map((p) => ({ name: p.name ?? p.id, S: { ...L.DEFAULT_SETTINGS, ...p.settings } }));
-looks.unshift({ name: 'the defaults', S: { ...L.DEFAULT_SETTINGS } });
+const looks = L.PRESETS.map((p) => ({ id: p.id, preset: p, name: p.name ?? p.id, S: { ...L.DEFAULT_SETTINGS, ...p.settings } }));
+looks.unshift({ id: null, name: 'the defaults', S: { ...L.DEFAULT_SETTINGS } });
 for (const seq of L.builtInSequences()) {
   for (const st of seq.stages ?? []) {
     const look = L.PRESETS.find((p) => p.id === st.presetId);
-    looks.push({ name: `${seq.name}: ${st.name}`, S: { ...L.DEFAULT_SETTINGS, ...(look?.settings ?? {}), ...(st.settings ?? {}) } });
+    looks.push({ id: st.presetId ?? null, name: `${seq.name}: ${st.name}`, S: { ...L.DEFAULT_SETTINGS, ...(look?.settings ?? {}), ...(st.settings ?? {}) } });
   }
 }
-const moved = [];
-let worstBefore = { slidePeak: 0 }, rocked = 0;
-for (const { name, S } of looks) {
+const named = (l) => l.id !== null && L.FRAME_MOVING_LOOKS.has(l.id);
+const moved = [], namedMoved = [], namedSlid = new Set();
+let worstBefore = { slidePeak: 0 }, rocked = 0, held = 0;
+for (const l of looks) {
+  const { name, S } = l;
   const now = song(S), was = song({ ...S, frameSway: 1 });
-  if (now.slidePeak > 0 || now.lampPeak > 0 || now.beat > 0) moved.push(`${name} (slide ${pc(now.slidePeak)}, lamp ${pc(now.lampPeak)}, beat ${now.beat})`);
+  const moves = now.slidePeak > 0 || now.lampPeak > 0 || now.beat > 0;
+  if (named(l)) {
+    if (moves) namedMoved.push(`${name} (slide ${pc(now.slidePeak)} peak, lamp ${pc(now.lampPeak)}, beat ${now.beat})`);
+    // The look itself, not a show stage that plays it, and the picture slid, not merely a dial set.
+    if (L.PRESETS.some((p) => p === l.preset) && now.slidePeak >= 0.0005) namedSlid.add(l.id);
+    continue;
+  }
+  held++;
+  if (moves) moved.push(`${name} (slide ${pc(now.slidePeak)}, lamp ${pc(now.lampPeak)}, beat ${now.beat})`);
   if (was.slidePeak > worstBefore.slidePeak) worstBefore = { ...was, name };
   if ((S.plateRock ?? 0) > 0) rocked++;
 }
-console.log(`   ${looks.length} looks and show stages, ${rocked} with Plate Rock up; as #347 shipped (Frame Sway at full, what every look had), the worst slid the picture ${pc(worstBefore.slidePeak)} of the plate in a frame (${worstBefore.name})`);
-check('every shipped look and show stage holds the frame still: no cover slide, no lamp on the rock, no beat turn, on any frame of the song',
-  moved.length === 0 && looks.length > 20, moved.length ? moved.slice(0, 4).join('; ') : `${looks.length} of ${looks.length} still`);
+console.log(`   ${looks.length} looks and show stages, ${held} not on the named list, ${rocked} of those with Plate Rock up; as #347 shipped (Frame Sway at full, what every look had), the worst slid the picture ${pc(worstBefore.slidePeak)} of the plate in a frame (${worstBefore.name})`);
+check('every shipped look and show stage not named to move the frame holds it still: no cover slide, no lamp on the rock, no beat turn, on any frame of the song',
+  moved.length === 0 && held > 20, moved.length ? moved.slice(0, 4).join('; ') : `${held} of ${held} still`);
+
+/*
+  The named looks. Asked of the list itself, so it cannot grow into the
+  default (a handful at most), cannot name a look that is not shipped (a
+  typo would be a look that silently lost its opt-in), and cannot name one
+  that does not use it (a stale name is room for the next one nobody chose).
+  And asked of every look on the shelf, so the opt-in is the only way in:
+  a look outside the list that sets Frame Sway, or patches the sound (any
+  of its three sources) onto a dial that moves the whole frame, fails here.
+  Oil Wheel did, until 28f: its band's mid was patched onto the dish's
+  motor. A scene patch (the room camera) is a different matter, read by the
+  room's own checks, and is not counted.
+*/
+const SOUND = new Set(['sound', 'bands', 'hits']);
+const frameRoutes = (S) => (S.sceneMappings ?? []).filter((m) => m && SOUND.has(m.source ?? 'room') && L.FRAME_MOTION.has(m.setting)).map((m) => `${m.source}:${m.feature} on ${m.setting}`);
+const outside = [];
+for (const l of looks) {
+  if (named(l)) continue;
+  const routes = frameRoutes(l.S);
+  if ((l.S.frameSway ?? 0) > 0) routes.push(`Frame Sway ${l.S.frameSway}`);
+  if (routes.length) outside.push(`${l.name}: ${routes.join(', ')}`);
+}
+const list = [...L.FRAME_MOVING_LOOKS];
+const unknown = list.filter((id) => !L.PRESETS.some((p) => p.id === id));
+const unused = list.filter((id) => {
+  const p = L.PRESETS.find((x) => x.id === id);
+  return p && !((p.settings.frameSway ?? 0) > 0 || frameRoutes(p.settings).length > 0);
+});
+console.log(`   named to move the frame: ${list.join(', ') || 'none'}; on the song: ${namedMoved.join('; ') || 'none moved'}`);
+check(`only the named looks move the frame with the music, and they are a handful (at most ${L.FRAME_MOVING_MOST}) of shipped looks that use it`,
+  outside.length === 0 && list.length <= L.FRAME_MOVING_MOST && unknown.length === 0 && unused.length === 0,
+  `${outside.length ? `outside the list: ${outside.join('; ')}` : 'nothing outside the list'}; ${list.length} named${unknown.length ? `, not shipped: ${unknown.join(', ')}` : ''}${unused.length ? `, not using it: ${unused.join(', ')}` : ''}`);
+check('and each look on the list, as shipped, does slide the picture on the song (0.05% of the plate a frame or more at its peak), so the opt-in is a real one',
+  list.every((id) => namedSlid.has(id)), `${namedSlid.size} of ${list.length} slid: ${namedMoved.join('; ') || 'none moved'}`);
 
 /*
   And nothing but a hand turns it on (the owner, 2026-10-11: "It's fine if
@@ -159,8 +211,19 @@ const off = song(base), full = song({ ...base, frameSway: 1 }), half = song({ ..
 console.log(`   the defaults (Plate Rock ${base.plateRock}) through the song, per frame: the picture's slide peak ${pc(full.slidePeak)} and mean ${pc(full.slideMean)} as #347 shipped, ${pc(off.slidePeak)} and ${pc(off.slideMean)} now; the lamp's jump on the rock ${pc(full.lampPeak)} then, ${pc(off.lampPeak)} now`);
 check('and it is the dial: at full Frame Sway the same song slides the default look\'s picture as #347 did, 0.05% of the plate a frame or more at the peak',
   full.slidePeak >= 0.0005 && full.lampPeak > 0 && full.beat === 1, `${pc(full.slidePeak)} peak, lamp ${pc(full.lampPeak)}`);
-check('half way slides it less than full and more than none',
-  half.slidePeak > 0 && half.slidePeak < full.slidePeak && half.beat === 0.5, `${pc(half.slidePeak)} against ${pc(full.slidePeak)}`);
+/*
+  The room only holds the glass where the glass slides as far as it. Since
+  Plate Rock's hand leans half as steeply (27f-2, lib/plateRock.ts
+  ROCK_LEAN), at the default rock the glass rests about 5 mm off the middle
+  (R_c sinθ, 2.6 degrees) and swings to under 2 cm, inside half the room as
+  well as all of it, so the default look slides the same at Frame Sway 0.5
+  and 1 (0.343% either way): the dial has nothing to hold. It is read where
+  the glass does reach the rim, the same song at full Plate Rock.
+*/
+const fullRock = song({ ...base, plateRock: 1, frameSway: 1 }), halfRock = song({ ...base, plateRock: 1, frameSway: 0.5 });
+check('half way slides it less than full and more than none (at full Plate Rock, where the glass reaches the rim)',
+  halfRock.slidePeak > 0 && halfRock.slidePeak < fullRock.slidePeak && half.beat === 0.5,
+  `${pc(halfRock.slidePeak)} against ${pc(fullRock.slidePeak)}; at the default rock ${pc(half.slidePeak)} against ${pc(full.slidePeak)}`);
 check('and the plate\'s own tilt still swings with the kicks at Frame Sway 0 (Plate Rock moves the heavier colour, the liquid\'s motion)',
   off.tiltPeak > 0.05 && Math.abs(off.tiltPeak - full.tiltPeak) < 1e-12, `sinθ up to ${off.tiltPeak.toFixed(3)}, the same as at full`);
 check('a Frame Sway that is not a number is off', L.frameSway(NaN) === 0 && L.coverRoom(undefined) === 0 && L.frameSway(2) === 1 && L.frameSway(-1) === 0);

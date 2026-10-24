@@ -43,13 +43,14 @@ import { luckyLook } from '../src/lib/lucky.ts';
 import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
-import { SettingRide } from '../src/lib/ride.ts';
+import { SettingRide, rideSlot } from '../src/lib/ride.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/DeskPanels.tsx';
 import { SHIPPED } from '../src/lib/deskLayout.ts';
 import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
+import { helpFor, CONTROL_HELP } from '../src/lib/controlHelp.ts';
 import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
@@ -830,6 +831,65 @@ check('nothing to hand over is no React update at all', new SettingRide().drain(
   ride.drain();
   check('and a value written twice is only handed over once',
     ride.write('dimmer', 0.4) === undefined && ride.drain() === null);
+}
+
+/*
+  The plate's own read of the ride (PLAN.md §14f, `lay`): what a frame draws
+  while React is told ten times a second. #348's first try laid the whole
+  shadow over every frame and went back for three faults; the first two are
+  the ride's to answer, and are held here (the third, every reader in the
+  frame loop reading one object, is the visualizer's, and `npm run renders`
+  holds it on the Mac by counting the frames that draw a ride).
+*/
+{
+  const all = () => true;
+  const ride = new SettingRide();
+  const slot = rideSlot();
+  let base = { dimmer: 0.5, bloom: 0.3 };
+  check('a plate with nothing ridden draws what React rendered, the same object', ride.lay(base, all, slot) === base);
+  ride.write('dimmer', 0.8);
+  const a = ride.lay(base, all, slot);
+  check('a move React has not rendered is drawn at once', a !== base && a.dimmer === 0.8 && a.bloom === 0.3 && base.dimmer === 0.5);
+  check('and the next frame with nothing new is handed the same object, not a copy', ride.lay(base, all, slot) === a);
+  ride.write('dimmer', 0.9);
+  const b = ride.lay(base, all, slot);
+  check('and a new move is a new object', b !== a && b.dimmer === 0.9);
+  // React renders the move: from then on, no frame copies anything.
+  ride.drain();
+  base = { ...base, dimmer: 0.9 };
+  ride.observe(base);
+  let copies = 0;
+  for (let i = 0; i < 3600; i++) if (ride.lay(base, all, slot) !== base) copies++;
+  check('once React has the move, a minute of frames lays nothing (it laid every frame for good)', copies === 0, `${copies} of 3600 frames copied`);
+  check('while the fader still answers for itself', ride.read('dimmer', base) === 0.9);
+}
+{
+  // The identified track overrides the key the fader moves: the track wins
+  // in what is drawn, as it does in what React renders (effectiveSettings).
+  const ride = new SettingRide();
+  const overridden = new Set(['dimmer']);
+  const notOverridden = (k) => !overridden.has(k);
+  const drawn = { dimmer: 0.9, bloom: 0.3 };   // the track asks 0.9
+  ride.write('dimmer', 0.6);
+  ride.write('bloom', 0.5);
+  const out = ride.lay(drawn, notOverridden, rideSlot());
+  check('a fader never lays over a key the track overrides', out.dimmer === 0.9, `drew ${out.dimmer}, the track asks 0.9`);
+  check('and still lays the keys the track leaves alone', out.bloom === 0.5);
+  check('and a ride on nothing but overridden keys copies nothing',
+    (() => { const r = new SettingRide(); r.write('dimmer', 0.6); return r.lay(drawn, notOverridden, rideSlot()) === drawn; })());
+}
+{
+  // A preset moving the setting takes it back from the fader, on the plate too.
+  const ride = new SettingRide();
+  const slot = rideSlot();
+  const live = { dimmer: 0.5 };
+  ride.write('dimmer', 0.8);
+  ride.drain();
+  Object.assign(live, { dimmer: 0.8 });
+  ride.observe(live);
+  const preset = { dimmer: 0.2 };
+  ride.observe(preset);
+  check('a preset that moves the setting is what the plate draws', ride.lay(preset, () => true, slot) === preset);
 }
 
 /*
@@ -1696,6 +1756,50 @@ check('and neither starts over the limit',
   const undead = [...RETIRED.keys()].filter(n => have.has(n));
   check('nothing is listed as retired while it still exists', undead.length === 0,
     undead.length ? undead.join(', ') : `${RETIRED.size} retired`);
+}
+
+// ── Kick Bloom ──
+// The kick's outward dye burst has its own dial, and is not a ring. This reads
+// the frame loop's source (the burst is inline there, so the lab cannot reach
+// it; the picture itself is for a Mac read, docs/judging.md): the dial gates
+// the burst, scales the dye each droplet lays and the push it is given, and
+// the droplets no longer sit at (d / drops) of a turn on one circle.
+{
+  const vis = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
+  const burst = vis.slice(vis.indexOf('const bloomGain'), vis.indexOf('// The beat dose'));
+  check('Kick Bloom gates the kick\'s dye burst and scales its dye and push',
+    /kickBloom \?\? 1/.test(burst) && /bloomGain > 0/.test(burst) && /autoAmp \* pourDt \* bloomGain/.test(burst) && /bloomGain;/.test(burst.slice(burst.indexOf('const speed'))),
+    'src/components/LiquidVisualizer.tsx');
+  check('and the burst is clumps at random angles, not droplets evenly round one circle',
+    burst.includes('lobeAt') && !/\(d \/ drops\) \* Math\.PI \* 2/.test(burst));
+}
+
+// ── What each control says it is (PLAN.md 8j) ───────────────────────
+//
+// The hover card on the desk and the tap card on the phone read one line per
+// control from `lib/controlHelp.ts`, by the setting's key. A control with no
+// line draws a card with only its name, which looks like a design choice
+// rather than an omission, so every pinnable control is held to having one.
+// And the lines are held to being a line: one sentence a person can read in a
+// glance, in plain words (no dashes standing in for a clause, no filler the
+// label already says).
+{
+  const none = PINNABLE.filter(s => !helpFor(String(s.key)));
+  check('every control a desk can hold has a line saying what it does', none.length === 0,
+    none.length ? `${none.map(s => `${s.label} (${String(s.key)})`).join(', ')}: add to src/lib/controlHelp.ts` : `${PINNABLE.length} lines`);
+  const strays = Object.keys(CONTROL_HELP).filter(k => !PIN_RANGE.has(k));
+  check('and no line is left for a control that is gone', strays.length === 0, strays.join(', ') || 'none');
+  const lines = PINNABLE.map(s => [s, helpFor(String(s.key)) ?? '']);
+  const long = lines.filter(([, l]) => l.length > 135 || l.length < 20);
+  check('each is a short sentence, 20 to 135 characters', long.length === 0,
+    long.map(([s, l]) => `${s.label} (${l.length})`).join(', ') || 'all');
+  const dashed = lines.filter(([, l]) => /[—–]|\s-\s/.test(l) || !/[.)]$/.test(l));
+  check('written in plain sentences: they end with a stop and use no dash for a clause', dashed.length === 0,
+    dashed.map(([s]) => s.label).join(', ') || 'all');
+  const same = new Map();
+  for (const [s, l] of lines) same.set(l, [...(same.get(l) ?? []), s.label]);
+  const dup = [...same.values()].filter(v => v.length > 1);
+  check('and no two controls share a line', dup.length === 0, dup.map(v => v.join(' = ')).join('; ') || 'all different');
 }
 
 // ── Result ──────────────────────────────────────────────────────────

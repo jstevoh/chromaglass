@@ -66,7 +66,7 @@ jobs:
       - name: Film the looks
         run: npm run film
         env:
-          FILM_ONLY: ${{ github.event_name == 'pull_request' && 'classic,fillmore-1969,soap-film' || inputs.only }}
+          FILM_ONLY: ${{ github.event_name == 'pull_request' && 'classic,poster-1969,soap-film' || inputs.only }}
           FILM_SECONDS: ${{ inputs.seconds || '120' }}
           FILM_TAKES: ${{ inputs.takes || '3' }}
           FILM_SHARD: ${{ matrix.shard }}/${{ github.event_name == 'pull_request' && '1' || '6' }}
@@ -97,7 +97,7 @@ jobs:
         run: npm run film
         env:
           FILM_COMBINE: shards
-          FILM_ONLY: ${{ github.event_name == 'pull_request' && 'classic,fillmore-1969,soap-film' || inputs.only }}
+          FILM_ONLY: ${{ github.event_name == 'pull_request' && 'classic,poster-1969,soap-film' || inputs.only }}
           FILM_TAKES: ${{ inputs.takes || '3' }}
           FILM_SECONDS: ${{ inputs.seconds || '120' }}
       - uses: actions/upload-artifact@v4

@@ -31,6 +31,7 @@ import { getSceneValue, type SceneReading } from './sceneSense.ts';
 import { getAudioValue, type AudioFeatureKey } from '../constants.ts';
 import { SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures.ts';
 import type { ModulatorFeature, Modulators } from './modulators';
+import type { HitSource } from './hitSource.ts';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { PatchSource, SceneFeature, SceneMapping, VisualizerSettings } from '../types';
 import { PINNABLE, onStep } from './deskPins.ts';
@@ -69,10 +70,14 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   Clear Film (PLAN §20b) likewise: moving it pours clear oil over the whole
   dish or draws it off, so a patch riding the beat would fill the lace's
   holes in on every bar. A pour is a hand's gesture.
+  Two Projectors (PLAN §18b-10) switches the rig between one lamp and two, so
+  a patch or LFO must not flip it mid-song.
 */
-const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm',
+const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
   'frameSway',
+  // A hand's alone too: the tilt is the owner's, and a kick routed to Slosh would be the sound rocking the liquid (lib/slosh.ts).
+  'slosh',
   ...MIX_FADE_KEYS.map(String)]);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>
@@ -154,6 +159,12 @@ export interface PatchContext {
    * adding it was a day's work rather than a rewrite.
    */
   shape: Modulators | null;
+  /**
+   * The hits and the note (`hitSource.ts`): how hard each drum's last hit
+   * was, held and let fall. The same microphone as `sound` and `bands`, so
+   * the same master, Sound Impact.
+   */
+  hits?: HitSource | null;
   /** Master depth per source, so a whole source can be pulled down on a fader. */
   roomImpact: number;
   filmImpact: number;
@@ -191,6 +202,12 @@ function liveValue(
     const reading = ctx.sound?.features;
     if (ctx.soundImpact <= 0 || !reading || !NAMED.has(feature)) return null;
     return { value: sourceValue(reading, feature as SourceName), impact: ctx.soundImpact };
+  }
+  // The hits, read as `bands` is: nothing to say with no reading this frame
+  // (the source has let its values fall by then anyway).
+  if (source === 'hits') {
+    if (ctx.soundImpact <= 0 || !ctx.hits || !ctx.sound?.features) return null;
+    return { value: ctx.hits.value(feature), impact: ctx.soundImpact };
   }
   // Shapes have no staleness: an LFO is never out of date, and an envelope
   // that has not been fired reads zero, which is already "nothing to say".

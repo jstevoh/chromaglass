@@ -14,10 +14,11 @@ import {
   Sliders,
   History,
 } from 'lucide-react';
-import { Sheet, Button } from './ui';
+import { Sheet, Button, SwitchPill } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
 import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
+import { openAccountSheet } from '../lib/tierGates';
 
 export interface RecordPanelProps {
   onClose: () => void;
@@ -79,8 +80,10 @@ export function RecordPanel({
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* ── Tab Bar ─────────────────────────────────────────── */}
         <div className="flex shrink-0 items-center justify-between border-b border-border bg-elevated/50 px-5 py-2.5">
-          <div className="inline-flex rounded-lg border border-border bg-surface p-1">
+          <div className="inline-flex rounded-lg border border-border bg-surface p-1" role="tablist" aria-label="Record mode">
             <button
+              role="tab"
+              aria-selected={tab === 'video'}
               onClick={() => setTab('video')}
               data-testid="record-tab-video"
               className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
@@ -99,6 +102,8 @@ export function RecordPanel({
               )}
             </button>
             <button
+              role="tab"
+              aria-selected={tab === 'performance'}
               onClick={() => setTab('performance')}
               data-testid="record-tab-performance"
               className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
@@ -150,6 +155,26 @@ export function RecordPanel({
                   </div>
                 </div>
               </div>
+
+              {recorder.maxDurationSec !== null && (
+                <div
+                  data-cg-app-tile="full-record"
+                  data-cg-record-free-cap={String(recorder.maxDurationSec)}
+                  onClick={openAccountSheet}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+                  className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
+                >
+                  <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
+                    <span>In the ChromaGlass app · Full-length unmarked Record</span>
+                    <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
+                  </div>
+                  <p className="mt-0.5 text-amber-100/90">
+                    On the free site, clips are capped at {recorder.maxDurationSec} seconds and carry the ChromaGlass corner mark. Unlock Home or Pro for full-length unmarked takes.
+                  </p>
+                </div>
+              )}
 
               {/* Status & Primary Control Card */}
               <div className="rounded-xl border border-border bg-surface p-4">
@@ -231,20 +256,18 @@ export function RecordPanel({
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => recorder.setOptions({ includeAudio: !videoOpts.includeAudio })}
                       disabled={recorder.recording}
                       data-testid="record-audio-toggle"
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        videoOpts.includeAudio ? 'bg-primary' : 'bg-border-strong'
-                      } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                       role="switch"
                       aria-checked={videoOpts.includeAudio}
+                      aria-label="Include Audio Track"
+                      className={`flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1 ${
+                        recorder.recording ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                          videoOpts.includeAudio ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
+                      <SwitchPill on={videoOpts.includeAudio} />
                     </button>
                   </div>
                 </div>
@@ -258,7 +281,7 @@ export function RecordPanel({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup" aria-label="Quality & Bitrate Preset">
                     {(
                       [
                         {
@@ -282,12 +305,15 @@ export function RecordPanel({
                       return (
                         <button
                           key={q.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
                           disabled={recorder.recording}
                           onClick={() => recorder.setOptions({ quality: q.id as VideoQuality })}
                           data-testid={`record-quality-${q.id}`}
                           className={`flex flex-col text-left rounded-lg border p-3 transition-colors ${
                             selected
-                              ? 'border-accent-border bg-accent-soft text-text'
+                              ? 'border-accent-border bg-accent-bg text-text'
                               : 'border-border bg-elevated/40 text-muted hover:border-border-strong hover:text-text'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -310,16 +336,19 @@ export function RecordPanel({
                     <div className="text-[12px] text-muted">
                       Capture rate from the fluid simulation loop.
                     </div>
-                    <div className="flex gap-2 pt-1">
+                    <div className="flex gap-2 pt-1" role="radiogroup" aria-label="Frame Rate">
                       {([60, 30] as const).map((rate) => (
                         <button
                           key={rate}
+                          type="button"
+                          role="radio"
+                          aria-checked={videoOpts.fps === rate}
                           disabled={recorder.recording}
                           onClick={() => recorder.setOptions({ fps: rate })}
                           data-testid={`record-fps-${rate}`}
                           className={`flex-1 rounded-md border py-1.5 text-center text-[12px] font-medium transition-colors ${
                             videoOpts.fps === rate
-                              ? 'border-accent-border bg-accent-soft text-text'
+                              ? 'border-accent-border bg-accent-bg text-text'
                               : 'border-border bg-elevated/40 text-muted hover:border-border-strong'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -335,7 +364,7 @@ export function RecordPanel({
                     <div className="text-[12px] text-muted">
                       Preferred video container (subject to browser support).
                     </div>
-                    <div className="flex gap-2 pt-1">
+                    <div className="flex gap-2 pt-1" role="radiogroup" aria-label="Container & Codec">
                       {(
                         [
                           { id: 'auto', label: 'Auto' },
@@ -345,12 +374,15 @@ export function RecordPanel({
                       ).map((fmt) => (
                         <button
                           key={fmt.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={videoOpts.format === fmt.id}
                           disabled={recorder.recording}
                           onClick={() => recorder.setOptions({ format: fmt.id as VideoFormat })}
                           data-testid={`record-format-${fmt.id}`}
                           className={`flex-1 rounded-md border py-1.5 text-center text-[12px] font-medium transition-colors ${
                             videoOpts.format === fmt.id
-                              ? 'border-accent-border bg-accent-soft text-text'
+                              ? 'border-accent-border bg-accent-bg text-text'
                               : 'border-border bg-elevated/40 text-muted hover:border-border-strong'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >

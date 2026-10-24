@@ -56,7 +56,7 @@ await new Promise((r) => setTimeout(r, 2500));
 
 const browser = await launchChromium(chromium);
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-await page.addInitScript(() => { try { localStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
+await page.addInitScript(() => { try { sessionStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
 
 // `?stages` from the first frame, a pinned grid so the governor is not also
 // moving, and the classic look so the plate is the same plate every run.

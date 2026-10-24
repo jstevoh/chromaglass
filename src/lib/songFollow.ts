@@ -57,14 +57,15 @@
  * What it reports, and why confidence is two things. `position` is where
  * most of the weight is. Confidence asks two questions: does the map at that
  * place sound like the room (`quality`, the correlation of the two profiles,
- * held over about three seconds), and do the guesses agree (`agreement`, the
- * weight within a beat or two of the same place in a section of the same
- * kind; a chorus heard twice in the map is two places that sound the same,
- * and being unsure which chorus this is is not being lost). A jam on chords
+ * held over about three seconds as it falls and half that as it rises), and
+ * do the guesses agree (`agreement`, the weight within a beat or two of the
+ * same place in a section of the same kind; a chorus heard twice in the map
+ * is two places that sound the same, and being unsure which chorus this is
+ * is not being lost). A jam on chords
  * the song never had fails the first; a vamp on chords the song has in
  * several places fails the second. When confidence is low, the show should
- * fall back on what it hears live (`songShape.ts`); wiring that is PLAN 28g
- * step 2.
+ * fall back on what it hears live (`songShape.ts`); `followedPlace.ts`
+ * does that, and is what the show reads (PLAN.md 28g-2).
  *
  * Measured by `npm run songfollow`.
  */
@@ -88,8 +89,14 @@ const JUMP_AT_END = 0.15;
 const LEAK = 1e-3;
 /** Each hop, the share of each tempo's weight that moves to each tempo beside it. */
 const TEMPO_DRIFT = 0.04;
-/** Quality held over this many seconds. */
-const QUALITY_SEC = 3;
+/** Confidence at and over which the tempo heard is taken as the band's (see `step`, "lost"). */
+const TEMPO_KNOWN_AT = 0.5;
+/** Confidence under which the follower is lost, and the band's tempo is held at what was known. */
+const TEMPO_LOST = 0.2;
+/** The band's tempo is remembered over this many seconds of being followed. */
+const TEMPO_KNOWN_SEC = 4;
+/** Quality held over this many seconds as it falls, and this many as it rises (see `estimate`). */
+const QUALITY_SEC = 3, QUALITY_RISE_SEC = 1.5;
 /** Correlation at and under which the room is not this song at all, and at and over which it plainly is. */
 const QUALITY_NONE = 0.3, QUALITY_SURE = 0.7;
 /** Agreement counts the guesses within this many seconds of the reported place, in a section of the same kind. */
@@ -177,7 +184,12 @@ export class SongFollower {
   private readonly live = new Float64Array(12);
   private heard = false;
   private qualityHeld = 0;
+  /** The band's tempo as last known while followed: a weight per tempo, or null before it was ever followed. */
+  private tempoKnown: Float64Array | null = null;
+  private readonly tempoHere = new Float64Array(TEMPO_STEPS);
   readonly now: FollowState = { position: null, section: -1, tempo: 1, confidence: 0, quality: 0, agreement: 0 };
+  /** Hops made so far: `now` is updated in place, and changes only when this does (or on `anchor`). */
+  hops = 0;
 
   constructor(map: FollowMap) {
     const N = this.frames = Math.max(1, Math.floor(map.chroma.length / 12));
@@ -254,6 +266,7 @@ export class SongFollower {
       for (let i = 0; i < 12; i++) this.sum[i] /= this.count;
       const harmonic = centreChroma(this.sum, this.live);
       this.step(dt, harmonic);
+      this.hops++;
       this.sum.fill(0);
       this.count = 0;
       this.hopStart = t;
@@ -335,6 +348,32 @@ export class SongFollower {
     for (let s = 0; s < N * K; s++) total += a[s];
     if (!(total > 0)) a.fill(1 / (N * K));
     else for (let s = 0; s < N * K; s++) a[s] /= total;
+    /*
+      Lost (a jam the song never had, a song that is not this one): what is
+      heard says where the map sounds most like the room, and nothing about
+      how fast the band plays. Left alone, the weight ran to the slowest
+      tempo: in a jam every chord the band plays is somewhere in the map (its
+      E is the chorus's last chord), and a state that barely moves sits on
+      such a place for longest, so the slow states outlived the rest. Measured
+      on the check's jam: the tempo 0.99 going in, 0.63 two bars later and
+      0.62 at the chorus after, sixteen bars on, which the follower then
+      followed at 0.62 for two bars before losing it again. So while lost,
+      each place's weight is spread over the tempos as the band was last
+      known to play, half of it a hop; where the place is, it still decides.
+      With it the tempo is 0.95 through the jam, and the jam reads as one:
+      confidence 0.11 in it against 0.17 without, and the place the show
+      reads (`followedPlace.ts`) unsure on 107 of its 112 hops against 95,
+      where the rest were the place jumping to wherever the slow states sat
+      (5.3 bars, `npm run songfollow`).
+    */
+    const known = this.tempoKnown;
+    if (known && this.now.confidence < TEMPO_LOST) {
+      for (let i = 0; i < N; i++) {
+        let w = 0;
+        for (let k = 0; k < K; k++) w += a[k * N + i];
+        for (let k = 0; k < K; k++) a[k * N + i] = 0.5 * a[k * N + i] + 0.5 * w * known[k];
+      }
+    }
     this.estimate(harmonic);
   }
 
@@ -355,9 +394,11 @@ export class SongFollower {
       if (run > bestW) { bestW = run; best = c; }
     }
     let sw = 0, sx = 0, st = 0;
+    const th = this.tempoHere;
+    th.fill(0);
     for (let i = Math.max(0, best - r); i <= Math.min(N - 1, best + r); i++) {
       sw += m[i]; sx += m[i] * i;
-      for (let k = 0; k < K; k++) st += a[k * N + i] * Math.log(this.rates[k]);
+      for (let k = 0; k < K; k++) { st += a[k * N + i] * Math.log(this.rates[k]); th[k] += a[k * N + i]; }
     }
     const f = sw > 0 ? sx / sw : best;
     const fi = Math.round(f);
@@ -371,9 +412,16 @@ export class SongFollower {
       const c = this.startFrame[s] + into;
       for (let i = Math.max(this.startFrame[s], c - r); i <= Math.min(this.endFrame[s] - 1, c + r); i++) agree += m[i];
     }
+    // Quality falls over QUALITY_SEC and rises over half that: a band back
+    // from a jam is the song again as soon as it sounds like it for a bar,
+    // and the show should not wait out three seconds of jam in the average
+    // before believing it. Measured on the check's jam: the place the show
+    // reads was sure of the chorus after it 5.4 bars in with one rate, 1.8
+    // with these two; the jam's own confidence stays under 0.3 (0.11).
     if (heardNow) {
-      const q = Math.min(1, (1 / FOLLOW_RATE) / QUALITY_SEC);
-      this.qualityHeld += q * (this.match(fi) - this.qualityHeld);
+      const now = this.match(fi);
+      const q = Math.min(1, (1 / FOLLOW_RATE) / (now > this.qualityHeld ? QUALITY_RISE_SEC : QUALITY_SEC));
+      this.qualityHeld += q * (now - this.qualityHeld);
     }
     const qn = Math.min(1, Math.max(0, (this.qualityHeld - QUALITY_NONE) / (QUALITY_SURE - QUALITY_NONE)));
     const n = this.now;
@@ -385,5 +433,13 @@ export class SongFollower {
     n.quality = this.qualityHeld;
     n.agreement = Math.min(1, agree);
     n.confidence = qn * Math.min(1, agree / 0.6);
+    // The band's tempo while followed, for when it is lost (see `step`).
+    if (heardNow && n.confidence >= TEMPO_KNOWN_AT && sw > 0) {
+      if (!this.tempoKnown) this.tempoKnown = Float64Array.from(th, x => x / sw);
+      else {
+        const l = 1 - Math.exp(-1 / (FOLLOW_RATE * TEMPO_KNOWN_SEC));
+        for (let k = 0; k < K; k++) this.tempoKnown[k] += l * (th[k] / sw - this.tempoKnown[k]);
+      }
+    }
   }
 }

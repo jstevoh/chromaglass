@@ -89,7 +89,13 @@ if (!app.requestSingleInstanceLock()) {
 /** The laptop's window: the desks and the plate. */
 let showWindow = null;
 /** What the show server was started with, for the menu's details. */
-const show = { port: 0, osc: 0, key: '' };
+const show = {
+  port: 0,
+  osc: 0,
+  key: '',
+  requireSignIn: false,
+  license: { valid: false, tier: 'free', email: null, id: null, exp: null, error: null, enforced: false },
+};
 
 /**
  * The show key, kept between launches.
@@ -98,18 +104,24 @@ const show = { port: 0, osc: 0, key: '' };
  * phone is set up in the same minute; an app that is quit and reopened
  * between soundcheck and doors would log every phone out. So the app picks
  * one on its first launch and keeps it, and SHOW_KEY still wins when set.
+ *
+ * Eight digits, not four (PLAN 14m): four are ten thousand guesses, which a
+ * script on the venue's Wi-Fi makes in seconds. The server now locks an address
+ * out for five minutes after three wrong keys, and the two together put a
+ * guessed key years away. A key kept from before is shorter than eight digits
+ * and is made again once, so each phone scans the code one more time.
  */
 function showKey() {
   if (process.env.SHOW_KEY) return String(process.env.SHOW_KEY);
   const file = join(app.getPath('userData'), 'show.json');
   try {
     const saved = JSON.parse(readFileSync(file, 'utf8'));
-    if (typeof saved.key === 'string' && /^\d{4,}$/.test(saved.key)) return saved.key;
+    if (typeof saved.key === 'string' && /^\d{8,}$/.test(saved.key)) return saved.key;
   } catch { /* first launch */ }
-  const key = String(randomInt(1000, 10000));
+  const key = String(randomInt(10_000_000, 100_000_000));
   try {
     mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, JSON.stringify({ key }, null, 2));
+    writeFileSync(file, JSON.stringify({ key }, null, 2), { mode: 0o600 });
   } catch { /* a key for this launch only */ }
   return key;
 }
@@ -204,6 +216,10 @@ const webPreferences = () => ({
   contextIsolation: true,
   sandbox: true,
   backgroundThrottling: false,
+  additionalArguments: [
+    `--chromaglass-license=${Buffer.from(JSON.stringify(show.license)).toString('base64url')}`,
+    `--chromaglass-require-signin=${show.requireSignIn ? '1' : '0'}`,
+  ],
 });
 
 /*
@@ -305,10 +321,32 @@ async function start() {
   show.port = await choosePort();
   show.key = showKey();
   show.osc = Number(process.env.OSC_PORT ?? 9000);
+  show.requireSignIn = Boolean(process.env.CHROMAGLASS_REQUIRE_SIGNIN);
+  const licenseFile = process.env.CHROMAGLASS_LICENSE_FILE ?? join(app.getPath('userData'), 'license.json');
+  process.env.CHROMAGLASS_LICENSE_FILE = licenseFile;
   // The server reads its settings from the environment, as it does in a terminal.
   process.env.PORT = String(show.port);
   process.env.SHOW_KEY = show.key;
   process.env.OSC_PORT = String(show.osc);
+  const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);
+  const licenseMgr = createServerLicenseManager({ filePath: licenseFile });
+  await licenseMgr.initFromEnv();
+  const initialStatus = await licenseMgr.currentStatus();
+  let initialError = null;
+  if (process.env.CHROMAGLASS_LICENSE_KEY && !initialStatus.valid) {
+    const { verifyLicenseKey } = await import(pathToFileURL(join(ROOT, 'server', 'license-key.js')).href);
+    const check = await verifyLicenseKey(process.env.CHROMAGLASS_LICENSE_KEY);
+    initialError = check.error ?? 'invalid-signature';
+  }
+  show.license = {
+    valid: initialStatus.valid,
+    tier: initialStatus.tier,
+    email: initialStatus.email,
+    id: initialStatus.id,
+    exp: initialStatus.exp,
+    error: initialError,
+    enforced: initialStatus.enforced,
+  };
   await import(pathToFileURL(SERVER).href);
   await serverUp(show.port);
 

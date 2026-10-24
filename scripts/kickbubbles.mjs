@@ -120,8 +120,6 @@ try {
     });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-    // A browser that has never chosen a source, so the first gesture starts
-    // the band, exactly as on a first visit. Nothing about the sound is written.
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&play=0${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.chromaglassSettings === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
     await page.waitForTimeout(6000);
@@ -130,6 +128,19 @@ try {
     const before = await read(page);
     const plate = await page.locator('canvas').first().boundingBox();
     const at = plate ? { x: plate.x + plate.width / 2, y: plate.y + plate.height / 2 } : { x: c.screen.viewport.width / 2, y: c.screen.viewport.height / 3 };
+    // The app opens on Source Off (PLAN.md 14y), so the band is chosen the way a
+    // hand does, by its control, after the dials above are set and before the
+    // click on the plate: what is counted still begins with the band.
+    if (c.screen.touch) {
+      await page.getByTestId('phone-open-sound').first().tap();
+      await page.getByTestId('phone-sound-band').first().tap();
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+    } else {
+      await page.getByTestId('dot-sound').click();
+      await page.getByTestId('audio-source-simulated').click();
+      await page.keyboard.press('Escape');
+    }
+    await page.waitForTimeout(500);
     if (c.screen.touch) await page.touchscreen.tap(at.x, at.y);
     else await page.mouse.click(at.x, at.y);
     await page.waitForTimeout(c.listenMs ?? LISTEN_MS);

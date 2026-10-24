@@ -64,6 +64,9 @@
  * less inertia than real water would. That is a shortcut kept for the step's
  * time (an advection and a projection, the largest part of it), and PLAN §18a
  * has it as its own item to measure on the Water looks.
+ * The ferrofluid's share of the carry is taken (phaseMomentum, wgsl/fluid.ts):
+ * its drag time in the rest gap is 0.6 s, so a drop dragged at the hand's speed
+ * outran its own momentum and fell behind the magnet (PLAN 29c).
  *
  * And the rim is open. The old projection was a closed box, so every source
  * had to be balanced by a uniform sink over the whole plate, and a press pushed
@@ -80,7 +83,7 @@
  */
 
 import { HAND_GRIP } from '../../lib/handSolid';
-import { DISH_METRES } from '../../lib/turntable';
+import { DISH_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
 
 /**
@@ -224,7 +227,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // both the dye's weight over the plate's mean, the second down whichever way the hand tips the glass.
   // Comet flow adds an explicit, constant pull to the dye (S.cometX, S.cometY).
   if (A.a.x > 0.0 || any(A.b.xy != vec2f(0.0)) || S.cometX != 0.0 || S.cometY != 0.0) {
-    let w = textureLoad(dye, q, 0).a - S.meanD;
+    let dRim = uvOf(id) - vec2f(0.5);
+    let rRim = length(dRim);
+    let rMax = ${OPEN_RIM.toFixed(2)} - 1.0 / S.n;
+    let qDish = select(q, clampP(vec2i((vec2f(0.5) + dRim * (rMax / max(rRim, 1e-6))) * S.n), S.n), rRim >= ${OPEN_RIM.toFixed(2)});
+    let w = textureLoad(dye, qDish, 0).a - S.meanD;
     v = vec4f(v.xy - S.up * (A.a.x * w) + (A.b.xy + vec2f(S.cometX, S.cometY)) * w, v.z, v.w);
   }
   if (S.air > 0.1) {

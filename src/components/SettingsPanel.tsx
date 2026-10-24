@@ -3,7 +3,9 @@ import type { MixTakes } from '../lib/mixFade';
 import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
-import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MAPPABLE_SOURCES, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
+import { SOURCE_NAMES } from '../lib/audioFeatures';
+import { HIT_FEATURES, HIT_FEATURE_LABELS } from '../lib/hitSource';
+import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
 import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
@@ -13,11 +15,14 @@ import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
-import { Segmented, Sheet } from './ui';
+import { Segmented, Sheet, SwitchPill, Toggle } from './ui';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
+import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
+import { helpFor } from '../lib/controlHelp';
+import { useControlTip } from './ui/ControlTip';
 
 /**
  * Pinning a control onto a desk.
@@ -224,6 +229,9 @@ const PATCH_SOURCES: [PatchSource, string][] = [
   // The sound again, by name: the kick, the snare, the hats and the bands
   // (`bands` in types.ts says why it is a source of its own).
   ['bands', 'Bands'],
+  // And its hits and its note (`lib/hitSource.ts`): how hard each drum's
+  // last hit was, falling over a quarter second. Same microphone, same master.
+  ['hits', 'Hits'],
   // The odd one out, and last for that reason: the other three report what is
   // happening in the room, and this one is a shape you asked for.
   ['shape', 'Shapes'],
@@ -239,7 +247,8 @@ const PATCH_SOURCES: [PatchSource, string][] = [
  */
 const featuresFor = (source: PatchSource): [string, string][] =>
   source === 'sound' ? AUDIO_FEATURES
-    : source === 'bands' ? MAPPABLE_SOURCES.map(f => [f, MUSIC_SOURCE_LABELS[f]] as [string, string])
+    : source === 'bands' ? SOURCE_NAMES.map(f => [f, MUSIC_SOURCE_LABELS[f]] as [string, string])
+    : source === 'hits' ? HIT_FEATURES.map(f => [f, HIT_FEATURE_LABELS[f]] as [string, string])
     : source === 'shape' ? MODULATOR_FEATURES.map(f => [f, MODULATOR_LABELS[f]] as [string, string])
     : SCENE_FEATURES;
 
@@ -290,8 +299,13 @@ const TARGET_GROUPS = SETTINGS_SECTIONS
 const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, settingKey }: { label: string; value: number | undefined; min: number; max: number; step: number; onChange: (v: number) => void; icon?: React.ComponentType<{ size?: number }>; disabled?: string | false; settingKey?: keyof VisualizerSettings }) => {
   const safeValue = value ?? 0;
   const curve = settingKey ? curveOf(settingKey) : 1;
+  // What the control does, as the desk's hover card says it (PLAN.md 8j); a
+  // tap on the name opens it where there is no hover.
+  const line = helpFor(settingKey);
+  const tip = useControlTip({ name: label, help: line, value: disabled ? undefined : readSetting(String(settingKey ?? ''), safeValue, min, max), disabled: !!disabled });
   return (
-    <div className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
+    <div ref={el => { tip.anchor.current = el; }} {...tip.bind} className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
+      {tip.card}
       <div className="flex items-center justify-between gap-2">
         {/*
           The rail beside this pane is sentence case and so is every control
@@ -303,7 +317,10 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
         */}
         <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-text-2">
           {Icon && <Icon size={14} />}
-          <span className="truncate">{label}</span>
+          <span
+            className={`truncate ${line ? '[@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4' : ''}`}
+            onClick={line ? tip.toggle : undefined}
+          >{label}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {settingKey && <PinChips settingKey={settingKey} />}
@@ -565,18 +582,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/* The same switch as the one at the bottom of Wall → Output, where it
             used to live alone: the last control of the longest section. */}
         {output && onOutput && (
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-[13px] font-medium text-text">Flash Limit</span>
-            <button
-              onClick={() => onOutput({ ...output, flashGuard: !output.flashGuard })}
-              className={`w-10 h-5 rounded-full relative transition-colors ${output.flashGuard ? 'bg-white' : 'bg-white/20'}`}
+          <div className="mb-4">
+            <Toggle
+              label="Flash Limit"
+              on={output.flashGuard}
+              onChange={v => onOutput({ ...output, flashGuard: v })}
               title="Hold the whole screen below three flashes a second (photosensitivity)"
-              aria-label="Flash Limit"
-              aria-pressed={output.flashGuard}
-              data-testid="flash-limit-master"
-            >
-              <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${output.flashGuard ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
+              testId="flash-limit-master"
+            />
           </div>
         )}
 
@@ -721,15 +734,14 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         )}
 
         {/* Room calibration */}
-        <div className="mb-3 mt-2 flex items-center justify-between">
-          <span className="text-[13px] font-medium text-text">Auto Calibrate</span>
-          <button
-            onClick={() => onUpdate({ autoCalibrate: !(settings.autoCalibrate !== false) })}
-            className={`w-11 h-6 rounded-full relative transition-colors ${settings.autoCalibrate !== false ? 'bg-white' : 'bg-white/20'}`}
+        <div className="mb-3 mt-2">
+          <Toggle
+            label="Auto Calibrate"
+            on={settings.autoCalibrate !== false}
+            onChange={v => onUpdate({ autoCalibrate: v })}
             title="Learn this room's noise floor and dynamics, and drive the visuals from where the music sits between them"
-          >
-            <div className={`w-5 h-5 rounded-full bg-black absolute top-0.5 transition-transform ${settings.autoCalibrate !== false ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-          </button>
+            testId="auto-calibrate-toggle"
+          />
         </div>
         {/* The beat, ahead of the microphone */}
         <Slider
@@ -838,14 +850,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               <div className="text-[12px] text-muted">Listen for which song is playing, so set items, song shows and looks made for a song go up on their own.</div>
             </div>
             <button
+              type="button"
               role="switch"
               aria-checked={!!songDetection}
               onClick={() => onSongDetection(!songDetection)}
-              className={`h-6 w-11 shrink-0 rounded-full relative transition-colors ${songDetection ? 'bg-white' : 'bg-white/20'}`}
+              className="flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1"
               title={songDetection ? 'On: songs are identified' : 'Off: nothing is identified'}
               data-testid="song-detection-toggle"
             >
-              <div className={`w-5 h-5 rounded-full bg-black absolute top-0.5 transition-transform ${songDetection ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+              <SwitchPill on={!!songDetection} />
             </button>
           </div>
         )}
@@ -1168,6 +1181,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ hueJourney: v })}
           settingKey="hueJourney"
         />
+        <Slider
+          label="Kick Bloom"
+          value={settings.kickBloom ?? 1}
+          min={0}
+          max={1.5}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ kickBloom: v })}
+          settingKey="kickBloom"
+        />
+        <Info>
+          Kick Bloom is the dye each kick throws outward from the bass spot. Beat Squeeze presses a thin sheet on the liquid where the kick lands: a dent as wide as the sheet bends over this liquid, wide on thin oil, a fingertip on syrup. Plate Rock is the slow one: a hand tipping the dish on the one and three, the heavier colour running downhill each way.
+        </Info>
         <Slider
           label="Beat Squeeze"
           value={settings.beatSqueeze ?? 0}
@@ -1612,6 +1637,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="turingPrint"
         />
         <Slider
+          label="↳ Print Ink (0 is Starch)"
+          value={settings.turingInk ?? 0}
+          min={0}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ turingInk: v })}
+          settingKey="turingInk"
+        />
+        <Slider
+          label="↳ Print Drift (0 is Still)"
+          value={settings.turingDrift ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ turingDrift: v })}
+          settingKey="turingDrift"
+        />
+        <Slider
           label="Gel Wheel"
           value={settings.gelWheel ?? 0}
           min={0}
@@ -1994,9 +2037,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           A patch is a <span className="text-white/60">source</span>, something that changes in it,
           a control it moves, and how far — a floor filling up opening the turbulence, a crowd
           going still slowing the plate, someone crossing left to right walking the lamp across
-          with them. The source can be the room camera, the film projector, the sound, or a shape
-          (an LFO on the bar, or an envelope a pad fires), and a patch can land on every plate or
-          on one of them, so a reel can drive layer 1 while the bass drives layer 2.
+          with them. The source can be the room camera, the film projector, the sound (its
+          levels, its bands, or its hits: how hard each kick, snare and hat landed, and the
+          note), or a shape (an LFO on the bar, or an envelope a pad fires), and a patch can
+          land on every plate or on one of them, so a reel can drive layer 1 while the bass
+          drives layer 2.
         </Info>
         <div className="mb-3">
           <div className="flex items-center justify-between mb-2">
@@ -2172,7 +2217,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <Slider
           label="Sound Impact"
-          disabled={!listens('sound') && !listens('bands') && !midi?.map.sound?.some(isMapping) && 'no patch reads the sound'}
+          disabled={!listens('sound') && !listens('bands') && !listens('hits') && !midi?.map.sound?.some(isMapping) && 'no patch reads the sound'}
           value={settings.soundImpact ?? 1}
           min={0}
           max={1}
@@ -2421,32 +2466,74 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <h3 className={TITLE}>
           <Image size={12} /> Logo &amp; Titles
         </h3>
-        <div className="flex gap-2 mb-5">
-          <input
-            ref={markInputRef}
-            id="mark-file"
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onMarkFile?.(f); e.target.value = ''; }}
-          />
-          <button
-            onClick={() => markInputRef.current?.click()}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-            title="A PNG with transparency sits on the plate; anything else sits in its own rectangle"
-            data-testid="mark-load"
-          >
-            <Image size={13} /> {markLoaded ? 'Replace' : 'Load a mark'}
-          </button>
-          <button
-            onClick={() => onMarkClear?.()}
-            disabled={!markLoaded}
-            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
-            data-testid="mark-clear"
-          >
-            Take it off
-          </button>
-        </div>
+        {isFreeTierGated() ? (
+          <div className="mb-5 flex flex-col gap-2.5">
+            <div
+              data-cg-free-logo-mark="ChromaGlass"
+              data-cg-app-tile="custom-logo"
+              onClick={openAccountSheet}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+              className="cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] leading-relaxed text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
+            >
+              <div className="flex items-center justify-between gap-2 font-semibold text-amber-200">
+                <span>In the ChromaGlass app · Custom band logo &amp; text layer</span>
+                <span className="shrink-0 text-[11px] font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
+              </div>
+              <p className="mt-0.5 text-amber-100/90">
+                On the free site, the logo layer displays the ChromaGlass mark. Unlock Home or Pro to load your own band mark or SVG.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="80" viewBox="0 0 420 80"><text x="210" y="52" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="38" font-weight="600" letter-spacing="2">ChromaGlass</text></svg>`;
+                  onMarkFile?.(new File([svg], 'chromaglass-mark.svg', { type: 'image/svg+xml' }));
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
+                data-testid="mark-load"
+              >
+                <Image size={13} /> {markLoaded ? 'ChromaGlass mark active' : 'Show ChromaGlass mark'}
+              </button>
+              <button
+                onClick={() => onMarkClear?.()}
+                disabled={!markLoaded}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+                data-testid="mark-clear"
+              >
+                Take it off
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-5">
+            <input
+              ref={markInputRef}
+              id="mark-file"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onMarkFile?.(f); e.target.value = ''; }}
+            />
+            <button
+              onClick={() => markInputRef.current?.click()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
+              title="A PNG with transparency sits on the plate; anything else sits in its own rectangle"
+              data-testid="mark-load"
+            >
+              <Image size={13} /> {markLoaded ? 'Replace' : 'Load a mark'}
+            </button>
+            <button
+              onClick={() => onMarkClear?.()}
+              disabled={!markLoaded}
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
+              data-testid="mark-clear"
+            >
+              Take it off
+            </button>
+          </div>
+        )}
         <Slider label="Opacity" value={settings.markMix ?? 1} min={0} max={1} step={0.01}
           onChange={(v: number) => onUpdate({ markMix: v })} settingKey="markMix" />
         <Slider label="Size" value={settings.markScale ?? 0.22} min={0.03} max={1} step={0.01}
@@ -2927,6 +3014,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={5}
           onChange={(v: number) => onUpdate({ tiltDirection: v })}
           settingKey="tiltDirection"
+        />
+        <Slider
+          label="Slosh"
+          value={settings.slosh ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ slosh: v })}
+          settingKey="slosh"
         />
         <Slider
           label="Heat Spread"
@@ -3503,14 +3599,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ spinDrag: v })}
           settingKey="spinDrag"
         />
-        <div className="flex items-center justify-between mb-4 mt-4">
-          <span className="text-[13px] font-medium text-text">LED Platform</span>
-          <button
-            onClick={() => onUpdate({ ledPlatform: !settings.ledPlatform })}
-            className={`w-10 h-5 rounded-full relative transition-colors ${settings.ledPlatform ? 'bg-white' : 'bg-white/20'}`}
-          >
-            <div className={`w-4 h-4 rounded-full bg-black absolute top-0.5 transition-transform ${settings.ledPlatform ? 'translate-x-5' : 'translate-x-0.5'}`} />
-          </button>
+        <div className="mb-4 mt-4">
+          <Toggle
+            label="LED Platform"
+            on={!!settings.ledPlatform}
+            onChange={v => onUpdate({ ledPlatform: v })}
+            testId="led-platform-toggle"
+          />
         </div>
         {settings.ledPlatform && (
           <div className="flex flex-col gap-4 mb-4">
@@ -3605,6 +3700,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </option>
             ))}
           </select>
+        </div>
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-[13px] font-medium text-text">Two Projectors</span>
+          <div className="flex items-center gap-2">
+            <PinChips settingKey="twoProjectors" />
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings.twoProjectors > 0.5}
+              aria-label="Two Projectors"
+              onClick={() => onUpdate({ twoProjectors: settings.twoProjectors > 0.5 ? 0 : 1 })}
+              className="flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1"
+              data-testid="two-projectors-toggle"
+            >
+              <SwitchPill on={settings.twoProjectors > 0.5} />
+            </button>
+          </div>
         </div>
       </section>
       )}
@@ -3728,6 +3840,48 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       )}
 
       {sections}
+      {isTierGatingEnforced() && getEffectiveTier() !== 'pro' && (
+        <section
+          data-cg-app-tiles=""
+          data-cg-effective-tier={getEffectiveTier()}
+          className="mt-6 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] p-4"
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-[12px] font-semibold uppercase tracking-wider text-amber-200">
+              In the ChromaGlass app
+            </span>
+            <button
+              type="button"
+              onClick={openAccountSheet}
+              className="text-[11px] font-semibold text-amber-200 underline underline-offset-2 hover:text-amber-100"
+            >
+              {getEffectiveTier() === 'home' ? 'Upgrade to Pro →' : 'Get Home or Pro →'}
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {APP_FEATURE_TILES.filter((t) => (getEffectiveTier() === 'home' ? t.tier === 'pro' : true)).map((tile) => (
+              <div
+                key={tile.id}
+                data-cg-app-tile={tile.id}
+                data-cg-tile-tier={tile.tier}
+                onClick={openAccountSheet}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+                className="cursor-pointer rounded-lg border border-white/10 bg-black/40 p-2.5 text-[12px] leading-snug transition-colors hover:border-amber-500/40 hover:bg-black/60"
+              >
+                <div className="flex items-center justify-between gap-2 font-medium text-neutral-100">
+                  <span>{tile.title}</span>
+                  <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-200">
+                    {tile.tier}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-neutral-400">{tile.summary}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {scope === 'stage' && (
         <p className="mt-2 text-[12px] text-dim" data-testid="stage-sheet-rule">
           The room and the machine: nothing here saves into a look.

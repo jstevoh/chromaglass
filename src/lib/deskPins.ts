@@ -85,7 +85,9 @@ const SECTION_OF: Record<string, string> = {
   turbulenceScale: 'look',
   plateRock: 'look',
   frameSway: 'look',
+  slosh: 'physics',
   beatSqueeze: 'show',
+  kickBloom: 'show',
   beatAccent: 'show',
   fingering: 'show',
   beads: 'show',
@@ -127,6 +129,8 @@ const SECTION_OF: Record<string, string> = {
   chemistryPattern: 'lamp',
   chemistryWidth: 'lamp',
   turingPrint: 'lamp',
+  turingInk: 'lamp',
+  turingDrift: 'lamp',
   gelWheel: 'lamp',
   beatLead: 'audio-input',
   filmDrive: 'film',
@@ -153,6 +157,7 @@ const SECTION_OF: Record<string, string> = {
   spinRpm: 'layers',
   spinAuto: 'layers',
   spinBeats: 'layers',
+  twoProjectors: 'layers',
   // The mixer's channel strips, all in its own section.
   ...Object.fromEntries(MIX_CONTROLS.map(c => [String(c.key), 'mixer'])),
   // And each row's fade time (lib/mixFade.ts), beside its strip.

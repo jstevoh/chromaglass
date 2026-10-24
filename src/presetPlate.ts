@@ -57,12 +57,10 @@ export function dyesOnPlate(n: number, journeyOn: boolean): number {
 export const PRESET_CONTRACTS: Record<string, number[]> = {
   'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
   'comet':              [18, 20, 23, 7, 16, 2],
-  'galaxy':             [18, 23, 10, 8, 16, 7],
-  'deep-ocean':         [16, 19, 7, 9, 22, 18],
+  'galaxy':             [7, 18, 20, 17, 23, 8],  // ice-blue arms, ultramarine, magenta knots, an amber core's glow; it was six blues and violets, one hue on the wall
   'cyberpunk':          [20, 2, 10, 18, 16, 6],
   'acid-trip':          [18, 20, 2, 21, 17, 6],
   'bass-drop':          [4, 11, 20, 18, 9, 7],
-  'timbre-shifter':     [23, 10, 16, 7, 17, 21],
   'microscopic-chaos':  [20, 2, 10, 23, 18, 8],
   'aurora-borealis':    [19, 5, 6, 16, 7, 23, 10], // greens through ice to a violet, as the sky has
   'solar-flare':        [17, 0, 1, 21, 3, 4],
@@ -72,11 +70,8 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'neon-coral-reef':    [21, 2, 17, 0, 16, 7],
   'stardust-collapse':  [15, 23, 10, 17, 21, 7],
   'lumia':              [10, 7, 1],
-  'sensual-laboratory': [14, 12],
   'turing-print':       [14, 22],                // graphite and midnight, unused while the print is on: its colour is the indicator's (depositChem)
-  'oil-wheel':          [17, 1, 6, 5, 18, 10],
   'poster-1969':        [1, 21, 17, 18, 10],
-  'fillmore-1969':      [1, 0, 3, 7, 5, 10],
   'fillmore-wash':      [5, 10, 9],
   // The dye mixes like filters, so a set is chosen for what its overlaps make:
   // amber over teal is a flat green and amber over ultramarine is mud, which
@@ -84,17 +79,15 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // The three that show off a part of the app nothing else used.
   'oil-and-water':      [17, 16],             // amber oil, teal water
   'red-cabbage':        [23, 10],             // the indicator itself: violet, and its deep purple
-  'chemical-clock':     [7, 15],              // a pale dish for the reaction's own red and blue
-  'agate':              [12, 13, 17, 4],      // an agate's browns, its amber and its red bands
+  // A dish of gel is clear: the ferroin is its only colour. Icy blue under
+  // the red reads as brown blots (the showreel's "muddy red-green marble").
+  'chemical-clock':     [15],                 // clear gel: the reaction's own red and blue are the colour
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
-  'ferro-maze':         [15, 7],              // clear and a breath of ice: the light table is the colour, the ferrofluid the ink
   'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
   'lava-lamp':          [4, 1, 20, 17, 21, 11],  // the wax: crimson, orange, magenta, amber, coral, raspberry
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
-  'oil-on-water':       [0, 17, 1, 21],
-  'colorful-cosmos':    [18, 10, 20, 2, 17, 21],
   // Fully saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye. The three
@@ -116,11 +109,9 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'classic':            ['drop'],
   'comet':              ['pour', 'streak'],
   'galaxy':             ['spray', 'streak'],
-  'deep-ocean':         ['pour', 'drop'],
   'cyberpunk':          ['streak', 'splatter'],
   'acid-trip':          ['splatter', 'spray'],
   'bass-drop':          ['splatter', 'drop'],
-  'timbre-shifter':     ['spray'],
   'microscopic-chaos':  ['drop'],
   'aurora-borealis':    ['streak', 'spray'],
   'solar-flare':        ['splatter', 'streak'],
@@ -132,14 +123,9 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   // These three had no entry and were quietly taking the 'drop' default —
   // found by `npm run plate`, which is the whole reason it exists.
   'lumia':              ['pour'],                 // nothing on this plate arrives suddenly
-  'sensual-laboratory': ['drop', 'spray'],        // a reaction started, then spattered across
   'turing-print':       ['drop'],                 // each drop of reagent a place a pattern grows from
-  'oil-wheel':          ['pour', 'drop'],         // a wheel is filled, not thrown at
   'poster-1969':        ['pour', 'drop'],
-  'fillmore-1969':      ['pour', 'drop'],
   'crowd-plate':        ['drop', 'pour'],
-  'oil-on-water':       ['drop'],
-  'colorful-cosmos':    ['pour'],
   'macro-bead':         ['drop', 'splatter'],
   'cell-bloom':         ['drop'],
   'lace-run':           ['pour', 'streak'],
@@ -148,9 +134,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'oil-and-water':      ['drop', 'pour'],
   'red-cabbage':        ['drop'],
   'chemical-clock':     ['drop'],
-  'agate':              ['drop'],
   'magnet-garden':      ['pour'],                 // a pour is what lays the ferrofluid
-  'ferro-maze':         ['pour'],
   'ferro-paint':        ['drop', 'pour'],
   'lava-lamp':          ['pour', 'drop'],         // wax poured in, a drop now and then to start a plume
   'roy':                ['pour', 'drop'],         // big flat shapes, and a drop now and then to break one
@@ -185,7 +169,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'galaxy':             ['water', 'milk'],
   // Syrup is heavier than the water it is in, so it goes down the slope
   // while everything else drifts — which is what depth looks like.
-  'deep-ocean':         ['water', 'glycerine', 'syrup'],
   // Neon wants hard edges and punched holes, not a soft wash.
   'cyberpunk':          ['water', 'silicone', 'reagent'],
   // A blob that crawls while the oil around it climbs — which is the lamp.
@@ -195,7 +178,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // Each hit blows a clear hole and the colour runs off the rim of it.
   'bass-drop':          ['water', 'soap'],
   // This one is about colour and rotation; the plate should stay out of it.
-  'timbre-shifter':     ['water'],
   'microscopic-chaos':  ['oil', 'silicone'],
   // Curtains have to drape rather than blow away: body, not tension.
   'aurora-borealis':    ['water', 'glycerine'],
@@ -217,22 +199,17 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // And soap, for the one of its three areas whose veil spreads and opens (lib/plateAreas.ts).
   'lumia':              ['water', 'glycerine', 'soap'],
   // Boyle put reactions on the platen — cells growing, then carried off.
-  'sensual-laboratory': ['silicone', 'soap'],
   // The reagent is what the reaction grows from (26c); water is the dish's own.
   'turing-print':       ['reagent', 'water'],
-  'oil-wheel':          ['oil', 'silicone'],
   // The flat hard-edged poster: two dyes that refuse to blend into a third.
   // This is the look the repel channel was written for.
   'poster-1969':        ['milk', 'ink'],
-  'oil-on-water':       ['oil', 'silicone', 'water'],
   // Round drops that stay round for as long as the photograph does.
-  'colorful-cosmos':    ['milk', 'oil'],
   // Razor edges and lacing on the same bead.
   'macro-bead':         ['silicone', 'milk'],
   // Silicone oil is literally how a pour painter makes cells.
   'cell-bloom':         ['silicone', 'oil'],
   'lace-run':           ['soap', 'silicone'],
-  'fillmore-1969':      ['oil', 'silicone', 'milk'],
   // Hands on the glass: every dancer breaks the film a little.
   'crowd-plate':        ['water', 'soap'],
 
@@ -245,9 +222,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'oil-and-water':      ['oil', 'water', 'oil'],
   'red-cabbage':        ['acid', 'base', 'water'],
   'chemical-clock':     ['water'],
-  'agate':              ['water'],
   'magnet-garden':      ['water', 'oil'],
-  'ferro-maze':         ['water', 'oil'],
   'ferro-paint':        ['water', 'oil', 'water'],
   // Wax that is heavier than the liquid round it, and a liquid thick enough
   // that it falls in plumes rather than drops.

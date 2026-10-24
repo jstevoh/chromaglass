@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  drawChromaGlassWatermark,
+  FREE_RECORD_MAX_SECONDS,
+  isFreeTierGated,
+} from '../lib/tierGates';
 
 /**
  * Record the show to a video file, straight from the canvas.
@@ -29,6 +34,7 @@ export interface LastTake {
   seconds: number;
   filename: string;
   timestamp: number;
+  watermarked?: boolean;
 }
 
 export interface Recorder {
@@ -44,6 +50,8 @@ export interface Recorder {
   toggle: (canvas: HTMLCanvasElement | null, audio: MediaStream | null, overrideOptions?: Partial<RecorderOptions>) => void;
   lastTake: LastTake | null;
   clearLastTake: () => void;
+  maxDurationSec: number | null;
+  watermarked: boolean;
 }
 
 export const DEFAULT_RECORDER_OPTIONS: RecorderOptions = {
@@ -196,10 +204,36 @@ export function useRecorder(): Recorder {
     if (!mime) { setError('This browser cannot record video in the requested format.'); return; }
 
     const fps = activeOpts.fps || 60;
+    const freeGated = isFreeTierGated();
+    const maxSec = freeGated ? FREE_RECORD_MAX_SECONDS : null;
+    let captureTarget: HTMLCanvasElement = canvas;
+    let watermarkRaf: number | null = null;
+
+    if (freeGated && typeof document !== 'undefined') {
+      const proxy = document.createElement('canvas');
+      proxy.width = Math.max(1, canvas.width || 1280);
+      proxy.height = Math.max(1, canvas.height || 720);
+      const ctx = proxy.getContext('2d');
+      if (ctx) {
+        const drawMarked = () => {
+          if (proxy.width !== canvas.width && canvas.width > 0) proxy.width = canvas.width;
+          if (proxy.height !== canvas.height && canvas.height > 0) proxy.height = canvas.height;
+          try {
+            ctx.drawImage(canvas, 0, 0, proxy.width, proxy.height);
+          } catch { /* canvas not ready */ }
+          drawChromaGlassWatermark(ctx, proxy.width, proxy.height);
+          watermarkRaf = requestAnimationFrame(drawMarked);
+        };
+        drawMarked();
+        captureTarget = proxy;
+      }
+    }
+
     let stream: MediaStream;
     try {
-      stream = (canvas as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream }).captureStream(fps);
+      stream = (captureTarget as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream }).captureStream(fps);
     } catch (e) {
+      if (watermarkRaf !== null) cancelAnimationFrame(watermarkRaf);
       setError(e instanceof Error ? e.message : 'The canvas refused to be captured.');
       return;
     }
@@ -215,6 +249,7 @@ export function useRecorder(): Recorder {
     try {
       rec = new MediaRecorder(stream, { mimeType: mime, ...recorderBitrates(activeOpts, audio) });
     } catch (e) {
+      if (watermarkRaf !== null) cancelAnimationFrame(watermarkRaf);
       setError(e instanceof Error ? e.message : 'Could not start the recorder.');
       return;
     }
@@ -223,6 +258,7 @@ export function useRecorder(): Recorder {
     rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
     rec.onerror = () => setError('Recording failed.');
     rec.onstop = () => {
+      if (watermarkRaf !== null) { cancelAnimationFrame(watermarkRaf); watermarkRaf = null; }
       const blob = new Blob(chunksRef.current, { type: mime.split(';')[0] });
       chunksRef.current = [];
       for (const t of stream.getTracks()) t.stop();
@@ -243,7 +279,8 @@ export function useRecorder(): Recorder {
       a.click();
       a.remove();
 
-      const elapsed = Math.max(1, Math.round((performance.now() - beganRef.current) / 1000));
+      const rawElapsed = Math.max(1, Math.round((performance.now() - beganRef.current) / 1000));
+      const elapsed = maxSec !== null ? Math.min(maxSec, rawElapsed) : rawElapsed;
       setLastTake({
         blob,
         url,
@@ -251,6 +288,7 @@ export function useRecorder(): Recorder {
         seconds: elapsed,
         filename,
         timestamp: Date.now(),
+        watermarked: freeGated,
       });
     };
 
@@ -259,7 +297,13 @@ export function useRecorder(): Recorder {
     setRecording(true);
     setSeconds(0);
     beganRef.current = performance.now();
-    timerRef.current = setInterval(() => setSeconds(Math.floor((performance.now() - beganRef.current) / 1000)), 500);
+    timerRef.current = setInterval(() => {
+      const elapsedSec = Math.floor((performance.now() - beganRef.current) / 1000);
+      setSeconds(maxSec !== null ? Math.min(maxSec, elapsedSec) : elapsedSec);
+      if (maxSec !== null && elapsedSec >= maxSec) {
+        try { if (rec.state !== 'inactive') rec.stop(); } catch { /* already stopped */ }
+      }
+    }, 250);
   }, []);
 
   const toggle = useCallback((canvas: HTMLCanvasElement | null, audio: MediaStream | null, overrideOptions?: Partial<RecorderOptions>) => {
@@ -269,5 +313,20 @@ export function useRecorder(): Recorder {
 
   useEffect(() => () => { stop(); if (timerRef.current) clearInterval(timerRef.current); }, [stop]);
 
-  return { recording, seconds, error, supported, options, setOptions, start, stop, toggle, lastTake, clearLastTake };
+  const freeGated = isFreeTierGated();
+  return {
+    recording,
+    seconds,
+    error,
+    supported,
+    options,
+    setOptions,
+    start,
+    stop,
+    toggle,
+    lastTake,
+    clearLastTake,
+    maxDurationSec: freeGated ? FREE_RECORD_MAX_SECONDS : null,
+    watermarked: freeGated,
+  };
 }

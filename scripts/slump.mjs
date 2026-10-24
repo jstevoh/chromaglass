@@ -48,9 +48,10 @@
  *      wider than the law's own radius
  *   8. a drop of clear liquid (white, which is not a dye) does not slump: it
  *      is the water's own density
- *   9. the measure sees a blur: the glycerine drop under the Diffusion Rate
- *      blur instead (0.0002) reads an exponent over 0.3 and an edge under 0.6,
- *      where 4 and 5 want 0.125 and 0.8
+ *   9. the measure sees a blur: the glycerine drop under unphysical diffusion
+ *      instead (D ≈ 1.7e-5 m²/s, diff: 8.5, about 42,500× food dye's real molecular
+ *      rate Dm ≈ 4e-10 m²/s, matching the old Jacobi blur 18h replaced) reads an
+ *      exponent over 0.3 and an edge under 0.6, where 4 and 5 want 0.125 and 0.8
  *  10. the plate's resolution does not set the answer: the water drop on a
  *      512² plate is within 4% of the 256² plate's front at 20 s (the rate
  *      and the cap are both worked out from the cell's size in metres)
@@ -123,7 +124,12 @@ const water = await drop([0, 5, 20, 30], { gapThickness: 0, solutalBuoyancy: 0 }
 const heavy = await drop([0, 20], { gapThickness: 0, solutalBuoyancy: 1 });
 const syrup = await drop([0, 20], { gapThickness: 1, solutalBuoyancy: 0 });
 const clear = await drop([0, 10], { gapThickness: 0, solutalBuoyancy: 0 }, true);
-const blur = await drop([0, 5, 30], { gapThickness: 1, solutalBuoyancy: 0, diff: 0.0002 });
+// 18h calibrated diff: 0.0002 to physical molecular diffusion (Dm ≈ 4e-10 m²/s),
+// which in 30 s barely moves a drop. The blur control tests unphysical rapid diffusion
+// (the old Jacobi blur's D ≈ 1.7e-5 m²/s, 42,500× Dm, diff: 8.5) with the slump
+// suppressed by glycerine viscosity, confirming checks 4 and 5 distinguish slump
+// physics from Gaussian blurring.
+const blur = await drop([0, 5, 30], { gapThickness: 1, solutalBuoyancy: 0, diff: 8.5 });
 const fine = await drop([0, 20], { gapThickness: 0, solutalBuoyancy: 0 }, false, 512);
 const nuWater = await nu(0), nuSyrup = await nu(1);
 const dyeLayer = await page.evaluate(() => lab.dyeLayer);
@@ -200,7 +206,7 @@ report('8. clear liquid does not slump', still(clear, 10),
 
 const blurExp = growth(at(blur, 5), at(blur, 30), 5, 30), blurSharp = at(blur, 30).r50 / at(blur, 30).r05;
 report('9. the measure sees a blur', blurExp > 0.3 && blurSharp < 0.6,
-  `with the slump off and Diffusion Rate 0.0002: t^${blurExp.toFixed(3)}, edge ${blurSharp.toFixed(3)}`);
+  `with the slump off and unphysical diffusion (D ≈ 1.7e-5 m²/s, diff: 8.5): t^${blurExp.toFixed(3)}, edge ${blurSharp.toFixed(3)}`);
 
 const res = at(fine, 20).front / w20.front;
 report('10. the plate\'s resolution does not set the answer', Math.abs(res - 1) <= 0.04,

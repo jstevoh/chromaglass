@@ -99,6 +99,8 @@ const OWN: PanelSpec[] = [
   { id: 'cues',    name: 'Cues',    category: 'live',  kind: 'own', deckWidth: 304 },
   { id: 'rides',   name: 'Rides',   category: 'live',  kind: 'own', deckWidth: 312 },
   { id: 'recipe',  name: 'Recipe',  category: 'live',  kind: 'own', deckWidth: 320 },
+  // The song as a timeline, its show's cues and the nudge (PLAN 28h): the deck's widest, because a lane of sections is read across.
+  { id: 'score',   name: 'Score',   category: 'live',  kind: 'own', deckWidth: 400 },
   { id: 'bottles', name: 'Bottles', category: 'plate', kind: 'own', deckWidth: 312 },
   { id: 'dyes',    name: 'Dyes',    category: 'plate', kind: 'own', deckWidth: 360 },
   { id: 'tools',   name: 'Tools',   category: 'plate', kind: 'own', deckWidth: 340 },

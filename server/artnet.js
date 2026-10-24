@@ -133,14 +133,36 @@ export function artnetConfig(env = process.env) {
   const order = String(env.ARTNET_ORDER ?? 'rgb').toLowerCase();
   return {
     host,
-    port: Number(env.ARTNET_PORT ?? ARTNET_PORT),
-    universe: Math.max(0, Math.min(32767, Number(env.ARTNET_UNIVERSE ?? 0))),
-    count: Math.max(1, Math.min(170, Number(env.ARTNET_FIXTURES ?? 4))),
-    start: Math.max(1, Math.min(UNIVERSE_SIZE, Number(env.ARTNET_START ?? 1))),
+    port: within(env.ARTNET_PORT, ARTNET_PORT, 1, 65535),
+    universe: within(env.ARTNET_UNIVERSE, 0, 0, 32767),
+    count: within(env.ARTNET_FIXTURES, 4, 1, 170),
+    start: within(env.ARTNET_START, 1, 1, UNIVERSE_SIZE),
     order: order in ORDERS ? order : 'rgb',
     /** Frames a second. The spec's ceiling is 44; fixtures smooth anything above about 20. */
-    rate: Math.max(1, Math.min(44, Number(env.ARTNET_RATE ?? 30))),
+    rate: within(env.ARTNET_RATE, 30, 1, 44),
   };
+}
+
+/**
+ * A number off the environment, clamped, or `fallback` when it is not one.
+ * Number('fast') is NaN and Math.min/max pass NaN through, so a word typed
+ * where a number goes used to reach setInterval as NaN, which Node runs every
+ * millisecond: a thousand packets a second onto the lighting network. An
+ * empty value is unset, not zero.
+ */
+function within(value, fallback, lo, hi) {
+  const n = value === undefined || String(value).trim() === '' ? NaN : Number(value);
+  return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : fallback;
+}
+
+/**
+ * The universe Art-Net in listens to, from ARTNET_IN_UNIVERSE, or null for
+ * every universe. A lighting network carries every universe its desk drives,
+ * and the dimmer rack's would otherwise be read as settings too.
+ */
+export function artnetInUniverse(env = process.env) {
+  const n = env.ARTNET_IN_UNIVERSE === undefined || String(env.ARTNET_IN_UNIVERSE).trim() === '' ? NaN : Number(env.ARTNET_IN_UNIVERSE);
+  return Number.isFinite(n) ? Math.max(0, Math.min(32767, Math.round(n))) : null;
 }
 
 /**

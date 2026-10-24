@@ -1,9 +1,9 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, PLATE_METRES } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
-import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF } from '../src/gpu/wgsl/spikes';
+import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
@@ -61,12 +61,18 @@ type Lab = {
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
 let lab: Lab | null = null;
+/** Who drew: the adapter's vendor and architecture (`google swiftshader` on the
+ *  CPU rasteriser, Apple's on a Mac's Metal), copied out at `create` because a
+ *  GPUAdapterInfo does not cross page.evaluate. A check whose claim is the
+ *  rasteriser's (`npm run lampzero`) reads this rather than trusting the flags. */
+let adapterInfo: { vendor: string; architecture: string; device: string; description: string } | null = null;
 
 let lastDrop: { n: number; h: Float32Array } | null = null;
 const api = {
   async create(N = 256, L = 192) {
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) throw new Error('no adapter');
+    adapterInfo = { vendor: adapter.info.vendor, architecture: adapter.info.architecture, device: adapter.info.device, description: adapter.info.description };
     const wantLimits: Record<string, number> = {};
     if (adapter.limits.maxStorageBufferBindingSize) {
       wantLimits.maxStorageBufferBindingSize = adapter.limits.maxStorageBufferBindingSize;
@@ -85,6 +91,8 @@ const api = {
     lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null };
     return { N, L };
   },
+  /** The adapter `create` drew on, or null before it. */
+  adapter() { return adapterInfo; },
   /** A disc of colour flat to its edge, for a force the same everywhere in a pool (`npm run thick`). */
   dyeDisc(x: number, y: number, r: number, rgb: [number, number, number], d = 1) {
     const { L, dyeAdd } = lab!;
@@ -347,7 +355,13 @@ const api = {
   },
   /** The thickest film Clear Film lays, as a share of the gap (FILM_MAX in src/gpu/fluid.ts). */
   filmMax: FILM_MAX,
-  async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  async phase() {
+    const f = await lab!.solver.readPhase();
+    if (!f) return null;
+    // A share gone non-finite reads as an empty plate (nothing over a half): loud instead.
+    for (let k = 0; k < f.data.length; k++) if (!Number.isFinite(f.data[k])) throw new Error(`phase: non-finite at cell ${k}`);
+    return { n: f.n, data: Array.from(f.data) };
+  },
   /** The spun dish's swirl on its own grid (readSwirl): `npm run dish`. */
   async swirl() { const f = await lab!.solver.readSwirl(); return { m: f.m, data: Array.from(f.data) }; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
@@ -451,6 +465,14 @@ const api = {
    * physics.
    */
   SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
+  /**
+   * The magnet's pull in the solver's own units, and the gap's, for `npm run
+   * magnetgain` to derive what MAGNET_GAIN is in tesla, metres and seconds
+   * (PLAN 29c-2): the energy law's scale and saturation (wgsl/spikes.ts),
+   * the gain and its guards, the reference liquid and the ferrofluid's
+   * viscosities, the rest gap and the dish's width (gpu/fluid.ts).
+   */
+  MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, PLATE_METRES,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
   /**
@@ -523,11 +545,14 @@ const api = {
    * radians, as the motor does. The plate reads the solver's packed view
    * field (the gap, the mix, the reactions) as the app does; `view: false`
    * hands it none, and it reads a blank one, a flat gap at rest.
+   * `airField: true` hands the plate the bubbles' air field with `bubbles` at 0:
+   * the dye is drawn beside its holes without the bubbles drawn in them, which
+   * is how `npm run holeline` reads what the dye does at a hole's edge.
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
     cam: {
       magnets?: { x: number; y: number; height: number; strength: number }[];
-      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
+      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; airField?: boolean; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
       /*
         The other pictures the plate composites, for the mixer's check
         (`npm run mixer`): a film frame, a logo, and a second plate. The
@@ -601,7 +626,11 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species };
+    // Asked for the air field and there is none: airNear would read a blank
+    // and be 0, which a check of the flat dye beside a hole would take for the
+    // mask not being there. Say so instead.
+    if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a

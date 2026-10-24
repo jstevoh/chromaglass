@@ -2096,10 +2096,25 @@ try {
   {
     const applied = await page.evaluate(() => {
       if (typeof window.chromaglassApplyPreset !== 'function') return false;
-      window.chromaglassApplyPreset('oil-on-water');
+      window.chromaglassApplyPreset('oil-and-water');
       return true;
     });
-    check('a photographic preset can be reached', applied, applied ? 'oil-on-water' : 'no hook');
+    /*
+      The camera by hand. Oil on Water and Colorful Cosmos were the only
+      looks that shipped with the camera pass on (`camera: 1`,
+      `renderStyle: 'photo'`), and both retired in PLAN 28i-1; the pass is
+      still there for a person to switch on, and the output pass still has
+      to sit after it, which is what this section asks. So the look it asks
+      on is Oil & Water, the look those two retired into, with the two
+      settings the retired one carried laid on it. Nothing below is loosened:
+      `and it really has the camera on` still reads the setting back.
+    */
+    if (applied) {
+      await page.evaluate(() => window.chromaglassSettings?.({ renderStyle: 'photo', camera: 1 }));
+      await page.waitForFunction(() => (window.chromaglassSettings?.()?.camera ?? 0) === 1, null, { timeout: 20000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    }
+    check('a look with the camera pass on can be reached', applied, applied ? 'oil-and-water with camera 1' : 'no hook');
     if (applied) {
       // Long enough for the camera pass to be built and the plate to fill.
       await withOutput({});
@@ -2267,21 +2282,25 @@ try {
   // be apart. A source routed to another source's texture, or never drawn,
   // fails the first; a source that is only the wall fails the second.
   //
-  // On Fillmore East, two plates, with the camera and the film stock off, so
-  // the wall is the plate's display pass as the sources are: section 6 left
-  // Oil on Water up, one plate under a lens, where the back plate alone and
+  // On Poster, 1969 with a second plate, with the camera and the film stock off,
+  // so the wall is the plate's display pass as the sources are: section 6 left
+  // Oil & Water up, one plate under a lens, where the back plate alone and
   // the film alone are both the bare lamp and could not be told apart.
   //
-  // Fillmore and not Classic, and a film playing, because each source has to
-  // have something of its own to show. The first Mac run (#226) was on
+  // Two plates with something on each, and a film playing, because each source
+  // has to have something of its own to show. The first Mac run (#226) was on
   // Classic with no film: Classic lays its back plate empty (`layPlate`
   // clears every plate and seeds only the front; the back fills only as the
   // automation pours into it), so the back source and its reference were both
   // black, the front source was the wall to 0.001 because the back added
   // nothing to it, and the film alone was black because nothing was loaded.
-  // All three were measuring a moment of the plate, not the routing. Fillmore
-  // is the look made of two projectors: the back plate is laid with its own
-  // wash (`laySecondPlate`) and the film row is at 0.7. The film is the
+  // All three were measuring a moment of the plate, not the routing. The look
+  // that laid its back plate with a wash of its own (Fillmore East, the two
+  // projectors, whose `laySecondPlate`) retired in PLAN 28i-1, so this lays
+  // the same wash on the back plate itself, with the solver's own
+  // `seedPreset('fillmore-wash')`, after raising the layers to two and Two
+  // Projectors on, the Fillmore's own two settings (Poster, 1969 is on the
+  // lamp and in Screen, as it was); and the film row is at 0.7. The film is the
   // browser's fake camera (scripts/chromium.mjs asks for one), started from
   // Settings, Film, Camera, as a person would.
   // `npm run mixer` holds each source to the exact picture on a lab plate;
@@ -2317,8 +2336,12 @@ try {
       return d ? { on: !!d.timestamps, t: { ...(d.timings ?? {}) } } : null;
     });
 
-    await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
-    await set({ camera: 0, stock: 0 });
+    await page.evaluate(() => window.chromaglassApplyPreset?.('poster-1969'));
+    await set({ camera: 0, stock: 0, layerCount: 2, twoProjectors: 1 });
+    // The back plate's own wash, laid as the Fillmore look laid it. A noise
+    // that is flat: the wash is three blobs and reads none.
+    await page.waitForFunction(() => (window.chromaglassDebug?.().fluids?.length ?? 0) >= 2, null, { timeout: 20000 }).catch(() => {});
+    await page.evaluate(() => { window.chromaglassDebug?.().fluids?.[1]?.seedPreset?.('fillmore-wash', () => 0); });
     await page.getByTestId('open-all-settings').click();
     await page.getByTestId('settings-nav-film').click();
     await page.getByTestId('film-camera').click();
@@ -2360,7 +2383,7 @@ try {
       front: { backLevel: 0, filmMix: 0 },
       back: { frontLevel: 0, filmMix: 0, markMix: 0 },
       // The film alone also drops the lamp ground (lib/plateSources.ts): on a
-      // look on the lamp, Fillmore East among them since PLAN 18b-1, its
+      // look on the lamp, as Poster, 1969 is, its
       // reference on the wall has to as well, or it is the bare lamp.
       film: { frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0, lampGround: 0 },
     };

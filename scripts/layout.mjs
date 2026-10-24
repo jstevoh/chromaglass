@@ -347,7 +347,7 @@ try {
     const deck = await measureIn('[data-testid="desk-deck"]');
     // Each panel drew its own body, not just its frame: a section's knobs, the
     // section itself (with that section in it), or the desk panel's own list.
-    const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer' };
+    const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer', score: 'song-score' };
     // Why each one failed, so a red run says which of three things it was:
     // the panel never reached the deck, it did and drew no body, or the body
     // is there and has no height.
@@ -361,7 +361,8 @@ try {
       return h < 8 ? `${id} (${Math.round(h)}px tall)` : null;
     }).filter(Boolean), { ids, own: OWN_BODY });
     const failedPanels = await page.locator('[data-testid="desk-deck"] [data-testid="panel-failed"]').count();
-    // 31: the seven desk panels and the twenty-four settings sections. It was
+    // 32: the eight desk panels (the Score joined them, PLAN 28h) and the
+    // twenty-four settings sections. Before the Score it was 31, and it was
     // 33 until Sound Mappings and Heat Slide were folded into Sound and Fluid
     // Physics (2026-10-10; `npm run desklayout` holds that), and a browser
     // listing fewer has lost a panel.
@@ -369,9 +370,9 @@ try {
     const bare = ids.filter(id => id !== 'phone' && !(deck.perPanel[id] > 0));
     await noteIds();
     check('every panel there is, docked, draws its own body, readable and big enough to use',
-      stageGone && onLoadin && reloaded && ids.length >= 31 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
+      stageGone && onLoadin && reloaded && ids.length >= 32 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
       [!stageGone && 'the Stage sheet never closed', !onLoadin && 'Load-in never came up', !reloaded && 'not on Load-in after the reload',
-        ids.length < 31 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
+        ids.length < 32 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
         || `${ids.length} panels, ${deck.n} controls`);
     await page.evaluate(() => localStorage.removeItem('chromaglass-desk-layout:loadin'));
     await page.reload({ waitUntil: 'networkidle' });
@@ -575,6 +576,53 @@ try {
   await page.keyboard.press('Escape');
   await settle(500);
 
+  // ── The plate bar does not move when the look changes (PLAN.md 19v-3) ──
+  {
+    /*
+      The magnet check lost its second press on the Mac six times in a day
+      (2026-10-11). Its first hold gave the look its magnet, which marked the
+      look changed, and Save read "Save •": 11 px wider. At 1280 in Build the
+      plate bar is one row with 0–1 px to spare, so it wrapped to two, the
+      plate's hole dropped 42 px, and the canvas, painted over the hole, went
+      with it; the second press, aimed at the plate's top row from a box
+      measured before any touch, landed on the bar. A performer's hand aimed
+      at the plate would too. So: a clean look at 1280 × 800 in Build, the
+      plate's hole and Save measured; then the look changed by a real hand
+      (an arrow key on the first deck knob, which goes through the same
+      update a magnet hold does; `window.chromaglassSettings` would not mark
+      it changed), and both measured again. The mark has to show, or the
+      look never changed and nothing was asked; and the look has to start
+      clean, or both measures are of the same changed bar. On the old
+      "Save •" this line read a 42 px drop.
+    */
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pg = await ctx.newPage();
+    await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* */ } });
+    await pg.goto(URL, { waitUntil: 'networkidle' });
+    for (let i = 0; i < 20 && !(await pg.getByTestId('desk-preview').count()); i++) await pg.waitForTimeout(300);
+    await pg.waitForTimeout(1500);
+    const measure = () => pg.evaluate(() => {
+      const box = (id) => { const r = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; };
+      const mark = document.querySelector('[data-testid="save-dirty"]');
+      return { preview: box('desk-preview'), save: box('save-look'), marked: !!mark && getComputedStyle(mark).visibility === 'visible' };
+    });
+    const before = await measure();
+    const knob = pg.locator('[data-testid="desk-deck"] [data-knob] input[type="range"]').first();
+    let after = null;
+    if (await knob.count()) {
+      await knob.focus();
+      for (let i = 0; i < 4; i++) await pg.keyboard.press('ArrowRight');
+      for (let i = 0; i < 10; i++) { await pg.waitForTimeout(200); after = await measure(); if (after.marked) break; }
+    }
+    await ctx.close();
+    const moved = (a, b) => (a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h)) : Infinity);
+    const dp = moved(before.preview, after?.preview), ds = moved(before.save, after?.save);
+    const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
+    check('at 1280 in Build, changing the look does not move the plate: its hole and Save keep their boxes, and Save shows the look has changed',
+      !before.marked && !!after?.marked && dp <= 0.5 && ds <= 0.5,
+      `clean ${before.marked ? 'no (already marked)' : 'yes'}, marked after ${after?.marked ? 'yes' : 'no'}; plate ${fmt(before.preview)} → ${fmt(after?.preview)} (${dp.toFixed(1)} px); Save ${fmt(before.save)} → ${fmt(after?.save)} (${ds.toFixed(1)} px)`);
+  }
+
   // ── The rest of Desk v2 (PLAN.md 8c, 8e, 8f, 8h) ───────────────
   await page.setViewportSize({ width: 1440, height: 900 });
   await clickOn('mode-segmented-design');
@@ -634,6 +682,54 @@ try {
       // Moved well away first, so a double-click that did nothing cannot pass.
       check('a double-click puts it back to the look\'s own value', Math.abs(capSide - lookValue) / span > 0.1 && Math.abs(reset - lookValue) / span < 0.01,
         `look ${lookValue.toFixed(3)}, moved to ${capSide.toFixed(3)}, back to ${reset.toFixed(3)}`);
+      /*
+        8j: what a knob is called, and what it does. The owner could not tell
+        which knob was under the hand: names cut to the knob's width ("Magnet …"), and a
+        value swapped in for the name, with a chip over the row above, while
+        a hand was on it. So the card has the whole name, a line on what it
+        does and the value; it never sits on the knob itself; and it, and
+        the knob's own name, are still there while the knob is being turned.
+        Read off the knob that is there (any of the deck's), against its own
+        aria-label, so a renamed control cannot pass by matching a literal.
+      */
+      await page.mouse.move(5, 5);
+      await settle(300);
+      const name = await knob.getAttribute('aria-label');
+      const knobBox = await knob.evaluate(el => { const r = el.closest('[data-knob]').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+      const kcx = knobBox.x + knobBox.w / 2, kcy = knobBox.y + 20;
+      const readTip = () => page.evaluate(() => {
+        const t = document.querySelector('[data-control-tip]');
+        if (!t) return null;
+        const r = t.getBoundingClientRect();
+        return { name: t.querySelector('[data-tip=name]')?.textContent ?? '', help: t.querySelector('[data-tip=help]')?.textContent ?? '', value: t.querySelector('[data-tip=value]')?.textContent ?? '', r: { x: r.x, y: r.y, w: r.width, h: r.height } };
+      });
+      const none = await readTip();
+      await page.mouse.move(kcx, kcy);
+      await settle(700);
+      const tipped = await readTip();
+      const apart = tipped && (tipped.r.y + tipped.r.h <= knobBox.y + 1 || tipped.r.y >= knobBox.y + knobBox.h - 1);
+      check('hovering a knob names it in full and says what it does, clear of the knob itself',
+        !none && !!tipped && tipped.name === name && tipped.help.length > 20 && !!tipped.value && apart,
+        `${name}: ${tipped ? `"${tipped.help.slice(0, 48)}…", ${tipped.value}, card ${Math.round(tipped.r.y)}–${Math.round(tipped.r.y + tipped.r.h)} against the knob's ${Math.round(knobBox.y)}–${Math.round(knobBox.y + knobBox.h)}` : 'no card'}`);
+      await page.mouse.down();
+      // Toward the middle of its travel, so a knob already at a stop still moves.
+      const upward = (await readKnob() - min) / span < 0.5;
+      await page.mouse.move(kcx, kcy + (upward ? -30 : 30), { steps: 6 });
+      await settle(200);
+      const held = await readTip();
+      const labelWhileHeld = await knob.evaluate(el => el.closest('[data-knob]').textContent);
+      const keepsName = labelWhileHeld.includes(name);
+      check('and the knob keeps its own name while it is being turned, with the card still up and the value moving',
+        keepsName && !!held && held.name === name && held.value !== tipped?.value,
+        `knob reads "${labelWhileHeld.slice(0, 40)}", card ${held ? held.value : 'gone'} (was ${tipped?.value})`);
+      await page.mouse.up();
+      await page.mouse.move(5, 5);
+      await settle(300);
+      const gone = await readTip();
+      check('the card goes when the hand does', !gone, gone ? 'still up' : 'gone');
+      // Put the value back for what follows.
+      await knob.dblclick();
+      await settle(200);
     }
   }
   {
@@ -671,9 +767,12 @@ try {
       server behind the preview, so its address is given here, and the code
       drawn is read back into its modules and compared, module for module,
       with the encoder's own for that address (`npm run qr` reads the encoder
-      back to the text).
+      back to the text). The answer is the one the relay gives the laptop,
+      which since 14m (#391) carries the display key too; without it the panel
+      now reads the page as one opened at the Wi-Fi address and draws no code
+      on purpose (14m-lan, `npm run phonelink`).
     */
-    const info = { chromaglass: 'relay', port: 8787, hosts: ['192.168.1.23'], key: '3f9a27c1b4e8d6f0' };
+    const info = { chromaglass: 'relay', port: 8787, hosts: ['192.168.1.23'], key: '3f9a27c1b4e8d6f0', displayKey: '0123456789abcdef0123456789abcdef' };
     await page.route('**/remote-info.json', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(info) }));
     // Out of Load-in and back, so the panel mounts again and asks.
     await clickOn('mode-segmented-perform');
