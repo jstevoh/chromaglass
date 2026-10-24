@@ -3750,6 +3750,35 @@ Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
 
 ## 26. A reaction that prints: Turing stripes in black and white
 
+### 19ae-1. A green head says so on the PR, and every hop names its commit
+
+**Shipped** 2026-10-24. What went wrong that day: the Mac watcher's wait for
+Antigravity's CI died, and two PRs that had gone green sat for two hours before anyone
+looked; all five open Antigravity PRs had fallen behind `main` and conflicted, and #355
+(13 days old) broke when `main` was merged in; five sat as review-owed at once. The Mac
+queue was not the hold-up: `npm run macqueue -- --hours 48` read a PR shard's mean wait
+at 7 minutes, and no Mac job running for 2,274 of the 2,880 minutes. The time went in the
+hops between tools, each waiting on a process or a person to notice.
+
+Changed: `.github/workflows/ready.yml` runs when `Checks` finishes. If the run tested the
+PR's current head and it is green, it labels the PR `ready-for-review` and comments
+`READY #<n> <item> head <sha>`; a push or a red run of the head takes the label off. Only
+`antigravity/` branches and PRs labelled `review-owed`. It never checks out the PR's
+code, and the PR's own text reaches the shell only through environment variables.
+`docs/handoff.md` gains "Small and short-lived" (one plan item, about 400 lines, a day;
+`main` merged in once, just before review) and "Ready, review, merge" (which PRs owe a
+review before merge; verdicts `PASS`/`CHANGES #<n> head <sha>`; a re-review reads only
+the commits since; merge pinned with `--match-head-commit`). `AGENTS.md` and `CLAUDE.md`
+carry the short form. `scripts/reach.mjs` lists `ready.yml` with the workflows that never
+run a Mac shard.
+
+Measured: the workflow's script run against a stubbed `gh` on eight cases (green head,
+CRLF body, a re-run that must not comment twice, a review comment naming the head that
+must not count as the `READY`, a stale run, a red head, a Claude PR, a shell
+substitution in the title, an empty `pull_requests` list); `actionlint` clean;
+`npm run reach` 76 → 78 ok (the two new cases), `npm run closedruns` all ok. The first
+live label is the next Antigravity PR to go green.
+
 ### 26a. Gray–Scott on the GPU, carried by the flow (#327; carried once since 26d)
 
 #327 moved the reaction onto a compute field at the dye's grid (`grayScott`, rgba16float:
