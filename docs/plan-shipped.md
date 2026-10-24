@@ -2068,6 +2068,37 @@ wrong keys lock the address out; a 1 MB frame is refused without the process gro
 silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
 socket's `patch` is dropped.
 
+### 14m-mark. A big logo never reached the network display
+
+**Shipped** (the PR after #391). 14m made the relay close a socket on a frame over 512 KB
+and the desk's link drop any message that large, and the mark crosses the relay as a data
+URL, once, when a network display joins: a print-sized PNG logo is several megabytes, so
+after 14m the network display showed no logo. The cap stays (it is what keeps the relay
+from holding a stranger's megabytes); the desk sends the network display a copy that fits
+(`src/lib/markFit.ts`): a mark under 400 KB goes byte for byte as before, a larger one is
+redrawn at most 1920 px on its long side as WebP (which keeps transparency; JPEG would
+paint the clear parts black) and shrunk in steps until it fits. Safari writes no WebP from
+a canvas and falls back to PNG, which keeps transparency too. The laptop's plate and a cast
+window on the same machine keep the original. `npm run phonelink`: a 2.2 MB PNG with a
+clear border reaches a mirror socket as a 287 KB WebP at 700×700, border alpha 0 and centre
+255; a mirror joining afterwards is handed the same mark (the desk's link survived); a
+48-pixel logo crosses byte for byte. On the code before it: no mark reaches either mirror.
+
+### 14m-lan. The laptop's page at its Wi-Fi address
+
+**Shipped** (with 14m-mark). The plan said the page would sit quiet with no display key;
+measured, it never got that far: a browser gives WebGPU only to a secure page, and
+`http://<laptop-ip>:3000/` is not one, so the page stopped at the first shader module with
+"GPUTextureUsage is not defined" and nothing else. The failure screen (`src/main.tsx`) now
+says why, and links `http://localhost:<port>/` on the same port; a network display
+(`?cast=true`) is told why and is not sent to its own localhost, which is not the laptop
+(the network display's own problem is PLAN 14m-https). In a browser told to treat the
+address as secure, the Phone · iPad panel says to open the page at localhost and draws no
+code: it used to draw one of the remote with no key in it, which a phone could scan and
+never join with. `npm run phonelink` asks all of it, with a WebSocket count that must see
+the localhost desk's socket so that "opens no socket" cannot pass by counting nothing:
+29 of 36 on the code before, 36 of 36 now.
+
 ### 14o. The song-ID Worker is open to anyone
 
 **Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an

@@ -767,9 +767,12 @@ try {
       server behind the preview, so its address is given here, and the code
       drawn is read back into its modules and compared, module for module,
       with the encoder's own for that address (`npm run qr` reads the encoder
-      back to the text).
+      back to the text). The answer is the one the relay gives the laptop,
+      which since 14m (#391) carries the display key too; without it the panel
+      now reads the page as one opened at the Wi-Fi address and draws no code
+      on purpose (14m-lan, `npm run phonelink`).
     */
-    const info = { chromaglass: 'relay', port: 8787, hosts: ['192.168.1.23'], key: '3f9a27c1b4e8d6f0' };
+    const info = { chromaglass: 'relay', port: 8787, hosts: ['192.168.1.23'], key: '3f9a27c1b4e8d6f0', displayKey: '0123456789abcdef0123456789abcdef' };
     await page.route('**/remote-info.json', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(info) }));
     // Out of Load-in and back, so the panel mounts again and asks.
     await clickOn('mode-segmented-perform');

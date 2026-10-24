@@ -49,6 +49,7 @@ import { relayInfo, parseRemoteGesture, type RemoteState, type RelayInfo } from 
 import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
 import type { CastState, CastMessage } from './lib/castProtocol';
 import type { RemoteMessage } from './lib/remoteProtocol';
+import { fitMarkForCast } from './lib/markFit';
 import { runBench, formatBench, readRenderer } from './lib/bench';
 import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
@@ -3290,6 +3291,14 @@ export default function App() {
    * rather than only in the visualizer for that reason.
    */
   const markUrlRef = useRef<string | null>(null);
+  /*
+    The same mark as it crosses the show server to a network display: the
+    original when it fits a relay frame, else a smaller copy (PLAN 14m-mark,
+    `lib/markFit.ts`). The relay closes a socket on a frame over 512 KB, and a
+    print-sized logo is several megabytes, so before this a big logo never
+    reached the network display at all.
+  */
+  const markRelayUrlRef = useRef<string | null>(null);
   const [markLoaded, setMarkLoaded] = useState(false);
   /*
     The state, at most fifteen times a second.
@@ -3368,7 +3377,7 @@ export default function App() {
     if (withMark) send({ type: 'mark', dataUrl: markUrlRef.current });
     if (mirrorCountRef.current > 0) {
       relaySendRef.current?.({ type: 'cast', message: { type: 'state', state } });
-      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
+      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
     }
   }, []);
   useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
@@ -3396,9 +3405,10 @@ export default function App() {
       img.onload = () => {
         for (const v of bothEngines()) v.loadMark?.(img, img.naturalWidth, img.naturalHeight);
         markUrlRef.current = url;
+        markRelayUrlRef.current = fitMarkForCast(img, url);
         setMarkLoaded(true);
         castSend({ type: 'mark', dataUrl: url });
-        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: url } });
+        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
         setToastRef.current?.('Mark on the wall');
       };
       img.onerror = () => setToastRef.current?.('That file would not open as a picture');
@@ -3410,6 +3420,7 @@ export default function App() {
   const clearMark = useCallback(() => {
     for (const v of bothEngines()) v.clearMark?.();
     markUrlRef.current = null;
+    markRelayUrlRef.current = null;
     setMarkLoaded(false);
     castSend({ type: 'mark', dataUrl: null });
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
