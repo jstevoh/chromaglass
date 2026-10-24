@@ -227,7 +227,7 @@ style (§31).
   **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
 - **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground); ~~**18b-1** which looks
   go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
-  it), then **18f** heat from the lamp (which unblocks 10.6
+  it), then ~~**18f** heat from the lamp~~ #352 (which unblocks 10.6
   and the slide plan's S2) and ~~**18j** milk~~ #353 (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   ~~**18g-1**~~ colour leaves by flushing #362 (18g-2..5 open) and **18k-spray**.
@@ -4122,7 +4122,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18c | A pour adds liquid | Large: a drop shoves the colour outward into rings | Free | Better with 18a's open rim |
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
-| 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
+| 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | **Shipped** (#352) |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362); 18g-2..5 open |
 | 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Partly shipped** (#358); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; physical pop mode open |
@@ -4663,35 +4663,13 @@ its frame rate live. "Free" means no new passes or texture reads.
 
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 
-- **Where:** `currentForces` pushes heat along `S.up` (the gravity direction, whatever
-  `plateUpright` says), saturated by tanh(20T). Heat is injected in spots by pours and
-  the music (`addTemp`), and `heatDecay` is per step. Centre gravity and rock use
-  tanh(dye − mean) and are not tied to the dome the gap actually has. The oil has no
-  density, so it never rises on a tilt. `mixForce` already gets this right: gravity
-  only in proportion to how upright the plate is. The noise stirring (`forcesB`) is
-  what moves an untouched plate, with no physical source.
-- **The real phenomenon:**
-  - On a level plate gravity points through the glass, so in-plane buoyancy is zero.
-  - The lamp heats the dish through the dye's absorption, so dark regions warm. A hot
-    spot drives liquid outward along the surface (thermocapillary flow: dσ/dT about
-    −0.15 mN/m per K for water, −0.06 for oils). It thins the film into holes, which is
-    the European school's burning away. From below, the lamp makes Bénard–Marangoni
-    cells once the Marangoni number passes about 80.
-  - Water's viscosity falls about 2% per K.
-  - Downhill on a dished glass is ∇h from the gap's dome.
-- **What it takes:**
-  - A heat source ∝ lamp intensity × absorbed fraction (from 18b), and Newton cooling
-    per second.
-  - ∇T fed into the existing `marangoniFlux` as σ(Γ, T).
-  - Buoyancy gated on `upright`, with the tanh removed. Oil gets a density below
-    water's.
-  - Viscosity falling with temperature, into 18a's mobility.
-  - Heat written to the velocity texture's spare channel in `packVel` (it is thrown
-    away there today) so 18e's shadowgraph shows the convection as shimmer.
-- **Cost:** a few operations in existing passes, and four taps in the plate.
-- **Gain:** an untouched plate breathes where it is dark and hot, speeds up with the
-  Dimmer, and shows the lamp's own cells. It is the mechanism slide-plan S2 is waiting
-  on (heat with a strength). Turbulence stays as the declared stir dial.
+**Shipped (#352):** In-plane thermal buoyancy is strictly gated on plate uprightness (zero on a level plate) with tanh saturation removed (linear Boussinesq). Heat source couples to the lamp dimmer with Beer–Lambert spectral absorption from the dye (using the plate's `lampThrough` decode) and a central hotspot (`1 / (1 + 2.5 r²)` shortcut). Newton cooling decays per-second with a real physical time constant in the tens of seconds (τ ≈ 12.4s via `heatDecay^(4*dt)`). Oil in `mixForce` is given physical buoyant density below water (ρ_oil ≈ 0.85), rising on an upright plate while wax sinks. Water viscosity drops ~2%/K, increasing thin-gap mobility under gravity. Shipped writeup in `docs/plan-shipped.md` §18f. Verified with `npm run heat` (9/9 checks).
+
+Open follow-ups:
+- **18f-1. Full per-channel absorbance across all passes:** decode RGB absorbance per channel for spectral heating across every look and pass rather than single-pass average.
+- **18f-2. Bénard–Marangoni cells:** surface stress −∇T inside an existing force pass (replacing separate marangoniFlux dispatch) so that cellular convection patterns emerge without breaking soap/oil conservation.
+- **18f-3. Convection shimmer (18e):** pack velocity channel z export into plate shader shadowgraph taps to render hot plume optical refraction and shimmer without disturbing raw `(u, v)` reads in `cellride`.
+
 
 ### 18g. Colour leaves by flushing, not by fading
 
