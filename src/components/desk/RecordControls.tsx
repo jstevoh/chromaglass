@@ -43,7 +43,7 @@ export function RecordControls({
           {videoRecording ? (
             <>■ Stop video · {videoClock}</>
           ) : (
-            <>● <span className="hidden 2xl:inline">Record </span>Screen</>
+            <>● Plate<span className="hidden 2xl:inline"> video</span></>
           )}
         </span>
       </Button>

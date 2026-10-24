@@ -8179,12 +8179,12 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
     draw them once, once it takes a title per option and a number id.
 - **35b** Regroup the panels into seven: Play, Pour, Feed, Motion, Chemistry, Look, Stage
-  (phase 2). Waits on the owner's pick in the audit thread. The four group vocabularies
+  (phase 2). The owner chose all three phases, in order (2026-10-24). The four group vocabularies
   to reconcile: `data-group` in SettingsPanel, `lib/settingsMap.ts`, the panel browser,
   and the phone rail, whose headings are hidden.
 - **35c** One home per setting (phase 3): Flash Limit, Blackout, MIDI on, the audio
   source and record/replay each appear in two places; Drive/Impact pairs sit in different
-  sections; Squish Plate splits up; the sequencer is behind Songs. Waits on 35b.
+  sections; Squish Plate splits up; the sequencer is behind Songs. After 35b.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

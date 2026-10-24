@@ -5007,7 +5007,7 @@ Webcam, Window), each demo loop row has its own Film and Pour, lit while that lo
 with a "playing as film" tag (the row was a button with Pour as Dye a span inside it, and Load
 Film a span with no handler). Names: Video section → Film, the header dot → Film (it was lit by
 the poured video and opened the film), Camera section → Lens, the film's Camera source → Webcam,
-● Video → ● Record Screen, ● Record performance → ● Record take, the Dye panel's Video… → Pour a
+● Video → ● Plate video (the name the recording options use), ● Record performance → ● Record take, the Dye panel's Video… → Pour a
 video…, Macro/Wide → Close-up (pressed), the phone dock's Presets → Looks and Play → Motion, Play
 screen → Simple screen, Wander on its own → Evolve. Test ids kept.
 

@@ -1615,7 +1615,7 @@ On the laptop in a dark room, and on the phone, with no reading of labels:
   lights too. Say whether you can tell which loop is doing what from across the room.
 - **The desk.** The layout switch, the tools, the layers, the bottles and the palette list: the
   chosen one is a solid violet now, not a lighter grey. Blackout is grey until pressed, then
-  solid red; the two record buttons the same. Say whether the violet is too loud anywhere, or
+  solid red; the two record buttons (Plate video, Record take) the same. Say whether the violet is too loud anywhere, or
   whether anything that is on still looks off.
 - **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
   tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
