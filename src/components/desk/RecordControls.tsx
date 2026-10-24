@@ -31,7 +31,8 @@ export function RecordControls({
       {/* ── Video Recording Button (Canvas Only) ─────────────── */}
       <Button
         height={32}
-        variant={videoRecording ? 'danger' : 'secondary'}
+        pressed={!!videoRecording}
+        live
         onClick={onToggleVideo}
         testId="record-video-button"
         title={videoRecording
@@ -42,7 +43,7 @@ export function RecordControls({
           {videoRecording ? (
             <>■ Stop video · {videoClock}</>
           ) : (
-            <>● <span className="hidden 2xl:inline">Record </span>Video</>
+            <>● <span className="hidden 2xl:inline">Record </span>Screen</>
           )}
         </span>
       </Button>
@@ -51,7 +52,8 @@ export function RecordControls({
       {/* Kept with data-testid="performance-button" for scripts/take.mjs & layout.mjs */}
       <Button
         height={32}
-        variant={performance ? 'danger' : 'secondary'}
+        pressed={!!performance}
+        live
         kbd="T"
         onClick={onTogglePerformance}
         midiKey="action:performance-toggle"
@@ -64,7 +66,7 @@ export function RecordControls({
           {performance ? (
             <>■ Stop · {performance.clock}{short && <span className="hidden 2xl:inline"> · {short}</span>}</>
           ) : (
-            <>● Record<span className="hidden 2xl:inline"> performance</span></>
+            <>● Record<span className="hidden 2xl:inline"> take</span></>
           )}
         </span>
       </Button>

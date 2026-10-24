@@ -81,7 +81,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     here too, because nobody loads a reel and then goes to a different
     section to see it.
   */
-  { id: 'film', name: 'Video', category: 'inputs',
+  { id: 'film', name: 'Film', category: 'inputs',
     terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive' },
   /*
     The patch bay, with every master over it.
@@ -127,8 +127,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade transmission light through dye thickness depth pale deep' },
   { id: 'stock', name: 'Film Stock', category: 'look',
     terms: 'film stock 16mm super 8 slide reversal negative faded grain gate weave projector curve toe shoulder period sixties' },
-  { id: 'camera', name: 'Camera', category: 'look',
-    terms: 'photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
+  { id: 'camera', name: 'Lens', category: 'look',
+    terms: 'camera photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
   { id: 'macro', name: 'Macro Closeup', category: 'look',
     terms: 'zoom bead chase magnify closeup detail cells lacing depth relief' },
   { id: 'automation', name: 'Automation', category: 'look',

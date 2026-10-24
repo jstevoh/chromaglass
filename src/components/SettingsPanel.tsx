@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
+import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Droplets, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { SOURCE_NAMES } from '../lib/audioFeatures';
@@ -20,7 +20,7 @@ import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
-import { Segmented, Sheet, SwitchPill, Toggle } from './ui';
+import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
@@ -67,7 +67,7 @@ function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings }) {
         data-testid={`pin-${desk}-${String(settingKey)}`}
         className={`h-[22px] w-[22px] shrink-0 rounded-[4px] border text-[11px] font-bold leading-none transition-colors ${
           on
-            ? 'border-white bg-white text-black'
+            ? LIT
             : 'border-white/15 text-white/25 hover:border-white/40 hover:text-white/70'
         }`}
       >
@@ -115,6 +115,10 @@ interface SettingsPanelProps {
   scenePreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   /** The film projector: what's playing, and how to change it. */
   filmSource?: 'none' | 'file' | 'camera' | 'window';
+  /** The file playing as the film (its name), while the source is a file. */
+  filmName?: string | null;
+  /** The file pouring as dye (its name), or null. */
+  pourName?: string | null;
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
   /** Another tab, window or screen, through the browser's own picker. */
@@ -386,7 +390,14 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+/** The loops that ship in public/video, for the Film section's demo rows. A loop is known by its title, which is the name of the File it is handed over as. */
+const DEMO_LOOPS = [
+  { id: 'ring', src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
+  { id: 'particles', src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
+  { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
+] as const;
+
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -586,8 +597,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/* Not on a desk panel: the desk's header has Blackout, in every layout. */}
         {onBlackout && !embed && (
           <button
+            aria-pressed={blackout}
             onClick={onBlackout}
-            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             title="Fade the plate to black and back (B on the keyboard)"
             data-testid="blackout-button"
           >
@@ -806,9 +818,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className={`min-h-9 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
-                  tempo?.source ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'cursor-not-allowed border-white/5 opacity-30'
-                }`}
+                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
               >
                 Listen
               </button>
@@ -884,10 +894,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-3 gap-1">
             {([['off', 'Keep'], ['preset', 'New preset'], ['random', 'Random']] as const).map(([mode, label]) => (
               <button
+                aria-pressed={(settings.onNewSong ?? 'off') === mode}
                 key={mode}
                 onClick={() => onUpdate({ onNewSong: mode })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  (settings.onNewSong ?? 'off') === mode ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.onNewSong ?? 'off') === mode ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={mode === 'off' ? 'Keep the look across songs' : mode === 'preset' ? 'Switch to another preset when a new song starts' : 'Roll a random look when a new song starts'}
                 data-testid={`new-song-${mode}`}
@@ -1310,7 +1321,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       {keep('camera') && (
       <section id="settings-camera" className={`${CARD} ${shown('camera') ? GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="camera">
         <h3 className={TITLE}>
-          <Aperture size={12} /> Camera
+          <Aperture size={12} /> Lens
         </h3>
         <Info>
           The macro photograph instead of the projected show: a lit paper backdrop, dye as transmission, every drop a dome with a softbox in it, then a real lens over the picture — refraction, a focal plane, bloom, colour fringing, the sensor's roll-off.
@@ -1320,10 +1331,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-2 gap-1">
             {(['show', 'photo'] as const).map((style) => (
               <button
+                aria-pressed={(settings.renderStyle ?? 'show') === style}
                 key={style}
                 onClick={() => onUpdate({ renderStyle: style })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  (settings.renderStyle ?? 'show') === style ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.renderStyle ?? 'show') === style ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={style === 'show' ? 'The projected light show: dye as light on black' : 'The photograph: dye over lit paper'}
                 data-testid={`render-${style}`}
@@ -1411,10 +1423,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
+                aria-pressed={(settings.stockType ?? 0) === i}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
                 className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
-                  (settings.stockType ?? 0) === i ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={[
                   '16mm reversal: cool and saturated, with a hard shoulder',
@@ -1494,10 +1507,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-5 gap-1" data-testid="kaleido-folds">
             {[0, 2, 4, 6, 8].map((k) => (
               <button
+                aria-pressed={Math.round(settings.kaleidoscope ?? 0) === k}
                 key={k}
                 onClick={() => onUpdate({ kaleidoscope: k })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  Math.round(settings.kaleidoscope ?? 0) === k ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  Math.round(settings.kaleidoscope ?? 0) === k ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={k === 0 ? 'No mirror rig' : `${k} mirrored wedges`}
                 data-testid={`kaleido-folds-${k}`}
@@ -1732,8 +1746,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         </Info>
         <div className="flex items-center gap-2 mb-3">
           <button
+            aria-pressed={!!sceneOn}
             onClick={() => onSceneToggle?.(!sceneOn)}
-            className={`flex-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${sceneOn ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${sceneOn ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-toggle"
           >
             {sceneOn ? 'Watching' : 'Watch the room'}
@@ -1821,15 +1836,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <div className="flex items-center gap-2 mb-2">
           <button
+            aria-pressed={settings.scenePeople !== false}
             onClick={() => onUpdate({ scenePeople: !(settings.scenePeople !== false) })}
-            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.scenePeople !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.scenePeople !== false ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-people"
           >
             Hold people
           </button>
           <button
+            aria-pressed={settings.sceneMirror !== false}
             onClick={() => onUpdate({ sceneMirror: !(settings.sceneMirror !== false) })}
-            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.sceneMirror !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.sceneMirror !== false ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-mirror"
             title="Flip the camera's view left for right, for a camera facing the room"
           >
@@ -1861,103 +1878,113 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       {keep('film') && (
       <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
         <h3 className={TITLE}>
-          <Video size={12} /> Video
+          <Video size={12} /> Film
         </h3>
         <div className="mt-2 mb-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <span className="text-[12px] font-mono opacity-50">
-              {filmSource === 'file' ? 'loop playing'
-                : filmSource === 'camera' ? 'camera live'
+            <span className="min-w-0 truncate text-[12px] text-muted" data-testid="film-now">
+              {filmSource === 'file' ? `playing ${filmName ?? 'a video file'}`
+                : filmSource === 'camera' ? 'webcam live'
                 : filmSource === 'window' ? 'window live'
-                : 'off'}
+                : 'no film'}
             </span>
           </div>
-          {/* Wraps: as a 312px desk panel its four sources ran past the frame, and Off was cut off. */}
-          <div className="flex flex-wrap gap-2">
-            <input
-              ref={filmInputRef}
-              id="film-loop-file"
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
-            />
-            <button
-              onClick={() => filmInputRef.current?.click()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-              title="Play a video file through the dye, looping"
-            >
-              <Film size={13} /> Load loop
-            </button>
-            <button
-              onClick={() => onFilmCamera?.()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-              title="Point a camera at a real dish of oil and composite it through the solver"
-              data-testid="film-camera"
-            >
-              <Camera size={13} /> Camera
-            </button>
-            {/*
-              Disabled rather than silently doing nothing where the browser
-              has no screen capture — which is every phone. A button that
-              looks pressable and answers with a console warning is the kind
-              of control that makes someone doubt the rest of the panel.
-            */}
-            <button
-              onClick={() => onFilmWindow?.()}
-              disabled={!canCaptureWindow}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
-              title={canCaptureWindow
-                ? 'Play another tab, window or screen through the dye — a film from the Internet Archive, a media player, anything on this machine'
-                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.'}
-              data-testid="film-window"
-            >
-              <MonitorPlay size={13} /> Window
-            </button>
-            <button
-              onClick={() => onFilmClear?.()}
-              disabled={filmSource === 'none'}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
-              data-testid="film-off"
-            >
-              Off
-            </button>
-          </div>
-          
-          {/* Demo Videos */}
-          <div className="mt-3 flex flex-col gap-1">
-            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo Loops</span>
-            {[
-              { src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
-              { src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
-              { src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
-            ].map(v => (
+          <input
+            ref={filmInputRef}
+            id="film-loop-file"
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
+          />
+          {/*
+            One pick-one, the source lit (PLAN 35a). The owner, a loop
+            playing: "I really can't tell what buttons are turned on/off."
+            These were four grey buttons alike and Off was the only one that
+            changed, by greying out, so the row said what was not playing and
+            never what was. Video file opens the chooser even when it is the
+            one lit, which is how a second file replaces the first.
+
+            Wraps: as a 312px desk panel its four sources ran past the frame,
+            and Off was cut off. Window is disabled rather than silently doing
+            nothing where the browser has no screen capture, which is every
+            phone: a button that looks pressable and answers with a console
+            warning is the kind of control that makes someone doubt the rest
+            of the panel.
+          */}
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Film source" data-testid="film-source">
+            {([
+              ['none', 'Off', null, 'film-off', 'No film under the dye', () => onFilmClear?.()],
+              ['file', 'Video file', Film, 'film-file', 'Play a video file from this machine through the dye, looping', () => filmInputRef.current?.click()],
+              ['camera', 'Webcam', Camera, 'film-camera', 'Point a camera at a real dish of oil and composite it through the solver', () => onFilmCamera?.()],
+              ['window', 'Window', MonitorPlay, 'film-window', canCaptureWindow
+                ? 'Play another tab, window or screen through the dye: a film from the Internet Archive, a media player, anything on this machine'
+                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.', () => onFilmWindow?.()],
+            ] as const).map(([id, label, Icon, testId, title, go]) => (
               <button
-                key={v.src}
-                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
-                onClick={async () => {
-                  try {
-                    const res = await fetch(v.src);
-                    const blob = await res.blob();
-                    if (onFilmFile) onFilmFile(new File([blob], v.title, { type: 'video/webm' }));
-                  } catch (e) { console.error('Failed to load demo video', e); }
-                }}
+                key={id}
+                aria-pressed={filmSource === id}
+                onClick={go}
+                disabled={id === 'window' && !canCaptureWindow}
+                className={`flex ${id === 'none' ? '' : 'flex-1'} items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+                  filmSource === id ? LIT : 'border-white/15 bg-white/5 text-text-2 hover:bg-white/10'
+                }`}
+                title={title}
+                data-testid={testId}
               >
-                <span className="text-[12px] font-medium">{v.title}</span>
-                <div className="flex gap-3">
-                  <span className="text-[10px] text-white/40 hover:text-white px-1" onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      const res = await fetch(v.src);
-                      const blob = await res.blob();
-                      if (onPourVideo) onPourVideo(new File([blob], v.title, { type: 'video/webm' }));
-                    } catch (e) { console.error('Failed to load demo video', e); }
-                  }}>Pour as Dye</span>
-                  <span className="text-[10px] text-white/40 hover:text-white px-1">Load Film</span>
-                </div>
+                {Icon && <Icon size={13} />} {label}
               </button>
             ))}
+          </div>
+
+          {/*
+            The demo loops, each with its two uses as the cartoon shelf has
+            them: Film plays it as the source above, Pour lays it into the
+            dish as dye. The whole row was a button that filmed it, with Pour
+            as Dye a span inside it and Load Film a span that did nothing of
+            its own (a click on it fell through to the row), and nothing said
+            which loop was playing. Now each use is its own button, lit while
+            that loop is doing it, and the one filming says so.
+          */}
+          <div className="mt-3 flex flex-col gap-1" data-testid="film-demos">
+            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo loops</span>
+            {DEMO_LOOPS.map(v => {
+              const filming = filmSource === 'file' && filmName === v.title;
+              const pouring = pourName === v.title;
+              const fetchAs = async (use: (f: File) => void) => {
+                try {
+                  const blob = await (await fetch(v.src)).blob();
+                  use(new File([blob], v.title, { type: 'video/webm' }));
+                } catch (e) { console.error('Failed to load demo video', e); }
+              };
+              const btn = 'flex h-8 shrink-0 items-center gap-1 rounded-md border px-2.5 text-[12px] font-medium transition-colors';
+              const off = 'border-white/15 text-text-2 hover:bg-white/10';
+              return (
+                <div key={v.src} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5" data-testid={`film-demo-${v.id}`}>
+                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{v.title}</span>
+                  {filming && <Tag tone="next">playing as film</Tag>}
+                  <button
+                    aria-pressed={filming}
+                    onClick={() => (filming ? onFilmClear?.() : fetchAs(f => onFilmFile?.(f)))}
+                    className={`${btn} ${filming ? LIT : off}`}
+                    title={filming ? 'Playing as the film. Click to take it off.' : 'Play it through the projector as the film, looping (Film Mix sets how much shows)'}
+                    data-testid={`film-demo-film-${v.id}`}
+                  >
+                    <Clapperboard size={11} /> Film
+                  </button>
+                  <button
+                    aria-pressed={pouring}
+                    onClick={() => (pouring ? onStopPourVideo?.() : fetchAs(f => onPourVideo?.(f)))}
+                    className={`${btn} ${pouring ? LIT : off}`}
+                    title={pouring ? 'Pouring into the dish. Click to stop.' : 'Pour it into the dish as dye, looping'}
+                    data-testid={`film-demo-pour-${v.id}`}
+                  >
+                    <Droplets size={11} /> Pour
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           <Info>
@@ -2368,9 +2395,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         ) : (
           <>
             <button
+              aria-pressed={midi.enabled}
               onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
               className={`mb-3 w-full rounded-lg py-2.5 text-[13px] font-medium transition-colors ${
-                midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10 hover:bg-white/15'
+                midi.enabled ? `border ${LIT}` : 'border border-white/10 hover:bg-white/10'
               }`}
               data-testid="settings-midi-enable"
             >
@@ -2518,9 +2546,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <div className="grid grid-cols-3 gap-1">
               {([['ask', 'Ask'], ['auto', 'Automatic'], ['off', 'Off']] as const).map(([m, label]) => (
                 <button
+                  aria-pressed={projectorMode === m}
                   key={m}
                   onClick={() => onProjectorMode(m)}
-                  className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${projectorMode === m ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                  className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${projectorMode === m ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                   data-testid={`projector-mode-${m}`}
                 >
                   {label}
@@ -3270,10 +3299,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
             {(['thick', 'thin'] as const).map((v) => (
               <button
+                aria-pressed={settings.viscosity === v}
                 key={v}
                 onClick={() => onUpdate({ viscosity: v })}
                 className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
-                  settings.viscosity === v ? 'bg-white text-black font-bold' : 'hover:bg-white/5 opacity-50'
+                  settings.viscosity === v ? `${LIT} font-bold` : 'text-muted hover:bg-hover'
                 }`}
               >
                 {v}

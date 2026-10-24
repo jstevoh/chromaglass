@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
 import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
-import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
+import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
 import { CartoonShelf } from '../CartoonShelf';
@@ -402,9 +402,10 @@ function RidesBody({ p }: { p: DeskProps }) {
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="rides">
       <div className="flex h-9 shrink-0 items-center justify-end px-3">
         <button
+          aria-pressed={picking}
           onClick={() => setPicking(v => !v)}
           className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
-            picking ? 'bg-text text-bg' : 'text-dim hover:bg-hover hover:text-text'
+            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
           }`}
           title="Choose which controls ride here"
           data-testid="ride-pick"
@@ -520,9 +521,10 @@ function RecipeBody({ p }: { p: DeskProps }) {
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="recipe">
       <div className="flex h-7 shrink-0 items-center justify-end px-3">
         <button
+          aria-pressed={picking}
           onClick={() => setPicking(v => !v)}
           className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
-            picking ? 'bg-text text-bg' : 'text-dim hover:bg-hover hover:text-text'
+            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
           }`}
           title="Choose which controls are on the recipe"
           data-testid="recipe-pick"
@@ -564,11 +566,13 @@ function RecipeBody({ p }: { p: DeskProps }) {
         {!ridesOut && <Button full height={32} onClick={p.onOpenSettings} testId="open-all-settings">All settings…</Button>}
         <Button
           height={32}
+          pressed={!!p.settings.macroMode}
+          title="The closeup camera, in among the drops (M). Lit while it is on."
           onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
           midiKey="action:macro-toggle"
           testId="macro-button"
         >
-          {p.settings.macroMode ? 'Wide' : 'Macro'}
+          Close-up
         </Button>
         {/* Randomise replaces every setting at once, so it asks first. */}
         <Button
@@ -592,11 +596,12 @@ function BottlesBody({ p }: { p: DeskProps }) {
     <div className="grid grid-cols-3 gap-1.5" data-testid="bench-left">
       {[...p.dyeBottles, ...p.behaviourBottles].map(l => (
         <button
+          aria-pressed={p.bottleId === l.id}
           key={l.id}
           onClick={() => p.onBottle(l.id)}
           title={l.behaviour ? `${l.name}: changes the plate where it lands` : l.name}
           className={`flex h-8 min-w-0 items-center gap-2 rounded-md border px-2 text-left transition-colors ${
-            p.bottleId === l.id ? 'border-accent-border bg-elevated text-text' : 'border-transparent text-muted hover:bg-hover hover:text-text'
+            p.bottleId === l.id ? LIT : 'border-transparent text-muted hover:bg-hover hover:text-text'
           }`}
           data-testid={`bottle-${l.id}`}
         >
@@ -633,7 +638,7 @@ function DyesBody({ p }: { p: DeskProps }) {
           onClick={() => p.onDye(bottle.own!)}
           aria-pressed={natural}
           className={`flex h-8 w-full items-center gap-2 rounded-md border px-2 text-left text-[13px] transition-colors ${
-            natural ? 'border-border-strong bg-hover text-text' : 'border-border text-muted hover:bg-hover hover:text-text'
+            natural ? LIT : 'border-border text-muted hover:bg-hover hover:text-text'
           }`}
           data-testid="dye-natural"
           title={`${bottle.name} as it is, with no dye in it`}
@@ -692,17 +697,19 @@ function DyesBody({ p }: { p: DeskProps }) {
           <div className="fixed inset-0 z-[60]" onClick={() => setPalettes(null)} />
           <div className="fixed z-[61] w-64 overflow-y-auto rounded-md border border-border-strong bg-surface py-1 shadow-2xl" style={palettes} data-testid="palette-menu">
             <button
+              aria-pressed={p.paletteLock === null}
               onClick={() => { p.onPalette(null); setPalettes(null); }}
-              className={`flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] ${p.paletteLock === null ? 'bg-active text-text' : 'text-text-2 hover:bg-hover'}`}
+              className={`flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] ${p.paletteLock === null ? LIT : 'text-text-2 hover:bg-hover'}`}
               data-testid="palette-auto"
             >
               Auto <span className="ml-auto text-[12px] text-faint">the music picks</span>
             </button>
             {p.palettes.map((h, i) => (
               <button
+                aria-pressed={p.paletteLock === i}
                 key={h.name}
                 onClick={() => { p.onPalette(i); setPalettes(null); }}
-                className={`flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] ${p.paletteLock === i ? 'bg-active text-text' : 'text-text-2 hover:bg-hover'}`}
+                className={`flex h-9 w-full items-center gap-2.5 px-3 text-left text-[13px] ${p.paletteLock === i ? LIT : 'text-text-2 hover:bg-hover'}`}
                 data-testid={`palette-${i}`}
               >
                 <span className="flex shrink-0 gap-0.5">
@@ -728,7 +735,7 @@ function DyesBody({ p }: { p: DeskProps }) {
           className="h-8 flex-1 rounded-md border border-dashed border-border-strong text-[13px] text-muted transition-colors hover:bg-hover hover:text-text"
           data-testid="video-dye"
         >
-          <Video size={13} className="mr-1.5 inline" /> Video…
+          <Video size={13} className="mr-1.5 inline" /> Pour a video…
         </button>
       </div>
       {p.cartoons && (
@@ -770,12 +777,12 @@ function ToolsBody({ p }: { p: DeskProps }) {
             onClick={() => p.onTool(id)}
             title={`${label} (${k}). Right-click for its options.`}
             data-testid={`tool-segmented-${id}`}
-            className={`inline-flex h-8 min-w-0 items-center justify-between gap-1 rounded-md border px-2 text-[13px] font-medium transition-colors duration-[120ms] ${
-              p.tool === id ? 'border-border-strong bg-active text-text' : 'border-border text-muted hover:bg-hover hover:text-text-2'
+            aria-keyshortcuts={k}
+            className={`inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border px-2 text-[13px] font-medium transition-colors duration-[120ms] ${
+              p.tool === id ? LIT : 'border-border text-muted hover:bg-hover hover:text-text-2'
             }`}
           >
             <span className="truncate">{label}</span>
-            <span className="shrink-0 font-mono text-[11px] text-faint">{k}</span>
           </button>
         ))}
       </div>

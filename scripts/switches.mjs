@@ -69,6 +69,19 @@
  * fix, and the floors below are what keep a run that found nothing from
  * passing.
  *
+ * And a third (PLAN 35a, 2026-10-24), because ΔE 20 let through the very
+ * looks the owner then reported: "I really can't tell what buttons are turned
+ * on/off." A chosen tab drawn as a white label among grey ones (ΔE 30), the
+ * shared Segmented's chosen item in the active grey (1.19:1 against the
+ * panel), a 15% white tint: each is a difference a performer can find by
+ * comparing two buttons side by side, and none is one they can read off a
+ * single button across a dark room. So on against off is also held as light:
+ * the fill's luminance ratio at 3:1 (WCAG 1.4.11, the contrast a state's cue
+ * needs), or a ring that only one state has at 3:1 against what is behind it
+ * (a colour swatch cannot change its fill; its ring is the cue). Text alone
+ * does not count. The design's lit violet is 3.47:1 against the panel; the
+ * old chosen segment 1.19:1, a white tint 1.12:1.
+ *
  * The bars are stated once in `BARS` and printed at the top of the run. A
  * change to one is a change to a check (`docs/handoff.md`, "Check changes").
  */
@@ -91,6 +104,8 @@ const BARS = {
   knob: 3,
   /** On against off, chosen against unchosen: CIE76 ΔE, the strongest channel. */
   difference: 20,
+  /** On against off as light: the fill, or a ring only one state has, as a WCAG ratio. Text alone does not count. */
+  lift: 3,
   /** A switch's on track is the accent, within this much per channel (0–255). */
   accentTolerance: 8,
   /** Fewer stateful controls than this on a surface and it was not reached: red, not green. */
@@ -106,8 +121,8 @@ const BARS = {
 
 /** The settings sections, as the palette lists them (`lib/settingsMap.ts`): id and the name typed to find it. */
 const SETTINGS_SECTIONS = [['master', 'Master'], ['mixer', 'Mixer'], ['audio-input', 'Sound'], ['room', 'The Room'],
-  ['film', 'Video'], ['patches', 'Patches'], ['midi', 'Controller'], ['look', 'Light Show Look'], ['show', 'Show'],
-  ['kaleidoscope', 'Kaleidoscope'], ['lamp', 'Lamp & Light'], ['stock', 'Film Stock'], ['camera', 'Camera'],
+  ['film', 'Film'], ['patches', 'Patches'], ['midi', 'Controller'], ['look', 'Light Show Look'], ['show', 'Show'],
+  ['kaleidoscope', 'Kaleidoscope'], ['lamp', 'Lamp & Light'], ['stock', 'Film Stock'], ['camera', 'Lens'],
   ['macro', 'Macro Closeup'], ['automation', 'Automation'], ['squish', 'Squish Plate'], ['physics', 'Fluid Physics'],
   ['liquids', 'Liquids'], ['interaction', 'Manual Interaction'], ['projectors', 'Wall'], ['mapping', 'Mapping'],
   ['mark', 'Logo & Titles'], ['layers', 'Plates & LED'], ['simulation', 'Simulation']];
@@ -197,10 +212,12 @@ const PROBE = `(() => {
     const under = behind(el);
     const self = one(el, under);
     const parts = [];
+    const r0 = rect(el); const area0 = Math.max(1, r0.width * r0.height);
     for (const d of el.querySelectorAll('*')) {
       if (parts.length >= 16) break;
       if (!visible(d)) continue;
-      parts.push(one(d, behind(d)));
+      const rd = rect(d);
+      parts.push({ ...one(d, behind(d)), share: (rd.width * rd.height) / area0 });
     }
     return { ...self, under, parts };
   };
@@ -289,6 +306,8 @@ const PROBE = `(() => {
         item.group = key.split('|')[0];
         item.label = on ? label(on) : label(el);
         item.testids = all.map(s => s.dataset.testid).filter(Boolean);
+        // Greyed only when every member is: one locked option is not the group.
+        item.disabled = all.every(s => !!s.disabled || s.getAttribute('aria-disabled') === 'true');
         if (on && off) { item.a = measure(on); item.b = measure(off); item.pair = label(off); item.i = els.push(on) - 1; item.j = els.push(off) - 1; }
       }
       out.push(item);
@@ -306,15 +325,35 @@ const PROBE = `(() => {
     }
     return out;
   };
+  /*
+    The element read or clicked, found again by its test id when a re-render
+    replaced it. A control that says a state now includes the desk's Choose
+    buttons (which ride here, which are on the recipe), and pressing one and
+    pressing it back remounts the panel under it: the Evolve switch read before
+    was a node no longer in the page, and a click on it changed nothing.
+  */
+  const live = (i) => {
+    let el = els[i];
+    if (!el.isConnected && el.dataset.testid) {
+      // Only an id that names one control: two with one id (the remote's
+      // Blackouts) would be a click on whichever came first.
+      const again = document.querySelectorAll('[data-testid="' + el.dataset.testid + '"]');
+      if (again.length === 1) els[i] = el = again[0];
+    }
+    return el;
+  };
   const read = (i) => {
-    const el = els[i]; const track = trackOf(el);
+    const el = live(i); const track = trackOf(el);
     const r = { on: stateOf(el, track), body: measure(el) };
     if (track) { r.track = measure(track); const k = knobOf(track); if (k) r.knob = measure(k); }
     return r;
   };
-  const click = (i) => { const el = els[i]; el.scrollIntoView({ block: 'center' }); el.click(); };
+  const click = (i) => { const el = live(i); el.scrollIntoView({ block: 'center' }); el.click(); };
   const accent = () => parse(getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#8B5CF6');
-  window.__sw = { enumerate, read, click, accent, els };
+  const token = (n) => parse(getComputedStyle(document.documentElement).getPropertyValue('--color-' + n).trim() || '#000');
+  /** The colours an on may be drawn in: lit, live (red), ok (green) and the accent a switch's track is. */
+  const onColours = () => ['lit', 'live', 'ok', 'accent'].map(n => ({ n, c: token(n) }));
+  window.__sw = { enumerate, read, click, accent, onColours, els };
 })();`;
 
 const NO_FADE = '*, *::before, *::after { transition: none !important; animation-duration: 0s !important; }';
@@ -362,6 +401,41 @@ function difference(a, b, { parts = true } = {}) {
   return { best, by, ...own, ring, part };
 }
 
+/**
+ * Two readings as light rather than colour: the fill's luminance ratio, or a
+ * ring one of them has and the other lacks against what is behind it. For a
+ * control read twice the parts inside count too (a dot, a tick, a lit chip
+ * inside a row); across two members of a group they do not, as above.
+ */
+function lift(a, b, { parts = true } = {}) {
+  /*
+    A fill counts only the right way round and in a colour that means on: the
+    on fill brighter than the off one, and within the tolerance of lit, live,
+    ok or the accent (the skeptic's, 2026-10-24: a ratio is symmetric, so a
+    button dark when on and white when off, or an amber chosen fill, would
+    pass on light alone). A part inside counts only if it is at least
+    PART_SHARE of the control, so a 3 px dot does not carry the cue.
+  */
+  const meansOn = (c) => onColours.some(({ c: t }) => Math.max(...[0, 1, 2].map(k => Math.abs(c[k] - t[k]))) <= BARS.accentTolerance);
+  const counts = (p, q) => lum(p) > lum(q) && meansOn(p) ? ratio(p, q) : 1;
+  const fill = counts(a.fill, b.fill);
+  const ringOf = (p) => Math.max(1, ...p.ring.map(c => ratio(c, p.under)));
+  const ring = a.ring.length && !b.ring.length ? ringOf(a) : (b.ring.length && !a.ring.length ? ringOf(b) : 1);
+  let part = 1;
+  if (parts) for (let i = 0; i < Math.min(a.parts.length, b.parts.length); i++) {
+    if (a.parts[i].share >= PART_SHARE) part = Math.max(part, counts(a.parts[i].fill, b.parts[i].fill));
+  }
+  const best = Math.max(fill, ring, part);
+  return { best, by: best === fill ? 'fill' : best === ring ? 'ring' : 'a part inside', fill, ring, part, raw: ratio(a.fill, b.fill) };
+}
+/** The least share of a control's area a part inside must cover for its fill to carry the cue. */
+const PART_SHARE = 0.15;
+/** Read once from the page: the colours an on may be drawn in. */
+let onColours = [];
+const ratioOf = (x) => `${x.toFixed(2)}:1`;
+/** Disabled groups whose light was not held (see the group's reading). */
+const dimmed = [];
+
 const rows = [];
 const surfaceCounts = { desk: 0, phone: 0, remote: 0 };
 const surfaceFlips = { desk: 0, phone: 0, remote: 0 };
@@ -371,6 +445,7 @@ const named = new Set();
 async function visit(page, where, surface, opts = {}) {
   const items = await page.evaluate(() => window.__sw.enumerate());
   const accent = await page.evaluate(() => window.__sw.accent());
+  onColours = await page.evaluate(() => window.__sw.onColours());
   surfaceCounts[surface] += items.length;
   let flipped = 0;
   const detailOf = (j, a, b) => `fill ${hex(a.fill)}/${hex(b.fill)} ${fmt(j.fill)}, border ${fmt(j.border)}, text ${fmt(j.text)}, ring ${fmt(j.ring)}, inside ${fmt(j.part)}`;
@@ -382,19 +457,23 @@ async function visit(page, where, surface, opts = {}) {
       let j = difference(it.a, it.b, { parts: false });
       let ok = j.best >= BARS.difference;
       let how = `against ${it.pair}`;
+      let l = lift(it.a, it.b, { parts: false });
+      let lit = l.best >= BARS.lift;
       // A group whose cue is a part inside (the Play screen's look tiles ring
       // their swatch) cannot be read across two members, each with its own
       // content. So the choice is moved to the other member and the chosen
       // one is read again, unchosen: the same element in both states, where
       // its parts do count. Put back afterwards.
-      if (!ok && !it.disabled) {
+      if ((!ok || !lit) && !it.disabled) {
         const before = await scrims(page);
         try {
           await page.evaluate(k => window.__sw.click(k), it.j);
           const moved = await changed(page, it.i, true);
           if (moved && moved.on === false) {
             const twice = difference(it.a, moved.body, { parts: true });
-            if (twice.best >= BARS.difference) { j = twice; ok = true; how = 'read chosen, then unchosen'; }
+            if (!ok && twice.best >= BARS.difference) { j = twice; ok = true; how = 'read chosen, then unchosen'; }
+            const twiceLit = lift(it.a, moved.body, { parts: true });
+            if (!lit && twiceLit.best >= BARS.lift) { l = twiceLit; lit = true; }
             await page.evaluate(k => window.__sw.click(k), it.i);
             await changed(page, it.i, false);
           }
@@ -402,7 +481,12 @@ async function visit(page, where, surface, opts = {}) {
         for (const id of (await scrims(page)).filter(x => !before.includes(x))) { await page.keyboard.press('Escape'); await page.waitForTimeout(200); if ((await scrims(page)).includes(id)) await tap(page, id); }
       }
       check(`${where}: ${it.group}: ${it.label} (chosen) ${how}: ΔE ${fmt(j.best)} by ${j.by}`, ok, detailOf(j, it.a, it.b));
-      rows.push({ where, label: it.group, kind: 'group', verdict: ok ? 'ok' : 'FAIL', best: j.best, by: j.by });
+      // A group greyed out as a whole (the remote's, until a laptop is
+      // connected) is dimmed on purpose, chosen and unchosen alike; its light
+      // is read where it is enabled, and the run says how many it skipped.
+      if (it.disabled && !lit) { dimmed.push(`${where}: ${it.group}`); lit = true; }
+      else check(`${where}: ${it.group}: ${it.label} (chosen) lights against ${it.pair}: ${ratioOf(l.best)} by ${l.by}`, lit, `fill ${hex(it.a.fill)}/${hex(it.b.fill)} ${ratioOf(l.fill)}, ring ${ratioOf(l.ring)}`);
+      rows.push({ where, label: it.group, kind: 'group', verdict: ok && lit ? 'ok' : 'FAIL', best: j.best, by: j.by, lift: l.best });
       continue;
     }
     // A binary control: read it, flip it, read it again, put it back. A
@@ -467,7 +551,10 @@ async function visit(page, where, surface, opts = {}) {
       const j = difference(on.body, off.body);
       const ok = j.best >= BARS.difference;
       check(`${name}: on against off ΔE ${fmt(j.best)} by ${j.by}`, ok, detailOf(j, on.body, off.body));
-      rows.push({ where, label: it.label, kind: 'button', verdict: ok ? 'ok' : 'FAIL', best: j.best, by: j.by });
+      const l = lift(on.body, off.body);
+      const lit = l.best >= BARS.lift;
+      check(`${name}: on lights against off ${ratioOf(l.best)} by ${l.by}`, lit, `fill ${hex(on.body.fill)}/${hex(off.body.fill)} ${ratioOf(l.fill)}, ring ${ratioOf(l.ring)}, inside ${ratioOf(l.part)}`);
+      rows.push({ where, label: it.label, kind: 'button', verdict: ok && lit ? 'ok' : 'FAIL', best: j.best, by: j.by, lift: l.best });
     }
   }
   surfaceFlips[surface] += flipped;
@@ -523,7 +610,7 @@ if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const started = Date.now();
 
 try {
-  console.log(`bars: knob against track ${BARS.knob}:1 (WCAG 1.4.11); on against off ΔE ${BARS.difference} (CIE76); a switch's on track is the accent (±${BARS.accentTolerance}); at least ${JSON.stringify(BARS.minControls)} controls`);
+  console.log(`bars: knob against track ${BARS.knob}:1 (WCAG 1.4.11); on against off ΔE ${BARS.difference} (CIE76) and ${BARS.lift}:1 in light (fill or ring); a switch's on track is the accent (±${BARS.accentTolerance}); at least ${JSON.stringify(BARS.minControls)} controls`);
 
   // ── The desk ────────────────────────────────────────────────────────
   const desk = await open(`${BASE}?${QUERY}`, { viewport: { width: 1440, height: 900 } });
@@ -624,6 +711,7 @@ try {
   const unmeasured = rows.filter(r => r.verdict === 'unmeasured');
   console.log(`\n${rows.length} controls in ${((Date.now() - started) / 1000).toFixed(0)}s: ${rows.filter(r => r.verdict === 'ok').length} ok, ${failed.length} under the bar, ${unmeasured.length} with one state unreachable here, ${exempt} native (browser-drawn, exempt)`);
   for (const r of unmeasured) console.log(`      ? ${r.where}: ${r.label} — ${r.note}`);
+  for (const d of dimmed) console.log(`      ~ ${d}: disabled here, its light not held`);
 } finally {
   await browser.close();
   stopServer(server);

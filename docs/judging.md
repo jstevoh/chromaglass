@@ -1590,3 +1590,17 @@ record on, through the room microphone and through the laptop:
 Settings, Patches, on any of the three: each patch has a thumbnail of the plate with the
 look's areas; tap one to aim the patch there, and Fire on a hit gives it a gate. On the phone,
 the same sheet. Say whether the picker is clear and big enough under a thumb.
+
+## 68. On reads on (PLAN 35a)
+
+On the laptop in a dark room, and on the phone, with no reading of labels:
+
+- **Film.** Load a demo loop with Film: its Film button and Video file in Source should be lit
+  violet, the row should say "playing as film", and Off should not be. Pour another: its Pour
+  lights too. Say whether you can tell which loop is doing what from across the room.
+- **The desk.** The layout switch, the tools, the layers, the bottles and the palette list: the
+  chosen one is a solid violet now, not a lighter grey. Blackout is grey until pressed, then
+  solid red; the two record buttons the same. Say whether the violet is too loud anywhere, or
+  whether anything that is on still looks off.
+- **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
+  tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Search as SearchIcon } from 'lucide-react';
 import { Segmented, StatusDot } from '../ui';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
 import { AlphaBadge } from '../AlphaBadge';
@@ -178,9 +179,9 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
       />
       <StatusDot
         on={!!dots.video}
-        label="Video" tight={t}
+        label="Film" tight={t}
         onClick={onVideo}
-        title={dots.video ? 'Video is playing — click to pick a different video' : 'Click to pick a video file'}
+        title={dots.video ? 'A film is playing under the dye. Click for the Film section.' : 'No film under the dye. Click for the Film section.'}
         testId="dot-video"
       />
       {onWall && (
@@ -353,6 +354,9 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
         ) : dotsAt(tight)}
         <button
           onClick={onSearch}
+          title="Search every setting, look and action (⌘K)"
+          aria-label="Search"
+          aria-keyshortcuts="Meta+K"
           className={`ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong ${tight ? 'px-2' : 'px-3'} text-[13px] text-muted transition-colors hover:bg-hover hover:text-text`}
           data-testid="search-chip"
         >
@@ -362,11 +366,12 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
             At 1024 the right-hand cluster was still about twenty pixels too
             wide and the leftmost thing in it — the Mic dot — sat under the
             centred switch. "Search" is the most expendable word in the header:
-            the shortcut beside it says what the button is, and ⌘K is the one
-            convention every app this sits beside already uses.
+            the magnifier says what the button is, and ⌘K, the one convention
+            every app this sits beside already uses, is in its hover title
+            with every other shortcut (PLAN 35a).
           */}
-          <span className="hidden xl:inline">Search </span>
-          <span className="font-mono text-[11px] text-faint">⌘K</span>
+          <SearchIcon size={13} aria-hidden />
+          <span className="hidden xl:inline">Search</span>
         </button>
         {trailing}
       </div>

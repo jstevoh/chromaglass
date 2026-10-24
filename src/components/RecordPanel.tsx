@@ -14,7 +14,7 @@ import {
   Sliders,
   History,
 } from 'lucide-react';
-import { Sheet, Button, SwitchPill } from './ui';
+import { Sheet, Button, SwitchPill, LIT } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
 import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
@@ -88,7 +88,7 @@ export function RecordPanel({
               data-testid="record-tab-video"
               className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
                 tab === 'video'
-                  ? 'bg-elevated text-text shadow-sm'
+                  ? LIT
                   : 'text-muted hover:text-text'
               }`}
             >
@@ -108,7 +108,7 @@ export function RecordPanel({
               data-testid="record-tab-performance"
               className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
                 tab === 'performance'
-                  ? 'bg-elevated text-text shadow-sm'
+                  ? LIT
                   : 'text-muted hover:text-text'
               }`}
             >
@@ -313,7 +313,7 @@ export function RecordPanel({
                           data-testid={`record-quality-${q.id}`}
                           className={`flex flex-col text-left rounded-lg border p-3 transition-colors ${
                             selected
-                              ? 'border-accent-border bg-accent-bg text-text'
+                              ? LIT
                               : 'border-border bg-elevated/40 text-muted hover:border-border-strong hover:text-text'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -348,7 +348,7 @@ export function RecordPanel({
                           data-testid={`record-fps-${rate}`}
                           className={`flex-1 rounded-md border py-1.5 text-center text-[12px] font-medium transition-colors ${
                             videoOpts.fps === rate
-                              ? 'border-accent-border bg-accent-bg text-text'
+                              ? LIT
                               : 'border-border bg-elevated/40 text-muted hover:border-border-strong'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -382,7 +382,7 @@ export function RecordPanel({
                           data-testid={`record-format-${fmt.id}`}
                           className={`flex-1 rounded-md border py-1.5 text-center text-[12px] font-medium transition-colors ${
                             videoOpts.format === fmt.id
-                              ? 'border-accent-border bg-accent-bg text-text'
+                              ? LIT
                               : 'border-border bg-elevated/40 text-muted hover:border-border-strong'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -549,13 +549,14 @@ export function RecordPanel({
 
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
+                              aria-pressed={isReplaying}
                               onClick={() =>
                                 isReplaying ? onStopPerformanceReplay() : onReplayPerformance(perf.id)
                               }
                               title={isReplaying ? 'Stop replay' : 'Replay this performance'}
                               className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
                                 isReplaying
-                                  ? 'border-accent-border bg-accent-soft text-accent-text'
+                                  ? LIT
                                   : 'border-border hover:bg-hover text-text'
                               }`}
                             >

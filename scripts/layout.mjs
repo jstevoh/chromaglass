@@ -749,7 +749,7 @@ try {
     if (parts[0]) {
       await page.getByTestId('output-test-pattern').first().click();
       await settle(400);
-      const pressed = await page.getByTestId('output-test-pattern').first().evaluate((el) => el.className.includes('bg-white text-black'));
+      const pressed = (await page.getByTestId('output-test-pattern').first().getAttribute('aria-pressed')) === 'true';
       // A gain change, so the config is written while the pattern is up.
       await page.evaluate(() => window.chromaglassOutput?.({ gain: 1.05 }));
       await settle(300);

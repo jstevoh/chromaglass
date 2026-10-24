@@ -67,6 +67,7 @@
     "cartoons": "npm run build && node --experimental-strip-types scripts/cartoons.mjs",
     "saves": "npm run build && node scripts/saves.mjs",
     "switches": "npm run build && node scripts/switches.mjs",
+    "states": "node scripts/states.mjs",
     "draw": "npm run build && node --experimental-strip-types scripts/draw.mjs",
     "drawwall": "npm run build && node --experimental-strip-types scripts/drawwall.mjs",
     "applink": "npm run build && esbuild scripts/applink.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/applink.mjs && node node_modules/.cache/applink.mjs",
