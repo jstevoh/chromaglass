@@ -81,7 +81,7 @@ try {
         s += c; x += c * u; y += c * v;
         if (d >= 0.5 - 1.5 / m.n) { rim += c; rimCells++; }
       }
-      return { amount: s / (m.n * m.n), x: x / Math.max(s, 1e-9), y: y / Math.max(s, 1e-9), rim: rim / Math.max(1, rimCells) };
+      return { amount: s / (m.n * m.n), x: x / Math.max(s, 1e-9), y: y / Math.max(s, 1e-9), rim: rim / Math.max(1, rimCells), rimOil: rim };
     };
     // A lens touching the rim at angle θ (its edge on the rim), or anywhere with `at`.
     const lensAt = (th) => [0.5 + (0.5 - R) * Math.cos(th), 0.5 + (0.5 - R) * Math.sin(th)];
@@ -151,7 +151,7 @@ for (const [name, t, weak] of [['at the middle of the grid\'s edge', r.edge, r.w
   const weakThree = kept(weak, weak.length - 4) - kept(weak);
   check(`a lens against the rim ${name}, the plate level, keeps its oil: over 92% after six seconds, and in the last three its surface tension drains none (it loses under 0.5% more than at a hundredth of the tension)`,
     kept(t) > 0.92 && lastThree - weakThree < 0.005,
-    `${pct(kept(t))} kept, ${pct(lastThree)} lost in the last three seconds against ${pct(weakThree)} at a hundredth of the tension; by second ${bySecond(t)}; main kept 9.6% at the edge and 21.1% on the diagonal`);
+    `${pct(kept(t))} kept, ${pct(lastThree)} lost in the last three seconds against ${pct(weakThree)} at a hundredth of the tension; by second ${bySecond(t)}; the oil on the rim's cells ${t[0].rimOil.toFixed(1)} cells' worth at the start, ${t[t.length - 1].rimOil.toFixed(1)} at the end (spread along the rim, or drawn off it: the grid sets the contact angle, PLAN 18g-8); main kept 9.6% at the edge and 21.1% on the diagonal`);
 }
 // 2.
 check('the drain was the surface tension: the same lens at a hundredth of the tension keeps over 99%',
