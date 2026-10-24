@@ -4799,6 +4799,7 @@ export default function App() {
     <SettingsPanel
       mixTakes={mixTakes}
       backLook={backLookName}
+      lookId={activePresetId}
       songDetection={musicSettings.enabled}
       onSongDetection={(on) => updateMusicSettings({ enabled: on })}
       settings={settings}

@@ -202,8 +202,7 @@ bar grid together); **14e** (M, output latency and one lead per source); **10.2-
 **10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11,
 re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering the
 music, explored as four directions the same day and all four taken, in this order:
-**25h** areas that listen for themselves (A, M–L, with its palette per area and 30a's gate
-on an area cord), then **24.3-place** the melody walks across the plate (B, M), then **25i**
+~~**25h** areas that listen for themselves~~ (shipped), then **24.3-place** the melody walks across the plate (B, M), then **25i**
 colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
 14r read per area); then **30a**'s rest, shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
@@ -6355,14 +6354,14 @@ purpose; the owner says which, if any, should fill the screen too.
    glycerine and syrup in separate places are what depth looks like.
 2. **fillmore-1969**: the reference light show, two projectors, Beat Squeeze 0.9 and
    both routes on the bass all in the middle; its oil, silicone and milk want a place each.
-3. **bass-drop**: every kick into the middle (Squeeze 0.8, Center Gravity 0.4); kicks
-   that take two or three wells in turn.
+3. ~~**bass-drop**~~ (shipped with 25h): three soap wells on the bass, taken in turn,
+   Center Gravity 0.4 → 0.15.
 4. **poster-1969** and **roy**: flat poster shapes, bass on both routes and the squeeze
    in the middle; a shape per area keeps them separate shapes.
 5. **oil-on-water**, **glycerine-drift**, **milk-marble**, **home-movie**, **crowd-plate**:
    each liquid look's bottles in places of their own.
-6. **jellyfish-bloom**: its four bells already sit in four places; the mids should land
-   at the bells, not orbit the middle.
+6. ~~**jellyfish-bloom**~~ (shipped with 25h): its four bells laid in four areas, a band
+   each (OWN_SEED_AREAS: its own seed lays the bells there).
 
 Kept centred on purpose: galaxy, solar-flare, stardust-collapse and fractal-dream (their
 picture is a centre), and classic (the picture `npm run fx` measures). The ferrofluid
@@ -6401,43 +6400,45 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   Underground, fire kicks, difference the dye frames: the change should centre within
   about 0.06 of the bass area (turned by the plate's angle), and on classic at the
   middle (the check-skeptic's design).
-- **25h. Areas that listen for themselves** (added 2026-10-24 from Imaginando's VS 2,
-  §30; M–L, first of §30's list). The owner, 2026-10-24: the presets want more
-  complexity, more varied palettes and parts of the canvas reacting to the music. VS
-  gives each of its eight layers its own modulation matrix, MIDI channel, audio
-  modulators and hue cords, so a kick drives one layer and the melody another. Here an
-  area (`PlateArea`, `plateAreas.ts`) already takes the music's hands by band
-  (`areasForBand`: where a kick drops, where the bass pours), but every patch-bay cord
-  (`SceneMapping`) still moves one number for the whole plate, and every area draws on
-  one palette. Add an optional `area` to a cord, so its setting acts as a field that is
-  the plate's value outside the area and the cord's value inside it, eased over the
-  area's rim; and a colour family per area, so each area's bottles pour from their own
-  hues and one look holds two or three palettes. What acts in one place is what a
-  projectionist does to one place: the lamp's heat there (`addTemp` today; with 18f the
-  real thermocapillary spreading and thinning it drives, and until 18f that is a
-  shortcut named in the PR), stirring there (a paddle's local force, not a whole-plate
-  swirl), dye released there, and the pigment's hue there. A setting with no local
-  meaning (the Dimmer, the frame's grade) refuses an area. Nothing moves the frame, and
-  each cord reads only fast readings (the owner's rules). A cord with no area plays as
-  today, so every saved look and preset loads unchanged. A MIDI channel can take an
-  area too, with 24.3. On the phone, the patch view gets an area picker that shows the
-  areas on a thumbnail of the plate. *Measure:* in the lab, a band's cord with an area
-  changes the dye and velocity inside that area by at least 5x what it changes outside
-  (synthetic bursts in that band only, other bands silent); with two areas on two bands,
-  each answers only its own band; and the 25e count of lit regions on the looks
-  rebuilt with it, before and after. Then 28i's presets use it.
-  *Widened 2026-10-24 (the owner took all four directions of that day's exploration; this
-  is direction A and goes first, since the other three plug into areas).* Two parts of
-  other items ship inside it: the colour family per area above (direction C's palette), and
-  the least of **30a** an area cord needs to fire on the instrument and not the room: a
-  threshold, an attack and a release on the cord (absent, it reads as today). The first
-  looks: **Velvet Underground** (the kick warms and stirs the soap well, so each kick opens
-  a ring there; the mids fold the glycerine with a local paddle; the hats set beads in the
-  syrup; the violet between stays dark), **Jellyfish Bloom** (a band per bell: the kick
-  presses the lowest so it contracts and sends out a pulse, the hats ruffle the top bell's
-  fringe, the mids land at the side bells; 25b-6), then **Bass Drop** (kicks take three
-  wells in turn; 25b-3). The plate holds five dyes (18l), so three areas get about two
-  colours each; a look that wants three full families waits on 25i-3.
+- ~~**25h. Areas that listen for themselves**~~ (shipped: a cord aimed at one area heats,
+  stirs with a paddle, pours or picks a bottle there, on a gate; a colour family per area;
+  Velvet Underground, Jellyfish Bloom and Bass Drop on it; `npm run areacords`). Story in
+  `docs/plan-shipped.md` §25. Open, found building it:
+  - **25h-1. A warm spot opens no hole yet (a named shortcut).** An area's heat is real heat
+    in kelvin, carried and cooled as the lamp's is, and what it does is what 18f gave warm
+    liquid: it rises on an upright plate and thins the water in the gap (18f-4's shortcut).
+    The surface pulled away from a warm spot, which is what a projectionist's heat is mostly
+    for, is thermal Marangoni (18f-2, reverted with #352). Velvet's kick heats its soap well,
+    and until 18f-2 lands the ring there is the kick's own hand and the soap's. When 18f-2
+    lands, `npm run areacords` should add a heat cord that opens the well's surface on a
+    level plate, against the same cord with the heat off.
+  - **25h-2. The gate on every cord, and the rest of 30a.** The threshold, attack and
+    release are read on area cords only (lib/areaCords.ts CordGate); a whole-plate cord
+    still follows its reading. Folding the gate into the patch bay's fold (a state per cord,
+    by what the cord is), and 30a's curves, are 30a's.
+  - **25h-3. Area cords on the back plate.** They work on the plate the music plays, in its
+    areas; a back plate with its own look has that look's areas (25d) but the front look's
+    cords do not reach them, and the panel greys Plate for an area cord. With 25d.
+  - **25h-4. Beads in one area.** The exploration had Velvet's hats set beads in the syrup;
+    Beads is one number for the plate (the BeadField's amount), so the hats pour the syrup's
+    bottles instead. A local bead source (the field's spawn masked to an area) would be a
+    fifth act.
+  - **25h-5. A look saved under its own name has no areas**, so its area cords do nothing:
+    areas are keyed by built-in id, as the dye's seed is (plateAreas.ts). A saved look
+    should carry its areas with it, or name the built-in it came from.
+  - **25h-6. The paddle turns with the dish** (25c's shortcut applies): an area turns with
+    the glass, and so does the paddle tending it. Invisible at these looks' motors.
+  - **25h-7. The Mac's measure of the rebuilt looks.** The lab plays each look's own cords
+    on its areas; the music's own hands (Bass Drop's kicks taking its wells in turn, the
+    kick's ring and press on Jellyfish's lowest bell) live in the visualizer's loop, which
+    only the Mac's app run reaches. That is 25e's lit-region count in `watch.mjs`, run on
+    the three looks before and after this.
+  - **25h-8. A Go between two area looks lands the old look's cords on the new one's
+    areas.** The crossfade fades the outgoing look's cords out over the Go (lookFade.ts),
+    and an area cord names its area by index, so for up to the fade's length Velvet's kick
+    heat on its soap well (area 1) heats Jellyfish's lowest bell. A cord should carry the
+    look it was written for, or the fade should drop the outgoing look's area cords at once
+    (they are hands, which a Go can let go of, not settings that must not jump).
 - **25i. Colour that answers the music** (direction C, 2026-10-24; after 25h). Once each
   area has its own family (25h), the music picks which bottle pours next. (1) **By the
   note**: a patch source that maps the lead note's pitch class (a fast reading: the
@@ -7242,7 +7243,10 @@ Turing Print" work (#331), which also made the reaction grow at all.
     *Split 2026-10-24* (the owner took the four directions of that day's exploration,
     25h first): the eight looks' frame fixes and Milk Marbling's dead patch run now; the
     two or three patches per look wait for 25h, so each look's music is written once, per
-    area, rather than plate-wide and then again. 28i-2 runs now as briefed.
+    area, rather than plate-wide and then again. 25h has shipped: an area cord is
+    `{ area, setting: 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue', threshold, attack,
+    release }` (lib/areaCords.ts), and `npm run areacords` holds every look's area cords to
+    their areas and to fast readings. 28i-2 runs now as briefed.
   - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
     magenta cells, no rainbow); then four or more hues on the film.
 

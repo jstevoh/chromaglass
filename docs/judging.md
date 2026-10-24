@@ -1568,3 +1568,25 @@ the bottom of the dye sheet. Each cartoon has Pour and Film.
   on the CPU is still open (14ab-2).
 - Say which of the four earn a place, and whether you want more (Ruttmann's abstract
   Lichtspiel films are the next candidates, 14ac-3).
+
+## 67. Areas that listen for themselves (PLAN 25h)
+
+Three looks now play their music in parts of the plate rather than over all of it. With a
+record on, through the room microphone and through the laptop:
+
+- **Velvet Underground.** Each kick should warm and fold the raspberry soap well on the right
+  (the paddle turns the other way on each kick), the mids should fold the magenta glycerine
+  top left slowly, and the hats should drop ultramarine and purple into the syrup low in the
+  middle. The violet between should stay dark. Say whether each pool reads as following its
+  own instrument, and whether the soap well's fold is too busy or too slight.
+- **Jellyfish Bloom.** Its four bells now sit in fixed places, a band each: the lowest, middle
+  bell should pulse pink and teal on the kick, the top bell's fringe should ruffle on the hats
+  (and go icy blue when the top end is bright), the two side bells should fill on the mids.
+  Before, the bells were scattered at random and the music landed in the middle.
+- **Bass Drop.** Kicks should take three wells in turn (crimson, blues, magenta) instead of
+  all landing in the middle, and the wells should stay apart (its Center Gravity went 0.4 to
+  0.15 so they do not slide together). Say whether it lost the weight it had.
+
+Settings, Patches, on any of the three: each patch has a thumbnail of the plate with the
+look's areas; tap one to aim the patch there, and Fire on a hit gives it a gate. On the phone,
+the same sheet. Say whether the picker is clear and big enough under a thumb.
