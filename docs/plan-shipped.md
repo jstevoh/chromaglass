@@ -4021,6 +4021,42 @@ back 95% of the way at the default, 89% at full. Shortcuts (27f-4): the ring the
 never opened past rest), the reach is read at the 6 mm middle, and the release is KickRelease's
 third of a second rather than the sheet's own slower relaxation.
 
+### 27f-5. The rock lifts the oil, not the frame (2026-10-24)
+
+Oil on a tipped plate is lighter than the water round it (light mineral oil, 880 kg/m³), so
+under the cover it rises the other way from the heavy colour, a bubble under a tipped glass.
+Built in the thin gap's `hsBody` (wgsl/thinGap.ts): the force c·Δρ g sinθ uphill (fluid.ts
+`OIL_LIFT`, in SI: 0.16 m/s a unit of sinθ at the 6 mm rest gap through the default 22 cSt, no
+tuning), laid as the closed dish's own circulation, u = ∇⊥ψ with −∇²Ψ = ∇c and Ψ = 0 near the
+rim (`hsLiftSource`, `hsLiftRelax`: over-relaxed red-black sweeps, eight a step, warm from the
+last step, ψ multiplied by the tilt). So an even sheet of oil feels nothing, the picture's mean
+flow is zero by construction, and the rim holds what reaches it. The tilt is the step's
+`rockX`, the hand's swing and the phone's tilt both. With the oil there the colour's weight is
+the water's colour alone (Oil Bodies' own share taken off, `WATER_DYE`), over its own mean taken
+on the GPU this step (`hsOilMean`): weighed whole, a Clock Glass body's colour pulled it
+downhill about nine times as hard as its oil lifts, so the bodies sank against their buoyancy.
+
+Measured (`npm run oillift`, lab, sinθ 0.1): a lens rises at 6.22 mm/s against Hele-Shaw's 6.40
+worked out in SI for its soft edge (Δρ g sinθ h²/12μ, halved for the water it pushes round it,
+× (1 − a²/R²), × ∫c²/∫c); a level one stays put; a lens carrying Clock Glass's colour rises at
+88% of a plain one (the 6% of its colour Oil Bodies leaves in the water at its edge weighs as
+dyed water); what the tilt adds to the picture's mean flow is 0.000 mm/s on a full sheet and
+under 0.02 mm/s on half sheets (the first try, below, 4.2), and Clock Glass's own lay rocked
+keeps its mean at 1.5% of its liquid's speed; a lens rocked into the rim keeps 99% of its oil
+over six seconds of a steady tilt and stops.
+
+Tried first, and taken out of #440: the buoyancy on the two-layer dish's oil rafts alone slid
+an oil sheet across the dish, the whole picture, at −4.2 mm/s a lean (Oil & Water and Clock
+Glass both run the default Plate Rock at Frame Sway 0), and a lens at the rim drove into it.
+Then, in this PR's first cut, the force laid as the oil's share over the dish's mean,
+(c − c̄) L, as the colour's weight is: the frame held, but through the gap's open rim (p = 0, the
+plate's free edge) a lens that reached it went out, 88% of it in three seconds at 6°. Laid as
+the circulation but held to zero only on the rim's own cells, it lost 7%; three cells in, 0.9%
+over six seconds, of which the same lens left level there loses 0.2%. Open: 27f-6 (a standing
+plate), 27f-7 (the lift's circulation is the even gap's; the mix's oil has the water's
+viscosity), 18g-6 (a body touching the rim drains through it by its own surface tension, on
+main).
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)

@@ -176,6 +176,7 @@
     "blowrange": "node scripts/blowrange.mjs",
     "forces": "node scripts/forces.mjs",
     "rides": "node scripts/rides.mjs",
+    "oillift": "node scripts/oillift.mjs",
     "musicforce": "node scripts/musicforce.mjs",
     "bassboost": "node scripts/bassboost.mjs",
     "thick": "node scripts/thick.mjs",
