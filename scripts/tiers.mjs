@@ -427,6 +427,17 @@ try {
     });
     await page.waitForTimeout(300);
     const proGridNudgeWhilePro = await page.locator('[data-cg-grid-upgrade-pro]').count();
+    // The 1024² grid is a Pro option (PLAN 23.17): the free and Home tiers see
+    // it in the list, so they know it exists, but cannot pick it. Reading the
+    // option's own `disabled` (not a label or a nudge) is what keeps the
+    // option gated: a label that says "Pro" on an option anyone can choose
+    // passed this check before it read the attribute (the 2026-10-24 review
+    // of #406). Read here while the Pro key is active, and again below on
+    // the free tier, so the check needs both halves of the gate.
+    const option1024 = '#settings-simulation option[value="1024"]';
+    const pro1024Count = await page.locator(option1024).count();
+    const pro1024Disabled =
+      pro1024Count === 1 ? await page.locator(option1024).isDisabled() : null;
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
     const floatingNudgeWhilePro = await page.locator('[data-cg-upgrade-pro-nudge]').count();
@@ -466,18 +477,24 @@ try {
       () => page.locator('[data-cg-grid-upgrade-pro]').isVisible().catch(() => false),
       10_000,
     );
-    const has1024Option =
-      (await page.locator('#settings-simulation option[value="1024"]').count()) === 1;
+    const free1024Count = await page.locator(option1024).count();
+    const free1024Disabled =
+      free1024Count === 1 ? await page.locator(option1024).isDisabled() : null;
     check(
-      '12. slower framerates suggest upgrading to Pro with 768²/1024² GPU headroom (no git clone) and hide when Pro is active',
+      '12. slower framerates suggest upgrading to Pro with 768²/1024² GPU headroom (no git clone), hide when Pro is active, and only a Pro key can pick the 1024² grid',
       proGridNudgeWhilePro === 0 &&
         floatingNudgeWhilePro === 0 &&
         nudgeText.includes('ChromaGlass Pro') &&
         !nudgeText.includes('git clone') &&
         !nudgeText.includes('Run it locally') &&
         nudgeCtaHref.includes('lemonsqueezy.com/checkout/buy/') &&
-        has1024Option,
-      `proGridWhilePro=${proGridNudgeWhilePro} floatWhilePro=${floatingNudgeWhilePro} has1024=${has1024Option} href=${nudgeCtaHref}`,
+        pro1024Count === 1 &&
+        pro1024Disabled === false &&
+        free1024Count === 1 &&
+        free1024Disabled === true,
+      `proGridWhilePro=${proGridNudgeWhilePro} floatWhilePro=${floatingNudgeWhilePro} ` +
+        `1024 pro=${pro1024Count}/${pro1024Disabled ? 'disabled' : 'enabled'} ` +
+        `free=${free1024Count}/${free1024Disabled ? 'disabled' : 'enabled'} href=${nudgeCtaHref}`,
     );
 
     await ctx.close();
