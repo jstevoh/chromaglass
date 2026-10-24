@@ -3,7 +3,8 @@
  * The camera section's dials each do something (PLAN.md 33i).
  *
  *   npm run lens                       (the lab: any adapter that computes, so a cloud session too)
- *   LENS_BEFORE=1 npm run lens         the same asks of the camera pass on origin/main, which fail
+ *   LENS_BEFORE=1 npm run lens         the same asks of the camera pass as it was before 33i
+ *                                      (scripts/fixtures/camera-before-33i.ts.txt), which fail
  *
  * What was reported (the owner, 2026-10-22): "the camera controls don't really
  * do much". Measured in the lab on a plate of nine dyes, through the real plate
@@ -37,19 +38,31 @@
  *   4. Lens is the sensor's look and no more: Lens at 1 with the optics at 0
  *      changes the frame, and Lens at 1 over the optics keeps what they did;
  *   5. nothing in the camera pass is driven by the band: its sources read no
- *      sound, so the frame stays where the plate puts it.
+ *      sound, so the frame stays where the plate puts it;
+ *   6. a look saved with Lens up opens looking as it did. The first reading of
+ *      such a look, "it keeps its optics", was reviewed on this plate: the new
+ *      optics are stronger at the same dial, so a look saved with the old
+ *      defaults (aperture .5, bloom .4, chromatic .3, refraction .6) and Lens
+ *      at 1 moved 8.1 levels on average (31.6% of pixels by 8 or more), and at
+ *      Lens .6 10.5 (39.4%). Each such look is now rendered through the old
+ *      pass (a child run of this script on the frozen old shader, below) and
+ *      through the new pass with the settings the loader gives it, and the
+ *      difference held under a bar; the unmigrated reading is rendered too, as
+ *      the control, and must be far worse, or the bar measures nothing.
  *
- * `LENS_BEFORE=1` builds the lab on the camera shader as origin/main has it
+ * `LENS_BEFORE=1` builds the lab on the camera shader as it was before 33i
  * and asks for the dials with Lens at 0, as a person would turn them: the
  * old pass does nothing there at all. At Lens 1 it moved the frame far less
  * (the numbers are printed with it).
  */
 import { build } from 'esbuild';
-import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { openLab } from './lab.mjs';
 
 const BEFORE = !!process.env.LENS_BEFORE;
+// A child run on the old shader that only renders the saved looks and writes the frames here.
+const DUMP = process.env.LENS_DUMP;
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok });
@@ -57,8 +70,29 @@ const check = (name, ok, detail = '') => {
 };
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 
+// What the owner's looks saved before 33i held beside Lens: the four optics
+// were multiplied by Lens then, and these were the defaults. Three sets (the
+// defaults, a strong set and a light one) at three Lens values, because the
+// old pass blended by Lens and the blur and the glow are not linear in a dial.
+const OLD = { aperture: 0.5, bloom: 0.4, chromaticAberration: 0.3, refraction: 0.6 };
+const SAVED_SETS = {
+  'the old defaults': OLD,
+  'every optic at .8': { aperture: 0.8, bloom: 0.8, chromaticAberration: 0.8, refraction: 0.8 },
+  'every optic at .25': { aperture: 0.25, bloom: 0.25, chromaticAberration: 0.25, refraction: 0.25 },
+};
+const SAVED_LENS = [1, 0.6, 0.3];
+const SAVED = SAVED_LENS.flatMap((lens) => Object.entries(SAVED_SETS).map(([name, set]) => ({ lens, name, set })));
+const SAVED_FILE = 'node_modules/.cache/lens-saved-old.json';
+const FOCUS = 0.55; // DEFAULT_SETTINGS.focus, which the old pass was also shown with
+
+// The old pass's reading of a saved look: the dials as they were written.
+const oldCamera = (c) => ({ amount: c.lens, focus: FOCUS, aperture: c.set.aperture, bloom: c.set.bloom, chromatic: c.set.chromaticAberration, refraction: c.set.refraction });
+
 // ── 1. The gate ───────────────────────────────────────────────────────
 const out = 'node_modules/.cache/lens-lib.mjs';
+// The saved looks, as the new pass is given them: the loader's reading, and the
+// settings as written (the control).
+let migratedCams = [], rawCams = [];
 if (!BEFORE) {
   await build({
     stdin: {
@@ -77,6 +111,8 @@ if (!BEFORE) {
   const L = await import(`../${out}`);
   const D = L.DEFAULT_SETTINGS;
   const OPTICS = ['refraction', 'aperture', 'bloom', 'chromaticAberration'];
+  const savedLook = (version, over) => L.parsePresetFile(JSON.stringify({
+    format: L.PRESET_FORMAT, version, name: 'old', settings: { ...D, ...OLD, camera: 0, ...over } }));
   const wanted = (over) => L.cameraWanted({ ...D, ...over });
 
   check('the defaults leave the camera pass off',
@@ -107,18 +143,25 @@ if (!BEFORE) {
   // A look the owner saved before the optics acted on their own holds their
   // old defaults beside Lens 0 (a saved look keeps every setting), which were
   // inert then and would not be now: it must read as it looked.
-  const OLD = { aperture: 0.5, bloom: 0.4, chromaticAberration: 0.3, refraction: 0.6 };
-  const saved = (version, over) => L.parsePresetFile(JSON.stringify({
-    format: L.PRESET_FORMAT, version, name: 'old', settings: { ...D, ...OLD, camera: 0, ...over } }));
-  const m2 = saved(2, {}), m1 = saved(undefined, {});
+  const m2 = savedLook(2, {}), m1 = savedLook(undefined, {});
   check('a look saved before the optics acted alone, with Lens at 0, is read with them at 0',
     !L.cameraWanted(m2.settings) && !L.cameraWanted(m1.settings) && OPTICS.every((k) => m2.settings[k] === 0 && m1.settings[k] === 0),
     `version 2: ${OPTICS.map((k) => m2.settings[k]).join('/')}, no version: ${OPTICS.map((k) => m1.settings[k]).join('/')}`);
-  const lensed2 = saved(2, { camera: 0.6 });
-  const v3 = saved(3, {});
-  check('one saved with Lens up keeps its optics, and one saved from now on keeps whatever it was saved with',
-    OPTICS.every((k) => lensed2.settings[k] === OLD[k] && v3.settings[k] === OLD[k]),
-    `lens up ${OPTICS.map((k) => lensed2.settings[k]).join('/')}, version 3 ${OPTICS.map((k) => v3.settings[k]).join('/')}`);
+  const lensed2 = savedLook(2, { camera: 0.6 });
+  const v3 = savedLook(3, {});
+  const weaker = ['aperture', 'bloom', 'chromaticAberration', 'refraction'].every((k) => lensed2.settings[k] > 0 && lensed2.settings[k] < OLD[k] * 0.6 + 1e-9);
+  check('one saved with Lens up has each optic scaled down to the dial that draws what it drew, and one saved from now on keeps whatever it was saved with',
+    weaker && OPTICS.every((k) => v3.settings[k] === OLD[k]),
+    `lens .6 ${OPTICS.map((k) => lensed2.settings[k]).join('/')} from ${OPTICS.map((k) => OLD[k]).join('/')}, version 3 ${OPTICS.map((k) => v3.settings[k]).join('/')}`);
+  const absent = L.parsePresetFile(JSON.stringify({ format: L.PRESET_FORMAT, version: 2, name: 'old', settings: { camera: 1 } })).settings;
+  check('a look saved with Lens up and an optic it never wrote is read with that optic\'s old default, not 0',
+    absent.refraction > 0 && absent.aperture > 0 && absent.bloom > 0 && absent.chromaticAberration > 0,
+    OPTICS.map((k) => absent[k]).join('/'));
+  migratedCams = SAVED.map((c) => {
+    const st = savedLook(2, { camera: c.lens, ...c.set }).settings;
+    return { amount: st.camera, focus: st.focus, aperture: st.aperture, bloom: st.bloom, chromatic: st.chromaticAberration, refraction: st.refraction };
+  });
+  rawCams = SAVED.map(oldCamera);
   const up = L.upgradeSaved({ ...m2, version: 2, settings: { ...D, ...OLD, camera: 0 } });
   check('a set list\'s saved looks are read the same way', !L.cameraWanted(up.settings) && up.version === 3,
     `version ${up.version}, wanted ${L.cameraWanted(up.settings)}`);
@@ -126,16 +169,30 @@ if (!BEFORE) {
 
 // ── 2–4. The pass, in the lab ──────────────────────────────────────────
 const plugins = [];
+// The camera pass as it was before 33i, frozen in a fixture so this runs where
+// origin/main is not fetched and does not move when main does.
 if (BEFORE) {
-  const old = execSync('git show origin/main:src/gpu/wgsl/camera.ts', { encoding: 'utf8' });
+  const old = readFileSync('scripts/fixtures/camera-before-33i.ts.txt', 'utf8');
   plugins.push({
     name: 'old-camera',
     setup(b) { b.onLoad({ filter: /src\/gpu\/wgsl\/camera\.ts$/ }, () => ({ contents: old, loader: 'ts' })); },
   });
 }
+// The old pass's frames of the saved looks come from a run of this script on
+// the old shader, which renders them and stops: two shaders cannot live in one lab.
+if (!BEFORE) {
+  mkdirSync('node_modules/.cache', { recursive: true });
+  try {
+    execFileSync(process.execPath, ['scripts/lens.mjs'], { env: { ...process.env, LENS_BEFORE: '1', LENS_DUMP: SAVED_FILE }, stdio: 'pipe' });
+  } catch (e) {
+    console.log(String(e.stdout ?? '') + String(e.stderr ?? ''));
+    process.exit(1);
+  }
+}
 const { page, close } = await openLab({ plugins, tag: BEFORE ? 'lensbefore' : '' });
 const S = 384;
-const r = await page.evaluate(async (S) => {
+const cams = DUMP ? SAVED.map(oldCamera) : [...migratedCams, ...rawCams];
+const r = await page.evaluate(async ({ S, cams, only }) => {
   await lab.create(256);
   const pal = lab.palette();
   let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -145,6 +202,15 @@ const r = await page.evaluate(async (S) => {
   }
   lab.flush(); await lab.step(40);
   const draw = (cam) => lab.render(S, { granulation: 0 }, { camera: cam, time: 3 });
+  const b64 = (px) => {
+    const u = new Uint8Array(px.buffer ? px.buffer : px); let t = '';
+    for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(t);
+  };
+  const o = {};
+  o.frames = [];
+  for (const c of cams) o.frames.push(b64(await draw(c)));
+  if (only) return o;
   const diff = (a, b) => {
     let big = 0, sum = 0; const n = a.length / 4;
     for (let i = 0; i < a.length; i += 4) {
@@ -154,7 +220,6 @@ const r = await page.evaluate(async (S) => {
     }
     return { share: big / n, mean: sum / n };
   };
-  const o = {};
   const OFF = { amount: 0, focus: 0.5 };
   const off = await draw(OFF);
   o.off2 = diff(off, await draw(OFF));
@@ -219,14 +284,15 @@ const r = await page.evaluate(async (S) => {
   o.bare = {};
   for (const key of ['refraction', 'aperture', 'bloom']) o.bare[key] = diff(bare, await draw({ ...OFF, [key]: 1 }));
   return o;
-}, S);
+}, { S, cams, only: !!DUMP });
 await close();
+if (DUMP) { writeFileSync(DUMP, JSON.stringify(r.frames)); process.exit(0); }
 
-const OLD_NOTE = BEFORE ? ' (the camera pass as origin/main has it)' : '';
+const OLD_NOTE = BEFORE ? ' (the camera pass as it was before 33i)' : '';
 // Mean change in 0..255 levels over the whole frame, full dial. Measured on
-// this build (Metal, 384 px, nine pours): refraction 11.7, aperture 7.9, bloom
-// 21.9, chromatic 4.3. The pass as origin/main has it, at Lens 1 (the only way
-// those dials worked there): 3.6, 4.4, 8.8, 0.5. A bar between the two fails
+// this build (SwiftShader, 384 px, nine pours): refraction 11.7, aperture 8.1,
+// bloom 21.9, chromatic 4.8. The pass as it was before 33i, at Lens 1 (the only
+// way those dials worked there): 3.6, 4.4, 8.8, 0.5. A bar between the two fails
 // the old pass on strength as well as on the Lens multiply.
 const need = { refraction: 6, aperture: 6, bloom: 15, chromatic: 2 };
 check('the same render twice is identical, so a difference below is the dial', r.off2.share === 0 && r.off2.mean === 0, `${r.off2.mean.toFixed(3)} levels`);
@@ -276,6 +342,35 @@ check('Lens alone is the sensor\'s look and moves the frame by itself',
 check('Lens over the optics keeps what the optics did and still adds its own look',
   r.opticsKept.share >= 0.3 && r.lensOverOptics.share >= 0.5 * r.lensOnly.share,
   `against the plain picture ${pct(r.opticsKept.share)}; Lens's own part ${pct(r.lensOverOptics.share)} against ${pct(r.lensOnly.share)} alone`);
+
+// ── 6. Saved looks ────────────────────────────────────────────────────
+// The mean change in levels between two frames, the larger of the three
+// channels at each pixel, and the share of pixels that moved by 8 or more.
+if (!BEFORE) {
+  const bufs = JSON.parse(readFileSync(SAVED_FILE, 'utf8')).map((b) => Buffer.from(b, 'base64'));
+  const mine = r.frames.map((b) => Buffer.from(b, 'base64'));
+  const meanDiff = (a, b) => {
+    let sum = 0, big = 0; const n = a.length / 4;
+    for (let i = 0; i < a.length; i += 4) {
+      const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+      sum += d; if (d >= 8) big++;
+    }
+    return { mean: sum / n, share: big / n };
+  };
+  // The bar per set: the old pass drew its blur and glow with different
+  // shapes (twelve taps and eight directions against sixty-four and sixty), so
+  // the match is not exact, and the stronger the dials the more the shapes
+  // show. Named in PLAN.md 33i. The first reading ("keeps its optics") gave
+  // 8.1 and 10.5 levels for the old defaults at Lens 1 and .6.
+  const bar = { 'the old defaults': 3, 'every optic at .8': 6, 'every optic at .25': 2.5 };
+  SAVED.forEach((c, i) => {
+    const mig = meanDiff(bufs[i], mine[i]);
+    const raw = meanDiff(bufs[i], mine[SAVED.length + i]);
+    check(`a look saved with ${c.name} and Lens ${c.lens} opens within ${bar[c.name]} levels of how the old pass drew it`,
+      mig.mean < bar[c.name] && raw.mean > 1.5 * mig.mean,
+      `migrated ${mig.mean.toFixed(2)} levels (${pct(mig.share)} of pixels by 8 or more); read as written ${raw.mean.toFixed(2)} (${pct(raw.share)})`);
+  });
+}
 
 // ── 5. No sound in the pass ───────────────────────────────────────────
 const SOUND = /\b(audio|bass|beat|kick|energy|treble|mids?|analy[sz]er|spectrum|rms|sound)\b/i;

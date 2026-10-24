@@ -1513,4 +1513,8 @@ frame); Aperture with Focus moved should pull a sharp ring out of a soft ground,
 should look like glass, not like a smear; Bloom should be a halo on the bright dye with a faint wide
 skirt; Chromatic Aberration should be a red/blue edge on the domes that you would notice but not
 mistake for a bug. Then Aperture at 1 on a dense plate: is there hair along the sharp dye edges, and
-does the frame rate hold? A saved look from before should look as it did.
+does the frame rate hold? Chromatic Aberration alone is lateral colour only (a fringe growing
+towards the corners); a red/blue fringe along the domes' edges needs Refraction up as well, since
+the prism is what spreads the colours. A saved look from before with Lens up should look within a
+few levels of how it did (its optics are rescaled by Lens, `npm run lens` line 6); the residual is
+a softer blur and a wider glow, not a different picture.

@@ -892,7 +892,7 @@ export interface VisualizerSettings {
   aperture: number;           // the lens's opening: how fast things go soft away from the focal plane (0 = everything sharp)
   bloom: number;              // scatter in the lens: a halo around the highlights
   chromaticAberration: number;// the glass's dispersion: colour fringing at refracting edges and, growing outward, at the frame's corners
-  refraction: number;         // how far the dye's and the bubbles' curved surfaces bend what is under them
+  refraction: number;         // how far the dye's curved surface bends what is under it (not the bubbles: PLAN 33i-6)
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film

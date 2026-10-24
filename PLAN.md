@@ -7508,20 +7508,24 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
   line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
 
-### ~~33i. The camera's dials do something~~ — **Shipped, this PR** (Settings → Camera: Refraction, Aperture, Bloom and Chromatic Aberration act at their own settings with Lens at 0, and are no longer greyed; the shader rebuilt on thin-prism refraction, a thin lens's blur circle, a power-law glow and Abbe dispersion, `src/gpu/wgsl/camera.ts`; the four default to 0 and saved looks and set lists are read as they looked, `PRESET_VERSION` 3; `npm run lens`: mean change of the frame at a full dial, Lens at 0, was 0.0 for all four on the old pass, now refraction 11.7, aperture 8.1, bloom 21.9, chromatic 4.8 levels; story in `docs/plan-shipped.md` §33i)
+### ~~33i. The camera's dials do something~~ — **Shipped, this PR** (Settings → Camera: Refraction, Aperture, Bloom and Chromatic Aberration act at their own settings with Lens at 0, and are no longer greyed; the shader rebuilt on thin-prism refraction, a thin lens's blur circle, a power-law glow and Abbe dispersion, `src/gpu/wgsl/camera.ts`; the four default to 0 and saved looks and set lists are read as they looked (a look with Lens up has each optic rescaled by Lens, within 2 to 4 levels of the old picture), `PRESET_VERSION` 3; `npm run lens`: mean change of the frame at a full dial, Lens at 0, was 0.0 for all four on the old pass, now refraction 11.7, aperture 8.1, bloom 21.9, chromatic 4.8 levels; story in `docs/plan-shipped.md` §33i)
 
 - **33i-1. Shortcuts to replace with the real thing.** (a) Dispersion runs at an Abbe
   number of about 8, the densest flints; real oils sit near 50 and would show nothing.
   Replace with per-wavelength refraction of the dye's real index (the plate's liquid
   table) and let the knob scale the exposure, not the physics. (b) The glow scatters what
   is over a 0.5 knee because the plate is stored in 8 bits and clips at 1; draw the plate
-  in half floats and scatter true radiance. (c) Refraction displaces the picture by the
+  in half floats and scatter true radiance. The glow also only adds light (gain 2.4 on what is
+  over the knee) and takes none from the core, where a real point spread moves it out of the
+  core; conserve it once the plate is in half floats. (c) Refraction displaces the picture by the
   surface slope; the light's path through the film's thickness is not traced, and the
   height the lens focuses on is the dye's column (`aux.z`), not the gap's real depth.
 - **33i-2. Depth of field costs 64 taps a pixel and leaves hair at aperture 1.** Where a
   sharp dye ramp sits over a defocused ground the stochastic disc leaves a faint noise
   along the edge. Measure it on Metal at a full frame (`docs/judging.md` §63); if it
-  costs frames, gather at half resolution for the wide discs.
+  costs frames, gather at half resolution for the wide discs. The gather weights also lack
+  the disc-area share (about 64 over the radius squared of the physical strength); a naive
+  area weight is noisier, so the wide discs are somewhat fainter than a real lens's.
 - **33i-3. Lens up on a look still at the defaults is now only the sensor look.** The old
   defaults (aperture 0.5, bloom 0.4, refraction 0.6) came on with Lens; they no longer
   do. The shipped looks keep their cameras (checked, 32 looks); Lucky rolls the optics
@@ -7529,6 +7533,17 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
 - **33i-4. Idea: the cyberpunk look's colour fringing.** It stored 0.35 that never drew
   (its Lens is 0); the dead value was removed. Give it a visible 0.2 if the owner wants
   the fringe on that look.
+- **33i-6. A bubble's own lens is gone from the camera.** The old pass added `bub*0.045`
+  to the refraction and shrank the blur by `1-bub*0.5` where a bubble sat; the new one reads
+  no bubble mask (`aux.w`). A bubble is a diverging lens (a gas pocket in a liquid): bend by
+  the bubble's own slope, and let Aperture treat it as the thing it is. Judge whether the
+  closeup misses it first (`docs/judging.md` §63).
+- **33i-7. Saved looks with Lens up are close, not identical.** Each optic is rescaled by
+  Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`); the old defaults sit
+  2.0 to 2.3 levels from the old pass, an every-optic-at-.8 look 3.4 to 3.95, at .25 1.1 to
+  1.5. The rest is the kernels: the old 12-tap blur and 8-direction glow against the new 64
+  taps and 60 samples. The old fringe was under half a level, so chromatic maps to about
+  0.03. `npm run lens` line 6 holds the bars (3, 6, 2.5).
 - **33i-5. `sceneMap.ts` has no keys for the camera's dials**, so a scene cannot ride
   them; add them if a scene should (the frame must not move with sound).
 

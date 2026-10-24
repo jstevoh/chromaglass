@@ -4593,7 +4593,13 @@ fails on the old pass on 14 lines. The bars were first set as shares of pixels m
 the skeptic showed an old pass at Lens 1 nearly met; they are means now, between the old
 pass's and the new.
 
-Left open as 33i-1 to 33i-5 in `PLAN.md`: the Abbe-8 exaggeration, the 8-bit glow knee, the
+Review of the first push found that a saved look with Lens up had changed (the optics no longer
+rode Lens, so the old defaults at Lens 1 sat 8 levels from the old picture, at Lens .3 13). A
+pre-v3 look now has each optic rescaled by Lens times a fitted ratio, fitted against the old pass
+rendered from a frozen copy of it (`scripts/fixtures/camera-before-33i.ts.txt`): 2.0 levels on the
+old defaults. Left as 33i-7.
+
+Left open as 33i-1 to 33i-7 in `PLAN.md`: the Abbe-8 exaggeration, the 8-bit glow knee, the
 64-tap cost and edge hair at aperture 1, and Lens-up at the defaults.
 
 ## 34. What a competitor's page showed

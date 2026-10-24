@@ -975,6 +975,12 @@ jobs:
       - name: The air lens
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run airlens
+      # The camera's four dials, each alone with Lens at 0 (refraction, aperture, bloom,
+      # chromatic aberration each move the frame), and a pre-v3 saved look through the old and the
+      # migrated shader: the same picture within a bar.
+      - name: The lens's dials
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run lens
       # Film Physics on the plate: nothing but the film changes; the projector's bubbles take the
       # faint tint the light through a film is, the closeup's the soap's own reflected gold.
       - name: The film, photographed
