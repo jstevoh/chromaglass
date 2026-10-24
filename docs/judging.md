@@ -1552,7 +1552,46 @@ at a show, through the microphone in the room as well as through the laptop:
 Say whether a change ever lands in the middle of a song, whether one is ever missed, and whether
 the speeds feel right; if they do, On a New Song can open on New preset again (14z-4).
 
-## 66. Beat Squeeze's sheet gives back at the liquid's own pace (PLAN 27f-4)
+## 66. The cartoons, poured and filmed (PLAN 14ac)
+
+On the desk, the Dye panel has a Cartoons shelf under Image… and Video…; on the phone, it is at
+the bottom of the dye sheet. Each cartoon has Pour and Film.
+
+- **Pour** The Skeleton Dance on a dark look (Classic) and then on a pale one. It pours the
+  picture's light as dye, so a cartoon with a light background lays a lot of white; say whether
+  that reads as the cartoon or as a wash, and whether pouring the *drawing* (the dark ink) would
+  be better (14ac-2).
+- **Film** Swing You Sinners! with Film Mix at its default and at full: does the cartoon read
+  through the dye, and does the grey picture want the look's colours (14ac-4)?
+- Leave one pouring for a whole loop (five to seven minutes) and say whether it ever stutters
+  or the plate slows; the pour's stutter every frame is fixed (14ab-1), but its per-pixel work
+  on the CPU is still open (14ab-2).
+- Say which of the four earn a place, and whether you want more (Ruttmann's abstract
+  Lichtspiel films are the next candidates, 14ac-3).
+
+## 67. Areas that listen for themselves (PLAN 25h)
+
+Three looks now play their music in parts of the plate rather than over all of it. With a
+record on, through the room microphone and through the laptop:
+
+- **Velvet Underground.** Each kick should warm and fold the raspberry soap well on the right
+  (the paddle turns the other way on each kick), the mids should fold the magenta glycerine
+  top left slowly, and the hats should drop ultramarine and purple into the syrup low in the
+  middle. The violet between should stay dark. Say whether each pool reads as following its
+  own instrument, and whether the soap well's fold is too busy or too slight.
+- **Jellyfish Bloom.** Its four bells now sit in fixed places, a band each: the lowest, middle
+  bell should pulse pink and teal on the kick, the top bell's fringe should ruffle on the hats
+  (and go icy blue when the top end is bright), the two side bells should fill on the mids.
+  Before, the bells were scattered at random and the music landed in the middle.
+- **Bass Drop.** Kicks should take three wells in turn (crimson, blues, magenta) instead of
+  all landing in the middle, and the wells should stay apart (its Center Gravity went 0.4 to
+  0.15 so they do not slide together). Say whether it lost the weight it had.
+
+Settings, Patches, on any of the three: each patch has a thumbnail of the plate with the
+look's areas; tap one to aim the patch there, and Fire on a hit gives it a gate. On the phone,
+the same sheet. Say whether the picker is clear and big enough under a thumb.
+
+## 68. Beat Squeeze's sheet gives back at the liquid's own pace (PLAN 27f-4)
 
 Classic with a band at 120 bpm, Beat Squeeze at 0.5, Kick Bloom at 0, Frame Sway 0. Each kick
 should still be a dent where it lands, but now its letting go is the liquid's: on the default oil

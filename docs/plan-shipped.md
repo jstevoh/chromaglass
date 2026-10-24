@@ -2163,6 +2163,65 @@ playing, the beat clock fired 303 kicks for the band's 258 and fires 257; in the
 on the Perform desk 10 kicks for 10 presses and none, on the phone 9 for 9 taps and
 none, while knocks with no hand on anything are still all heard.
 
+
+### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped 2026-10-24)
+
+Asked by the owner 2026-10-24: early cartoons in the app to run in the background and feed
+the visuals, The Skeleton Dance first, and then "I don't want a short loop, I want the
+extended cartoon looped."
+
+What shipped. Four cartoons, each the whole film with only its title and end cards cut:
+The Skeleton Dance (1929, 5:08), Steamboat Willie (1928, 6:58), Swing You Sinners! (1930,
+7:28) and Out of the Inkwell's The Tantalizing Fly (1919, 3:19). A Cartoons shelf on the
+desk's Dye panel and in the phone's dye sheet gives each a Pour (into the dish as dye,
+looping, with Stop) and a Film (through the projector, under the dye; pressed again, off).
+They are not also in Settings' Film section: on the desk that section sits beside the Dye
+panel, and `npm run layout` caught the same buttons drawn twice.
+
+Copyright. Every one was published in 1930 or before, so it is in the US public domain
+(95 years from publication at the most). Where each copy came from, what was cut, and the
+caveats (Disney's trademarks in Mickey; later versions of the characters; that The
+Skeleton Dance's only copies online come from a modern transfer, not a print scan; status
+outside the US) are in `public/video/cartoons/SOURCES.md`. Steamboat Willie is a scan of
+an old 16mm print, cropped to the picture (its frame lines measured at rows 47 and 430 and
+its edges at columns 60 and 538 on every tenth second of the reel). Swing You Sinners! is a
+1950s television print whose distributor's title cards are cut.
+
+Size. Silent H.264 MP4, 384 px wide, grey, 24 fps, grain smoothed (hqdn3d) before
+encoding, the index at the front so a cartoon plays while it arrives: 6.1, 5.5, 8.1 and
+1.5 MB, 21.2 MB together. The first pass, 480 px with light smoothing, was 48 MB. Nothing
+is fetched at load (the files are not under `/assets/`, so the service worker leaves them
+alone), so 14v's load time is unchanged; a cartoon is given to the video by address, so it
+starts before it has all arrived.
+
+14ab-1, fixed with it. `App.tsx` handed the poured video to the plate on every animation
+frame, and `pourVideo` paused whatever it held before taking the new one, which was the
+same video: it was paused and played sixty times a second. Now `pourVideo` takes a video
+once (the same one again only makes sure it plays) and the app calls it once, on play.
+Measured by `npm run cartoons`'s pour line, on a phone page in Chromium: with the old pour
+(the per-frame hand-over and the old `pourVideo` put back), the page closed under the pour
+before its two seconds were up (the check's "the page lives through Pour and Film" red,
+10/11); with the fix, 2.00 s of the cartoon played in two seconds, 0 pauses, a picture
+range of 186 read back from it, 14/14.
+
+The film survives a rebuild. The GL effect's cleanup stopped the film, and that cleanup
+also runs when the plate is rebuilt (`glEpoch`: a lost device, a resolution change), so a
+loop, the camera or a window went dark on the projector while the panel still said it was
+playing. Found by `npm run cartoons` under software WebGPU (`PW_WEBGPU=1`), after its review
+made it ask what the projector holds: a second and a half after Film the projector held no
+film and the video had been reset (15/16). The film is now stopped only when the plate goes
+away, in its own effect (16/16 there).
+
+The check, after one review pass: besides the files and the licence record, it asks that
+the video the plate holds as its pour (`__cgVideo` under `?debug`) is the cartoon that
+played, and that the plate's frame loop read it where there is a plate (2–3 frames in two
+seconds on software WebGPU); that each loops (sent half a second from its end, back at its
+start 1.5 s later, no `ended`); and that Stop and Film-off pause that same element and the
+plate and projector let go. It runs in CI's browser part.
+
+Measured: `npm run cartoons` 16/16 (no GPU and `PW_WEBGPU=1`), `layout` 77/77, `phone`
+357/357, `desk` 48/48, `panel` 197/197, `lint` clean.
+
 ### 15i. Picking a bottle pours nothing (shipped)
 
 **Shipped.** The owner, 2026-10-04: "when I pick the ferrofluid liquid - it deposits a
@@ -3306,6 +3365,28 @@ sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by
 (the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
 The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
+### 18f. Heat comes from the lamp, and a level plate has no "up"
+
+**Shipped (#352):**
+- **Where:** `currentForces` previously pushed heat along `S.up` regardless of whether the plate was level or upright, saturated by an artificial `tanh(20T)` clamp. Centre gravity and rock used `tanh(dye - mean)`. The oil in `mixForce` had no buoyant density contrast, so oil never floated upward relative to water when the plate was tilted. Heat decayed per step rather than per second, meaning 60 Hz and 120 Hz simulations cooled at vastly different rates.
+- **The real phenomenon and changes:**
+  1. **Level plate has no in-plane buoyancy:** On a level dish, gravity points straight through the glass normal to the plate ($g_z$), so in-plane buoyancy ($g_x, g_y$) is identically zero. In `currentForces` and `mixForce`, in-plane thermal buoyancy is strictly gated on `upright` (zero on a level plate, active on a tilted/vertical plate).
+  2. **Linear Boussinesq:** Removed the artificial `tanh(20T)` clamp. For temperature differences of tens of kelvin, density changes are linear in temperature ($\Delta \rho = -\rho \beta \Delta T$), so buoyant acceleration scales linearly with temperature. Doubling temperature doubles plume acceleration (verified by `npm run heat` check 5).
+  3. **Beer–Lambert spectral absorption:** The lamp heats the dish in proportion to how much light the dye absorbs. In `decayVel`, dye absorption is decoded using the plate's `lampThrough` Beer–Lambert model (`exp(-d.rgb / d.a)` per unit depth), so dark dyes absorb strongly while pale dyes and clear water stay cool (verified by `npm run heat` checks 1 and 8). The central lamp hotspot is modeled by the spatial shortcut $1 / (1 + 2.5 r^2)$.
+  4. **Anchored physical units & Newton cooling:** Temperature is modeled in kelvin. The heating rate constant `LAMP_HEATING = 0.24` K/s is derived from physical irradiance absorbed in a thin layer: $I / (\rho \cdot c \cdot h) \approx 1000\text{ W/m}^2 / (1000\text{ kg/m}^3 \times 4184\text{ J/(kg K)} \times 0.001\text{ m})$. Newton cooling decays per-second with a real physical time constant in the tens of seconds ($\tau \approx 12.4\text{ s}$ via `heatDecay^(4*dt)`), remaining dt-independent across frame rates.
+  5. **Oil buoyant density:** In `mixForce`, oil ($\rho \approx 0.85\text{ g/cm}^3$) is less dense than water ($\rho = 1.0$), so oil experiences upward buoyancy along the tilted plate while heavier wax sinks.
+  6. **Temperature-dependent viscosity:** Water viscosity drops by ~2% per kelvin ($\mu(T) \approx \mu_0 / (1 + 0.02 \Delta T)$), causing thin-gap mobility under gravity to rise with temperature (~1.5× at 30°C).
+  7. **CPU twin alignment:** `LiquidVisualizer.tsx`'s `stepCurrent` mirrors the GPU solver: `fy = upright * p.currentBuoy * Math.min(50, Math.max(0, this.temp[q])) + p.rockY * dd`, removing `tanh(20T)` and gating on `upright`.
+- **Measured:**
+  - `npm run heat`: 9/9 checks passing on Metal and SwiftShader.
+  - Check 1 & 8: Dark dye heats to 0.0707 K in 0.5s under full dimmer, clear water stays at 0.0000 K; dark dye absorbs 12.95× more heat than pale dye of equal total density.
+  - Check 2: Dimmer at 0 produces 0.0000 K; dimmer at 0.5 heats to 0.0353 K (0.500× linear scaling).
+  - Check 3: 60 steps at dt=1/60s cool to 9.0703, 120 steps at dt=1/120s cool to 9.0625; ratio 1.0009 confirms dt-independence (per-step would diverge by 3.36×).
+  - Check 4: Level plate produces 0.000000 in-plane vy; upright plate produces upward plume vy = 0.126343.
+  - Check 5: Plume vy is 0.22839 at T=15 and 0.41284 at T=30; ratio 1.808 confirms linear Boussinesq scaling (tanh clamp would saturate to 1.10).
+  - Check 6: Thin-gap terminal velocity increases from 0.12048 to 0.18945 at 30°C (ratio 1.572), matching the ~2%/K viscosity drop.
+  - Check 7: Oil rises with vy = +0.00809, wax sinks with vy = -0.03311, level plate is 0.000000.
+
 ### 18g. Colour leaves by flushing, not by fading
 
 **18g-1** (2026-10-11): flushing at the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim, and a still dish loses no colour through its rim (`evapFactor` 1). Base evaporation still fades colour inside the dish until 18g-3/18g-5, and the dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
@@ -3725,6 +3806,67 @@ Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
   dish's turn carries them round under it, and Cell Size 0.32 → 0.6 so the cells are
   drawn at its zoom.
 
+
+### 25h. Areas that listen for themselves (shipped)
+
+The owner, 2026-10-24: the presets want more complexity, more varied palettes and parts of
+the canvas reacting to the music; of the four directions explored that day, all taken, this
+one first. Areas already took the music's hands by band, but every patch cord moved one
+number for the whole plate and every area drew on one palette.
+
+- **A cord aimed at an area** (`SceneMapping.area`, an index into the look's areas) does one
+  of four things a hand does to one place (`lib/areaCords.ts`): **Heat here** (heat in
+  kelvin, 1.5 K/s at full, carried and cooled as the lamp's is; 25h-1 names that it opens no
+  hole until 18f-2), **Stir here** (a paddle drawn round the pool: the Finger's own solid on
+  a thin gap, one turn in 1.2 s, turning back on each hit of a gated cord), **Pour here**
+  (the area's bottles, 1.5 of density a second, under the look's fill as the music's pours
+  are) and **Bottle here** (which bottle pours next). A setting is one number per plate, a
+  uniform in the shaders, so an area takes the four acts and nothing else; the patch bay's
+  fold leaves an area cord alone. Every act eases to nothing over the area's rim.
+- **A gate on an area cord**, the least of 30a: a threshold (closing 0.05 under it, so a
+  reading dithering on the line is one hit), an attack and a release, linear, so the
+  envelope reaches a hit's height in the attack and falls from it in the release. None of
+  the three set, the cord follows its reading as every cord did.
+- **A colour family per area** (`PlateArea.dyes`). Absent, the family is the area's dye and
+  the next, which is what its pool's second colour and the Color route's cycle already took,
+  so Lumia and Cell Bloom lay and play as before. Velvet Underground's contract grew to six
+  (lavender, coral and purple after its three), one pair per pool.
+- **The looks.** Velvet Underground: the kick warms and stirs the soap well, the mids fold
+  the glycerine with a slow paddle, the hats pour the syrup's two bottles in turn. Jellyfish
+  Bloom (25b-6): its four bells are areas now and its seed lays them there (`OWN_SEED_AREAS`;
+  they were scattered at random), the kick pours the lowest bell's pink and teal, the hats
+  ruffle the top bell, the brilliance band picks its bottle (for the treble's sparks that land
+  there: the music's own hands in an area read its Bottle cord, `AreaHands.picked`, which the
+  first build left to the area's pour cords alone, and that bell had none), the mids pour the
+  side bells.
+  Bass Drop (25b-3): three soap wells on the bass, taken in turn by the kicks, Center
+  Gravity 0.4 → 0.15; the snare stirs the low well and the sub warms the left. Preset depths
+  stay at 0.6 or under, the most a one-second look change crossfades within `npm run desk`'s
+  0.03 a tick.
+- **The panel.** On a look with areas each patch gets an area picker over a thumbnail of the
+  plate (`components/phone/AreaPicker.tsx`, the areas drawn where they are in their
+  families' colours, 40 px targets for a thumb, the same sheet on the phone), and an area
+  cord gets the gate: Fire on a hit, Gate, Rise, Fall.
+- **Measured** (`npm run areacords`, the lab on SwiftShader, Velvet's pools on a thin gap,
+  laid through the app's own sink, each run against a control of the same plate with no
+  cords): one band's cords on the soap well changed the dye there 2×10⁵ times what they
+  changed outside every area and kept 1.946 of the 1.967 of density poured there, the flow
+  13.6x, and the heat 1.302 K on the run's mean of 1.310 K laid, against nothing outside;
+  with two areas on two bands, band 2 worked the well 773x (dye) and 17.4x (flow) more than
+  the syrup, and band 7 the syrup 286x and 18.4x more than the well; each gate opened once a
+  burst (8 of 8). The flow held to the paddle's own arithmetic (the review): 0.090 cells a step
+  meaned over the well, on 0.016 that the paddle's solid laid there and a paddle going 0.337
+  round its circle (the floors half and a tenth); with the paddle cut to a cell across (0.05 of
+  the area) the well went 0.006 and the check failed, where the ratio alone had passed. In
+  node, a hit that grows after the gate opens ends at 0.887 for 0.9 (0.500 with the height
+  untracked), and two cords alike keep a gate each. In node, a gate opened 14 times for 8 bursts and 6 stretches dithering on
+  its line, where reading the line alone opened 51; rise 0.250 s for 0.25 and fall 0.333 s for
+  0.35, for a hit of 0.9 and one of 0.5. The 25e
+  count of lit places, each look played by its own cords for four seconds of a groove with
+  every act in the plate's middle (where the music landed before areas) and then in its
+  areas: Jellyfish Bloom 1 → 3, Velvet Underground 1 → 1 (its cords pour in one pool; the
+  other two are stirred and warmed), Bass Drop 0 → 0 (its cords pour nothing; its wells take
+  the music's own hands, 25h-7).
 
 ## 26. A reaction that prints: Turing stripes in black and white
 

@@ -180,6 +180,11 @@ const OIL_CELLS = 0.5;
 const SOAP_PULL = 0.5;
 const DYE_WEIGHT = 0.12;
 const HEAT_LIFT = 0.06;
+/**
+ * The lamp heating rate: absorbed lamp irradiance turning into heat per second (PLAN §18f).
+ * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
+ */
+const LAMP_HEATING = 0.24;
 /** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
 const LAMP_HEAT = 6;
 /** Vorticity confinement's push, as a fraction of the local spin, per step. */
@@ -676,7 +681,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49
+const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50
 
 export class WebGPUFluid {
   readonly N: number;
@@ -1693,13 +1698,15 @@ export class WebGPUFluid {
     */
     f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
-    f[22] = fin(p.currentDamp, 0.98); f[23] = fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
+    const upright = Math.max(0, Math.min(1, fin(p.plateUpright, 0)));
+    f[22] = fin(p.currentDamp, 0.98); f[23] = upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
     f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
     // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
     f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);
     f[30] = fin(p.plateCurve, 0); f[31] = fin(p.gapSpring, 0.05); f[32] = fin(p.gapMemory, 0.5); f[33] = fin(p.cometY, 0);
     const gx = fin(p.gravityX, 0), gy = fin(p.gravityY, -1);
     const gl = Math.hypot(gx, gy) || 1;
+    // S.up points upward along the plate (opposite to in-plane gravity). In-plane buoyancy is gated on upright.
     f[34] = -gx / gl; f[35] = -gy / gl;
     const magStrength = fin(p.magnetStrength, 0);
     const extras = magStrength > 0.0001 ? p.extraMagnets ?? [] : [];
@@ -1710,6 +1717,7 @@ export class WebGPUFluid {
     }
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
     f[49] = p.surfaceClear ? 1 : 0;
+    f[50] = fin(p.dimmer, 1) * LAMP_HEATING;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -3362,7 +3370,7 @@ export class WebGPUFluid {
     stage('decay', (pass) => {
       this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
       this.dye.swap();
-      this.run(pass, 'decayVel', this.vel.write, [this.vel.read], none);
+      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], none);
       this.vel.swap();
     });
 

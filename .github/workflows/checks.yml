@@ -159,6 +159,13 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run plate
 
+      # Areas that listen (PLAN 25h): the area cords' gate, timed, and every
+      # look's area cords on areas it has and fast readings it really has. The
+      # lab half, the cords on the real solver, runs on the Mac (plate shard).
+      - name: Area cords (the gate and the tables)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run areacords -- --node
+
       # That a look change never cuts the plate to black in front of a room.
       - name: The desk
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
@@ -674,6 +681,14 @@ jobs:
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
+
+      # The cartoons that ship (PLAN 14ac): small, silent, recorded in
+      # SOURCES.md, and on a phone page they pour without the pour pausing
+      # every frame (14ab-1), loop, are what the plate and the projector hold,
+      # and stop. No GPU needed: the hand-over is the same without a plate.
+      - name: The cartoons
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run cartoons
       # Preview builds on a copy while the wall keeps its look (PLAN.md 8b,
       # scripts/draftwall.mjs): which engine each settings change reaches,
       # what a receiver is sent, Send to wall, Live and the wall closing. Its
@@ -988,6 +1003,14 @@ jobs:
       - name: The Finger drags the liquid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingerflow
+      # An area cord works its area and nowhere else (PLAN 25h): a band's cord
+      # on one pool changes the dye, the flow and the heat there 5x what it
+      # changes outside; two areas on two bands each answer their own; and the
+      # rebuilt looks' pours light a place per area where the middle lit one.
+      - name: Areas that listen
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 12
+        run: npm run areacords
       # A Blow's wind on a thin gap as air on the film (PLAN 15g): the breath's
       # stress moves the liquid at τh/2μ, slower in a thick one, stops with
       # the breath, and carries the colour, the ferrofluid and the oil along
@@ -1214,6 +1237,12 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,
+      # warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,
+      # and Newton cooling decays per-second with a tens-of-seconds time constant.
+      - name: The heat
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run heat
       # More colours (PLAN 18l): most looks carry five dyes and five are on the
       # plate; a dye is paler thin than deep and a deep yellow turns orange; two
       # neighbouring dyes meeting walk between their hues; the grade keeps hue.

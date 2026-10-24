@@ -5,6 +5,7 @@ import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { CartoonShelf } from '../CartoonShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
@@ -730,6 +731,12 @@ function DyesBody({ p }: { p: DeskProps }) {
           <Video size={13} className="mr-1.5 inline" /> Video…
         </button>
       </div>
+      {p.cartoons && (
+        <div className="mt-1 flex flex-col gap-1">
+          <span className="text-[11px] uppercase tracking-wider text-dim">Cartoons</span>
+          <CartoonShelf {...p.cartoons} />
+        </div>
+      )}
     </div>
   );
 }
