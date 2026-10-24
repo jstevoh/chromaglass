@@ -5449,6 +5449,54 @@ Not a gate and no bar: a rate depends on what was pushed.
   because a version bump changes the key.
   Found while measuring 0-tap (PR #429).
 
+### 19ac. The phone's double tap on Speed is judged on two taps landing in time
+
+- **19ac-1. `Play: a double tap on Speed puts it back to the look's own speed` has no
+  grip on the window it depends on.** `scripts/phone.mjs:1159`. Red once on PR #429
+  (`377/378`, the Mac `show` shard) and green on four other runs of the same afternoon,
+  on a PR that touches neither the phone nor the app. The detail it printed was
+  `0.009 → 0.28 → 0.005`: the slider was moved to 0.28 by the first part of the test,
+  then the two taps at three-tenths of the track left it at 0.005 rather than back at
+  0.009. 0.005 is where a *single* tap at three-tenths puts it, so what failed is not
+  the reset — the app never saw a double tap at all. The second tap fell outside its
+  window.
+
+  The check waits 60 ms between the taps and asserts `reset === before` as strings, and
+  that is the whole of its grip: nothing asserts that the app registered a double tap, so
+  a missed window and a broken reset are the same red, and the printed line reads like
+  the reset went to the wrong value when in fact it never ran. Under a loaded runner a
+  synthetic `touchscreen.tap` pair can straddle any fixed window, which is the flake.
+  Two things to do, and the first matters more than the fixing of the flake: have the
+  check read whatever the app exposes for "a double tap was seen" (or the edited flag
+  clearing) and fail *separately* when the gesture did not land, so the red names its
+  own cause; then make the gap deterministic against the app's own window rather than a
+  bare 60 ms — read the constant the phone uses instead of guessing under it. Do not
+  simply widen the tolerance on `reset`: a value that is close to the look's speed is
+  not the same claim as the look's speed, and the check is right to compare exactly.
+  Found while measuring 0-tap (PR #429).
+ Lace and holes: a pale film torn open over colour
+
+### 19ad. The `open` shard flakes on two unrelated faults
+
+- **19ad-1. `WebGPU (macOS) · open` goes red on marginal timing and on a stray reading.**
+  Seen twice on branches that could not reach it — PR #429 (which changes
+  `scripts/tools.mjs`) and PR #444 (workflow YAML only) — and green on four other runs of
+  the same shard across other branches in the same afternoon, so it is intermittent
+  rather than a regression on main. Two different checks:
+  `and it is moving for good no later than the old way was` read a
+  **longest wait for a frame of 2.03 s against a 2.00 s bar** (2026-10-22), which is the
+  kind of margin a loaded runner closes on its own; and
+  `The ear behind the wall: and it hears on the wall's asks, one a frame, not on its own
+  frames or the tick` read **61 ask, 0 frame, 1 tick over 61 frames asked for**
+  (2026-10-24), where the single tick reading is the whole of the violation — one stray
+  reading out of 61 fails a check written to allow none.
+  Both want the same treatment and neither should get a looser bar first: measure the
+  quantity over a run of shards to see what it actually swings between, and only then
+  decide whether the bar is wrong or the app is. For the ear, find out whether one tick
+  reading in sixty-one is a real path through the code (a first frame, a resize, a
+  reading taken before the wall asked) or noise; "allow one" would be the wrong fix if
+  the one is a genuine route. Found while measuring 0-tap and 19ab (PRs #429, #444).
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
