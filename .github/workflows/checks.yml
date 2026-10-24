@@ -237,11 +237,16 @@ jobs:
       # its own and the shard dies before its first sound check runs — every PR in
       # the repo red for an hour, whatever it changed. Four minutes is ten times
       # the warm cost; past that the mirror is not answering and the useful
-      # output is this step's name, not a cancelled harness.
+      # output is this step's name, not a cancelled harness. ffmpeg is a real
+      # need, unlike the browser's fonts (19ab-2), so it is fetched every run and
+      # a failure stays a failure; the retries only stop one stalled connection
+      # from spending the whole four minutes.
       - name: ffmpeg, for the shelf and the render's files
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         timeout-minutes: 4
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+        run: |
+          apt=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30)
+          sudo apt-get "${apt[@]}" update -qq && sudo apt-get "${apt[@]}" install -y -qq --no-install-recommends ffmpeg
       - name: The bands
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run bands
@@ -584,15 +589,36 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ms-playwright-${{ runner.os }}-${{ steps.pw.outputs.v }}
-      # `--with-deps` still runs apt for the system libraries, which the cache
-      # above does not hold, so this step can still meet a slow mirror. Six
-      # minutes is about ten times the warm cost and well under the work it would
-      # otherwise cancel: a mirror that is not answering now fails as itself, with
-      # this step's name on it, instead of reading as a harness that hung.
+      # The browser only, not `--with-deps`: with the cache warm this is a
+      # second, and the six minutes are for the cold download the cache misses
+      # once a Playwright version.
       - name: Install Chromium
         if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
         timeout-minutes: 6
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
+      # The system libraries, from apt only when one is missing (PLAN 19ab-2).
+      # `--with-deps` ran apt on every run, and on 2026-10-24 it timed out at six
+      # minutes on a mirror sending 50 to 100 KB/s, fetching eight upgrades of
+      # libraries the runner already had and nine fonts nothing draws; every
+      # browser check after it passed. So the runner is asked what is missing
+      # (scripts/chromiumlibs.mjs: ldd over every binary of both builds, then a
+      # launch of each) and apt runs only for a real gap. Not `continue-on-error`
+      # on the old step: that keeps a slow mirror green but lets a truly missing
+      # library surface later as a harness's browser closing at launch, with
+      # nothing naming it. Here a gap apt cannot fill fails this step, with the
+      # library's name, before the first harness runs. Eight minutes covers apt
+      # on the rare run that needs it; the run that does not takes seconds. The
+      # retries are for a connection that stalls rather than one that is slow:
+      # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
+      - name: Chromium's system libraries, from apt only if one is missing
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
+        timeout-minutes: 8
+        run: |
+          node scripts/chromiumlibs.mjs && exit 0
+          echo "::warning title=Chromium's system libraries::the runner is missing one (listed above); installing Playwright's packages from apt"
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-ci-retries > /dev/null
+          npx playwright install-deps chromium
+          node scripts/chromiumlibs.mjs || { echo "::error title=Chromium's system libraries::still missing after apt (listed above); every browser check after this fails on it"; exit 1; }
       # Every shader compiles, on SwiftShader, in two seconds (PLAN.md 19b).
       # It runs again on the Mac's show shard, against Metal; here it is found
       # before the Mac queue rather than after it.
