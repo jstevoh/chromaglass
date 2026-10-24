@@ -62,13 +62,28 @@
           Google redirect in flight. Accepting a pending email from an
           address would let a link sign someone into another person's
           account; the sign-in screen asks for the email again instead.
-        - Crash logs, which are this browser's diagnostics, not settings.
+        - Crash logs, which are this browser's diagnostics, not settings, and
+          the marketing choice, which the account already holds and which a
+          planted copy would send to the server as consent on the next
+          sign-in.
+        - The licence key, when the visitor was signed in: the account gives
+          it back (23.12), and a carried fragment is written into the
+          browser's history (and Chrome's synced history) before it leaves
+          the address bar. A key typed by hand with no account still comes.
         - What is in IndexedDB: the song maps and per-track state, which are
           worked out again from the music.
       The new name only accepts a fragment that came from the old one
       (document.referrer is the old origin after a script redirect; a link
       from anywhere else is ignored), never replaces a key it already has,
-      and takes only string values under chromaglass* names.
+      and takes only string values under chromaglass* names. The old name
+      never forwards a carry-shaped fragment it was handed, and carries once
+      (chromaglass-carried), so a key cleared on chromaglass.art is not
+      written back by the next visit to an old bookmark or QR code. What is
+      left open: Firebase's own /__/auth/handler, on the old names, ends a
+      completed Google sign-in by sending the browser to a URL on an
+      authorised domain, so a link that walks someone through a whole
+      sign-in could arrive with an old-name referrer. It can only add keys
+      the visitor does not have, and none that sign in or give consent.
 
       What stays on the old name:
         - Firebase's own /__/ paths (the auth handler is authDomain's page).
@@ -82,14 +97,18 @@
           talks to its opener by postMessage, which needs the same origin.
         - More saved state than an address can hold (over 900,000
           characters; Firefox stops at about a million). It stays, whole,
-          rather than arriving in part. `npm run onehost` measures all of it.
+          rather than arriving in part.
+        - ?cg-stay, by hand: the way back to what the old name kept, to
+          export a recorded performance from its IndexedDB, say.
+      `npm run onehost` measures all of it.
     -->
     <script>
       (function () {
         var OLD = ['chromaglass.web.app', 'chromaglass.firebaseapp.com'];
         var HOME = 'https://chromaglass.art';
         var TAG = '#cg-carry=v1.';
-        var LEFT = /^chromaglass(-signed-in|-auth-email|-pending-email|-redirect-pending|-recovered|-landing-seen|-crash|:crash)/;
+        var LEFT = /^chromaglass(-signed-in|-auth-email|-pending-email|-redirect-pending|-recovered|-landing-seen|-crash|:crash|-marketing|-carried)/;
+        var CARRIED = 'chromaglass-carried';
         var MAX = 900000;
         function toB64(s) {
           var b = new TextEncoder().encode(s), bin = '';
@@ -106,18 +125,28 @@
         if (OLD.indexOf(host) >= 0) {
           if (location.pathname.indexOf('/__/') === 0 || !navigator.onLine) return;
           if (/[?&]cast(=|&|$)/.test(location.search) && window.opener) return;
+          if (/[?&]cg-stay(=|&|$)/.test(location.search)) return;
           var go = function () {
             var saved = {}, any = false;
             try {
-              for (var i = 0; i < localStorage.length; i++) {
-                var k = localStorage.key(i);
-                if (k && k.indexOf('chromaglass') === 0 && !LEFT.test(k)) { saved[k] = localStorage.getItem(k); any = true; }
+              if (!localStorage.getItem(CARRIED)) {
+                var account = localStorage.getItem('chromaglass-signed-in') === '1';
+                for (var i = 0; i < localStorage.length; i++) {
+                  var k = localStorage.key(i);
+                  if (!k || k.indexOf('chromaglass') !== 0 || LEFT.test(k)) continue;
+                  if (account && k === 'chromaglass:license-key') continue;
+                  saved[k] = localStorage.getItem(k); any = true;
+                }
               }
             } catch (e) { /* storage refused: nothing to carry */ }
-            var hash = location.hash.slice(1), frag = location.hash;
+            // A carry only ever starts here, from this browser's own storage: a
+            // fragment that arrived already shaped like one is dropped, or a
+            // link to the old name could have this page vouch for it.
+            var frag = location.hash.indexOf('#cg-carry=') === 0 ? '' : location.hash, hash = frag.slice(1);
             if (any) {
               frag = TAG + toB64(JSON.stringify(saved)) + (hash ? '&cg-hash=' + encodeURIComponent(hash) : '');
               if (frag.length > MAX) return;
+              try { localStorage.setItem(CARRIED, String(Date.now())); } catch (e) { /* carried again next time */ }
             }
             location.replace(HOME + location.pathname + location.search + frag);
           };
@@ -135,7 +164,8 @@
         if (location.hash.indexOf(TAG) === 0) {
           var rest = location.hash.slice(TAG.length), cut = rest.indexOf('&cg-hash=');
           var payload = cut >= 0 ? rest.slice(0, cut) : rest;
-          var was = cut >= 0 ? '#' + decodeURIComponent(rest.slice(cut + 9)) : '';
+          var was = '';
+          try { was = cut >= 0 ? '#' + decodeURIComponent(rest.slice(cut + 9)) : ''; } catch (e) { /* a broken fragment: dropped */ }
           try { history.replaceState(history.state, '', location.pathname + location.search + was); } catch (e) { /* the fragment stays in the bar */ }
           var from = '';
           try { from = new URL(document.referrer).hostname; } catch (e) { /* no referrer */ }

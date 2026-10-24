@@ -6194,13 +6194,16 @@ once the login works (23.14).*
   forwards `chromaglass.web.app` and `chromaglass.firebaseapp.com` to the same path, query and
   fragment on `chromaglass.art`, carrying the old name's `chromaglass*` keys in the fragment;
   the new name writes them before the app's module runs, only from an old-name referrer, never
-  over a key it has, and leaves behind the signed-in flag, account email, pending email link and
-  crash logs (one sign-in on the new name; the account gives the key back, 23.12). It stays
-  for Firebase's `/__/` pages, offline, a cached show whose network does not reach
-  `chromaglass.art`, a `?cast` window with an opener, and state over 900,000 characters.
+  over a key it has. The old name drops a carry-shaped fragment it is handed and carries once.
+  Left behind: the signed-in flag, account email, pending email link, marketing choice, crash
+  logs, and a signed-in visitor's licence key (one sign-in on the new name; the account gives
+  the key back, 23.12, and the key stays out of browser history). It stays for Firebase's
+  `/__/` pages, offline, a cached show whose network does not reach `chromaglass.art` within
+  4 s, a `?cast` window with an opener, `?cg-stay` by hand, and state over 900,000 characters.
   Hosting's own redirects match paths, not hosts, so firebase.json cannot do it on one site.
-  *Measure:* `npm run onehost` (20/20; 8/20 on the old page, and the referrer guard and the
-  keep-what-it-has rule each turn their checks red when taken out), in `Measure · lab`.
+  *Measure:* `npm run onehost` (25/25; 9/25 on the old page, and the referrer guard, the
+  keep-what-it-has rule, the dropped handed-in fragment, carry-once and the 4 s wait each turn
+  their checks red when taken out), in `Measure · lab`.
   The address itself was checked the same day: one A record at GoDaddy (Firebase's
   199.36.158.100), www and http both 301 to `https://chromaglass.art/`, Google Trust Services
   certificates for both names (2026-10-18, in CT logs).
@@ -6208,11 +6211,14 @@ once the login works (23.14).*
     per-track state and fingerprints are worked out again; its `performances` store is not and
     stays on the old name), the Firebase
     session (signed in again once), a browser that strips the referrer (its state stays on the
-    old name), and an installed web.app app, whose window now opens chromaglass.art out of its
+    old name; `?cg-stay` reaches it), and an installed web.app app, whose window now opens chromaglass.art out of its
     scope: install again from chromaglass.art. A second Hosting site for `chromaglass.art`, with
     a redirect-only release on the default site, would make the forward a 301, at the cost of
     moving the custom domain and its certificate; worth it only once 23.16 has carried most
-    returning visitors across.
+    returning visitors across. Also open: Firebase's `/__/auth/handler` on the old names ends
+    a completed Google sign-in at a URL on an authorised domain, so a link that walks someone
+    through a whole sign-in arrives with an old-name referrer and could add keys the visitor
+    lacks (none that sign in or give consent). A second site would close that too.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free

@@ -69,6 +69,7 @@ async function freshContext({ reach = true, init = '' } = {}) {
     if (url.pathname === '/seed') return route.fulfill({ status: 200, contentType: 'text/html', body: SEED });
     if (url.pathname === '/favicon.svg' && url.searchParams.has('reach')) {
       probes++;
+      if (reach === 'slow') return new Promise((r) => setTimeout(r, 5000)).then(() => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg/>' })).catch(() => {});
       return reach ? route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg/>' }) : route.abort('internetdisconnected');
     }
     if (/\.(svg|png|webmanifest)$/.test(url.pathname)) return route.fulfill({ status: 200, body: '' });
@@ -100,7 +101,6 @@ async function arrive(ctx, url, { wait = 0 } = {}) {
   const hops = [];
   page.on('framenavigated', (f) => { if (f === page.mainFrame()) hops.push(f.url()); });
   await page.goto(url);
-  await page.waitForFunction(() => window.__atStart, null, { timeout: 15000 });
   if (wait) await page.waitForTimeout(wait);
   await page.waitForFunction(() => window.__atStart, null, { timeout: 15000 });
   await page.waitForLoadState('load');
@@ -114,14 +114,14 @@ const SAVED = {
   'chromaglass-setlist': JSON.stringify(['fillmore', 'cellbloom']),
   'chromaglass-midi-map': '{"cc1":"oil"}',
   'chromaglass-preset': 'fillmore',
-  'chromaglass-signed-in': '1',
   'chromaglass-auth-email': 'someone@example.com',
+  'chromaglass-marketing-optin': '1',
   'chromaglass-pending-email': 'someone@example.com',
   'chromaglass-crashlog': '[]',
   'someone-else': 'not ours',
 };
 const CARRIED = ['chromaglass:license-key', 'chromaglass-user-presets', 'chromaglass-setlist', 'chromaglass-midi-map', 'chromaglass-preset'];
-const LEFT = ['chromaglass-signed-in', 'chromaglass-auth-email', 'chromaglass-pending-email', 'chromaglass-crashlog', 'someone-else'];
+const LEFT = ['chromaglass-auth-email', 'chromaglass-marketing-optin', 'chromaglass-pending-email', 'chromaglass-crashlog', 'someone-else'];
 
 try {
   // ── A first visit moves at once, address intact ─────────────────────────
@@ -146,12 +146,34 @@ try {
     check('  the licence, presets, set list and MIDI map are there before the app runs, byte for byte',
       at.href.startsWith(ART) && missing.length === 0, missing.length ? `missing ${missing.join(', ')}` : `${CARRIED.length - 1} keys`);
     const leaked = LEFT.filter((k) => k in at.store);
-    check('  the signed-in flag, account email, pending email link, crash log and others\' keys stay behind',
+    check('  the account email, marketing choice, pending email link, crash log and others\' keys stay behind',
       at.href.startsWith(ART) && leaked.length === 0, leaked.length ? `carried ${leaked.join(', ')}` : '');
     check('  a key chromaglass.art already had is kept, not replaced', at.store['chromaglass-preset'] === 'cellbloom', at.store['chromaglass-preset']);
     const old = await storeAt(ctx, OLD);
     check('  and the old name still holds everything (nothing is deleted on the way)',
       Object.keys(SAVED).every((k) => old[k] === SAVED[k]));
+
+    // It carries once: a key cleared on chromaglass.art is not written back
+    // by the next visit to an old bookmark.
+    const art = await ctx.newPage();
+    await art.goto(`${ART}/seed`);
+    await art.evaluate(() => localStorage.removeItem('chromaglass-setlist'));
+    await art.close();
+    const again = await arrive(ctx, `${OLD}/`);
+    check('  a second visit to the old name still moves, and carries nothing back',
+      again.at.href === `${ART}/` && !('chromaglass-setlist' in again.at.store) && !again.hops.some((h) => h.includes('cg-carry')), again.hops.join(' → '));
+    await ctx.close();
+  }
+
+  // ── Signed in: the account gives the key back, so it stays out of history ─
+  {
+    const { ctx } = await freshContext();
+    await seed(ctx, OLD, { ...SAVED, 'chromaglass-signed-in': '1' });
+    const { at, hops } = await arrive(ctx, `${OLD}/`);
+    check('a signed-in visitor\'s presets come, and neither the signed-in flag nor the licence key goes into the address',
+      at.href === `${ART}/` && at.store['chromaglass-setlist'] === SAVED['chromaglass-setlist'] && !('chromaglass-signed-in' in at.store) && !('chromaglass:license-key' in at.store)
+        && !hops.some((h) => h.includes('cg-carry') && Buffer.from(h.split('cg-carry=v1.')[1].split('&')[0], 'base64url').toString().includes('license')),
+      `${Object.keys(at.store).length} keys`);
     await ctx.close();
   }
 
@@ -179,6 +201,12 @@ try {
     const fromLink = await link.evaluate(() => ({ ...window.__atStart, referrer: document.referrer }));
     check('a carried fragment in a link from another site writes nothing',
       payload && fromLink.referrer.startsWith(EVIL) && Object.keys(fromLink.store).length === 0, `${fromLink.referrer}, ${Object.keys(fromLink.store).length} keys`);
+    // The way round the referrer: hand the payload to the old name itself,
+    // in a browser with nothing saved there, so its own forward would carry
+    // the fragment across with an old-name referrer.
+    const through = await arrive(victim, `${OLD}/${payload}`);
+    check('a carried fragment handed to the old name is dropped there, not forwarded with its referrer',
+      payload && Object.keys(through.at.store).length === 0 && through.at.href === `${ART}/`, `${Object.keys(through.at.store).length} keys, ${through.at.href}`);
     await victim.close();
   }
 
@@ -213,6 +241,21 @@ try {
     const at = await page.evaluate(() => window.__atStart);
     check('a cached show with the internet up moves, once chromaglass.art answers, with its state',
       at.href === `${ART}/?look=fillmore` && probes() === 1 && at.store['chromaglass-setlist'] === SAVED['chromaglass-setlist'], `${at.href}, ${probes()} probe`);
+    await ctx.close();
+  }
+  {
+    // chromaglass.art slower than the 4 s the page waits: a network that is
+    // up but not reaching the internet usually hangs rather than refuses.
+    const { ctx, probes } = await freshContext({ reach: 'slow', init: UNDER_WORKER });
+    const { at } = await arrive(ctx, `${OLD}/`, { wait: 6000 });
+    check('a cached show whose network hangs past four seconds stays on the old name', at.href === `${OLD}/` && probes() === 1, `${at.href}, ${probes()} probe`);
+    await ctx.close();
+  }
+  {
+    const { ctx } = await freshContext();
+    await seed(ctx, OLD, SAVED);
+    const { at } = await arrive(ctx, `${OLD}/?cg-stay`);
+    check('?cg-stay stays on the old name, with what it kept', at.href === `${OLD}/?cg-stay` && at.store['chromaglass-setlist'] === SAVED['chromaglass-setlist'], at.href);
     await ctx.close();
   }
   {
