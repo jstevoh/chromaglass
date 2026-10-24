@@ -644,7 +644,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   gapReshape: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
@@ -653,11 +653,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let was = clamp(0.03 * (1.0 - A.a.x * k), 0.004, 0.06);
   let now = clamp(0.03 * (1.0 - A.a.y * k), 0.004, 0.06);
   let s = textureLoad(src, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, 0.0, 0.0));
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, s.b, s.a));
 }`,
 
   gapRest: `${HEAD}
-@group(0) @binding(2) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(2) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
@@ -1448,7 +1448,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
 @group(0) @binding(4) var sheetT: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let s = textureLoad(sq, vec2i(id.xy), 0);
@@ -1506,13 +1506,40 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     would cut off. Cut, it would ratchet: the ring's rise dropped, its
     fall laid in full, every kick leaving the gap a little closer where the
     ring went. Only the floor holds.
+
+    And the floor keeps what it took (\`owed\`, the texel's fourth number).
+    On a dome (Plate Shape below zero) the middle rests near the floor, and
+    a dent there closes more than the gap has: the floor refuses the rest
+    of it. Given back in full as the sheet lets go, the opening then landed
+    past rest by all that was refused, and every kick near the middle left
+    the gap a little more open: at Plate Shape −1, a dozen default kicks
+    left the middle a whole dent past rest and the dish's mean 10% of a
+    dent open (the review of #452). So what the floor refuses is owed, and
+    the sheet's openings pay it before they open the gap: the gap is the
+    floor or rest minus the dent, whichever is higher, as the sheet's own
+    state says, however many kicks. It takes the spring as the gap does
+    (the dent it stands for is pulled back by it too). The kick is also
+    pressed no deeper than the dome's rest under it (pressKick), so what
+    is owed is the dent's inner flank, not its middle.
+
+    And not \`pressed\`. Setting it everywhere the sheet moved (which is every
+    cell: the solve is a sum of sines) stopped the memory below for every
+    other press while any kick's sheet was live: a hand press's push after
+    it went from −4.5e2 a step to under 3. The memory must not repeat the
+    sheet's own rate (the solve already carries it on), so the rate it
+    remembers (the texel's third number) is this step's without the
+    sheet's, and every other press keeps its tail.
   */
+  var sheetRate = 0.0;
+  var owed = s.a;
   if (A.a.z > 0.5) {
     let dw = textureLoad(sheetT, vec2i(id.xy), 0).r;
     if (dw != 0.0) {
-      pressed = true;
-      let g2 = max(0.004, gap + dw);
-      dhdt += (g2 - gap) / max(S.dt, 0.0001);
+      let want = gap + dw - owed;
+      let g2 = max(0.004, want);
+      owed = g2 - want;
+      sheetRate = (g2 - gap) / max(S.dt, 0.0001);
+      dhdt += sheetRate;
       gap = g2;
     }
   }
@@ -1548,13 +1575,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   if (!pressed) {
     let room = (gap - 0.004) / max(S.dt, 0.0001);
-    dhdt += max(s.g * S.gapMemory, -room);
+    dhdt += max(s.b * S.gapMemory, -room);
   }
   // The spring back toward the dome, and its motion counts.
   let g3 = gap + (rest - gap) * S.gapSpring;
   dhdt += (g3 - gap) / max(S.dt, 0.0001);
-  let out = vec4f(g3, dhdt, 0.0, 0.0);
-  textureStore(dst, vec2i(id.xy), select(vec4f(rest, 0.0, 0.0, 0.0), out, finite2(out.xy)));
+  let out = vec4f(g3, dhdt, dhdt - sheetRate, owed * (1.0 - S.gapSpring));
+  textureStore(dst, vec2i(id.xy), select(vec4f(rest, 0.0, 0.0, 0.0), out, finite2(out.xy) && finite2(out.zw)));
 }`,
 
   /*

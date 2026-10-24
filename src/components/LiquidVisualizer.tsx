@@ -63,7 +63,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { RhythmSheet, stampedVolume } from '../lib/sheet';
+import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -3003,7 +3003,7 @@ class FluidSimulation {
    * `amount` each disc's press. Remembered for the lift like a hand's press,
    * and let go a moment later (`kickRelease`).
    */
-  pressKick(x: number, y: number, amount: number, fingering: number, radii: readonly number[], nu = NU_REF): void {
+  pressKick(x: number, y: number, amount: number, fingering: number, radii: readonly number[], nu = NU_REF, curve = 0): void {
     x = Math.round(x);
     y = Math.round(y);
     if (radii.length === 1 && this.gpu && this.thinGap) {
@@ -3018,7 +3018,9 @@ class FluidSimulation {
       const radius = Math.round(radii[0] * GRID_SCALE);
       this.pressLift.press('kick', x, y, radius, amount, fingering, showNow());
       this.sheet.setLiquid(nu);
-      this.sheet.pressVolume((x + 0.5) / this.size, (y + 0.5) / this.size, stampedVolume(amount, radii[0] / 128), radii[0] / 128, KICK_HOLD);
+      // No deeper than the dome's rest under it (kickRoom): where the glasses touch, a kick presses nothing.
+      const u = (x + 0.5) / this.size, v = (y + 0.5) / this.size;
+      this.sheet.pressVolume(u, v, stampedVolume(amount, radii[0] / 128), radii[0] / 128, KICK_HOLD, kickRoom(u, v, curve));
     } else {
       radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
       this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
@@ -8987,7 +8989,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   deep as a hard one; now two thirds (kickDepth).
                 */
                 const a = kickDepth(squeezeAmt, bass01, accent);
-                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii, thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS));
+                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii, thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), Math.max(-1, Math.min(1, currentSettings.plateCurve ?? 0)));
                 if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, (sheet ? press.radii[0] : 30) * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }

@@ -64,10 +64,10 @@ const check = (name, ok, detail = '') => {
 
 // ── 4, the curve, in node ───────────────────────────────────────────
 const out = 'node_modules/.cache/rides-lib.mjs';
-await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './src/lib/turntable.ts'; export { STRONG_BEAT, WEAK_BEAT } from './src/lib/barGrid.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './src/lib/turntable.ts'; export { STRONG_BEAT, WEAK_BEAT } from './src/lib/barGrid.ts'; export { RhythmSheet, stampedVolume } from './src/lib/sheet.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
 const { stirOf, stirBefore, kickDepth, KICK_RADII, kickPress, dentRadius, kickRock, stepRock, rockSwing, swayAt, CUR_ROCK, restingHand, springKick, springStep,
   ROCK_LEVEL_AFTER, ROCK_LEVEL_MOVE, STRONG_BEAT, WEAK_BEAT,
-  stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, thicknessViscosity } = await import(`../${out}`);
+  stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, thicknessViscosity, RhythmSheet, stampedVolume, KICK_HOLD } = await import(`../${out}`);
 const { createNoise2D } = await import('simplex-noise');
 // The app's sway noise, on a fixed table (the app keys its own on the show's seed).
 let seedN = 11;
@@ -719,16 +719,31 @@ try {
       stamp's displaced volume against the glass's, to 25%). The solved
       sheet's push falls off from where it landed, where the glass's
       dish-wide closing moves the middle and the edge alike (the whole
-      picture breathing); how far its liquid goes is the sheet's (some into
+      picture breathing); how far its liquid goes is the sheet's: some into
       the ring round the dent, the rest levelled out to the rim by its
-      weight), printed beside the stamp's volume share.
+      weight. So the ring 70 cells out moves by the liquid that has left
+      that disc, which the solve says itself: the held dent's net volume
+      inside 70 cells of the lab's 192 is 0.57 of the stamp's (0.89 inside
+      30), and 70 cells out the sheet moves the colour that share of the
+      stamp's volume share, to 25% either way. Asked first only as under the
+      stamp's share, which a sheet that moved nothing there passed, and so
+      did a press only as deep as the stamp's middle, 0.123 (the review of
+      #452).
     */
     const vol = (radii, a) => radii.reduce((v, R) => v + a * R * R, 0);
     const wantFar = vol([SHEET_CELLS], 3) / vol(KICK_RADII.map((R) => Math.round(R * 1.5)), 1);
-    const got = r.sheetFar.out / r.far.out;
-    check('and is local: its push falls off away from the dent, 70 cells out under 0.6 of the glass\'s falloff, and far off moves the colour less than a stamp\'s displaced volume would (the ring keeps some of it)',
-      r.sheetFar.out / r.sheetDefault.out < 0.6 * (r.far.out / r.kickDefault.out) && got < wantFar,
-      `30 → 70 cells out the sheet's ring goes ${r.sheetDefault.out.toFixed(2)} → ${r.sheetFar.out.toFixed(2)} cells, the glass's ${r.kickDefault.out.toFixed(1)} → ${r.far.out.toFixed(1)}; far off ${got.toFixed(3)} of the glass's, a stamp's volume would say ${wantFar.toFixed(3)}`);
+    const solved = (() => {
+      const nu = thicknessViscosity(0.45), amount = kickDepth(0.5, 0.7, 1) * kickPress(nu, 0).share;
+      const R = kickPress(nu, 0).radii[0] / 128, s = new RhythmSheet();
+      s.setLiquid(nu);
+      s.pressVolume(0.5, 0.5, stampedVolume(amount, R), R, KICK_HOLD);
+      s.step(192, KICK_HOLD, 0, new Float32Array(192 * 192));
+      return s.volumeWithin(0.5, 0.5, 70 / 192) / stampedVolume(amount, R);
+    })();
+    const got = r.sheetFar.out / r.far.out, wantSheet = wantFar * solved;
+    check('and is local: its push falls off away from the dent, 70 cells out under 0.6 of the glass\'s falloff, and far off moves the colour as much as the solve says leaves that disc, to 25%',
+      r.sheetFar.out / r.sheetDefault.out < 0.6 * (r.far.out / r.kickDefault.out) && Math.abs(got / wantSheet - 1) < 0.25,
+      `30 → 70 cells out the sheet's ring goes ${r.sheetDefault.out.toFixed(2)} → ${r.sheetFar.out.toFixed(2)} cells, the glass's ${r.kickDefault.out.toFixed(1)} → ${r.far.out.toFixed(1)}; far off ${got.toFixed(3)} of the glass's, the solve says ${wantSheet.toFixed(3)} (${solved.toFixed(3)} of the stamp's ${wantFar.toFixed(3)} leaves the disc)`);
     check('let go, it comes back at least three quarters of the way', share(r.sheetDefault) >= 0.75 && share(r.sheetFull) >= 0.75,
       `default ${(100 * share(r.sheetDefault)).toFixed(0)}%, full ${(100 * share(r.sheetFull)).toFixed(0)}%`);
   }

@@ -41,18 +41,33 @@
   6 mm of water, 8e-3 on the default oil, 2e-4 in glycerine.
 
   So the sheet's whole life follows, none of it drawn (`npm run sheet`,
-  on the plate's 20 cm at the 6 mm middle):
+  on the plate's 20 cm at the 6 mm middle). The held shapes are the
+  floating sheet's whatever moves the liquid; the paces are the
+  lubrication equation's, and only glycerine's are the liquid's own
+  (PLAN 27f-8(f), below):
   - Water: the dent is a floating plate's (a Kelvin kei), 57 mm to its
-    zero with a ring of 2% round it, and let go it levels within a frame
-    (96% of it), and what is left goes as the dish's own slowest mode.
-  - The default oil: 43 mm, a ring of 7% at 63 mm; let go, two thirds of
-    it back in the first 60th of a second (the finger's sharp middle), 96%
-    by a fifth of a second, all of it within one.
+    zero with a ring of 2% round it; let go, the equation levels it within
+    a frame (96% of it), what is left going as the dish's slowest mode.
+  - The default oil: 43 mm, a ring of 7% at 63 mm; let go, the equation
+    gives two thirds of it back in the first 60th of a second (the
+    finger's sharp middle), 96% by a fifth of a second, all within one.
   - Glycerine: 24 mm, a ring of 14% at 35 mm, the bending length's dent;
     let go, it gives back three quarters in a fifth of a second and 94% in
     a second, and holds a trace for two.
   The thicker the liquid, the narrower its dent, the higher its ring and
   the slower it lets go.
+
+  Lubrication is itself a shortcut, and named (27f-8(f)). Reynolds's
+  equation holds when the layer's viscous time h²/ν is short against the
+  motion: at 6 mm that is 36 s in water, 1.6 s on the default oil and
+  0.036 s in glycerine, where the solved dent (k = 1/14 mm) relaxes in
+  0.6 ms, 13 ms and 0.57 s. Only glycerine is inside it; the oil is about
+  125 times outside and water 6×10⁴. There the liquid's inertia sets the
+  pace: let go, a dent under the sheet rings as a flexural-gravity wave,
+  ω² = (gk + Dk⁵/ρ) tanh kh, a period near 0.27 s at that k, damped by the
+  Stokes layers (1.4 mm deep on the oil), a couple of swings on the oil
+  and many in water, where the equation has it gone at once (the review
+  of #452).
 
   The rim. The dish's rim meets the reservoir round it, where the liquid's
   pressure is the open air's (the thin gap's open rim, p = 0), and the sheet
@@ -94,14 +109,22 @@
   ceiling at rest (the ring is the sheet past rest). The gap's spring, which
   the shader runs on every cell, pulls the laid dent back toward rest too,
   so the sheet's own state takes the same spring each step, and what is laid
-  is only the sheet's own motion.
+  is only the sheet's own motion. On a dome (Plate Shape below zero) the
+  middle rests near the floor: a kick there presses no deeper than the
+  dome's rest under it allows (kickRoom), and what the floor still refuses
+  of a dent's flank is owed in the shader and paid out of the sheet's next
+  openings, so the gap stays the floor or rest minus the dent, whichever is
+  higher. And the sheet's rate is kept apart from the rate the press
+  memory carries on (squeezeUpdate's third number), so every other press
+  keeps its tail while a kick's sheet is live.
 
   Named shortcuts (PLAN 27f-8): the mobility is the rest depth's, h₀³, not
   h³ of the gap under the dent (at full the dent's middle is half the gap,
   where the film drains an eighth as fast); the sheet's rim is the plate's
   square, the dish's is its circle; the gap under it is the plate's 6 mm
   middle everywhere, not the dome; the force is set from the stamp's
-  volume, not a hand's.
+  volume, not a hand's; and (f) the layer drains by lubrication, which is
+  the liquid's pace only in glycerine (above).
 */
 
 /** Cells across the sheet's own grid (a power of two). */
@@ -120,6 +143,33 @@ export const FINGER_SIGMA = 0.005;
 export const SHEET_DEEPEST = 0.02;
 /** Below this anywhere on the plate (plate widths, 2 µm on a 20 cm plate: under a three-thousandth of the gap) a sheet with nothing on it stops being stepped. */
 export const SHEET_QUIET = 1e-5;
+/** The tightest the gap closes (plate widths): squeezeUpdate's floor. */
+export const GAP_FLOOR = 0.004;
+
+/**
+ * The gap's rest at plate fraction (x, y) under Plate Shape `curve`, as the
+ * shader lays it (gapRest, squeezeUpdate: 0.03 bowed by the shape, between
+ * the floor and 0.06). Below zero the glasses touch in the middle.
+ */
+export function plateRest(x: number, y: number, curve: number): number {
+  const dx = x - 0.5, dy = y - 0.5;
+  const r2 = Math.max(0, Math.min(1, (dx * dx + dy * dy) * 4));
+  const c = Number.isFinite(curve) ? curve : 0;
+  return Math.max(GAP_FLOOR, Math.min(0.06, 0.03 * (1 - c * (r2 - 0.5) * 2)));
+}
+
+/**
+ * How deep a kick at (x, y) may press the sheet's middle on Plate Shape
+ * `curve` (plate widths): SHEET_DEEPEST, or the dome's rest there less the
+ * floor where that is less. The sheet is solved on the plate's flat 6 mm
+ * (PLAN 27f-8(c)); on a dome whose middle rests near the floor a dent there
+ * closed more than the gap had, the floor refused it, and the sheet's state
+ * then held a press the plate never made. The flanks the floor still takes
+ * are owed in the shader (squeezeUpdate's fourth number).
+ */
+export function kickRoom(x: number, y: number, curve: number): number {
+  return Math.max(0, Math.min(SHEET_DEEPEST, plateRest(x, y, curve) - GAP_FLOOR));
+}
 
 interface Press { x: number; y: number; force: number; hold: number; age: number }
 
@@ -199,6 +249,8 @@ export class RhythmSheet {
   /** The gap closed, summed over every cell a step closed (plate widths), and the cells closed while a finger was down: as applySquish counts a press. */
   closed = 0;
   pressedCells = 0;
+  /** The deepest the dent was anywhere on the plate at the last step (plate widths, either sign): what the quiet is judged on. */
+  peak = 0;
 
   constructor(opts: { n?: number; span?: number; plateMetres?: number; D?: number; h0?: number } = {}) {
     this.n = opts.n ?? SHEET_N;
@@ -253,7 +305,7 @@ export class RhythmSheet {
    * The depth (m) one newton held `hold` from a flat sheet at (x, y) (metres)
    * leaves under itself, with its images: the inverse transform at the
    * press's own point, (1/A) Σ 4 g(k) G(k) sin²(kₓx) sin²(k_y y), g the held
-   * gain (1 − e^(−λT))/Dk⁴. Shallower near the rim, which holds the sheet.
+   * gain (1 − e^(−λT))/(Dk⁴ + ρg). Shallower near the rim, which holds the sheet.
    */
   private unitCentre(x: number, y: number, hold: number): number {
     const n = this.n;
@@ -288,7 +340,9 @@ export class RhythmSheet {
    * as hard as pushes `volume` (plate widths³: gap closed × area) out from
    * under the sheet within `radius` (plate widths) of it by the time it lets
    * go, the stamped bowl's own (stampedVolume), but never so hard that the
-   * middle closes past SHEET_DEEPEST. Returns the depth its own middle reaches.
+   * middle closes past `deepest` (SHEET_DEEPEST, or less where the dome's rest
+   * under it is shallower: kickRoom). Returns the depth its own middle reaches,
+   * 0 with no room to press at all.
    *
    * Why the volume and not the stamp's middle depth: the colour a press
    * moves is the liquid it pushes out. A finger's dent on a floating sheet
@@ -297,8 +351,8 @@ export class RhythmSheet {
    * `npm run rides`' ring 30 cells out went 1.9 cells at the default and 3.4
    * at full, where the stamp's went 3.0 and 6.8 and the line asks 4 at full.
    */
-  pressVolume(x: number, y: number, volume: number, radius: number, hold: number): number {
-    if (!(volume > 0) || !(hold > 0) || !(radius > 0)) return 0;
+  pressVolume(x: number, y: number, volume: number, radius: number, hold: number, deepest = SHEET_DEEPEST): number {
+    if (!(volume > 0) || !(hold > 0) || !(radius > 0) || !(deepest > 0)) return 0;
     const X = this.metres(Math.max(0.01, Math.min(0.99, x))), Y = this.metres(Math.max(0.01, Math.min(0.99, y)));
     const centre = this.unitCentre(X, Y, hold);
     // The unit force's held dent, in space: the same modes as the load would lay, with its gain.
@@ -315,7 +369,7 @@ export class RhythmSheet {
     }
     v *= this.dx * this.dx;
     const want = volume * this.plateMetres ** 3;
-    const force = Math.min(want / Math.max(v, 1e-30), (SHEET_DEEPEST * this.plateMetres) / centre);
+    const force = Math.min(want / Math.max(v, 1e-30), (Math.min(SHEET_DEEPEST, deepest) * this.plateMetres) / centre);
     this.load(X, Y, force, hold);
     return (force * centre) / this.plateMetres;
   }
@@ -347,7 +401,7 @@ export class RhythmSheet {
     this.loadsStale = false;
   }
 
-  /** Each mode's decay e^(−λ dt) and its load's gain (1 − e^(−λ dt))/Dk⁴ over a step of `dt`, kept for the dt and liquid they were worked out for (a frame's step is the same step after step). */
+  /** Each mode's decay e^(−λ dt) and its load's gain (1 − e^(−λ dt))/(Dk⁴ + ρg) over a step of `dt`, kept for the dt and liquid they were worked out for (a frame's step is the same step after step). */
   private decayFor(dt: number): { e: Float64Array; g: Float64Array } {
     const c = this.decay;
     if (c.dt === dt && c.M === this.M) return c;
@@ -420,6 +474,23 @@ export class RhythmSheet {
     let s = 0, a = 0;
     for (let q = 0; q < w.length; q++) { s += w[q]; a += Math.abs(w[q]); }
     return a > 0 ? Math.abs(s) / a : 0;
+  }
+
+  /**
+   * The dent's net volume now (plate widths³, positive pushed out) within
+   * `radius` plate widths of (x, y): the liquid that has left that disc, the
+   * dent's closing less the ring's opening inside it. For the checks, which
+   * read how far a kick's liquid goes against it.
+   */
+  volumeWithin(x: number, y: number, radius: number): number {
+    const w = this.toSpace(), n = this.n;
+    const X = this.metres(x), Y = this.metres(y), R = radius * this.plateMetres;
+    let v = 0;
+    for (let j = 0; j < n / this.span; j++) for (let i = 0; i < n / this.span; i++) {
+      const dx = i * this.dx - X, dy = j * this.dx - Y;
+      if (dx * dx + dy * dy < R * R) v += w[i + j * n];
+    }
+    return (v * this.dx * this.dx) / this.plateMetres ** 3;
   }
 
   /** The dent as the plate holds it now (plate widths, positive closes the gap), on the grid it was last laid on: for the checks. */
@@ -510,6 +581,7 @@ export class RhythmSheet {
     }
     this.laid += laid;
     this.closed += closed;
+    this.peak = most / this.plateMetres;
     if (pressing) this.pressedCells += closing;
     if (keep < 1) for (let q = 0; q < this.wr.length; q++) { this.wr[q] *= keep; this.wi[q] *= keep; }
     this.steps++;

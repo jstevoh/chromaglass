@@ -1561,5 +1561,9 @@ ring of colour pushed out round the dent and drawn back. Turn Thickness to full:
 tighten and hold, coming back slowly over a second or two, the ring round it plainer. Toward water
 it should be wide and gone almost as it lands. Little outside the dent and its ring should move on
 the kick (under half of what the old dent moved there). Say whether the thick liquid's slow give-back reads as syrup or as lag, and whether
-the default oil's dent still reads as a press.
+the default oil's dent still reads as a press. A real sheet on a thin liquid would not just give back: on the
+default oil and toward water it would swing past rest once or twice (a slow wave under the sheet,
+about a quarter of a second a swing) before it settled, which the solve leaves out (PLAN 27f-8(f)).
+Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
+building.
 

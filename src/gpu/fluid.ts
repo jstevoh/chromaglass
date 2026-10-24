@@ -1118,13 +1118,13 @@ export class WebGPUFluid {
     */
     const byFormat: [string, GPUTextureFormat[], boolean][] = [
       ['fill', [dye, RGBA32, VEL, R32], true],
-      ['gapRest', [RG32], true],
+      ['gapRest', [RGBA32], true],
       // A change to the plate's shape: a look changed to mid-show, never an opening.
-      ['gapReshape', [RG32], false],
+      ['gapReshape', [RGBA32], false],
       ['deltaDye', [dye], true],
       ['deltaVel', [VEL], true],
       ['liquidForces', [VEL], true],
-      ['squeezeUpdate', [RG32], true],
+      ['squeezeUpdate', [RGBA32], true],
       ['scaleDye', [dye], true],
       // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
       ['addSlosh', [VEL], false],
@@ -1407,7 +1407,7 @@ export class WebGPUFluid {
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
     this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
-    this.squeeze = pp(this.N, RG32, 'squeeze');
+    this.squeeze = pp(this.N, RGBA32, 'squeeze');
     /*
       The second phase (H7): one number a cell, how much of the dark liquid is
       there.
@@ -4113,13 +4113,15 @@ export class WebGPUFluid {
   /**
    * The squeeze film, read back whole: the gap and its rate. For checks.
    *
-   * RG32, so eight bytes a texel and two floats a cell — r is the gap between
-   * the glasses, g is how fast it is changing, which is the thing that moves
-   * any liquid at all.
+   * RGBA32, so sixteen bytes a texel — r is the gap between the glasses, g is
+   * how fast it is changing, which is the thing that moves any liquid at all.
+   * (b is the rate the press's memory carries on, g without the rhythm
+   * sheet's; a what the floor has refused the sheet: squeezeUpdate, PLAN
+   * 27f-4. Not read back.)
    */
   async readSqueeze(): Promise<{ n: number; gap: Float32Array; rate: Float32Array } | null> {
     const n = this.N;
-    const row = Math.ceil((n * 8) / 256) * 256;
+    const row = Math.ceil((n * 16) / 256) * 256;
     const buf = this.device.createBuffer({ label: 'read squeeze', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read squeeze' });
     enc.copyTextureToBuffer({ texture: this.squeeze.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
@@ -4130,8 +4132,8 @@ export class WebGPUFluid {
     const stride = row / 4;
     for (let y = 0; y < n; y++) {
       for (let x = 0; x < n; x++) {
-        gap[y * n + x] = all[y * stride + x * 2];
-        rate[y * n + x] = all[y * stride + x * 2 + 1];
+        gap[y * n + x] = all[y * stride + x * 4];
+        rate[y * n + x] = all[y * stride + x * 4 + 1];
       }
     }
     buf.unmap();

@@ -1,4 +1,4 @@
-import { sheetReach } from './sheet';
+import { sheetReach } from './sheet.ts';
 /**
  * A hand on the top glass, and the glass coming back up (PLAN.md §10 step 4,
  * roadmap G in docs/bubbles-plan.md).
@@ -428,7 +428,11 @@ export const KICK_HOLD = RELEASE_MS / 1000;
   28 cells of a 128 plate across its radius, a fifth of the dish; in water 47,
   most of the middle; in glycerine 15, a fingertip's dimple. A thin liquid
   runs out from under the sheet fast enough for the bend to spread before the
-  kick lets go, a thick one holds the sheet up round the finger.
+  kick lets go, a thick one holds the sheet up round the finger. (As the
+  lubrication equation has it, which is the liquid's own pace only in
+  glycerine: in 6 mm of the default oil the layer's viscous time h²/ν is
+  1.6 s, a hundred times the dent's, and the liquid's inertia rings the
+  sheet; PLAN 27f-8(f).)
 
   That was 27f-3, and its reach left out the liquid's weight. A sheet
   floating on a layer is held up where it is pushed down by Archimedes as

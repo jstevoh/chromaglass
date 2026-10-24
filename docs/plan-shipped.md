@@ -4072,7 +4072,27 @@ exactly as μ^(−1/6) now asks it to narrow with thickness, the solve's (`npm r
 against the grid), and the one that asked the far ring to move by the stamp's displaced volume now
 asks it to move less. Shortcuts (27f-8): the mobility is the rest depth's,
 the sheet's rim is the plate's square, the gap under it the 6 mm middle, the force set from the
-depth, and the slosh dish's press keeps the stamp's timings.
+volume, the slosh dish's press keeps the stamp's timings, and (f) the layer drains by lubrication,
+which is the liquid's own pace only in glycerine.
+
+The review (the PR's one Opus pass) held the solve and found two places where it met the plate
+wrongly. On a dome (Plate Shape below zero) the middle rests near the floor; a dent there closed
+more than the gap had, the floor refused it, and the sheet's opening was then laid back in full,
+so every kick near the middle left the gap more open: at Plate Shape −1 a dozen default kicks left
+the middle a whole dent past rest and the dish's mean 10% of a dent open (13.5% at full; −0.5 at
+full 44.8% and 2.2%). Now a kick presses no deeper than the dome's rest under it (`kickRoom`), and
+the shader owes what its floor refuses (the squeeze texel's fourth number, paid out of the sheet's
+next openings, taking the spring as the gap does): read against each dome's own rest, a dozen kicks
+and let go, the gap is the solve's to 0.12% of a dent cell for cell and the mean within 0.06%. And
+the sheet set `pressed` on every cell it moved, which is every cell, so the press memory stopped
+for every other press while a kick's sheet was live: a hand press's push after it went from −4.5e2
+a step to under 3. The memory now carries a rate of its own (the texel's third number, this step's
+without the sheet's), and the same press reads the same, step for step, with a sheet live across
+the plate. The squeeze texture is RGBA32 for those two numbers. Also named by the review: Reynolds
+needs the layer's viscous time h²/ν short against the motion, true only in glycerine (27f-8(f));
+`rides`' far line now asks both ways against the solve's own share of the stamp's volume that
+leaves 70 cells (0.568, so 0.193 against the 0.175 read), and the quiet asks for the slowest
+mode's time (oil 1.400 s against 1.391), not 255 s.
 
 ### 27f-5. The rock lifts the oil, not the frame (2026-10-24)
 
