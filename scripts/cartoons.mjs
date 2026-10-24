@@ -19,16 +19,22 @@
  *               cartoon ships without its source and licence written down.
  *   the pour    on a phone, the dye sheet lists every cartoon with a Pour and
  *               a Film button a thumb's height (44 px), and Pour starts the
- *               cartoon playing: its time moves on, it loops, its picture can
- *               be read back (same origin, so the plate may read it; a blank
- *               or tainted read would pour nothing), and over two seconds it
- *               is paused not once. Before 14ab-1's fix the app handed the
- *               video to the plate every frame and the plate paused and played
- *               it each time: about 120 pauses in those two seconds.
- *               Stop then stops it, and the button says Pour again.
- *   the film    Film plays the cartoon as the projector's film (its time moves
- *               on, read from the element the app played), and the button
- *               shows pressed; pressed again, the film is off.
+ *               cartoon playing: its time moves on, its picture can be read
+ *               back (same origin, so the plate may read it; a blank or
+ *               tainted read would pour nothing), over two seconds it is
+ *               paused not once, sent near its end it comes round to its start
+ *               (the loop), and it is the video the plate holds as its pour
+ *               (`__cgVideo` under ?debug), so a video that plays but was never
+ *               handed over fails. Before 14ab-1's fix the app handed the
+ *               video over every frame and the plate paused and played it each
+ *               time; measured with that code put back, the phone's page closed
+ *               under the pour inside the two seconds. Stop then pauses that
+ *               same element, the plate lets go of it, and the button says
+ *               Pour again.
+ *   the film    Film plays the cartoon as the projector's film: its time
+ *               moves on, it loops, it is the element the projector holds, and
+ *               the button shows pressed; pressed again, that element is
+ *               paused and the projector holds no film.
  *
  * A cloud session has no GPU, but none of this needs one: the pour's video
  * plays and is handed over whether or not the plate can draw it.
@@ -130,16 +136,28 @@ try {
   check('the phone\'s dye sheet lists every cartoon, each with Pour and Film a thumb\'s height',
     rows.every(r => r.pour >= 44 && r.film >= 44), rows.map(r => `${r.id} ${Math.round(r.pour)}/${Math.round(r.film)}`).join(', '));
 
-  /** The played video whose address ends with this cartoon's file. */
+  /*
+    Watch the played video whose address ends with this cartoon's file for two
+    seconds: how far it got, whether it paused, and whether its picture reads
+    back. The element is kept on the page (`__cgWatched`), so the checks after
+    Stop and Film-off ask that same element, not a search that finds nothing
+    once its address is gone. Then it is sent half a second from its end, and
+    a second and a half later it has to be back at the start without an
+    `ended`: that is the loop, where two seconds of a five-minute cartoon
+    never reach the end.
+  */
   const watch = (src) => page.evaluate(async (src) => {
     const v = window.__cgPlayed.find(e => e.currentSrc.endsWith(src));
     if (!v) return null;
-    let pauses = 0;
+    (window.__cgWatched ??= {})[src] = v;
+    let pauses = 0, ended = 0;
     const count = () => pauses++;
+    const end = () => ended++;
     v.addEventListener('pause', count);
+    v.addEventListener('ended', end);
     const t0 = v.currentTime;
     await new Promise(r => setTimeout(r, 2000));
-    v.removeEventListener('pause', count);
+    const moved = v.currentTime - t0;
     let read = 'none';
     try {
       const c = document.createElement('canvas'); c.width = 64; c.height = 48;
@@ -149,40 +167,72 @@ try {
       for (let i = 0; i < d.length; i += 4) { lo = Math.min(lo, d[i]); hi = Math.max(hi, d[i]); }
       read = hi - lo;
     } catch (e) { read = `refused: ${e.name}`; }
-    return { moved: v.currentTime - t0, paused: v.paused, loop: v.loop, pauses, read };
+    const pausesBefore = pauses;
+    // A slow machine (software WebGPU) may not have the length yet: wait for it, up to five seconds.
+    for (let i = 0; i < 50 && !Number.isFinite(v.duration); i++) await new Promise(r => setTimeout(r, 100));
+    if (!Number.isFinite(v.duration)) return { moved, paused: v.paused, pauses: pausesBefore, read, wrapped: false, after: NaN, ended };
+    v.currentTime = v.duration - 0.5;
+    await new Promise(r => setTimeout(r, 1500));
+    const wrapped = v.currentTime < 1.5 && !v.paused && ended === 0;
+    const after = v.currentTime;
+    v.removeEventListener('pause', count);
+    v.removeEventListener('ended', end);
+    return { moved, paused: v.paused, pauses: pausesBefore, read, wrapped, after, ended };
   }, src);
+  const held = () => page.evaluate(() => {
+    const h = window.__cgVideo?.();
+    // Whether the plate runs (has WebGPU and a frame loop), asked the way `npm run phone` asks it.
+    const plate = !document.querySelector('[data-testid="needs-webgpu"]') && typeof window.chromaglassDebug?.()?.hands === 'function';
+    return h ? { pour: h.pour?.currentSrc ?? null, film: h.film?.currentSrc ?? null, filmKind: h.filmKind, pourReads: h.pourReads, plate } : null;
+  });
+  const watched = (src) => page.evaluate((src) => {
+    const v = window.__cgWatched?.[src];
+    return v ? { paused: v.paused } : null;
+  }, src);
+  const tail = (u) => (u ? u.split('/').pop() : String(u));
 
   const pourId = CARTOONS[0].id;
   await page.getByTestId(`cartoon-pour-${pourId}`).tap();
   await page.waitForTimeout(1500);
   const poured = await watch(CARTOONS[0].src);
-  check(`Pour plays ${CARTOONS[0].title} as dye: its time moves on, it loops, its picture can be read, and it is paused not once in two seconds (14ab-1)`,
-    poured && poured.moved >= 1.5 && !poured.paused && poured.loop && poured.pauses === 0 && typeof poured.read === 'number' && poured.read >= 64,
-    poured ? `${poured.moved.toFixed(2)} s on, loop ${poured.loop}, ${poured.pauses} pauses, picture range ${poured.read}` : 'never played');
+  const pourHeld = await held();
+  check(`Pour plays ${CARTOONS[0].title} as dye: its time moves on, its picture can be read, and it is paused not once in two seconds (14ab-1)`,
+    poured && poured.moved >= 1.5 && poured.pauses === 0 && typeof poured.read === 'number' && poured.read >= 64,
+    poured ? `${poured.moved.toFixed(2)} s on, ${poured.pauses} pauses, picture range ${poured.read}` : 'never played');
+  check('and it loops: sent to half a second from its end, it is back at its start a second and a half later, with no end',
+    poured && poured.wrapped, poured ? `at ${poured.after.toFixed(2)} s, ${poured.ended} ended, paused ${poured.paused}` : 'never played');
+  // With a plate running (a GPU), its frame loop has to have found the video
+  // ready on some of those frames; without one there is no frame loop to ask.
+  check('and the video the plate holds as its pour is that same cartoon, read by its frame loop where it has one',
+    pourHeld && pourHeld.pour?.endsWith(CARTOONS[0].src) && (!pourHeld.plate || pourHeld.pourReads > 0),
+    pourHeld ? `the plate's pour: ${tail(pourHeld.pour)}; ${pourHeld.plate ? `frames it found ready to read: ${pourHeld.pourReads}` : 'no plate here (no GPU), its reads not asked'}` : 'no ?debug handle');
   const stopShown = await page.getByTestId(`cartoon-stop-${pourId}`).isVisible().catch(() => false);
   await page.getByTestId(`cartoon-stop-${pourId}`).tap().catch(() => {});
   await page.waitForTimeout(400);
-  const stopped = await page.evaluate((src) => {
-    const v = window.__cgPlayed.find(e => e.src.endsWith(src) || e.currentSrc.endsWith(src));
-    return v ? { paused: v.paused, src: v.getAttribute('src') } : null;
-  }, CARTOONS[0].src);
+  const stopped = await watched(CARTOONS[0].src);
+  const stopHeld = await held();
   const pourBack = await page.getByTestId(`cartoon-pour-${pourId}`).isVisible().catch(() => false);
-  check('pouring, its button says Stop; Stop stops it and the button says Pour again',
-    stopShown && pourBack && (!stopped || stopped.paused), `Stop shown ${stopShown}, after: ${JSON.stringify(stopped)}, Pour back ${pourBack}`);
+  check('pouring, its button says Stop; Stop pauses that video, the plate lets go of it, and the button says Pour again',
+    stopShown && pourBack && stopped?.paused === true && stopHeld && stopHeld.pour === null,
+    `Stop shown ${stopShown}, the video ${stopped ? (stopped.paused ? 'paused' : 'still playing') : 'not found'}, the plate's pour ${tail(stopHeld?.pour)}, Pour back ${pourBack}`);
 
   const filmOne = CARTOONS[2];
   await page.getByTestId(`cartoon-film-${filmOne.id}`).tap();
   await page.waitForTimeout(1500);
   const filmed = await watch(filmOne.src);
+  const filmHeld = await held();
   const pressed = await page.getByTestId(`cartoon-film-${filmOne.id}`).getAttribute('aria-pressed');
-  check(`Film plays ${filmOne.title} through the projector, looping, and its button shows pressed`,
-    filmed && filmed.moved >= 1.5 && !filmed.paused && filmed.loop && pressed === 'true',
-    filmed ? `${filmed.moved.toFixed(2)} s on, loop ${filmed.loop}, pressed ${pressed}` : `never played, pressed ${pressed}`);
+  check(`Film plays ${filmOne.title} as the projector's film, looping, and its button shows pressed`,
+    filmed && filmed.moved >= 1.5 && filmed.wrapped && pressed === 'true' && filmHeld?.film?.endsWith(filmOne.src) && filmHeld.filmKind === 'file',
+    filmed ? `${filmed.moved.toFixed(2)} s on, looped to ${filmed.after.toFixed(2)} s, pressed ${pressed}, the projector's film ${tail(filmHeld?.film)} (${filmHeld?.filmKind})` : `never played, pressed ${pressed}`);
   await page.getByTestId(`cartoon-film-${filmOne.id}`).tap();
   await page.waitForTimeout(400);
   const after = await page.getByTestId(`cartoon-film-${filmOne.id}`).getAttribute('aria-pressed');
-  const filmPaused = await page.evaluate((src) => window.__cgPlayed.find(e => e.getAttribute('src') === src)?.paused ?? true, filmOne.src);
-  check('pressed again, the film is off', after === 'false' && filmPaused, `pressed ${after}, paused ${filmPaused}`);
+  const filmStopped = await watched(filmOne.src);
+  const offHeld = await held();
+  check('pressed again, the film is off: that video paused, the projector holds no film, the button not pressed',
+    after === 'false' && filmStopped?.paused === true && offHeld?.filmKind === 'none',
+    `pressed ${after}, the video ${filmStopped ? (filmStopped.paused ? 'paused' : 'still playing') : 'not found'}, the projector's film ${offHeld?.filmKind}`);
   await ctx.close();
 } catch (e) {
   // Measured 2026-10-24 with the pour as it was before 14ab-1's fix (handed

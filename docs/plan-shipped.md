@@ -2204,8 +2204,23 @@ before its two seconds were up (the check's "the page lives through Pour and Fil
 10/11); with the fix, 2.00 s of the cartoon played in two seconds, 0 pauses, a picture
 range of 186 read back from it, 14/14.
 
-Measured: `npm run cartoons` 14/14, `layout` 77/77, `phone` 357/357, `desk` 48/48,
-`panel` 197/197, `lint` clean.
+The film survives a rebuild. The GL effect's cleanup stopped the film, and that cleanup
+also runs when the plate is rebuilt (`glEpoch`: a lost device, a resolution change), so a
+loop, the camera or a window went dark on the projector while the panel still said it was
+playing. Found by `npm run cartoons` under software WebGPU (`PW_WEBGPU=1`), after its review
+made it ask what the projector holds: a second and a half after Film the projector held no
+film and the video had been reset (15/16). The film is now stopped only when the plate goes
+away, in its own effect (16/16 there).
+
+The check, after one review pass: besides the files and the licence record, it asks that
+the video the plate holds as its pour (`__cgVideo` under `?debug`) is the cartoon that
+played, and that the plate's frame loop read it where there is a plate (2–3 frames in two
+seconds on software WebGPU); that each loops (sent half a second from its end, back at its
+start 1.5 s later, no `ended`); and that Stop and Film-off pause that same element and the
+plate and projector let go. It runs in CI's browser part.
+
+Measured: `npm run cartoons` 16/16 (no GPU and `PW_WEBGPU=1`), `layout` 77/77, `phone`
+357/357, `desk` 48/48, `panel` 197/197, `lint` clean.
 
 ### 15i. Picking a bottle pours nothing (shipped)
 

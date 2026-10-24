@@ -3496,7 +3496,10 @@ Mic or Band pick came back on every launch from `localStorage`.
 dye or played as the film from a Cartoons shelf on the desk's Dye panel and the phone's dye
 sheet (`src/lib/cartoons.ts`, `CartoonShelf.tsx`; sources and licences in
 `public/video/cartoons/SOURCES.md`; `npm run cartoons`). With it, **14ab-1** (written down
-with 14aa): the video pour no longer pauses and plays its video every frame. The story is in
+with 14aa): the video pour no longer pauses and plays its video every frame. And the
+projector's film (a loop, the camera, a window, a cartoon) now survives the plate being
+rebuilt (a lost device, a resolution change), where it used to go dark while the panel still
+said it was playing. The story is in
 `docs/plan-shipped.md` under the same number. The owner's look at them is `docs/judging.md` §66.
 
 The owner: "can we download a couple videos for inclusion into the app? things that can run
