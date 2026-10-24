@@ -3454,6 +3454,11 @@ for, and the GPU was asked for only after they had arrived and drawn.
   cap hold their length). Story in
   `docs/plan-shipped.md` §14v-7; judged by `npm run flakes -- --check 'no stop in the
   opening'` over the week after.
+- **14v-8. Two edges of 14v-7's rule, from its review (#456).** (a) One gap can reach
+  6.5 s before check 4 goes red: 4.5 s of it taken out as the page seen free, plus the 2 s
+  bar. Read the week's `stillIdle` on the line before deciding whether the cap should be
+  per gap. (b) The `seenOk` gate (long tasks observable, the timer ticking as asked) has no
+  self-case: add one to `stillCases` where the timer runs slow and nothing is taken out.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
@@ -5464,14 +5469,12 @@ Not a gate and no bar: a rate depends on what was pushed.
   startup's "moving for good no later than the old way" 7 of 193 (19aa-7); the phone's
   two fingers holding Drop 4 of 172 (19h-2, a solver rebuilt by the governor in the
   window is the lead). Two deploys went red on one-off Mac flakes on 10-24.
-- **19aa-6. The renders lines on a starved runner.** `renders`' "the ear is reading" and
-  "the plate hears a new reading on four frames in five" (laptop, the band) and "the
-  plate's Dimmer moves at least twice as often as the desk's" (phone, a fader): 8 of 191
-  each, every red with the page drawing 1.7 to 22 frames a second (the band) or 14.6 to
-  22.5 (the fader) in the first of its two windows and the second window fine. So the
-  first window meets a page not yet up to speed. Find what the page is doing then (a
-  look still compiling behind, the governor's first move) and wait for that, by name, not
-  for longer: the line is right to ask for the readings at the page's own rate.
+- **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** `renders` waits
+  for the plate to draw fifteen frames in a second before measuring (the band's 8 reds of
+  191 were all first windows at 0 to 14.5 frames a second), and the fader's line asks the
+  Dimmer to change on four frames in five drawn and a quarter more than the desk's, where
+  "twice the desk's" asked for more changes than frames below 20 a second. Story in
+  `docs/plan-shipped.md` §19aa-6.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 193.** Every red
   read the show's own wait 1.8 to 3.0 s against the control's 0.7 to 1.1 s, with 1 s
   spare, and moving for good 2.4 to 7.6 s earlier than the control. Not read further;

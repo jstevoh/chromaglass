@@ -183,6 +183,33 @@ async function open(browser, screen, { source, desk, fader = false }) {
   // Past the opening: the first seconds build pipelines, load the look and
   // learn the room, and each of those is a render that happens once.
   await page.waitForTimeout(5000);
+  /*
+    And, where a plate draws, until it draws: a second at a time, at most
+    thirty, until one second holds the fifteen frames the lines below ask of
+    each window (45 in 3 s). What was seen (`npm run flakes`, the week to
+    2026-10-24): the laptop's band lines red on 8 of 191 Mac runs, every one
+    in the first window and every second window fine, the plate drawing 0.0,
+    1.7, 1.9, 9.9, 10.8, 12.2, 13.6 and 14.5 frames a second there against
+    16.5 to 28.4 in the next. Five seconds in, the page was still opening on
+    a cold runner (this runs on the open shard after startup, which empties
+    the Mac's shader cache), so those windows measured the opening, not the
+    ear. As squeeze.mjs does for its steps: a plate that never gets there is
+    still measured, and fails; a warm one passes this at once. How long it
+    waited is printed.
+  */
+  if (PLATE) {
+    const t0 = Date.now();
+    const drawn = () => page.evaluate(() => window.chromaglassDebug?.()?.riding?.frames ?? 0);
+    let up = false;
+    for (let k = 0; k < 30 && !up; k++) {
+      const a = await drawn();
+      await page.waitForTimeout(1000);
+      up = (await drawn()) - a >= 15;
+    }
+    const waited = (Date.now() - t0) / 1000;
+    if (!up) console.log(`  (${screen.name}: the plate never drew fifteen frames in a second, ${waited.toFixed(1)} s after the five-second wait; measured anyway)`);
+    else if (waited > 1.5) console.log(`  (${screen.name}: the plate came up to fifteen frames a second ${waited.toFixed(1)} s after the five-second wait)`);
+  }
   return { page, ctx };
 }
 
@@ -204,6 +231,7 @@ async function measure(page) {
       fresh: b.fresh - a.fresh,
       ownFrame: b.ownFrame - a.ownFrame,
       rideFrames: b.rideFrames - a.rideFrames,
+      rideRate: (b.rideFrames - a.rideFrames) / s,
       laid: b.laid - a.laid,
       deskMoves: (b.deskMoves - a.deskMoves) / s,
       drawnMoves: (b.drawnMoves - a.drawnMoves) / s,
@@ -298,14 +326,29 @@ try {
         w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits <= x.deskMoves + ALLOWED_EXTRA),
         w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s for ${f(x.deskMoves)}`).join(', '));
       /*
-        Twice as often as React is told, at least: at sixty messages a second
-        the plate's Dimmer changes on nearly every frame it draws (24 to 60 a
-        second on the Mac), and a plate fed only React's would change 9 times.
+        On four frames in five the plate draws, and a quarter more often than
+        React is told, at least: at sixty messages a second the plate's Dimmer
+        changes on nearly every frame it draws, and a plate fed only React's
+        would change on React's 7 to 10.5 a second, once each, whatever its
+        frame rate.
+
+        It asked "twice as often as the desk's" until 2026-10-24, which says
+        the same at the 24 to 60 frames a second it was written against and
+        asks for more changes than frames below 20: red on 8 of 191 Mac runs
+        in the week to 10-24 (all 8 green on the same commit), every one with
+        the phone's page drawing 14.6 to 22.5 frames a second and the Dimmer
+        changing on 93 to 100% of them ("18.5/s drawn for 10.2 on the desk"
+        with 18.7 frames a second, where 20.4 was asked). So the bar is now
+        the claim itself, per frame drawn, which is stricter than twice the
+        desk's at any rate above 25 frames a second, and the quarter over
+        the desk's still fails a plate fed by React at any rate the line
+        allows (45 frames in 3 s and up: React's at most 10.5 against a
+        floor of 12).
       */
-      const laidLine = `${screen.name}, a fader: the plate's Dimmer moves at least twice as often as the desk's`;
+      const laidLine = `${screen.name}, a fader: the plate's Dimmer moves on four frames in five it draws, and more often than the desk's`;
       if (PLATE) {
-        check(laidLine, w.every(x => x.rideFrames >= 45 && x.drawnMoves >= 2 * x.deskMoves && x.laid > 0),
-          w.map(x => `${f(x.drawnMoves)}/s drawn for ${f(x.deskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', '));
+        check(laidLine, w.every(x => x.rideFrames >= 45 && x.drawnMoves >= 0.8 * x.rideRate && x.drawnMoves >= 1.25 * x.deskMoves && x.laid > 0),
+          w.map(x => `${f(x.drawnMoves)}/s drawn on ${f(x.rideRate)} frames/s, for ${f(x.deskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', '));
       } else skip(laidLine, `no plate draws here (${w.map(x => x.rideFrames).join(', ')} frames); held on the Mac`);
       // Let go, and give the last tenth of a second time to reach React.
       const at = await page.evaluate(() => { clearInterval(window.__sweep); return window.__faderAt; });
