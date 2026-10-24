@@ -20,7 +20,7 @@ import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pi
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
-import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, type SloshPress } from '../lib/slosh';
+import { SloshClock, sloshAccel, rockAccel, rockRise, sloshDrag, sloshNu, glassHeld, type SloshPress } from '../lib/slosh';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
@@ -45,7 +45,7 @@ import { AutoSpin, GRIP_SECONDS, OPEN_RIM, SpinHand, carrierViscosity, dishFollo
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, CUR_ROCK, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -3816,7 +3816,11 @@ class FluidSimulation {
     kick (`pressKick`), the same glass the thin gap is pressed by. And by Plate
     Rock's swing only as far as Frame Sway lets the music move the frame
     (rockAccel: a rocked dish sways the whole picture), so at Frame Sway's
-    default 0 not at all, and on Bass Drop at its 0.35. With nothing driving it and its ring gone (SloshClock) it is
+    default 0 not at all, and on Bass Drop at its 0.35. And on every look with
+    oil on its plate, by the rock's tilt as the oil feels it under the cover
+    glass (rockRise, PLAN 27f-5): the lenses rise up the tipped plate and the
+    water stays, the two layers going opposite ways and the frame not moving.
+    With nothing driving it and its ring gone (SloshClock) it is
     not stepped at all and the solver is told once, so the default plate is the
     same bits it was (`npm run slosh`, `npm run sloshgpu`).
   */
@@ -3843,9 +3847,11 @@ class FluidSimulation {
     }
     this.dishKicks = this.dishKicks.filter((k) => k.t < KICK_HOLD + KICK_RELEASE + dt);
     const r = sloshDrag(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS));
-    const driven = ax !== 0 || ay !== 0 || presses.some((q) => q.depth > 0);
+    // The rock's own tilt (the swing × CUR_ROCK, as the thin gap takes it) on the oil, where there is oil to feel it.
+    const [bx, by] = rockRise(this.swingX * CUR_ROCK, this.swingY * CUR_ROCK, (p.oilTension ?? 0) > 0);
+    const driven = ax !== 0 || ay !== 0 || bx !== 0 || by !== 0 || presses.some((q) => q.depth > 0);
     const tick = this.sloshClock.tick(dt, driven, r);
-    gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level } : null);
+    gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level, bx, by } : null);
   }
 
   private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {

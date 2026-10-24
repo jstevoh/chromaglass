@@ -40,11 +40,22 @@
  *      carried through a reversal and a ring-down does not come back to where
  *      it started when the drag is low and the tilt turns round (a rotating
  *      tilt makes the dish swirl), and does not move at all with no tilt.
+ *
+ * (12 to 15 are each said where they run.)
+ *
+ *  16. Plate Rock on the layers (PLAN 27f-5, lib/slosh.ts rockRise): the rock's
+ *      tilt under the cover glass moves the oil and not the water, so with no
+ *      oil it moves nothing, bit for bit; a lens rises uphill at the speed its
+ *      two-layer drag allows, between the water held still under it and the
+ *      water dragged free with it; rocked a lean a second the water away from
+ *      it stays within a tenth of the lens's speed, which is the frame not
+ *      moving; a lens against the rim is held there; and the dish let go comes
+ *      to rest within the ring time the GPU's dish is given.
  */
 import { readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import {
-  SloshDish, SloshClock, sloshAccel, sloshDrag, sloshNu, sloshRingSeconds, twoLayerDrag, pressHead,
+  SloshDish, SloshClock, sloshAccel, rockRise, sloshDrag, sloshNu, sloshRingSeconds, twoLayerDrag, pressHead,
   SLOSH_C, SLOSH_G, SLOSH_FLOOR, SLOSH_LEAN, SLOSH_COURANT_MAX, SLOSH_N, SLOSH_LENS, SLOSH_OIL_DENSITY, SLOSH_OIL_NU, SLOSH_REST_DEPTH, SLOSH_DT,
 } from '../src/lib/slosh.ts';
 import { thicknessViscosity } from '../src/lib/turntable.ts';
@@ -57,8 +68,8 @@ import { thicknessViscosity } from '../src/lib/turntable.ts';
   own parts (WORKERS), and prints what they found in the parts' order. The checks
   are the same checks; only which process runs each changes.
 */
-const ORDER = ['1', '2', '3', '4', '7a', '7b', '7c', '7d', '7e', '8', '9', '10', '11', '12', '13', '14', '15'];
-const WORKERS = [['3', '12'], ['1', '2', '4', '7c', '15'], ['7a', '7b', '9', '13', '14'], ['7d', '7e', '8', '10', '11']];
+const ORDER = ['1', '2', '3', '4', '7a', '7b', '7c', '7d', '7e', '8', '9', '10', '11', '12', '13', '14', '15', '16'];
+const WORKERS = [['3', '12'], ['1', '2', '4', '7c', '15', '16'], ['7a', '7b', '9', '13', '14'], ['7d', '7e', '8', '10', '11']];
 const PART = process.env.SLOSH_PART;
 if (PART === undefined) {
   const outs = await Promise.all(WORKERS.map((_, k) => new Promise((done) => {
@@ -608,6 +619,103 @@ if (mine('15')) {
     let dormant = -1;
     for (let k = 0; k < 60 * 95; k++) if (!d.step(DT, 0, 0, r)) { dormant = (k + 1) * DT; break; }
     check(`Thickness ${thickness}: the dish let go is at rest within the ring time the GPU's dish is given`, dormant > 0 && dormant <= sloshRingSeconds(r),
+      `at rest after ${dormant.toFixed(1)} s of ${sloshRingSeconds(r).toFixed(1)}`);
+  }
+}
+
+// 16. Plate Rock on the layers (PLAN 27f-5): the oil rises up the rocked plate under the cover; the water stays.
+if (mine('16')) {
+  const N = SLOSH_N;
+  const lensAt = (cx, cy, rad) => {
+    const s = new Float32Array(N * N);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) s[j * N + i] = Math.hypot((i + 0.5) / N - cx, (j + 0.5) / N - cy) < rad ? 1 : 0;
+    return s;
+  };
+  // No oil: the rock's tilt is the cover's pressure and nothing else, and a dish handed the force anyway does not wake.
+  {
+    const [zx, zy] = rockRise(0.3, -0.2, false);
+    const d = new SloshDish();
+    d.setOil(null);
+    d.rest();
+    let live = false;
+    for (let k = 0; k < 120; k++) live = d.step(DT, 0, 0, dragOf(DEFAULT_THICKNESS), -0.6, 0.4) || live;
+    check('with no oil on the plate the rock\'s tilt moves no liquid in the dish, bit for bit', zx === 0 && zy === 0 && !live && d.maxSpeed() === 0 && d.maxRise() === 0,
+      `rise (${zx}, ${zy}), fastest ${d.maxSpeed()}, highest ${d.maxRise()}`);
+  }
+  // A lens held under the default rock's tilt (sinθ 0.09 downhill along +x) rises along −x, at the speed between its two drags.
+  for (const thickness of [0, DEFAULT_THICKNESS, 0.6]) {
+    const r = dragOf(thickness);
+    const d = new SloshDish();
+    d.setOil(lensAt(0.5, 0.5, 0.12));
+    d.rest();
+    const [bx, by] = rockRise(0.09, 0, true);
+    for (let k = 0; k < 60; k++) d.step(DT, 0, 0, r, bx, by);
+    let s1 = 0, n1 = 0;
+    for (let k = 0; k < N * N; k++) if (d.wet[k] && d.h1[k] > 0) { s1 += d.ox[k]; n1++; }
+    const mid = (N >> 1) * N + (N >> 1), M = [0, 0, 0, 0];
+    twoLayerDrag(d.h1[mid], d.h[mid], SLOSH_OIL_DENSITY * SLOSH_OIL_NU, sloshNu(r), M);
+    const m1 = SLOSH_OIL_DENSITY * d.h1[mid];
+    // Water held still under it (a lid's counterflow cancelling the drag's pull) and water free to be dragged along.
+    const held = (m1 * bx) / M[0], free = (m1 * bx) / (M[0] - (M[1] * M[2]) / M[3]);
+    const U = s1 / n1;
+    check(`Thickness ${thickness}: a lens under the rock's held tilt rises uphill, at the speed its drag on the cover and the water allows`,
+      bx < 0 && U < 0 && Math.abs(U) >= 0.9 * Math.abs(held) && Math.abs(U) <= 1.05 * Math.abs(free),
+      `${(U * 200).toFixed(2)} mm/s after a second; water held ${(held * 200).toFixed(2)}, water free ${(free * 200).toFixed(2)}`);
+  }
+  // Rocked a lean a second for ten seconds: the lens goes with each lean and the water away from it barely moves.
+  for (const thickness of [0, DEFAULT_THICKNESS]) {
+    const r = dragOf(thickness);
+    const d = new SloshDish();
+    d.setOil(lensAt(0.5, 0.5, 0.12));
+    d.rest();
+    let far2 = 0, nf = 0, oil2 = 0, no = 0, sxy = 0, sxx = 0, syy = 0;
+    for (let k = 0; k < 600; k++) {
+      const sin = 0.09 * Math.sin(Math.PI * k * DT);
+      const [bx] = rockRise(sin, 0, true);
+      d.step(DT, 0, 0, r, bx, 0);
+      let om = 0, oc = 0;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const c = j * N + i;
+        if (!d.wet[c]) continue;
+        if (d.h1[c] > 0) { oil2 += d.ox[c] ** 2 + d.oy[c] ** 2; no++; om += d.ox[c]; oc++; }
+        else if (Math.hypot((i + 0.5) / N - 0.5, (j + 0.5) / N - 0.5) > 0.24) { far2 += (d.qx[c] ** 2 + d.qy[c] ** 2) / (d.h[c] * d.h[c]); nf++; }
+      }
+      om /= oc;
+      sxy += om * -sin; sxx += om * om; syy += sin * sin;
+    }
+    const ratio = Math.sqrt(far2 / nf) / Math.sqrt(oil2 / no), follow = sxy / Math.sqrt(sxx * syy);
+    check(`Thickness ${thickness}: rocked a lean a second, the lens rises with each lean and the water away from it moves under a tenth as fast`,
+      ratio < 0.1 && follow > 0.9 && oil2 > 0,
+      `the far water at ${(ratio * 100).toFixed(1)}% of the lens's rms speed; the lens's speed follows the lean at r ${follow.toFixed(3)}`);
+  }
+  // A lens against the rim, pushed into it for two seconds: the wall holds it.
+  {
+    const r = dragOf(DEFAULT_THICKNESS);
+    const d = new SloshDish();
+    d.setOil(lensAt(0.08, 0.5, 0.08));
+    d.rest();
+    const [bx] = rockRise(0.09, 0, true);
+    for (let k = 0; k < 120; k++) d.step(DT, 0, 0, r, bx, 0);
+    let out = 0, mean = 0, cnt = 0;
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const c = j * N + i;
+      if (!d.wet[c] || d.h1[c] <= 0) continue;
+      mean += Math.abs(d.ox[c]); cnt++;
+      if (!(i > 0 && d.wet[c - 1])) out = Math.max(out, -d.ox[c]);
+    }
+    check('a lens pushed against the rim by the rock is held there: nothing in the cells against the wall moves out through it',
+      out <= 1e-3 * (mean / cnt) && cnt > 0, `fastest outward ${out.toExponential(1)} plate widths/s, the lens's mean ${(mean / cnt).toExponential(2)}`);
+  }
+  // Let go after a rock, the dish is at rest within the ring time the GPU's dish is given.
+  {
+    const r = dragOf(0);
+    const d = new SloshDish();
+    d.setOil(lensAt(0.5, 0.5, 0.12));
+    d.rest();
+    for (let k = 0; k < 120; k++) d.step(DT, 0, 0, r, ...rockRise(0.09 * Math.sin(Math.PI * k * DT), 0, true));
+    let dormant = -1;
+    for (let k = 0; k < 60 * 130; k++) if (!d.step(DT, 0, 0, r)) { dormant = (k + 1) * DT; break; }
+    check('rocked on water and let go, the dish with its lens is at rest within the ring time', dormant > 0 && dormant <= sloshRingSeconds(r),
       `at rest after ${dormant.toFixed(1)} s of ${sloshRingSeconds(r).toFixed(1)}`);
   }
 }

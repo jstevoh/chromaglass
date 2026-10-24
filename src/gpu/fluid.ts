@@ -1758,7 +1758,7 @@ export class WebGPUFluid {
     if (!this.slosh.ready()) { this.sloshTex = null; return; }
     // The oil is the mix's, while the look has Oil Tension and the mix is made (lib/slosh.ts: the lens floats at its capillary thickness).
     const oil = this.mix && (p.oilTension ?? 0) > 0 ? { tex: this.mix.read, n: this.N } : null;
-    this.slosh.step(enc, p.magnetSeconds ?? 1 / 60, drive.ax, drive.ay, drive.nu, drive.presses, oil, this.sloshLevel, this.profiler.pass('slosh'));
+    this.slosh.step(enc, p.magnetSeconds ?? 1 / 60, drive.ax, drive.ay, drive.nu, drive.presses, oil, this.sloshLevel, this.profiler.pass('slosh'), drive.bx ?? 0, drive.by ?? 0);
     this.sloshLevel = false;
     this.sloshTex = this.slosh.flow;
   }

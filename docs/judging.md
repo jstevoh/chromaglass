@@ -1528,8 +1528,15 @@ is the plate shard. On a real GPU:
   sharp front that runs to the rim and back. Say whether it reads as a wave or as a jolt.
 - Bass Drop with music: its Beat Squeeze should now send a ring out from each kick that runs
   to the rim and back, and its Plate Rock should slosh the whole dish, a little (Frame Sway
-  0.35). Say whether the whole-dish slosh is too much (the frame-motion rule).
+  0.35). Off Bass Drop, Beat Squeeze's ring starts from the sheet's one dent where the kick
+  lands (27f-3), narrower. Say whether the whole-dish slosh is too much (the frame-motion rule).
 - Any other look (Frame Sway 0) with Plate Rock up: the rock should tip the dye as it did,
   and not slosh the whole dish.
+- Plate Rock on a look with oil (Oil Tension up; PLAN 27f-5): on each lean the oil's bodies
+  should drift a little the other way from the colour, up the tipped plate, and come back on
+  the next lean, the water's colour staying where it is around them: the two layers parting,
+  not the picture moving. On the default rock that is a few millimetres a lean (5 mm/s at the
+  default Thickness), more with Plate Rock up. Say whether it reads, and whether it should be
+  more.
 - With Slosh at 0, Plate Rock at 0 and Beat Squeeze at 0, the plate should look exactly as
   before.

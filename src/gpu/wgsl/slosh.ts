@@ -41,6 +41,8 @@ struct Slosh {
   c: vec4f,
   // the presses (lib/slosh.ts SLOSH_PRESSES): x, y, radius, depth (plate units, 0..1 across; plate widths of head)
   p: array<vec4f, 6>,
+  // the oil's own body force (lib/slosh.ts rockRise), x and y, plate widths a second squared; 0, 0
+  e: vec4f,
 };
 @group(0) @binding(0) var<uniform> S: Slosh;
 
@@ -248,8 +250,11 @@ const STEP = /* wgsl */ `${HEAD}${SCHEME}
     var adv = vec2f(0.0);
     if (o.x > 0.0) { if (wl) { adv += o.x * (o.xy - ol); } } else { if (wr) { adv += o.x * (oR - o.xy); } }
     if (o.y > 0.0) { if (wd) { adv += o.y * (o.xy - od); } } else { if (wu) { adv += o.y * (ou - o.xy); } }
-    dox = -g * gx - adv.x / dx;
-    doy = -g * gy - adv.y / dx;
+    // The oil's own force (rockRise), less its outward part against the rim: the wall's reaction (lib/slosh.ts shortcut k).
+    let bx = select(select(0.0, S.e.x, wl), select(0.0, S.e.x, wr), S.e.x > 0.0);
+    let by = select(select(0.0, S.e.y, wd), select(0.0, S.e.y, wu), S.e.y > 0.0);
+    dox = -g * gx - adv.x / dx + bx;
+    doy = -g * gy - adv.y / dx + by;
   }
   var W = vec4f(w.x + dt * dh, w.y + dt * dqx, w.z + dt * dqy, 0.0);
   var O = vec4f(o.x + dt * dox, o.y + dt * doy, o.z, 0.0);

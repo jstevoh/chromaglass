@@ -4258,8 +4258,10 @@ its frame rate live. "Free" means no new passes or texture reads.
       capillary thickness, read from the plate's own oil each frame, with the two-layer
       laminar drag between them; the dish moved to the GPU (`gpu/slosh.ts`). Plate Rock's
       swing tips it where Frame Sway lets the frame move (`rockAccel`; how the rock itself is
-      driven is 27f-2's). Story in `docs/plan-shipped.md` §18a-13a; `npm run slosh`,
-      `npm run sloshgpu`.
+      driven is 27f-2's), and on every look raises its oil under the cover (`rockRise`,
+      27f-5). A kick's glass presses the dish over the same radii it presses the gap
+      (`kickPress`: the sheet's one dent off the frame-moving looks). Story in
+      `docs/plan-shipped.md` §18a-13a; `npm run slosh`, `npm run sloshgpu`.
     - **18a-13b. The rim's boundary layer.** The rim is free-slip; a real dish's wall
       holds a thin layer still and sheds a vortex when the wave turns there. The
       drag too is the covered gap's (12ν/h², Poiseuille between two walls), where a
@@ -6486,8 +6488,8 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - **27f-2. Plate Rock leans on the one and three (shipped; story in docs/plan-shipped.md §27f-2).**
     A hand's minimum-jerk reach to the other side of a turning axis on the strong beats, never a
     shove on each kick; `npm run rides` holds it (judging.md §61).
-  - **27f-3. Beat Squeeze presses a sheet, locally (shipped pending the owner's pick on the
-    thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
+  - **27f-3. Beat Squeeze presses a sheet, locally (shipped 2026-10-22; the owner picked the
+    local sheet on the thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
     lays one dent as wide as a 0.1 mm sheet bends over the liquid in the kick's hold
     (elastohydrodynamic bending length); Bass Drop keeps the glass. `npm run rides` holds it.
   - **27f-4, open. The sheet solved, not stamped.** 27f-3 lays the dent's held shape (a clamped
@@ -6498,13 +6500,23 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     and shallowing as t^(−1/3), slow on syrup) and the ring the dent lifts round itself (13% of
     its depth at 3.4ℓ). That ring needs the gap opened past rest, which the shader's
     squeezeUpdate never does (a lift stops at rest): the same item as the lift's ceiling.
-  - **27f-5, open. The rock tips the layers, not only the dye.** The hand's tilt drives the
-    dye's weight down the plate (Darcy–Boussinesq in the gap). A dish of oil on water tipped
-    the same way also sloshes at the layers' interface (reduced gravity, a wave of several
-    seconds across the dish, underdamped in water, overdamped in the default oil): once the
-    two-layer slosh (18a-13a) lands, the rock's tilt should drive its internal mode. Not the
-    single-layer slosh's surface mode, which moves the whole picture together and would be a
-    frame move from the sound (the owner's rule); a design call for the owner when 18a-13a ships.
+  - **27f-5. The rock tips the layers, not only the dye (shipped 2026-10-24; story in
+    docs/plan-shipped.md §27f-5).** Under the cover glass the rock's tilt is the cover's
+    pressure plus the oil's buoyancy, so the two-layer dish (18a-13a) is pushed on its oil
+    alone (`rockRise`): the lenses rise up the tipped plate and come back on the next lean,
+    the water stays, and the frame does not move (the water away from a lens under a tenth of
+    its speed). `npm run slosh` §16, `npm run sloshgpu`; the owner's eyes in judging.md §64.
+  - **27f-6, open. The cover's pressure solved, not split.** 27f-5 takes the uniform part of
+    the tilt off as the cover's pressure and leaves the dish its free surface (shortcut j in
+    lib/slosh.ts): right for lenses, which is what the plate's oil is, but a plate oiled evenly
+    all over would move all its oil uphill together, where under a real cover the water would
+    return beneath it and the column's mean flow would be nil (at an even share of 1 the oil's
+    mean speed is the whole picture's, about 5 mm/s rms on the default rock, in node). The answer is
+    the rigid lid's Poisson solve for the layers' summed transport on the dish (64², a few
+    Jacobi sweeps a step on the GPU), which would also give the lens the counterflow around it
+    rather than the free surface's small rise. And the interface's own weight, the inner mode
+    that would ring a thin oil across the dish in a few seconds, waits on 18a-13g (a lens that
+    carries its own thickness).
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't feel
   like it actually does anything").** The slider multiplied the ranged bass reading, which every
   hand takes over 70 or 85 and stops: on the band's chorus the reading sat over the press's
