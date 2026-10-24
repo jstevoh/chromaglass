@@ -16,7 +16,9 @@
  *   5. an upgrade webhook upgrades a Home key to Pro;
  *   6. machine activation enforces two machines per key, refuses a third (409),
  *      and deactivating one frees the slot for the new machine;
- *   7. a refunded key is gone from GET /keys and refused by POST /activate.
+ *   7. a refunded key is gone from GET /keys and refused by POST /activate;
+ *   8. a test-mode order (Lemon Squeezy's `meta.test_mode`, payable with its public test card)
+ *      files no key unless the buyer's email is on the `TEST_MODE_EMAILS` allow-list.
  */
 
 import { readFileSync } from 'node:fs';
@@ -394,6 +396,35 @@ let bobProToken = '';
       actAfterRefund.status === 401 &&
       aliceBody.keys?.length === 1,
     `bob keys=${bobBody.keys?.length}, activate=${actAfterRefund.status}, alice keys=${aliceBody.keys?.length}`,
+  );
+}
+
+// ── 8. Test-mode orders file nothing unless the email is allow-listed ─────
+{
+  const lsOrder = (email, orderId, testMode) => ({
+    meta: { event_name: 'order_created', test_mode: testMode },
+    data: { id: orderId, attributes: { user_email: email, first_order_item: { product_name: 'ChromaGlass Pro', order_id: orderId } } },
+  });
+  const e8 = { ...makeEnv(), TEST_MODE_EMAILS: ' Owner@example.com , other@example.com ' };
+  const keysOf = async (addr) => (await (await getKeys(e8, await mintFirebaseToken({ email: addr }))).json()).keys?.length;
+  const stranger = await postWebhook(e8, lsOrder('stranger@example.com', 8001, true));
+  const owner = await postWebhook(e8, lsOrder('owner@example.com', 8002, true));
+  const live = await postWebhook(e8, lsOrder('buyer@example.com', 8003, false));
+  const noneEnv = makeEnv();
+  await postWebhook(noneEnv, lsOrder('stranger@example.com', 8005, true));
+  const noneKeys = (await (await getKeys(noneEnv, await mintFirebaseToken({ email: 'stranger@example.com' }))).json()).keys?.length;
+  // The flag may sit on the order itself rather than in meta; it must count either way.
+  const onOrder = { ...lsOrder('attr@example.com', 8006, false), };
+  onOrder.data.attributes.test_mode = true;
+  await postWebhook(e8, onOrder);
+  const attrKeys = await keysOf('attr@example.com');
+  const strangerKeys = await keysOf('stranger@example.com');
+  const ownerKeys = await keysOf('owner@example.com');
+  const liveKeys = await keysOf('buyer@example.com');
+  check(
+    '8. a test-mode order files no key unless its email is on TEST_MODE_EMAILS; a live order always does',
+    stranger.status === 200 && strangerKeys === 0 && ownerKeys === 1 && liveKeys === 1 && noneKeys === 0 && attrKeys === 0,
+    `stranger keys=${strangerKeys}, allow-listed keys=${ownerKeys}, live keys=${liveKeys}, no allow-list keys=${noneKeys}, flag on the order keys=${attrKeys}`,
   );
 }
 
