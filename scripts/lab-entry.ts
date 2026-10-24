@@ -22,7 +22,8 @@ import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
-import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
+import { squishDisc, glassSpring, PressLift, KICK_HOLD, kickPress, type Stroke } from '../src/lib/squish';
+import { RhythmSheet, stampedDepth } from '../src/lib/sheet';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
@@ -57,6 +58,9 @@ type Lab = {
   hands: Float32Array | null;
   /** A Blow's breath laid this step (layBreath), or null with none. */
   breath: Float32Array | null;
+  /** Beat Squeeze's rhythm sheet (lib/sheet.ts), made at its first press, and its change laid this step, or null with none. */
+  sheet: RhythmSheet | null;
+  sheetGap: Float32Array | null;
   /** The magnets the plate was last stepped with, as the app hands them to the picture. */
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
@@ -88,7 +92,7 @@ const api = {
     device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });
     solver.clear();
-    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null };
+    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null, sheet: null, sheetGap: null };
     return { N, L };
   },
   /** The adapter `create` drew on, or null before it. */
@@ -198,10 +202,45 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath);
+    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath, l.sheetGap);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
-    l.hands = null; l.breath = null;
+    l.hands = null; l.breath = null; l.sheetGap = null;
   },
+  /**
+   * Beat Squeeze's kick on the rhythm sheet, as the app presses it
+   * (LiquidVisualizer pressKick, lib/sheet.ts): a fingertip at plate
+   * fraction (x, y) on a liquid of viscosity `nu`, held `hold` seconds,
+   * as deep at its middle as the stamped bowl of a kick of `amount` closed
+   * the gap to. Laid by `sheetStep`.
+   */
+  sheetPress(x: number, y: number, amount: number, nu: number, hold = KICK_HOLD) {
+    const l = lab!;
+    if (!l.sheet) l.sheet = new RhythmSheet();
+    l.sheet.setLiquid(nu);
+    l.sheet.press(x, y, stampedDepth(amount), hold);
+  },
+  /** One step of the sheet (`dt` seconds, the gap's spring `spring` a step), its change laid for the next flush, as the app's liftStep lays it. Returns the cells laid. */
+  sheetStep(dt = 1 / 60, spring = BASE.gapSpring) {
+    const l = lab!;
+    if (!l.sheet?.live) return 0;
+    const out = new Float32Array(l.L * l.L);
+    const cells = l.sheet.step(l.L, dt, spring, out);
+    if (cells > 0) l.sheetGap = out;
+    return cells;
+  },
+  /** The sheet's change laid this step moved to the press's channel (the gap column of the velocity deltas), for the check that the press's ceiling cuts its ring. */
+  sheetAsPress() {
+    const l = lab!;
+    if (!l.sheetGap) return;
+    for (let q = 0; q < l.sheetGap.length; q++) l.velAdd[q * 4 + 3] += l.sheetGap[q];
+    l.sheetGap = null;
+  },
+  /** What the sheet has laid and pressed, and whether it still moves: for the checks. */
+  sheetState() { const s = lab!.sheet; return s ? { live: s.live, steps: s.steps, presses: s.pressCount, laid: s.laid, closed: s.closed } : null; },
+  /** The dent as the plate should hold it now (plate widths, L × L), from the sheet's own solve: a check sets the plate's gap against it. */
+  sheetHeld() { const h = lab!.sheet?.heldNow(); return h ? Array.from(h) : null; },
+  /** The kick's press (lib/squish.ts kickPress), for a check to ask which liquid's dent it is. */
+  kickPress,
   /**
    * A Finger in the liquid on a thin gap, laid as the app lays one
    * (lib/handSolid.ts): at grid cell (x, y) of the L × L plate, `r` cells

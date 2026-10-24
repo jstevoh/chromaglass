@@ -1447,7 +1447,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   squeezeUpdate: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(4) var sheetT: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rg32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let s = textureLoad(sq, vec2i(id.xy), 0);
@@ -1492,6 +1493,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
         let h0 = max(rest, 0.004);
         g2 = max(0.004, inverseSqrt(1.0 / (gap * gap) + 2.0 * (-dg) / (h0 * h0 * h0)));
       }
+      dhdt += (g2 - gap) / max(S.dt, 0.0001);
+      gap = g2;
+    }
+  }
+  /*
+    The rhythm sheet's change this step (A.a.z; lib/sheet.ts, PLAN 27f-4),
+    laid as solved. Not as a press: the sheet's solve is already the film
+    draining under it (lubrication, the film's own resistance), so a
+    Stefan closing on top would count that resistance twice, and the ring
+    it lifts round its dent is the sheet past rest, which a press's ceiling
+    would cut off. Cut, it would ratchet: the ring's rise dropped, its
+    fall laid in full, every kick leaving the gap a little closer where the
+    ring went. Only the floor holds.
+  */
+  if (A.a.z > 0.5) {
+    let dw = textureLoad(sheetT, vec2i(id.xy), 0).r;
+    if (dw != 0.0) {
+      pressed = true;
+      let g2 = max(0.004, gap + dw);
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
     }

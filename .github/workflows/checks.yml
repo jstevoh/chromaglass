@@ -1021,6 +1021,15 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 4
         run: npm run oillift
+      # Beat Squeeze's sheet solved (PLAN 27f-4): the dent against the theory
+      # of a floating sheet in water, oil and glycerine, exact per mode, its
+      # rim, its release's pace; on the plate the gap is the solve's cell for
+      # cell, its ring past rest, no ratchet, the frame still. In the open
+      # shard: the plate shard is near its timeout.
+      - name: The rhythm sheet is solved
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 4
+        run: npm run sheet
       # The music's own pushes as forces a thin gap keeps (PLAN 27e): Sound
       # Drive's bass is a hand on the glass that presses as the bass comes in
       # and lets up as it goes (the burst it replaces moved nothing), and the

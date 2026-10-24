@@ -4021,6 +4021,51 @@ back 95% of the way at the default, 89% at full. Shortcuts (27f-4): the ring the
 never opened past rest), the reach is read at the 6 mm middle, and the release is KickRelease's
 third of a second rather than the sheet's own slower relaxation.
 
+### 27f-4. The rhythm sheet solved, not stamped (2026-10-24)
+
+27f-3 laid the kick's dent as its held shape (a clamped bowl 2.28 bending lengths across) and gave it
+back by a cosine over a third of a second. Now the sheet is solved (lib/sheet.ts `RhythmSheet`): a
+fingertip of 5 mm on 0.1 mm of polyester floating on the 6 mm layer, D∇⁴w + ρg w = F − p, the layer
+draining under it by lubrication, so w_t = M∇²(D∇⁴w + ρg w − F) with M = h₀³/12μ. Linear with
+constant coefficients, every Fourier mode has its own exact step, e^(−λdt) and the load's
+(1 − e^(−λdt))/(Dk⁴ + ρg), λ = Mk²(Dk⁴ + ρg): 128² modes on a box twice the plate's side, the plate
+in one corner and its negated mirror images in the others, so every mode is a product of sines and
+the sheet is held at rest, at the open air's pressure, on the plate's edges (the dish's open rim,
+whose reservoir lets the liquid out and back). One inverse transform a step, done as half a complex
+one because the sheet is real: 0.7 ms in node on the app's 192 plate. Each kick presses as deep at
+its middle as the stamp closed the gap (stampedDepth, the shader's Stefan closing of the bowl), so
+the dial means what it did. The change is laid each step through its own channel (applyDeltas'
+`sheet`, squeezeUpdate's `sheetT`), as solved: no Stefan closing on top, and no ceiling at rest, which
+would have cut the ring and ratcheted the gap closed where it went. The plate's spring is taken on
+the sheet too, so what is laid is only the sheet's own motion. Off the GPU or off a thin gap the
+stamp stays.
+
+What the solve found. The liquid's weight was missing from 27f-3's reach: a floating sheet pushed
+down is held up by Archimedes as well as by its stiffness, the two balancing at (D/ρg)^(1/4), 14 mm,
+which is smaller than a dent. And the weight levels the layer as a puddle levels, at Mρg: 0.18 m²/s
+in water, 8e-3 on the default oil, 2e-4 in glycerine. Without it, kicked twice a second the dish's
+mean gap sank by more than half a dent's depth in a minute (the liquid pushed out under the sheet
+stood outside the dish and came back only through the box's slowest modes); with it and the rim,
+within 1.5% on the oil. 27f-4's own text had two things wrong: the dent does not shallow as
+t^(−1/3) (with no net volume an unbounded sheet's goes as t^(−2/3), and on the plate the rim takes it
+first), and syrup is not slower for the bending alone (every time in that solution is t/T; it is
+the weight, levelling a thin liquid fast and a thick one slowly, that makes it so).
+
+Measured (`npm run sheet`, 16 checks, node and the lab): the held dent within 1% of the integral of
+the same equation in water, the default oil and glycerine; 57, 43 and 24 mm to its zero, a ring of
+2%, 7% and 14% round it (the reach dentRadius now takes, by quadrature, within 5% of the solve's:
+35, 27 and 15 cells of 128, where the bending length alone said 47, 28 and 15); let go, water
+levels within a frame (96%), the oil gives back 96% in a fifth of a second and glycerine three
+quarters, each within 1% of the theory while the dent is the finger's and not the rim's, and
+water's last of it goes as the dish's slowest mode (0.231 a frame against e^(−λ₁/60) 0.231). On the
+plate the gap is the solve's cell for cell to 0.03% of a dent, held, letting go, after a dozen kicks
+and let go; the ring stands 7.6% of a dent past rest where the same change laid as a press is cut
+at rest; a dozen kicks and twenty seconds later the dish's mean is within 0.02% of a dent of rest;
+and past 4ℓ from a held kick the liquid moves 0.30 of what the stamp drives there. `npm run rides`'
+Beat Squeeze lines now press the solved sheet. Shortcuts (27f-8): the mobility is the rest depth's,
+the sheet's rim is the plate's square, the gap under it the 6 mm middle, the force set from the
+depth, and the slosh dish's press keeps the stamp's timings.
+
 ### 27f-5. The rock lifts the oil, not the frame (2026-10-24)
 
 Oil on a tipped plate is lighter than the water round it (light mineral oil, 880 kg/m³), so
@@ -4036,7 +4081,7 @@ the water's colour alone (Oil Bodies' own share taken off, `WATER_DYE`), over it
 on the GPU this step (`hsOilMean`): weighed whole, a Clock Glass body's colour pulled it
 downhill about nine times as hard as its oil lifts, so the bodies sank against their buoyancy.
 
-Measured (`npm run oillift`, lab, sinθ 0.1): a lens rises at 6.22 mm/s against Hele-Shaw's 6.40
+Measured (`npm run oillift`, lab, sinθ 0.1): a lens rises at 6.21 mm/s against Hele-Shaw's 6.40
 worked out in SI for its soft edge (Δρ g sinθ h²/12μ, halved for the water it pushes round it,
 × (1 − a²/R²), × ∫c²/∫c); a level one stays put; a lens carrying Clock Glass's colour rises at
 88% of a plain one (the 6% of its colour Oil Bodies leaves in the water at its edge weighs as
