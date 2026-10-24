@@ -2607,6 +2607,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             value={String(settings.simResolution ?? 'auto')}
             onChange={(e) => {
               const v = e.target.value;
+              if (v === '1024' && isTierGatingEnforced() && !isProLicenseUnlocked()) return;
               onUpdate({ simResolution: (v === 'auto' ? v : Number(v)) as SimResolution });
             }}
             className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm focus:outline-none focus:border-white/50"
@@ -2617,7 +2618,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <option value="384">GPU · 384²</option>
             <option value="512">GPU · 512²</option>
             <option value="768">GPU · 768² (heavy)</option>
-            <option value="1024">GPU · 1024² (Pro · ultra)</option>
+            <option value="1024" disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}>GPU · 1024² (Pro · ultra)</option>
           </select>
           <Info>
             Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them.
@@ -2634,7 +2635,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 Upgrade to ChromaGlass Pro for full GPU &amp; CPU headroom
               </div>
               <p className="mt-1 text-[11px] text-white/75">
-                Pro unlocks the <span className="font-mono text-white/90">768²</span> and <span className="font-mono text-white/90">1024²</span> fluid grids, full native Retina resolution, and full WebGPU hardware limits on your machine.
+                Pro lets the automatic quality ladder climb to <span className="font-mono text-white/90">768²</span> at <span className="font-mono text-white/90">2x</span> and <span className="font-mono text-white/90">1024²</span> at <span className="font-mono text-white/90">1x</span>, and unlocks the <span className="font-mono text-white/90">1024²</span> grid pin on your machine.
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <a

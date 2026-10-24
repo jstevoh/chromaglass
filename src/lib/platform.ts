@@ -85,10 +85,11 @@ export function isProLicenseUnlocked(): boolean {
  * The ladder tier used by the quality governor (PLAN.md §23.17).
  *
  * A verified Pro licence on a desktop or laptop browser promotes `'hosted'` to
- * `'local'`, unlocking the full `768²` and `1024²` fluid grids, native Retina
- * display pixel ratios (`2x`/`3x`), and projector stage rungs. Explicit
- * `?tier=hosted` diagnostic runs (`npm run pixels`) and phone apps remain on
- * `'hosted'` unless `proUnlocked` is explicitly passed as `true`.
+ * `'local'`, letting the automatic quality ladder climb to `768²` at `2x`/`3x`
+ * native Retina display pixel ratios and `1024²` at `1x`, alongside projector
+ * stage rungs. Explicit `?tier=hosted` diagnostic runs (`npm run pixels`) and
+ * phone apps remain on `'hosted'` unless `proUnlocked` is explicitly passed as
+ * `true`.
  */
 export function effectiveLadderTier(
   tier: PlatformTier = detectTier(),

@@ -24,9 +24,9 @@ const readDismissed = (): boolean => {
 /**
  * Shown once the quality governor has had to step down to hold the frame rate,
  * or the GPU solver is unavailable (PLAN.md §23.17). Suggests upgrading to
- * ChromaGlass Pro — which unlocks the full 768² and 1024² local GPU/CPU ladder
- * at native display resolution, full WebGPU hardware limits, and the native
- * Mac app — and stays hidden once a Pro licence is active.
+ * ChromaGlass Pro — which lets the automatic quality ladder climb to 768² at
+ * 2x and 1024² at 1x, and on the web adds the Mac app with a window of its own
+ * and the projector outputs — and stays hidden once a Pro licence is active.
  */
 export function RunLocallyCard({ status }: { status: EngineStatus | null }) {
   const [dismissed, setDismissed] = useState(readDismissed);
@@ -88,9 +88,11 @@ export function RunLocallyCard({ status }: { status: EngineStatus | null }) {
         </button>
       </div>
       <p className="mb-3 text-xs leading-relaxed text-white/75">
-        {reason} <strong className="font-semibold text-white">ChromaGlass Pro</strong> unlocks the
-        full 768² and 1024² local GPU &amp; CPU ladder at native display resolution, plus the
-        native Mac app with zero browser overhead.
+        {reason} <strong className="font-semibold text-white">ChromaGlass Pro</strong> lets the
+        automatic quality ladder climb to 768² at 2x and 1024² at 1x
+        {status.tier === 'native'
+          ? '.'
+          : ', plus the Mac app with a window of its own and the projector outputs.'}
       </p>
       <div className="mb-3 flex items-center gap-2">
         <a
