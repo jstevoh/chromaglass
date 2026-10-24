@@ -1514,3 +1514,13 @@ running back as the bass falls, and each kick's dye should throw further. It sho
 bass, not as a busier or shakier plate, and nothing should move the whole frame. Say whether 3
 is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
 bass you wanted.
+
+## 64. A network display over https (PLAN 14m-https)
+
+Start the show on the Mac (`npm run show` or the Mac app) and open the network display address
+it prints, `https://<laptop-ip>:3443/?cast=true&key=…`, on a second computer, a tablet or a
+TV's browser on the same Wi-Fi. The browser should warn once that the connection is not
+private; choose Advanced, then Proceed (Safari: Show Details, then visit this website). The
+plate should then come up and follow the laptop, as a projector on HDMI does. Say which
+browsers took it, and whether the warning came back on a later visit (it should not on the same
+device, unless the laptop's Wi-Fi address changed).

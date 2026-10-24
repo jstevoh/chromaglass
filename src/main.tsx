@@ -104,15 +104,16 @@ async function startOver(): Promise<boolean> {
  * server also hands the display key only to localhost, so even in a browser
  * told to treat the address as secure that page could not link phones. The
  * way out is the same page at localhost on the same port, said in plain words.
- * A network display at a Wi-Fi address meets the same wall and has no such way
- * out yet (PLAN 14m-https). Null on a secure page, where the failure is something else.
+ * A network display at a Wi-Fi address meets the same wall; its way out is the
+ * https address the show server now prints for it (PLAN 14m-https). Null on a
+ * secure page, where the failure is something else.
  */
 function insecureAddress(): { local: string; cast: boolean } | null {
   if (typeof window === 'undefined' || window.isSecureContext) return null;
   const { hostname, port, search } = window.location;
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') return null;
   // A network display (`?cast=true`) is another machine: its localhost is not
-  // the laptop, so it is told only why, not sent somewhere that is not the show.
+  // the laptop, so it is sent to the https address instead, not to its own localhost.
   return { local: `http://localhost${port ? `:${port}` : ''}/`, cast: new URLSearchParams(search).has('cast') };
 }
 
@@ -155,7 +156,7 @@ class Boot extends Component<{ children: any }, { failed: any; recovering: boole
               <p className="max-w-md text-[13px] leading-relaxed text-white/80" data-testid="boot-insecure">
                 This page was opened at a Wi-Fi address, and browsers run the GPU only on a secure page (https, or the computer's own localhost).{' '}
                 {insecureAddress()!.cast ? (
-                  'A network display cannot start from this address.'
+                  'A network display opens the https address the show server prints instead, and accepts its warning once.'
                 ) : (
                   <>On the laptop running the show, open <a className="font-mono underline" href={insecureAddress()!.local}>{insecureAddress()!.local}</a> instead.</>
                 )}

@@ -257,6 +257,13 @@ export interface RelayInfo {
    * It is a fresh 32-hex-digit key each launch, never shown or put in a URL.
    */
   displayKey: string | null;
+  /**
+   * The port the show server also serves https on, for network displays (PLAN
+   * 14m-https): a browser runs WebGPU only on a secure page, so a display
+   * opened at the http Wi-Fi address cannot start. Null when the server has no
+   * certificate (no openssl, or HTTPS_PORT=0).
+   */
+  httpsPort: number | null;
 }
 
 /**
@@ -281,13 +288,14 @@ export async function relayInfo(): Promise<RelayInfo | null> {
   try {
     const res = await fetch(REMOTE_INFO_PATH, { cache: 'no-store' });
     if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
-    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[]; key?: string | null; displayKey?: string | null };
+    const body = (await res.json()) as { chromaglass?: unknown; port?: number; httpsPort?: number | null; hosts?: string[]; key?: string | null; displayKey?: string | null };
     if (body?.chromaglass !== 'relay') return null;
     return {
       port: body.port ?? (Number(window.location.port) || 3000),
       hosts: Array.isArray(body.hosts) ? body.hosts : [],
       key: body.key ?? null,
       displayKey: body.displayKey ?? null,
+      httpsPort: typeof body.httpsPort === 'number' && body.httpsPort > 0 ? body.httpsPort : null,
     };
   } catch {
     return null;

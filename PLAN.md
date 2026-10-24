@@ -107,7 +107,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   and limits. **Shipped, this PR** (`npm run showkey` 11 of 33 → 33 of 33, `npm run
   fingerprint-worker` 7 → 19 of 19). 14m-mark and 14m-lan shipped in the follow-up
   (`npm run phonelink` 29 → 36 of 36), and the live Worker answered a lookup (14o-smoke).
-  Left: 14m-https, 14m-guest, 14m-tunnel, 14m-budget, 14o-count.
+  14m-https shipped after them (`npm run netdisplay` 11 of 11). Left: 14m-guest, 14m-tunnel,
+  14m-budget, 14o-count.
 - **1.2** ~~**14n**~~ (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks. **Shipped, #322** (`sanitizePatch`, `npm run sanitize`, `npm run remotemix`: malformed patches/gestures dropped, MIDI writes sanitized, DEFAULT_SETTINGS and all 41 presets intact).
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
@@ -210,7 +211,7 @@ Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back
 (M); **5-actions** (S); **11-pinch** (S).
 
 Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the load-in card
-(S); **14m-guest** (M), **14m-tunnel** (S, the Mac), ~~**14m-mark**~~ (S, shipped), **14m-https** (M, network displays at a Wi-Fi address); **31b** a warp grid for curved walls (M, §31).
+(S); **14m-guest** (M), **14m-tunnel** (S, the Mac), ~~**14m-mark**~~ (S, shipped), ~~**14m-https**~~ (M, shipped); **31b** a warp grid for curved walls (M, §31).
 
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
 **5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
@@ -3089,17 +3090,7 @@ Left open from it:
   tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
 - ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
 - ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- **14m-https** (M, found in 14m-lan): a **network display cannot start at an `http://`
-  Wi-Fi address**. Browsers give WebGPU only to a secure page (https, or localhost), so
-  `http://<laptop-ip>:3000/?cast=true&key=…`, the address the README and the server give
-  a projector's browser or a second computer, fails at the first shader module with
-  "GPUTextureUsage is not defined" (measured in Chromium on 2026-10-24; `npm run
-  phonelink` now asks for the plain words on that screen). The phone's remote needs no
-  GPU and is unaffected. *Fix, to choose:* the show server serves https on the LAN with a
-  certificate the owner's devices trust (mkcert-style; every device installs it once), or
-  network displays go through the tunnel's https address, or the network display gets a
-  WebGL2 fallback of the plate. *Measure:* a network display opened at the address the
-  server prints draws a plate in a browser as it ships (the Mac's `wall`).
+- ~~**14m-https**~~ (M): network displays open over https on the Wi-Fi. **Shipped** (`npm run netdisplay`). Story in `docs/plan-shipped.md`.
 - **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
   address, the server refuses new joins from everyone but the laptop for 60 s. That is
   what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years

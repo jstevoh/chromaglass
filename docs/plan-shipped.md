@@ -2099,6 +2099,29 @@ never join with. `npm run phonelink` asks all of it, with a WebSocket count that
 the localhost desk's socket so that "opens no socket" cannot pass by counting nothing:
 29 of 36 on the code before, 36 of 36 now.
 
+### 14m-https. A network display could not start
+
+**Shipped** (after 14m-mark). Found while doing 14m-lan: a browser gives WebGPU only to a
+secure page (https, or localhost), and the address the show server printed for a projector's
+browser or a second computer was `http://<laptop-ip>:3000/?cast=true&key=…`, so the network
+display stopped at its first shader module ("GPUTextureUsage is not defined"), in Chromium
+and by the same rule in Safari. The show server (`server/remote-server.js`) now also serves
+the same files and the same relay over https on `HTTPS_PORT` (`PORT + 443`, 3443 beside
+3000), with a self-signed certificate made by the system's `openssl` on the first launch
+and kept in `server/.tls` (the Mac app keeps it in its own data folder, `TLS_DIR`). Each
+display's browser warns once (Advanced, then Proceed), and from then on the page is a secure
+context with WebGPU: measured in Chromium, a page whose certificate warning was accepted is
+secure and has `navigator.gpu`. One WebSocketServer takes upgrades from both ports, so every
+count and broadcast sees an https display and an http phone alike; a socket to another path
+is still refused. An https port that is taken, or no `openssl`, leaves the show on http and
+says why. Why not the alternatives: a certificate browsers trust outright needs a public name
+and an authority a room's Wi-Fi lacks; a home-made authority installed per device is the same
+warning made into a setup step; the tunnel leaves the room; a WebGL copy of the plate would be
+a second renderer. The server prints and the desk's Cast menu shows the https address with the
+warning's words; the phone's remote stays on http (it needs no GPU and so no warning).
+`npm run netdisplay`: 11 of 11; on the server before it the first six lines fail (no https
+port, no certificate, the display never opens).
+
 ### 14o. The song-ID Worker is open to anyone
 
 **Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an

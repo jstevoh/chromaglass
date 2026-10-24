@@ -110,7 +110,7 @@ npm run remote
 
 In the **iPhone app** (`npm run ios` on a Mac with Xcode; PLAN.md §12) the phone plays the show itself, and More › **Laptop remote** turns it into this remote: paste the Phone address `npm run remote` printed, or type the laptop's address and key. The app remembers the laptop, and **Play here** switches back.
 
-The server also prints a **network display** address, `http://<laptop-ip>:3000/?cast=true&key=…`. Open it in any browser on the same network — a projector or TV that runs its own browser, a tablet on a stand — and it shows the show, fed the settings and audio bands by the laptop through the relay. Nothing needs to be discovered by Chrome.
+The server also prints a **network display** address, `https://<laptop-ip>:3443/?cast=true&key=…`. Open it in any browser on the same network — a projector or TV that runs its own browser, a tablet on a stand — and it shows the show, fed the settings and audio bands by the laptop through the relay. Nothing needs to be discovered by Chrome.
 
 ## On stage
 
@@ -316,7 +316,7 @@ A **game controller** needs no setup: plug it in (or pair it) and press a button
 
 ### The show key
 
-Every start prints an eight-digit **show key**, and phones and network displays must carry it in their address (`&key=…`) to join; the printed addresses include it. It is kept in `server/.show-key`, so a restart keeps it; `SHOW_KEY=… npm run remote` sets your own. The laptop's own page takes a separate display key that the server hands only to `localhost`, so open the show on the laptop at `http://localhost:3000/`, not at its Wi-Fi address. Browsers run WebGPU only on a secure page (https, or localhost), so a network display opened at an `http://` Wi-Fi address cannot start yet (PLAN 14m-https). The key is what makes it safe to expose the server beyond the room.
+Every start prints an eight-digit **show key**, and phones and network displays must carry it in their address (`&key=…`) to join; the printed addresses include it. It is kept in `server/.show-key`, so a restart keeps it; `SHOW_KEY=… npm run remote` sets your own. The laptop's own page takes a separate display key that the server hands only to `localhost`, so open the show on the laptop at `http://localhost:3000/`, not at its Wi-Fi address. Browsers run WebGPU only on a secure page (https, or localhost), so network displays open the show server's https address (`https://<laptop-ip>:3443/?cast=true&key=…`, on `PORT + 443`; `HTTPS_PORT` moves it, `HTTPS_PORT=0` turns it off). Its certificate is made on the first launch (with the system's `openssl`) and is self-signed, so each display's browser warns once: Advanced, then Proceed. The key is what makes it safe to expose the server beyond the room.
 
 ### Across buildings, other access points, or the internet
 
