@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
 import { isPhoneApp } from './lib/appLink';
+import { SHOW_PATH, isLandingAddress } from './lib/showPath';
 import { requestGpuEarly } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
 import {
@@ -44,22 +45,30 @@ const LazyLicenseGate = lazy(() => import('./components/LicenseGate'));
 // The page a first visit meets before the sign-in (PLAN.md 34a). Its own chunk,
 // with no Firebase and no engine in it.
 const LazyLanding = lazy(() => import('./components/Landing'));
-const LANDING_SEEN_KEY = 'chromaglass-landing-seen';
-
 /**
- * Does this visit meet the landing page before the sign-in?
+ * Does this visit meet the landing page?
  *
- * Only the hosted site's own sign-in, on a first visit: not the iPhone app
- * (whose first screen is the plate), nor a desktop launch that asks for a
- * licence, nor a visit that is already part way through signing in. Google and
- * Apple sign in by a redirect that reloads the page, and the sign-in screen is
- * what collects it; the emailed link opens the page with its code in the
- * address. Both go straight to the sign-in. The tab remembers that the page
- * has been seen (sessionStorage), so the reload after a redirect does.
+ * A visitor who must sign in meets it first wherever they arrive (PLAN.md
+ * 34a), except at the show's own address, `/show`, which asks at once. One
+ * who need not sign in meets it at the site's own address, `/` with no app
+ * word in its query (lib/showPath.ts): the owner's choice, 2026-10-24, after
+ * the page came up only for a signed-out visit and the owner, signed in,
+ * kept getting the plate at chromaglass.art. A shared look, the profile or
+ * the remote still open the app for them.
+ *
+ * Never the iPhone app (whose first screen is the plate), a desktop launch
+ * that asks for a licence, a build with no sign-in (the Mac app's show
+ * server, the harnesses), or a visit part way through signing in. Play moves
+ * the address from `/` to `/show` before the sign-in opens, so Google's and
+ * Apple's redirect and the emailed link come back to the show; a redirect
+ * still pending (one started before this change) skips the page too.
  */
-function landingFirst(): boolean {
+function landingFirst(mustSignIn: boolean): boolean {
   if (!LazySignIn || isPhoneApp() || requiresDesktopSignInSync() || hasEmailSignInLink()) return false;
-  try { return sessionStorage.getItem(LANDING_SEEN_KEY) !== '1'; } catch { return true; }
+  try { if (sessionStorage.getItem('chromaglass-redirect-pending') === '1') return false; } catch { /* no session storage: the page is shown */ }
+  const { pathname, search } = window.location;
+  if (pathname.replace(/\/$/, '') === SHOW_PATH) return false;
+  return mustSignIn || isLandingAddress(pathname, search);
 }
 
 // Installable: the service worker is what lets Chrome and Edge offer
@@ -214,13 +223,31 @@ function Gate() {
     return 'signin';
   });
 
-  // The landing page is up behind the sign-in; the sign-in opens over it.
-  const [landing] = useState(landingFirst);
+  // The landing page is up at `/`; for a visitor who must sign in, the
+  // sign-in opens over it, and for one who need not, Play opens the show.
+  const [landing, setLanding] = useState(() => landingFirst(phase !== 'app'));
   const [asking, setAsking] = useState(!landing);
   const play = () => {
-    try { sessionStorage.setItem(LANDING_SEEN_KEY, '1'); } catch { /* the page is simply shown again */ }
-    setAsking(true);
+    try {
+      if (window.location.pathname === '/') {
+        window.history.pushState(window.history.state, '', `${SHOW_PATH}${window.location.search}${window.location.hash}`);
+      }
+    } catch { /* a sandboxed frame: the address stays, the show still opens */ }
+    if (phase === 'app') setLanding(false); else setAsking(true);
   };
+  const signedIn = () => { setLanding(false); setPhase('app'); };
+
+  // Back from the sign-in to the webpage uncovers it. Once the plate is up,
+  // back changes the address and nothing else: no auth or address change
+  // takes a running show down (the never-lock-out rule, PLAN.md 23.10).
+  useEffect(() => {
+    if (!landing) return;
+    const onPop = () => {
+      if (window.location.pathname === '/') setAsking(false);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [landing]);
 
   useEffect(() => {
     if (!gateActive) return;
@@ -270,12 +297,13 @@ function Gate() {
       return (
         <>
           {landing && <LazyLanding onPlay={play} covered={asking} />}
-          {asking && <LazySignIn onSignedIn={() => setPhase('app')} />}
+          {asking && <LazySignIn onSignedIn={signedIn} />}
         </>
       );
     }
     return <LazyLicenseGate onUnlocked={() => setPhase('app')} />;
   }
+  if (landing && !asking) return <LazyLanding onPlay={play} covered={false} />;
   return <Root />;
 }
 

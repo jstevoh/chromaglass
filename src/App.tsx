@@ -111,6 +111,7 @@ import { parseSeed, showSeed, stream } from './lib/rng';
 import { blendKey, nextBlend, raiseInMix, MIX_SOURCE_INFO, type MixMover, type MixSource } from './lib/mixer';
 import { RowFades, barsToMs, fadeBarsOf, fadeTempo, LOOK_LEVEL_KEYS, FADE_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
 import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
+import { SHOW_PATH } from './lib/showPath';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -324,7 +325,8 @@ export default function App() {
         params.delete('profile');
         params.delete('unsubscribe');
         const qs = params.toString();
-        window.history.replaceState(null, '', `/${qs ? `?${qs}` : ''}${window.location.hash}`);
+        // Back to the show's own address, not `/`: a reload there is the webpage (lib/showPath.ts).
+        window.history.replaceState(null, '', `${SHOW_PATH}${qs ? `?${qs}` : ''}${window.location.hash}`);
       }
     } catch { /* ignore history errors */ }
   }, []);

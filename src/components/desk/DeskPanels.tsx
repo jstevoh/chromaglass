@@ -21,6 +21,7 @@ import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
+import { SHOW_PATH } from '../../lib/showPath';
 
 /**
  * The bodies of the desk's panels (Desk v2).
@@ -915,7 +916,7 @@ function PhoneBody({ p }: { p: DeskProps }) {
   const localUrl = info ? `http://localhost:${info.port}/` : '';
   const url = hasRelay && info
     ? `http://${info.hosts[0]}:${info.port}/?remote=1${info.key ? `&key=${info.key}` : ''}`
-    : `${window.location.origin}/`;
+    : `${window.location.origin}${SHOW_PATH}`;
 
   const showCode = p.status.phone === 0 || moreOpen;
 
