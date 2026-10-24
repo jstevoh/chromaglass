@@ -24,6 +24,7 @@ import { RoomTracker } from '../src/lib/audioCalibration.ts';
 import { SongBoundary, roomIsQuiet, DEFAULT_BOUNDARY } from '../src/lib/songBoundary.ts';
 import { TempoSource, bpmOf } from '../src/lib/tempo.ts';
 import { BeatClock, LevelOnsets } from '../src/lib/beatClock.ts';
+import { DEFAULT_SETTINGS } from '../src/types.ts';
 
 const HZ = 20;
 const DT = 1 / HZ;
@@ -425,6 +426,14 @@ console.log('\nTelling the show the tempo rather than making it work it out:\n')
     checks.push(['onsets cannot drag a clocked tempo off the desk\'s', drift < 0.5]);
   }
 }
+
+/*
+  Until the boundary is trusted on recorded sets (PLAN 14z), nobody gets a look
+  changed by it without asking: it misses crossfades and gapless sets and can
+  fire on a quiet bridge, and a look that changes at the wrong moment is worse
+  on a wall than one that holds. This reads the shipped default, not a copy.
+*/
+checks.push(['a new song keeps the look unless someone asks for more (On a New Song opens on Keep)', DEFAULT_SETTINGS.onNewSong === 'off']);
 
 console.log('');
 for (const [what, ok] of checks) {

@@ -3480,6 +3480,32 @@ Mic or Band pick came back on every launch from `localStorage`.
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
 
+### 14z. A new song: where songs start and end, and the change on the music (asked 2026-10-24)
+
+The owner: song detection does not work well enough to ship. It does not catch where
+songs begin and end, and it does not change the look at the right moment. What it is
+today (`songBoundary.ts`, `useSongChange.ts`): it fires after 1.8 s of quiet that
+follows at least 20 s of song, or when song ID names a different track, which it asks
+every 12 to 35 s. A crossfade or a gapless set never reads as quiet, so it is never
+caught; a quiet bridge can be. It samples at the App's render rate, not the ear's
+(14u), the hung `busyRef` can switch the end-of-song half off for the session (14s),
+and the change is a fixed 2 s fade wherever it lands (`App.tsx`, the On a New Song
+effect). `npm run music` only feeds it synthetic level traces.
+
+- **14z-1** (**shipped**): On a New Song opens on Keep. Nobody gets a look changed by
+  a boundary nobody trusts; New preset and Random are still one press in Settings.
+  `npm run music`: "a new song keeps the look unless someone asks for more" (FAIL on
+  'preset', ok on 'off').
+- **14z-2**: hear a song change from what the music is, not only from silence: a
+  sustained change in timbre, key and tempo across a few bars (a novelty curve over
+  chroma, MFCC-like bands and tempo, with a slow baseline), confirmed by song ID when it
+  answers, on the ear's own clock. Judged on recorded songs and real transitions (CD
+  gaps, streaming gaps, DJ crossfades, gapless albums, a quiet bridge that must not
+  fire), not synthetic traces, with hits, misses and lateness counted per transition.
+- **14z-3**: time the change to the music: land it on the new song's first downbeat
+  (or the next phrase start), and size the fade to the transition heard (a cut for a
+  gap, a long fade under a crossfade). Then On a New Song can open on New preset again.
+
 ## 15. Every tool on every liquid
 
 Asked 2026-09-27 ("Shouldn't blowing and finger also move around the ferrofluid?",
