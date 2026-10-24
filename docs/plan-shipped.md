@@ -3770,7 +3770,13 @@ code, and the PR's own text reaches the shell only through environment variables
 review before merge; verdicts `PASS`/`CHANGES #<n> head <sha>`; a re-review reads only
 the commits since; merge pinned with `--match-head-commit`). The owner chose (19ae-2)
 that the reviewing Claude session merges on its own `PASS` rather than waiting for
-Antigravity's next run, which can be a day or more off when it is out of credit. `AGENTS.md` and `CLAUDE.md`
+Antigravity's next run, which can be a day or more off when it is out of credit.
+And (19ae-5) "Who takes what", last written 2026-10-06 around lane numbers since shipped,
+now splits by what a job needs: Antigravity's clean first reviews were narrow builds with
+a check already written (three of five in the week to 10-19), its three-to-five-round
+PRs were open-ended physics that also wrote or moved their checks, and its one live
+escape was sign-in and keys. A PR with two `CHANGES` comes to Claude Code instead of a
+third round. `AGENTS.md` and `CLAUDE.md`
 carry the short form. `scripts/reach.mjs` lists `ready.yml` with the workflows that never
 run a Mac shard.
 

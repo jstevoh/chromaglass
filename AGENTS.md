@@ -33,6 +33,12 @@ Details in `docs/handoff.md` ("Small and short-lived", "Ready, review, merge"):
 - The PR body's handoff block starts `Plan item: <id>`, and its `Review owed:` line starts
   `before-merge`, `sampled` or `none`. Add the `review-owed` label when you open the PR if
   that line is not `none`.
+- Take what needs the Mac's GPU, and builds whose check already exists and fails on
+  `main`; physics and look builds only from a Claude brief whose check is red on `main`.
+  Never write or change a check yourself, and leave sign-in, keys, payments, Workers,
+  the deploy and CI to Claude Code (`docs/handoff.md`, "Who takes what").
+- After a second `CHANGES` on the same PR, label it `handoff` and stop: Claude Code
+  finishes it on your branch.
 - Your summary comment at the end of each run starts `Pushed #<n> <item> head <sha>`.
 - Never post a `READY` line or add `ready-for-review` yourself: when `Checks` goes green
   on the head, `ready.yml` adds the label and comments `READY #<n> <item> head <sha>`.

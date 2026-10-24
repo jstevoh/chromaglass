@@ -5573,6 +5573,11 @@ Here the pale part is a liquid of its own, and the holes are where it has come a
   chose it 2026-10-24): the reviewer merges on its own `PASS`, pinned to the head it
   passed (`docs/handoff.md` "Ready, review, merge", step 4). GitHub's auto-merge was the
   other option, not taken.
+- **19ae-5. Who takes what, by what the job needs.** **Shipped** (`docs/handoff.md`
+  "Who takes what", rewritten from the scorecard): Antigravity takes GPU-only work, builds
+  whose check already fails on `main`, and briefed physics; Claude Code keeps checks,
+  open-ended physics, sign-in and payments, CI, reviews. A PR with two `CHANGES` goes to
+  Claude Code (`handoff`) instead of a third round.
 - **19ae-3. The watcher no longer relays "ready".** With `READY` on the PR, the reviewing
   thread can subscribe to each Antigravity PR and wake on the comment itself; the Mac
   watcher keeps only what needs the Mac (full `qa`, driving Antigravity). A process note

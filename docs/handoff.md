@@ -12,40 +12,48 @@ handoff that is not in a branch, a PR or `PLAN.md` never happened.
 
 ## Who takes what
 
-When both tools have credit, the owner splits the work by what each can run (2026-10-06):
+Rewritten 2026-10-24 from what three weeks of Antigravity PRs showed (the project's
+scorecard; numbers without names, since the repo is public). The work that came back
+clean on its first review was narrow and already defined: a UI change with its phone
+version, a rename, a port, a fix with a check to turn green (three of five first passes
+in the week to 10-19). The work that went three to five rounds was open-ended physics and
+taste, where the PR also wrote or moved its own check: of the reasons reviews failed, wrong
+physics, a check that passes without the feature, and a moved bar came up most. And the
+one change that reached the live site broken was sign-in and keys. So the split is by
+what the job needs, not by lane:
 
-- **Antigravity** runs on the owner's Mac, which has a real GPU. It can read the app's
+**Antigravity takes:**
+
+- **What only a real GPU can show.** It runs on the owner's Mac and can read the app's
   frames, which a cloud session cannot (the "What can be verified where" table in
-  `CLAUDE.md`). So it takes the work that has to be reproduced on a GPU:
-  - **Order of work 0.3**: Mac-only reds (0-finger, 0-wallgain, the wall's stamps,
-    11-magnetdrag, 11-blowbubble), then 19s.
-  - **2.4 / 10.0**: The first `film.yml` baseline (cloud sessions get a 403 on
-    `workflow_dispatch`; Antigravity runs as the owner and can dispatch it).
-  - **2.1 18a-11** (Thin Gap's cost) and **2.5** (wall smoothness / H2b numbers):
-    measured with `npm run stages` on a real GPU.
-  - **1.3 S19/S18, 1.9 S17, 1.12** (flash guard → 14r → S21): GPU pipeline work
-    in `src/gpu/`.
-  - **Wave 4** frame budget (H2c-4, H2c-1/3/2, 14j): before/after numbers from `stages`.
-  - **3.1 P7-cpu delete**: already decided (delete CPU solver stepping, ~1,000 lines);
-    next in lane G once #307 lands.
-  - *Exception on lane E*: **19i** is being finished by Antigravity (already in progress
-    locally). Claude Code sessions should not pick up 19i.
-- **Claude Code** runs in cloud sessions. It takes CI and scripts (lane E: 19k, 19m,
-  19l, 19o–19n, 19c–19t), docs (lane F: 19m, 19f), and logic, sound and server work
-  that the node harnesses and the lab can verify:
-  - Wave 1 server, sanitizer and sound items (1.1 14m/14o, 1.2 14n, 1.4 S14, 1.5 14s,
-    1.6, 1.7, 1.11).
-  - The review pass on PRs labelled `review-owed`.
+  `CLAUDE.md`): reproducing a red that only the Mac shards show, `npm run stages`
+  numbers (frame budget, a tool's cost), `film.yml` runs (cloud sessions get a 403 on
+  `workflow_dispatch`), and the before and after pictures a look change needs.
+- **Builds with "done" already written down.** A plan item whose check exists and fails
+  on `main`, with the number to reach: UI panels and their phone versions, settings
+  plumbing, layout, ports, renames, deleting code a plan item already decided to delete,
+  tuning a preset toward a number a check reads.
+- **Physics and look builds from a brief.** Only once a Claude Code session has written
+  the brief and its check, shown red on `main`: the brief names the phenomenon, the
+  number and the check, and the PR changes neither the check nor its bar.
 
-*Note on 19l*: Once 19l ships (headed Chromium under xvfb in cloud sessions), cloud sessions
-will be able to read app frames and take over parts of the GPU verification. Until then,
-anything judged by its pixels stays on the Mac.
+**Claude Code keeps:**
 
-This decides who takes which work. It does not change the order: each tool still takes
-the first open step of its kind in `PLAN.md`'s Order of work. When one tool is out of
-credit, the other carries on with whatever is next, of either kind. A cloud session that
-reaches a GPU-only step says so in its PR and leaves the pixels to the Mac CI or to
-Antigravity.
+- Writing and changing checks, and briefs (the check first).
+- Open-ended physics or look work that has no check yet, root causes, and diagnosis.
+- Sign-in, keys, payments, licences, the Workers under `server/`, the deploy and the CI
+  workflows.
+- Reviews, and merging the PRs it passes ("Ready, review, merge").
+- `PLAN.md` restructuring and the docs.
+
+**Two rounds, then it comes back.** An Antigravity PR that gets `CHANGES` twice is
+labelled `handoff` and a Claude Code session finishes it on the same branch, rather than
+a third round: rounds three to five cost more than one session taking it over, and each
+round's late fixes were where the moved bars came from.
+
+Either tool takes the other's kind of work when the other is out of credit, in Order of
+work order. A cloud session that reaches a GPU-only step says so in its PR and leaves the
+pixels to the Mac CI or to Antigravity.
 
 ## Claiming
 
