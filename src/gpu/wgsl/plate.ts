@@ -1978,14 +1978,16 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
 
   Named shortcuts:
   1. Small-angle deflection θ ≈ |∇density| · 0.35 (from the air-masked slope g0 on Layer 0,
-     PLAN 33b) plus the hue-gated two-dye boundary deflection bEdge · edgeK · 0.65 (PLAN 33a,
-     capped at 0.42 pupil loss so an oil drop straddling two dyes keeps each side's colour in
-     npm run droplens) is evaluated from the dye slope and colour step rather than ∇(n·h);
-     it omits oil, film and gap thickness terms that the Laplacian includes, and operates
-     per-texel so it scales with grid resolution.
+     PLAN 33b) plus the hue-gated two-dye boundary deflection bEdge · edgeK · 1.1 (PLAN 33a,
+     shaped by smoothstep(0.25, 1.0, uB) * 0.78 so gentle overlap tails stay above mid-grey in
+     npm run mixer and an oil drop straddling two dyes keeps each side's colour in npm run
+     droplens) is evaluated from the dye slope and colour step rather than ∇(n·h); it omits oil,
+     film and gap thickness terms that the Laplacian includes, and operates per-texel so it
+     scales with grid resolution.
   2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the OPL step.
-  3. Pupil overlap is approximated by a smoothstep with a 0.0 extinction floor, weighted by
-     reliefK (Edge Relief × plateAmt) on the meniscus slope and edgeK on the two-dye boundary.
+  3. Pupil overlap is approximated by a smoothstep with a 0.15 extinction floor (0.85 max loss),
+     weighted by reliefK (Edge Relief × plateAmt) on the meniscus slope and edgeK on the two-dye
+     boundary.
   4. The shadowgraph transport 1 - Δz · ∇²OPL is divided by local OPL, scaled by
      boundaryContrast * 2 and masked by an edge-deflection smoothstep; at default
      projectorFocus = 0.5, Δz = 0 so the Becke term is 1 until the slider moves.
@@ -2019,8 +2021,9 @@ fn refractionOptics(near: vec4f, bEdge: f32, reliefK: f32, edgeK: f32) -> f32 {
   let na = DROP_NA;
   let theta = gLen * 0.35;
   let u = clamp(theta / (2.0 * na), 0.0, 1.0);
-  let uBound = clamp((bEdge * edgeK * 0.65) / (2.0 * na), 0.0, 0.42);
-  let aperture = 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK + uBound, 0.0, 1.0);
+  let uB = clamp((bEdge * edgeK * 1.1) / (2.0 * na), 0.0, 1.0);
+  let uBound = smoothstep(0.25, 1.0, uB) * 0.78;
+  let aperture = 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK + uBound, 0.0, 0.85);
 
   let deltaZ = (U.projectorFocus - 0.5) * 1.5;
   let shadowGain = max(1.0, U.boundaryContrast * 2.0);
