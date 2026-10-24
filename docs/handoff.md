@@ -168,8 +168,9 @@ instructions by hand:
   `npm run lint` plus whatever the "Which checks for which files" table in `CLAUDE.md` asks
   for.
 - **steward, ship**: followed step by step. Merging is under "Ready, review, merge"
-  below: as soon as CI is green on the head and any review owed before merge has passed
-  that head, without asking. The PR is marked ready, it is squash-merged, the deploy is
+  below: a PR that owes no review before merge is merged by Antigravity as soon as CI
+  is green on the head, without asking; one that owes a review is merged by the
+  reviewer on its `PASS`. The PR is marked ready, it is squash-merged, the deploy is
   watched to green and reported in Pacific time, and the branch is restarted from
   `main`. The squash body ends with `Co-Authored-By: Antigravity <noreply@google.com>`.
 
@@ -236,16 +237,25 @@ reviewed and does not pass the new one.
 leaving out merges of `main`: `git log -p --no-merges <reviewed>..<new head>`. A whole
 second review happens only when that diff goes beyond the list.
 
-**4. Merge.** Antigravity merges when `Checks` is green on the head and, for a
-before-merge PR, a `PASS` names that same head, with the head pinned so a push in between
-refuses the merge:
+**4. Merge.** A before-merge PR is merged by the Claude Code session that passed it,
+straight after its `PASS` (the owner, 2026-10-24): a `PASS` used to wait for
+Antigravity's next run, and Antigravity can be out of credit for a day or more. The merge
+is pinned to the head the `PASS` names, so a push in between refuses it:
 
 ```
 gh pr merge <n> --squash --match-head-commit <the head the PASS names>
 ```
 
-A clean merge of `main` after a `PASS` (no conflict to resolve) needs no new review, only
-the green; a merge that resolved a conflict does, of the resolution alone.
+(`merge_pull_request` with `expectedHeadSha` from a cloud session.) The squash body keeps
+`Co-Authored-By: Antigravity <noreply@google.com>` and names no model. The reviewer then
+watches the deploy to green and reports it in Pacific time on the PR; Antigravity's next
+run restarts its branch from `main`. If `Checks` is not green on that head when the
+`PASS` is written, the `PASS` says so and the merge waits for the `READY` line.
+
+A PR that owes no review before merge (`sampled` or `none`) is merged by Antigravity
+the same way, pinned to its green head. A clean merge of `main` after a `PASS` (no
+conflict to resolve) needs no new review, only the green; a merge that resolved a
+conflict does, of the resolution alone.
 
 ## Claude Code's review pass
 

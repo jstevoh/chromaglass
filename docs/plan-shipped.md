@@ -3768,7 +3768,9 @@ code, and the PR's own text reaches the shell only through environment variables
 `docs/handoff.md` gains "Small and short-lived" (one plan item, about 400 lines, a day;
 `main` merged in once, just before review) and "Ready, review, merge" (which PRs owe a
 review before merge; verdicts `PASS`/`CHANGES #<n> head <sha>`; a re-review reads only
-the commits since; merge pinned with `--match-head-commit`). `AGENTS.md` and `CLAUDE.md`
+the commits since; merge pinned with `--match-head-commit`). The owner chose (19ae-2)
+that the reviewing Claude session merges on its own `PASS` rather than waiting for
+Antigravity's next run, which can be a day or more off when it is out of credit. `AGENTS.md` and `CLAUDE.md`
 carry the short form. `scripts/reach.mjs` lists `ready.yml` with the workflows that never
 run a Mac shard.
 

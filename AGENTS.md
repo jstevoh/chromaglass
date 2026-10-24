@@ -38,5 +38,6 @@ Details in `docs/handoff.md` ("Small and short-lived", "Ready, review, merge"):
   on the head, `ready.yml` adds the label and comments `READY #<n> <item> head <sha>`.
   A review answers `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>` and a numbered
   list.
-- Merge with `gh pr merge <n> --squash --match-head-commit <sha>`, where `<sha>` is the
-  head a `PASS` named (or the green head, when no review is owed before merge).
+- A PR that owes a review before merge is merged by the Claude reviewer on its `PASS`,
+  pinned to the head it passed; do not merge it yourself. One that owes none you merge
+  with `gh pr merge <n> --squash --match-head-commit <the green head>`.

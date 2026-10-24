@@ -158,7 +158,8 @@ When CI is red, use the `steward` skill.
   `gh pr list --label ready-for-review --label review-owed` (green and waiting on a
   review before merge, up to three a session) and then the sampled pass on merged
   `review-owed` PRs (about one a session). A verdict's first line is
-  `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>`.
+  `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>`, and on a `PASS` the reviewer
+  squash-merges the PR itself, pinned to that head, and confirms the deploy.
 
 ## Agents and skills in this repo
 
