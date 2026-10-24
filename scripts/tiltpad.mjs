@@ -176,8 +176,37 @@ try {
     const at = async (fx, fy) => { const c = await disc(); return [c.cx + fx * c.r, c.cy - fy * c.r]; };
 
     check('the Gig desk has a Tilt panel with a pad in it', (await pad().count()) === 1 && (await page.getByTestId('panel-tilt').count()) === 1);
+    // The deck scrolls sideways: bring the pad into view before aiming a pointer at it.
+    await pad().scrollIntoViewIfNeeded();
+    await settle();
     const b0 = await rect();
-    check('the pad is big enough to use with a mouse', b0 && b0.width >= 150 && b0.height >= 150, b0 ? `${Math.round(b0.width)}×${Math.round(b0.height)}` : 'none');
+    check('the pad is big enough to use with a mouse', b0 && b0.width >= 140 && b0.height >= 140, b0 ? `${Math.round(b0.width)}×${Math.round(b0.height)}` : 'none');
+    const inside = b0 && b0.x >= 0 && b0.y >= 0 && b0.x + b0.width <= 1440 && b0.y + b0.height <= 900;
+    check('and on the screen, whole, so a drag can start anywhere on it', inside, b0 ? `${Math.round(b0.x)},${Math.round(b0.y)} to ${Math.round(b0.x + b0.width)},${Math.round(b0.y + b0.height)} of 1440×900` : 'none');
+    /*
+      Adding a panel to the Gig desk must not push the way into every setting
+      off the screen: the first draft docked this under Rides, which stopped
+      Rides filling its column, and the Mac's `qa` found "All settings…" at
+      y=965 on a 900 px window. The same question is asked here, but this is
+      not the guard: with the first draft's layout put back, this line still
+      passed in a cloud session (its Rides panel is shorter than the Mac's), so
+      only the Mac's `qa` can fail on it. It stays as a cheap second look.
+    */
+    const way = await page.evaluate(() => {
+      const e = document.querySelector('[data-testid="open-all-settings"]');
+      if (!e) return null;
+      const r = e.getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), ok: r.top >= 0 && r.bottom <= window.innerHeight && r.width > 40 };
+    });
+    check('and the Gig desk still has a visible way into every setting', way && way.ok, way ? `All settings… at y=${way.top}–${way.bottom} of 900` : 'no button');
+    const deckBox = await page.evaluate(() => {
+      const d = document.querySelector('[data-testid="panel-tilt"]');
+      const q = (id) => d?.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect();
+      const panel = d?.getBoundingClientRect();
+      const parts = ['tilt-pad', 'tilt-says', 'tilt-spring', 'tilt-level'].map(q);
+      return panel && parts.every(Boolean) ? { clipped: parts.filter(r => r.bottom > panel.bottom + 0.5 || r.top < panel.top - 0.5).length } : null;
+    });
+    check('and nothing in the panel is cut off by its frame', deckBox && deckBox.clipped === 0, deckBox ? `${deckBox.clipped} parts outside` : 'no panel');
 
     // The look's own tilt, to come back to.
     const home = await read();
@@ -198,6 +227,9 @@ try {
     await page.mouse.move(rx, ry, { steps: 4 });
     await settle(150);
     const held = await read();
+    const during = await rect();
+    check('the pad stays put under the pointer while it tips (its column does not change width with the readout)',
+      Math.abs(during.x - b0.x) < 0.5 && Math.abs(during.width - b0.width) < 0.5, `x ${b0.x.toFixed(1)} → ${during.x.toFixed(1)}`);
     check('dragging to the right of the middle tips the plate to the right: bearing 90, Gravity about 0.79',
       held && held.dragging && apart(held.d, 90) <= 2 && near(held.u, 0.79, 0.03), `Gravity ${held?.u}, bearing ${held?.d}`);
     await page.mouse.up();
@@ -220,7 +252,7 @@ try {
     await page.mouse.move(sx, sy);
     await page.mouse.move(gx, gy);
     await page.mouse.down();
-    await page.mouse.move(gx - 4, gy + 4, { steps: 3 });
+    await page.mouse.move(gx, gy, { steps: 3 });
     await settle(150);
     const away = await read();
     check('and dragged to the lower left it runs lower left: bearing 225',

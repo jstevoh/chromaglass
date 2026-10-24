@@ -4,7 +4,7 @@ import { usePortalBody } from '../portalBody';
 import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
 import { TiltPad } from '../ui/TiltPad';
-import { bearingName, readSpring, writeSpring } from '../../lib/tiltPad';
+import { bearingArrow, bearingName, readSpring, writeSpring } from '../../lib/tiltPad';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
@@ -1032,18 +1032,30 @@ function TiltBody({ p }: { p: DeskProps }) {
   const direction = s.tiltDirection ?? 180;
   const slosh = s.slosh ?? 0;
   const [spring, setSpring] = useState(readSpring);
+  /*
+    The pad beside its controls, not above them: the Gig layout puts this in
+    the deck, which is 236 px tall, and a column of pad, readout, switch,
+    button and dial is twice that. (The first draft docked it under Rides in
+    the right column. Two panels there stop Rides filling the column, its
+    "All settings…" footer scrolled to y=965 on a 900 px screen, and the Mac's
+    `qa` caught it: "the desk has a visible way into every setting".)
+  */
   return (
-    <div className="flex flex-col items-center gap-3 px-1 pb-1 pt-2" data-testid="tilt-panel">
-      <TiltPad
-        upright={upright}
-        direction={direction}
-        onTilt={t => p.onSetting({ plateUpright: t.upright, tiltDirection: t.direction })}
-        spring={spring}
-      />
-      <div className="font-mono text-[12px] text-text-2" data-testid="tilt-says">
-        {upright > 0 ? `${Math.round(upright * 100)}% · runs ${bearingName(direction)}` : 'Level'}
+    <div className="flex items-center gap-4 px-1 pb-1 pt-1" data-testid="tilt-panel">
+      <div className="flex w-[148px] shrink-0 flex-col items-center gap-1">
+        <TiltPad
+          upright={upright}
+          direction={direction}
+          onTilt={t => p.onSetting({ plateUpright: t.upright, tiltDirection: t.direction })}
+          spring={spring}
+          size={148}
+        />
+        {/* An arrow, not words: this column is as wide as the pad and a longer readout would widen it and walk the pad out from under the pointer. */}
+        <div className="whitespace-nowrap font-mono text-[12px] text-text-2" data-testid="tilt-says" title={upright > 0 ? `Liquid runs ${bearingName(direction)}` : undefined}>
+          {upright > 0 ? `${Math.round(upright * 100)}% ${bearingArrow(direction)}` : 'Level'}
+        </div>
       </div>
-      <div className="w-full">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Toggle
           label="Spring back"
           on={spring}
@@ -1052,19 +1064,19 @@ function TiltBody({ p }: { p: DeskProps }) {
           title="Let go and the stick returns to where it was when you took it. Off, it stays where you leave it."
         />
         <Button onClick={() => p.onSetting({ plateUpright: 0 })} disabled={upright === 0} testId="tilt-level" full height={32}>Level</Button>
-      </div>
-      <div className="w-full">
-        <Slider
-          label="Slosh"
-          value={slosh}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={v => p.onSetting({ slosh: v })}
-          display={`${Math.round(slosh * 100)}%`}
-          midiKey="setting:slosh"
-          resetTo={0}
-        />
+        <div className="pt-2">
+          <Slider
+            label="Slosh"
+            value={slosh}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={v => p.onSetting({ slosh: v })}
+            display={`${Math.round(slosh * 100)}%`}
+            midiKey="setting:slosh"
+            resetTo={0}
+          />
+        </div>
       </div>
     </div>
   );

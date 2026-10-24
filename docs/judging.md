@@ -1537,8 +1537,8 @@ is the plate shard. On a real GPU:
 
 ## 65. The tilt pad (PLAN 18a-13f)
 
-A joystick for Gravity and Tilt Direction: the **Tilt** panel on the Gig desk (right column,
-under Rides; the panel browser opens it on any layout), the phone's Play sheet, and the
+A joystick for Gravity and Tilt Direction: the **Tilt** panel on the Gig desk (in the deck, after Tools;
+the panel browser opens it on any layout), the phone's Play sheet, and the
 remote. `npm run tiltpad` measures the mapping and the wiring; how it feels under a hand is
 yours. With Slosh at about half and a few dyes poured:
 - Drag the puck to one side and flick it across to the other, then let go. Does the liquid

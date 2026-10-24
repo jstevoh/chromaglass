@@ -105,7 +105,7 @@ const OWN: PanelSpec[] = [
   { id: 'dyes',    name: 'Dyes',    category: 'plate', kind: 'own', deckWidth: 360 },
   { id: 'tools',   name: 'Tools',   category: 'plate', kind: 'own', deckWidth: 340 },
   // The joystick for Gravity and Tilt Direction (PLAN 18a-13f): the laptop's way to tip the plate one way and then the other.
-  { id: 'tilt',    name: 'Tilt',    category: 'plate', kind: 'own', deckWidth: 240 },
+  { id: 'tilt',    name: 'Tilt',    category: 'plate', kind: 'own', deckWidth: 330 },
   { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 304 },
 ];
 
@@ -165,7 +165,7 @@ const empty = (): Omit<DeskLayout, 'plateMode'> => ({ left: [], right: [], deck:
 */
 export const SHIPPED: Record<LayoutName, DeskLayout> = {
   build: { ...empty(), right: ['bottles', 'dyes', 'tools'], deck: ['recipe', 'physics', 'camera', 'audio-input', 'macro', 'patches'], plateMode: 'preview' },
-  gig: { ...empty(), left: ['cues'], right: ['rides', 'tilt'], deck: ['dyes', 'tools', 'patches'], plateMode: 'live' },
+  gig: { ...empty(), left: ['cues'], right: ['rides'], deck: ['dyes', 'tools', 'tilt', 'patches'], plateMode: 'live' },
   loadin: { ...empty(), left: ['midi', 'audio-input'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' },
 };
 

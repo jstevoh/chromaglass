@@ -91,6 +91,11 @@ export function bearingName(direction: number): string {
   return names[Math.round((((direction % 360) + 360) % 360) / 45) % 8];
 }
 
+/** The bearing as an arrow, for a readout with no room for words: the pad's own column must not change width as it changes. */
+export function bearingArrow(direction: number): string {
+  return ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'][Math.round((((direction % 360) + 360) % 360) / 45) % 8];
+}
+
 /**
  * How long the puck takes to return to where it was grabbed when Spring is on,
  * milliseconds. A real stick snaps back in a tenth of a second; the plate's

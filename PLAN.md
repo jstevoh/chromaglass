@@ -4338,9 +4338,11 @@ its frame rate live. "Free" means no new passes or texture reads.
       per device) returns the puck to where it was grabbed, not to level, so a look that
       stands the plate up (Lava Lamp, Gravity 1) keeps its own tilt after the pad has
       been used; off, it holds. Double-click, Escape and Home level it; arrow keys tip
-      it (shift for a bigger step). On the Gig desk's right column under Rides as the
+      it (shift for a bigger step). In the Gig desk's deck, after Tools, as the
       **Tilt** panel (the panel browser opens it on any layout), with Spring, Level and
-      the Slosh dial beside it; on the phone's Play sheet at a thumb's size, held off
+      the Slosh dial beside it (the first draft docked it under Rides, which stopped
+      Rides filling its column and pushed "All settings…" off the screen: the Mac's `qa`
+      caught it); on the phone's Play sheet at a thumb's size, held off
       while the motion sensor is steering; on the remote, sent through the show server as
       one patch. `npm run tiltpad` (47 checks: the map, the real desk, a real touch on
       the phone, a phone linked to a display through the show server; a spring that went
