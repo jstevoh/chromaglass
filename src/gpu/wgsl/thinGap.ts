@@ -144,6 +144,41 @@ fn hsRowSums(x: i32, y: i32, n: i32) -> vec2f {
 }
 `;
 
+  /*
+    Whether a cell of the oil lift's grid (m on a side) is where Ψ is solved:
+    inside the rim by three of its cells. The flow is ∇⊥ψ by central
+    differences, and the flux through a face between two cells is the
+    difference of ψ across the face's two ends, the cells either side of
+    it; with ψ = 0 on every cell near the rim no face of it carries any of
+    the lift. Held at the rim's own cells, the cells just inside it still had
+    ψ, and a lens rocked into the rim lost 7% of its oil through it in three
+    seconds at 6° (lab, at a hundredth of the looks' Oil Tension, so the
+    surface tension's own drain, PLAN 18g-6, is out of it); two cells in, it
+    lost 2.3% in six; three, 0.9%, of which the same lens left level there
+    loses 0.2%. The lens stops three cells short of the rim, 3 mm on a 192
+    plate, a meniscus's width.
+  */
+  const LIFT_GRID = /* wgsl */ `
+fn liftIn(q: vec2i, m: i32) -> bool {
+  return q.x >= 0 && q.y >= 0 && q.x < m && q.y < m && length((vec2f(q) + 0.5) / f32(m) - vec2f(0.5)) < ${OPEN_RIM.toFixed(2)} - 3.0 / f32(m);
+}
+`;
+
+  /*
+    The water's share of a cell's colour, for the colour's weight on a
+    tipped plate with oil on it (hsBody). With Oil Bodies the oil carries its
+    own share (\`oilDye\`, bodyPartition) and the water's is what is left;
+    without, the colour is not kept to either liquid and the water's share
+    is taken as the water's share of the column, d(1 − c). \`oilDye\` is
+    1×1 and empty without Oil Bodies; \`mixT\` is bound beside it.
+  */
+  const WATER_DYE = /* wgsl */ `
+fn waterDye(q: vec2i, d: f32) -> f32 {
+  if (textureDimensions(oilDye).x > 1u) { return max(d - textureLoad(oilDye, q, 0).a, 0.0); }
+  return d * (1.0 - clamp(textureLoad(mixT, min(q, vec2i(textureDimensions(mixT)) - 1), 0).r, 0.0, 1.0));
+}
+`;
+
   /* The same on level 0, whose pressure is packed and whose mobility is `mob`. */
   const ROWS0 = /* wgsl */ `
 fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
@@ -209,9 +244,53 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       over the gap in rest gaps, as Updraft's, the liquid then answers as h
       and as its own viscosity. \`breath\` is 1×1 and empty with no Blow.
 
+      **And the oil rises up the same tipped plate** (PLAN 27f-5). A body of
+      oil is lighter than the water round it, ρ₁/ρ = 0.88, so under the
+      cover glass it goes the other way from the heavy colour: a bubble under
+      a tipped glass. Its force is the oil's share c times Δρ g sinθ, uphill
+      (L, A.b.zw, from fluid.ts OIL_LIFT), and between two glasses what that
+      force does is a circulation: the oil goes up, the water comes down
+      round it, and nothing else moves. An even sheet of oil moves nothing,
+      and the dish's rim holds what reaches it.
+
+      The force is laid as that circulation and no more, the closed dish's
+      Darcy flow at an even gap: u = ∇⊥ψ, ψ = L_y Ψ_x − L_x Ψ_y, with
+      −∇²Ψ_a = ∂c/∂a inside the rim and Ψ = 0 on it (hsLiftSource,
+      hsLiftRelax). That is the force with its gradient part taken off, which
+      between two glasses is a pressure and moves nothing (the curl of c L is
+      the curl of the flow, and ψ = 0 on the rim is no flux through it). Laid
+      as c L itself, as the colour's weight is, the gap's own solve takes the
+      rim as open (the plate's free edge, past which a press's liquid goes,
+      p = 0), and a lens that reached it went out through it: in the lab 88%
+      of a lens was gone over the uphill rim in three seconds of a 6° tilt,
+      the oil of Clock Glass's bodies draining from the picture a lean at a
+      time. The clock glass's rim is its wall, and a circulation closed inside
+      it is what a tipped dish does. ψ vanishing on the rim also makes the
+      flow's mean over the dish zero, so the oil cannot slide the frame: the
+      first try, on the two-layer dish's rafts alone, slid an oil sheet and
+      the whole picture with it at 4 mm/s every lean (PLAN 27f-5 has it).
+      Where the gap is not even (a press, a domed plate) the gap's solve then
+      takes what is left, with its own mobility: exact on an even gap, the
+      shortcut PLAN 27f-7 names.
+
+      With the oil there, the colour's weight is the water's colour alone
+      (WATER_DYE), over that colour's own mean on the dish (hsOilMean). ROCK_FALL weighs a unit of dye as dyed water against clear
+      water; the oil's colour is an oil-soluble dye whose weight is inside the
+      oil's own density, and laid as the water's it sent the oil's coloured
+      bodies downhill against their buoyancy (Clock Glass lays its bodies at
+      twice the water's wash, oilLay.ts's BODY_DYE, and a unit of dye weighs
+      about four times a full cell of oil's lift). The mean is taken on the
+      GPU this step: one late by a readback would leave every cell a residue
+      that slides the whole plate. Rain Drip's weight and the comet's pull
+      keep the colour's whole weight over the app's mean, as they were: a
+      standing plate's oil is PLAN 27f-6.
+
       A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
       AIR_SHEAR), the rest gap h0, the breath's pascals to the flow's speed);
-      A.b = (Plate Rock's pull, x and y, 0, 0).
+      A.b = (Plate Rock's pull on the colour, x and y; the oil's lift L, x
+      and y, zero with no oil). \`oilMean\` is the water's colour's mean on
+      the dish (hsOilMean), \`psi\` hsLiftRelax's (Ψ_x, Ψ_y), on its own
+      square grid (its side the buffer's length's square root).
     */
     hsBody: `${HEAD}${NOISE}${COMMON}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -219,6 +298,24 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
 @group(0) @binding(4) var sq: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(6) var breath: texture_2d<f32>;
+@group(0) @binding(7) var mixT: texture_2d<f32>;
+@group(0) @binding(8) var<storage, read> oilMean: array<f32, 4>;
+@group(0) @binding(9) var<storage, read> psi: array<vec2f>;
+@group(0) @binding(10) var oilDye: texture_2d<f32>;
+${LIFT_GRID}
+${WATER_DYE}
+// Ψ at a point of the plate, bilinear between its cell middles, zero past the rim.
+fn psiAt(uv: vec2f, m: i32) -> vec2f {
+  let g = uv * f32(m) - 0.5;
+  let c0 = vec2i(floor(g));
+  let f = g - vec2f(c0);
+  return mix(mix(liftAt(c0, m), liftAt(c0 + vec2i(1, 0), m), f.x),
+             mix(liftAt(c0 + vec2i(0, 1), m), liftAt(c0 + vec2i(1, 1), m), f.x), f.y);
+}
+fn liftAt(q: vec2i, m: i32) -> vec2f {
+  if (!liftIn(q, m)) { return vec2f(0.0); }
+  return psi[q.x + q.y * m];
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -226,13 +323,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // Rain Drip's heavy colour down a standing plate, and Plate Rock's tilt (A.b.xy, fluid.ts ROCK_FALL):
   // both the dye's weight over the plate's mean, the second down whichever way the hand tips the glass.
   // Comet flow adds an explicit, constant pull to the dye (S.cometX, S.cometY).
-  if (A.a.x > 0.0 || any(A.b.xy != vec2f(0.0)) || S.cometX != 0.0 || S.cometY != 0.0) {
+  // The oil's lift (A.b.zw) up the same tilt, the water's colour then weighed alone (above).
+  if (A.a.x > 0.0 || any(A.b != vec4f(0.0)) || S.cometX != 0.0 || S.cometY != 0.0) {
     let dRim = uvOf(id) - vec2f(0.5);
     let rRim = length(dRim);
     let rMax = ${OPEN_RIM.toFixed(2)} - 1.0 / S.n;
     let qDish = select(q, clampP(vec2i((vec2f(0.5) + dRim * (rMax / max(rRim, 1e-6))) * S.n), S.n), rRim >= ${OPEN_RIM.toFixed(2)});
-    let w = textureLoad(dye, qDish, 0).a - S.meanD;
-    v = vec4f(v.xy - S.up * (A.a.x * w) + (A.b.xy + vec2f(S.cometX, S.cometY)) * w, v.z, v.w);
+    let dq = textureLoad(dye, qDish, 0).a;
+    let w = dq - S.meanD;
+    var rock = A.b.xy * w;
+    if (any(A.b.zw != vec2f(0.0))) {
+      rock = A.b.xy * (waterDye(qDish, dq) - oilMean[0]);
+      // u = ∇⊥ψ = (∂ψ/∂y, −∂ψ/∂x), ψ = L_y Ψ_x − L_x Ψ_y, by differences a cell of Ψ's grid apart:
+      // on every cell, the rim's and past it too, so its divergence is zero on all of them (LIFT_GRID).
+      let m = i32(round(sqrt(f32(arrayLength(&psi)))));
+      let e = 1.0 / f32(m);
+      let uv = uvOf(id);
+      let dx = (psiAt(uv + vec2f(e, 0.0), m) - psiAt(uv - vec2f(e, 0.0), m)) * (0.5 * f32(m));
+      let dy = (psiAt(uv + vec2f(0.0, e), m) - psiAt(uv - vec2f(0.0, e), m)) * (0.5 * f32(m));
+      rock += vec2f(A.b.w * dy.x - A.b.z * dy.y, -A.b.w * dx.x + A.b.z * dx.y);
+    }
+    v = vec4f(v.xy - S.up * (A.a.x * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
   }
   if (S.air > 0.1) {
     let p = uvOf(id) * S.l;
@@ -245,6 +356,113 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.xy + tau * A.a.w / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
   }
   textureStore(dst, q, safeVel(v));
+}`,
+
+    /*
+      The mean hsBody weighs the water's colour against on a tipped plate
+      with oil on it: dye × (1 − c) over the dish (inside the open rim, where
+      the picture is). One workgroup, each thread a stride of the grid, then
+      a tree (ferroDrop's MEAN), so the mean is this step's, not a
+      readback's from frames ago.
+    */
+    hsOilMean: `${HEAD}
+@group(0) @binding(2) var mixT: texture_2d<f32>;
+@group(0) @binding(3) var dye: texture_2d<f32>;
+@group(0) @binding(4) var<storage, read_write> oilMean: array<f32, 4>;
+@group(0) @binding(5) var oilDye: texture_2d<f32>;
+${WATER_DYE}
+var<workgroup> sums: array<vec2f, 256>;
+@compute @workgroup_size(256) fn main(@builtin(local_invocation_index) t: u32) {
+  let n = u32(S.n);
+  var s = vec2f(0.0);
+  for (var i = t; i < n * n; i += 256u) {
+    let q = vec2i(i32(i % n), i32(i / n));
+    if (length((vec2f(q) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { continue; }
+    s += vec2f(1.0, waterDye(q, textureLoad(dye, q, 0).a));
+  }
+  sums[t] = s;
+  workgroupBarrier();
+  for (var k = 128u; k > 0u; k >>= 1u) {
+    if (t < k) { sums[t] += sums[t + k]; }
+    workgroupBarrier();
+  }
+  if (t == 0u) { oilMean[0] = sums[0].y / max(sums[0].x, 1.0); }
+}`,
+
+    /*
+      The oil's lift as the closed dish's circulation (hsBody says why): the
+      right-hand side of −∇²Ψ_a = ∂c/∂a, on a grid of its own, m on a side
+      (the solver's, coarser past LIFT_MOST in fluid.ts, which says why),
+      each cell's c the mean of the solver's cells under it. Written as
+      h²·∂c/∂a, h = 1/m, by central differences: h·(c₊ − c₋)/2, the term
+      the relaxation adds.
+      A.a = (m, 0, 0, 0).
+    */
+    hsLiftSource: `${HEAD}
+@group(0) @binding(2) var mixT: texture_2d<f32>;
+@group(0) @binding(3) var<storage, read_write> src: array<vec2f>;
+${LIFT_GRID}
+fn coarse(q: vec2i, m: i32) -> f32 {
+  let n = vec2i(textureDimensions(mixT));
+  let r = clamp(q, vec2i(0), vec2i(m - 1));
+  let lo = r * n / m;
+  let hi = max((r + 1) * n / m, lo + 1);
+  var s = 0.0;
+  for (var j = lo.y; j < hi.y; j++) { for (var i = lo.x; i < hi.x; i++) {
+    s += clamp(textureLoad(mixT, vec2i(i, j), 0).r, 0.0, 1.0);
+  } }
+  return s / f32((hi.x - lo.x) * (hi.y - lo.y));
+}
+/*
+  A neighbour past the rim is read as this cell: the force is the oil inside
+  the dish, and its curl is the interior's. The rim's own jump, oil against
+  the wall, is the wall's to hold, which Ψ = 0 there does.
+*/
+fn inside(q: vec2i, here: f32, m: i32) -> f32 {
+  if (!liftIn(q, m)) { return here; }
+  return coarse(q, m);
+}
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+  let m = i32(A.a.x);
+  let k = i32(id.x);
+  if (k >= m * m) { return; }
+  let q = vec2i(k % m, k / m);
+  if (!liftIn(q, m)) { src[k] = vec2f(0.0); return; }
+  let c = coarse(q, m);
+  src[k] = 0.5 / f32(m) * vec2f(inside(q + vec2i(1, 0), c, m) - inside(q - vec2i(1, 0), c, m),
+                                inside(q + vec2i(0, 1), c, m) - inside(q - vec2i(0, 1), c, m));
+}`,
+
+    /*
+      One red-black sweep of over-relaxed Gauss–Seidel on −∇²Ψ = s, both Ψ
+      at once, Ψ = 0 past the rim (a cell there counts as zero). Warm: Ψ is
+      kept from step to step, because it is the oil's shape and not the
+      tilt's (the tilt multiplies it in hsBody), and the oil changes shape
+      slowly; a few sweeps a step keep up with it. And Ψ anywhere short of
+      converged is still a circulation with nothing through the rim, so a
+      lag is a lens a little slow, never the frame moving.
+      A.a = (m, the colour, the over-relaxation ω, 0).
+    */
+    hsLiftRelax: `${HEAD}
+@group(0) @binding(2) var<storage, read> src: array<vec2f>;
+@group(0) @binding(3) var<storage, read_write> psi: array<vec2f>;
+${LIFT_GRID}
+fn at(q: vec2i, m: i32) -> vec2f {
+  if (!liftIn(q, m)) { return vec2f(0.0); }
+  return psi[q.x + q.y * m];
+}
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
+  let m = i32(A.a.x);
+  let half = m / 2;
+  let k = i32(id.x);
+  if (k >= m * half) { return; }
+  let y = k / half;
+  let x = 2 * (k % half) + ((y + i32(A.a.y)) & 1);
+  let q = vec2i(x, y);
+  let i = x + y * m;
+  if (!liftIn(q, m)) { psi[i] = vec2f(0.0); return; }
+  let gs = 0.25 * (at(q + vec2i(1, 0), m) + at(q - vec2i(1, 0), m) + at(q + vec2i(0, 1), m) + at(q - vec2i(0, 1), m) + src[i]);
+  psi[i] = psi[i] + A.a.z * (gs - psi[i]);
 }`,
 
     /*

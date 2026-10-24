@@ -1013,6 +1013,14 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 6
         run: npm run rides
+      # Plate Rock lifts the oil (PLAN 27f-5): on a tipped thin gap a lens of
+      # oil rises at Hele-Shaw's speed worked out in SI, its colour does not
+      # hold it down, the rim holds it, and the picture as a whole does not
+      # move with the tilt (the first try slid it 4.2 mm/s every lean).
+      - name: The rock lifts the oil, not the frame
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 4
+        run: npm run oillift
       # The music's own pushes as forces a thin gap keeps (PLAN 27e): Sound
       # Drive's bass is a hand on the glass that presses as the bass comes in
       # and lets up as it goes (the burst it replaces moved nothing), and the

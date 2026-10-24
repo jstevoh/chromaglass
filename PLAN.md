@@ -4645,6 +4645,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **18g-3** capDye and solvent evaporation: model real evaporation as solvent loss leaving a coffee ring at the rim, rather than dye loss.
 - **18g-4** r16f flux pass: carrier-thickness field for evaporation and liquid volume fraction.
 - **18g-5** Remove the dye-budget regulator safety cap once 18c-2 (pours add volume) ships and looks cannot saturate.
+- **18g-6, open. An oil body touching the open rim drains through it by its own surface tension** (found 2026-10-24 building 27f-5, on main, no rock). In the lab at Clock Glass's Oil Tension (0.9) a lens of 0.06 laid against the rim with the plate level kept 66% of its oil in the dish after six seconds; a half-dish sheet against the rim moves the picture's mean 0.14 mm/s while it drains (`npm run oillift` prints both). Cause: the rim holds the pressure at zero, the water's reservoir pressure, also inside the oil where the rim cuts it, so the oil's Laplace pressure has a way out; a real body touching the rim keeps its interface (the reservoir past it is water) and stays. The fix is the oil's capillary force taken as its closed-dish circulation the way 27f-5's lift is (its gradient part a pressure that moves nothing), or the rim's held pressure read from the phase there. Clock Glass's bodies are laid inside 0.44 of the middle so it bites on a pour, a stir or a slosh that carries one to the rim.
 
 - **Where:** the dye-budget regulator and "evaporation" (`LiquidVisualizer.tsx`,
   applied in `decayDye`), `capDye`, the `airExclude` multiply, a still bubble's
@@ -6652,33 +6653,26 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     and shallowing as t^(−1/3), slow on syrup) and the ring the dent lifts round itself (13% of
     its depth at 3.4ℓ). That ring needs the gap opened past rest, which the shader's
     squeezeUpdate never does (a lift stops at rest): the same item as the lift's ceiling.
-  - **27f-5, open. The rock tips the layers, not only the dye.** The hand's tilt drives the
-    dye's weight down the plate (Darcy–Boussinesq in the gap). Oil on the same tipped plate is
-    lighter than the liquid round it (ρ₁/ρ 0.88), so under the cover it should rise the other
-    way, a bubble under a tipped glass. Not the dish's free-surface slosh, which moves the whole
-    picture together and would be a frame move from the sound (the owner's rule).
-    - *Tried 2026-10-24 and taken out before merging (the review of #440):* the buoyancy laid on
-      the two-layer dish's oil rafts alone, (1 − 1/r) g sinθ uphill, water unforced. A lens rose
-      at 5.5 mm/s on the default rock and the water away from it moved under 4% of that, but
-      nothing held the lid's constraint: an oil sheet across the dish (Oil & Water, Clock Glass,
-      both on the default Plate Rock and Frame Sway 0) moved the picture's mean at −4.2 mm/s
-      after a second of lean, the whole frame with the beat, and a lens pushed into the rim kept
-      driving into it, only the wall's own cells held (−4.6 mm/s at 6 s). `rockRise`, its check
-      and the dish's oil-force slot were reverted; the code is on the branch's history (9348529).
-    - *Where it belongs instead:* the thin gap, which already is the covered plate. Put the oil's
-      buoyancy in `hsBody` beside the dye's weight, as the oil share's departure from the plate's
-      mean (Boussinesq, as the dye's `dye.a − meanD`: an even sheet then feels nothing, a lens all
-      of it), through the oil's own mobility, and let the gap's projection make the flow
-      divergence-free: that is the lid's counterflow round the lens and the rim's no-flux, both
-      exact in Darcy. Needs the mix bound in hsBody and a mean oil share (a reduction, or the
-      same route `meanD` takes). Check first whether `dye.a` already weighs the oil's own colour
-      (if it does, the gap sends oil downhill today). The phone's tilt tips the gap
-      (`rockX = swingX + ext.x·1.1`), so the oil should take `rockX`, not the swing alone.
-      Measure: a lens rises at the Hele-Shaw speed Δρ g sinθ h²/12μ₁ written out in SI (not a
-      ratio of the code's own numbers); the plate's mean velocity over a half and a full sheet
-      stays under a bar; a lens at the rim stops as a whole.
+  - **27f-5. The rock lifts the oil, not the frame (shipped 2026-10-24; story in
+    docs/plan-shipped.md §27f-5).** On a tipped thin gap oil rises uphill through the water at
+    Hele-Shaw's speed (`OIL_LIFT`, in SI), laid as the closed dish's circulation so an even sheet
+    feels nothing, the frame stays still and the rim holds a lens; the water's colour alone weighs.
+    `npm run oillift` holds it.
     - On the frame-moving looks the dish's own tilt (`rockAccel`, SLOSH_LEAN × Frame Sway) and the
       gap's (CUR_ROCK) are two different sizes of the same tilt; say which is the plate's.
+  - **27f-6, open. A standing plate lifts the oil too.** Rain Drip's weight and Comet's pull still
+    weigh all the colour, oil's included, over the app's mean, and a plate stood up (Plate Upright,
+    Rain Drip) lifts no oil: the same circulation with gravity's in-plane share in place of the
+    rock's tilt.
+  - **27f-7, open (a shortcut named). The lift's circulation is the even gap's.** Ψ is solved with
+    the plate's mobility taken as even, then the gap's own solve takes what is left where the gap is
+    not (a press, a domed plate), with its open rim: exact on an even gap, and under a press a little
+    of the lift can reach the rim. The full answer is the lift's own solve with the gap's mobility
+    and a closed rim, a second multigrid; or one solve with the rim's held pressure set per liquid
+    (18g-6 wants the same). And the oil in the mix has the water's viscosity in the gap: a light
+    mineral oil is fifty times thicker (OIL_NU), which would slow a lens to about 1/25 of this in
+    water looks (Darcy's inclusion, 2μ₂/(μ₁+μ₂)) and change how every oil body moves; its own item
+    when the mix's oil gets its viscosity.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't feel
   like it actually does anything").** The slider multiplied the ranged bass reading, which every
   hand takes over 70 or 85 and stops: on the band's chorus the reading sat over the press's

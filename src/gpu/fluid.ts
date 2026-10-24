@@ -492,6 +492,39 @@ const AIR_SHEAR = 0.5;
 */
 export const ROCK_FALL = 12;
 /*
+  The oil rising up the same tipped plate (PLAN 27f-5, hsBody). Unlike the
+  colour's weight this is not tuned: a light mineral oil is 12% lighter than
+  the water (SPIN_OIL_LIGHT, the centrifuge's own), and between two glasses a
+  column of it, tipped by θ, rises through the reference liquid at Darcy's
+  Δρ g sinθ h₀² / 12μ_ref at the rest gap, which is how hsPrep reads a body
+  force: 6 mm, 22 cSt, so 0.16 m/s per unit of sinθ, a column's speed with
+  nothing round it to push aside. A round lens has the water to push round
+  it (in a liquid of its own thickness it goes at half that, Hele-Shaw's
+  inclusion), and on the default Plate Rock's leans of a few degrees it rises
+  a few millimetres a lean. This is that free speed in m/s per unit sinθ; the
+  step turns it into the flow's per-step speed as the breath's is turned.
+  `npm run oillift` measures the lens against the same formula worked out in
+  SI there, and the frame against moving.
+*/
+/*
+  The grid the oil's lift is relaxed on (hsLiftSource, hsLiftRelax): the
+  solver's own, up to LIFT_MOST on a side, coarser past it (a 384 or 512
+  plate). Half the side was tried, a quarter the cells: Ψ is one integration
+  smoother than the oil's edge, but a lens of the plate's usual size is only
+  four of those cells across its radius, and in the lab a lens rose at 91% of
+  the speed Darcy gives its own soft edge, against 97% on the solver's grid.
+  The cost is the sweeps, LIFT_SWEEPS a step of over-relaxed red-black
+  Gauss–Seidel, warm from the last step, which keep up with an oil that
+  moves a few millimetres a lean: from cold, at the grid's best ω, about 200
+  sweeps on a 192 plate, a third of a second of rocking. Short of converged
+  it is still a closed circulation, a lens a little slow and never the frame.
+*/
+const LIFT_MOST = 256;
+const LIFT_SWEEPS = 8;
+const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax'];
+function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
+export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * (REST_GAP * PLATE_METRES) ** 2 / (12 * NU_REF);
+/*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).
 
@@ -834,6 +867,10 @@ export class WebGPUFluid {
   /** What the step's hsPrep reads as the velocity after the body forces: hsMid, or hsPrev when no body force ran. */
   private hsMidNow: GPUTexture | null = null;
   private hsMob: GPUBuffer | null = null;
+  private hsOilMean: GPUBuffer | null = null;
+  private hsLiftSrc: GPUBuffer | null = null;
+  private hsLiftPsi: GPUBuffer | null = null;
+  private liftN = 2;
   private hsP: GPUBuffer | null = null;
   /** Whether the thin gap's pipelines are built (prepareThinGap), and the build under way. */
   private hsReady = false;
@@ -1242,6 +1279,8 @@ export class WebGPUFluid {
       add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
+      // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
+      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
       for (const [key, code] of WebGPUFluid.driftBuilds(dye)) add(key, code, false);
     } else {
@@ -1276,6 +1315,14 @@ export class WebGPUFluid {
    * format, and the dye's carry in substeps. Not the mix's carry, which only
    * a look with the mix asks for.
    */
+  /** The oil lift's kernels' sources, once each: the step asks whether they are built on every rocked step of an oil look. */
+  private static liftSources = new Map<string, string>();
+  private static liftCode(name: string): string {
+    let code = WebGPUFluid.liftSources.get(name);
+    if (!code) WebGPUFluid.liftSources.set(name, code = kernel(name, 'rgba16float'));
+    return code;
+  }
+
   private static thinBuilds(dye: GPUTextureFormat): [string, string][] {
     return [
       ...THIN_GAP_KERNELS.map((name): [string, string] => [`${name}:thin`, kernel(name, 'rgba16float')]),
@@ -1719,6 +1766,8 @@ export class WebGPUFluid {
     this.speciesLive = false;
     // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
     if (this.hsPour) this.clearBuffer(pass, this.hsPour, 'clear pours');
+    // The oil lift's Ψ is the last oil's shape; the next plate's starts from still.
+    if (this.hsLiftPsi) this.dispatchBuf(pass, 'mgZero', 'mgZero:lift', this.arg('lift zero', [2 * this.liftN * this.liftN, 0, 0, 0]), [this.hsLiftPsi], 2 * this.liftN * this.liftN);
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
@@ -2494,12 +2543,43 @@ export class WebGPUFluid {
       const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
       const breathScale = breath ? (h0 / (2 * LIQUID_DENSITY * NU_REF)) * seconds / (PLATE_METRES * Math.max(disp, 1e-9)) : 0;
       const breathTex = breath ?? this.blank('rgba');
+      /*
+        The oil's lift up the tipped plate (PLAN 27f-5, hsBody): wherever the
+        mix holds oil, which it does only while the look's Oil Tension is on.
+        Its speed, OIL_LIFT in m/s per unit sinθ, turned into the flow's
+        per-step speed as the breath's is, and signed uphill, against the
+        colour's pull. It is laid as the closed dish's circulation, Ψ relaxed
+        a few sweeps a step from where it was (hsLiftSource, hsLiftRelax);
+        the water's colour then weighs against its own mean (hsOilMean).
+      */
+      const lifting = rockOn && !!mix && this.mixLive && oil > 0.001;
+      const mixTex = lifting ? mix!.read : this.blank('rgba');
+      // The oil's own share of the colour, with Oil Bodies (WATER_DYE in wgsl/thinGap.ts).
+      const oilDyeTex = lifting && bodiesOn && this.oilDye ? this.oilDye.read : this.blank('rgba');
       stage('thin body', (pass) => {
         this.ensureThinGap();
-        this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}`,
+        let lift = 0;
+        if (lifting) {
+          const m = this.liftN;
+          this.hsRun(pass, 'hsOilMean', `hsOilMean:${mixTex.label}:${this.dye.read.label}:${oilDyeTex.label}`, this.arg('oil mean', [0, 0, 0, 0, 0, 0, 0, 0]),
+            [mixTex, this.dye.read, this.hsOilMean!, oilDyeTex], 64);
+          this.hsRun(pass, 'hsLiftSource', `hsLiftSource:${mixTex.label}`, this.arg('lift source', [m, 0, 0, 0]), [mixTex, this.hsLiftSrc!], m * m);
+          const omega = 2 / (1 + Math.sin(Math.PI / m));
+          for (let k = 0; k < LIFT_SWEEPS; k++) {
+            for (const parity of [0, 1]) {
+              this.hsRun(pass, 'hsLiftRelax', `hsLiftRelax:${parity}`, this.arg(`lift relax ${parity}`, [m, parity, omega, 0]),
+                [this.hsLiftSrc!, this.hsLiftPsi!], m * (m / 2));
+            }
+          }
+          const built = (name: string) => this.pipelines.hasCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
+          if (built('hsOilMean') && built('hsLiftSource') && built('hsLiftRelax')) {
+            lift = -OIL_LIFT * seconds / (PLATE_METRES * Math.max(disp, 1e-9));
+          }
+        }
+        this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
           this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
-            rockOn ? ROCK_FALL * p.rockX : 0, rockOn ? ROCK_FALL * p.rockY : 0, 0, 0]),
-          [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex]);
+            rockOn ? ROCK_FALL * p.rockX : 0, rockOn ? ROCK_FALL * p.rockY : 0, lift * p.rockX, lift * p.rockY]),
+          [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex, mixTex, this.hsOilMean!, this.hsLiftPsi!, oilDyeTex]);
         this.vel.swap();
       });
     }
@@ -4562,6 +4642,11 @@ export class WebGPUFluid {
         usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       }));
       this.hsMob = buf('thin gap mobility', this.N);
+      // The oil's lift (PLAN 27f-5, hsBody): the water's colour's mean, and the circulation's Ψ and its right-hand side.
+      this.hsOilMean = buf('thin gap oil mean', 1);
+      this.liftN = liftGrid(this.N);
+      this.hsLiftSrc = this.disposer.track(this.device.createBuffer({ label: 'oil lift source', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE }));
+      this.hsLiftPsi = this.disposer.track(this.device.createBuffer({ label: 'oil lift psi', size: this.liftN * this.liftN * 8, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC }));
       // The thin solve's own P, packed as the old solver's pressure is. The thin
       // carries read it (THIN_FACE); hsGradient hands phaseAdvect's area form c·P
       // in that one (wgsl/thinGap.ts, hsGradient).
