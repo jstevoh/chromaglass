@@ -9,6 +9,11 @@ import type { LevelParams } from '../lib/soundLevels';
 import {
   RenderCancelled, RenderEncoder, openRenderSink, pickRenderFormat, renderSupport, type AudioPriming, type RenderFormat, type RenderSink,
 } from '../lib/render';
+import {
+  drawChromaGlassWatermark,
+  FREE_RENDER_MAX_HEIGHT,
+  isFreeTierGated,
+} from '../lib/tierGates';
 
 /**
  * Render this song (PLAN.md §6): the loop that plays the show against the
@@ -76,6 +81,11 @@ export interface SongRenderState {
   frameDigests: FrameDigest[] | null;
   /** The whole file, when it was kept in memory and asked for (the checks). */
   bytes: Uint8Array | null;
+  /** Whether the ChromaGlass corner mark was composited (free tier, PLAN 23.5). */
+  watermarked?: boolean;
+  /** Effective dimensions rendered. */
+  renderedWidth?: number;
+  renderedHeight?: number;
 }
 
 export interface SongRenderRequest {
@@ -132,6 +142,10 @@ export function useSongRender(host: SongRenderHost) {
     set({});
     const support = renderSupport();
 
+    const freeGated = isFreeTierGated();
+    const renderWidth = freeGated && (req.height > FREE_RENDER_MAX_HEIGHT || req.width > 1280) ? 1280 : req.width;
+    const renderHeight = freeGated && (req.height > FREE_RENDER_MAX_HEIGHT || req.width > 1280) ? FREE_RENDER_MAX_HEIGHT : req.height;
+
     let format: RenderFormat | null = null;
     let song: DecodedSong | null = null;
     let restoreApp: (() => void) | null = null;
@@ -142,12 +156,17 @@ export function useSongRender(host: SongRenderHost) {
       if (!support.webcodecs) {
         return set({ phase: 'failed', message: 'This browser cannot render a song: it has no WebCodecs (Chrome and Edge do). The Record button still captures the screen as it plays.' });
       }
-      format = await pickRenderFormat(req.width, req.height, req.fps, 48000, 2);
+      format = await pickRenderFormat(renderWidth, renderHeight, req.fps, 48000, 2);
       if (!format) {
-        return set({ phase: 'failed', message: `This browser cannot encode ${req.width}x${req.height} at ${req.fps} fps in H.264 or VP9. Try a smaller size; the Record button still captures the screen.` });
+        return set({ phase: 'failed', message: `This browser cannot encode ${renderWidth}x${renderHeight} at ${req.fps} fps in H.264 or VP9. Try a smaller size; the Record button still captures the screen.` });
       }
-      set({ format: `${format.label}${support.streamsToDisk && !req.test?.keepInMemory ? ', written to disk as it renders' : ', kept in memory and downloaded at the end'}` });
-      const base = `${req.name.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'song'}_${req.width}x${req.height}_${req.fps}fps_seed${req.seed}_${stamp()}`;
+      set({
+        format: `${format.label}${support.streamsToDisk && !req.test?.keepInMemory ? ', written to disk as it renders' : ', kept in memory and downloaded at the end'}`,
+        watermarked: freeGated,
+        renderedWidth: renderWidth,
+        renderedHeight: renderHeight,
+      });
+      const base = `${req.name.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'song'}_${renderWidth}x${renderHeight}_${req.fps}fps_seed${req.seed}_${stamp()}`;
       try {
         sink = await openRenderSink(`${base}.${format.ext}`, format, !!req.test?.keepInMemory);
       } catch {
@@ -178,11 +197,11 @@ export function useSongRender(host: SongRenderHost) {
       clockTaken = true;
       set({ frames, message: 'Laying the look…' });
       plateTaken = true;
-      const laid = await plate.begin({ fps: req.fps, width: req.width, height: req.height, digest: !!req.test?.hashFrames });
+      const laid = await plate.begin({ fps: req.fps, width: renderWidth, height: renderHeight, digest: !!req.test?.hashFrames });
 
       const seconds = frames / req.fps;
       encoder = new RenderEncoder({
-        format, width: req.width, height: req.height, fps: req.fps, sink,
+        format, width: renderWidth, height: renderHeight, fps: req.fps, sink,
         audio: req.test?.maxFrames ? { sampleRate: song.sampleRate, channels: song.channels.map((c) => c.subarray(0, Math.round(seconds * song!.sampleRate))) } : song,
         hashFrames: !!req.test?.hashFrames,
       });
@@ -191,6 +210,15 @@ export function useSongRender(host: SongRenderHost) {
       // The sound is in the file: the channels can go (the ear keeps the mono).
       song.channels = [];
       set({ phase: 'frames', message: `Rendering ${laid.lookId} on a ${laid.grid}² grid, ${laid.stepRate} steps a second` });
+
+      let markCanvas: HTMLCanvasElement | null = null;
+      let markCtx: CanvasRenderingContext2D | null = null;
+      if (freeGated && typeof document !== 'undefined') {
+        markCanvas = document.createElement('canvas');
+        markCanvas.width = renderWidth;
+        markCanvas.height = renderHeight;
+        markCtx = markCanvas.getContext('2d');
+      }
 
       const enc = encoder;
       const digests: FrameDigest[] | null = req.test?.hashFrames ? [] : null;
@@ -202,7 +230,16 @@ export function useSongRender(host: SongRenderHost) {
           if (i > 0) tickFixedClock();
           hostRef.current.setAudio(audio);
         });
-        await enc.addFrame((ts, dur) => plate.step(audio, ts, dur));
+        await enc.addFrame((ts, dur) => {
+          const raw = plate.step(audio, ts, dur);
+          if (markCanvas && markCtx) {
+            markCtx.drawImage(raw, 0, 0, renderWidth, renderHeight);
+            drawChromaGlassWatermark(markCtx, renderWidth, renderHeight);
+            raw.close();
+            return new VideoFrame(markCanvas, { timestamp: ts, duration: dur });
+          }
+          return raw;
+        });
         if (digests) digests.push(plate.digest() ?? {});
         await plate.settle();
         const now = performance.now();
@@ -219,6 +256,9 @@ export function useSongRender(host: SongRenderHost) {
         frameHashes: req.test?.hashFrames ? enc.frameHashes.slice() : null,
         frameDigests: digests,
         bytes: req.test?.keepInMemory ? sink.bytes?.() ?? null : null,
+        watermarked: freeGated,
+        renderedWidth: renderWidth,
+        renderedHeight: renderHeight,
         message: `Rendered ${frames} frames (${(summary.durationMs / 1000).toFixed(1)} s) in ${Math.round(elapsed())} s: ${(summary.bytes / 1e6).toFixed(1)} MB of ${format.label}.`,
       });
     } catch (e) {

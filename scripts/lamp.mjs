@@ -18,13 +18,14 @@
  * Asked here, through the real plate shader on lab plates:
  *
  *   1. at 0 the picture is the plate as it was before the lamp, byte for
- *      byte: every look, its Lamp Ground set to 0, against a second lab built
- *      from today's plate.ts with the lamp's lines taken out (loud if one is
- *      not where it was), on a plate of five pools and a two-dye overlap,
- *      a back plate drawn where a look has one. And the looks that ship on
- *      the lamp (PLAN 18b-1, `npm run lampjudge`) draw on it: as shipped
- *      each differs from itself at 0 by more than the ground not reaching
- *      it, and none is black
+ *      byte, every look, and the looks that ship on the lamp draw on it: that
+ *      is `npm run lampzero`, on the CPU rasteriser, since 2026-10-11. It
+ *      compares two compiled programs (today's plate.ts against the same
+ *      with the lamp's lines taken out, lampcontrol.mjs), and a GPU's
+ *      compiler may round the two differently where their text is the same:
+ *      the owner's M4 read one pixel of Fillmore 2 levels off. Its header
+ *      has the story. The numbering here stays, so the lines below keep
+ *      their names in the run logs.
  *   2. a clear pool on the lamp ground throws at least 90% of the lamp (PLAN
  *      §20a), read in a hole in a ring of dye against the bare lamp at the
  *      same pixels; the same pool on the black ground is the control, and
@@ -51,10 +52,10 @@
  * Checks 2 to 5 render with the grade and the plate's painted texture
  * (saturation, grain, boundary glow, meniscus, beads) at their neutral
  * values, so what is read is the light through the dye and nothing laid on
- * it; check 1 renders each look with its own settings.
+ * it (lampzero renders each look with its own settings).
  */
-import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
+import { RED, YELLOW, BLUE, TEAL } from './lampcontrol.mjs';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -62,104 +63,13 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-/*
-  The plate before the lamp, for check 1: today's plate.ts with every line
-  the lamp added taken out, the composites put back to what they were. Each
-  edit says how many places it must find; a refactor that moves one makes
-  this throw rather than quietly compare a shader with itself.
-*/
-function paren(src, open) {
-  let depth = 0;
-  for (let i = open; i < src.length; i++) {
-    if (src[i] === '(') depth++;
-    else if (src[i] === ')' && --depth === 0) return i;
-  }
-  throw new Error('lamp: unbalanced parentheses in plate.ts');
-}
-/** The top-level arguments of the call whose '(' is at `open`. */
-function args(src, open) {
-  const close = paren(src, open), out = [];
-  let depth = 0, from = open + 1;
-  for (let i = open + 1; i < close; i++) {
-    if (src[i] === '(') depth++;
-    else if (src[i] === ')') depth--;
-    else if (src[i] === ',' && depth === 0) { out.push(src.slice(from, i).trim()); from = i + 1; }
-  }
-  out.push(src.slice(from, close).trim());
-  return { close, out };
-}
-const BEFORE_LAMP = {
-  name: 'before-lamp',
-  setup(b) {
-    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]plate\.ts$/ }, (a) => {
-      let s = readFileSync(a.path, 'utf8');
-      const edit = (what, re, to, n) => {
-        const found = s.match(re)?.length ?? 0;
-        if (found !== n) throw new Error(`lamp: the before-lamp control found ${found} of ${n} ${what} in wgsl/plate.ts`);
-        s = s.replace(re, to);
-      };
-      edit('lamp grounds', /\n[ \t]*if \(U\.lampGround > 0\.001\) \{ lampBg = [^\n]*\}/g, '', 1);
-      edit('front plate levels', /mixLevelled\(groundOf\(bgColor\)/g, 'mixLevelled(bgColor', 1);
-      edit('decodes through the lamp', /\n[ \t]*if \(U\.lampGround > 0\.001\) \{ dyeThrough = [^\n]*\}/g, '', 2);
-      edit('back plates through the lamp', /if \(U\.lampGround > 0\.001\) \{\n\s*let lit1[\s\S]*?\} else \{\n\s*outColor = painted1;\n\s*\}/g, 'outColor = painted1;', 1);
-      // Each call site of the two composites back to the mix it was.
-      for (const [fn, n, to] of [
-        ['chemOnGround', 3, (x) => x[1]],
-        ['onGround', 2, (x) => `mix(${x[0]}, ${x[1]}.rgb, ${x[1]}.a)`],
-      ]) {
-        let at = 0, done = 0;
-        const call = new RegExp(`(?<![\\w])${fn}\\(`, 'g');
-        for (;;) {
-          call.lastIndex = at;
-          const m = call.exec(s);
-          if (!m) break;
-          // Not the declaration.
-          if (s.slice(Math.max(0, m.index - 3), m.index) === 'fn ') { at = m.index + 1; continue; }
-          const { close, out } = args(s, m.index + fn.length);
-          const rep = to(out);
-          s = s.slice(0, m.index) + rep + s.slice(close + 1);
-          at = m.index + rep.length;
-          done++;
-        }
-        if (done !== n) throw new Error(`lamp: the before-lamp control rewrote ${done} of ${n} ${fn} calls in wgsl/plate.ts`);
-      }
-      if (/U\.lampGround/.test(s.replace(/fn (?:onGround|chemOnGround|groundOf)\([\s\S]*?\n\}/g, ''))) {
-        throw new Error('lamp: the before-lamp control left a read of U.lampGround outside the two composites');
-      }
-      return { contents: s, loader: 'ts' };
-    });
-  },
-};
 
 const S = 192;
-const RED = [0.05, 1.6, 1.6], YELLOW = [0.02, 0.1, 1.6], BLUE = [1.6, 0.9, 0.25], TEAL = [1.2, 0.3, 0.8];
-// The plate for check 1: four pools, a pale one, and two dyes overlapping.
-const POOLS = [[0.3, 0.3, 0.14, RED, 1.4], [0.7, 0.3, 0.14, YELLOW, 1.4], [0.3, 0.7, 0.14, BLUE, 1.4], [0.7, 0.7, 0.14, TEAL, 0.6],
-  [0.47, 0.5, 0.1, RED, 0.3], [0.55, 0.5, 0.1, BLUE, 0.3]];
 const NEUTRAL = { saturationBoost: 1, granulation: 0, boundaryContrast: 0, edgeRelief: 0, beads: 0, lacing: 0, cells: 0, glossiness: 0, microDroplets: 0, thinFilm: 0 };
 
-/** Every look on the pools plate, at its own settings with Lamp Ground 0:
- *  [id, its own Lamp Ground, pixels at 0, pixels as shipped (only when that
- *  is not 0)]. */
-const everyLook = (lab) => lab.page.evaluate(async ([pools, S]) => {
-  await lab.create(128);
-  for (const p of pools) lab.dye(...p);
-  lab.flush(); await lab.step(2);
-  const out = [];
-  for (const id of lab.lookIds()) {
-    const s = lab.look(id).settings;
-    const back = (s.layerCount ?? 1) > 1;
-    const cam = { backPlate: back, backRotation: back ? 1.1 : 0 };
-    const lg = s.lampGround ?? 0;
-    out.push([id, lg, await lab.render(S, { ...s, lampGround: 0 }, cam), lg > 0 ? await lab.render(S, s, cam) : null]);
-  }
-  return out;
-}, [POOLS, S]);
-
 const now = await openLab();
-let looksNow, shots;
+let shots;
 try {
-  looksNow = await everyLook(now);
   shots = await now.page.evaluate(async ([S, N, RED, YELLOW, BLUE, TEAL]) => {
     const flat = async (dyes, amount) => {
       const { L } = await lab.create(128);
@@ -215,6 +125,8 @@ try {
     await lab.create(128); lab.dye(0.4, 0.5, 0.15, BLUE, 0.5); lab.flush(); await lab.step(1);
     out.offOne = await r({ lampGround: 1 });
     out.offTwo = await r({ lampGround: 1, layerCount: 2 }, { backPlate: true, backRotation: Math.PI });
+    out.offTwoAdd = await r({ lampGround: 1, layerCount: 2, twoProjectors: 1 }, { backPlate: true, backRotation: Math.PI });
+
     // 6. The photograph.
     // With both lamps up: the hot-spots are the one lamp-ground line the
     // photograph's branches do not skip on their own.
@@ -223,10 +135,6 @@ try {
     return out;
   }, [S, NEUTRAL, RED, YELLOW, BLUE, TEAL]);
 } finally { await now.close(); }
-
-const then = await openLab({ plugins: [BEFORE_LAMP], tag: 'before-lamp' });
-let looksThen;
-try { looksThen = await everyLook(then); } finally { await then.close(); }
 
 // ── Reading ───────────────────────────────────────────────────────────
 const px = (img, x, y) => { const k = (y * S + x) * 4; return [img[k], img[k + 1], img[k + 2]]; };
@@ -247,40 +155,6 @@ const mean = (img, pts) => {
 const lum = (c) => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
 const f2 = (v) => v.toFixed(2);
 const r0 = (c) => c.map(v => Math.round(v)).join(',');
-
-// ── 1. At 0, the plate as it was ─────────────────────────────────────
-{
-  const litOf = (px) => { let t = 0; for (let k = 0; k < px.length; k += 4) t += px[k] + px[k + 1] + px[k + 2]; return t / (px.length / 4); };
-  const rows = looksNow.map(([id, lg, a, own], i) => {
-    const [idThen, , b] = looksThen[i];
-    if (idThen !== id || a.length !== S * S * 4 || b.length !== a.length) return { id, lg, worst: NaN, lit: 0 };
-    let worst = 0;
-    for (let k = 0; k < a.length; k++) { if (k % 4 !== 3) worst = Math.max(worst, Math.abs(a[k] - b[k])); }
-    let moved = 0;
-    if (own) for (let k = 0; k < a.length; k++) { if (k % 4 !== 3) moved += Math.abs(own[k] - a[k]); }
-    return { id, lg, worst, lit: litOf(a), litOwn: own ? litOf(own) : null, moved: own ? moved / (a.length * 0.75) / 255 : null };
-  });
-  const off = rows.filter(r => !(r.worst === 0));
-  const dark = rows.filter(r => r.lit < 5);
-  check(`every look at Lamp Ground 0 draws the plate as it was before the lamp, byte for byte (${rows.length} looks)`,
-    !off.length && !dark.length && rows.length >= 30,
-    `${off.length ? `different: ${off.map(r => `${r.id} ${r.worst}`).join(', ')}; ` : ''}${dark.length ? `black: ${dark.map(r => r.id).join(', ')}` : 'none different'}`);
-  // A look turned up draws a different picture from the same look at 0, by
-  // more than the 6% `npm run lampjudge` calls the ground not reaching it, and
-  // not a black one. Not "brighter": a look whose own light already glows on
-  // the black ground (Timbre Shifter's rainbow LED ring) has that light
-  // filtered by the dye on the lamp, and reads darker there; the first
-  // version of this line asked for brighter and found four of the ten darker
-  // (Timbre Shifter 449 to 200 summed over the plate).
-  // Equal would mean the setting never reached the plate; black, that the
-  // lamp is dimmed to nothing.
-  const up = rows.filter(r => r.lg > 0);
-  const flat = up.filter(r => !(r.moved > 0.06) || r.litOwn < 5);
-  // At least one: with none on the lamp the line would pass on nothing.
-  check(`the looks that ship on the lamp draw on it (${up.length}: each differs from itself at 0 by over 6%, none black)`,
-    up.length > 0 && !flat.length,
-    up.length ? up.map(r => `${r.id} ${(r.moved * 100).toFixed(0)}%`).join(', ') : 'none ship on the lamp');
-}
 
 // ── 2. A clear pool throws the lamp ──────────────────────────────────
 {
@@ -365,21 +239,31 @@ const r0 = (c) => c.map(v => Math.round(v)).join(',');
   // mirror of each point, so the light is the lamp times what the front
   // lets through here and what the back lets through there.
   const mirror = (x, y) => [S - 1 - x, S - 1 - y];
-  let err = 0, n = 0, front = 0, back = 0, both = 0;
+  let err = 0, errAdd = 0, n = 0, front = 0, back = 0, both = 0;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const [mx, my] = mirror(x, y);
     const lampHere = px(shots.bare, x, y), lampThere = px(shots.bare, mx, my);
     const tHere = px(shots.offOne, x, y).map((v, c) => v / Math.max(1, lampHere[c]));
     const tThere = px(shots.offOne, mx, my).map((v, c) => v / Math.max(1, lampThere[c]));
     const got = px(shots.offTwo, x, y);
+    const gotAdd = px(shots.offTwoAdd, x, y);
     const tH = lum(tHere), tT = lum(tThere);
     if (tH > 0.9 && tT > 0.9) continue;            // clear glass in both: nothing to read
     if (tH < 0.7 && tT > 0.95) front++; else if (tT < 0.7 && tH > 0.95) back++; else if (tH < 0.7 && tT < 0.7) both++;
-    for (let c = 0; c < 3; c++) { err += Math.abs(got[c] - lampHere[c] * tHere[c] * tThere[c]); n++; }
+    for (let c = 0; c < 3; c++) {
+      err += Math.abs(got[c] - lampHere[c] * tHere[c] * tThere[c]);
+      let expected = (lampHere[c] * tHere[c] + lampHere[c] * tThere[c]) * 0.5;
+      errAdd += Math.abs(gotAdd[c] - expected);
+      n++;
+    }
   }
   check('the lamp through the back plate and the front is the product of what each lets through, each where its own dye is',
     n > 0 && err / n <= 2 && front > 50 && back > 50 && both > 50,
     `mean error ${f2(err / Math.max(1, n))} over ${n} readings; ${front} pixels under the front's dye alone, ${back} under the back's, ${both} under both`);
+  check('two projectors add their light: each filtered by its own plate, from a lamp dimmed to half',
+    n > 0 && errAdd / n <= 2,
+    `mean error ${f2(errAdd / Math.max(1, n))} over ${n} readings`);
+
 }
 
 // ── 6. Halfway ───────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Film, X } from 'lucide-react';
 import type { SongRenderState } from '../hooks/useSongRender';
 import { estimateFilmBytes } from '../lib/render';
+import { FREE_RENDER_MAX_HEIGHT, isFreeTierGated, openAccountSheet } from '../lib/tierGates';
 
 /**
  * Render this song: the size, the rate and the seed, then progress and a
@@ -60,11 +61,15 @@ interface Props {
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 export function RenderPanel(p: Props) {
-  const [sizeId, setSizeId] = useState<string>('1080p');
+  const freeGated = isFreeTierGated();
+  const [sizeId, setSizeId] = useState<string>(() => (freeGated ? '720p' : '1080p'));
   const [fps, setFps] = useState<number>(60);
   const [seed, setSeed] = useState<string>(String(p.currentSeed));
   useEffect(() => { if (!p.running) setSeed((s) => s || String(p.currentSeed)); }, [p.currentSeed, p.running]);
-  const chosen = RENDER_SIZES.find((s) => s.id === sizeId) ?? RENDER_SIZES[0];
+  useEffect(() => {
+    if (freeGated && sizeId !== '720p') setSizeId('720p');
+  }, [freeGated, sizeId]);
+  const chosen = RENDER_SIZES.find((s) => s.id === sizeId) ?? (freeGated ? RENDER_SIZES[1] : RENDER_SIZES[0]);
   const frames = Math.ceil(p.songSeconds * fps);
   const filmBytes = estimateFilmBytes(chosen.width, chosen.height, fps, p.songSeconds);
   const size = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
@@ -82,6 +87,20 @@ export function RenderPanel(p: Props) {
       </div>
       <p className="px-1 text-[12px] text-white/80 truncate" title={p.songName}>{p.songName} · {clock(p.songSeconds)}</p>
 
+      {freeGated && (
+        <div
+          data-cg-app-tile="full-render"
+          data-cg-render-free-cap="720p"
+          onClick={openAccountSheet}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAccountSheet(); } }}
+          className="mt-2 cursor-pointer rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] leading-snug text-amber-100 transition-colors hover:border-amber-400/50 hover:bg-amber-500/15"
+        >
+          <span className="font-semibold text-amber-200">In the ChromaGlass app:</span> 1080p &amp; 4K unmarked song renders. Free-site renders are 720p with the ChromaGlass corner mark. <span className="font-medium text-amber-300 underline underline-offset-2">Get Home or Pro →</span>
+        </div>
+      )}
+
       {!p.webcodecs ? (
         <p className="mt-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[12px] leading-relaxed text-amber-100" data-testid="render-unsupported">
           This browser cannot render a song: it has no WebCodecs (Chrome and Edge do). The Record button still captures the show as it plays, with MediaRecorder, which drops frames when the machine is busy.
@@ -91,12 +110,17 @@ export function RenderPanel(p: Props) {
           <div className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 px-1 text-[11px] text-white/70">
             <span>Size</span>
             <div className="flex flex-wrap gap-1">
-              {RENDER_SIZES.map((s) => (
-                <button key={s.id} disabled={p.running} onClick={() => setSizeId(s.id)} data-testid={`render-size-${s.id}`}
-                  className={`h-6 rounded-full border px-2.5 ${sizeId === s.id ? 'border-white/40 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-60`}>
-                  {s.label}
-                </button>
-              ))}
+              {RENDER_SIZES.map((s) => {
+                const locked = freeGated && (s.height > FREE_RENDER_MAX_HEIGHT || s.width > 1280);
+                return (
+                  <button key={s.id} disabled={p.running || locked} onClick={() => !locked && setSizeId(s.id)} data-testid={`render-size-${s.id}`}
+                    data-cg-render-locked={locked ? s.id : undefined}
+                    title={locked ? 'In the ChromaGlass app (Home & Pro)' : undefined}
+                    className={`h-6 rounded-full border px-2.5 ${sizeId === s.id ? 'border-white/40 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-40`}>
+                    {s.label}
+                  </button>
+                );
+              })}
             </div>
             <span>Rate</span>
             <div className="flex gap-1">

@@ -116,12 +116,19 @@ export interface RemoteState {
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
   | { type: 'hello'; role: 'display' | 'controller' | 'mirror'; key?: string }
-  /** Relay → a client that presented the wrong show key, before it is closed. */
-  | { type: 'denied'; reason: 'key' }
+  /**
+   * Relay → a client it is turning away, before it closes it: the wrong key, or
+   * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
+   * minutes, `retryMs` from now. A locked phone waits that long rather than
+   * knocking again, since every knock while locked is refused unread.
+   */
+  | { type: 'denied'; reason: 'key' | 'locked'; retryMs?: number }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
   | { type: 'mirrors'; count: number }
+  /** Relay → display: how many phones (controllers) are connected. */
+  | { type: 'controllers'; count: number }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
   | { type: 'cast'; message: CastMessage }
   /**
@@ -242,7 +249,23 @@ export interface RelayInfo {
   hosts: string[];
   /** The show key, given only to the machine the server runs on; phones and displays carry it in their URL. */
   key: string | null;
+  /**
+   * The display's own key (PLAN 14m), also given only to the machine the server
+   * runs on. The display role sends the show to every network display and hears
+   * every phone, so it no longer takes the eight-digit key a phone carries: a
+   * phone that read the key off the QR code could otherwise say it was the laptop.
+   * It is a fresh 32-hex-digit key each launch, never shown or put in a URL.
+   */
+  displayKey: string | null;
 }
+
+/**
+ * The largest message the relay takes (PLAN 14m): it closes a socket that sends
+ * more (code 1009) rather than hold a stranger's megabytes. A patch with a few
+ * pictures in it is the largest thing a phone or the laptop sends, and is well
+ * under this; the sender drops anything over it rather than lose the link.
+ */
+export const MAX_FRAME_BYTES = 512 * 1024;
 
 /** The show key from this page's own URL (`?key=1234`), if it came with one. */
 export function showKeyFromUrl(): string | null {
@@ -258,10 +281,86 @@ export async function relayInfo(): Promise<RelayInfo | null> {
   try {
     const res = await fetch(REMOTE_INFO_PATH, { cache: 'no-store' });
     if (!res.ok || !(res.headers.get('content-type') ?? '').includes('json')) return null;
-    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[]; key?: string | null };
+    const body = (await res.json()) as { chromaglass?: unknown; port?: number; hosts?: string[]; key?: string | null; displayKey?: string | null };
     if (body?.chromaglass !== 'relay') return null;
-    return { port: body.port ?? (Number(window.location.port) || 3000), hosts: Array.isArray(body.hosts) ? body.hosts : [], key: body.key ?? null };
+    return {
+      port: body.port ?? (Number(window.location.port) || 3000),
+      hosts: Array.isArray(body.hosts) ? body.hosts : [],
+      key: body.key ?? null,
+      displayKey: body.displayKey ?? null,
+    };
   } catch {
     return null;
   }
 }
+
+export type ParsedRemoteGesture =
+  | { type: 'blow'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
+  | { type: 'drop'; x: number; y: number; layer: number; amount?: number; color?: string; wall?: boolean }
+  | { type: 'press'; x: number; y: number; layer: number; amount?: number; wall?: boolean }
+  | { type: 'finger'; x: number; y: number; layer: number; amount?: number; dx?: number; dy?: number; wall?: boolean }
+  | { type: 'spin'; x: number; y: number; layer: number; amount?: number; id?: number; wall?: boolean }
+  | { type: 'tilt'; x: number; y: number };
+
+/**
+ * Pure parser for incoming remote gestures and tilt.
+ *
+ * Drops malformed gestures (non-finite coordinates, invalid color strings)
+ * and clamps tilt to [-1, 1]. Returns null if the gesture is malformed or
+ * of an unknown gesture type.
+ */
+export function parseRemoteGesture(raw: unknown): ParsedRemoteGesture | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const msg = raw as Record<string, unknown>;
+  const type = msg.type;
+  if (typeof type !== 'string') return null;
+
+  if (type === 'tilt') {
+    if (typeof msg.x !== 'number' || !Number.isFinite(msg.x)) return null;
+    if (typeof msg.y !== 'number' || !Number.isFinite(msg.y)) return null;
+    return {
+      type: 'tilt',
+      x: Math.max(-1, Math.min(1, msg.x)),
+      y: Math.max(-1, Math.min(1, msg.y)),
+    };
+  }
+
+  if (type !== 'blow' && type !== 'drop' && type !== 'press' && type !== 'finger' && type !== 'spin') {
+    return null;
+  }
+
+  if (typeof msg.x !== 'number' || !Number.isFinite(msg.x)) return null;
+  if (typeof msg.y !== 'number' || !Number.isFinite(msg.y)) return null;
+
+  const layer = typeof msg.layer === 'number' && Number.isFinite(msg.layer) ? msg.layer : 0;
+  const amount = typeof msg.amount === 'number' && Number.isFinite(msg.amount) ? msg.amount : undefined;
+  const wall = msg.wall === true ? true : undefined;
+
+  switch (type) {
+    case 'blow': {
+      const dx = typeof msg.dx === 'number' && Number.isFinite(msg.dx) ? msg.dx : undefined;
+      const dy = typeof msg.dy === 'number' && Number.isFinite(msg.dy) ? msg.dy : undefined;
+      return { type: 'blow', x: msg.x, y: msg.y, layer, amount, dx, dy, wall };
+    }
+    case 'drop': {
+      if (msg.color !== undefined && (typeof msg.color !== 'string' || msg.color.length > 9)) {
+        return null;
+      }
+      const color = typeof msg.color === 'string' ? msg.color : undefined;
+      return { type: 'drop', x: msg.x, y: msg.y, layer, amount, color, wall };
+    }
+    case 'press': {
+      return { type: 'press', x: msg.x, y: msg.y, layer, amount, wall };
+    }
+    case 'finger': {
+      const dx = typeof msg.dx === 'number' && Number.isFinite(msg.dx) ? msg.dx : undefined;
+      const dy = typeof msg.dy === 'number' && Number.isFinite(msg.dy) ? msg.dy : undefined;
+      return { type: 'finger', x: msg.x, y: msg.y, layer, amount, dx, dy, wall };
+    }
+    case 'spin': {
+      const id = typeof msg.id === 'number' && Number.isInteger(msg.id) ? msg.id : undefined;
+      return { type: 'spin', x: msg.x, y: msg.y, layer, amount, id, wall };
+    }
+  }
+}
+

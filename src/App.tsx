@@ -6,11 +6,14 @@ import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { songShapeLine } from './lib/songShape';
+import { followLine } from './lib/followedPlace';
 import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
+import type { CartoonShelfProps } from './components/CartoonShelf';
+import { CARTOON_BY_ID } from './lib/cartoons';
 import { SETTINGS_SECTIONS, sectionSearchText, resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
@@ -23,7 +26,7 @@ import { useDeskLayouts } from './hooks/useDeskLayout';
 import { LAYOUT_OF_MODE } from './lib/deskLayout';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { luckyLook } from './lib/lucky';
-import { driftLook } from './lib/drift';
+import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
 import { PadPictureSender, setPadPictureSender } from './lib/padPicture';
 import { CommandPalette, type Command } from './components/desk/CommandPalette';
@@ -32,8 +35,8 @@ import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DronePa
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
-import { SettingRide } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw } from 'lucide-react';
+import { SettingRide, rideSlot } from './lib/ride';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
@@ -44,10 +47,11 @@ import { ToolAmount } from './components/ToolAmount';
 import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
 import { useRemoteLink } from './hooks/useRemoteLink';
-import { relayInfo, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
+import { relayInfo, parseRemoteGesture, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
 import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
 import type { CastState, CastMessage } from './lib/castProtocol';
 import type { RemoteMessage } from './lib/remoteProtocol';
+import { fitMarkForCast } from './lib/markFit';
 import { runBench, formatBench, readRenderer } from './lib/bench';
 import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
@@ -60,7 +64,9 @@ import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
 import { useSongShows } from './hooks/useSongShows';
-import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, type ActionSet, type SongAction, type SongShow } from './lib/songShows';
+import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, newId, type ActionSet, type ActionWhat, type ActionWhen, type SongAction, type SongShow } from './lib/songShows';
+import type { SongScoreProps } from './components/SongScore';
+import { songDuration } from './lib/songScore';
 import { MidiPanel } from './components/MidiPanel';
 import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
@@ -92,6 +98,9 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
+import { isFreeTierGated } from './lib/tierGates';
+import { syncServerLicense } from './lib/licenseKey';
+import { usePublishAccountShow } from './lib/accountShows';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
@@ -117,13 +126,19 @@ type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'dr
 
 const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 /**
- * Where the show listened last time.
+ * Where the show is listening, for as long as this tab lives.
  *
  * It used to open the microphone on load, every load, which meant a permission
- * prompt in front of the plate before anyone had asked for one. Now the choice
- * is remembered and nothing is opened on its own: the microphone comes back
- * only if the browser already says permission is granted (so no prompt
- * appears), and anything else waits for a click.
+ * prompt in front of the plate before anyone had asked for one. Then the choice
+ * was remembered in `localStorage` and came back with every launch, and a first
+ * visit's first click started the band on its own, so the Sound panel's Source
+ * opened on Mic or Band and not on Off (the owner, 2026-10-22: the source is
+ * None whenever the app opens). It is `sessionStorage` now: a new tab or a
+ * relaunched app opens on Off whatever look loads, and the pick still survives a
+ * reload of the tab, which a gig has to be able to do without losing the input.
+ * Nothing is opened on its own: the microphone comes back only if the browser
+ * already says permission is granted (so no prompt appears), and anything else
+ * waits for a click.
  */
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
@@ -133,31 +148,23 @@ const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'str
 };
 
 const DESK_MODE_KEY = 'chromaglass-desk-mode';
-/** Random Evolve's drift lands over four seconds in this many steps. */
-const DRIFT_GLIDE_STEPS = 20;
+/** How often Evolve listens and steps its glides (lib/slowEvolve.ts). */
+const DRIFT_STEP_MS = 500;
+/**
+ * How often a MIDI fader's moves are handed to React, for the desk's number
+ * (PLAN.md §14f). The plate does not wait for it: it reads the ride itself.
+ * The ear's own rate (useAudioAnalyzer's EAR_VIEW_MS), for the same reason.
+ */
+const RIDE_VIEW_MS = 100;
 const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 
 function rememberedSource(): AudioSource {
   try {
-    const raw = localStorage.getItem(AUDIO_SOURCE_KEY);
+    const raw = sessionStorage.getItem(AUDIO_SOURCE_KEY);
     // 'file' needs a file nobody has chosen yet, and 'system' opens a picker.
     if (raw === 'microphone' || raw === 'simulated') return raw;
   } catch { /* private */ }
   return 'none';
-}
-
-/**
- * Has anyone ever told this browser where to listen?
- *
- * Not the same question as `rememberedSource() === 'none'`, which is also the
- * answer for someone who turned the microphone off on purpose. This one
- * separates a first visit from a considered silence, and it is the difference
- * between a stranger's first five seconds being the thing the project is —
- * a plate moving to music — and being a plate sitting still while they look
- * for the button that makes it do something.
- */
-function everChoseSource(): boolean {
-  try { return localStorage.getItem(AUDIO_SOURCE_KEY) !== null; } catch { return true; }
 }
 
 /** True only if the browser will hand over the microphone without asking. */
@@ -275,8 +282,66 @@ interface ArmedLook {
   sequence?: string;
 }
 
+import AccountSheet from './components/AccountSheet';
+
+const hasAccountOrLicenseUI =
+  Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
+  import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' ||
+  (typeof window !== 'undefined' &&
+    (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
+      new URLSearchParams(window.location.search).get('tierGates') === '1'));
+
+const isUnsubscribeRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/unsubscribe\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
+
+const isProfileRoute = () =>
+  typeof window !== 'undefined' &&
+  (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname) ||
+    new URLSearchParams(window.location.search).has('profile') ||
+    new URLSearchParams(window.location.search).has('unsubscribe'));
+
 export default function App() {
   const [isActive, setIsActive] = useState(true);
+  const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
+
+  const openProfileSheet = useCallback(() => {
+    if (!hasAccountOrLicenseUI) return;
+    setShowAccount(true);
+    try {
+      if (!/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname)) {
+        window.history.pushState({ cgProfile: true }, '', `/profile${window.location.search}${window.location.hash}`);
+      }
+    } catch { /* ignore history errors in sandboxed frames */ }
+  }, []);
+
+  const closeProfileSheet = useCallback(() => {
+    setShowAccount(false);
+    try {
+      if (/^\/(profile|account|unsubscribe)\/?$/i.test(window.location.pathname)) {
+        const params = new URLSearchParams(window.location.search);
+        params.delete('profile');
+        params.delete('unsubscribe');
+        const qs = params.toString();
+        window.history.replaceState(null, '', `/${qs ? `?${qs}` : ''}${window.location.hash}`);
+      }
+    } catch { /* ignore history errors */ }
+  }, []);
+
+  const openAccount = hasAccountOrLicenseUI ? openProfileSheet : undefined;
+
+  useEffect(() => {
+    if (!hasAccountOrLicenseUI) return;
+    const onOpen = () => openProfileSheet();
+    const onPopState = () => setShowAccount(isProfileRoute());
+    window.addEventListener('cg-open-account', onOpen);
+    window.addEventListener('popstate', onPopState);
+    return () => {
+      window.removeEventListener('cg-open-account', onOpen);
+      window.removeEventListener('popstate', onPopState);
+    };
+  }, [openProfileSheet]);
 
   // The laptop driving the projector must not dim, sleep or screensave: what
   // it does, the wall does. Held while the plate is running and dropped the
@@ -426,8 +491,9 @@ export default function App() {
         // Called with nothing, it says what the settings are (npm run qa reads the camera's aim).
         return settingsRef.current;
       };
-    (window as unknown as { chromaglassGovernor?: unknown }).chromaglassGovernor =
-      () => (wallRef.current as unknown as { governor?: unknown })?.governor ?? null;
+    (window as unknown as { chromaglassGovernor?: () => unknown }).chromaglassGovernor =
+      () => wallRef.current?.governor?.() ?? null;
+    (window as unknown as { chromaglassSanitizePatch?: typeof sanitizePatch }).chromaglassSanitizePatch = sanitizePatch;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
       (tool: typeof activeTool) => { setActiveTool(tool); };
@@ -758,14 +824,19 @@ export default function App() {
         `afterEscape=1`, same run, same sequence.
 
         One list, every panel, so Esc means the same thing everywhere.
+        The Stage sheet (⌘,) came with Desk v2 and was left off it, so only
+        its own listener closed it, and that one could miss the key
+        (hooks/useEscape.ts, `npm run layout`'s "the Stage sheet never closed").
       */
       setShowSettings(false);
+      setShowStage(false);
       setShowHelp(false);
       setShowTrackPanel(false);
       setShowMidi(false);
       setShowSequencer(false);
       setShowSave(false);
       setShowPalette(false);
+      setShowAccount(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -855,36 +926,47 @@ export default function App() {
 
   const videoInputRef = useRef<HTMLInputElement>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
-  const videoFrameRaf = useRef<number | null>(null);
-
+  /** A poured file's object URL, revoked when the pour moves on. */
+  const pourUrlRef = useRef<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  /** The shelf's cartoon pouring as dye (lib/cartoons.ts), or null for a file or nothing. */
+  const [pouringCartoon, setPouringCartoon] = useState<string | null>(null);
+  /*
+    The video pour: one hidden, muted, looping <video>, handed to the plate
+    once when it starts playing. It used to be handed over again on every
+    animation frame, which made the plate pause and play it every frame
+    (PLAN 14ab-1, fixed in `pourVideo`); the plate's own frame loop reads the
+    picture, so once is enough. A cartoon is given by address, so it pours
+    while it is still arriving; a file by an object URL.
+  */
+  const pourVideoFrom = useCallback((src: string, objectUrl: boolean) => {
+    const v = videoPlayerRef.current;
+    if (!v) return;
+    if (pourUrlRef.current) URL.revokeObjectURL(pourUrlRef.current);
+    pourUrlRef.current = objectUrl ? src : null;
+    v.onplay = () => { setIsVideoPlaying(true); visualizerRef.current?.pourVideo(v); };
+    v.onpause = () => setIsVideoPlaying(false);
+    v.onended = () => setIsVideoPlaying(false);
+    v.src = src;
+    v.play().catch(() => { /* autoplay policy: plays on the next gesture */ });
+  }, []);
+  const stopPour = useCallback(() => {
+    visualizerRef.current?.stopPourVideo();
+    const v = videoPlayerRef.current;
+    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+    if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
+    setIsVideoPlaying(false);
+    setPouringCartoon(null);
+  }, []);
+  const pourFile = useCallback((file: File) => {
+    pourVideoFrom(URL.createObjectURL(file), true);
+    setPouringCartoon(null);
+  }, [pourVideoFrom]);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !videoPlayerRef.current) return;
-    videoPlayerRef.current.src = URL.createObjectURL(file);
-    videoPlayerRef.current.play();
-    setIsVideoPlaying(true);
-    
-    const loop = (time: number) => {
-      if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
-        visualizerRef.current?.pourVideo(videoPlayerRef.current);
-        videoFrameRaf.current = requestAnimationFrame(loop);
-      } else {
-        setIsVideoPlaying(false);
-      }
-    };
-    
-    videoPlayerRef.current.onplay = () => {
-      setIsVideoPlaying(true);
-      if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
-      loop(performance.now());
-    };
-
-    videoPlayerRef.current.onpause = () => setIsVideoPlaying(false);
-    videoPlayerRef.current.onended = () => setIsVideoPlaying(false);
-
+    if (file) pourFile(file);
     e.target.value = '';
-  }, []);
+  }, [pourFile]);
 
   const userPresetsRef = useRef<UserPreset[]>([]);
 
@@ -921,7 +1003,7 @@ export default function App() {
     stopDrone();
 
     setAudioSource(source);
-    try { localStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
+    try { sessionStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
     if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
     if (source === 'none') return;
     if (source === 'file') {
@@ -1164,22 +1246,22 @@ export default function App() {
   // The browser will not run audio before a gesture, so a restored band stays
   // silent until the first click anywhere. One listener, then gone.
   //
-  // The same gesture starts the band for anyone who has never chosen a source
-  // at all. A first visit used to land on a plate with nothing driving it:
-  // the fluid moved, but the thing the project *is* — a light show played by
-  // the music — needed the visitor to find a button first. The band is
-  // synthesised, silent and opens no device, so it needs no permission and
-  // asks for nothing; it is the demo this app already had and never showed
-  // anybody. It is written to storage like any other choice, so this happens
-  // once per browser and the microphone is still one click away.
+  // That gesture used to start the band for anyone who had never chosen a
+  // source, so a stranger's first five seconds were a plate moving to music.
+  // The owner asked for the opposite (2026-10-22): the Source is None whenever
+  // the app opens, and a click anywhere does not choose it. The band is still
+  // one press away in the Sound panel and on the phone's Sound tab.
   useEffect(() => {
+    let kiosk = false;
+    try { kiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'; } catch { /* no query to read */ }
     const wake = () => {
       void simulatedRef.current?.resume();
-      // After the click has been handled: if the visitor's first gesture was
-      // the Mic button, that choice is already recorded and this does nothing.
-      setTimeout(() => {
-        if (audioSourceRef.current === 'none' && !everChoseSource()) void handleSourceChange('simulated');
-      }, 0);
+      // `?kiosk=1`, below, is the one open that picks a source for itself.
+      if (kiosk) {
+        setTimeout(() => {
+          if (audioSourceRef.current === 'none') void handleSourceChange('simulated');
+        }, 0);
+      }
     };
     window.addEventListener('pointerdown', wake, { once: true });
     window.addEventListener('keydown', wake, { once: true });
@@ -1197,8 +1279,6 @@ export default function App() {
       visit than a silent one, and on a normal browser the context would
       refuse anyway and the click handler above would still be waiting.
     */
-    let kiosk = false;
-    try { kiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'; } catch { /* no query to read */ }
     if (kiosk) wake();
     return () => {
       window.removeEventListener('pointerdown', wake);
@@ -1289,9 +1369,12 @@ export default function App() {
   }, []);
   startBenchRef.current = startBench;
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
+  /** The shelf's cartoon playing as the film; read only while the film is a file (a camera or window replaces it). */
+  const [filmCartoon, setFilmCartoon] = useState<string | null>(null);
   const loadFilm = async (file: File) => {
     await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
+    setFilmCartoon(null);
   };
   const startFilmCamera = async () => {
     try {
@@ -1330,6 +1413,28 @@ export default function App() {
   const clearFilm = () => {
     wallRef.current?.clearFilm();
     setFilmSource('none');
+    setFilmCartoon(null);
+  };
+  const filmCartoonNow = async (id: string) => {
+    const c = CARTOON_BY_ID.get(id);
+    if (!c) return;
+    await wallRef.current?.loadFilmUrl(c.src);
+    setFilmSource('file');
+    setFilmCartoon(id);
+  };
+  /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
+  const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
+  const cartoons: CartoonShelfProps = {
+    pouring: pouringCartoon,
+    filming: filmingCartoon,
+    onPour: (id) => {
+      const c = CARTOON_BY_ID.get(id);
+      if (!c) return;
+      pourVideoFrom(c.src, false);
+      setPouringCartoon(id);
+    },
+    onFilm: (id) => { if (filmingCartoon === id) clearFilm(); else void filmCartoonNow(id); },
+    onStopPour: stopPour,
   };
   // ── The room ────────────────────────────────────────────────────
   // The camera as a sensor: it stirs the plate, puts hands on it and rides
@@ -1472,6 +1577,7 @@ export default function App() {
   }, [settings, pinnedPresetId, userPresets.presets]);
   /** Network displays connected through the relay, and where they can reach it. */
   const [mirrorCount, setMirrorCount] = useState(0);
+  const [phoneCount, setPhoneCount] = useState(0);
   const [relay, setRelay] = useState<RelayInfo | null>(null);
   useEffect(() => { if (castMenu) void relayInfo().then(setRelay); }, [castMenu]);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
@@ -1483,12 +1589,21 @@ export default function App() {
     });
   }, []);
 
-  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings);
+  const musicIntel = useMusicIntelligence(audioStream, liveAudio, musicSettings, settings, ear.onReading);
   /*
     Performances, started and stopped by hand: T on either desk, the
     Performance dot in the desk header, or the Track panel. The note after a
     stop says what was kept, for four seconds.
   */
+  // Under ?debug, tag the song playing by name, as the desk's track panel
+  // does by hand: the phone has no track panel, and `npm run followview`
+  // checks what the phone says about a followed song.
+  const manualTagRef = useRef(musicIntel.manualTag);
+  manualTagRef.current = musicIntel.manualTag;
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { __tagSong?: (artist: string, title: string) => void }).__tagSong = (artist, title) => manualTagRef.current(artist, title);
+  }, []);
   const perfLive = !!musicIntel.performance.live;
   const { startPerformance, stopPerformance } = musicIntel;
   const togglePerformance = useCallback(() => {
@@ -1596,7 +1711,61 @@ export default function App() {
   */
   const driftAnchor = useRef(settings);
   /** The drift's moves in flight: each dial from where it was to where it is going, and how far along. */
-  const driftGlide = useRef(new Map<string, { from: number; to: number; at: number }>());
+  const driftGlide = useRef(new Map<string, { from: number; to: number; at: number; seconds: number }>());
+  /** Evolve's planner: when the next move starts, which dials, which way (lib/slowEvolve.ts). */
+  const slowEvolveRef = useRef<SlowEvolve | null>(null);
+  /** The look's own Evolve Speed: the dial's pace is measured from it (lib/slowEvolve.ts evolvePace). */
+  const lookPaceRef = useRef(0.12);
+  /*
+    A look laid, opened, faded to or taken back: Evolve lets go of the move it
+    is making. A glide lasts up to a minute and a half at the default Evolve
+    Speed (minutes low on the dial), and each half
+    second it writes its dials from where they were on the old look to where
+    they were going on it, so a move left running dragged two or three dials
+    of the new look back toward the old one for the rest of its length (found
+    in review). The planner starts again too, so its first move on the new
+    look comes after a short rest rather than wherever the old rest was.
+  */
+  const evolveLetsGo = () => { driftGlide.current.clear(); slowEvolveRef.current = null; };
+
+  /*
+    A MIDI fader's ride (lib/ride.ts): `rideSetting` below says how it reaches
+    the plate and React. Declared here because the other ways into the
+    settings hand React the ride first (`flushRide`). React hears a ride
+    every RIDE_VIEW_MS, so a preset, a Go or a desk slider landing in that
+    tenth of a second would otherwise be written over by the fader's older
+    move when it flushed; flushed first, the newer write lands last and wins,
+    and the ride sees it as somebody else's and lets go, as it always has.
+  */
+  const ride = useRef(new SettingRide()).current;
+  const rideFlush = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /*
+    The ride's schedule: when React was last handed it, stepped by
+    RIDE_VIEW_MS the way the ear steps its own (useAudioAnalyzer's
+    publishedAtRef). Timed from each flush instead, every late timer and
+    every wait for the next message was added to the period: on the Mac's
+    phone page, drawing 20 frames a second, the desk showed a fader 7.0 to
+    7.3 times a second (`npm run renders`). Never more than one step behind
+    now, so a stall does not buy a burst after it.
+  */
+  const rideMark = useRef(-Infinity);
+  const flushRide = () => {
+    if (rideFlush.current) { clearTimeout(rideFlush.current); rideFlush.current = null; }
+    const patch = ride.drain();
+    if (!patch) return;
+    const now = performance.now();
+    rideMark.current = Number.isFinite(rideMark.current) ? Math.max(rideMark.current + RIDE_VIEW_MS, now - RIDE_VIEW_MS) : now;
+    // Where Evolve's drift wanders from: a ride is a hand's write (PLAN.md 14t).
+    driftAnchor.current = { ...driftAnchor.current, ...patch };
+    setSettings(prev => ({ ...prev, ...patch }));
+    /*
+      Here and not on every message: setting a state to what it already is
+      is not always free, and per message it rendered the App another ten
+      times a second while the fader moved (`npm run renders`, 20 a second
+      for the desk's 9 before, the fader's lines).
+    */
+    setDocDirty(true);
+  };
 
   /*
     The Mixer's take buttons (lib/mixFade.ts), declared here because both of
@@ -1633,6 +1802,7 @@ export default function App() {
   const updateSettings = (patch: Partial<VisualizerSettings>) => {
     const clean = sanitizePatch(patch);
     if (Object.keys(clean).length === 0) return;
+    flushRide();
     /*
       Hold stays where the closeup is (QA-12, reported by the owner as the
       picture jumping when Hold was pressed): see holdWhereItIs. Here rather
@@ -1664,7 +1834,9 @@ export default function App() {
   const removeLayer = backLook ? undefined : () => updateSettings({ layerCount: 1 });
 
   const applyPreset = (presetId: string, presetSettings: Partial<VisualizerSettings>) => {
+    flushRide();
     lookTakesLevels();
+    evolveLetsGo();
     // The whole look, whatever was playing before it: see LOOK_BASE. The room
     // (the microphone's calibration, the dimmer, the logo, the grid) stays.
     setSettings(prev => {
@@ -1687,7 +1859,9 @@ export default function App() {
     // A saved look is a look like any other. Anything added to the app since it
     // was saved comes from the base rather than from whatever was playing,
     // and like any other it stops a take on the gel and the lumia.
+    flushRide();
     lookTakesLevels();
+    evolveLetsGo();
     setSettings(prev => targetLook(prev, p.settings));
     setPinnedPresetId(p.id);
     // Your own look, opened: the save sheet's Replace, and the look menu's
@@ -1872,7 +2046,6 @@ export default function App() {
   // slider, so the phone and the panel show the glide as it happens.
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
-  const aimTick = useRef(0);
   /*
     A hand on the closeup camera (Alt-drag or Alt-click on the plate): it goes
     where it is aimed. Taken off Auto, since a camera that roams on its own
@@ -1885,63 +2058,79 @@ export default function App() {
   }, []);
 
   /*
-    Evolve, as a wander rather than a jump (lib/drift.ts).
+    Evolve, as slow moves rather than twitches (lib/slowEvolve.ts, lib/drift.ts).
 
     "Random Evolve" meant two unrelated things and nothing in between: the
     automation that drops dye and blows air, and a whole new look rolled at a
-    song boundary — fifty-five settings replaced at once, which is a cut. So a
-    look either sat perfectly still in its settings or went somewhere else
-    entirely.
+    song boundary, which is a cut. The middle was two dials nudged every six
+    seconds, each over four: ten moves a minute that the owner saw as Evolve
+    "directly reacting to frequency and bouncing around".
 
-    This is the middle. Every few seconds two dials move a little, held inside
-    a window either side of where the look sat when evolving started, so an
-    hour of it wanders the mood without arriving anywhere the look was not.
-    The anchor is re-taken whenever a look is laid down, because from then on
-    *that* is the look being wandered around.
+    Now it is one move at a time: a few related dials going the same way
+    together, glided over 30 to 90 seconds at the default Evolve Speed (the
+    dial stretches that up to four times or shrinks it to an eighth:
+    evolvePace), steered by the song's sections and
+    its level over the last half minute, or by a slow clock with nothing
+    playing. Each dial stays inside a window round where the look sat when
+    evolving started; the anchor is re-taken whenever a look is laid down,
+    because from then on *that* is the look being wandered around.
+
+    Stepped every half second, on the show's clock so a render plans the same
+    moves as the show. A glide writes the settings twice a second, not five
+    times: a dial moving a fifth of its travel over a minute moves a third of
+    a percent in half a second, which nobody can see as a step, and every
+    write re-renders the app. At the top of the dial a glide is 4 to 11 s and
+    a dial may move a couple of percent of its travel a write; whether that
+    reads as steps is PLAN 10-8d-2, for the owner's eye.
   */
   useEffect(() => {
     if (!isAutomated || !isActive) {
       // Switched off, or the show is paused: the next spell of evolving starts
-      // from wherever the plate is now, not from where the last one began.
+      // from wherever the plate is now, not from where the last one began,
+      // and its first move comes in seconds rather than after a stale rest.
       driftAnchor.current = settingsRef.current;
+      slowEvolveRef.current = null;
       return;
     }
-    /*
-      Glided, not stepped. Each drift used to land in one frame, so a ride on
-      the desk visibly jumped every six seconds and the plate lurched with
-      it. The move is now spread over four seconds in small steps; a dial a
-      hand takes in the meantime is dropped from the glide (updateSettings),
-      and the hand wins.
-    */
+    const STEP_S = DRIFT_STEP_MS / 1000;
     const id = showInterval(() => {
-      const rate = settingsRef.current.automateRate ?? 0.12;
-      const patch = driftLook(settingsRef.current, driftAnchor.current, rate) as Record<string, number>;
-      for (const [k, to] of Object.entries(patch)) {
-        const from = (settingsRef.current as unknown as Record<string, number>)[k];
-        if (typeof from === 'number' && Number.isFinite(to)) driftGlide.current.set(k, { from, to, at: 0 });
-      }
-      /*
-        The closeup camera is Evolve's to move too, when it is zoomed in and
-        held or following: every other drift the aim glides a short way, so
-        the camera wanders the plate slowly instead of sitting on one spot
-        for the whole song. Auto moves itself; a hand on the aim takes it
-        (updateSettings drops a dial a hand touches from the glide).
-      */
       const cur = settingsRef.current;
-      aimTick.current = (aimTick.current + 1) % 2;
-      if (aimTick.current === 0 && (cur.macroZoom ?? 1) > 1.05 && (cur.macroCamera ?? 'hold') !== 'auto') {
-        // The aim's wander is Evolve's, so it draws from Evolve's stream.
-        const wander = (v: number) => Math.min(0.85, Math.max(0.15, v + stream('show.drift').centred() * 0.24));
-        const ax = cur.macroAimX ?? 0.5, ay = cur.macroAimY ?? 0.5;
-        driftGlide.current.set('macroAimX', { from: ax, to: wander(ax), at: 0 });
-        driftGlide.current.set('macroAimY', { from: ay, to: wander(ay), at: 0 });
+      /*
+        What it hears: the song shape tracker on the wall's engine (the show,
+        not Preview's copy), which is already slow, and the tempo the bar grid
+        has found. Nothing per frame: the treble and the energy of a moment
+        are exactly the bounce this is here to remove.
+      */
+      const heard = (wallRef.current ?? visualizerRef.current)?.songShape();
+      const bar = heard?.bar;
+      const ear: EvolveEar = {
+        playing: !!heard && heard.now.section !== 'quiet',
+        section: heard?.now.section ?? 'quiet',
+        intensity: heard?.now.intensity ?? 0,
+        tension: heard?.now.tension ?? 0,
+        lastDrop: heard?.now.lastDrop ?? null,
+        time: heard?.now.time ?? 0,
+        bpm: bar && bar.period > 0 && bar.beatConfidence >= 0.5 ? 60 / bar.period : 0,
+      };
+      const out = (slowEvolveRef.current ??= new SlowEvolve()).step(STEP_S, ear, cur, driftAnchor.current, cur.automateRate ?? 0.12,
+        lookPaceRef.current);
+      if (out.palette) for (const v of bothEngines()) v.evolvePalette();
+      if (out.move) {
+        const { to, seconds, aim } = out.move;
+        const all: Record<string, number> = { ...to, ...(aim ? { macroAimX: aim.x, macroAimY: aim.y } : {}) };
+        const live = cur as unknown as Record<string, number>;
+        for (const [k, v] of Object.entries(all)) {
+          // A fader whose move React has not rendered yet is a hand on that
+          // dial now; the move would glide it from a value it has already left.
+          if (ride.holds(k) && ride.read(k, live) !== live[k]) continue;
+          const from = live[k] ?? (k.startsWith('macroAim') ? 0.5 : undefined);
+          if (typeof from === 'number' && Number.isFinite(v)) driftGlide.current.set(k, { from, to: v, at: 0, seconds });
+        }
       }
-    }, 6000, 'drift');
-    const glide = showInterval(() => {
       if (driftGlide.current.size === 0) return;
       const step: Record<string, number> = {};
       for (const [k, g] of driftGlide.current) {
-        g.at = Math.min(1, g.at + 1 / DRIFT_GLIDE_STEPS);
+        g.at = Math.min(1, g.at + STEP_S / g.seconds);
         const e = g.at * g.at * (3 - 2 * g.at);
         step[k] = g.from + (g.to - g.from) * e;
         if (g.at >= 1) driftGlide.current.delete(k);
@@ -1949,8 +2138,8 @@ export default function App() {
       // Not through updateSettings: that is a hand, and re-anchors.
       setSettings(prev => ({ ...prev, ...step }));
       setDocDirty(true);
-    }, 4000 / DRIFT_GLIDE_STEPS, 'drift-glide');
-    return () => { clearShowInterval(id); clearShowInterval(glide); driftGlide.current.clear(); };
+    }, DRIFT_STEP_MS, 'drift');
+    return () => { clearShowInterval(id); driftGlide.current.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAutomated, isActive]);
 
@@ -1990,6 +2179,8 @@ export default function App() {
   const lookPhase = (s: Partial<VisualizerSettings>) => ({ phaseAmount: s.phaseAmount ?? 0, phaseScale: s.phaseScale ?? DEFAULT_SETTINGS.phaseScale });
   const ferrofluidPoured = () => {
     if ((settingsRef.current.phaseAmount ?? 0) > 0.002) return;
+    // A fading look has the amount at nothing at the ring's swap on purpose (lib/lookFade's ringDip).
+    if (lookFadeRef.current) return;
     updateSettings({ phaseAmount: 0.6 });
   };
 
@@ -2035,52 +2226,61 @@ export default function App() {
     const s = settingsRef.current;
     const patch: Partial<VisualizerSettings> = {};
     if ((s.magnetStrength ?? 0) <= 0) patch.magnetStrength = 0.8;
-    if (ferrofluid && (s.phaseAmount ?? 0) <= 0.002) patch.phaseAmount = 0.6;
+    // Not while a look is fading: the fade takes the amount to nothing at the ring's swap
+    // (lib/lookFade's ringDip), and this would read that as "turned down" and write 0.6 over it.
+    if (ferrofluid && (s.phaseAmount ?? 0) <= 0.002 && !lookFadeRef.current) patch.phaseAmount = 0.6;
     if (Object.keys(patch).length) updateSettings(patch);
   };
 
   /*
-    A hand on a hardware fader, answered at once and rendered once a frame.
+    A hand on a hardware fader: answered at once, drawn on the next frame, and
+    shown on the desk ten times a second.
 
     See `lib/ride.ts` for why this is not just `setSettings`. `observe` runs
     here, in the render body beside `settingsRef`, because what it needs to
     know is what React actually rendered — that is how the ride tells its own
     late writes from a preset moving the same setting underneath it.
 
-    A frame rather than a timer, so the rate matches the one thing that can
-    show the value. PLAN 14f wants the split instead (the plate reading the
-    ride itself, the desk told ten times a second), and #348 tried it on a
-    100 ms timer with the plate overlaying the ride's values every frame. It
-    went back to this because the overlay never stopped once a fader had been
-    touched, the shadow outliving the flush by design: measured, one move and
-    a render later, 3600 frames of the next 3600 still copied the whole
-    settings object, and the fader's last value sat over the identified
-    track's override of the same key (the plate read 0.6 with the track
-    asking 0.9). 14f says what a split that holds needs. Until then a move
-    reaches the plate on the frame after React renders it, and nothing runs
-    while no fader moves.
+    It used to hand React every move once a frame, so the whole App (the
+    desks, the panels, the plate's component) rendered sixty times a second
+    while a fader moved, which on a weaker laptop is dropped frames in the
+    middle of the move the fader is there to make smooth (PLAN.md §14f). It
+    is the split the ear has had since #211: the plate reads the ride itself
+    at the top of each frame (`ridePlate` below, `lay` in lib/ride.ts), and
+    React, which now only has the number on the desk to show, is told every
+    RIDE_VIEW_MS. A timer, not a frame: a backgrounded tab's timers slow to
+    one a second, which is fine, because the plate reads the ride and not
+    React, and the desk is not being looked at.
 
-    The cost is that a backgrounded tab stops flushing, which is fine: a
-    backgrounded tab has stopped drawing the plate too, so there is no show
-    to be riding, and a pending move lands on the frame after it comes
-    back.
+    A ride is a hand's write (PLAN.md 14t), so Evolve's drift treats it as
+    one, the way `updateSettings` does: a glide in flight on the same dial is
+    dropped at once, and where the drift wanders from moves to where the
+    fader put it. Before, the drift's glide wrote over the fader every tick of
+    a four-second move, and since the ride takes a value it did not send as
+    somebody else's edit, the fader lost its pickup and had to find it again;
+    and the next drift pulled the dial back into the window round the look as
+    laid.
   */
-  const ride = useRef(new SettingRide()).current;
   ride.observe(settings as unknown as Record<string, unknown>);
-  const rideFrame = useRef(0);
+  /** Tells the cast's throttle a ride moved (`castNudge` below): a receiver hears it at the cast's own rate. */
+  const castNudgeRef = useRef<() => void>(() => {});
   const rideSetting = useCallback((key: keyof VisualizerSettings, value: number) => {
-    ride.write(String(key), value);
-    setDocDirty(true);
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+    const clean = sanitizePatch({ [key]: value });
+    if (!Object.prototype.hasOwnProperty.call(clean, key)) return;
+    const sanitizedVal = clean[key] as number;
+    const k = String(key);
+    ride.write(k, sanitizedVal);
+    driftGlide.current.delete(k);
     laterWrites.mark([String(key)], showNow());
     if (rowFades.handOn([String(key)])) setRowFading(rowFades.running());
-    if (rideFrame.current) return;
-    rideFrame.current = requestAnimationFrame(() => {
-      rideFrame.current = 0;
-      const patch = ride.drain();
-      if (patch) setSettings(prev => ({ ...prev, ...patch }));
-    });
+    castNudgeRef.current();
+    if (rideFlush.current) return;
+    const wait = Math.max(0, rideMark.current + RIDE_VIEW_MS - performance.now());
+    rideFlush.current = setTimeout(() => { rideFlush.current = null; flushRide(); }, wait);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ride]);
-  useEffect(() => () => { if (rideFrame.current) cancelAnimationFrame(rideFrame.current); }, []);
+  useEffect(() => () => { if (rideFlush.current) clearTimeout(rideFlush.current); }, []);
 
   // ── Cue and Go ────────────────────────────────────────────────────
   //
@@ -2261,6 +2461,34 @@ export default function App() {
   const [wallLook, setWallLook] = useState<WallLook | null>(null);
   const wallLookRef = useRef(wallLook);
   wallLookRef.current = wallLook;
+  /*
+    The plate's read of the ride, at the top of each of its frames (PLAN.md
+    §14f; `lay` in lib/ride.ts). One for each engine, because each draws its
+    own settings:
+
+    - Neither takes a key the identified track overrides. The fader moves
+      the look's setting, and the track's value is what is drawn for that
+      key (`effectiveSettings`); laid over it, the ride would undo the track.
+    - Nor the plate count. It is a structure, not a level, the stage can hold
+      more plates than the look asks for (`stageLayers`), and it is the one
+      setting the plate's component acts on through React rather than reading
+      on its frame. It reaches the plate when React renders it.
+    - While the desk builds on a copy (Preview), the wall takes only the
+      room's keys from the desk, as `wallSettings` does: the rest of what the
+      desk rides is the copy's, not the show's.
+  */
+  const overridesRef = useRef(musicIntel.overrides);
+  overridesRef.current = musicIntel.overrides;
+  const ridePlate = useMemo(() => {
+    const deskTakes = (k: string) => k !== 'layerCount' && !(overridesRef.current && k in overridesRef.current);
+    const wallTakes = (k: string) => deskTakes(k) && (!wallLookRef.current || RIG_KEYS.has(k as keyof VisualizerSettings));
+    const deskSlot = rideSlot(), wallSlot = rideSlot();
+    type Live = Record<string, unknown>;
+    return {
+      desk: (base: VisualizerSettings) => ride.lay(base as unknown as Live, deskTakes, deskSlot) as unknown as VisualizerSettings,
+      wall: (base: VisualizerSettings) => ride.lay(base as unknown as Live, wallTakes, wallSlot) as unknown as VisualizerSettings,
+    };
+  }, [ride]);
   const drafting = draftWanted && wallLook !== null;
   /*
     The wall's engine and a receiver follow `wallLook` for as long as it is
@@ -2363,7 +2591,8 @@ export default function App() {
     if (wallFadeRef.current) clearShowInterval(wallFadeRef.current);
     const started = showNow();
     const ms = Math.max(1, fadeSeconds) * 1000;
-    const step = lookFadeStep(false);
+    // The handoff above swaps the ring in one frame, so the fade dips its amount there (lib/lookFade's ringDip).
+    const step = lookFadeStep(false, true);
     wallFadeRef.current = showInterval(() => {
       const t = Math.min(1, (showNow() - started) / ms);
       setWallLook(prev => prev && { ...prev, settings: step(from, to, t, prev.settings), target: t >= 1 ? null : prev.target });
@@ -2442,6 +2671,7 @@ export default function App() {
       : pinnedPresetId ? allPresets.find(p => p.id === pinnedPresetId)?.settings : undefined;
     return lookOf(own ?? {});
   }, [docId, userPresets.presets, pinnedPresetId, allPresets]);
+  lookPaceRef.current = typeof lookValues.automateRate === 'number' ? lookValues.automateRate : 0.12;
   const lookValueOf = useCallback((key: keyof VisualizerSettings): number | undefined => {
     const v = lookValues[key];
     return typeof v === 'number' ? v : undefined;
@@ -2595,11 +2825,18 @@ export default function App() {
     What a hand wrote after the Back began is left where the hand put it,
     and so is whatever `hold` names (the dimmer, while a blackout is on).
   */
-  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = []) => {
+  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = [], swapsRing = false) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     lookTakesLevels();
-    const from = settingsRef.current;
-    const step = lookFadeStep(back);
+    flushRide();
+    evolveLetsGo();
+    // From where a fader has the plate now, not where React last heard it.
+    const from = ride.lay(settingsRef.current as unknown as Record<string, unknown>, () => true, rideSlot()) as unknown as VisualizerSettings;
+    // `swapsRing`: the caller ran the visualizer's handoff, which swaps the
+    // ferrofluid ring in one frame at the middle; the amount dips to nothing there (lib/lookFade's ringDip).
+    // The handoff never runs shorter than a second, so a fade under a second would dip and come
+    // back before the swap and then swap the ring at full strength: it keeps its straight line.
+    const step = lookFadeStep(back, swapsRing && seconds >= 1);
     if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
     const started = showNow();
     const ms = seconds * 1000;
@@ -2642,7 +2879,7 @@ export default function App() {
     // evaporate for minutes under the new ones. A cut still gets a second.
     const target = targetLook(from, next.settings);
     visualizerRef.current?.handoff(Math.max(1, seconds), lookPhase(target));
-    fadeSettingsTo(target, seconds);
+    fadeSettingsTo(target, seconds, false, [], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
 
@@ -2718,6 +2955,7 @@ export default function App() {
     const prev = previousLook.current;
     if (!prev) return;
     previousLook.current = null;
+    evolveLetsGo();
     if (prev.id) adoptPreset(prev.id);
     visualizerRef.current?.handoff(Math.max(1, fadeSeconds), lookPhase(prev.settings));
     // A take still walking stops where it is: the Back puts every row's level
@@ -2727,7 +2965,7 @@ export default function App() {
     if (rowFades.handOn(FADE_LEVEL_KEYS)) setRowFading(rowFades.running());
     // A blackout on stays on: a Back that faded the dimmer up would light the
     // wall with the Blackout button still lit.
-    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : []);
+    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : [], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
@@ -2999,9 +3237,23 @@ export default function App() {
   };
 
   // ── A new song, a new look ──────────────────────────────────────
-  // Heard as a gap between tracks, or named by track identification. The
-  // sequencer owns the evolution while it runs, so it is left alone then.
-  const songChange = useSongChange(audioData, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
+  // Heard as a gap between tracks, or named by track identification, on the
+  // ear's own clock and landed on a beat (PLAN 14z). The sequencer owns the
+  // evolution while it runs, so it is left alone then.
+  const songChange = useSongChange(ear.onReading, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
+  /*
+    How long the new song's look takes to come in, by how the song came.
+
+    After a gap the new song starts clean and the change lands on one of its
+    first beats, so it comes in quickly: a second, short enough to read as the
+    show answering the song and long enough not to read as a cut. Named by
+    identification, the new song has been playing for several seconds already
+    (a crossfade, or a gapless join; `npm run songends` measures 6 to 17 s at the
+    median), so the look blends in under it instead: twice the desk's fade,
+    and never under four seconds. Both were a fixed desk fade at whatever
+    moment the gap rule happened to fire.
+  */
+  const songFadeSeconds = (reason: 'gap' | 'track') => reason === 'gap' ? 1 : Math.max(4, fadeSeconds * 2);
   const lastSongChangeSeq = useRef(0);
   useEffect(() => {
     if (!songChange || songChange.seq === lastSongChangeSeq.current) return;
@@ -3042,7 +3294,7 @@ export default function App() {
       setPinnedPresetId(null);
       // The song boundary's own stream, not Lucky's default: a Lucky press
       // between songs must not decide which look the next song brings.
-      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), fadeSeconds);
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), songFadeSeconds(songChange.reason));
       return;
     }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
@@ -3053,7 +3305,7 @@ export default function App() {
     if (!next) return;
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);
-    fadeSettingsTo(evolvedLook(from, next.settings), fadeSeconds);
+    fadeSettingsTo(evolvedLook(from, next.settings), songFadeSeconds(songChange.reason));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songChange?.seq]);
 
@@ -3091,6 +3343,14 @@ export default function App() {
    * rather than only in the visualizer for that reason.
    */
   const markUrlRef = useRef<string | null>(null);
+  /*
+    The same mark as it crosses the show server to a network display: the
+    original when it fits a relay frame, else a smaller copy (PLAN 14m-mark,
+    `lib/markFit.ts`). The relay closes a socket on a frame over 512 KB, and a
+    print-sized logo is several megabytes, so before this a big logo never
+    reached the network display at all.
+  */
+  const markRelayUrlRef = useRef<string | null>(null);
   const [markLoaded, setMarkLoaded] = useState(false);
   /*
     The state, at most fifteen times a second.
@@ -3144,7 +3404,15 @@ export default function App() {
   const castSentCountRef = useRef(0);
   const sendCastState = useCallback((withMark = false) => {
     if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
-    const state = castStateRef.current;
+    /*
+      With a fader's moves React has not rendered yet (PLAN.md §14f): React
+      hears a ride ten times a second, and a receiver that drew only that
+      would take a ride to black as the staircase CAST_STATE_MS is there to
+      prevent. The wall's view of the ride, since a receiver draws the wall.
+    */
+    const told = castStateRef.current;
+    const laid = ridePlate.wall(told.settings);
+    const state = laid === told.settings ? told : { ...told, settings: laid };
     const send = castSendRef.current;
     castSentAtRef.current = performance.now();
     castSentTriggersRef.current = castTriggers(state);
@@ -3161,12 +3429,27 @@ export default function App() {
     if (withMark) send({ type: 'mark', dataUrl: markUrlRef.current });
     if (mirrorCountRef.current > 0) {
       relaySendRef.current?.({ type: 'cast', message: { type: 'state', state } });
-      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
+      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
     }
   }, []);
   useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
 
+  const [, setLicenseTick] = useState(0);
+  useEffect(() => {
+    const onLicense = () => setLicenseTick((n) => n + 1);
+    window.addEventListener('cg-license-changed', onLicense);
+    void syncServerLicense();
+    return () => window.removeEventListener('cg-license-changed', onLicense);
+  }, []);
+
   const loadMark = useCallback((file: File) => {
+    const effectiveFile = isFreeTierGated()
+      ? new File(
+          [`<svg xmlns="http://www.w3.org/2000/svg" width="420" height="80" viewBox="0 0 420 80"><text x="210" y="52" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="38" font-weight="600" letter-spacing="2">ChromaGlass</text></svg>`],
+          'chromaglass-mark.svg',
+          { type: 'image/svg+xml' },
+        )
+      : file;
     const reader = new FileReader();
     reader.onload = () => {
       const url = String(reader.result ?? '');
@@ -3174,25 +3457,38 @@ export default function App() {
       img.onload = () => {
         for (const v of bothEngines()) v.loadMark?.(img, img.naturalWidth, img.naturalHeight);
         markUrlRef.current = url;
+        markRelayUrlRef.current = fitMarkForCast(img, url);
         setMarkLoaded(true);
         castSend({ type: 'mark', dataUrl: url });
-        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: url } });
+        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
         setToastRef.current?.('Mark on the wall');
       };
       img.onerror = () => setToastRef.current?.('That file would not open as a picture');
       img.src = url;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(effectiveFile);
   }, [castSend]);
 
   const clearMark = useCallback(() => {
     for (const v of bothEngines()) v.clearMark?.();
     markUrlRef.current = null;
+    markRelayUrlRef.current = null;
     setMarkLoaded(false);
     castSend({ type: 'mark', dataUrl: null });
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
   }, [castSend]);
   castReadyRef.current = () => sendCastState(true);
+  /*
+    A ride between React's renders asks for a send the way a change of state
+    does (the throttle just below), so a receiver hears a fader at the cast's
+    own rate rather than at React's.
+  */
+  castNudgeRef.current = () => {
+    if (!castLinkRef.current || castTrailRef.current) return;
+    const wait = CAST_STATE_MS - (performance.now() - castSentAtRef.current);
+    if (wait <= 0) { sendCastState(false); return; }
+    castTrailRef.current = setTimeout(() => { castTrailRef.current = null; sendCastState(false); }, wait);
+  };
   const castLinkRef = useRef('');
   useEffect(() => {
     if (!isCasting && mirrorCount === 0) {
@@ -3286,6 +3582,7 @@ export default function App() {
       audio: a ? {
         volume: a.volume, bass: a.bass, mid: a.mid, treble: a.treble,
         energy: a.energy, spectralCentroid: a.spectralCentroid, timbre: a.timbre, complexity: a.complexity,
+        passage: a.passage,
       } : null,
     };
     if (castingRef.current && !stageRef.current) castSendRef.current(message);   // a mirror of this canvas needs no feed
@@ -3729,6 +4026,9 @@ export default function App() {
         case 'mirrors':
           setMirrorCount(message.count);
           break;
+        case 'controllers':
+          setPhoneCount(message.count);
+          break;
         case 'request-cast':
           relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
           break;
@@ -3746,7 +4046,6 @@ export default function App() {
           const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
           if (color) {
             updateLiquidColor(selectedLiquidId, color);
-            
           }
           break;
         }
@@ -3792,55 +4091,36 @@ export default function App() {
           }
           break;
         case 'blow': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
-          const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'blow') break;
           // A pen's lean is a direction, not a stroke: turned with the dish, its length kept.
-          wallRef.current?.applyGesture({ tool: 'blow', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'lean') });
+          wallRef.current?.applyGesture({ tool: 'blow', layer: g.layer, amount: g.amount, ...onWall(g.wall, g.x, g.y, g.layer, g.dx, g.dy, 'lean') });
           break;
         }
         case 'drop': {
-          if (message.color !== undefined && (typeof message.color !== 'string' || message.color.length > 9)) {
-            break;
-          }
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          const color = typeof message.color === 'string' ? message.color : undefined;
-          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(message.wall, x, y, layer), layer, amount, ...laidColour(selectedLiquid, color) });
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'drop') break;
+          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(g.wall, g.x, g.y, g.layer), layer: g.layer, amount: g.amount, ...laidColour(selectedLiquid, g.color) });
           break;
         }
         case 'press': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          wallRef.current?.applyGesture({ tool: 'press', ...onWall(message.wall, x, y, layer), layer, amount });
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'press') break;
+          wallRef.current?.applyGesture({ tool: 'press', ...onWall(g.wall, g.x, g.y, g.layer), layer: g.layer, amount: g.amount });
           break;
         }
         case 'finger': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          const dx = typeof message.dx === 'number' && Number.isFinite(message.dx) ? message.dx : undefined;
-          const dy = typeof message.dy === 'number' && Number.isFinite(message.dy) ? message.dy : undefined;
-          wallRef.current?.applyGesture({ tool: 'finger', layer, amount, ...onWall(message.wall, x, y, layer, dx, dy, 'stroke') });
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'finger') break;
+          wallRef.current?.applyGesture({ tool: 'finger', layer: g.layer, amount: g.amount, ...onWall(g.wall, g.x, g.y, g.layer, g.dx, g.dy, 'stroke') });
           break;
         }
         // The pad's finger on the dish (PLAN §22): the dish turns under it.
         case 'spin': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? message.x : 0.5;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? message.y : 0.5;
-          const layer = typeof message.layer === 'number' && Number.isFinite(message.layer) ? message.layer : 0;
-          const amount = typeof message.amount === 'number' && Number.isFinite(message.amount) ? message.amount : undefined;
-          const id = typeof message.id === 'number' && Number.isInteger(message.id) ? message.id : undefined;
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'spin') break;
           // Untouched by the dish's turn: Spin reads the hand's angle as the room sees it.
-          wallRef.current?.applyGesture({ tool: 'spin', ...onWall(message.wall, x, y, layer, undefined, undefined, 'stroke', false), layer, amount, id });
+          wallRef.current?.applyGesture({ tool: 'spin', ...onWall(g.wall, g.x, g.y, g.layer, undefined, undefined, 'stroke', false), layer: g.layer, amount: g.amount, id: g.id });
           break;
         }
         // A remote on Draw asking for the wall (lib/padPicture.ts).
@@ -3848,9 +4128,9 @@ export default function App() {
           padPictureRef.current?.want(message.width);
           break;
         case 'tilt': {
-          const x = typeof message.x === 'number' && Number.isFinite(message.x) ? Math.max(-1, Math.min(1, message.x)) : 0;
-          const y = typeof message.y === 'number' && Number.isFinite(message.y) ? Math.max(-1, Math.min(1, message.y)) : 0;
-          wallRef.current?.setExternalTilt(x, y);
+          const g = parseRemoteGesture(message);
+          if (!g || g.type !== 'tilt') break;
+          wallRef.current?.setExternalTilt(g.x, g.y);
           break;
         }
         /*
@@ -3878,6 +4158,7 @@ export default function App() {
       }
     },
   });
+  usePublishAccountShow(!phone && remoteLink.status === 'connected', pinnedLookName);
 
   runActionRef.current = runAction;
 
@@ -3960,6 +4241,58 @@ export default function App() {
   const songRuntimeRef = useRef(songRuntime);
   songRuntimeRef.current = songRuntime;
 
+  /*
+    The score (PLAN 28h): the song as a timeline, its show's cues on it, and
+    the nudge. One set of props for the desk's Score panel and the phone's Play
+    sheet, so a cue pinned on either lands in the same song show.
+
+    A cue pinned to a song that has no show yet makes one, named for the look
+    that is playing, for the song's next play. It starts at once (Follow
+    songs) without fading to that look: the person pinned a burst on a chorus,
+    not a look change, and the plate may be a look no saved one matches (a
+    slider moved, a fader ridden), which a fade would take back.
+  */
+  const currentShow = useMemo(() => showFor(songShows, currentSong), [songShows, currentSong]);
+  const pinScoreCue = useCallback((when: ActionWhen, what: ActionWhat) => {
+    if (!currentSong) return;
+    const action: SongAction = { id: newId('act'), when, what };
+    const shows = songShowsRef.current;
+    const existing = showFor(shows, currentSong);
+    if (existing) { setSongShows(shows.map(s => (s.id === existing.id ? { ...s, actions: [...s.actions, action] } : s))); return; }
+    const lookId = activePresetId ?? pinnedPresetId ?? 'classic';
+    const saved = userPresets.presets.find(u => u.id === lookId);
+    const preset = PRESETS.find(q => q.id === lookId) ?? PRESETS.find(q => q.id === 'classic');
+    const look = saved ? { kind: 'saved' as const, id: saved.id, name: saved.name } : { kind: 'preset' as const, id: preset?.id ?? 'classic', name: preset?.name };
+    const id = newId('song');
+    songRuntimeRef.current.keepLook(id);
+    setSongShows([...shows, { id, song: currentSong, look, actions: [action] }]);
+  }, [currentSong, setSongShows, activePresetId, pinnedPresetId, userPresets.presets]);
+  const removeScoreCue = useCallback((actionId: string) => {
+    setSongShows(songShowsRef.current.map(s => (s.actions.some(a => a.id === actionId) ? { ...s, actions: s.actions.filter(a => a.id !== actionId) } : s)));
+  }, [setSongShows]);
+  const { nudgePosition, nudgeToSection, resetNudge } = musicIntel;
+  const scoreProps = useMemo<SongScoreProps>(() => ({
+    songName: currentSong ? songLabel(currentSong) : null,
+    map: musicIntel.state.songMap,
+    phase: !musicIntel.state.track ? 'none'
+      : musicIntel.state.songMap ? 'ready'
+      : musicIntel.state.analyzing ? 'analyzing'
+      : musicIntel.state.recording ? 'hearing' : 'unmapped',
+    positionSec: musicIntel.state.positionSec,
+    nudgeSec: musicIntel.state.nudgeSec,
+    bpm: tempoLabel.bpm,
+    durationSec: songDuration(musicIntel.state.track?.durationSec, currentShow?.song.durationSec, musicIntel.state.songMap?.durationSec),
+    show: currentShow,
+    // The song's clock, which a followed show and the sequencer's section
+    // stages read. A show started by hand keeps its own (PLAN 28h-4).
+    onNudge: nudgePosition,
+    onNudgeToSection: nudgeToSection,
+    onResetNudge: resetNudge,
+    onPin: pinScoreCue,
+    onRemoveCue: removeScoreCue,
+  }), [currentSong, musicIntel.state.songMap, musicIntel.state.track, musicIntel.state.analyzing, musicIntel.state.recording,
+    musicIntel.state.positionSec, musicIntel.state.nudgeSec, tempoLabel.bpm, currentShow, nudgePosition, nudgeToSection, resetNudge, pinScoreCue, removeScoreCue]);
+
   // ── Render this song (PLAN.md §6) ───────────────────────────────
   const showSequencerRef = useRef(sequencer);
   showSequencerRef.current = sequencer;
@@ -4006,7 +4339,8 @@ export default function App() {
       laterWrites.clear();
       setRowFading({});
       driftGlide.current.clear();
-      aimTick.current = 0;
+      // A render plans its own moves from the start, as the show would on this song.
+      slowEvolveRef.current = null;
       const kept = { settings: settingsRef.current, anchor: driftAnchor.current, active: isActiveRef.current, playing: !!el && !el.paused };
       if (el && !el.paused) el.pause();
       renderHoldRef.current = true;
@@ -4031,6 +4365,7 @@ export default function App() {
         flushSync(() => { setSettings(kept.settings); setIsActive(kept.active); setRenderHold(false); setRowFading({}); });
         driftAnchor.current = kept.anchor;
         driftGlide.current.clear();
+        slowEvolveRef.current = null;
         // The song plays on if it was playing: a render interrupts listening, it does not end it.
         if (kept.playing && musicElRef.current) void musicElRef.current.play().catch(() => { /* needs a gesture: the play button is there */ });
       };
@@ -4370,16 +4705,21 @@ export default function App() {
    */
   const cueBarUp = overlayUp && !!(cued || fading > 0 || previousLook.current);
 
+  const livePhoneCount = remoteLink.status === 'connected' ? phoneCount : 0;
+  useEffect(() => {
+    if (remoteLink.status !== 'connected') setPhoneCount(0);
+  }, [remoteLink.status]);
+
   const deskDots = useMemo(() => ({
     sound: audioSource !== 'none',
     video: isVideoPlaying,
     mic: audioSource !== 'none',
     wall: isCasting,
     midi: midi.enabled,
-    phone: remoteLink.status === 'connected',
+    phone: livePhoneCount > 0,
     rec: recorder.recording ? String(recorder.seconds) : null,
     perf: perfClock,
-  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, remoteLink.status, recorder.recording, recorder.seconds, perfClock]);
+  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, livePhoneCount, recorder.recording, recorder.seconds, perfClock]);
 
   /*
     Where each status dot goes.
@@ -4459,6 +4799,7 @@ export default function App() {
     <SettingsPanel
       mixTakes={mixTakes}
       backLook={backLookName}
+      lookId={activePresetId}
       songDetection={musicSettings.enabled}
       onSongDetection={(on) => updateMusicSettings({ enabled: on })}
       settings={settings}
@@ -4512,6 +4853,7 @@ export default function App() {
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       onFilmFile={loadFilm}
+      onPourVideo={pourFile}
       onFilmCamera={startFilmCamera}
       onFilmWindow={startFilmWindow}
       onFilmClear={clearFilm}
@@ -4530,7 +4872,7 @@ export default function App() {
         ref={wallEngineRef}
         onBackLookCleared={backLookCleared}
         audioData={audioData} hear={hear}
-        settings={walled ? wallSettings : effectiveSettings}
+        settings={walled ? wallSettings : effectiveSettings} ride={ridePlate.wall}
         seedCount={wallLook ? wallLook.seedCount : seedCount} spinFlick={wallLook ? wallLook.spinFlick : spinFlick}
         selectedLiquid={selectedLiquid} activeLayer={activeLayer}
         clearTrigger={wallLook ? wallLook.clearTrigger : clearTrigger}
@@ -4576,7 +4918,7 @@ export default function App() {
           key="draft"
           ref={visualizerRef}
           draft
-          audioData={audioData} hear={hear} settings={effectiveSettings} seedCount={seedCount} spinFlick={spinFlick}
+          audioData={audioData} hear={hear} settings={effectiveSettings} ride={ridePlate.desk} seedCount={seedCount} spinFlick={spinFlick}
           selectedLiquid={selectedLiquid} activeLayer={activeLayer} clearTrigger={clearTrigger}
           onAim={aimMacro}
           toolAmount={toolAmount}
@@ -5388,6 +5730,7 @@ export default function App() {
           onClear={() => setClearTrigger(n => n + 1)}
           recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording, take: recorder.lastTake }}
           onAllControls={() => choosePhoneScreen('stage')}
+          onOpenAccount={openAccount}
         />
         </PanelGuard>
       )}
@@ -5430,6 +5773,7 @@ export default function App() {
             onPalette={selectPalette}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
+            cartoons={cartoons}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -5462,6 +5806,8 @@ export default function App() {
             onTrack={playTrack}
             soundDrive={settings.audioImpact}
             songLine={audioSource === 'none' ? '' : songLine}
+            score={scoreProps}
+            mapLine={followLine(musicIntel.state.follow, musicIntel.state.track?.title)}
             deaf={earDeaf}
             show={{
               running: sequencer.status.running,
@@ -5497,12 +5843,18 @@ export default function App() {
               pattern: settings.chemistryPattern ?? 0,
               width: settings.chemistryWidth ?? 0.5,
               print: settings.turingPrint ?? 0,
+              ink: settings.turingInk ?? 0,
+              drift: settings.turingDrift ?? 0,
             }}
             onReaction={(patch) => updateSettings(patch)}
             lampGround={settings.lampGround ?? 0}
             onLampGround={(v) => updateSettings({ lampGround: v })}
+            twoProjectors={settings.twoProjectors ?? 0}
+            onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
+            slosh={settings.slosh ?? 0}
+            onSlosh={(v) => updateSettings({ slosh: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}
@@ -5516,6 +5868,7 @@ export default function App() {
               setPhone(false);
             }}
             onPlayScreen={() => choosePhoneScreen('play')}
+            onOpenAccount={openAccount}
           />
           </PanelGuard>
           )}
@@ -5819,8 +6172,10 @@ export default function App() {
         <div className="flex gap-2 pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
           <button
             onClick={() => { setShowTrackPanel(!showTrackPanel); setShowSequencer(false); }}
+            aria-pressed={showTrackPanel}
+            data-testid="track-panel-button"
             className={`relative p-2 rounded-full transition-all ${
-              showTrackPanel ? 'bg-purple-500 text-white' : 'hover:bg-white/10 text-white/60'
+              showTrackPanel ? 'bg-accent text-white' : 'hover:bg-white/10 text-white/60'
             }`}
             title={musicIntel.state.track ? `${musicIntel.state.track.title} — ${musicIntel.state.track.artist}` : 'Track intelligence'}
           >
@@ -6001,6 +6356,7 @@ export default function App() {
           onMidi={deskOpen.midi}
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
+          onOpenAccount={openAccount}
           showCrumb={
             <>
               <span className="text-muted">Show</span>
@@ -6014,8 +6370,9 @@ export default function App() {
             sequence: sequencer.status.running
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
               : null,
-            phone: remoteLink.status === 'connected',
+            phone: livePhoneCount,
             rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+            song: audioSource === 'none' ? null : followLine(musicIntel.state.follow, musicIntel.state.track?.title),
           }}
           onBlackout={toggleBlackout}
           blackout={blackout}
@@ -6056,6 +6413,7 @@ export default function App() {
           onSetAction={onSetAction}
           onItemAction={onItemAction}
           songNow={currentSong ? songLabel(currentSong) : null}
+          score={scoreProps}
           liveId={setActive ? liveItemId : activePresetId}
           nextId={setActive ? (cued?.item ?? null) : (cued?.id ?? null)}
           onCue={cueAny}
@@ -6108,6 +6466,7 @@ export default function App() {
           onPalette={selectPalette}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
+          cartoons={cartoons}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
@@ -6125,6 +6484,16 @@ export default function App() {
         <PanelGuard name="Stage" onClose={() => setShowStage(false)}>
           {settingsPanel({ scope: 'stage', focusSection: null, onClose: () => setShowStage(false) })}
         </PanelGuard>
+      )}
+
+      {showAccount && hasAccountOrLicenseUI && (
+        <AccountSheet
+          onClose={closeProfileSheet}
+          onOpenSettings={() => {
+            closeProfileSheet();
+            openAllSettings();
+          }}
+        />
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives
@@ -6207,9 +6576,24 @@ export default function App() {
         {showHelp && <GuidePanel focus={helpFocus} onClose={() => { setShowHelp(false); setHelpFocus(null); }} />}
       </AnimatePresence>
 
+      {/* ── Bottom-left Profile & Store pill (when overlayUp) ──── */}
+      {overlayUp && !isMinimized && showControls && openAccount && (
+        <button
+          type="button"
+          data-cg-account-open=""
+          onClick={openAccount}
+          title="Profile, Settings & Store"
+          aria-label="Account"
+          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-amber-400/40 bg-black/75 px-3.5 py-1.5 text-[12px] font-semibold text-amber-100 shadow-xl backdrop-blur-xl transition-all hover:border-amber-400/70 hover:bg-black/90"
+        >
+          <User size={14} className="shrink-0 text-amber-300" />
+          <span>Profile &amp; Store</span>
+        </button>
+      )}
+
       {/* ── Audio Meters (bottom-left, out of the way) ─────────── */}
       {isActive && audioData && !isMinimized && overlayUp && (
-        <div className="absolute bottom-6 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
+        <div className="absolute bottom-16 left-6 z-10 flex items-end gap-1 opacity-30 pointer-events-none">
           {[
             { label: 'B', value: audioData.bass },
             { label: 'M', value: audioData.mid },

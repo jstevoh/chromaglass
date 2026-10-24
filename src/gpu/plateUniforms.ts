@@ -215,6 +215,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 
   pack.set('derivedOn', ctx.derived ? 1 : 0);
   pack.set('layerCount', fluids.length);
+  pack.set('twoProjectors', s.twoProjectors ?? 0);
   pack.set('rotation0', view.rotations[0] ?? 0);
   pack.set('rotation1', view.rotations[1] ?? 0);
   pack.set('resolution', width, height);
@@ -377,9 +378,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('camCenter', view.shot.cx, view.shot.cy);
   pack.set('camZoom', view.shot.zoom);
   pack.set('macroOn', view.macroAmount);          // `u_macro` in the GLSL
-  pack.set('macroCells', s.macroCells ?? 0.75);
+  pack.set('macroCells', s.macroCells ?? 0);
   pack.set('macroCellScale', s.macroCellScale ?? 0.5);
-  pack.set('macroLacing', s.macroLacing ?? 0.55);
+  pack.set('macroLacing', s.macroLacing ?? 0);
   pack.set('macroDepth', s.macroDepth ?? 0.5);
   pack.set('macroEdge', s.macroEdgeDetail ?? 0.6);
   pack.set('macroRelief', s.macroRelief ?? 0.7);

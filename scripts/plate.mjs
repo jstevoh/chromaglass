@@ -484,8 +484,25 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   };
   walk('src'); walk('scripts');
   check('nothing in src/ or scripts/ still names a retired look', stale.length === 0, stale.join(', '));
-  const sample = Object.keys(RETIRED_PRESETS)[0];
-  if (sample) check('a retired id finds its replacement', findPreset(sample)?.id === RETIRED_PRESETS[sample], `${sample} → ${findPreset(sample)?.id}`);
+  /*
+    "Finds its replacement" is the look at the end of the id's chain. It was
+    one id's table entry (the first one) compared with what `findPreset`
+    returns, which is the same thing only while every entry names a live
+    look. PLAN 28i-1 retires Colorful Cosmos into Classic, and Sunny Side Up
+    still names Colorful Cosmos, so that id now takes two hops and the
+    resolver follows them (the brief for 28i-1: "the chain is followed").
+    The walk below is written out here, not taken from `livePresetId`, so a
+    resolver that stops after one hop reads red on every retired id that
+    names another retired one.
+  */
+  const endOf = (id) => { let at = id; for (let i = 0; i < 8 && RETIRED_PRESETS[at] !== undefined; i++) at = RETIRED_PRESETS[at]; return at; };
+  const lost = Object.keys(RETIRED_PRESETS).filter(id => findPreset(id)?.id !== endOf(id) || !ids.includes(endOf(id)));
+  check('every retired id finds the look at the end of its chain', lost.length === 0,
+    lost.map(id => `${id} → ${findPreset(id)?.id ?? 'nothing'} (wanted ${endOf(id)})`).join(', ') || `${Object.keys(RETIRED_PRESETS).length} ids`);
+  const chained = Object.keys(RETIRED_PRESETS).filter(id => RETIRED_PRESETS[RETIRED_PRESETS[id]] !== undefined);
+  check('and a retired id whose replacement is retired too is followed the whole way, not one hop',
+    chained.every(id => findPreset(id)?.id === endOf(id) && findPreset(id)?.id !== RETIRED_PRESETS[id]),
+    chained.map(id => `${id} → ${RETIRED_PRESETS[id]} → ${findPreset(id)?.id}`).join(', ') || 'no chain in the table');
 }
 
 // ── 5c. Every colour palette reads on the lamp and on black (PLAN.md 28b) ──

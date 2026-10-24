@@ -63,7 +63,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { BarGrid, Accent, accentGain, barLine, OFF_THE_BEAT, STRONG_BEAT, WEAK_BEAT } from '../src/lib/barGrid.ts';
 import { arrange, rng, SR } from './arrangement.mjs';
-import { kickRock } from '../src/lib/plateRock.ts';
+import { kickRock, restingHand } from '../src/lib/plateRock.ts';
 import { kickDepth } from '../src/lib/squish.ts';
 
 let failed = 0, passed = 0;
@@ -665,14 +665,21 @@ console.log('\nWiring');
     scales what they give: a grep of a helper's body would pass on a helper
     that took the accent and dropped it.
   */
-  const shove = accent => { const r = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 }; kickRock(r, 0.8, accent); return Math.hypot(r.vx, r.vy); };
+  /*
+    The rock leans rather than being shoved since 27f-2 (lib/plateRock.ts): the
+    weight is how far the hand tips the dish on the one, read from where the
+    lean is going. And the frame loop hands the rock the kick's place in the
+    bar and the grid's beat, on the same clock as the accent, so it leans on
+    the strong beats only.
+  */
+  const shove = accent => { const r = restingHand(); kickRock(r, 0.8, accent, 0, 0.5); return Math.hypot(r.toX ?? 0, r.toY ?? 0); };
   const shoveScales = shove(1) > 0 && Math.abs(shove(1.5) / shove(1) - 1.5) < 1e-9;
   const depthScales = kickDepth(0.9, 0.8, 1) > 0 && Math.abs(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1) - 1.5) < 1e-9;
   check('and the weight reaches the rock, the squeeze and the beads',
-    /if \(R > 0 && kickStep\) kickRock\(rock, bass01, accent\);/.test(vis)
+    /if \(R > 0 && kickStep\) kickRock\(rock, bass01, accent, barGridRef\.current\.placeAt\(accentAt\), barGridRef\.current\.now\.period\);/.test(vis)
     && /const a = kickDepth\(squeezeAmt, bass01, accent\);/.test(vis) && /0\.4 \* squeezeAmt \* bass01 \* accent\)/.test(vis)
     && shoveScales && depthScales,
-    `the rock's shove ×${(shove(1.5) / shove(1)).toFixed(3)} and the squeeze's depth ×${(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1)).toFixed(3)} at an accent of 1.5`);
+    `the rock's lean ×${(shove(1.5) / shove(1)).toFixed(3)} and the squeeze's depth ×${(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1)).toFixed(3)} at an accent of 1.5`);
   check('the app reads what the grid knows for the phone', /const bar = report \? barLine\(report\.bar\) : '';/.test(app)
     && /bar: \{ \.\.\.barGridRef\.current\.now \}/.test(vis));
 }

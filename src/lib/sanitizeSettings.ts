@@ -1,13 +1,30 @@
-import { DEFAULT_SETTINGS, type VisualizerSettings, type SimResolution } from '../types.ts';
+import {
+  DEFAULT_SETTINGS,
+  BLEND_MODES,
+  LED_MODES,
+  MACRO_CAMERA_MODES,
+  ON_NEW_SONG_MODES,
+  MIX_BLENDS,
+  VISCOSITY_MODES,
+  AUDIO_FEATURES,
+  RENDER_STYLES,
+  type VisualizerSettings,
+  type SimResolution,
+} from '../types.ts';
 import { PIN_RANGE, onStep } from './deskPins.ts';
+import { SETTING_TRAVEL } from './sceneMap.ts';
+import { isAreaTarget } from './areaCords.ts';
 
-const VALID_VISCOSITY = new Set(['thin', 'thick', 'water']);
-const VALID_BLEND_MODE = new Set(['screen', 'normal', 'multiply', 'overlay']);
-const VALID_LED_MODE = new Set(['rainbow', 'solid', 'pulse', 'audio']);
-const VALID_MACRO_CAMERA = new Set(['hold', 'follow', 'auto']);
-const VALID_ON_NEW_SONG = new Set(['preset', 'none']);
-const VALID_ROW_BLEND = new Set(['own', 'add', 'screen', 'mult', 'over']);
-const VALID_AUDIO_FEATURES = new Set(['volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity', 'none']);
+const VALID_VISCOSITY = new Set<string>(VISCOSITY_MODES);
+const VALID_BLEND_MODE = new Set<string>(BLEND_MODES);
+const VALID_LED_MODE = new Set<string>(LED_MODES);
+const VALID_MACRO_CAMERA = new Set<string>(MACRO_CAMERA_MODES);
+const VALID_ON_NEW_SONG = new Set<string>(ON_NEW_SONG_MODES);
+const VALID_ROW_BLEND = new Set<string>(MIX_BLENDS);
+const VALID_AUDIO_FEATURES = new Set<string>(AUDIO_FEATURES);
+const VALID_RENDER_STYLE = new Set<string>(RENDER_STYLES);
+// The audio slots are the default's own, so a slot added to AudioMappings is kept too.
+const AUDIO_SLOTS = Object.keys(DEFAULT_SETTINGS.audioMappings) as (keyof VisualizerSettings['audioMappings'])[];
 
 // stockType is the only numeric setting in DEFAULT_SETTINGS outside PIN_RANGE
 const EXTRA_NUMERIC_RANGES: Record<string, { min: number; max: number; step?: number }> = {
@@ -34,7 +51,7 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
   const out: Partial<VisualizerSettings> = {};
 
   for (const [key, value] of Object.entries(patch)) {
-    if (!(key in DEFAULT_SETTINGS)) continue; // Drop unknown keys
+    if (!Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key)) continue; // Drop unknown and inherited keys
     const def = (DEFAULT_SETTINGS as unknown as Record<string, unknown>)[key];
 
     // Special case: simResolution ('auto' | number)
@@ -89,7 +106,7 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
       } else if (key === 'mixOrder') {
         if (value.length <= 64 && /^[a-z ]+$/.test(value)) out.mixOrder = value;
       } else if (key === 'renderStyle') {
-        if (value === 'show' || value === 'photo') out.renderStyle = value;
+        if (VALID_RENDER_STYLE.has(value)) out.renderStyle = value as VisualizerSettings['renderStyle'];
       } else if (value.length <= 64) {
         (out as Record<string, unknown>)[key] = value;
       }
@@ -100,7 +117,7 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
     if (key === 'audioMappings' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
       const am = value as Record<string, unknown>;
       const sanitizedAm: Partial<VisualizerSettings['audioMappings']> = {};
-      for (const slot of ['velocity', 'density', 'color', 'rotation'] as const) {
+      for (const slot of AUDIO_SLOTS) {
         if (typeof am[slot] === 'string' && VALID_AUDIO_FEATURES.has(am[slot] as string)) {
           sanitizedAm[slot] = am[slot] as VisualizerSettings['audioMappings'][typeof slot];
         }
@@ -114,11 +131,30 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
     // Object settings: sceneMappings
     if (key === 'sceneMappings' && Array.isArray(value)) {
       const validMappings = value.filter(m =>
-        m && typeof m === 'object' &&
+        m && typeof m === 'object' && !Array.isArray(m) &&
         (m.source === undefined || typeof m.source === 'string') &&
+        typeof m.feature === 'string' &&
         typeof m.setting === 'string' &&
-        typeof m.depth === 'number' && Number.isFinite(m.depth)
-      ).slice(0, 32);
+        /*
+          A cord on a setting, or a cord aimed at an area with one of the
+          hand's four acts there (lib/areaCords.ts, PLAN 25h). An area with
+          a setting, or an act with no area, is neither, and is dropped
+          rather than read as the other.
+        */
+        (m.area === undefined
+          ? Object.prototype.hasOwnProperty.call(SETTING_TRAVEL, m.setting)
+          : Number.isInteger(m.area) && m.area >= 0 && m.area < 8 && isAreaTarget(m.setting)) &&
+        typeof m.depth === 'number' && Number.isFinite(m.depth) &&
+        (m.layer === undefined || m.layer === 'all' || (typeof m.layer === 'number' && Number.isFinite(m.layer))) &&
+        [m.threshold, m.attack, m.release].every(v => v === undefined || (typeof v === 'number' && Number.isFinite(v)))
+      ).map(m => {
+        const out = { ...m, depth: Math.max(-100, Math.min(100, m.depth)) };
+        // The gate's three, each in its range: a threshold is a share of the reading, the times are seconds.
+        if (m.threshold !== undefined) out.threshold = Math.max(0, Math.min(1, m.threshold));
+        if (m.attack !== undefined) out.attack = Math.max(0, Math.min(10, m.attack));
+        if (m.release !== undefined) out.release = Math.max(0, Math.min(10, m.release));
+        return out;
+      }).slice(0, 32);
       out.sceneMappings = validMappings;
       continue;
     }

@@ -198,6 +198,15 @@ export class BeadField {
   private dropAmt = 0;
   /** The colours drops are dyed from: the look's palette, as seen (0..1). */
   private palette: [number, number, number][] = [];
+
+  /**
+   * Viscosity ratio lambda = mu_drop / mu_carrier (PLAN 18i).
+   * In a thin gap, an oil pancake drop lags the depth-mean flow: U_drop = 2U / (1 + lambda).
+   * The 0.8 flow speed was originally tuned by eye for show aesthetics, and
+   * lambda = 1.5 was solved back from 2U / (1 + lambda) = 0.8 as a tuned shortcut.
+   * This is a property on BeadField; per-bottle dynamic coupling awaits 18d-3 Cahn-Hilliard pinch-off.
+   */
+  viscosityRatio = 1.5;
   /** The drop mask's pixels and its scratch, kept between frames (see `rasterDrops`). */
   private dropPixels: Uint8ClampedArray | null = null;
   private dropOwn: Float32Array | null = null;
@@ -412,11 +421,26 @@ export class BeadField {
     const N = this.grid;
     const bs = this.beads;
     if (bs.length === 0) return;
+    const dropSpeed = 2 / (1 + this.viscosityRatio);
     for (const b of bs) {
       const [vx, vy] = velocity(b.x, b.y);
-      // Heavier than the dye: they lag the flow and drift little on their own.
-      b.x += (vx * CELLS_PER_UNIT * 0.8 - tiltX * 500) * dt + this.rng.centred() * 0.15;
-      b.y += (vy * CELLS_PER_UNIT * 0.8 - tiltY * 500) * dt + this.rng.centred() * 0.15;
+      /*
+        In a Hele-Shaw cell, a viscous drop lags the depth-mean flow: 2U / (1 + lambda).
+
+        And nothing else moves it. Each step used to add a random walk of
+        ±0.075 cells on each axis ("drift little on their own"), which on the
+        plate at 1x is half a pixel and invisible, and in the closeup at 6x on
+        a 1440 px frame is 4 px rms sixty times a second on every drop: the
+        drops shivered (the owner, 2026-10-11, "twitchier than before";
+        `npm run steadycam` measures it). A millimetre drop of oil in water
+        has no Brownian motion to see: the thermal walk of a 1 mm sphere in
+        water is a couple of microns in an hour (D = kT / 6πηR ≈ 4 × 10⁻¹⁶ m²/s),
+        and the bubbles already keep still on still paint for the same
+        reason (PLAN 18i, `npm run bubblephysics`). So a drop on still paint
+        stays exactly where it is, as the bubbles do.
+      */
+      b.x += (vx * CELLS_PER_UNIT * dropSpeed - tiltX * 500) * dt;
+      b.y += (vy * CELLS_PER_UNIT * dropSpeed - tiltY * 500) * dt;
       b.age += dt;
       if (b.inner && (b.inner.age += dt) >= innerLife(b.inner.seed)) delete b.inner;
       if (b.sx !== undefined) {

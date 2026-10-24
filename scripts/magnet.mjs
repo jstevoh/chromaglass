@@ -202,10 +202,10 @@ try {
   });
 
   const box = await plateBox(page);
-  // Drag offset from the middle row (y=0.35 rather than 0.50): the check asks
-  // that the pool end nearer the hand than the hand's mirror across y=0.5.
-  // Along y=0.5 the hand and its mirror are the same point, which degenerates
-  // the mirror check into a coin-flip against float jitter.
+  // A third of the way down the window. This was meant to keep the drag off
+  // the plate's middle row, which it cannot do: the plate stops at whatever
+  // angle Classic had turned to, and the pointer turns with it. The drag
+  // (check 3, on) is laid out on the plate instead.
   const at = (fx, fy = 0.35) => [box.x + box.width * fx, box.y + box.height * fy];
 
   /*
@@ -226,9 +226,9 @@ try {
     so let go of it stays under the glass where the hand left it (check 4).
     A hold that reached nothing would pass every other line here.
 
-    The touch is near the canvas's left edge, so the hand is well off the
-    middle (asked: 0.2 at least), where neither the look's ring nor a magnet
-    under the middle would put anything near it.
+    The touch is where the drag will start, chosen on the plate at least
+    0.25 off its middle (asked: 0.2 at least), where neither the look's ring
+    nor a magnet under the middle would put anything near it.
   */
   /*
     What the plate is doing round the touch, printed and not asked: on one
@@ -246,7 +246,66 @@ try {
   const fmtScene = (a, b) => `the plate turned ${a.angle !== null && b.angle !== null ? (b.angle - a.angle).toFixed(4) : '?'} rad (spin ${b.spin !== null ? b.spin.toFixed(4) : '?'} rad/s), ` +
     `${a.steps !== null && b.steps !== null ? b.steps - a.steps : '?'} solver steps in ${((b.at - a.at) / 1000).toFixed(1)} s, automation ${JSON.stringify(a.auto)} → ${JSON.stringify(b.auto)}`;
   const given = () => page.evaluate(() => { const s = window.chromaglassDebug().settings ?? {}; return { amount: s.phaseAmount ?? 0, strength: s.magnetStrength ?? 0, size: s.magnetSize }; });
-  await page.mouse.move(...at(0.05));
+  /*
+    Where the hand goes, chosen on the plate (the drag, check 3 on, says why).
+    A grid of window points over the plate, each asked where a hand there
+    lands (plateAt, the pointer's own mapping) and whether the canvas is what
+    is there to be touched. The drag ends at the one furthest from the
+    plate's middle row, within 0.25 of its middle; it starts at one 0.25 to
+    0.32 off the middle (this touch's own ask is 0.2), 0.3 to 0.45 from the
+    end, as near 0.4 as there is, with the canvas under the whole line
+    between. Both kept off the rim, where the old line never went: the
+    first planned way ended 0.33 out, the pool (0.157 across) was dragged
+    to 0.30,0.90, half of it over the rim, and the plate then held 170% of
+    the ferrofluid poured (PLAN 19v-2), which is the rim's question and not
+    this one's. The window shows only the middle of the plate (the plate is
+    drawn at one and a half times the window's longer side), and which part
+    of the plate that is turns with it, so a path chosen on the window, or on
+    the plate alone, can leave the glass or sit on its middle row.
+  */
+  const plan = await page.evaluate((b) => {
+    const d = window.chromaglassDebug(), canvasAt = (x, y) => document.elementFromPoint(x, y)?.id === 'liquid-canvas';
+    if (!d.plateAt) return { why: 'no plateAt' };
+    const pts = [];
+    for (let i = 0; i <= 24; i++) for (let j = 0; j <= 16; j++) {
+      const x = b.x + b.width * (0.06 + 0.88 * i / 24), y = b.y + b.height * (0.06 + 0.88 * j / 16);
+      const q = d.plateAt(x, y);
+      if (q && canvasAt(x, y)) pts.push({ w: [x, y], q });
+    }
+    // The ends furthest off the middle row first; the first with a start that works is the way.
+    const off = (p) => Math.abs(p.q.y - 0.5), mid = (p) => Math.hypot(p.q.x - 0.5, p.q.y - 0.5);
+    const ends = pts.filter((p) => mid(p) <= 0.25).sort((u, v) => off(v) - off(u));
+    let start = null, end = null, tried = 0;
+    for (const e of ends) {
+      const starts = pts.map((p) => ({ ...p, len: Math.hypot(p.q.x - e.q.x, p.q.y - e.q.y) }))
+        .filter((p) => mid(p) >= 0.25 && mid(p) <= 0.32 && p.len >= 0.3 && p.len <= 0.45)
+        .sort((u, v) => Math.abs(u.len - 0.4) - Math.abs(v.len - 0.4));
+      tried += starts.length;
+      start = starts.find((p) => [1, 2, 3, 4, 5, 6, 7].every((k) => canvasAt(p.w[0] + (e.w[0] - p.w[0]) * k / 8, p.w[1] + (e.w[1] - p.w[1]) * k / 8)));
+      if (start) { end = e; break; }
+    }
+    return start ? { start, end } : { why: `of ${pts.length} points on the glass, ${ends.length} within 0.25 of the middle, no start 0.3 to 0.45 from one with the glass under the way (${tried} tried)` };
+  }, box);
+  const startW = plan.start?.w ?? at(0.05);
+  /*
+    Where the plate is, and what is under the hand's first point: the drag
+    below is aimed from the box measured here, before any touch. Six Mac runs
+    on 2026-10-11 lost the second press because the first hold changed the
+    look, Save grew a dot, the plate bar wrapped to two rows at 1280 and the
+    canvas dropped 42 px under the hand (PLAN.md 19v-3). The app no longer
+    moves; this says so on every run, with the bar's height and the canvas's
+    top at the plan, the second touch and the drag's end, so a plate that
+    moves again is named here and not read as the Magnet failing to draw.
+  */
+  const where = () => page.evaluate(([x, y]) => {
+    const c = document.getElementById('liquid-canvas')?.getBoundingClientRect();
+    const bar = document.querySelector('[data-testid="desk-preview"]')?.previousElementSibling?.getBoundingClientRect();
+    return { box: c ? { x: c.x, y: c.y, w: c.width, h: c.height } : null, bar: bar ? bar.height : null, under: document.elementFromPoint(x, y)?.id || document.elementFromPoint(x, y)?.getAttribute('data-testid') || document.elementFromPoint(x, y)?.tagName || 'nothing' };
+  }, startW);
+  const atPlan = await where();
+  console.log(`     the hand's way on the plate: ${plan.start ? `${plan.start.q.x.toFixed(2)},${plan.start.q.y.toFixed(2)} → ${plan.end.q.x.toFixed(2)},${plan.end.q.y.toFixed(2)} ` +
+    `(${plan.start.len.toFixed(2)}), in the window ${plan.start.w.map(Math.round)} → ${plan.end.w.map(Math.round)}` : `none (${plan.why}): from near the left edge, across the window`}`);
+  await page.mouse.move(...startW);
   await page.mouse.down();
   await page.waitForTimeout(1500);
   const first = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
@@ -285,7 +344,8 @@ try {
   await page.waitForTimeout(500);
   const poured = await phase(firstAt, 0.18), livePoured = await live();
   const sceneBefore = await scene();
-  await page.mouse.move(...at(0.05));
+  const atTouch = await where();
+  await page.mouse.move(...startW);
   await page.mouse.down();
   const early = [];
   for (let k = 0; k < 6; k++) {
@@ -329,16 +389,31 @@ try {
     moving the grid gives the plate a new solver (CI: "44% kept" once, which
     is (256/384)²: a grid change, not a leak).
 
-    From near the canvas's left edge to three quarters across, about 0.45
-    of the plate in a cloud session's mapping (0.05 across read 0.74,0.32
-    on the plate, 0.75 across 0.36,0.59), in six seconds.
+    About 0.4 of the plate in six seconds, from where the pool was laid to
+    the point on the plate furthest off its middle row that the window shows
+    (chosen before the first touch, above), and asked to have ended more than
+    0.15 off it, so the hand's mirror is more than 0.3 from the hand. It was
+    a line across the window, from
+    near its left edge to three quarters across, and where that ended on the
+    plate was up to the angle Classic had turned to before the turning was
+    held: 0.36,0.59 in a cloud session, 0.71,0.51 on the Mac run that
+    failed, where the pool 0.03 from the hand was also 0.03 from its mirror
+    and the check could not tell a carried pool from a flipped plate (main's
+    deploy of #340 needed a re-run). So both ends are chosen on the plate
+    through the pointer's own mapping (plateAt, the same mapping a hand
+    lands by), and the check asks the hand really ended that far off the
+    middle row. Laid out with the end at exactly 0.4 from a start near the
+    window's edge, the check-skeptic's sweep of the plate's angle found no
+    such end at 148 angles of 360: hence the start is chosen too.
   */
   const drag0 = await phase(null);
   const sceneDrag = await scene();
   const trail = [];
   const sample = async () => { const h = await page.evaluate(() => window.chromaglassDebug().magnetHand?.()); if (h) trail.push({ x: h.x, y: h.y }); };
   for (let i = 0; i <= 40; i++) {
-    await page.mouse.move(...at(0.05 + 0.7 * i / 40));
+    const f = i / 40;
+    // No way planned: the old line across the window, and the check below says so.
+    await page.mouse.move(...(plan.end ? [startW[0] + (plan.end.w[0] - startW[0]) * f, startW[1] + (plan.end.w[1] - startW[1]) * f] : at(0.05 + 0.7 * f)));
     await page.waitForTimeout(150);
     if (i % 4 === 0) await sample();
   }
@@ -355,6 +430,7 @@ try {
   console.log(`     through the drag and the hold: ${fmtScene(sceneDrag, await scene())}`);
   const drag1 = await phase(spot ? { x: spot.x, y: spot.y } : null, 0.18);
   const after = { lays: await lays() };
+  const atEnd = await where();
   await page.mouse.up();
   console.log(`     the hand's path: ${trail.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')}`);
   console.log(`     the solver's magnet at the end: ${solverMagnet ? `${solverMagnet.x.toFixed(2)},${solverMagnet.y.toFixed(2)} strength ${solverMagnet.strength} height ${solverMagnet.height} ${solverMagnet.held ? 'held' : 'NOT held'}` : 'unknown'}`);
@@ -365,13 +441,23 @@ try {
   const came = way > 0 ? 1 - behind / way : 0;
   const nearEnd = drag1.total > 0 ? drag1.near / 1e4 / drag1.total : 0;
   const mirrored = spot ? Math.hypot(spot.x - to.x, 1 - spot.y - to.y) : 0;
+  // The hand and its mirror at least 0.3 apart, or "nearer the hand than its mirror" asks nothing.
+  const apart = spot ? 2 * Math.abs(spot.y - 0.5) : 0;
   const once = after.lays === laysBefore;
   const counts = `laid as a look's ${laysBefore} → ${after.lays} times`;
+  {
+    const off = (u, v) => (u && v ? Math.max(Math.abs(u.x - v.x), Math.abs(u.y - v.y), Math.abs(u.w - v.w), Math.abs(u.h - v.h)) : Infinity);
+    const moved = Math.max(off(atPlan.box, atTouch.box), off(atPlan.box, atEnd.box));
+    const at3 = (w) => `bar ${w.bar === null ? '?' : w.bar.toFixed(0)} px, canvas top ${w.box ? w.box.y.toFixed(1) : '?'}`;
+    check('the plate stays where the hand found it: the canvas keeps its box through both touches, and the second starts on the canvas',
+      moved < 1 && atTouch.under === 'liquid-canvas',
+      `at the plan ${at3(atPlan)}; at the second touch ${at3(atTouch)}, under the hand ${atTouch.under}; at the drag's end ${at3(atEnd)}; moved ${moved.toFixed(1)} px`);
+  }
   check('dragging the Magnet carries its pool with the hand',
-    sameGrid && once && !!spot && way > 0.2 && came > 0.5 && behind < mirrored && nearEnd > 0.5,
+    sameGrid && once && !!spot && !!plan.end && apart > 0.3 && way > 0.2 && came > 0.5 && behind < mirrored && nearEnd > 0.5,
     `the pool's centre ${from.x.toFixed(2)},${from.y.toFixed(2)} → ${to.x.toFixed(2)},${to.y.toFixed(2)}, the hand ending at ` +
     `${spot ? `${spot.x.toFixed(2)},${spot.y.toFixed(2)}` : 'nowhere'}: ${(came * 100).toFixed(0)}% of the way (${way.toFixed(2)}), ` +
-    `${behind.toFixed(2)} from the hand against ${mirrored.toFixed(2)} from its mirror, ${(nearEnd * 100).toFixed(0)}% of it within 0.18 of the hand; ` +
+    `${behind.toFixed(2)} from the hand against ${mirrored.toFixed(2)} from its mirror (${apart.toFixed(2)} from the hand${plan.end ? '' : `; no way planned on the plate: ${plan.why}`}), ${(nearEnd * 100).toFixed(0)}% of it within 0.18 of the hand; ` +
     `${counts}${sameGrid ? '' : `; the grid moved ${drag0.n} → ${drag1.n}`}`);
   /*
     The phase moves in flux form, so its total changes only if something
@@ -395,8 +481,9 @@ try {
 
     The look's magnet is put first in the far corner from where the hand
     will be, so a magnet gone home cannot pass by landing near the hand:
-    the drag above ends wherever the pointer mapping puts 0.85 across, which
-    read 0.43,0.58 in a cloud session, 0.1 from the middle. And the check
+    the hand presses wherever the pointer mapping puts 0.85 across, which
+    read 0.43,0.58 in a cloud session, 0.1 from the middle, and 0.30,0.30
+    on one Mac run. And the check
     first asks that the solver really has the magnet in that corner, so a
     settings write that never reached it cannot pass either. Then the hand
     presses the magnet down there, holds it, lets go, and two seconds on the
@@ -435,7 +522,16 @@ try {
     && Math.abs(m.height - m.lookHeight) < 1e-3
     && m.radius !== null && Math.abs(m.radius - 0.05 * (sized ? m.k : 1)) < 1e-4;
   await page.mouse.move(...at(0.85));
-  const probe = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
+  /*
+    Where the hand will press, asked of the pointer's mapping (plateAt). It
+    was asked of magnetHand, which is where the hand last held the magnet:
+    a hover does not move it. With the drag ending near 0.75 across that was
+    close enough; with the drag laid out on the plate it ended at 0.57,0.73,
+    the corner was put at 0.1,0.1 against it, the press landed at 0.30,0.30,
+    0.28 from that corner, and "let go of, it stays" failed on its own
+    "away > 0.3" (the Mac, #349's second run).
+  */
+  const probe = await page.evaluate(([x, y]) => window.chromaglassDebug().plateAt?.(x, y) ?? null, at(0.85));
   const corner = { x: (probe?.x ?? 0.5) > 0.5 ? 0.1 : 0.9, y: (probe?.y ?? 0.5) > 0.5 ? 0.1 : 0.9 };
   await page.evaluate((c) => Object.assign(window.chromaglassDebug().settings, { magnetX: c.x, magnetY: c.y }), corner);
   await page.waitForTimeout(1000);

@@ -28,6 +28,10 @@ coverage/
 
 # Unminified build used for profiling
 dist-dev/
+dist-signin/
+dist-signin-off/
+dist-accountlink/
+dist-tiers/
 
 # Scratch space for measurement runs (scripts/detail.mjs inputs and outputs).
 scratch/
@@ -37,8 +41,13 @@ scratch/
 # remembering.
 /chromaglass/
 gallery/
+handpour.json
 controls/
 film/
 
 # The Mac app's packed builds (npm run mac-app)
 desktop/release/
+
+# The show server's key and local licence state, kept between launches (PLAN 14m, 23.4): private to the machine.
+server/.show-key
+server/.license.json

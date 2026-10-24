@@ -123,15 +123,26 @@ try {
   for (const pg of PAGES) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
-    if (!pg.band) {
-      // A chosen silence, so the page's first click starts no band (scripts/mirror.mjs).
-      await page.addInitScript(() => {
-        try { localStorage.setItem('chromaglass-audio-source', 'none'); } catch { /* none */ }
-      });
-    }
+    // The app opens on Source None (PLAN.md 14y), so the band's pages choose it the
+    // way a reload keeps it, and the first click below is still what lets it play;
+    // the silent page is a chosen silence (scripts/mirror.mjs).
+    await page.addInitScript((source) => {
+      try { sessionStorage.setItem('chromaglass-audio-source', source); } catch { /* private window */ }
+    }, pg.band ? 'simulated' : 'none');
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForTimeout(9000);
-    const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+    // A cold Mac takes longer than nine seconds to open the stage, as bottles.mjs
+    // found: PR #370 moved depth and the flick off the tools shard, so this became
+    // the first check its runner ran, on an empty shader cache, and silence's page
+    // read no engine at all at nine seconds (its two later pages, on the same
+    // machine a minute on, were on the GPU at once). So the read waits up to
+    // twenty seconds more for the GPU solver, as bottles.mjs does, and still fails
+    // if it never comes. A warm machine reads it at nine seconds, as it always did.
+    let engine = null;
+    for (let k = 0; k < 10 && !isGpuEngine(engine); k++) {
+      engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
+      if (!isGpuEngine(engine)) await page.waitForTimeout(2000);
+    }
     if (!isGpuEngine(engine)) {
       check(`${pg.name}: the GPU solver is the one being measured`, false, engine ?? 'no debug hook');
       await page.close();

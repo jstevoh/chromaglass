@@ -24,7 +24,7 @@ import { spawn } from 'node:child_process';
 import { installFrameReader, frameOf } from './frame.mjs';
 
 const PORT0 = Number(process.env.CLOSEUP_PORT ?? 4660);
-const LOOKS = (process.env.CLOSEUP_LOOKS ?? 'soap-film,classic,oil-on-water,galaxy').split(',');
+const LOOKS = (process.env.CLOSEUP_LOOKS ?? 'soap-film,classic,oil-and-water,galaxy').split(',');
 const RUNS = Number(process.env.CLOSEUP_RUNS ?? 3);
 /** Over this much of the frame in one colour is the fault, not a dark passage. */
 const BAR = 0.5;

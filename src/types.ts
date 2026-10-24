@@ -1,8 +1,11 @@
 import type { SourceName } from './lib/audioFeatures';
+import type { HitFeature } from './lib/hitSource';
 
-export type BlendMode = 'screen' | 'lighter' | 'exclusion' | 'multiply' | 'overlay';
+export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
+export type BlendMode = (typeof BLEND_MODES)[number];
 /** How a mixer row is laid over what is under it (lib/mixer.ts, `MixBlend`). */
-export type MixBlend = 'own' | 'screen' | 'add' | 'multiply' | 'key';
+export const MIX_BLENDS = ['own', 'screen', 'add', 'multiply', 'key'] as const;
+export type MixBlend = (typeof MIX_BLENDS)[number];
 
 /**
  * What a liquid writes into the plate's liquid field when it lands — see
@@ -242,7 +245,8 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     // Its viscosity reaches the thin gap through the phase (FERRO_NU).
     behaviour: { magnetic: 1, weight: 0.3, polarity: -0.6, viscosity: 6, density: 1.21, tension: 29 } },
 ];
-export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
+export const LED_MODES = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'] as const;
+export type LedMode = (typeof LED_MODES)[number];
 /**
  * Fluid solver grid: an edge length the solver runs at, or 'auto' to leave it
  * to the governor. There was a 'cpu' member here for the 192² JavaScript
@@ -250,7 +254,20 @@ export type LedMode = 'single' | 'rainbow' | 'ocean' | 'fire' | 'cyberpunk';
  * with it rather than quietly resolving to 256².
  */
 export type SimResolution = 'auto' | number;
-export type AudioFeature = 'none' | 'volume' | 'bass' | 'mid' | 'treble' | 'energy' | 'timbre' | 'complexity';
+export const AUDIO_FEATURES = ['none', 'volume', 'bass', 'mid', 'treble', 'energy', 'timbre', 'complexity'] as const;
+export type AudioFeature = (typeof AUDIO_FEATURES)[number];
+
+export const ON_NEW_SONG_MODES = ['off', 'preset', 'random'] as const;
+export type OnNewSongMode = (typeof ON_NEW_SONG_MODES)[number];
+
+export const VISCOSITY_MODES = ['thick', 'thin'] as const;
+export type ViscosityMode = (typeof VISCOSITY_MODES)[number];
+
+export const MACRO_CAMERA_MODES = ['hold', 'follow', 'auto'] as const;
+export type MacroCameraMode = (typeof MACRO_CAMERA_MODES)[number];
+
+export const RENDER_STYLES = ['show', 'photo'] as const;
+export type RenderStyle = (typeof RENDER_STYLES)[number];
 
 export interface AudioMappings {
   velocity: AudioFeature;
@@ -304,8 +321,13 @@ export type SceneFeature =
  * same region ranged on its own, and a look saved with one must not quietly
  * start reading the other. It shares `sound`'s master, Sound Impact, because
  * it is the same microphone.
+ *
+ * `hits` is the microphone a third time, by its moments: how hard each
+ * drum's last hit was, held and let fall over a quarter second, and the note
+ * (`lib/hitSource.ts`). Its own source because its features are its own
+ * names, and Sound Impact is its master too.
  */
-export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'shape';
+export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -315,13 +337,24 @@ export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'shape';
  * migration step to get wrong. Read them as `?? 'room'` and `?? 'all'` and the
  * old shape is a special case of the new one rather than a thing to convert.
  */
+/**
+ * What a hand does to one place on the plate (PLAN 25h, lib/areaCords.ts):
+ * warms it, stirs it with a paddle, pours into it, or picks which of its
+ * bottles pours. Only a cord aimed at an area can take one, and a cord aimed
+ * at an area can take nothing else.
+ */
+export type AreaTarget = 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue';
+
 export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
   /** A room/film feature, an audio one or a named source, depending on the source. */
-  feature: SceneFeature | AudioFeature | SourceName;
-  /** Any numeric setting — the same list a MIDI fader can learn. */
-  setting: keyof VisualizerSettings;
+  feature: SceneFeature | AudioFeature | SourceName | HitFeature;
+  /**
+   * Any numeric setting — the same list a MIDI fader can learn — or, on a
+   * cord aimed at an area, what the hand does there (`AreaTarget`).
+   */
+  setting: keyof VisualizerSettings | AreaTarget;
   /** How far the feature moves it, as a share of the setting's travel. −1..1. */
   depth: number;
   /**
@@ -332,6 +365,23 @@ export interface SceneMapping {
    * you aim it at, which is why the panel will not let you aim one.
    */
   layer?: number | 'all';
+  /**
+   * Which of the look's areas of the dish it works in (an index into its
+   * `PRESET_AREAS`, lib/plateAreas.ts), or absent for the whole plate as
+   * before. With one, `setting` is an `AreaTarget`: the hand works there and
+   * the rest of the plate is left as the look has it (PLAN 25h).
+   */
+  area?: number;
+  /**
+   * The cord's gate (the least of PLAN 30a): it opens when the reading
+   * crosses `threshold` (0..1), rises to the hit's height over `attack`
+   * seconds while open and falls over `release` once the reading drops back.
+   * All three absent, the cord follows its reading as it always has. Read on
+   * area cords (lib/areaCords.ts CordGate).
+   */
+  threshold?: number;
+  attack?: number;
+  release?: number;
 }
 
 export interface VisualizerSettings {
@@ -354,7 +404,7 @@ export interface VisualizerSettings {
   stockGrainSize: number;
   stockWeave: number;
   stockGate: number;
-  onNewSong: 'off' | 'preset' | 'random';
+  onNewSong: OnNewSongMode;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -535,6 +585,18 @@ export interface VisualizerSettings {
    * where it is on the stage while the dish turns under it.
    */
   tiltDirection: number;
+  /**
+   * How far a tilt sloshes the liquid: the dish's own momentum (lib/slosh.ts,
+   * PLAN 18a-13). Tipped one way and then the other, the colour runs downhill,
+   * piles on the low edge, and the reversal sends a wave back across it that
+   * rings off the rim and mixes. 0 (the default) is the plate as it was: the
+   * gap's drag has no inertia, so a held tilt changes the level and nothing
+   * else. It follows the tilt (Gravity and Tilt Direction, the phone's tilt)
+   * wherever Gravity's value came from, never the sound directly (PLAN 18a-13e),
+   * and never moves the frame.
+   * Optional so a look saved before it reads as 0.
+   */
+  slosh?: number;
   /** Heat diffusing faster than dye, as it does in water (about a hundred times): with Dye Weight, the double-diffusive salt fingers. */
   doubleDiffusion: number;
   /** The ferrofluid under a strong field: its magnetic particles repel each other and it breaks into a maze of stripes (Ohta–Kawasaki). */
@@ -555,7 +617,7 @@ export interface VisualizerSettings {
   spectralOptics: number;
   glassSmear: number;
   rainDrip: number;
-  viscosity: 'thick' | 'thin';
+  viscosity: ViscosityMode;
   polarity: number; // Repulsion between blobs
   
   /*
@@ -575,6 +637,7 @@ export interface VisualizerSettings {
   // Mixer
   layerCount: number;
   blendMode: BlendMode;
+  twoProjectors: number;
   gooeyEffect: number; // For metaball-like blending
   rotationSpeed: number;
   /*
@@ -713,7 +776,7 @@ export interface VisualizerSettings {
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
-  plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
+  plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid
    * (lib/plateRock.ts): Plate Rock's cover glass sliding the whole picture,
@@ -729,6 +792,8 @@ export interface VisualizerSettings {
   chemistryPattern: number;
   chemistryWidth: number;
   turingPrint: number;        // the reaction drawn as starch's blue-black complex with it, in equilibrium, black on the lamp (26d); 0 deposits colour as the coral looks do
+  turingInk: number;          // the print's colour: 0 is starch's own indigo (what a CIMA dish is), above 0 a hue round the wheel, as another indicator would make it (26d-3)
+  turingDrift: number;        // how far the print's feed and kill wander across the plate over 30 to 90 s, so the pattern keeps changing once it has grown (26d-6); 0 is the constant map
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
@@ -802,7 +867,16 @@ export interface VisualizerSettings {
   transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
-  beatSqueeze: number;        // the rhythm plate: a squeeze pulse pressed into the lead plate on every kick
+  beatSqueeze: number;        // the rhythm sheet: each kick presses a dent as wide as the sheet bends over the liquid (lib/squish.ts kickPress)
+  /**
+   * Kick Bloom: how far each kick throws a ring of dye outward from the bass
+   * spot, and the little push on each droplet. 1 is the ring every look has
+   * always had; 0 is none. It is the kick's visible outward pulse, apart from
+   * Beat Squeeze (the glass pressed, 0 on every look but Bass Drop) and Plate
+   * Rock (the dish tipped); before this dial all three read alike and only
+   * the first could be turned off.
+   */
+  kickBloom: number;
   /**
    * Accent the One: how far the kick's press (Beat Squeeze) and push (Plate
    * Rock) follow the kick's place in the bar, as a projectionist plays a
@@ -838,7 +912,7 @@ export interface VisualizerSettings {
   iridescence: number;        // thin-film colour running round bubble rims
 
   // Photograph — the macro shot of oil on water rather than the projected show
-  renderStyle: 'show' | 'photo'; // 'photo': a lit paper backdrop, dye as transmission, drops as domes with a softbox in them
+  renderStyle: RenderStyle; // 'photo': a lit paper backdrop, dye as transmission, drops as domes with a softbox in them
   paperA: string;             // the backdrop's two colours
   paperB: string;
   camera: number;             // the camera pass as a whole (0 = off): refraction, depth of field, bloom, chromatic aberration, the sensor's roll-off
@@ -865,11 +939,11 @@ export interface VisualizerSettings {
    * aim, 'follow' locks onto the liquid under the aim and rides with it,
    * 'auto' picks its own subjects and cuts between them. Absent is hold.
    */
-  macroCamera?: 'hold' | 'follow' | 'auto';
+  macroCamera?: MacroCameraMode;
   /** Where the closeup camera is aimed, across and up the plate (0-1). */
   macroAimX?: number;
   macroAimY?: number;
-  macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks, punches with the bass, tremor from the treble
+  macroSync: number;          // how much the closeup camera takes its cues from the music: cuts on kicks; its punch with the bass, push with the energy and tremor from the treble move the frame, so they also need Frame Sway (lib/macroCamera.ts)
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries
@@ -906,7 +980,16 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   stockGrainSize: 2,
   stockWeave: 0.6,
   stockGate: 0.35,
-  onNewSong: 'preset',      // a new song gets a new look
+  /*
+    Keep, until the boundary can be trusted. This was 'preset', and the owner
+    found on 2026-10-24 that it does not catch where songs start and end: it
+    fires only on 1.8 s of quiet after 20 s of song, or when song ID (asked
+    every 12 to 35 s) names a different track, so a crossfade or a gapless set
+    never changes the look and a quiet bridge can. A look that changes at the
+    wrong moment is worse on a wall than one that never changes, so a new song
+    keeps the look unless someone asks for more. `npm run music` holds this.
+  */
+  onNewSong: 'off',
   beatPrediction: 0.7,
   beatLead: 80,
   /*
@@ -969,6 +1052,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
+  slosh: 0,                 // the plate as it was: a tilt changes the level and the liquid does not slop (lib/slosh.ts)
   doubleDiffusion: 0,
   ferroLabyrinth: 0,
   mazeDetail: 0,            // the maze as it always was (MAZE_PERIOD)
@@ -988,6 +1072,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   dropHeight: 0,
   layerCount: 1,
   blendMode: 'screen',
+  twoProjectors: 0,
   gooeyEffect: 0.45,        // organic blob merging
   rotationSpeed: 0.0,       // no rotation — flat plate simulation
   spinDrag: 0.25,           // a flicked plate halves its speed in about a second
@@ -1059,6 +1144,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   layerScaleVariety: 0.5,
   hueJourney: 3,
   beatSqueeze: 0.0,
+  kickBloom: 1,               // the ring each kick has always thrown
   beatAccent: 0,            // off: every kick pressed alike, as every look had it
   backgroundLoop: 0.5,
   kaleidoscope: 0,
@@ -1087,6 +1173,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   chemistryPattern: 0,
   chemistryWidth: 0.5,
   turingPrint: 0,
+  turingInk: 0,
+  turingDrift: 0,
   gelWheel: 0,
   gelSpeed: 0.5,
   filmMix: 0.7,
@@ -1146,9 +1234,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroAimX: 0.5,
   macroAimY: 0.5,
   macroSync: 0.5,
-  macroCells: 0.75,
+  macroCells: 0,           // opt-in since 33g: the default closeup is the liquid, not packed cells
   macroCellScale: 0.5,
-  macroLacing: 0.55,
+  macroLacing: 0,
   macroDepth: 0.5,
   macroEdgeDetail: 0.6,
   macroRelief: 0.7,

@@ -116,7 +116,7 @@ async function scene(labels) {
   await lab.step(3);
   const QUIET = { macroCells: 0, macroLacing: 0, macroDepth: 0, macroEdgeDetail: 0, macroRelief: 0 };
   const views = {
-    plate: [{}, { zoom: 1.3, macroAmount: 0, view: true, cx: 0.5, cy: 0.5 }],
+    plate: [{ lampGround: 1 }, { zoom: 1.3, macroAmount: 0, view: true, cx: 0.5, cy: 0.5 }],
     closeup: [QUIET, { zoom: 3, macroAmount: 1, view: true, cx: 0.5, cy: 0.5 }],
   };
   // A bubble's film wobbles with the clock (0.08 of a period, every 15.7 s),
@@ -223,14 +223,26 @@ check('with no film on the plate, Film Physics changes nothing', differ(m.bare0,
   same with the film off (Iridescence 0), so what is compared is what the
   film adds.
 */
-const bubbleStats = (v) => {
+/*
+  The projector's bubble used to be a disc of the dye's own hue, so "the
+  pixels the bubbles change" found its whole footprint. Its middle is now
+  the plate itself (light through a slab of air, 33e), identical to the
+  render with no bubbles, so the flat render differs from none only in the
+  dark band, and on the default black ground the band is black on black:
+  0 pixels. The projected view therefore draws on the lamp ground (a bubble
+  is a dark ring on something lit) and, with `withFilm`, counts a pixel
+  the film changes by more than two levels a channel as the bubble's too,
+  so the middle that carries the film's faint tint is measured and not only
+  its band. The closeup keeps the first rule alone.
+*/
+const bubbleStats = (v, withFilm = false) => {
   let n = 0, c0 = 0, c1 = 0, cf = 0, moved = 0, y0 = 0, y1 = 0, yf = 0;
   const chroma = (a, i) => Math.max(...px(a, i)) - Math.min(...px(a, i));
   const yellow = (a, i) => (a[i] + a[i + 1]) / 2 - a[i + 2];
   for (const k of CLOCKS) {
   const none = m[`${v}None${k}`], flat = m[`${v}Flat${k}`], r0 = m[`${v}0${k}`], r1 = m[`${v}1${k}`];
   for (let i = 0; i < none.length; i += 4) {
-    if (sum3(flat, none, i) < 0.1 * 255 * 3) continue;
+    if (sum3(flat, none, i) < 0.1 * 255 * 3 && !(withFilm && (sum3(r0, flat, i) > 6 || sum3(r1, flat, i) > 6))) continue;
     n++; cf += chroma(flat, i); c0 += chroma(r0, i); c1 += chroma(r1, i);
     yf += yellow(flat, i); y0 += yellow(r0, i); y1 += yellow(r1, i);
     moved += sum3(r1, r0, i);
@@ -239,7 +251,7 @@ const bubbleStats = (v) => {
   return { n, add0: (c0 - cf) / n, add1: (c1 - cf) / n, moved: moved / n, yRainbow: (y0 - yf) / n, ySoap: (y1 - yf) / n };
 };
 {
-  const p = bubbleStats('plate');
+  const p = bubbleStats('plate', true);
   check('the projected bubbles\' film fades to a faint tint, the light through a film', p.n > 2000 && p.add0 > 10 && p.add1 < 0.25 * p.add0,
     `colour the film adds ${p.add1.toFixed(1)} against the rainbow's ${p.add0.toFixed(1)}, over ${p.n} bubble pixels`);
   const c = bubbleStats('closeup');

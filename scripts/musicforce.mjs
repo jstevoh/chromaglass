@@ -98,6 +98,8 @@ const { BassPress, bassPressDepth, BASS_PRESS, BASS_STEP, stirOf, levels01 } = a
   burst runs only off a thin gap, the hand is handed where the burst was,
   and every plate is handed its hand on every running step from outside the
   music's block (so a plate the music left, or music that stopped, lets up).
+  The depth is the velocity route's through `bassPressFor` (squish.ts: the
+  route over its ceiling, Sound Drive and the passage, PLAN 28e).
 */
 {
   const src = fs.readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
@@ -109,7 +111,7 @@ const { BassPress, bassPressDepth, BASS_PRESS, BASS_STEP, stirOf, levels01 } = a
   const inner = src.slice(opened, each);
   const depth = [...inner].reduce((d, ch) => d + (ch === '{' ? 1 : ch === '}' ? -1 : 0), 0);
   check("the frame loop: the burst only off a thin gap, the hand set where the burst was and handed to every plate after the music's block",
-    src.includes('if (vel01 > 0.25 && !activeFluid.thinGap) {') && set > block && between.includes('bassPressDepth(vel01,') && each > set && hand > each && hand - each < 400 && depth === 0,
+    src.includes('if (vel01 > 0.25 && !activeFluid.thinGap) {') && set > block && between.includes('bassPressFor(velRaw,') && each > set && hand > each && hand - each < 400 && depth === 0,
     `braces between the music's block and the hand: ${depth} open`);
 }
 

@@ -47,6 +47,8 @@ export interface RawLevels {
   spectralCentroid: number;
   timbre: number;
   complexity: number;
+  /** How loud this passage of the music is against its loud passages, as an amplitude, 0 to 1 (`Passage`). */
+  passage: number;
   calibration: RoomCalibration | null;
 }
 
@@ -88,6 +90,7 @@ export class SoundLevels {
     energy: new AutoRange({ minSpan: 0.02 }),
     timbre: new AutoRange({ minSpan: 4, floorRise: 40, ceilFall: 25 }),
   };
+  private readonly passage = new Passage();
   private calibration: RoomCalibration | null = null;
   private readonly bassEnd: number;
   private readonly midEnd: number;
@@ -158,6 +161,8 @@ export class SoundLevels {
       energySum += n * n;
     }
     const rawEnergy = Math.sqrt(energySum / binCount);
+    // Before any range or trim: the passage is the sound's own amplitude.
+    const passage = this.passage.update(rawEnergy, dt);
 
     // ── Map each band onto its own learned range ──────────────
     // A band is reported as where it sits between its quietest and its
@@ -228,12 +233,104 @@ export class SoundLevels {
     const zcr = (zeroCrossings / (binCount - 1)) * 100;
     const complexity = Math.min(100, zcr * 15) * (autoCal ? calibratedTrim(sens) : sens);
 
-    return { volume, bass, mid, treble, energy, spectralCentroid, timbre, complexity, calibration };
+    return { volume, bass, mid, treble, energy, spectralCentroid, timbre, complexity, passage, calibration };
   }
 }
 
+/*
+  How loud this passage is, against the song's loud passages, as a sound's
+  amplitude: near 1 in the groove (0.88 to 0.97 measured: the reference rides
+  the groove's louder bars, so its quieter ones read a little under), about
+  0.4 in a breakdown 8 dB down.
+
+  What was reported (the showreel, PLAN 28d): on 28 of 41 looks the plate
+  moved more in a song's quiet breakdown than in the groove around it. A real
+  show goes quiet with the band. The cause was not one place but the shape
+  of the whole ear. Every level above is a decibel reading ranged against its
+  own floor and ceiling, which is right for a microphone in an unknown room
+  and wrong across a song's sections: a bass 8 dB down still swings between
+  kick and gap over as many decibels as it did, so it reads as wide a swing
+  as the groove did. And the ceiling falls back in 8 to 18 seconds, so a
+  sixteen-second breakdown is turned back up before it ends. Measured on the
+  showreel's minute (Funkorama from 78 s, `npm run breakdown` holds the
+  same shape on a synthetic song), the band levels fell only to 0.6 to 0.76
+  of the groove's in the breakdown while the song's amplitude fell to 0.4.
+
+  A hand on a dish answers the sound's pressure, which is an amplitude, not
+  its decibels: a band playing at 0.4 of its pressure is a hand pushing at
+  0.4. So this is the one reading the music's hands are scaled by
+  (LiquidVisualizer: the pours, the bursts and the bass's press). It is the
+  waveform's RMS, which is an amplitude already, over about a bar (`HEARD_S`),
+  against the loud level the song has held (`REF_RISE_S`, `REF_FALL_S`). It
+  is left out of the levels themselves, which the beat clock, the sound
+  mappings and the meters read and which should keep fitting the room.
+
+  Why a minute-scale reference and not the ceilings' own seconds. A section
+  of a song lasts 8 to 32 bars, 15 to 60 seconds; a reference that forgot
+  the groove in ten would make every breakdown the new normal halfway
+  through, which is what the ceilings above did. Forty-five seconds keeps a
+  sixteen-second breakdown at 0.45 of the groove at its end. The price is a
+  listener turning the music down 10 dB: the plate calms with it and takes
+  a minute or two to learn the new level (measured, `npm run breakdown`:
+  0.54 a minute on, 0.78 two, 0.91 three). That is the show following the
+  volume knob, which is fair. The same holds live between songs: a render
+  starts fresh with each song, but the live ear keeps one reference for its
+  audio context, so a track mastered 10 dB quieter than the one before plays
+  its first minute or two with gentler hands (PLAN 28e-2: forget the
+  reference when a song ends, from the song-change clock).
+*/
+/** Seconds of sound the passage's loudness is heard over: about a bar at 120 bpm. */
+export const HEARD_S = 2;
+/** Seconds for the reference to rise to a louder passage: a few bars, so one loud bar is not the song's level. */
+export const REF_RISE_S = 3;
+/** Seconds for the reference to fall to a quieter one: a section and more, so a breakdown stays quiet. */
+export const REF_FALL_S = 45;
+/** A power under this (the waveform's RMS 0.003, -50 dBFS, under the bytes' rounding) is nothing heard yet. */
+const HEARD_FLOOR = 1e-5;
+
+export class Passage {
+  /** The mean power over `HEARD_S`, and the loud level the song has held, as the waveform's mean square. */
+  private power = 0;
+  private reference = 0;
+
+  /** Feed the waveform's RMS (0 to 1) every frame; returns this passage's amplitude against the reference, 0 to 1. */
+  update(rms: number, dt: number): number {
+    const p = Number.isFinite(rms) ? rms * rms : 0;
+    const step = Math.max(0, Math.min(0.25, Number.isFinite(dt) ? dt : 0));
+    this.power += (p - this.power) * (1 - Math.exp(-step / HEARD_S));
+    const tau = this.power > this.reference ? REF_RISE_S : REF_FALL_S;
+    this.reference += (this.power - this.reference) * (1 - Math.exp(-step / tau));
+    return this.read();
+  }
+
+  /**
+   * 1 until something has been heard, so a stream's first frames and a
+   * silent room pass the music's hands as they were (the volume gate and the
+   * room's gate close them in silence, as before); then the amplitude ratio.
+   * The reference rises slower than the passage, so a song's first bars read
+   * 1, not more, and a louder bar than the song has held is 1 too: the hands
+   * are never pushed past what the look set.
+   */
+  read(): number {
+    if (!(this.reference > HEARD_FLOOR)) return 1;
+    return Math.min(1, Math.sqrt(Math.max(0, this.power) / this.reference));
+  }
+
+}
+
+/**
+ * How hard the music's hands push this frame: Sound Drive over its 0.45 "1×",
+ * times the passage (an absent one is 1, the plate as it was). One function
+ * so the plate and `npm run breakdown` scale the same hands.
+ */
+export function musicHands(audioImpact: number | undefined, passage: number | undefined): number {
+  const impact = Number.isFinite(audioImpact) ? (audioImpact as number) : 0.45;
+  const g = Number.isFinite(passage) ? Math.max(0, Math.min(1, passage as number)) : 1;
+  return (impact / 0.45) * g;
+}
+
 /** The smoothed fields, as `AudioData` carries them. */
-export type SmoothedLevels = Omit<RawLevels, 'calibration'>;
+export type SmoothedLevels = Omit<RawLevels, 'calibration' | 'passage'> & { passage?: number };
 
 /**
  * The per-feature exponential smoothing, one frame's worth.
@@ -247,8 +344,8 @@ export type SmoothedLevels = Omit<RawLevels, 'calibration'>;
  */
 export function smoothLevels(prev: SmoothedLevels | null, next: SmoothedLevels, frames = 1): SmoothedLevels {
   if (!prev) {
-    const { volume, bass, mid, treble, energy, spectralCentroid, timbre, complexity } = next;
-    return { volume, bass, mid, treble, energy, spectralCentroid, timbre, complexity };
+    const { volume, bass, mid, treble, energy, spectralCentroid, timbre, complexity, passage } = next;
+    return { volume, bass, mid, treble, energy, spectralCentroid, timbre, complexity, passage };
   }
   const k = (c: number) => (frames === 1 ? c : 1 - Math.pow(1 - c, frames));
   const S = LEVEL_SMOOTHING;
@@ -261,6 +358,8 @@ export function smoothLevels(prev: SmoothedLevels | null, next: SmoothedLevels, 
     spectralCentroid:prev.spectralCentroid+ (next.spectralCentroid- prev.spectralCentroid)* k(S.centroid),
     timbre:          prev.timbre          + (next.timbre          - prev.timbre)          * k(S.timbre),
     complexity:      prev.complexity      + (next.complexity      - prev.complexity)      * k(S.complexity),
+    // Already heard over a bar and against a minute: smoothing it again would only delay it.
+    passage:         next.passage,
   };
 }
 

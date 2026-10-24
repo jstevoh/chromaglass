@@ -440,16 +440,21 @@ try {
   check('the page has a title', !!title && title.length > 0, title);
 
   // ── The first five seconds ────────────────────────────────────────
-  // A stranger's first visit has to *show* what this is, and what this is is a
-  // light show played by music. It used to land on a plate with nothing
-  // driving it until the visitor found a button. The band is silent and opens
-  // no device, so it costs a permission prompt of nothing — but the browser
-  // will not run audio before a gesture, so the earliest it can start is the
-  // first click anywhere, which is what this checks.
+  // The app opens with the sound Source on Off (PLAN.md 14y, the owner's word
+  // 2026-10-22): a click anywhere used to start the band for a first visit, and
+  // that is what a stranger no longer gets. This asks that the click chooses
+  // nothing, then chooses the band the way a hand does, by its button, so every
+  // check below still meets a plate played by the band. The browser will not run
+  // audio before a gesture, so the click is also what lets the analyser open.
   {
     const heard = () => page.evaluate(() => window.chromaglassCastState?.().audio?.volume ?? null);
     check('nothing is listening before the first gesture', (await heard()) === null);
     await page.mouse.click(5, 5);
+    await settle(3000);
+    check('and a click anywhere does not start the band: the Source opens on Off',
+      (await heard()) === null,
+      `volume ${await heard()}`);
+    await clickOn(firstVisible('simulated-audio-button'));
     // The analyser has to open and the room calibration has to learn a floor
     // before a level means anything, which takes seconds by design (and more
     // of them under software rasterisation). This waits for a reading rather
@@ -459,7 +464,7 @@ try {
       await settle(1000);
       playing = await heard();
     }
-    check('a first visit is driven by the band after one click',
+    check('the band button then drives the show',
       playing > 0,
       playing === null ? 'no audio reaching the show at all' : `volume ${Number(playing).toFixed(1)}`);
     check('and it still opened no device to do it',
@@ -979,8 +984,8 @@ try {
   await page.keyboard.press('Escape');
   await settle(500);
   //
-  // The band is already playing by now — a first visit starts it on the first
-  // gesture — so this checks the button *toggles*, which is the thing that can
+  // The band is already playing by now — the first-five-seconds block above chose
+  // it — so this checks the button *toggles*, which is the thing that can
   // break, rather than assuming it starts from off. Clicking it once must stop
   // the band, and clicking it again must start it, and neither may open a
   // device.
@@ -1136,9 +1141,9 @@ try {
     // drained, cleared, zoomed and dragged its way through fifty checks, and
     // the plate it leaves behind is whatever fell out of that — one run
     // measured it at pure black, which made the recovery check below a
-    // comparison of nothing with nothing. The Fillmore look seeds bright and
-    // immediately, so it is a plate that is definitely on.
-    await page.evaluate(() => window.chromaglassApplyPreset?.('fillmore-1969'));
+    // comparison of nothing with nothing. Poster, 1969 is on the lamp, so it is lit
+    // as soon as it is laid and is a plate that is definitely on.
+    await page.evaluate(() => window.chromaglassApplyPreset?.('poster-1969'));
     let before = 0;
     for (let i = 0; i < 15 && !(before > 0.01); i++) { await settle(1000); before = await litness(); }
     check('the wall is lit before the GPU goes away', before > 0.01,
@@ -1760,10 +1765,10 @@ try {
       throughTheHole.ok, `the cursor is over ${throughTheHole.what}`);
 
     // Go must name where it is going, or it is a button you press and hope.
-    await clickOn('cue-oil-on-water');
+    await clickOn('cue-oil-and-water');
     await settle(600);
     const goLabel = (await page.getByTestId('go-button').innerText()).trim();
-    check('and Go names the look it will send', /Oil on Water/i.test(goLabel), goLabel.replace(/\s+/g, ' '));
+    check('and Go names the look it will send', /Oil & Water/i.test(goLabel), goLabel.replace(/\s+/g, ' '));
 
     /*
       ── The screen says what the controller hit ──────────────────
@@ -1784,10 +1789,10 @@ try {
       document.querySelectorAll('[data-midi-hit="true"]').length);
     check('nothing is lit before anything is pressed', (await lit()) === 0, `${await lit()} lit`);
     const pressedAt = Date.now();
-    await page.evaluate(() => window.chromaglassTouch?.('preset:oil-on-water'));
+    await page.evaluate(() => window.chromaglassTouch?.('preset:oil-and-water'));
     await settle(120);
     const onNow = await page.evaluate(() => {
-      const row = document.querySelector('[data-testid="cue-oil-on-water"]');
+      const row = document.querySelector('[data-testid="cue-oil-and-water"]');
       return { hit: row?.getAttribute('data-midi-hit') === 'true', any: document.querySelectorAll('[data-midi-hit="true"]').length };
     });
     check('a controller press lights the row it fired',
@@ -2066,7 +2071,7 @@ try {
     await settle(6000);
     const calm = await jumps(2000);
     const from = await colour();
-    await goTo('deep-ocean', 4);
+    await goTo('jellyfish-bloom', 4);
     const fade = await jumps(4400);
     await settle(3600);
     const faded = await colour();
@@ -2084,7 +2089,7 @@ try {
         ? 'no frame'
         : `largest step in brightness ${fade.worst.toFixed(1)} through the fade, against ${calm.worst.toFixed(1)} on the plate alone `
         + `(fade ${fade.seen.map((v) => (v === null ? 'null' : v.toFixed(0))).join(' ')})`);
-    await goTo('deep-ocean', 0);
+    await goTo('jellyfish-bloom', 0);
     await settle(8000);
     const own = await colour();
     const f = (c) => (c ? c.map((v) => v.toFixed(2)).join('/') : 'n/a');
@@ -2095,7 +2100,7 @@ try {
       okColour,
       isNaN(dFaded) || isNaN(dFrom)
         ? 'no frame'
-        : `Solar Flare ${f(from)}, faded into Deep Ocean ${f(faded)}, Deep Ocean cut to ${f(own)}: `
+        : `Solar Flare ${f(from)}, faded into Jellyfish Bloom ${f(faded)}, Jellyfish Bloom cut to ${f(own)}: `
         + `${dFaded.toFixed(3)} from its own colour against ${dFrom.toFixed(3)} for Solar Flare`);
   }
 

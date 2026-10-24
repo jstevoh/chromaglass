@@ -57,6 +57,7 @@ import { WebGPUFluid } from './fluid';
 import { WebGPUPlate } from './plate';
 import { WebGPUFrameProbe } from './probe';
 import { WebGPUAir } from './air';
+import { WebGPUSlosh } from './slosh';
 import { WebGPUParticles } from './particles';
 import { WebGPUCamera } from './camera';
 import { WebGPUOutput } from './output';
@@ -198,8 +199,9 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   const queue = builds.slice();
   const asked: string[] = [];
   /*
-    One render pipeline compiling at a time, the other lanes taking the
-    compute kernels behind it in the meantime.
+    The opening's three `fluid/fill` kernels first, before the display's
+    render pipeline is asked; then one render pipeline compiling at a time,
+    the other lanes taking the compute kernels behind it in the meantime.
 
     What was reported: main's deploy of 5505a2a (run 37196539858) went red
     on startup 4b, the page's thread held from outside it for 4.98 s from
@@ -216,15 +218,33 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     waited behind them, 1.92 to 4.98 s on the seven runs since. So three
     render compiles at once bought nothing (they were served one after
     another anyway) and held the page for all three.
-    The display is still asked for first, as #249 chose, for the reason it
-    gave: it is the one compile of seconds, and asked last it ran alone
-    while the other lanes stood idle.
+
+    Asking `plate/display` alongside the first two `fluid/fill` kernels still
+    left a GPU-process stall on 14 of 92 Mac runs (PLAN.md 14v-6): on run
+    38028336404 `fluid/fill:rgba32float` was asked at 2.64 s beside
+    `plate/display` and took 4.32 s (0.31 s compile, 4.00 s first use waiting
+    behind the display's compile and draw), so a frame asked at 3.42 s waited
+    on the GPU process until 6.80 s (a 3.38 s stop). Asking the three
+    `fluid/fill` kernels first and holding the display's ask until they are
+    given lets that first compile and use settle in a few tenths of a second,
+    after `quiet.still()` has let the opening's mount frames finish, while
+    nothing is drawn; the display is asked the moment the fills settle and
+    still runs beside the remaining compute kernels.
   */
+  const isFill = (b: Prep): boolean => b.key.startsWith('fluid/fill:');
+  let fillLeft = builds.filter(isFill).length;
+  let fillsDone: (() => void) | null = null;
+  const fillsBusy: Promise<void> | null = fillLeft > 0 ? new Promise((r) => { fillsDone = r; }) : null;
   let renderBusy: Promise<void> | null = null;
-  // The page held still across the render compiles (`Quiet`, below): asked
-  // once, before the first of them, and let go when the last has settled.
-  let renderLeft = quiet ? builds.filter((b) => b.kind === 'render').length : 0;
+  // The page held still across the opening's first fills and render compiles
+  // (`Quiet`, below): asked once, before the first of them, and let go when the
+  // last has settled.
+  let quietLeft = quiet ? builds.filter((b) => isFill(b) || b.kind === 'render').length : 0;
   const take = (): Prep | undefined => {
+    if (fillLeft > 0) {
+      const i = queue.findIndex(isFill);
+      return i < 0 ? undefined : queue.splice(i, 1)[0];
+    }
     const i = renderBusy ? queue.findIndex((b) => b.kind !== 'render') : 0;
     return i < 0 ? undefined : queue.splice(i, 1)[0];
   };
@@ -263,19 +283,24 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
         startup's check of the half went red.
       */
       const left = stage === 'later' ? PREPARE_TIMEOUT_MS : t0 + PREPARE_TIMEOUT_MS - performance.now();
-      if (left <= 0) { timedOut = true; break; }
+      if (left <= 0) { timedOut = true; fillLeft = 0; fillsDone?.(); break; }
       const prep = take();
-      // Only render pipelines are left and one is compiling: wait for it.
-      if (!prep) { await renderBusy; continue; }
+      // Only fills are in flight, or only render pipelines are left and one is compiling: wait for it.
+      if (!prep) { await (fillLeft > 0 ? fillsBusy : renderBusy); continue; }
       asked.push(prep.key);
       const b0 = performance.now();
       const stamps: BuildTimes = {};
       const built = prep.build(stamps);
       const waited = within(built.then(() => undefined), left);
-      if (prep.kind === 'render') {
+      if (isFill(prep)) {
+        void waited.then(() => {
+          if (fillLeft > 0 && --fillLeft === 0) fillsDone?.();
+          if (quiet && --quietLeft === 0) quiet.go();
+        });
+      } else if (prep.kind === 'render') {
         renderBusy = waited.then(() => {
           renderBusy = null;
-          if (quiet && --renderLeft === 0) quiet.go();
+          if (quiet && --quietLeft === 0) quiet.go();
         });
       }
       const settled = await waited;
@@ -285,21 +310,22 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       times.push([prep.key, Math.round(from), Math.round(now - from)]);
       const c = stamps.compiled;
       raw.push([prep.key, Math.round(b0), c == null ? null : Math.round(c - b0), c == null || stamps.used == null ? null : Math.round(stamps.used - c)]);
-      if (!settled) { timedOut = true; break; }
+      if (!settled) { timedOut = true; fillLeft = 0; fillsDone?.(); break; }
       if (await built) ready++;
     }
   };
   /*
     Held still before any lane starts, not as a lane takes its first render
-    pipeline: an await between \`take\` and \`renderBusy\` let all three lanes
+    pipeline: an await between `take` and `renderBusy` let all three lanes
     take a render pipeline while the first waited, and the opening asked for
-    three at once (#283's first Mac run: \`air/air splat\` 3.32 s, under way
-    through a 2.15 s frame gap). The render pipelines are asked first anyway.
+    three at once (#283's first Mac run: `air/air splat` 3.32 s, under way
+    through a 2.15 s frame gap). Waiting here also lets the opening's mount
+    frames present before the first fill is asked of the GPU.
   */
-  if (renderLeft > 0) await quiet?.still().catch(() => undefined);
+  if (quietLeft > 0) await quiet?.still().catch(() => undefined);
   await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
   // Gone, timed out or a build that never settled: never left held still.
-  if (quiet && renderLeft > 0) quiet.go();
+  if (quiet && quietLeft > 0) quiet.go();
   /*
     The first uses, handed over as each compile came in and not waited for
     there (`firstUse` in `gpu/kit.ts` on why), waited for here, once, so
@@ -322,7 +348,8 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
 }
 
 /**
- * What the page holds still while the opening's render pipelines compile.
+ * What the page holds still while the opening's first fills and render
+ * pipelines compile.
  *
  * What was reported: the first deploy with the intro over the opening
  * (`lib/intro.ts`, run 37233245217) went red on `npm run startup`'s "no
@@ -342,15 +369,17 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
  * So the intro holds still for those seconds: it would have frozen anyway,
  * and still, the page keeps its frames, and with them the desk answering a
  * press. `still` resolves once the page has drawn the still picture (a
- * frame or two), so the last moving frame is not left queued behind the
- * first compile; `go` lets it move again. Asked only in the opening, and
- * only while the intro is up (`introStill`).
+ * frame or two), so the last moving or mounting frame is not left queued
+ * behind the first compile; `go` lets it move again. Asked only in the
+ * opening, and only while the intro is up (`introStill`).
  *
  * That caught the render compiles and not what comes before them: on a
  * cold Mac the GPU process is as busy starting the device, and the intro
  * moving through that stopped the frames as long (`lib/intro.ts` has the
  * runs). So the intro now starts still, from the first paint, and the
- * opening's `still` finds it so; `go` here is still what lets it move.
+ * opening's `still` waits two frames after the desk has taken it in so
+ * nothing from the mount is still in flight when the first fill is asked;
+ * `go` here is still what lets it move.
  */
 export interface Quiet {
   still(): Promise<void>;
@@ -367,14 +396,16 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUPlate.prepare(device, format, PICTURE_FORMAT, open),
     ...WebGPUFrameProbe.prepare(device),
     ...WebGPUAir.prepare(device),
+    ...WebGPUSlosh.prepare(device),
     ...WebGPUParticles.prepare(device, open),
     ...WebGPUCamera.prepare(device, format, open),
     ...WebGPUOutput.prepare(device, format),
     ...WebGPUPostChain.prepare(device, format, open),
   ];
   /*
-    The render pipelines first, the plate's display first of all (it heads
-    its owner's list); the compute kernels after, in their owners' order.
+    The opening's `fluid/fill` kernels first, then the render pipelines with
+    the plate's display first among them (it heads its owner's list), and the
+    remaining compute kernels after, in their owners' order.
 
     What was measured: with three in flight, the opening's fifty took from
     0.46 s to 9.23 s, and the last 1.34 s of it was the display alone, from
@@ -382,22 +413,25 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     its "slowest ahead"). It is one compile of seconds (1.3 to 2.2 s cold on
     CI's Mac) among forty-nine of tenths, and it was asked for forty-fifth,
     once the solver's kernels had all been handed out, so the other two
-    lanes ran dry while it finished. Asked for first it runs beside them
-    instead, and the opening ends when the most work does, not when the
-    longest compile asked last does: the order a list of jobs on a few
-    workers wants, longest first. The kind is the measure of length here
-    because it is the one the code knows: every render pipeline built ahead
-    draws a picture (the display's is the whole plate), every compute
-    kernel moves one field, and the slowest compute in any run read was
-    0.44 s. Sorted, not reordered by hand, so a new render pipeline in any
+    lanes ran dry while it finished. Asked for ahead of the solver's other
+    kernels it runs beside them instead, and the opening ends when the most
+    work does, not when the longest compile asked last does: the order a list
+    of jobs on a few workers wants, longest first. The kind is the measure of
+    length here because it is the one the code knows: every render pipeline
+    built ahead draws a picture (the display's is the whole plate), every
+    compute kernel moves one field, and the slowest compute in any run read
+    was 0.44 s. Sorted, not reordered by hand, so a new render pipeline in any
     owner's list takes its place without anyone remembering this.
 
-    First in the list, not all at once: `buildInTurn` compiles one render
-    pipeline at a time and gives the other lanes the kernels behind it (why
-    there), so the display goes first and the other render pipelines follow
-    it one by one while the kernels run beside them.
+    First in the list, not all at once: `buildInTurn` asks the three
+    `fluid/fill` kernels first so they are given before the display is asked,
+    and then compiles one render pipeline at a time and gives the other lanes
+    the kernels behind it (why there), so the display goes first among the
+    render pipelines and the others follow it one by one while the kernels
+    run beside them.
   */
-  const ahead = builds.filter((b) => !b.later).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'render' ? -1 : 1));
+  const rank = (b: Prep) => (b.key.startsWith('fluid/fill:') ? 0 : b.kind === 'render' ? 1 : 2);
+  const ahead = builds.filter((b) => !b.later).sort((a, b) => rank(a) - rank(b));
   const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES, opts.quiet);
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).

@@ -238,7 +238,16 @@ fn magnetRadius() -> f32 { return R; }
       .map((l) => ({ id: l.id, w: l.s.magnetStrength, h: lab.magnetDepth(l.s.magnetHeight, l.s.phaseScale) })));
     const peaks = [];
     for (const l of looks) peaks.push((await reachOf(consts.radius, l.h, l.w)).peak);
-    check('every look\'s own magnet, held further off, still raises no spikes', looks.length >= 3 && peaks.every((p) => p < consts.onset),
+    /*
+      The guard that this does not pass on an empty list was "at least three
+      looks": Magnet Garden, Ferro Paint and Ferro Maze. Ferro Maze retired in
+      PLAN 28i-1 (into Magnet Garden), so two looks carry a magnet; the guard is
+      those two, by name, which is as tight as three was (a look that loses its
+      magnet, or a lab that finds none, still reads red), and the bar on the
+      spikes below is as it was.
+    */
+    const MAGNET_LOOKS = ['magnet-garden', 'ferro-paint'];
+    check('every look\'s own magnet, held further off, still raises no spikes', MAGNET_LOOKS.every((id) => looks.some((l) => l.id === id)) && peaks.every((p) => p < consts.onset),
       looks.map((l, i) => `${l.id} ${peaks[i].toFixed(3)}`).join(', ') + ` at most, the onset ${consts.onset}`);
   }
 

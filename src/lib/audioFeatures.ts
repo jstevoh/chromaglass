@@ -47,6 +47,7 @@
 // either.
 import { AutoRange } from './audioCalibration.ts';
 import { fft } from './fft.ts';
+import { ChromaEar } from './chroma.ts';
 
 /**
  * The live analyser's settings, owned here so the hook and the offline path
@@ -151,6 +152,16 @@ export interface OnsetState {
   strength: number;
   /** When the latest hit landed (the frame's own time units), null before the first. */
   at: number | null;
+  /**
+   * How hard the latest hit was, held until the next (0 before the first).
+   *
+   * `strength` is on the one reading the hit landed on, like `hit`, and the
+   * show's loop is handed the newest reading once a frame: a plate drawing at
+   * twenty frames a second never sees two readings in three. Whatever reads a
+   * hit's strength by seeing `at` move (the patch bay's Hits source,
+   * `hitSource.ts`) reads it here.
+   */
+  last: number;
 }
 
 export interface AudioReading {
@@ -168,6 +179,12 @@ export interface AudioReading {
   tonalHigh: number;
   pitch: number;
   pitchClass: number;
+  /**
+   * The twelve notes sounding, C first, summed to 1 (all zero in silence):
+   * the harmony, whatever plays it (`chroma.ts`). The song follower matches
+   * a known song by it (PLAN.md 28g).
+   */
+  chroma: number[];
   brightness: number;
   timbre: number;
   complexity: number;
@@ -389,12 +406,14 @@ class OnsetDetector {
   private peak = 0;
   private peakAt = 0;
   at: number | null = null;
+  last = 0;
 
   reset(): void {
     this.history = []; this.historyAt = [];
     this.lastHit = -Infinity; this.armed = true;
     this.peak = 0; this.peakAt = 0;
     this.at = null;
+    this.last = 0;
   }
 
   /** Is this frame a candidate hit? Also records its flux in the history. */
@@ -431,7 +450,8 @@ class OnsetDetector {
     this.at = time;
     this.peak = Math.max(this.peak * Math.exp(-(time - this.peakAt) / STRENGTH_FALL_S), odf);
     this.peakAt = time;
-    return this.peak > 0 ? odf / this.peak : 1;
+    this.last = this.peak > 0 ? odf / this.peak : 1;
+    return this.last;
   }
 }
 
@@ -487,6 +507,7 @@ export class AudioFeatures {
   private specRing: Float64Array[] = [];
   private specRingPos = 0;
 
+  private readonly chromaEar = new ChromaEar();
   pitch = 0;
   pitchClass = 0;
   brightness = 0;
@@ -504,6 +525,7 @@ export class AudioFeatures {
     this.detectors.forEach(d => d.reset());
     this.specRing.forEach(r => r.fill(ABS_FLOOR_DB));
     this.specRingPos = 0;
+    this.chromaEar.reset();
     this.pitch = 0;
     this.pitchClass = 0;
     this.brightness = 0;
@@ -711,8 +733,11 @@ export class AudioFeatures {
       // A candidate the drum does not own leaves it armed: the next frame may
       // be the same hit seen properly (a kick landing with a snare can read as
       // the snare's body in its first sliver, and as a kick a frame later).
-      onsets[SOURCE_NAMES[r]] = { hit, strength, at: det.at };
+      onsets[SOURCE_NAMES[r]] = { hit, strength, at: det.at, last: det.last };
     }
+
+    const chroma = new Array<number>(12);
+    this.chromaEar.push(db, this.hzPerBin, time, chroma);
 
     return {
       time,
@@ -723,6 +748,7 @@ export class AudioFeatures {
       db: Array.from(this.levelDb.subarray(0, SOURCE_NAMES.length)),
       pitch: this.pitch,
       pitchClass: this.pitchClass,
+      chroma,
       brightness: this.brightness,
       timbre: this.timbre,
       complexity: this.complexity,

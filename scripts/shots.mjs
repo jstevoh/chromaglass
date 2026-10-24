@@ -20,7 +20,7 @@
  * made the images, so a set shot on the wrong machine is obvious rather than
  * merely disappointing.
  *
- *   npm run shots -- --preset fillmore-1969 --seconds 40
+ *   npm run shots -- --preset poster-1969 --seconds 40
  */
 
 import { chromium } from 'playwright';
@@ -54,25 +54,25 @@ const OUT = argOf('out', 'docs/shots');
  * What to photograph.
  *
  * Chosen to show that this is a range rather than one effect: the plate as a
- * ballroom projected it, the Fillmore's separate dishes, a macro closeup, and
- * the photographic render. The wait is per-preset because a plate needs
- * different amounts of time to become itself — the Fillmore has to build its
- * beads and cells, a macro shot has to find a bead to chase.
+ * ballroom poster printed it, the oil and water between two glasses, a macro
+ * closeup, and a reaction growing on glass. The wait is per-preset because a
+ * plate needs different amounts of time to become itself — the poster has to
+ * build its beads and cells, a macro shot has to find a bead to chase.
  */
 const SHOTS = [
-  { id: 'fillmore-1969', name: 'fillmore-east-1969', seconds: 34 },
-  { id: 'oil-on-water', name: 'oil-on-water', seconds: 30 },
+  { id: 'poster-1969', name: 'poster-1969', seconds: 34 },
+  { id: 'oil-and-water', name: 'oil-and-water', seconds: 30 },
   { id: 'macro-bead', name: 'macro-bead', seconds: 30 },
   { id: 'lumia', name: 'lumia', seconds: 25 },
   // These two are the ones that need a real graphics card, and they are at the
   // end so a set shot in a sandbox still has four usable frames in it. Both
   // fill their plate a step at a time — Classic drop by drop from the
-  // automation, the Sensual Laboratory by growing a reaction — and a machine
+  // automation, Turing Print by growing a reaction — and a machine
   // rasterising in software takes so few solver steps a second that what comes
   // out is a photograph of a plate that has not started yet rather than of the
   // look. The wait is long on purpose and still is not enough there.
   { id: 'classic', name: 'classic-light-show', seconds: 75 },
-  { id: 'sensual-laboratory', name: 'sensual-laboratory', seconds: 60 },
+  { id: 'turing-print', name: 'turing-print', seconds: 60 },
 ];
 
 /**
@@ -142,6 +142,8 @@ try {
   // The band drives it, so the plate is doing what it does in front of music
   // rather than sitting in whatever state automation happens to leave it.
   await installFrameReader(page);
+  // The app opens on Source None (PLAN.md 14y), so the band this run plays is chosen the way a reload keeps it.
+  await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
   await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic${engineQuery()}${EXTRA ? `&${EXTRA}` : ''}`, { waitUntil: 'load' });
   await page.mouse.click(8, 8);              // the gesture the band needs
   await page.waitForTimeout(6000);

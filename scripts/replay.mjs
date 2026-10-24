@@ -2,7 +2,7 @@
 /**
  * Replay one seeded roll of `npm run evolve` and print the look it rolled.
  *
- *   WANT_ID=fillmore-1969 WANT_K=9 npm run replay > /tmp/look.json
+ *   WANT_ID=poster-1969 WANT_K=9 npm run replay > /tmp/look.json
  *   WASH_LOOK=/tmp/look.json npm run wash
  *
  * `evolve` rolls from a seeded generator so a failure can be reproduced. This
@@ -27,7 +27,7 @@ const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4
 const LED = ['#ff2d55', '#34c759', '#0a84ff', '#ffd60a'];
 const base = (id) => ({ ...DEFAULT_SETTINGS, ...(PRESETS.find(p => p.id === id)?.settings ?? {}) });
 const ROLLS = Number(process.env.EVOLVE_ROLLS ?? 20);
-const STARTS = ['classic', 'fillmore-1969', 'oil-wheel'];
+const STARTS = ['classic', 'poster-1969', 'clock-glass'];
 const WANT_ID = process.env.WANT_ID ?? STARTS[0];
 if (!STARTS.includes(WANT_ID)) {
   console.error(`WANT_ID must be one of the start looks: ${STARTS.join(', ')}`);

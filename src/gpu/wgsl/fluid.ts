@@ -24,7 +24,7 @@
  */
 
 import { SPIKES_WGSL } from './spikes';
-import { DISH_METRES, DISH_GAP_RANGE } from '../../lib/turntable';
+import { DISH_METRES, DISH_GAP_RANGE, OPEN_RIM } from '../../lib/turntable';
 import { thinGapKernels } from './thinGap';
 import { FILM_TOP, PHASE_VIEW_TOP } from './standing';
 import { filmKernels } from './film';
@@ -46,7 +46,7 @@ struct Sim {
   turbScale: f32,
   spin: f32,
   tension: f32,
-  free9: f32,          // was the fingering push's strength (forcesB)
+  thinGap: f32,        // 1 on a thin gap (PLAN 18a), 0 on legacy plate
   vibI: f32,
   vibF: f32,
   drip: f32,
@@ -94,6 +94,10 @@ struct Sim {
   mags: array<vec4f, 3>,
   // The magnet's radius, every one of them (magnetDisc.ts): Magnet Size's.
   magRadius: f32,
+  // 1 where decayDye clears thin mist first (sparse dark looks only; lib/dyeTarget.ts).
+  surfaceClear: f32,
+  // Lamp intensity scaled by heating rate (PLAN 18f).
+  lampHeat: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -941,7 +945,36 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     This form puts the gradient on ψ, which is smooth everywhere, and has
     the same curl, which is all that survives the projection.
 
-    A.a = the magnet, A.b.x = gain, A.b.y = the most one step may add.
+    And read against the ferrofluid's own drag where a cell holds both
+    liquids (PLAN 29c, the drop's rim). Under Thin Gap a body force is
+    the speed it drives the reference liquid to, and hsPrep's drag on the
+    cell is the two liquids' geometric mean by share (wgsl/thinGap.ts),
+    which is right for the pressure's flow across a mixed cell and wrong
+    for a force on one of the liquids alone: the two lie side by side in
+    the gap, each its own column, and the Kelvin force moves the
+    ferrofluid's column at the ferrofluid's own Darcy mobility whatever
+    share of the cell it fills, while the clear liquid beside it is moved
+    only by the pressure (two-phase Darcy flow, each liquid at its own
+    mobility). So a cell's force-driven speed is φ·f·h²/12μ_ff, where the
+    mixed drag gave φ·f·h²/12μ_mix: a half-full rim cell was driven at a
+    quarter of the full cells' speed per unit of ferrofluid (ν_clear/ν_ff
+    4.5, so 0.5·4.5^0.5 against 4.5), and the rim held the drop back and
+    fell behind it. Measured (handoff, dropdiag): a drop 8 cells across
+    went at 0.42 of the sharp drop's Darcy speed under a weak magnet and
+    0.29 under a strong one, its back rim drawn into a crescent, the
+    smear the owner saw. The factor (ν_clear/ν_ff)^(1−φ) on the force,
+    A.b.z the ratio, is the mixed drag over the ferrofluid's, so what
+    hsPrep's drag leaves is the ferrofluid's own speed, in proportion to
+    its share. 1 off Thin Gap, where there is no drag to read against.
+    The share is then carried at the cell's velocity, the mixture's, which
+    the raised force and the projection make: the two columns lie side by
+    side in the gap and the edge between them goes where the liquid goes,
+    so a rim cell's ferrofluid has no velocity of its own for the carry to
+    read (a carry at the column's, or at the drop's fitted over its body,
+    tried and dropped: PLAN 29c-4, docs/plan-shipped.md §29c).
+
+    A.a = the magnet, A.b.x = gain, A.b.y = the most one step may add,
+    A.b.z = the clear liquid's viscosity over the ferrofluid's.
   */
   phaseForce: `${HEAD}${MAGNET_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -965,10 +998,92 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
                    magnetsEnergy(uv + vec2f(0.0, h), A.a) - magnetsEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
   // None under a standing layer: the film has the magnet's pull in its own
   // pressure there (wgsl/standing.ts, kelvin), and moves the layer by it.
-  var f = (1.0 - textureLoad(stand, p, 0).r) * phs(p, n) * gpsi * A.b.x;
+  // The pull is the three-by-three mean's share, so the force fades over
+  // the rim instead of stepping at the flux's edge; the factor's exponent
+  // is the cell's own share, the one hsPrep's drag is raised to
+  // (thinGap.ts, kdt), so the two cancel to the ferrofluid's own mobility
+  // cell by cell. With the mean in the exponent they did not cancel where
+  // the mean and the cell's own share differ: the rim's inner cells were
+  // driven past the ferrofluid's own mobility and its outer ones short of
+  // it. And no floor at 1: in water the ferrofluid is the thicker liquid
+  // and the ratio is under 1, and the factor is still the mixed drag over
+  // the ferrofluid's (1e-6 is the drag's own floor).
+  let share = phs(p, n);
+  var f = (1.0 - textureLoad(stand, p, 0).r) * share * pow(max(A.b.z, 1e-6), 1.0 - ph(p, n)) * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
+}`,
+
+  /*
+    The ferrofluid keeps its momentum (29c, the dragged drop). A thin gap does
+    not carry the velocity along itself (wgsl/thinGap.ts, "What the step no
+    longer does"): for the oils the drag takes a push in a few steps, so where
+    the liquid is by then is where the push was. The ferrofluid is thinner
+    (FERRO_NU, 5 cSt against the default oil's 22) and its drag time in the
+    rest gap is 0.6 s, 36 steps, while a drop dragged at the hand's speed,
+    0.1 of the plate a second, crosses its own width in 30. So every cell the
+    drop entered held the oil's velocity, part of the drop's, and the
+    magnet's pull brought it up at 2.8% of the shortfall a step. Measured in
+    the lab (ferrodrag's scene, 384²): the drop topped out at 0.09 of the
+    plate a second under a pull whose Darcy speed was 0.19 and its lag grew
+    without end, 2.78R at 3 s and 5.8R at 6 s, where under a weak magnet,
+    slow enough to keep up with its own momentum, it went at 0.95 of Darcy's.
+    Real ferrofluid carries its momentum: the term the gap's step drops is
+    ρ(u·∇)u, and weighed against the drag it is Uτ/R, 2.5 for this drop
+    against the oils' tenth.
+
+    So the velocity is carried along itself here by the ferrofluid's share of
+    the cell: the cell's momentum is φ of the ferrofluid's and 1 − φ of the
+    oil's, and only the ferrofluid's part travels (one backtrace; the oil's
+    part reads as it was). Before the step's forces, so hsPrep's snapshots
+    still read each force apart, and before the projection, which takes the
+    divergence the carry leaves out as the old plate's second projection did.
+    Only with ferrofluid on the plate: every other look's step is as it was.
+  */
+  phaseMomentum: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let share = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  if (share <= 0.001) { textureStore(dst, p, v); return; }
+  // Where this cell's liquid was a step ago, and the ferrofluid's own velocity
+  // there: its momentum φu over its share φ across the four cells round the
+  // point. Momentum arrives with ferrofluid, so where the trace lands on next
+  // to none the cell keeps the velocity it has, blended in by how far short
+  // of a quarter of a cell the four hold: a cell's carried velocity then
+  // changes by nothing as its trace crosses that line, where a switch at it
+  // jumped between the mixture's velocity and the ferrofluid's. (The first
+  // form read the mixture's velocity wherever the trace landed, and the
+  // drop's shedding into its wake was the same either way, cells over 0.01
+  // of ferrofluid 352 to 972 in 3 s: the wake was not the trace's reading
+  // but the share's advection: what the flux step's limiter spreads of the
+  // drop's trailing edge, phaseCompress below, and the carry's own velocity
+  // since dropped, PLAN 29c-4.)
+  let uv = uvOf(id);
+  let pos = clamp(uv - v.xy * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
+  let f = pos * S.n - 0.5;
+  let fl = floor(f);
+  let t = f - fl;
+  let hiN = vec2f(S.n - 1.0);
+  let lo = vec2i(clamp(fl, vec2f(0.0), hiN));
+  let hi = vec2i(clamp(fl + 1.0, vec2f(0.0), hiN));
+  let w = vec4f((1.0 - t.x) * (1.0 - t.y), t.x * (1.0 - t.y), (1.0 - t.x) * t.y, t.x * t.y);
+  let q = array<vec2i, 4>(vec2i(lo.x, lo.y), vec2i(hi.x, lo.y), vec2i(lo.x, hi.y), vec2i(hi.x, hi.y));
+  var mom = vec2f(0.0);
+  var sh = 0.0;
+  for (var k = 0; k < 4; k++) {
+    let s = clamp(textureLoad(phase, q[k], 0).r, 0.0, 1.0);
+    let u = textureLoad(vel, q[k], 0).xy;
+    mom += w[k] * s * u;
+    sh += w[k] * s;
+  }
+  let back = (mom + max(0.25 - sh, 0.0) * v.xy) / max(sh, 0.25);
+  textureStore(dst, p, safeVel(vec4f(mix(v.xy, back, share), v.z, v.w)));
 }`,
 
   /*
@@ -1080,6 +1195,207 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (p.y < n - 1) { d += exchange(p, p + vec2i(0, 1), sp, n); }
   let outVal = c + d;
   textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
+}`,
+
+  /*
+    The edge of a moving drop, kept as sharp as the grid holds it
+    (PLAN 29c-1: a named shortcut, standing in for an interface the grid
+    cannot draw).
+
+    Ferrofluid and the clear liquid do not mix: a real drop's edge is a
+    molecule thick wherever the flow takes it, and the drop is carried as
+    a body. On the grid the edge is three cells of grey, and the flux step
+    that carries it (phaseAdvect: MUSCL with a minmod slope, the most
+    diffusive of the limiters, which falls back to upwind at every
+    extremum, and a drop a few cells across is all extremum) spreads it by
+    about half a cell times the cells it moves: a numerical diffusion of
+    ½|u|Δx. Cahn–Hilliard's own pull back toward 0 and 1 is M·W|f''|, a
+    fifth of that at Phase Edge 0.75, so a drop dragged 0.3 of the plate
+    in three seconds (\`npm run ferrodrag\`) came out a grey smear with no
+    cell past half full, and even steepening the double well 2.9 times
+    did not hold it (lab: 100 cells past half → 0, either way).
+
+    So what the flux step spreads is given back where it spread it, face
+    by face: the part of its own second-order flux the limiter withheld.
+    MUSCL carries a face at its upwind cell plus ½(1 − |c|) of a limited
+    slope, c the face's Courant number this substep; Lax–Wendroff's face is
+    the same with the face's own slope Δ_f unlimited, and the two differ by
+    the flux ½|c|(1 − |c|)·(1 − ψ)·Δ_f, with 1 − ψ = 1 − minmod(Δ_up,
+    Δ_f)/Δ_f the share of the face's slope the limiter withheld (withheld,
+    below: the same minmod of the same two slopes phaseAdvect's upwind()
+    limits, Δ_up the slope behind the face on the side the flow comes
+    from). That flux is the anti-diffusion the limiter dropped to stay
+    monotone, and dropping it is what spreads the edge: given back, the
+    step is second-order where the limiter cut it to first, and the
+    spreading is gone. The step runs the carry in m substeps of c/m each
+    (phasePlan's \`psub\`, read here; never fewer than PHASE_SUBSTEPS on a
+    thin gap), so the step's deficit is m·½(c/m)(1 − c/m) = ½c(1 − c/m) of
+    each face's withheld slope, read once after them on the field they
+    left, not after each (the profile moves a fraction of a cell a
+    substep, and one blur and compression a step is what the Mac's frame
+    affords: below). It is exactly nothing on a pool at rest (c = 0: a
+    look's resting ferrofluid is as it was, to the bit), nothing where the
+    profile is smooth (Δ_up ≈ Δ_f, nothing withheld: the paraboloid pool
+    pressed under the glass in \`npm run ferropress\` comes back to the
+    one never pressed, worst ring 0.002 against the 0.03 bar), and no
+    more than the step withheld (C_α = 1). Each face's exchange is one
+    number read alike from both sides, moved toward the fuller side of the
+    edge, and at most a quarter of min(lo, 1 − hi), the emptier cell's
+    share and the fuller one's room, so it keeps the plate's total and
+    every cell inside 0..1, as phaseSeparate's sharpening did; the bound is
+    what stops the return at a sharp step's foot, where the unlimited flux
+    would draw on a cell that is empty. Unlike that sharpening (which set
+    a plate of drops at rest into blocky squares, and was replaced by
+    Cahn–Hilliard for it: docs/physics-plan.md) it moves nothing the flow
+    did not spread this step.
+
+    Why this and not the two forms before it. The first compressed every
+    moving face alike (Weller's interface compression, as volume-of-fluid
+    solvers carry an immiscible edge: a flux c(1−c) along the edge's normal
+    at the flow's own speed), as if the step spread ½|u|Δx everywhere, and
+    so sharpened a pool the step had not spread: minmod withholds nothing
+    on a smooth profile, so the pressed pool came back fuller than the one
+    never pressed, its worst ring 0.049 against the 0.03 bar (main's
+    0.012; 0.008 with the compression off), and run on the deep plate too
+    it broke three looks on the Mac (spikes 2 of 6, maze 3 of 4, fingers
+    3 of 4). The second scaled that flux by the share withheld: the pool
+    came back (worst ring 0.003), but the dragged drop still dissolved,
+    its half-full area 100 → 32 cells against a resting drop's 84 over
+    the same steps (PLAN 29c-7), and no carry of the share fixed it,
+    neither the mixture's velocity nor the drop's own fitted over its
+    body (tried and dropped: docs/plan-shipped.md §29c). The cause is
+    where the limiter withholds. On the edge a drop pushes ahead the slope
+    behind each face is the steeper, so minmod keeps the face's own slope
+    down the whole toe and withholds only at the shoulder (a quarter of
+    it, and all of the top face against a cell already full, where the
+    bound gives nothing): that edge is carried at second order. On the
+    edge it drags behind the slope behind each face is the gentler, so
+    every face of the tail is withheld by half or more and smeared at
+    first order, step after step: the tail is the wake, and it is the
+    limiter's. The second form returned it in proportion to the smaller
+    share at the face, min(lo, 1 − hi), where the limiter's deficit is in
+    proportion to the face's own difference |Δ_f|, which on a tail that
+    falls by two thirds a cell is more than twice the smaller share; and
+    its ¼|c| for the step's ½|c|(1 − |c|) read the deficit short again at
+    a slow face, by near half. So it gave back a quarter to a half of what
+    the limiter took, and the drop lost the rest. This form gives back what
+    the limiter took, with the flux step's own numbers in it (\`npm run
+    ferropress\` 7/7, worst ring 0.002). Two other losses remained on
+    \`ferrodrag\`'s scene: Cahn–Hilliard's bulk diffusion through the oil
+    (fixed in phaseCHVolume below by degenerate mobility, \`npm run
+    ferrorest\`: 100 → 90 half-full cells at rest against 84 with constant
+    mobility, cells over 0.01 +94 against +248, and on the dragged drop
+    324 → 1238 against 352 → 1602), and the trailing rim carried at the
+    cell's mixture velocity in the oil's return flow (PLAN 29c-8;
+    \`ferrodrag\` 1/3, lag 3.24R, half-full 100 → 0).
+
+    The direction and the normal are the edge's, read from the field
+    blurred by [1 2 1]² once a step (phaseBlur, the \`blur\` texture), not
+    the face's own: a checkerboard is withheld at every face (minmod of
+    two slopes of opposite sign is 0), and the deficit returned by each
+    face's own sign would grow it, where the blurred field reads a
+    checkerboard as flat, so the return is nothing there (the normal, and
+    so the exchange, is 0 across a flat blur) and a cell-scale wiggle on a
+    slope is moved toward the slope's fuller side, which smooths it. Read
+    from the texture, not blurred face by face: each face needs the blur
+    at six cells, and blurring them in place read 54 cells a face, 216 a
+    cell, which on the Mac cost every ferrofluid look a fifth of its step
+    (#373's review: 29.2 → 35.7 ms a step at 768²). The four faces' six
+    cells each are the nine cells round p, so the step reads the blur once
+    (9 cells) and the compression 9 more, with the phase, velocity, gap
+    and layer at p and its four neighbours. The face's Courant number is
+    read from the mean of its two cells' velocity (phaseAdvect filters its
+    own along the face and corrects it by the pressure, Rhie–Chow: a few
+    per cent apart) and clamped at 0.45 a substep as the flux step's is.
+
+    Under Thin Gap the field is a share of the gap (phaseAdvect), so what
+    crosses a face is a volume, the exchange times the thinner gap, and
+    each cell divides by its own (as phaseGrid). Stepped aside under a
+    standing layer (STAND_ASIDE), whose film shapes the layer there.
+
+    A.a = (C_α, the flow's displacement per unit velocity this step,
+    volume form on, the substeps the step ran when not in volume form: in
+    volume form their count is the plan's, psub[1]).
+  */
+  phaseCompress: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var blur: texture_2d<f32>;
+@group(0) @binding(4) var vel: texture_2d<f32>;
+@group(0) @binding(5) var sq: texture_2d<f32>;
+@group(0) @binding(6) var stand: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<r32float, write>;
+// The phase's substeps this step (phasePlan): 1/m and m.
+@group(0) @binding(8) var<storage, read> psub: array<f32>;
+${STAND_ASIDE}
+fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
+// The [1 2 1]²-blurred field (phaseBlur), read at the grid's edge as its edge cell.
+fn sm(p: vec2i, n: i32) -> f32 { return textureLoad(blur, clamp(p, vec2i(0), vec2i(n - 1)), 0).r; }
+fn gapOf(q: vec2i) -> f32 { return select(1.0, max(textureLoad(sq, q, 0).r, 0.004), A.a.z > 0.5); }
+// The field along a face's axis, read at the grid's edge as its edge cell (as phaseAdvect's ph).
+fn rawc(p: vec2i, n: i32) -> f32 { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0).r; }
+fn minmod(a: f32, b: f32) -> f32 { return select(0.0, select(max(a, b), min(a, b), a > 0.0), a * b > 0.0); }
+// The share of the face's slope the flux step's limiter withheld, 1 − ψ: how much
+// of the face's own slope phaseAdvect carried as plain upwind, and so spread. The
+// same minmod of the same two slopes, the face's and the one behind it on the
+// side the flow comes from, so a smooth pool (r ≈ 1, nothing withheld) is not
+// sharpened and a drop's trailing edge (the slope behind each face the gentler,
+// half or more withheld) is.
+fn withheld(p: vec2i, q: vec2i, e: vec2i, u: vec2f, n: i32) -> f32 {
+  let df = rawc(q, n) - rawc(p, n);
+  if (abs(df) < 1e-6) { return 0.0; }
+  let up = select(rawc(q + e, n) - rawc(q, n), rawc(p, n) - rawc(p - e, n), dot(u, vec2f(e)) >= 0.0);
+  return 1.0 - minmod(up, df) / df;
+}
+// What flows into p from its neighbour q = p + e this step.
+fn compress(p: vec2i, e: vec2i, n: i32) -> f32 {
+  let q = p + e;
+  let a = raw(p);
+  let b = raw(q);
+  // The edge's normal, from the blurred field, across the face and along it.
+  let t = vec2i(e.y, e.x);
+  let sp = sm(p, n);
+  let sq2 = sm(q, n);
+  let across = sq2 - sp;
+  let along = 0.25 * ((sm(p + t, n) - sm(p - t, n)) + (sm(q + t, n) - sm(q - t, n)));
+  let normal = abs(across) / sqrt(across * across + along * along + 1e-8);
+  // The face's Courant number a substep, as the flux step reads it (clamped at
+  // 0.45 there too), over the m substeps the step's carry ran.
+  let u = 0.5 * (textureLoad(vel, p, 0).xy + textureLoad(vel, q, 0).xy);
+  let m = select(max(A.a.w, 1.0), max(psub[1], 1.0), A.a.z > 0.5);
+  let cs = min(abs(dot(u, vec2f(e))) * A.a.y * f32(n) / m, 0.45);
+  // What the limiter withheld of the face's second-order flux over the step:
+  // m times ½c(1 − c) of the face's own difference, by the share withheld (above).
+  let deficit = m * 0.5 * cs * (1.0 - cs) * withheld(p, q, e, u, n) * abs(b - a);
+  let lo = min(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
+  let hi = max(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
+  let amount = min(A.a.x * deficit * normal, 0.25 * min(lo, 1.0 - hi));
+  let toFuller = select(-amount, amount, sp > sq2);
+  return aside(p, q, S.n) * toFuller * min(gapOf(p), gapOf(q));
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  var d = 0.0;
+  if (p.x > 0) { d += compress(p, vec2i(-1, 0), n); }
+  if (p.x < n - 1) { d += compress(p, vec2i(1, 0), n); }
+  if (p.y > 0) { d += compress(p, vec2i(0, -1), n); }
+  if (p.y < n - 1) { d += compress(p, vec2i(0, 1), n); }
+  let outVal = raw(p) + d / gapOf(p);
+  textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
+}`,
+
+  // The ferrofluid blurred by [1 2 1]² (PHASE_MEAN3), once a step, for
+  // phaseCompress to read its edge's normal from (and why: above).
+  phaseBlur: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
+${PHASE_MEAN3}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  textureStore(dst, p, vec4f(mean3(p, i32(S.n)), 0.0, 0.0, 0.0));
 }`,
 
   /*
@@ -1441,6 +1757,123 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let s = textureLoad(x, clampP(p - vec2i(1, 0), S.n), 0) + textureLoad(x, clampP(p + vec2i(1, 0), S.n), 0)
         + textureLoad(x, clampP(p - vec2i(0, 1), S.n), 0) + textureLoad(x, clampP(p + vec2i(0, 1), S.n), 0);
   textureStore(dst, p, (textureLoad(x0, p, 0) + A.a * s) * A.b);
+}`,
+
+  /*
+    18h. Dye spreads along the flow (pre-asymptotic shear dispersion) plus molecular diffusion:
+    In a Hele-Shaw cell on show timescales (t ≪ h²/Dm ≈ 25 hours), flow has not reached
+    the asymptotic Taylor–Aris regime. Parabolic Poiseuille shear across the gap creates
+    unsteady longitudinal spreading with variance σ² ≈ 0.2 |u|² Δt².
+    Shortcut: depth-averaged 2D solver models this as an anisotropic flux tensor along u⊗u
+    with cap 0.25 cells²/step (von Neumann stability limit).
+    Cross-term fluxes are limited to maintain strict positivity, exactly conserving dye mass.
+  */
+  dyeDisperse: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+
+fn inDish(p: vec2i) -> bool {
+  return S.thinGap < 0.5 || length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) < ${OPEN_RIM.toFixed(2)};
+}
+
+fn getDye(p: vec2i, n: i32) -> vec4f {
+  return textureLoad(dye, clamp(p, vec2i(0), vec2i(n - 1)), 0);
+}
+
+fn getDyeFrom(p: vec2i, c0: vec4f, n: i32) -> vec4f {
+  let q = clamp(p, vec2i(0), vec2i(n - 1));
+  if (!inDish(q)) { return c0; }
+  return textureLoad(dye, q, 0);
+}
+
+fn getDisp(p: vec2i, n: i32) -> vec3f {
+  let q = clamp(p, vec2i(0), vec2i(n - 1));
+  let v = textureLoad(vel, q, 0).xy * A.a.w;
+  let gapVal = clamp(textureLoad(sq, q, 0).r, 0.004, 0.06);
+  let gapRel = gapVal / A.a.z;
+  let dm = A.a.x;
+  let kappaT = A.a.y;
+  let v2 = dot(v, v);
+  let shear = kappaT * gapRel * gapRel * v2;
+  let shearLim = min(shear, max(0.0, A.b.x - dm));
+  let fac = select(0.0, shearLim / max(v2, 1e-9), v2 > 1e-9);
+  return vec3f(
+    dm + fac * v.x * v.x,
+    dm + fac * v.y * v.y,
+    fac * v.x * v.y
+  );
+}
+
+// Zero-flux Neumann condition across the circular dish rim (OPEN_RIM = 0.5) on a thin gap,
+// so molecular diffusion and shear dispersion do not bleed dye across the rim into the trough.
+fn fluxX(p: vec2i, DL: vec3f, DR: vec3f, n: i32) -> vec4f {
+  if (p.x < 0 || p.x >= n - 1 || p.y < 0 || p.y >= n) {
+    return vec4f(0.0);
+  }
+  let pR = p + vec2i(1, 0);
+  if (!inDish(p) || !inDish(pR)) {
+    return vec4f(0.0);
+  }
+  let Dxx = 0.5 * (DL.x + DR.x);
+  let Dxy = 0.5 * (DL.z + DR.z);
+  let cL = getDye(p, n);
+  let cR = getDye(pR, n);
+  let dc_dx = cR - cL;
+  let dc_dy = 0.25 * (
+    (getDyeFrom(p + vec2i(0, 1), cL, n) - getDyeFrom(p - vec2i(0, 1), cL, n)) +
+    (getDyeFrom(pR + vec2i(0, 1), cR, n) - getDyeFrom(pR - vec2i(0, 1), cR, n))
+  );
+  let prim = Dxx * dc_dx;
+  let cross = Dxy * dc_dy;
+  // Positivity-preserving cross-term limiter: bounds cross flux to 0.5 of primary flux magnitude,
+  // preventing cross-derivatives from pulling cell values negative or creating dye.
+  let cross_lim = clamp(cross, -0.5 * abs(prim), 0.5 * abs(prim));
+  return -(prim + cross_lim);
+}
+
+fn fluxY(p: vec2i, DB: vec3f, DT: vec3f, n: i32) -> vec4f {
+  if (p.y < 0 || p.y >= n - 1 || p.x < 0 || p.x >= n) {
+    return vec4f(0.0);
+  }
+  let pT = p + vec2i(0, 1);
+  if (!inDish(p) || !inDish(pT)) {
+    return vec4f(0.0);
+  }
+  let Dyx = 0.5 * (DB.z + DT.z);
+  let Dyy = 0.5 * (DB.y + DT.y);
+  let cB = getDye(p, n);
+  let cT = getDye(pT, n);
+  let dc_dy = cT - cB;
+  let dc_dx = 0.25 * (
+    (getDyeFrom(p + vec2i(1, 0), cB, n) - getDyeFrom(p - vec2i(1, 0), cB, n)) +
+    (getDyeFrom(pT + vec2i(1, 0), cT, n) - getDyeFrom(pT - vec2i(1, 0), cT, n))
+  );
+  let prim = Dyy * dc_dy;
+  let cross = Dyx * dc_dx;
+  let cross_lim = clamp(cross, -0.5 * abs(prim), 0.5 * abs(prim));
+  return -(prim + cross_lim);
+}
+
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let Dc = getDisp(p, n);
+  let De = getDisp(p + vec2i(1, 0), n);
+  let Dw = getDisp(p - vec2i(1, 0), n);
+  let Dn = getDisp(p + vec2i(0, 1), n);
+  let Ds = getDisp(p - vec2i(0, 1), n);
+
+  let fE = fluxX(p, Dc, De, n);
+  let fW = fluxX(p - vec2i(1, 0), Dw, Dc, n);
+  let fN = fluxY(p, Dc, Dn, n);
+  let fS = fluxY(p - vec2i(0, 1), Ds, Dc, n);
+  let netFlux = -(fE - fW + fN - fS);
+  let here = getDye(p, n);
+  let out = here + netFlux;
+  textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
   // The velocity's divergence, with the wall's ghost cells (velG in the GLSL).
@@ -2146,14 +2579,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var c = textureLoad(cur, q, 0).xy;
   let temp = bilerpN(vel, uv, S.n).z;
   /*
-    tanh with its argument held in range: some GPUs take tanh as a ratio of
-    exponentials, and past about 88 the exponential is infinite and the
-    ratio is NaN. A plate anywhere hotter than 4.4 (the lamp under a standing
-    plate reaches that) turned the whole current NaN, and the flow was
-    wiped every step after it. tanh is ±1 to float precision well before 10.
+    Buoyancy is linear with temperature (Boussinesq, PLAN §18f), with the tanh
+    removed so plumes have a strength proportional to their heat rather than
+    saturating at once. S.up is gated on upright, so a level plate has no in-plane
+    buoyancy.
   */
   let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
-  var f = S.up * (S.curBuoy * tanh(min(max(temp, 0.0) * 20.0, 10.0)));
+  var f = S.up * (S.curBuoy * clamp(temp, 0.0, 50.0));
   f += S.rock * dd;
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
@@ -2488,8 +2920,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     and the rim, in one kernel.
 
     A pour of volume (A.b.w 1, PLAN 18c) adds a share f of the column, a
-    dome of A.a.w at its middle, of the liquid poured: (1, ln(ν/ν_water), ρ,
-    n) in the four channels, each the share-weighted sum the carry
+    dome of A.a.w at its middle, of the liquid poured: (1, ln(ν/ν_water),
+    μs′ scatter, n) in the four channels, each the share-weighted sum the carry
     conserves. Added, not mixed in: the pour's volume goes into the thin
     solve as a source (pourVolume), and in that step the flow it makes
     carries f of the column out of the cell, which the flux-form carry
@@ -2507,7 +2939,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     middle has gone over the dish's open rim and is taken off.
 
     A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
-    density, index, the mode; the rim's radius for the rim).
+    scatter, index, the mode; the rim's radius for the rim).
   */
   liquidSplat0: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -2852,7 +3284,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   /*
     Oil Bodies: the dye's diffusion, for the water's colour only (see the
-    host's 'dye diffuse' stage). In: the whole dye and the oil's share, both
+    host's 'dye disperse' stage). In: the whole dye and the oil's share, both
     diffused, and the oil's share before. Out: the water's colour diffused
     with the oil's put back as it was (A.a.w = 0), or the oil's share as it
     was (A.a.w = 1).
@@ -3229,7 +3661,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let cl = length(capillary);
   if (cl > A.a.y) { capillary *= A.a.y / cl; }
   let wax = textureLoad(dye, p, 0).a;
-  let rho = wax - S.meanD;
+  let oil = textureLoad(mix, p, 0).r;
+  // Oil has density below water (PLAN §18f): floats upward when plate is upright/tilted.
+  let rho = wax - S.meanD - 0.15 * oil;
   let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
   var heat = v.z;
   if (A.a.z > 0.0) {
@@ -3437,6 +3871,30 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     with the plain step and stayed at 0.01570 with none. Every face's share
     of the difference is at most the plain step's, so its stability limit
     is unchanged. The gap is the one the phase has now moved into.
+
+    And the mobility is degenerate, 4m(1 − m) at each face's mean share
+    m = ½(c_p + c_q), with no floor (Elliott & Garcke 1996; PLAN 29c).
+    With a constant mobility at Cahn number ≈ 0.5 (an eight-cell drop on
+    384², R = 0.022, Phase Edge 0.75), a curved edge's Gibbs–Thomson
+    chemical potential shifts the bulk equilibrium to c_eq ≈ 0.021 and
+    drives ferrofluid out through the clear oil at 2·M·dt a substep: at
+    rest (\`npm run ferrorest\`) the drop's half-full cells fell 100 → 84
+    over 180 steps (116 → 84 from pour), its peak fell 0.996 → 0.946, and
+    its halo of cells over 0.01 grew by +248 (352 → 600), the same as on
+    main with Thin Gap on; a dragged drop left that halo behind in fresh
+    oil and re-made it as it moved (352 → 1602 cells over 0.01). Immiscible
+    liquids do not diffuse through each other's bulk; transport in a thin
+    gap is along the interface only. Evaluating 4m(1 − m) at the face's
+    mean share m is symmetric in (p, q), so each face's flux stays
+    antisymmetric and Σc·h is kept (to 0.01% over 200 steps, against a
+    9.8% loss when evaluated at c_p alone); it reaches 1 at m = 0.5, stays
+    at most 1 so the explicit stability limit (≤ M₀) is unchanged, and
+    vanishes in pure oil and pure ferrofluid. Measured on \`ferrorest\`: the
+    resting drop holds 90 of 100 half-full cells, its peak holds 0.975,
+    and its halo grows by +94 (324 → 418); on the dragged drop the cells
+    over 0.01 fall from 1602 to 1238 (the remaining trailing-rim loss to
+    the oil's return flow is PLAN 29c-8). The deep plate's \`phaseCH\` stays
+    as on main (PLAN 29c-1).
   */
   phaseCHVolume: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -3447,16 +3905,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${STAND_ASIDE}
 fn uu(p: vec2i, n: f32) -> f32 { return textureLoad(mu, clampP(p, n), 0).g; }
 fn hh(p: vec2i, n: f32) -> f32 { return max(textureLoad(sq, clampP(p, n), 0).r, 0.004); }
+fn cc(p: vec2i, n: f32) -> f32 { return clamp(textureLoad(src, clampP(p, n), 0).r, 0.0, 1.0); }
+// A face's mobility, 0..1 of A.b.x: 4c(1 - c) at the two cells' mean share, 1 at
+// an edge and nothing between two cells of one liquid (the comment above).
+fn mob(cp: f32, cq: f32) -> f32 { let m = 0.5 * (cp + cq); return 4.0 * m * (1.0 - m); }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
   let hp = hh(p, n);
   let up = uu(p, n);
+  let cp = cc(p, n);
   var flow = 0.0;
   for (var k = 0; k < 4; k++) {
     let q = p + select(vec2i(0, 1 - 2 * (k & 1)), vec2i(1 - 2 * (k & 1), 0), k < 2);
-    flow += aside(p, q, n) * (uu(q, n) - up) * min(hp, hh(q, n));
+    flow += aside(p, q, n) * mob(cp, cc(q, n)) * (uu(q, n) - up) * min(hp, hh(q, n));
   }
   let outVal = textureLoad(src, p, 0).r + A.b.x * flow / hp;
   textureStore(dst, p, select(vec4f(0.0), vec4f(outVal, 0.0, 0.0, 0.0), finite1(outVal)));
@@ -3674,16 +4137,41 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
-  var d = textureLoad(dye, vec2i(id.xy), 0) * S.evap;
-  // Before the clamp: an infinity through it is inf * 0, a NaN.
+  let p = vec2i(id.xy);
+  var d = textureLoad(dye, p, 0);
+  // PLAN 18g: Colour leaves by flushing over the open rim (OPEN_RIM = 0.5), not by fading.
+  // Liquid and dye carried past the circular dish rim spill into the overflow trough and leave the plate.
+  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+    d = vec4f(0.0);
+  } else {
+    // Named regulator shortcut (PLAN 18g / 28d-A, until 18c-2/18g-4 carry a separate
+    // solvent-thickness field): uniform d *= S.evap fades thick bodies and thin
+    // inter-body mist at the same fractional rate, leaving a grey-pastel veil across
+    // the black ground. A surface-to-volume term surf clears thin mist (d.a small)
+    // first while leaving thick dye bodies intact. It was ungated and moved every
+    // look; only ten were measured (review of #401, ask 4), so it is gated.
+    // Only where S.surfaceClear is set: a sparse dark look laid with a composition.
+    // Every other look keeps the uniform decay it always had (PLAN 28d-A).
+    let loss = max(0.0, 1.0 - S.evap);
+    let surf = S.surfaceClear * loss * 0.06 / ((d.a + 0.14) * (d.a + 0.14));
+    d *= max(0.0, S.evap - surf);
+  }
+  // Safety cap (PLAN 18g: "A safety cap stays, named as one"):
   if (!finite4(d)) { d = vec4f(0.0); }
   if (d.a > 6.0) { d *= 6.0 / d.a; }
-  textureStore(dst, vec2i(id.xy), max(d, vec4f(0.0)));
+  textureStore(dst, p, max(d, vec4f(0.0)));
 }`,
 
   decayVel: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var dye: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+
+// Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
+fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
+  return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
+}
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var v = textureLoad(vel, vec2i(id.xy), 0);
@@ -3692,7 +4180,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  v.z *= S.heatDecay;
+  // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
+  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
+  var temp = v.z * cool;
+  // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
+  let d = textureLoad(dye, vec2i(id.xy), 0);
+  var absorbed = 0.0;
+  if (d.a > 1e-4) {
+    let norm = 1.0 / d.a;
+    let unit = exp(-max(d.rgb, vec3f(0.0)) * norm);
+    let through = lampThrough(unit, d.a);
+    absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
+  }
+  // Central hotspot of the lamp (shortcut: 1 / (1 + 2.5 r²)):
+  let toCenter = uvOf(id) - vec2f(0.5);
+  let r2 = dot(toCenter, toCenter);
+  let hotspot = 1.0 / (1.0 + r2 * 2.5);
+  temp += S.lampHeat * hotspot * absorbed * S.dt;
+  v.z = temp;
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,
 
@@ -3715,6 +4220,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   textureStore(dst, vec2i(id.xy), textureLoad(src, vec2i(id.xy), 0) * A.a.x);
+}`,
+
+  /*
+    The slosh (PLAN 18a-13) laid over the flow the dye rides.
+
+    `scaleDye`'s copy of the thin gap's velocity, plus the dish's own: a
+    64 by 64 grid of velocities in plate widths a second (the GPU dish's
+    flow, gpu/slosh.ts) read by uv, bilinear, and turned into this solver's own
+    unit by the scale in A.a.w (the step's seconds over the step's
+    displacement, as the swirl's is). It is added here, after the solve and
+    before the dye rides it, and not as a force in front of it, because the
+    gap's drag would take it straight out again: the drag is 12ν/h² on a flow
+    with no inertia, and a wave that keeps going after the push stopped is
+    just the inertia the gap does not have. So the dish keeps the inertia and
+    the gap keeps the rim and the liquid's conservation.
+  */
+  addSlosh: `${HEAD}
+${BILERP_N}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var slosh: texture_2d<f32>;
+@group(0) @binding(4) var mixT: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let v = textureLoad(src, vec2i(id.xy), 0);
+  // The dish's two layers (lib/slosh.ts): the water's flow in xy, the oil's in zw. Where the plate holds oil (the mix's
+  // red, A.a.y on), that share of the cell rides the oil's: an oil body slides over the water as the raft it is.
+  let f = bilerpN(slosh, uvOf(id), A.a.z);
+  let c = select(0.0, clamp(textureLoad(mixT, vec2i(id.xy), 0).r, 0.0, 1.0), A.a.y > 0.5);
+  let s = mix(f.xy, f.zw, c) * A.a.w;
+  textureStore(dst, vec2i(id.xy), vec4f(v.xy + s, v.zw));
 }`,
 
   /*
@@ -3769,6 +4305,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
+  let here = textureLoad(src, p, 0);
+  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+    textureStore(dst, p, here);
+    return;
+  }
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
   var c = vec4f(0.0);
   var lo = vec4f(1e30);
@@ -3776,13 +4317,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   for (var j = 0; j < 5; j++) {
     var row = vec4f(0.0);
     for (var i = 0; i < 5; i++) {
-      let q = textureLoad(src, clampP(p + vec2i(i - 2, j - 2), S.n), 0);
+      let qp = clampP(p + vec2i(i - 2, j - 2), S.n);
+      var q = textureLoad(src, qp, 0);
+      if (S.thinGap > 0.5 && length((vec2f(qp) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { q = here; }
       row += k[i] * q;
       if (abs(i - 2) <= 1 && abs(j - 2) <= 1) { lo = min(lo, q); hi = max(hi, q); }
     }
     c += k[j] * row;
   }
-  let f = textureLoad(src, p, 0) - A.a.x * c * (1.0 / 256.0);
+  let f = here - A.a.x * c * (1.0 / 256.0);
   textureStore(dst, p, clamp(f, max(lo, vec4f(0.0)), max(hi, vec4f(0.0))));
 }`,
 
@@ -3857,6 +4400,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   grayScott: `${HEAD}
+const DRIFT_FEED = 0.02;
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -3889,8 +4433,90 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let reagent = max(c.b, A.b.x);
   let own = c.b / max(reagent, 1e-4);
-  let target_feed = mix(A.a.z, 0.03 + c.a * 0.01, own);
-  let target_kill = mix(A.a.w, 0.055 + c.a * 0.005, own);
+  var target_feed = mix(A.a.z, 0.03 + c.a * 0.01, own);
+  var target_kill = mix(A.a.w, 0.055 + c.a * 0.005, own);
+  /*
+    The map drifts (PLAN 26d-6). With one feed and kill the plate settles into
+    a stationary maze, because Gray–Scott at fixed parameters has a steady
+    stripe state; a real dish keeps changing because its chemistry does (the
+    reservoir's flow, the lamp, the temperature). Here F varies across the
+    plate and in time as three slow plane waves (periods of 40, 65 and 90
+    seconds, A.b.w the show's seconds on the reaction's clock), so each
+    region's stripes are fed a little more or less than the next one's and
+    keep rearranging, instead of settling. A.b.z is how far (0 is the fixed
+    map, today's look). Measured in the lab (npm run turing, line 9) on a
+    maze settled for 9000 units and run 9000 more (fifty seconds of a show at
+    the app's 180 units a second, Drift brought up at the app's own slew, see
+    below), it correlates 0.901 with its settled self at 0, 0.641 at 0.7 and
+    0.591 at 1 (the same ramp through the shader before the regime glide
+    below gave 0.867 and 0.814), with the stripe wavelength within 1.5% of
+    the control's at all three. DRIFT_FEED is 0.02 because 0.012 moved it too
+    gently.
+
+    k is no longer the base k moved along the curve; it is the curve plus a
+    margin. The reaction's non-trivial state vanishes at k = sqrt(F)/2 - F
+    (the saddle-node, where 4(F+k)^2 = F), and below that curve the plate is
+    flat grey. The shipped point (F 0.04, k 0.06) sits exactly on it, so the
+    old form (base k plus the curve's own excursion) dipped under it in some
+    regions at some times, and the owner saw a soft grey patch at Drift 1.
+    Now d = k - curve(F) is chosen, always above zero. Measured in the lab
+    (256^2, 6000 units, 60 seeds): d near 0 is a labyrinth, +0.002 broken
+    stripes, +0.004 mixed, +0.005 spots at F 0.035, and the d that still
+    holds a pattern shrinks as F rises (spots to 0.006 at F 0.03, 0.004 at
+    0.04, 0.002 at 0.05, under 0.002 at 0.06). A step between regimes
+    collapses the plate (stripes to nearly empty, then slow regrowth as
+    spots); the same move made over about 33 s is smooth, which is why the
+    second map below runs on slow waves. The same holds for Drift itself:
+    handed to a settled print in one step, full amplitude starves a 32-pixel
+    tile where the feed falls (mean 0, contrast 0) for about 3500 units, 20 s,
+    so the app slews the Drift it hands here at 0.025 a second
+    (TURING_DRIFT_PER_SECOND in LiquidVisualizer.tsx) and the lab check
+    ramps the same way, by solver iterations (TURING_ITERATIONS_PER_SECOND).
+    Over six reads the flattest 32-pixel tile, looked for every 16 pixels so
+    a patch off the tile grid cannot hide between tiles, keeps 0.93 of the
+    control's contrast at Drift 0.7 and 0.77 at 1 (the whole-tile grid read
+    0.95 and 0.89, and 0.81 and 0.74 for the shader before the glide), and 0.55 to 0.58 of the
+    cells carry activator (0.706 for held stripes, 0.483 for held spots).
+
+    Shortcuts, named: the maps are plane waves, not a true noise field, so
+    the regions are broad diagonal bands that slide and never a patchwork;
+    the cap on d is a straight line through the sweep above, not Pearson's
+    full regime boundaries; k ignores the look's own k while the drift is on
+    (only the feed is the look's), so a look's Pattern knob moves feed but
+    not the regime; the clock is fixed-rate, on purpose: it follows no
+    music; and every number is the lab's (SwiftShader rounds half floats to
+    nearest, Metal toward zero), none yet measured on Metal.
+  */
+  if (A.b.z > 0.0) {
+    let q = vec2f(p) / f32(S.n);
+    let w = sin(6.2832 * (0.9 * q.x + 0.4 * q.y) + 0.157 * A.b.w)
+          + sin(6.2832 * (-0.5 * q.x + 1.1 * q.y) + 0.097 * A.b.w + 2.1)
+          + sin(6.2832 * (0.3 * q.x - 0.8 * q.y) + 0.070 * A.b.w + 4.2);
+    let df = A.b.z * DRIFT_FEED * clamp(w * 0.5, -1.0, 1.0);
+    let f0 = max(target_feed, 0.002);
+    let f1 = clamp(f0 + df, 0.002, 0.09);
+    /*
+      A second map, of how far above the curve k sits, glides each region
+      between stripes and spots (PLAN 26d-6a). Three more plane waves, on
+      other directions and slower clocks (periods of 50, 80 and 120 s), give
+      r from 0 (stripes) to 1 (spots); A.b.z is how much of that range the
+      plate uses.
+    */
+    let wr = sin(6.2832 * (0.6 * q.x - 0.7 * q.y) + 0.126 * A.b.w + 1.3)
+           + sin(6.2832 * (-0.4 * q.x - 0.9 * q.y) + 0.079 * A.b.w + 3.7)
+           + sin(6.2832 * (1.0 * q.x + 0.2 * q.y) + 0.052 * A.b.w + 5.5);
+    let r = clamp(0.5 + A.b.z * clamp(wr * 0.5, -1.0, 1.0), 0.0, 1.0);
+    // How far above the saddle-node the pattern survives, narrowing as F
+    // rises (the lab's sweep, 256^2, 6000 units, grown from 60 seeds: spots
+    // at F 0.03 to d 0.006, at 0.04 to 0.004, at 0.05 to 0.002, and none at
+    // 0.06 past 0.001). The straight line through those is the cap, and the
+    // regime moves between a quarter of it (stripes, so the labyrinth is
+    // never at the curve's edge) and nine tenths of it (spots).
+    let cap = max(0.0105 - 0.15 * f1, 0.0008);
+    let above = cap * mix(0.25, 0.9, r);
+    target_kill = 0.5 * sqrt(f1) - f1 + above;
+    target_feed = f1;
+  }
   /*
     The supply saturates at a third of full reagent. Scaling F and k straight
     with the reagent put a tap of it (0.3 to 0.6 where it lands) at F 0.018,
@@ -3937,8 +4563,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
    * bicubic reconstruction draws it as a sharp, smooth edge at the
    * screen's resolution rather than the grid's. Where the reaction is fed
    * (the bath, or poured reagent) the liquid is the indicator's, and the
-   * print replaces what was there in proportion to the feed and to Turing
-   * Print; elsewhere the dye is left alone.
+   * print is laid over the dye in proportion to the feed and to Turing
+   * Print; elsewhere the dye is as it is.
+   *
+   * It is laid over, not in place: it replaced the dye on every fed cell,
+   * so a liquid poured on the plate was gone the frame it landed (PLAN
+   * 26d-3, the owner's "the coloured liquids don't work"). Absorbance adds
+   * (lib/dye.ts), so a red liquid under the print is red where the print is
+   * clear and black-red where it is not, as it would be in a stained dish.
+   * The print goes to its own texture, never to the dye: written into the
+   * dye each frame it would pile up, and the flow would carry it.
    */
   depositChem: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
@@ -3955,7 +4589,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let a = c.g;
   if (A.a.z <= 0.0) {
     if (a > A.a.y) {
-      let w = A.a.x * (a - A.a.y);
+      // Named regulator shortcut (PLAN 28d-A): when wetOnly (A.b.w) is set on a
+      // seeded reef look (neon-coral-reef), the whole-plate bath feeds the reaction
+      // inside the coral bodies (d.a) and wherever reagent was poured (c.b),
+      // rather than printing over the empty black water between bodies (showreel:
+      // 30% black to 1% by 30 s, now 23%).
+      let host = select(1.0, max(smoothstep(0.12, 0.55, d.a), smoothstep(0.01, 0.08, c.b)), A.b.w > 0.5);
+      let w = A.a.x * (a - A.a.y) * host;
       d = vec4f(d.rgb + w * A.b.rgb, d.a + w);
     }
     textureStore(dst, p, d);
@@ -3966,13 +4606,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let dens = PRINT_DENSITY * bound;
   let fed = clamp(max(c.b, A.a.w) / 0.3, 0.0, 1.0);
   /*
-    Turing Print is how much of the liquid is the indicator's: at 1 the fed
-    plate is the print alone, below it the print is laid over what is there
-    in that share. As a depth instead, its first notch (or a look fading
-    in) replaced every colour on a fed plate with a print 5% deep, nearly
-    clear, at once.
+    Turing Print is how much of the print the plate carries: the dye as
+    poured at 0, the whole print at 1, and a look fading in is the print
+    coming up over the liquid rather than replacing it.
   */
-  d = mix(d, vec4f(dens * A.b.rgb, dens), fed * min(A.a.z, 1.0));
+  d = d + fed * min(A.a.z, 1.0) * vec4f(dens * A.b.rgb, dens);
   textureStore(dst, p, d);
 }`,
 
