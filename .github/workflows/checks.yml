@@ -113,8 +113,10 @@ jobs:
     name: Measure · ${{ matrix.part }}
     runs-on: ubuntu-latest
     # The browser part ran 11:47 on main before the switches step (two to three
-    # minutes in CI); 15 left it no headroom.
-    timeout-minutes: 20
+    # minutes in CI); 15 left it no headroom. 25 since PLAN 33b: the lab part ran
+    # 13.8 minutes on a recent PR and `holeline` now builds a third lab (the
+    # control with the air mask taken out), so 20 left the same thin margin.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -157,6 +159,13 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run plate
 
+      # Areas that listen (PLAN 25h): the area cords' gate, timed, and every
+      # look's area cords on areas it has and fast readings it really has. The
+      # lab half, the cords on the real solver, runs on the Mac (plate shard).
+      - name: Area cords (the gate and the tables)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run areacords -- --node
+
       # That a look change never cuts the plate to black in front of a room.
       - name: The desk
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
@@ -179,6 +188,15 @@ jobs:
       - name: The turntable
         run: npm run turntable
 
+      # The tilt slosh's physics on the TypeScript reference (PLAN 18a-13a, 13d):
+      # two layers of shallow water that ring at the gap's wave speed, settle on
+      # a held tilt, damp at the drag's rate, break into bores at Stoker's speed,
+      # float an oil lens and ring out from a press, and stay bounded. Four
+      # processes side by side, about five minutes.
+      - name: The slosh
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run slosh
+
       # The two lists that have to agree about what a control is: the settings
       # panel's own markup, and the registry the desks pin from.
       - name: The panel
@@ -199,8 +217,14 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run closedruns
 
-      # The ear: level traces through the real calibration into the boundary
-      # detector, synthetic songs through the real matcher, and the tempo
+      # The scripts that read GitHub's API never print the token: a 502 from
+      # it once printed the owner's whole token through flakes.mjs's error.
+      # Against a local server that answers 502, with the old way as control.
+      - name: The API scripts keep the token out of their errors
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run ghapi
+
+      # The ear: synthetic songs through the real matcher, and the tempo
       # sources through the real beat clock.
       - name: The ear
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
@@ -213,12 +237,31 @@ jobs:
       # byte-identical. Then the shelf's real MP3s, decoded with ffmpeg, which
       # the ubuntu runner does not have until it is installed here; with no
       # decoder the script fails on CI rather than skipping the real music.
+      # Bounded for the reason in PLAN 19ab: on 2026-10-22 this step hung twice,
+      # 1474 s and 1471 s, both ended by the job's 25-minute wall rather than by
+      # finishing, against 22 s on the runs either side of the outage. The sound
+      # shard's own work is about three minutes, so an unbounded apt buries it on
+      # its own and the shard dies before its first sound check runs — every PR in
+      # the repo red for an hour, whatever it changed. Four minutes is ten times
+      # the warm cost; past that the mirror is not answering and the useful
+      # output is this step's name, not a cancelled harness.
       - name: ffmpeg, for the shelf and the render's files
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        timeout-minutes: 4
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: The bands
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run bands
+
+      # Where songs end and begin (PLAN.md 14z): eight real songs in
+      # scripts/fixtures/songs, decoded by the ffmpeg installed above, joined
+      # with gaps, gapless and crossfaded, in a quiet room and a noisy one,
+      # through the app's ear into the boundary; every song whole with no
+      # change inside it; and the local matcher naming each crossfade's new
+      # song. About two minutes on the runner's cores.
+      - name: Where songs end and begin
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run songends
 
       # Sound learn: controls bound to the music. A synthesised song through
       # the analyser, the beat clock and the trigger engine frame by frame: a
@@ -378,6 +421,12 @@ jobs:
       - name: The film table
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run filmtable
+      # A draining vertical soap film seen in reflection (PLAN 32a): 2D Darcy
+      # buoyancy convection, conservative minmod advection, evaporation to Newton
+      # black, and Airy's reflectance at an angle.
+      - name: The draining soap film
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run soapfilm
       # A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):
       # whole fades driven at the show timer's 16 ms, no step past the curve's
       # steepest, the turn-round, the hand, the cut, and the pads wired.
@@ -517,8 +566,39 @@ jobs:
       # mode switch stays put. The same measurements run again inside the show
       # night on macOS; here they fail in two minutes rather than fifteen, and
       # before the GPU shards have a chance to hide them behind another step.
+      # The browser is fetched inside the same 25 minutes as the measuring, so a
+      # cold download is a red with nothing wrong in the diff (PLAN 19ab). On
+      # 2026-10-22 this step took 650 s on the browser shard and 683 s on the lab
+      # shard, against 33 s where the browser was already on the runner; the
+      # browser shard's own work is about eighteen minutes, so eleven minutes of
+      # download puts it at twenty-nine against a limit of twenty-five and the
+      # harnesses are cancelled mid-flight. Two PRs went red that way in one
+      # afternoon, neither of them touching a browser check.
+      #
+      # Keyed on the Playwright version alone, not on the lockfile's hash: the
+      # browser build a given version installs never changes, so the version is
+      # the whole of what the cache depends on, while a lockfile key would throw
+      # the browser away on every unrelated dependency bump and pay the eleven
+      # minutes again. Read from the installed package rather than parsed out of
+      # the lockfile, so it is the version actually in use.
+      - name: Which Playwright
+        id: pw
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
+        run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: The browser, from the cache when it is there
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ steps.pw.outputs.v }}
+      # `--with-deps` still runs apt for the system libraries, which the cache
+      # above does not hold, so this step can still meet a slow mirror. Six
+      # minutes is about ten times the warm cost and well under the work it would
+      # otherwise cancel: a mirror that is not answering now fails as itself, with
+      # this step's name on it, instead of reading as a harness that hung.
       - name: Install Chromium
         if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
+        timeout-minutes: 6
         run: npx playwright install --with-deps chromium
       # Every shader compiles, on SwiftShader, in two seconds (PLAN.md 19b).
       # It runs again on the Mac's show shard, against Metal; here it is found
@@ -541,6 +621,42 @@ jobs:
       - name: Lamp Ground 0 is the plate before the lamp
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run lampzero
+      # The slosh dish's GPU kernels are the reference scheme (PLAN 18a-13a, 13d;
+      # scripts/sloshgpu.mjs): the two-layer dish stepped on the GPU and in
+      # TypeScript through a tilt, a rocked oil lens, a press, a kick's dome and
+      # a bore, held together to a ten-thousandth, cell by cell. `npm run slosh`
+      # holds the TypeScript to the physics; this holds the shader to it. It runs
+      # again on the Mac's plate shard, against Metal.
+      - name: The slosh dish on the GPU
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        env:
+          PW_WEBGPU: '1'
+        run: npm run sloshgpu
+      # No line round a bubble's hole in one dye (PLAN.md 33a,
+      # scripts/holeline.mjs). The owner saw bubbles drawn with a blocky dark
+      # outline: the edge line between two dyes fired on the depth step at a
+      # hole's rim, sampled on the solver's cell grid. The line now waits for
+      # the dye's colour to change, and this check builds a second lab with
+      # that gate cut out, so the halo it measures away is found again in the
+      # same run, and the line between two real dyes is still drawn. It also
+      # holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab
+      # with airNear's mask taken off finds the glow again), and a pool's edge
+      # into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,
+      # so it sits here beside lampzero rather than in the Mac queue.
+      - name: No line round a bubble's hole
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run holeline
+      # A bubble's clear middle is the plate (PLAN.md 33e, scripts/bubblelook.mjs).
+      # The owner saw bubbles as donuts: the projected middle was the dye's
+      # hue at 41-77 % strength, so a dim dye-coloured disc sat inside a black
+      # band. This check builds a second lab with the old line put back, so
+      # the donut it measures away is found again in the same run, on the
+      # dark ground and the lamp ground, at five sizes. Pictures from the lab,
+      # which SwiftShader renders as the shader's text, so it sits beside
+      # holeline in the open shard.
+      - name: A bubble's middle is the plate
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run bubblelook
       # Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):
       # against the Firebase Auth emulator, Google, Apple and magic-link
       # sign-in, offline returning sessions, sign-out and account deletion.
@@ -565,6 +681,14 @@ jobs:
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
+
+      # The cartoons that ship (PLAN 14ac): small, silent, recorded in
+      # SOURCES.md, and on a phone page they pour without the pour pausing
+      # every frame (14ab-1), loop, are what the plate and the projector hold,
+      # and stop. No GPU needed: the hand-over is the same without a plate.
+      - name: The cartoons
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run cartoons
       # Preview builds on a copy while the wall keeps its look (PLAN.md 8b,
       # scripts/draftwall.mjs): which engine each settings change reaches,
       # what a receiver is sent, Send to wall, Live and the wall closing. Its
@@ -713,6 +837,14 @@ jobs:
       - name: The input picker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run inputpick
+      # The app opens with the sound Source on Off (scripts/opensource.mjs,
+      # PLAN.md 14y): on the desk and the phone, on three looks, a click starts
+      # no sound and opens no device, the Band when chosen is kept through a
+      # reload of the tab, and a new tab opens on Off again. The sound the show
+      # hears and the controls' state, not the plate, so no GPU; on the same dist/.
+      - name: The Source opens on Off
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run opensource
 
       # Following a known song by ear (PLAN.md 28g-2): the app's own band
       # playing, its map made from its score, and the Perform desk's status
@@ -788,7 +920,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The Mac shards have headroom (19w) and no Metal-side download has gone slow
+      # yet, but the fetch is as unbounded here as the two above were, and the Mac
+      # queue is the one that costs: bound it so a slow mirror spends six minutes
+      # and names itself rather than eating a shard's budget before its checks.
       - name: Install Chromium
+        timeout-minutes: 6
         run: npx playwright install chromium
       # Once, first: the scripts run with plain `node` read the built app.
       - name: Build
@@ -866,6 +1003,14 @@ jobs:
       - name: The Finger drags the liquid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingerflow
+      # An area cord works its area and nowhere else (PLAN 25h): a band's cord
+      # on one pool changes the dye, the flow and the heat there 5x what it
+      # changes outside; two areas on two bands each answer their own; and the
+      # rebuilt looks' pours light a place per area where the middle lit one.
+      - name: Areas that listen
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 12
+        run: npm run areacords
       # A Blow's wind on a thin gap as air on the film (PLAN 15g): the breath's
       # stress moves the liquid at τh/2μ, slower in a thick one, stops with
       # the breath, and carries the colour, the ferrofluid and the oil along
@@ -891,6 +1036,23 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 6
         run: npm run rides
+      # Plate Rock lifts the oil (PLAN 27f-5): on a tipped thin gap a lens of
+      # oil rises at Hele-Shaw's speed worked out in SI, its colour does not
+      # hold it down, the rim holds it, and the picture as a whole does not
+      # move with the tilt (the first try slid it 4.2 mm/s every lean).
+      - name: The rock lifts the oil, not the frame
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 4
+        run: npm run oillift
+      # Beat Squeeze's sheet solved (PLAN 27f-4): the dent against the theory
+      # of a floating sheet in water, oil and glycerine, exact per mode, its
+      # rim, its release's pace; on the plate the gap is the solve's cell for
+      # cell, its ring past rest, no ratchet, the frame still. In the open
+      # shard: the plate shard is near its timeout.
+      - name: The rhythm sheet is solved
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 4
+        run: npm run sheet
       # The music's own pushes as forces a thin gap keeps (PLAN 27e): Sound
       # Drive's bass is a hand on the glass that presses as the bass comes in
       # and lets up as it goes (the burst it replaces moved nothing), and the
@@ -900,6 +1062,14 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         timeout-minutes: 6
         run: npm run musicforce
+      # Bass Boost is a gain on the bass's hand (PLAN 27g): the old arithmetic
+      # pinned the press and calmed the plate as the slider rose; now the
+      # glass presses deeper and the kicks still press and let go, in the
+      # ear, in the frame loop's source, and on the thin gap in the lab.
+      - name: Bass Boost presses harder
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 6
+        run: npm run bassboost
       # Each poured liquid as thick as it is (PLAN 18d): on a thin gap a pool
       # of glycerine falls under Rain Drip at Darcy's 2λ/(1+λ) of a pool of
       # colour, syrup in a thick look runs ahead of it, a liquid as thin as
@@ -944,6 +1114,11 @@ jobs:
       - name: The ferrofluid maze's detail
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run maze
+      # The slosh dish's kernels against the TypeScript reference, on Metal
+      # (the same check runs on SwiftShader in Measure's lab part).
+      - name: The slosh dish on Metal
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run sloshgpu
       # The magnet is a disc (PLAN 9v): the shader's field against Biot–Savart,
       # flatter over its face than the dipole was, a bigger one stronger at the
       # glass and reaching further, the default's spikes where they were.
@@ -997,6 +1172,38 @@ jobs:
       - name: The ferrofluid drop in the closeup
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run ferrodrop
+      # The closeup's ferrofluid drop at rest on the thin gap (PLAN 29c):
+      # degenerate mobility in phaseCHVolume holds its half-full core and
+      # halo against Ostwald ripening into the clear oil, conserves Σc·h, and
+      # does not move without a field, and sheds its half-full cells more
+      # slowly in a second window (steps 200 to 380). `npm run ferrodrag` stays
+      # out of CI as known red until PLAN 29c-8.
+      - name: The ferrofluid drop at rest on the thin gap
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run ferrorest
+      # The magnet's pull in tesla, metres and seconds (PLAN 29c-2): the
+      # shader's field against Biot–Savart, the shader's ∇ψ against the
+      # linear Kelvin law (a units check on ψ, the gain cancels there), the
+      # gain against EFH1's, and a drop at the two-phase Darcy speed with the
+      # rim's (ν_clear/ν_ff)^(1−φ) factor applied, under the per-step guard.
+      # On the fifth shard, the lightest (19w), since the open one ran 17.8
+      # minutes of its 20 before the split.
+      - name: The magnet's pull, derived
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        run: npm run magnetgain
+      # The dragged drop while it is dragged (PLAN 29c-8's neighbour): the
+      # ferrofluid carried along itself (phaseMomentum) and what the moving
+      # edge's limiter withheld paid back (phaseCompress), each held on its own
+      # over steps 60 to 120 of `ferrodrag`'s scene, a window before the trailing
+      # rim is lost to the oil's return flow. `ferrodrag` reads at three seconds,
+      # red with both passes and without them, so it could not tell. The script
+      # runs the scene three times (as given, phaseMomentum off, phaseCompress
+      # off) and requires each pass to be worth a margin, so the control is in
+      # the run and not done by hand once. On the fifth shard with
+      # `magnetgain`: three scenes of 120 steps.
+      - name: The dragged ferrofluid drop holds together
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        run: npm run ferrohold
       # Pushes Dye: where the ferrofluid grows the colour leaves and packs
       # along its edge, conserved, and at 0 nothing changes.
       - name: The ferrofluid pushes the dye
@@ -1030,12 +1237,28 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,
+      # warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,
+      # and Newton cooling decays per-second with a tens-of-seconds time constant.
+      - name: The heat
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run heat
       # More colours (PLAN 18l): most looks carry five dyes and five are on the
       # plate; a dye is paler thin than deep and a deep yellow turns orange; two
       # neighbouring dyes meeting walk between their hues; the grade keeps hue.
       - name: Enough colours, and the hues between them
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run colours
+      # The open rim holds a body of oil that touches it (PLAN 18g-6): held at
+      # the water's pressure in the oil too, the rim drained a lens against it
+      # to 9.6% in six seconds by its own surface tension; held at the oil's
+      # Laplace pressure it keeps it, the middle of the dish is untouched, and
+      # a pour still pushes oil out over the rim. In the fifth shard: the
+      # plate shard is near its timeout.
+      - name: The rim holds the oil that touches it
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        timeout-minutes: 4
+        run: npm run rimhold
       # A pour is liquid (PLAN 18c, 18d-2): water poured at the middle pushes a
       # ring of colour out by its volume, glycerine poured is all accounted
       # for, and a dish of glycerine flushed with a quarter of its volume of
@@ -1176,6 +1399,17 @@ jobs:
       - name: The grain inside the dye, not at its edge
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run grainedge
+      # The closeup is the liquid seen closer, not a field of cells (PLAN 33g):
+      # the defaults carry no cell or lacing texture at 4x and 6x, the old
+      # defaults (the control) carry plenty, and the relief is a smooth swell
+      # and sheen that keeps the dye's chroma. The lab only; it runs on the
+      # runner's own adapter (Metal on a Mac), so its time is the Mac's to
+      # measure (npm run macqueue after the first PR run), and the step
+      # carries a timeout of its own so a stuck lab cannot take the shard.
+      - name: The closeup is the liquid, not cells
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 8
+        run: npm run macroview
       # The Turing pattern (PLAN 26): one stripe width on every rung, carried
       # with the colour and healed after a stir, grown only where it is fed,
       # and Turing Print black on white where the reaction is, not piling up.
@@ -1313,8 +1547,12 @@ jobs:
       # ffmpeg is not on the macOS image; imageio-ffmpeg is a static build that
       # scripts/watch.mjs finds by itself. Homebrew's Python refuses a plain
       # pip install (PEP 668), hence the second try.
+      # Bounded with the other fetches (PLAN 19ab): two pip tries against PyPI on
+      # the shard that costs the Mac queue most, and nothing above stops them
+      # taking the shard's whole budget.
       - name: ffmpeg, to watch a take
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        timeout-minutes: 5
         run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
       - name: The show keeps moving
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}

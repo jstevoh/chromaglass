@@ -374,6 +374,7 @@ fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
 
 fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
+  dyeUnit = vec3f(1.0);
   let raw = textureBicubic(t, fuv);
   var rawAlpha = raw.a;
   if (useBlur) { rawAlpha = blurAlpha(t, fuv, blurFluid); }
@@ -390,6 +391,7 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
     exp(-decodeDensity(raw.g) * norm),
     exp(-decodeDensity(raw.b) * norm),
   );
+  dyeUnit = unit;
   let lt = lightThrough(unit, absTotalDensity);
 
   let darkness = 1.0 - max(lt.r, max(lt.g, lt.b));
@@ -436,18 +438,62 @@ fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
 
 fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
 
+/*
+  The line between two dyes (Boundary Contrast, 0.35 in every look) is drawn
+  where the lit colour changes across a few cells. The lit colour is the dye's
+  hue *and* its depth: a thin film of one dye is paler than a pool of it. So a
+  bubble's hole, where one dye's depth falls from a pool to nothing over two or
+  three cells, read here as a boundary between two colours, and the line was
+  drawn round every hole. The four taps sit 1.65 cells out on a cross, so on a
+  hole a few cells across the line came out as bright and dark blocks at those
+  offsets, a "+" stamped round each bubble: the owner's "bubbles still look
+  really pixelated around themselves" (2026-10-19). The dye itself was clean;
+  with Boundary Contrast at 0 the halo went (npm run holeline).
+
+  So the line is asked where the dye's colour changes, not its depth. The
+  colour per unit of dye ("unit" in decodeFluid: the absorbances over the
+  density) is the same anywhere one dye lies, however thin, and differs where
+  two meet. The lit difference is kept as it was, for how strong the line is,
+  and gated by how far the hue moves between the same two taps. A line between
+  two dyes, at any depth, is drawn as before; a hole in one dye, or a pool
+  thinning into clear water, draws none. A density ratio was tried first and
+  cleared the holes as well, but it also took the line off two dyes of very
+  different strength where they meet, which is a boundary.
+*/
+const HUE_LO: f32 = 0.03;
+const HUE_HI: f32 = 0.12;
+/*
+  The hue is the "unit" decodeFluid already works out from the very sample
+  it lights, so it is left here by that decode (as dyeThrough is) and read
+  after each of the four taps, rather than sampled again. Sampling it again
+  was the first version of this gate: four more bicubic reads (five filtered
+  taps each, so twenty more) on every pixel of the plate, while a laptop
+  window in the Mac runner's sound-render check drew 9.9 frames a second
+  (2026-10-20; not shown to be the cause, but the reads bought nothing).
+  Read this way the line costs what it did before the gate, five bicubic
+  reads, and draws the same picture (npm run holeline, to the percent).
+  Clear water, where decodeFluid returns before any hue, leaves 1, which is
+  clear water's hue.
+*/
+var<private> dyeUnit: vec3f = vec3f(1.0);
 fn boundaryDiff(t: texture_2d<f32>, fuv: vec2f) -> f32 {
   let cC = decodeFluid(t, fuv, 0.0, false);
   if (cC.a < 0.03) { return 0.0; }
   let e = (3.0 / U.logicalGrid) * 0.55;
   let cR = decodeFluid(t, fuv + vec2f(e, 0.0), 0.0, false);
+  let uR = dyeUnit;
   let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), 0.0, false);
+  let uL = dyeUnit;
   let cT = decodeFluid(t, fuv + vec2f(0.0, e), 0.0, false);
+  let uT = dyeUnit;
   let cB = decodeFluid(t, fuv + vec2f(0.0, -e), 0.0, false);
+  let uB = dyeUnit;
   let maskX = min(cR.a, cL.a);
   let maskY = min(cT.a, cB.a);
-  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX);
-  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY);
+  let hueX = smoothstep(HUE_LO, HUE_HI, length(uR - uL));
+  let hueY = smoothstep(HUE_LO, HUE_HI, length(uT - uB));
+  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX) * hueX;
+  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY) * hueY;
   return diffX + diffY;
 }
 `;
@@ -1158,13 +1204,21 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     // The grid normal is a gentle slope over many sim cells; scaled up it
     // becomes the dome of the bead, which is what carries the large-scale
     // sense of volume under the cell detail.
-    let n = normalize(vec3f(gridNormal.xy * 5.0 - tilt * r3 * 2.2, 1.0));
+    let n = normalize(vec3f(gridNormal.xy * 14.0 - tilt * r3 * 2.2, 1.0));
 
-    let L = lampDir(fuv, U.lamp);
+    // The lamp lowered toward the plate as a close lens sees it: light that
+    // rakes across the surface turns the same slope into a longer shadow side
+    // and a brighter lit side, which is what reads as height (33g). The plain
+    // lamp lights a dome almost evenly from above.
+    let L0 = lampDir(fuv, U.lamp);
+    let L = normalize(vec3f(L0.xy, L0.z * 0.6));
     let H = normalize(L + vec3f(0.0, 0.0, 1.0));
     let diff = max(0.0, dot(n, L));
-    
-    let spec = pow(max(0.0, dot(n, H)), 80.0);
+
+    // A tight glint where the surface faces the lamp, and a broad sheen under
+    // it: a wet film shows both, and the broad one is what outlines a swell
+    // that is too shallow to catch the glint.
+    let spec = pow(max(0.0, dot(n, H)), 80.0) + 0.16 * pow(max(0.0, dot(n, H)), 12.0);
     let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.8);
     // Recessed cores and grooves sit in their own shadow.
     let ao = 1.0 - clamp(core * k * 0.55 + fineCore * k * 0.25 + lace * 0.4, 0.0, 1.0) * 0.45;
@@ -1172,7 +1226,11 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     // Centred on ~1.0 for a flat, lit surface, so relief shapes the frame
     // without darkening it overall.
     col *= mix(1.0, (0.55 + 0.9 * diff) * ao, r3 * paint);
-    col += vec3f(1.0, 0.97, 0.90) * spec * r3 * paint * 1.2;    // wet highlight on the domes
+    // The glint rolls off instead of clipping, and takes a third of the dye's own
+    // colour: a steep slope under a dense plate drew a streak of pure white
+    // across a fifth of the frame, which read as glare, not as a wet surface.
+    let glint = 1.0 - exp(-spec * 1.6);
+    col += mix(vec3f(1.0, 0.97, 0.90), min(col, vec3f(1.0)), 0.35) * glint * r3 * paint * 0.9;
     col += col * fres * r3 * paint * 0.4;                      // bright refracting edge
   }
 
@@ -1666,6 +1724,36 @@ fn dropLens(uv: vec2f, cam: f32) -> vec4f {
   let upright = r * (1.0 - 1.0 / DROP_MAG) * (1.0 - smoothstep(0.0, 0.5, dropFlat(R, rho)));
   let push = mix(upright, turned, cam) * cover;
   return vec4f(toC * (push / max(r, 1e-3)), r, R);
+}
+
+/*
+  How near this pixel is to the air of a bubble, 0 beyond the reach of the
+  dye's relief and 1 inside it (33b). A hole in the dye is the bubble's own
+  edge, and the bubble pass draws that edge as the meniscus it is; the dye
+  beside it is flat. The relief below reads a ramp in the density though, and
+  the ramp the air cuts is steep (the air field's rim is about a texel and a
+  half) so it was lit as if it were a pool's edge into clear liquid: a pale
+  ring on the lamp's side and a dark one opposite, a few cells wide, round
+  every hole. This is the reach of that ramp, the Sobel taps (3 cells) and
+  the bicubic spread under each (about 2), looked for in air: the biggest
+  coverage anywhere a tap of the relief could have read, taken at 4.5 cells
+  and at the pixel. The 1x1 blank a layer without bubbles carries gives 0
+  without a sample.
+*/
+fn airNear(fuv: vec2f) -> f32 {
+  if (textureDimensions(air0).x <= 1u) { return 0.0; }
+  let r = 4.5 / U.logicalGrid;
+  var m = textureSampleLevel(air0, samp, fuv, 0.0).r;
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(r, 0.0), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(r, 0.0), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(0.0, r), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(0.0, r), 0.0).r);
+  let d = r * 0.7071;
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(d, d), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(-d, d), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv + vec2f(d, -d), 0.0).r);
+  m = max(m, textureSampleLevel(air0, samp, fuv - vec2f(d, d), 0.0).r);
+  return smoothstep(0.02, 0.3, m);
 }
 `;
 
@@ -2161,6 +2249,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
 
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
+  // The interface line is a width of the solver's own cells, so a closeup
+  // magnifies it into a band as wide as the frame: at 4x it was 18% of a
+  // lab plate drawn pure white, which flattens the very thing the closeup is
+  // for. The band is thinned toward a fifth in the closeup (33g shortcut: the
+  // true line would stay a pixel wide at any zoom, which the grid cannot say).
+  let edgeK = U.boundaryContrast * (1.0 - 0.8 * macroAmt);
   let closeup = macroAmt > 0.001;   // not 'macro': that is a reserved word in WGSL
   /*
     How much of the plate-wide view is left: the plate's own dressing (the
@@ -2380,6 +2474,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   var normal0 = vec3f(0.0, 0.0, 1.0);
   if (sharp0) {
     if (U.derivedOn > 0.5) { normal0 = gradNormal(near0.xy); } else { normal0 = sobelNormal(layer0, fuv0); }
+    // A hole the air cut is the bubble's edge, not the dye's (33b, airNear).
+    normal0 = normalize(mix(normal0, vec3f(0.0, 0.0, 1.0), airNear(fuv0)));
   }
   fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0), fluid0.a);
   if (darkBlend) { fluid0.a *= 0.6; film0 *= 0.6; }
@@ -2387,7 +2483,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
     var edge0 = boundaryLine(near0.z);
     if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
-    fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
+    fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * edgeK * 1.6 + vec3f(edge0 * edgeK * 0.25), fluid0.a);
   }
   // The per-pixel tests mask the result instead of branching around the
   // call: lacing measures two widths with fwidth, and WGSL reads a
@@ -2904,6 +3000,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     var normal1 = vec3f(0.0, 0.0, 1.0);
     if (sharp1) {
       if (U.derivedOn > 0.5) { normal1 = gradNormal(near1.xy); } else { normal1 = sobelNormal(layer1, fuv1); }
+      // No airNear here: the bubbles' air is cut in the lead layer's dye only
+      // (the app hands the back layer no air), and airNear reads the front
+      // plate's air in this layer's own coordinates, which differ under a
+      // layer zoom or drift, so it would flatten relief where no bubble is.
     }
     fluid1 = vec4f(applyLighting(fluid1.rgb, normal1, darkBlend, fuv1), fluid1.a);
     if (darkBlend) { fluid1.a *= 0.6; }
@@ -2911,7 +3011,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (U.boundaryContrast > 0.005 && fluid1.a > 0.03 && sharp1) {
       var edge1 = boundaryLine(near1.z);
       if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
-      fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
+      fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * edgeK * 1.6 + vec3f(edge1 * edgeK * 0.25), fluid1.a);
     }
     // The per-pixel tests mask the result instead of branching around the
     // call: lacing measures two widths with fwidth, and WGSL reads a
@@ -3163,9 +3263,17 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           bubble a point is comes from a linear field (wgsl/air.ts), good to
           well under a texel of the air, so a texel of the air would blur a
           small bubble's core away.
-        - **A clear middle**, the lamp through a slab of air with a breath of
-          the liquid's hue from the wetting film on the glass: what the
-          camera's bubble is at its very centre, held flat across the window.
+        - **A middle that is the plate there**, not a disc of its own. Light
+          that crosses a slab of air is the light the plate would show with
+          no bubble at all, so the middle is outColor (the plate under the
+          bubble, the lamp where the ground is the lamp, black where it is
+          black) with at most a tenth of the wetting film's hue, which is
+          all the film on the glass can carry. It used to be the dye's own
+          normalised hue at 41 to 77 per cent of full strength, which on the
+          dark ground is a dim dye-coloured disc inside a black band: a
+          donut, the owner's report of 2026-10-19, in every one of the eight
+          clarities (k1 only moved its brightness). Measured in the lab
+          before and after, scripts/bubblelook.mjs.
         - **No film colour unless asked for.** Iridescence at its default,
           a quarter, is what every look has always had, and the camera's
           bubble still wears it; the plate takes only what is asked above
@@ -3186,7 +3294,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let curvedB = max((1.0 - flatB) * R, spx);
         let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
-        cp = mix(lensCol, mix(tint, vec3f(1.0), 0.18) * (0.95 + 0.55 * ground), 0.25 + 0.55 * clarity);
+        cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);
         let cp0 = cp;
         let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
         cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));

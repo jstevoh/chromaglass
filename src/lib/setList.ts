@@ -15,7 +15,7 @@
  *     "name": "Friday at the Fillmore",
  *     "items": [
  *       { "look": "classic", "fade": 4 },
- *       { "look": "timbre-shifter", "song": { "title": "Dark Star", "artist": "Grateful Dead" },
+ *       { "look": "microscopic-chaos", "song": { "title": "Dark Star", "artist": "Grateful Dead" },
  *         "controls": { "globalSpeed": 0.03, "beatSqueeze": 0.6 },
  *         "rides": ["dimmer", "globalSpeed", "beatSqueeze", "turbulenceScale"] },
  *       { "saved": "user-my-wash-1726000000000", "name": "My wash" },

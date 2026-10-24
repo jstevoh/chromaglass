@@ -194,51 +194,6 @@ export const PRESETS: Preset[] = [
     }
   },
   {
-    id: 'deep-ocean',
-    name: 'Deep Ocean',
-    description: 'Slow, dense teal and midnight fluids drift down through a deep blue LED platform, light coming through them from below.',
-    settings: {
-      globalSpeed: 0.0126,
-      surge: 0.22,
-      layerCount: 2,
-      blendMode: 'overlay',
-      gooeyEffect: 0.8,
-      rotationSpeed: 0.087,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.8,
-      ledPlatform: true,
-      // A deep blue platform, as the description has it. The 'ocean' wheel
-      // runs up to cyan (0, 0.6, 0.8), and it lit every clear patch: an
-      // empty plate read luma 0.23 with 19% of it near black; this one 0.07,
-      // all of it dark blue, so the fluids carry the light.
-      ledMode: 'single',
-      ledColor: '#04122e',
-      ledSpeed: 0.05,
-      diffusionRate: 0.0001,
-      buoyancy: 0.2,
-      advection: 0.2,
-      damping: 0.99,
-      heatDecay: 0.98,
-      automateRate: 0.05,
-      platePressure: 0.1,
-      glassSmear: 0.2,
-      rainDrip: 0.8,
-      viscosity: 'thick',
-      polarity: 0.8,
-      evaporationRate: 0.01,
-      airVelocity: 0.05,
-      vibrationFrequency: 0.2,
-      transmission: 0.85,
-      secondLamp: 0.3,
-      saturationBoost: 1.35,
-      audioMappings: {
-        velocity: 'volume',
-        density: 'bass',
-        color: 'none',
-        rotation: 'energy',
-      },
-    }
-  },
-  {
     id: 'cyberpunk',
     name: 'Cyberpunk Neon',
     description: 'High contrast, fast-moving neon fluids over a cyberpunk LED base.',
@@ -361,7 +316,7 @@ export const PRESETS: Preset[] = [
       blendMode: 'lighter',
       gooeyEffect: 0.6,
       rotationSpeed: 0.146,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.4,
+      centerGravity: 0.15,       // was 0.4, which slid every well's dye into the middle (PLAN 25b-3)
       ledPlatform: false,
       diffusionRate: 0.0002,
       buoyancy: 0.3,
@@ -396,55 +351,20 @@ export const PRESETS: Preset[] = [
           picture, as nothing else on the shelf does.
         */
         { source: 'hits', feature: 'kickHit', setting: 'plateRock', depth: 0.5 },
-        { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 }
+        { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 },
+        /*
+          Its three wells (PLAN 25b-3, 25h): the kicks take them in turn
+          (areaForBand), and on top of that the snare stirs the low well (area
+          2) and the sub (band 1, 40 to 85 Hz) warms the left one (area 0)
+          while it holds.
+        */
+        { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 2, depth: 0.5, threshold: 0.3, attack: 0.02, release: 0.3 },
+        { source: 'bands', feature: 'band1', setting: 'areaHeat', area: 0, depth: 0.6, threshold: 0.5, attack: 0.05, release: 1.0 },
       ],
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
         color: 'none',
-        rotation: 'none',
-      },
-    }
-  },
-  {
-    id: 'timbre-shifter',
-    name: 'Timbre Shifter',
-    description: 'The brightness of the sound picks the colour of what pours in: a dark sound lavender and violet, a bright one teal, ice and amber.',
-    settings: {
-      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
-      lampGround: 1,
-      globalSpeed: 0.0252,
-      surge: 0.55,
-      layerCount: 2,
-      blendMode: 'lighter',
-      gooeyEffect: 0.3,
-      rotationSpeed: 0.202,      // the dish's motor; was 0.03 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.5,
-      ledPlatform: false,  // 28a: the lamp alone, white (the LED under it multiplies the lamp, see mixLamp)
-      ledMode: 'single',  // 28a: a rainbow lamp drew a colour wheel through the clear glass; a white lamp, and the colour is the dye's, following the timbre
-      ledSpeed: 0.2,
-      diffusionRate: 0.0001,
-      buoyancy: 0.7,
-      advection: 0.6,
-      damping: 0.98,
-      heatDecay: 0.96,
-      automateRate: 0.15,
-      platePressure: 0.4,
-      glassSmear: 0.5,
-      rainDrip: 0.6,
-      viscosity: 'thin',
-      polarity: 0.6,
-      evaporationRate: 0.03,
-      airVelocity: 0.1,
-      vibrationFrequency: 0.4,
-      hueJourney: 6,
-      audioMappings: {
-        velocity: 'mid',
-        density: 'volume',
-        color: 'timbre',
-        // Not the dish: a turn of the whole plate on the sound is the frame
-        // moving with the music, which the owner does not want by default.
-        // The motor above still turns it.
         rotation: 'none',
       },
     }
@@ -629,6 +549,23 @@ export const PRESETS: Preset[] = [
       transmission: 0.3,
       secondLamp: 0.3,
       ledColor: '#03102a',
+      /*
+        A band per bell (PLAN 25b-6, 25h; the bells are its areas). The kick
+        pours from the lowest bell (area 1), its pink and then the teal it
+        sends out, a pulse a kick, while Beat Squeeze's press lands on it; the
+        hats ruffle the top bell's fringe (area 2) with a quick paddle, and the
+        brilliance band picks that bell's bottle for what the music lays there
+        (the treble's sparks land on it): its icy blue when the top is bright
+        (band 7 over 0.83, at this depth), its first dye under that. The mids
+        (band 4) pour the two side bells (areas 0 and 3).
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.5, threshold: 0.3, attack: 0.02, release: 0.4 },
+        { source: 'hits', feature: 'hatsHit', setting: 'areaStir', area: 2, depth: 0.5, threshold: 0.3, attack: 0.01, release: 0.2 },
+        { source: 'bands', feature: 'band7', setting: 'areaHue', area: 2, depth: 0.6 },
+        { source: 'bands', feature: 'band4', setting: 'areaPour', area: 0, depth: 0.25, threshold: 0.45, attack: 0.3, release: 1.0 },
+        { source: 'bands', feature: 'band4', setting: 'areaPour', area: 3, depth: 0.25, threshold: 0.45, attack: 0.3, release: 1.0 },
+      ],
       audioMappings: {
         velocity: 'mid',
         density: 'mid',
@@ -720,6 +657,23 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.45,
       boundaryContrast: 0.5,
       dyeBudget: 0.45,          // dark violet between the pools: at the default 0.85 they ran into one wash
+      /*
+        Each pool hears its own instrument (PLAN 25h, lib/areaCords.ts). The
+        kick warms and stirs the soap well (area 1): a heat source under it
+        and a paddle that folds it back the other way on each kick, over the
+        ring the kick's own hand lands there. The mids (band 4, 380 to 800 Hz)
+        fold the glycerine (area 0) with a slow paddle that swells in over
+        0.4 s and lets go over 1.5. The hats pour the syrup's bottles (area
+        2), ultramarine and purple in turn, a drop a hat. All on the gate, so
+        it is the instrument and not the room; all fast readings; nothing on
+        the frame.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'areaHeat', area: 1, depth: 0.6, threshold: 0.3, attack: 0.02, release: 0.8 },
+        { source: 'hits', feature: 'kickHit', setting: 'areaStir', area: 1, depth: 0.6, threshold: 0.3, attack: 0.05, release: 0.5 },
+        { source: 'bands', feature: 'band4', setting: 'areaStir', area: 0, depth: 0.4, threshold: 0.45, attack: 0.4, release: 1.5 },
+        { source: 'hits', feature: 'hatsHit', setting: 'areaPour', area: 2, depth: 0.3, threshold: 0.35, attack: 0.01, release: 0.15 },
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'bass',
@@ -868,54 +822,6 @@ export const PRESETS: Preset[] = [
     }
   },
   {
-    id: 'sensual-laboratory',
-    name: 'Sensual Laboratory',
-    description: 'Mark Boyle\u2019s London: reactions on the platen instead of oil in a dish. Coral and cells grow from the plate in graphite and rust, then the flow carries them off.',
-    settings: {
-      // On the lamp: the owner found it washed out on black (PLAN 18b-1, `npm run lampjudge`'s OWNER).
-      lampGround: 1,
-      globalSpeed: 0.0126,
-      surge: 0.3,
-      layerCount: 1,
-      blendMode: 'multiply',
-      gooeyEffect: 0.4,
-      rotationSpeed: 0.0,
-      centerGravity: 0.0,
-      ledPlatform: true,
-      ledMode: 'single',
-      ledColor: '#f3ecdc',
-      ledSpeed: 0.0,
-      diffusionRate: 0.0002,
-      buoyancy: 0.3,
-      advection: 0.4,
-      damping: 0.985,
-      heatDecay: 0.985,
-      automateRate: 0.03,
-      platePressure: 0.2,
-      glassSmear: 0.15,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      polarity: 0.6,
-      evaporationRate: 0.05,
-      airVelocity: 0.03,
-      vibrationFrequency: 0.0,
-      audioImpact: 0.4,
-      turbulenceScale: 0.15,
-      turbulenceDetail: 3,
-      blobSurfaceTension: 0.5,
-      boundaryContrast: 0.5,
-      saturationBoost: 1.0,
-      dyeBudget: 0.35,
-      edgeRelief: 0.7,
-      bubbles: 0.2,
-      plateRock: 0.15,
-      layerScaleVariety: 0,
-      chemistry: 0.85,
-      exposure: 0.7,
-      audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
-    }
-  },
-  {
     /*
       PLAN.md 26d. The owner's "Mask Reaction Diff" pack, done as the chemistry
       it imitates: a CIMA dish (Castets, Dulos, Boissonade and De Kepper, 1990)
@@ -972,85 +878,19 @@ export const PRESETS: Preset[] = [
       chemistryPattern: 1,
       chemistryWidth: 0.5,
       turingPrint: 1,
+      /*
+        The print that goes on changing: a labyrinth under constant feed and
+        kill settles into one picture and only creeps (the lab's control:
+        correlation 0.90 with itself after fifty seconds), while 0.7 here moves
+        the feed along the saddle-node line across the plate on a 40 to 90
+        second clock and rearranges it (0.67 after the same fifty seconds) without
+        emptying it (0.69 of the plate carries activator against the
+        control's 0.71). Below 1 because at 1 a soft grey patch opens where
+        the map pushes the pattern toward a bare plate (PLAN.md 26d-6).
+      */
+      turingDrift: 0.7,
       exposure: 0.7,
       audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
-    }
-  },
-  {
-    id: 'oil-wheel',
-    name: 'Oil Wheel',
-    description: 'An Optikinetics wheel warming under a 250 W lamp: yellows, greens and blues turning at half a revolution a minute, cells drifting on convection, no hands on it.',
-    settings: {
-      globalSpeed: 0.0084,
-      surge: 0.35,
-      // One wheel: an Optikinetics wheel is one sealed disc in one gate. Two
-      // plates screened over each other were a full plate twice, a wash.
-      layerCount: 1,
-      blendMode: 'screen',
-      gooeyEffect: 0.7,
-      // Half a revolution a minute, as its description says: lookMotorRate(0.232)
-      // is 0.053 rad/s. At 0.137 it was 0.005 rad/s, a turn every twenty
-      // minutes, and the film read the wheel as still (motion 0.003). The
-      // wheel's own motor, not the frame moving to the music.
-      rotationSpeed: 0.232,
-      centerGravity: 0.15,
-      // No LED under the wheel: a brown one ('#3a2408', luma 0.14) lit every
-      // clear patch, so the dish was a brown disc with no dark in it (an
-      // empty plate: 84% of it above near black; off, 1%).
-      ledPlatform: false,
-      ledMode: 'single',
-      ledColor: '#3a2408',
-      ledSpeed: 0.0,
-      diffusionRate: 0.0002,
-      buoyancy: 0.6,
-      advection: 0.5,
-      damping: 0.99,
-      heatDecay: 0.995,
-      automateRate: 0.05,
-      platePressure: 0.25,
-      glassSmear: 0.1,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      polarity: 0.8,
-      evaporationRate: 0.006,
-      airVelocity: 0.0,
-      vibrationFrequency: 0.0,
-      audioImpact: 0.3,
-      turbulenceScale: 0.1,
-      turbulenceDetail: 2,
-      blobSurfaceTension: 0.75,
-      boundaryContrast: 0.5,
-      saturationBoost: 1.3,
-      glossiness: 0.15,
-      dyeBudget: 0.75,
-      edgeRelief: 0.55,
-      bubbles: 0.17,
-      plateRock: 0,
-      layerScaleVariety: 0.35,
-      // A halogen's warmth, not a brown filter: at 0.75 the grade took a
-      // quarter of the blue (x 0.78) and a tenth of the green from the
-      // whole frame, and the wheel's blues and greens went olive.
-      lampWarmth: 0.3,
-      lampHotspot: 0.6,
-      lampMotion: 0.2,
-      lightPlay: 0.7,
-      gelWheel: 0.25,
-      gelSpeed: 0.25,
-      dishVignette: 0.7,
-      spinDrag: 0.08,
-      sceneMappings: [
-        /*
-          This was the band's mid on the dish's motor, which turned the whole
-          wheel faster with the music. A real oil wheel turns at its motor's
-          speed whatever the band plays (the owner, 2026-10-11: the music
-          moves the liquid, not the frame), so the same mids go into the oil
-          instead: the lamp-warmed cells rise a little livelier while the band
-          is in them (28f). Buoyancy pushes through the heat the oil carries,
-          so the cells answer over a second or two, not on the frame.
-        */
-        { source: 'sound', feature: 'mid', setting: 'buoyancy', depth: 0.05 }
-      ],
-      audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
   {
@@ -1112,141 +952,6 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.1,
       iridescence: 0,
       secondLamp: 0,
-      audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
-    }
-  },
-  {
-    id: 'oil-on-water',
-    name: 'Oil on Water',
-    description: 'The macro photograph: yellow oil on water over blue paper, packed fields of bubbles, satellite droplets on the glass, a softbox in every dome, shallow focus.',
-    settings: {
-      oilTension: 0.7,
-      thicknessOptics: 0.5,
-      spectralOptics: 0.5,
-      globalSpeed: 0.0084,
-      surge: 0.45,
-      blendMode: 'screen',
-      gooeyEffect: 0.6,
-      rotationSpeed: 0.0,
-      centerGravity: 0.0,
-      ledPlatform: false,
-      ledMode: 'single',
-      ledColor: '#000000',
-      ledSpeed: 0.0,
-      diffusionRate: 0.00008,
-      buoyancy: 0.3,
-      advection: 0.5,
-      damping: 0.98,
-      heatDecay: 0.99,
-      automateRate: 0.06,
-      platePressure: 0.3,
-      glassSmear: 0.1,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      evaporationRate: 0.002,
-      airVelocity: 0.0,
-      vibrationFrequency: 0.0,
-      turbulenceDetail: 2,
-      glossiness: 0.0,
-      postBlurRadius: 0.3,
-      plateRock: 0.25,
-      beatSqueeze: 0.0,
-      layerScaleVariety: 0.0,
-      renderStyle: 'photo',
-      camera: 1,
-      layerCount: 1,
-      polarity: 0.6,
-      audioImpact: 0.4,
-      turbulenceScale: 0.2,
-      blobSurfaceTension: 0.8,
-      boundaryContrast: 0.3,
-      saturationBoost: 1.25,
-      dyeBudget: 0.45,
-      edgeRelief: 0.5,
-      bubbles: 0.45,
-      paperA: '#3f86d1',
-      paperB: '#8fcbef',
-      lightPlay: 0.9,
-      lampMotion: 0.3,
-      lampHotspot: 0.5,
-      secondLamp: 0,
-      iridescence: 0.2,
-      microDroplets: 0.7,
-      thinFilm: 0.15,
-      focus: 0.6,
-      aperture: 0.55,
-      bloom: 0.35,
-      chromaticAberration: 0.35,
-      refraction: 0.7,
-      audioMappings: { velocity: 'mid', density: 'bass', color: 'none', rotation: 'none' },
-    }
-  },
-  {
-    id: 'colorful-cosmos',
-    name: 'Colorful Cosmos',
-    description: 'Big round drops over a warm gradient, each a shaded planet with a terminator: two lamps, deep focus fall-off, bloom in the highlights.',
-    settings: {
-      globalSpeed: 0.0084,
-      surge: 0.45,
-      blendMode: 'screen',
-      gooeyEffect: 0.6,
-      rotationSpeed: 0.0,
-      centerGravity: 0.0,
-      ledPlatform: false,
-      ledMode: 'single',
-      ledColor: '#000000',
-      ledSpeed: 0.0,
-      diffusionRate: 0.00008,
-      buoyancy: 0.3,
-      advection: 0.5,
-      damping: 0.98,
-      heatDecay: 0.99,
-      automateRate: 0.06,
-      platePressure: 0.3,
-      glassSmear: 0.1,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      evaporationRate: 0.002,
-      airVelocity: 0.0,
-      vibrationFrequency: 0.0,
-      turbulenceDetail: 2,
-      glossiness: 0.0,
-      postBlurRadius: 0.3,
-      plateRock: 0.25,
-      beatSqueeze: 0.0,
-      layerScaleVariety: 0.0,
-      renderStyle: 'photo',
-      camera: 1,
-      layerCount: 1,
-      polarity: 0.7,
-      audioImpact: 0.45,
-      turbulenceScale: 0.12,
-      blobSurfaceTension: 1.0,
-      boundaryContrast: 0.2,
-      saturationBoost: 1.3,
-      dyeBudget: 0.35,
-      edgeRelief: 0.6,
-      bubbles: 0.35,
-      // The gradient deeper, so the drops are the light: at teal '#2a9aa3' to
-      // orange '#ff9a4a' the paper alone was luma 0.58 and the frame a milky
-      // wash with no dark anywhere; this one is 0.36. Not darker: at 0.15
-      // ('#0b2f38' to '#4a1f0a') the dye lit by it is so dim that its
-      // pigment grain is under a level, twice the grain only 1.5x the
-      // texture (`npm run grainedge`: 0.133, x2 0.205); here 0.258, x2 0.575.
-      paperA: '#1c626a',
-      paperB: '#a0582a',
-      lightPlay: 1.0,
-      lampMotion: 0.4,
-      lampHotspot: 0.6,
-      secondLamp: 0.6,
-      iridescence: 0.3,
-      microDroplets: 0.35,
-      thinFilm: 0.25,
-      focus: 0.7,
-      aperture: 0.75,
-      bloom: 0.55,
-      chromaticAberration: 0.4,
-      refraction: 0.8,
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -1432,89 +1137,6 @@ export const PRESETS: Preset[] = [
         color: 'treble',
         rotation: 'none',
       },
-    }
-  },
-  {
-    id: 'fillmore-1969',
-    name: 'Fillmore East, 1969',
-    description: 'The Joshua Light Show behind the Mothers: two plates thrown over the whole screen, pressed into a radial sunburst, a field of dark-rimmed oil beads across the red and orange, cyan and blue against them.',
-    settings: {
-      // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
-      lampGround: 1,
-      globalSpeed: 0.01008,
-      surge: 0.6,
-      layerCount: 2,
-      blendMode: 'screen',
-      twoProjectors: 1,
-      gooeyEffect: 0.5,
-      rotationSpeed: 0.0,
-      centerGravity: 0.0,
-      ledPlatform: false,
-      ledMode: 'single',
-      ledColor: '#000000',
-      ledSpeed: 0.0,
-      diffusionRate: 0,          // measured: sharper without it, and a pass cheaper
-      buoyancy: 0.3,
-      advection: 0.55,
-      damping: 0.975,
-      heatDecay: 0.98,
-      automateRate: 0.12,
-      platePressure: 0.6,
-      glassSmear: 0.25,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      polarity: 1.0,
-      evaporationRate: 0.002,
-      airVelocity: 0.0,
-      vibrationFrequency: 0.0,
-      audioImpact: 0.6,
-      turbulenceScale: 0.3,
-      turbulenceDetail: 2,
-      blobSurfaceTension: 0.5,
-      boundaryContrast: 0.05,
-      saturationBoost: 1.55,
-      glossiness: 0.0,
-      postBlurRadius: 0.0,
-      dyeBudget: 0.5,  // 28a: at 0.9 the dish filled until the lamp barely came through (luma 0.06 on the Mac); 18b-8
-      edgeRelief: 0.05,
-      lacing: 0.55,
-      bubbles: 0.1,
-      beads: 0.8,
-      fingering: 0.85,
-      cells: 0.2,
-      // 0: the plates fill the screen. At 0.85 each was its own dish on black,
-      // the lead one 0.71 of the frame's height across (40% of a 16:9 width)
-      // and the second 0.45: the owner, "it only takes up a small amount of
-      // the canvas". Dish Spread is still there to spread them.
-      dishSpread: 0.0,
-      dishVignette: 0.0,
-      plateRock: 0.3,
-      beatSqueeze: 0.1,
-      layerScaleVariety: 0.0,
-      backgroundLoop: 0.6,
-      hueJourney: 4,
-      lightPlay: 0.3,
-      lampMotion: 0.2,
-      lampHotspot: 0.6,
-      lampWarmth: 0.2,
-      iridescence: 0.1,
-      secondLamp: 0.2,
-      /*
-        The pattern for a look's own patches (28f). The Joshua Light Show was
-        hands on the plates in time with the band: the operator squeezed in
-        more colour on the bass and stirred on the hits. So the bass thickens
-        the pour (Dye Budget: the plate holds more colour while the bass is
-        in, and the pours and the evaporation carry it there over seconds, not
-        on the frame) and each kick or snare stirs the oil a little, harder
-        for a harder hit, gone in a quarter second and carried on by the
-        liquid. Never the plates' press itself: that moves the whole frame
-        (FRAME_MOVING_LOOKS).
-      */
-      sceneMappings: [
-        { source: 'bands', feature: 'bass', setting: 'dyeBudget', depth: 0.15 },
-        { source: 'hits', feature: 'anyHit', setting: 'turbulenceScale', depth: 0.15 },
-      ],
-      audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
   {
@@ -1851,48 +1473,6 @@ export const PRESETS: Preset[] = [
     }
   },
   {
-    id: 'agate',
-    name: 'Agate',
-    description: 'A reagent seeping out through a gel lays down bands of precipitate, each further from the last than the one before, the way an agate is banded.',
-    settings: {
-      globalSpeed: 0.0084,
-      advection: 0.3,
-      platePressure: 0.2,
-      beatSqueeze: 0.0,
-      dyeBudget: 0.5,
-      liesegang: 1,
-      thicknessOptics: 0.3,
-      ledColor: '#f4ead8',
-      surge: 0.35,
-      layerCount: 1,
-      blendMode: 'screen',
-      gooeyEffect: 0.5,
-      rotationSpeed: 0.019,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.15,
-      ledPlatform: true,
-      ledMode: 'single',
-      ledSpeed: 0.0,
-      diffusionRate: 0,
-      buoyancy: 0.2,
-      damping: 0.985,
-      heatDecay: 0.99,
-      automateRate: 0.1,
-      glassSmear: 0.2,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      evaporationRate: 0.003,
-      airVelocity: 0.02,
-      vibrationFrequency: 0.1,
-      audioImpact: 0.5,
-      boundaryContrast: 0.3,
-      saturationBoost: 1.3,
-      glossiness: 0.2,
-      postBlurRadius: 0.12,
-      lampHotspot: 0.4,
-      audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
-    }
-  },
-  {
     id: 'magnet-garden',
     name: 'Magnet Garden',
     description: 'Black ferrofluid on a bright golden pool over a field coil, with a magnet under the glass: it fingers into a labyrinth that sharpens on the beat.',
@@ -2060,78 +1640,12 @@ export const PRESETS: Preset[] = [
     }
   },
   /*
-    Two looks after Chemical Bouillon's ferrofluid films, the references the
-    owner gave for how ferrofluid should look (docs/bubbles-plan.md). Both
-    lean on the plate drawing the ferrofluid as a liquid with an edge (a
+    Two looks were made after Chemical Bouillon's ferrofluid films, the references the
+    owner gave for how ferrofluid should look (docs/bubbles-plan.md); Ferro Maze
+    retired in PLAN 28i-1, into Magnet Garden. Both leaned on the plate drawing the
+    ferrofluid as a liquid with an edge (a
     sharp line, black through, the water clear round it; npm run ferrolook).
   */
-  {
-    id: 'ferro-maze',
-    name: 'Ferro Maze',
-    description: 'Black ferrofluid on a white light table, over a field coil: it fingers out into a dense maze of worm-shaped channels that sharpens on the beat, as in Magnetic Pattern I.',
-    settings: {
-      ferroLabyrinth: 1,
-      // Fingers about half as wide as the default maze (the reference's are
-      // about a sixtieth of the frame). 0.5 and not more because it is the
-      // value `npm run maze` measures, and on the hosted 512² it is still
-      // above the twelve-cell floor (MAZE_FINEST in src/gpu/fluid.ts): at
-      // 0.6, right on it, some fingers draw as brown film.
-      mazeDetail: 0.5,
-      globalSpeed: 0.0095,
-      surge: 0.3,
-      layerCount: 1,
-      blendMode: 'screen',
-      gooeyEffect: 0.5,
-      rotationSpeed: 0.018,      // the dish's motor; was 0.002 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.2,
-      ledPlatform: true,
-      ledMode: 'single',
-      ledColor: '#f4f3ef',
-      ledSpeed: 0.0,
-      diffusionRate: 0,
-      buoyancy: 0.2,
-      advection: 0.35,
-      damping: 0.985,
-      heatDecay: 0.99,
-      automateRate: 0.15,
-      platePressure: 0.3,
-      glassSmear: 0.1,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      polarity: 0.8,
-      evaporationRate: 0.003,
-      airVelocity: 0.02,
-      vibrationFrequency: 0.1,
-      audioImpact: 0.5,
-      blobSurfaceTension: 0.5,
-      boundaryContrast: 0.2,
-      saturationBoost: 1.0,
-      dyeBudget: 0.6,
-      glossiness: 0.15,
-      postBlurRadius: 0.1,
-      phaseAmount: 1,
-      phaseScale: 0.4,
-      phaseSharp: 0.75,
-      /*
-        The strength is the magnet's field (gpu/wgsl/magnetDisc.ts, PLAN.md
-        9v), and far off, where this look's magnet works, the pull goes as
-        its square: 0.45 gathers the maze as 0.3 did when the strength was
-        the pull's own scale (0.96 of the old pull from 0.1 to 0.2
-        of the plate out). Still far under the spikes' onset: 0.02 of the
-        hand's field (\`npm run disc\`).
-      */
-      magnetStrength: 0.45,
-      magnetHeight: 0.4,
-      magnetWalk: 0.3,
-      beatSqueeze: 0.0,
-      lampHotspot: 0.0,
-      secondLamp: 0.0,
-      sceneMappings: [
-        { source: 'sound', feature: 'bass', setting: 'magnetStrength', depth: 0.4 }
-      ],
-      audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
-    }
-  },
   {
     id: 'ferro-paint',
     name: 'Ferro Paint',
@@ -2385,6 +1899,25 @@ export const RETIRED_PRESETS: Readonly<Record<string, string>> = {
   'boiling-point': 'aurora-borealis',
   // one flat gradient from blue to magenta, the dish too full to show a shape; Classic's nearest.
   'glycerine-drift': 'classic',
+  // Judged again on the Mac gallery of 2026-10-19 (PLAN.md 28i-1):
+  // graphite on a white platen, the white-ground fault Turing Print's own reaction pattern now carries;
+  'sensual-laboratory': 'turing-print',
+  // the same two liquids photographed through a lens pass; Oil & Water draws them in the dish, which is the look;
+  'oil-on-water': 'oil-and-water',
+  // big round drops over a warm gradient, a photograph that lost its black; Classic is the nearest look;
+  'colorful-cosmos': 'classic',
+  // a reagent banding through a gel, the picture Chemical Clock's gel reaction already draws;
+  'agate': 'chemical-clock',
+  // black ferrofluid on a light table, the picture Magnet Garden draws on its gold pool;
+  'ferro-maze': 'magnet-garden',
+  // a blue dish with the light coming from below, the picture Jellyfish Bloom draws with something in it;
+  'deep-ocean': 'jellyfish-bloom',
+  // the Fillmore's two plates, whose cool and warm dyes Poster, 1969 draws on one plate;
+  'fillmore-1969': 'poster-1969',
+  // a dish of fluid that says nothing of its ground, the stained slide Microscopic Chaos draws;
+  'timbre-shifter': 'microscopic-chaos',
+  // a wheel of oil and silicone that turned the whole frame, which only FRAME_MOVING_LOOKS may; Clock Glass keeps the oil and water between glass.
+  'oil-wheel': 'clock-glass',
 };
 
 /** A retired id's replacement, followed to the end; any other id unchanged. */

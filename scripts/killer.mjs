@@ -92,7 +92,7 @@ try {
     so it is chosen before the page loads instead.
   */
   await page.addInitScript(() => {
-    try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
+    try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
   });
   await installFrameReader(page);
   await page.goto(`http://localhost:${port}/?debug&gpu=mid&tier=local&look=${LOOK}`, { waitUntil: 'load' });

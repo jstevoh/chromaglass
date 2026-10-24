@@ -14,6 +14,7 @@ import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -116,6 +117,8 @@ export interface PhoneStageProps {
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
+  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
+  cartoons?: CartoonShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -244,8 +247,8 @@ export interface PhoneStageProps {
    * opens on a look with the reaction running, as Ben-Day is, because they
    * are the look's own rather than a hand's.
    */
-  reaction: { on: boolean; pattern: number; width: number; print: number };
-  onReaction: (patch: Partial<Pick<VisualizerSettings, 'chemistryPattern' | 'chemistryWidth' | 'turingPrint'>>) => void;
+  reaction: { on: boolean; pattern: number; width: number; print: number; ink: number; drift: number };
+  onReaction: (patch: Partial<Pick<VisualizerSettings, 'chemistryPattern' | 'chemistryWidth' | 'turingPrint' | 'turingInk' | 'turingDrift'>>) => void;
   /**
    * Lamp Ground (PLAN 18b): what the dye is seen on, black or the lamp
    * shining up through it. On the Looks sheet, always: it turns a look
@@ -267,6 +270,9 @@ export interface PhoneStageProps {
    */
   clearFilm: number;
   onClearFilm: (v: number) => void;
+  // Slosh: how far a tilt sloshes the liquid (lib/slosh.ts), beside the Tilt tile.
+  slosh: number;
+  onSlosh: (v: number) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -765,6 +771,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
+          {/* Not closed on a press, unlike the two above: Pour and Film are
+              each a toggle someone may want both of, and Stop is here too. */}
+          {p.cartoons && (
+            <div className="mt-4">
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
+              <CartoonShelf {...p.cartoons} size="phone" />
+            </div>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}
@@ -821,7 +835,11 @@ export function PhoneStage(p: PhoneStageProps) {
                 display={`${Math.round(p.reaction.width * 100)}%`} touch testId="phone-reaction-width" midiKey="setting:chemistryWidth" />
               <Slider label="Turing Print" value={p.reaction.print} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingPrint: v })}
                 display={`${Math.round(p.reaction.print * 100)}%`} touch testId="phone-turing-print" midiKey="setting:turingPrint" />
-              <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp.</p>
+              <Slider label="Print Ink" value={p.reaction.ink} min={0} max={1} step={0.01} onChange={(v) => p.onReaction({ turingInk: v })}
+                display={p.reaction.ink > 0 ? `${Math.round(p.reaction.ink * 360)}°` : 'Starch'} touch testId="phone-turing-ink" midiKey="setting:turingInk" />
+              <Slider label="Print Drift" value={p.reaction.drift} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingDrift: v })}
+                display={p.reaction.drift > 0 ? `${Math.round(p.reaction.drift * 100)}%` : 'Still'} touch testId="phone-turing-drift" midiKey="setting:turingDrift" />
+              <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp, or another indicator's colour.</p>
             </div>
           )}
           {/* The second projector's look routing (§16a) is temporarily hidden per user request */}
@@ -970,7 +988,11 @@ export function PhoneStage(p: PhoneStageProps) {
               <SongScore {...p.score} touch />
             </>
           )}
-          {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level.</p>}
+          {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level. Tip it one way and then the other, and with Slosh up it slops across.</p>}
+          <div className="mt-3">
+            <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
+              display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
+          </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>

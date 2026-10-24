@@ -29,7 +29,7 @@
  *      every depth is on −1..1, which is all the travel there is.
  *   2. Every sound patch on the shelf reads what is heard at once (`sound`,
  *      `bands`, `hits`), and the three looks written as the pattern for the
- *      rest (Cyberpunk, Fillmore East, Lava Lamp) each have two or three,
+ *      rest (Cyberpunk, Aurora Borealis, Lava Lamp) each have two or three,
  *      into the liquid and never onto a dial that moves the whole frame.
  *   3. The hits (lib/hitSource.ts), on a song whose drums are known to the
  *      sample (`scripts/arrangement.mjs`, as `npm run shape` uses), heard the
@@ -51,7 +51,9 @@
 
 import { analysePcm, SOURCE_NAMES } from '../src/lib/audioFeatures.ts';
 import { HitSource, HIT_FEATURES } from '../src/lib/hitSource.ts';
-import { PatchBay, SETTING_TRAVEL } from '../src/lib/sceneMap.ts';
+import { PatchBay, SETTING_TRAVEL, cordReading } from '../src/lib/sceneMap.ts';
+import { AreaHands, isAreaCord } from '../src/lib/areaCords.ts';
+import { plateAreas } from '../src/lib/plateAreas.ts';
 import { SoundLearn } from '../src/lib/soundLearn.ts';
 import { parseMidiMap, serializeMidiMap, MIDI_FORMAT, MUSIC_SOURCES } from '../src/lib/midi.ts';
 import { MODULATOR_FEATURES } from '../src/lib/modulators.ts';
@@ -93,6 +95,23 @@ for (const p of PRESETS) {
   for (const m of p.settings.sceneMappings ?? []) {
     patches++;
     if (!(m.depth >= -1 && m.depth <= 1)) deep.push(`${p.id} ${m.source}:${m.feature} on ${m.setting} at ${m.depth}`);
+    /*
+      A cord aimed at an area of the dish (PLAN 25h) moves no control: the
+      patch bay leaves it alone, because a setting is one number for the whole
+      plate, and it is the area's hands (lib/areaCords.ts) that act on it,
+      heating, stirring or pouring there. So it is asked the same question of
+      its own hands: two seconds of the same reading through the patch bay's
+      own reading (cordReading), long past any gate's rise, must leave it
+      acting on an area the look has. A name its source lacks reads 0 there
+      too, the gate never opens, and the act is nothing.
+    */
+    if (isAreaCord(m)) {
+      const hands = new AreaHands();
+      let acts = [];
+      for (let s = 0; s < 120; s++) acts = hands.step([m], plateAreas(p.id), (c) => cordReading(ctx, c, 0), 1 / 60);
+      if (!(Math.abs(acts[0]?.amount ?? 0) > 0)) dead.push(`${p.id} ${m.source ?? 'room'}:${m.feature} on ${m.setting} in area ${m.area}`);
+      continue;
+    }
     const travel = SETTING_TRAVEL[m.setting];
     // The control at the middle of its travel, so a patch either way has room to move it.
     const mid = travel ? (travel.min + travel.max) / 2 : 0.5;
@@ -115,7 +134,7 @@ for (const p of PRESETS) for (const m of p.settings.sceneMappings ?? []) {
   const src = m.source ?? 'room';
   if (!FAST.has(src) && !NOT_SOUND.has(src)) slow.push(`${p.id} ${src}:${m.feature}`);
 }
-const PATTERN = ['cyberpunk', 'fillmore-1969', 'lava-lamp'];
+const PATTERN = ['cyberpunk', 'aurora-borealis', 'lava-lamp'];
 const pattern = PATTERN.map((id) => {
   const ms = PRESETS.find((p) => p.id === id)?.settings.sceneMappings ?? [];
   return { id, n: ms.length, ok: ms.length >= 2 && ms.length <= 3 && ms.every((m) => FAST.has(m.source) && !FRAME_MOTION.has(m.setting)),

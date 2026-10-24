@@ -1,9 +1,9 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, PLATE_METRES } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
-import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF } from '../src/gpu/wgsl/spikes';
+import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
@@ -22,7 +22,8 @@ import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
-import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
+import { squishDisc, glassSpring, PressLift, KICK_HOLD, kickPress, type Stroke } from '../src/lib/squish';
+import { RhythmSheet, stampedVolume, kickRoom } from '../src/lib/sheet';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
@@ -57,6 +58,9 @@ type Lab = {
   hands: Float32Array | null;
   /** A Blow's breath laid this step (layBreath), or null with none. */
   breath: Float32Array | null;
+  /** Beat Squeeze's rhythm sheet (lib/sheet.ts), made at its first press, and its change laid this step, or null with none. */
+  sheet: RhythmSheet | null;
+  sheetGap: Float32Array | null;
   /** The magnets the plate was last stepped with, as the app hands them to the picture. */
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
@@ -88,7 +92,7 @@ const api = {
     device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });
     solver.clear();
-    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null };
+    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null, sheet: null, sheetGap: null };
     return { N, L };
   },
   /** The adapter `create` drew on, or null before it. */
@@ -198,10 +202,49 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath);
+    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath, l.sheetGap);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
-    l.hands = null; l.breath = null;
+    l.hands = null; l.breath = null; l.sheetGap = null;
   },
+  /**
+   * Beat Squeeze's kick on the rhythm sheet, as the app presses it
+   * (LiquidVisualizer pressKick, lib/sheet.ts): a fingertip at plate
+   * fraction (x, y) on a liquid of viscosity `nu`, held `hold` seconds,
+   * pushing out as much liquid as the stamped bowl of a kick of `amount`
+   * closed over the dent's reach (kickPress's radius), no deeper than Plate
+   * Shape `curve`'s rest there allows (kickRoom; `room: false` presses as
+   * if the plate were flat, a control). Laid by `sheetStep`. Returns the
+   * depth its middle reaches.
+   */
+  sheetPress(x: number, y: number, amount: number, nu: number, hold = KICK_HOLD, curve = 0, room = true) {
+    const l = lab!;
+    if (!l.sheet) l.sheet = new RhythmSheet();
+    l.sheet.setLiquid(nu);
+    const R = kickPress(nu, 0).radii[0] / 128;
+    return l.sheet.pressVolume(x, y, stampedVolume(amount, R), R, hold, room ? kickRoom(x, y, curve) : undefined);
+  },
+  /** One step of the sheet (`dt` seconds, the gap's spring `spring` a step), its change laid for the next flush, as the app's liftStep lays it. Returns the cells laid. */
+  sheetStep(dt = 1 / 60, spring = BASE.gapSpring) {
+    const l = lab!;
+    if (!l.sheet?.live) return 0;
+    const out = new Float32Array(l.L * l.L);
+    const cells = l.sheet.step(l.L, dt, spring, out);
+    if (cells > 0) l.sheetGap = out;
+    return cells;
+  },
+  /** The sheet's change laid this step moved to the press's channel (the gap column of the velocity deltas), for the check that the press's ceiling cuts its ring. */
+  sheetAsPress() {
+    const l = lab!;
+    if (!l.sheetGap) return;
+    for (let q = 0; q < l.sheetGap.length; q++) l.velAdd[q * 4 + 3] += l.sheetGap[q];
+    l.sheetGap = null;
+  },
+  /** What the sheet has laid and pressed, and whether it still moves: for the checks. */
+  sheetState() { const s = lab!.sheet; return s ? { live: s.live, steps: s.steps, presses: s.pressCount, laid: s.laid, closed: s.closed } : null; },
+  /** The dent as the plate should hold it now (plate widths, L × L), from the sheet's own solve: a check sets the plate's gap against it. */
+  sheetHeld() { const h = lab!.sheet?.heldNow(); return h ? Array.from(h) : null; },
+  /** The kick's press (lib/squish.ts kickPress), for a check to ask which liquid's dent it is. */
+  kickPress,
   /**
    * A Finger in the liquid on a thin gap, laid as the app lays one
    * (lib/handSolid.ts): at grid cell (x, y) of the L × L plate, `r` cells
@@ -272,6 +315,8 @@ const api = {
   thinGapViscosity,
   /** The real seconds a lab step takes, for `npm run thick`'s kept share and `npm run flush`'s pours. */
   stepSeconds: BASE.magnetSeconds ?? 1 / 60,
+  /** How far a unit of the flow carries the liquid in a lab step, in plate widths (the app's stepDisplacement), so a check can say a velocity in m/s. */
+  stepDisplacement(n: number) { return stepDisplacement(BASE.dt, BASE.advection, n); },
   ferroViscosity: FERRO_NU,
   /** The dye's depth per unit (PLAN 18m), so `npm run slump` lays the drop it means to. */
   dyeLayer: DYE_LAYER,
@@ -355,7 +400,13 @@ const api = {
   },
   /** The thickest film Clear Film lays, as a share of the gap (FILM_MAX in src/gpu/fluid.ts). */
   filmMax: FILM_MAX,
-  async phase() { const f = await lab!.solver.readPhase(); return f ? { n: f.n, data: Array.from(f.data) } : null; },
+  async phase() {
+    const f = await lab!.solver.readPhase();
+    if (!f) return null;
+    // A share gone non-finite reads as an empty plate (nothing over a half): loud instead.
+    for (let k = 0; k < f.data.length; k++) if (!Number.isFinite(f.data[k])) throw new Error(`phase: non-finite at cell ${k}`);
+    return { n: f.n, data: Array.from(f.data) };
+  },
   /** The spun dish's swirl on its own grid (readSwirl): `npm run dish`. */
   async swirl() { const f = await lab!.solver.readSwirl(); return { m: f.m, data: Array.from(f.data) }; },
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
@@ -459,6 +510,14 @@ const api = {
    * physics.
    */
   SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
+  /**
+   * The magnet's pull in the solver's own units, and the gap's, for `npm run
+   * magnetgain` to derive what MAGNET_GAIN is in tesla, metres and seconds
+   * (PLAN 29c-2): the energy law's scale and saturation (wgsl/spikes.ts),
+   * the gain and its guards, the reference liquid and the ferrofluid's
+   * viscosities, the rest gap and the dish's width (gpu/fluid.ts).
+   */
+  MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, PLATE_METRES,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
   /**
@@ -531,11 +590,14 @@ const api = {
    * radians, as the motor does. The plate reads the solver's packed view
    * field (the gap, the mix, the reactions) as the app does; `view: false`
    * hands it none, and it reads a blank one, a flat gap at rest.
+   * `airField: true` hands the plate the bubbles' air field with `bubbles` at 0:
+   * the dye is drawn beside its holes without the bubbles drawn in them, which
+   * is how `npm run holeline` reads what the dye does at a hole's edge.
    */
   async render(size: number, over: Partial<VisualizerSettings> = {},
     cam: {
       magnets?: { x: number; y: number; height: number; strength: number }[];
-      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
+      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; airField?: boolean; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
       /*
         The other pictures the plate composites, for the mixer's check
         (`npm run mixer`): a film frame, a logo, and a second plate. The
@@ -609,7 +671,11 @@ const api = {
     // one grain value everywhere, which a check of the grain would take for
     // a grain. Say so instead.
     if (cam.grain && !l.solver.grainTexture) throw new Error('lab.render: grain asked for, but this adapter has no grain field');
-    const layer = { dye: l.solver['dye'].read, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species };
+    // Asked for the air field and there is none: airNear would read a blank
+    // and be 0, which a check of the flat dye beside a hole would take for the
+    // mask not being there. Say so instead.
+    if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a

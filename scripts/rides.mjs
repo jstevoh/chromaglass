@@ -64,9 +64,10 @@ const check = (name, ok, detail = '') => {
 
 // ── 4, the curve, in node ───────────────────────────────────────────
 const out = 'node_modules/.cache/rides-lib.mjs';
-await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './src/lib/turntable.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { stirOf, stirBefore, kickDepth, KICK_RADII, kickRock, stepRock, rockSwing, swayAt, CUR_ROCK,
-  stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, thicknessViscosity } = await import(`../${out}`);
+await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './src/lib/turntable.ts'; export { STRONG_BEAT, WEAK_BEAT } from './src/lib/barGrid.ts'; export { RhythmSheet, stampedVolume } from './src/lib/sheet.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+const { stirOf, stirBefore, kickDepth, KICK_RADII, kickPress, dentRadius, kickRock, stepRock, rockSwing, swayAt, CUR_ROCK, restingHand, springKick, springStep,
+  ROCK_LEVEL_AFTER, ROCK_LEVEL_MOVE, STRONG_BEAT, WEAK_BEAT,
+  stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, thicknessViscosity, RhythmSheet, stampedVolume, KICK_HOLD } = await import(`../${out}`);
 const { createNoise2D } = await import('simplex-noise');
 // The app's sway noise, on a fixed table (the app keys its own on the show's seed).
 let seedN = 11;
@@ -74,18 +75,24 @@ const noise = createNoise2D(() => ((seedN = (seedN * 16807) % 2147483647) / 2147
 
 /*
   The plate's tilt, step by step, as the frame loop makes it (lib/plateRock.ts):
-  a kick every half second at a bass of 0.8, the spring stepped at 60 a
-  second, and the sway (swayAt, from `t0` seconds) with `sway` on. `before` is
-  the dial as it was, applied twice: the kick's shove was 14 × R, which is
-  kickRock's 7 at twice R's bass, and the swing × R again.
+  a kick every half second at a bass of 0.8, the hand stepped at 60 a
+  second, and the sway (swayAt, from `t0` seconds) with `sway` on. The lab
+  has no bar grid, so the hand leans as it does where the grid is unsure:
+  on the first kick two beats after the last lean, here every other kick
+  (27f-2). `spring` is the hand as it was from 27a to 27f-2, the 0.9 Hz
+  spring shoved on every kick (`springKick`), for the before. `before` is
+  that spring with the dial as it was before 27a, applied twice: the kick's
+  shove was 14 × R, which is the spring's 7 at twice R's bass, and the swing
+  × R again.
 */
-const tilts = ({ R, sway = false, t0 = 0, kicks = true, before = false }) => {
-  const rock = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 };
+const tilts = ({ R, sway = false, t0 = 0, kicks = true, before = false, spring = false }) => {
+  const rock = restingHand(), old = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 };
+  const sprung = before || spring;
   const out = [];
   for (let k = 0; k < 120; k++) {
-    if (kicks && R > 0 && k % 30 === 0) kickRock(rock, before ? 0.8 * 2 * R : 0.8, 1);
-    stepRock(rock, 1 / 60);
-    const [sx, sy] = rockSwing(rock, R, ...(sway ? swayAt(noise, t0 + k / 60) : [0, 0]));
+    if (kicks && R > 0 && k % 30 === 0) { if (sprung) springKick(old, before ? 0.8 * 2 * R : 0.8, 1); else kickRock(rock, 0.8, 1); }
+    if (sprung) springStep(old, 1 / 60); else stepRock(rock, 1 / 60);
+    const [sx, sy] = rockSwing(sprung ? old : rock, R, ...(sway ? swayAt(noise, t0 + k / 60) : [0, 0]));
     out.push([sx * CUR_ROCK, sy * CUR_ROCK]);
   }
   return out;
@@ -103,14 +110,14 @@ const tilts = ({ R, sway = false, t0 = 0, kicks = true, before = false }) => {
   late against it, and correlated 0.80 where it does 1.00.
 */
 const glassDrag = (t) => coverDrag(t);
-const covers = ({ R, t = 0.45, steps = 120 }) => {
-  const rock = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 }, cover = { x: 0, y: 0, vx: 0, vy: 0 };
+const covers = ({ R, t = 0.45, steps = 120, spring = false }) => {
+  const rock = spring ? { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 } : restingHand(), cover = { x: 0, y: 0, vx: 0, vy: 0 };
   const h = DISH_REST_GAP * DISH_METRES, catchUp = 1 - Math.exp(-(1 / 60) / (h * h / (12 * thicknessViscosity(t))));
   const out = [];
   let ux = 0, uy = 0, px = 0, py = 0;
   for (let k = 0; k < steps; k++) {
-    if (R > 0 && k % 30 === 0) kickRock(rock, 0.8, 1);
-    stepRock(rock, 1 / 60);
+    if (R > 0 && k % 30 === 0) { if (spring) springKick(rock, 0.8, 1); else kickRock(rock, 0.8, 1); }
+    if (spring) springStep(rock, 1 / 60); else stepRock(rock, 1 / 60);
     const [sx, sy] = rockSwing(rock, R, 0, 0);
     const tx = plateSin(sx * HOLD_TILT, sx), ty = plateSin(sy * HOLD_TILT, sy);
     stepCover(cover, tx, ty, glassDrag(t), 1 / 60);
@@ -135,6 +142,83 @@ const BAND = [0.8, 0.45];
   const now = peak(tilts({ R: 0.45 })) / peak(tilts({ R: 1 })), was = peak(tilts({ R: 0.45, before: true })) / peak(tilts({ R: 1, before: true }));
   check('Plate Rock\'s dial is the hand\'s tilt, once: the default 0.45 tips the plate 0.45 of full', Math.abs(now - 0.45) < 0.01 && was < 0.25,
     `${now.toFixed(3)} of full (it was ${was.toFixed(3)}, the dial squared); full tips it ${peak(tilts({ R: 1 })).toFixed(3)} (sinθ)`);
+}
+
+{
+  /*
+    27f-2. The rock told apart from the kick (lib/plateRock.ts). The owner:
+    Plate Rock and Beat Squeeze felt the same, because the hand was a spring
+    shoved on every kick, at its fastest the moment the kick landed, beside
+    the kick's dye burst and press. A song at 120 bpm, a kick on every beat
+    at a bass of 0.8, the hand stepped at 60 a second as the frame loop
+    steps it, with the bar grid's place for each kick (`places`, of the beat's
+    number) or none (the grid unsure). Asked of the hand, not of a moment: how
+    many leans over eight bars, on which beats, which way, how fast the hand
+    is moving just after a kick against its fastest, and where it is once the
+    kicks stop.
+  */
+  const song = ({ places = null, every = 30, bars = 8, spring = false, quiet = 0 }) => {
+    const hand = restingHand(), old = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 };
+    const steps = every * 4 * bars, leans = [], speeds = [], afterKick = [];
+    let px = 0, py = 0, peak = 0, lean = 0;
+    for (let k = 0; k < steps + quiet; k++) {
+      if (k < steps && k % every === 0) {
+        const b = k / every, place = places ? places(b) : null;
+        if (spring) springKick(old, 0.8, 1);
+        else if (kickRock(hand, 0.8, 1, place, places ? every / 60 : 0)) leans.push({ b, place, to: [hand.toX, hand.toY] });
+      }
+      if (spring) springStep(old, 1 / 60); else stepRock(hand, 1 / 60);
+      const r = spring ? old : hand;
+      const v = Math.hypot(r.x - px, r.y - py) * 60;
+      px = r.x; py = r.y;
+      if (k < steps) { peak = Math.max(peak, v); lean = Math.max(lean, Math.hypot(r.x, r.y)); }
+      speeds.push(v);
+    }
+    /*
+      What a kick does to the hand's speed: how much it changes from the step
+      before the kick to two steps after, against how much it changes over
+      the same three steps half way between kicks. A spring shoved goes from
+      wherever it was to its fastest at the kick, far more than it changes
+      between; a hand already reaching carries on, and one setting out from
+      rest has barely begun 33 ms in, so its speed changes at a kick no more
+      than anywhere else.
+    */
+    const between = [];
+    for (let k = every; k < steps; k += every) {
+      afterKick.push(Math.abs(speeds[k + 2] - speeds[k - 1]));
+      const m = k - Math.round(every / 2);
+      between.push(Math.abs(speeds[m + 2] - speeds[m - 1]));
+    }
+    const mean = (a) => a.reduce((x, y) => x + y, 0) / Math.max(1, a.length);
+    return { leans, peak, lean, kickShare: mean(afterKick) / Math.max(mean(between), 1e-9), end: Math.hypot(px, py) };
+  };
+  const bar = song({ places: (b) => b % 4 });
+  const onStrong = bar.leans.every((l) => l.place === 0 || l.place === 2);
+  check('Plate Rock leans on the one and on three, and on no other kick: 16 leans in 8 bars of kicks on every beat',
+    bar.leans.length === 16 && onStrong, `${bar.leans.length} leans, on ${[...new Set(bar.leans.map((l) => l.place))].join(' and ')} of the bar (0 the one)`);
+  const turns = bar.leans.slice(1).map((l, i) => { const p = bar.leans[i].to; return (l.to[0] * p[0] + l.to[1] * p[1]) / (Math.hypot(...l.to) * Math.hypot(...p)); });
+  check('each lean tips the dish the other way, the axis turning a little each time',
+    turns.every((c) => c < -0.8 && c > -0.999), `consecutive leans at ${Math.min(...turns).toFixed(3)} to ${Math.max(...turns).toFixed(3)} (cos of the angle between them)`);
+  const half = song({ places: (b) => (b % 2 ? WEAK_BEAT : STRONG_BEAT) });
+  const unsure = song({}), eighths = song({ every: 15 });
+  check('where the grid knows only the half bar it leans on the strong beats, and where it is unsure on every other kick, and on eighths a lean a second',
+    half.leans.length === 16 && unsure.leans.length === 16 && eighths.leans.length === 8,
+    `${half.leans.length} and ${unsure.leans.length} leans in 16 s, ${eighths.leans.length} in 8 s of eighths`);
+  const was = song({ spring: true });
+  check('the rock is not a pulse on the kick: the hand\'s speed changes no more across a kick than half way between kicks (the spring\'s, three times as much or more)',
+    bar.kickShare <= 1 && was.kickShare >= 3, `${bar.kickShare.toFixed(2)}× as much (the spring: ${was.kickShare.toFixed(2)}×), the step before to two steps after`);
+  /*
+    The lean is half the spring's peak (ROCK_LEAN, lib/plateRock.ts): held
+    for most of a half bar where the spring passed through its peak, a lean
+    as steep moved the colour three times as far (the lab below, 0.62 against
+    the spring's 0.20 at the default), so the hand tips the dish half as far
+    and moves the colour further than the spring did, not three times.
+  */
+  check('and tips the plate half as far as the spring\'s peak, holding it longer: the peak lean within 15% of half the spring\'s',
+    Math.abs(bar.lean / (0.5 * was.lean) - 1) < 0.15, `${bar.lean.toFixed(3)} against the spring's ${was.lean.toFixed(3)} (before the slider)`);
+  const stops = song({ places: (b) => b % 4, quiet: Math.round(60 * (ROCK_LEVEL_AFTER + ROCK_LEVEL_MOVE + 0.2)) });
+  check('and when the kicks stop the hand puts the dish down level, where a held lean would slide the colour to one side',
+    stops.end < 1e-6, `${stops.end.toExponential(1)} left of a lean of ${stops.lean.toFixed(2)}, ${(ROCK_LEVEL_AFTER + ROCK_LEVEL_MOVE + 0.2).toFixed(1)} s after the last kick`);
 }
 
 {
@@ -182,7 +266,9 @@ const { page, close } = await openLab();
 const gpuErrors = [];
 page.on('console', (m) => { if (/gpu error|device lost|validation/i.test(m.text())) gpuErrors.push(m.text().slice(0, 200)); });
 try {
-  const r = await page.evaluate(async ({ KICK_RADII, kicks, stirs, rocks, glasses }) => {
+  // The sheet's dent radius on the lab's 192 plate (GRID_SCALE 1.5), at the default Thickness, as kickPress lays it.
+  const SHEET_CELLS = Math.round(kickPress(thicknessViscosity(0.45), 0).radii[0] * 1.5);
+  const r = await page.evaluate(async ({ KICK_RADII, SHEET, kicks, stirs, rocks, glasses }) => {
     const res = {};
     const DEF = 0.45, THICK = 0.75;
     // The app's plate at the default Speed: its step and its glass (lift.mjs's APP_GLASS).
@@ -261,6 +347,7 @@ try {
       const full = await run({ tilt: rocks.full }), half = await run({ tilt: rocks.def });
       const before = await run({ tilt: rocks.before, oldRock: true }), beforeDef = await run({ tilt: rocks.beforeDef, oldRock: true });
       const sway = await run({ tilt: rocks.sway }), sway2 = await run({ tilt: rocks.sway2 });
+      res.rockSpring = moved(await run({ tilt: rocks.spring }));
       res.rockFull = moved(full); res.rockDefault = moved(half); res.rockBefore = moved(before); res.rockBeforeDefault = moved(beforeDef); res.sway = Math.max(moved(sway), moved(sway2));
       res.stir = {};
       for (const [name, s] of Object.entries(stirs)) { const o = await run({ turb: s }); res.stir[name] = { moved: moved(o), speed: o.speed }; }
@@ -387,6 +474,9 @@ try {
       res.heavyTilt = await go(glasses.full, { cover: false, heavy: true });
       res.evenFull = await go(glasses.full, { cost: true });
       res.evenDefault = await go(glasses.def, { cost: true });
+      // The spring's rock (27a to 27f-2), which slides the glass faster: the drift taken out at speed (5c).
+      res.springFull = await run(glasses.springFull, { cost: true });
+      res.springDefault = await run(glasses.springDef, { cost: true });
       res.evenLow = await go(glasses.low);
       res.evenThick = await go(glasses.thick, { t: THICK });
       res.evenStir = await go(null, { turb: stirs['a look\'s 0.3'] });
@@ -424,6 +514,29 @@ try {
       // outer disc (60), inside the glass's (96). Only a press across the dish moves it far.
       res.far = await kick(app_, kicks.def, 70);
       res.farPalm = await kick([40, 27, 15].map((r) => Math.round(r * 1.5)), kicks.def, 70);
+      /*
+        The rhythm sheet (27f-3), on the default oil, read at the same rings: pressed as the app
+        presses it now, the sheet solved (lib/sheet.ts, PLAN 27f-4), a finger held KICK_HOLD
+        (nine steps) and the sheet's own motion laid each step after, for as long as the glass's
+        kick above takes to be let go and settle (twenty steps and sixty).
+      */
+      const sheetKick = async (amount, R0 = 30) => {
+        await lab.create(N, N);
+        for (let a = 0; a < 64; a++) { const t = a / 64 * 2 * Math.PI; lab.dye(0.5 + Math.cos(t) * R0 / N, 0.5 + Math.sin(t) * R0 / N, 2.5 / N, [1, 0, 0], 1); }
+        lab.flush();
+        const over = app(N, 0);
+        await lab.step(2, over);
+        const r0 = await ring();
+        lab.sheetPress(0.5, 0.5, amount, SHEET.nu);
+        const go = async (n) => { for (let k = 0; k < n; k++) { lab.sheetStep(1 / 60, over.gapSpring); lab.flush(over.dt); await lab.step(1, over, true); } };
+        await go(9);
+        const held = await ring();
+        await go(80);
+        return { r0, out: held - r0, back: (await ring()) - r0 };
+      };
+      res.sheetDefault = await sheetKick(kicks.sheet);
+      res.sheetFull = await sheetKick(kicks.sheetFull);
+      res.sheetFar = await sheetKick(kicks.sheet, 70);
     }
     // ── 3b. The ferrofluid under the kicks ─────────────────────────────
     {
@@ -461,10 +574,11 @@ try {
     return res;
   }, {
     KICK_RADII,
-    glasses: { full: covers({ R: 1 }), def: covers({ R: 0.45 }), low: covers({ R: 0.2 }), thick: covers({ R: 1, t: 0.75 }) },
-    kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), before: 0.0024 * 0.5 * 0.7, classic: kickDepth(0.5, 0.7, 1) },
+    SHEET: { def: SHEET_CELLS, nu: thicknessViscosity(0.45) },
+    glasses: { springFull: covers({ R: 1, spring: true }), springDef: covers({ R: 0.45, spring: true }), full: covers({ R: 1 }), def: covers({ R: 0.45 }), low: covers({ R: 0.2 }), thick: covers({ R: 1, t: 0.75 }) },
+    kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), sheet: kickDepth(0.5, 0.7, 1) * kickPress(thicknessViscosity(0.45), 0).share, sheetFull: kickDepth(1, 1, 1) * kickPress(thicknessViscosity(0.45), 0).share, before: 0.0024 * 0.5 * 0.7, classic: kickDepth(0.5, 0.7, 1) },
     stirs: { 'a look\'s 0.3': stirOf(0.3, ...BAND), '0.5': stirOf(0.5, ...BAND), full: stirOf(1, ...BAND) },
-    rocks: { full: tilts({ R: 1 }), def: tilts({ R: 0.45 }), before: tilts({ R: 1, before: true }), beforeDef: tilts({ R: 0.45, before: true }), sway: tilts({ R: 0.45, sway: true, kicks: false }), sway2: tilts({ R: 0.45, sway: true, t0: 40, kicks: false }) },
+    rocks: { full: tilts({ R: 1 }), def: tilts({ R: 0.45 }), spring: tilts({ R: 0.45, spring: true }), before: tilts({ R: 1, before: true }), beforeDef: tilts({ R: 0.45, before: true }), sway: tilts({ R: 0.45, sway: true, kicks: false }), sway2: tilts({ R: 0.45, sway: true, t0: 40, kicks: false }) },
   });
 
   // 1.
@@ -483,9 +597,9 @@ try {
     `${ratio.toFixed(2)}× slower`);
   // 2.
   const yard = r.stir['a look\'s 0.3'].moved;
-  check('at full Plate Rock, kicked as the app kicks it, the colour moves at least a third as much as a look\'s own stir',
-    r.rockFull >= yard / 3 && r.rockDefault > 0.4 * r.rockFull,
-    `${r.rockFull.toFixed(3)} at full, ${r.rockDefault.toFixed(3)} at the default 0.45, against the stir's ${yard.toFixed(3)}; before, ${r.rockBefore.toFixed(3)} at full and ${r.rockBeforeDefault.toFixed(3)} at 0.45`);
+  check('at full Plate Rock, kicked as the app kicks it, the colour moves at least a third as much as a look\'s own stir, and at the default at least as far as the spring moved it',
+    r.rockFull >= yard / 3 && r.rockDefault > 0.4 * r.rockFull && r.rockDefault >= r.rockSpring,
+    `${r.rockFull.toFixed(3)} at full, ${r.rockDefault.toFixed(3)} at the default 0.45 (the spring shoved on every kick, 27a to 27f-2: ${r.rockSpring.toFixed(3)}), against the stir's ${yard.toFixed(3)}; before 27a, ${r.rockBefore.toFixed(3)} at full and ${r.rockBeforeDefault.toFixed(3)} at 0.45`);
   /*
     Between kicks the hand sways the glass (lib/plateRock.ts, ±0.35 of the
     swing), and on a thin gap a sway is a tilt the colour slides down. With
@@ -544,10 +658,20 @@ try {
     vacuously), and the slide above is the same run, fitted against the
     glass: the drift is carried, not dropped.
   */
+  /*
+    Since 27f-2 the app's rock is a hand that leans half as steeply and
+    slides the glass slower (the drift at most 0.71 cells a step at full on
+    192², 0.32 at the default), so it no longer drifts the film fast enough
+    to ask the drift's removal much. The bars are asked of the hand's rock,
+    which is what the app does, and of the old spring's as well, which still
+    drifts the film over a cell a step: the guard that the removal ran at
+    speed is read there, so it cannot pass on a glass that never moved.
+  */
   const cost = (o) => `${o.subs.toFixed(2)} substeps a step (most ${o.most}), drift taken out up to ${o.drift.toFixed(2)} cells a step`;
   check('and the glass costs the carries next to nothing: at the default no more substeps a step than the plate held still, at full under two and a half',
-    r.evenFull.drift >= 1 && r.evenDefault.drift >= 0.4 && r.evenDefault.subs <= r.stillSubs.subs + 0.25 && r.evenFull.subs <= 2.5 && r.evenFull.most <= 3,
-    `full ${cost(r.evenFull)}; 0.45 ${cost(r.evenDefault)}; still ${r.stillSubs.subs.toFixed(2)} (most ${r.stillSubs.most}); before, the drift in the flow asked 8.0 at 0.45 and 12.2 at full on 384²`);
+    r.springFull.drift >= 1 && r.springDefault.drift >= 0.4 && r.springDefault.subs <= r.stillSubs.subs + 0.25 && r.springFull.subs <= 2.5 && r.springFull.most <= 3
+    && r.evenDefault.subs <= r.stillSubs.subs + 0.25 && r.evenFull.subs <= 2.5 && r.evenFull.most <= 3,
+    `the hand's rock: full ${cost(r.evenFull)}; 0.45 ${cost(r.evenDefault)}; the spring's: full ${cost(r.springFull)}; 0.45 ${cost(r.springDefault)}; still ${r.stillSubs.subs.toFixed(2)} (most ${r.stillSubs.most}); before, the drift in the flow asked 8.0 at 0.45 and 12.2 at full on 384²`);
   // 3.
   const k = (o) => `out ${o.out.toFixed(1)} cells, back to ${o.back.toFixed(1)}`;
   check('Beat Squeeze: a kick at the default presses the glass across the dish and a ring 30 cells out goes 4 cells or more',
@@ -565,6 +689,64 @@ try {
   const share = (o) => 1 - Math.abs(o.back) / o.out;
   check('let go, the ring comes back at least three quarters of the way', share(r.kickDefault) >= 0.75 && share(r.kickFull) >= 0.75,
     `default ${(100 * share(r.kickDefault)).toFixed(0)}% (${r.kickDefault.back.toFixed(2)} cells short), full ${(100 * share(r.kickFull)).toFixed(0)}% (${r.kickFull.back.toFixed(2)})`);
+  /*
+    3c. The rhythm sheet (27f-3, lib/squish.ts kickPress; solved in 27f-4,
+    lib/sheet.ts). Off the looks that may move the frame the kick presses a
+    thin sheet floating on the liquid. Its reach was first the bending
+    length alone, (D h³ T / 12 μ)^(1/6), and asked here to go exactly as μ to
+    the minus one sixth; the solved sheet has the liquid's weight holding
+    it up too, which narrows the thin liquids' dents, so the reach is now
+    the solve's (sheetReach; `npm run sheet` holds it against the grid's
+    solve): glycerine's narrower than the default oil's narrower than
+    water's, and never the glass's dish. Then in the lab, pressed as the
+    app presses it, on the same ring of colour the glass's lines read: the
+    dent moves the ring 30 cells out (inside it), its push falls off away
+    from it faster than the glass's, and let go it comes back as the
+    glass's does.
+  */
+  {
+    const r45 = dentRadius(thicknessViscosity(0.45)), r1 = dentRadius(thicknessViscosity(1)), r0 = dentRadius(thicknessViscosity(0));
+    check('Beat Squeeze presses the rhythm sheet off the frame-moving looks: its dent as wide as the solved sheet reaches over the liquid, narrower the thicker',
+      r1 < r45 && r45 < r0 && r0 < 0.5 && kickPress(thicknessViscosity(0.45), 0.35).radii === KICK_RADII,
+      `a dent ${(128 * r1).toFixed(1)} cells of 128 in glycerine, ${(128 * r45).toFixed(1)} on the default oil, ${(128 * r0).toFixed(1)} in water; the glass's ${KICK_RADII[0]} on a look with Frame Sway`);
+    check('and the dent moves the colour inside it, 1.5 cells or more at the default and 4 or more at full',
+      r.sheetDefault.out >= 1.5 && r.sheetFull.out >= 4, `${k(r.sheetDefault)}; full ${k(r.sheetFull)} (a dent of ${SHEET_CELLS} cells on the lab's 192)`);
+    /*
+      What "local" can mean in a film that cannot be squeezed: what a press
+      displaces has to go somewhere, so past the dent's edge the colour still
+      moves. The stamp sent all its volume out through the whole film to the
+      open rim, one over the distance (asked here until 27f-4 as the
+      stamp's displaced volume against the glass's, to 25%). The solved
+      sheet's push falls off from where it landed, where the glass's
+      dish-wide closing moves the middle and the edge alike (the whole
+      picture breathing); how far its liquid goes is the sheet's: some into
+      the ring round the dent, the rest levelled out to the rim by its
+      weight. So the ring 70 cells out moves by the liquid that has left
+      that disc, which the solve says itself: the held dent's net volume
+      inside 70 cells of the lab's 192 is 0.57 of the stamp's (0.89 inside
+      30), and 70 cells out the sheet moves the colour that share of the
+      stamp's volume share, to 25% either way. Asked first only as under the
+      stamp's share, which a sheet that moved nothing there passed, and so
+      did a press only as deep as the stamp's middle, 0.123 (the review of
+      #452).
+    */
+    const vol = (radii, a) => radii.reduce((v, R) => v + a * R * R, 0);
+    const wantFar = vol([SHEET_CELLS], 3) / vol(KICK_RADII.map((R) => Math.round(R * 1.5)), 1);
+    const solved = (() => {
+      const nu = thicknessViscosity(0.45), amount = kickDepth(0.5, 0.7, 1) * kickPress(nu, 0).share;
+      const R = kickPress(nu, 0).radii[0] / 128, s = new RhythmSheet();
+      s.setLiquid(nu);
+      s.pressVolume(0.5, 0.5, stampedVolume(amount, R), R, KICK_HOLD);
+      s.step(192, KICK_HOLD, 0, new Float32Array(192 * 192));
+      return s.volumeWithin(0.5, 0.5, 70 / 192) / stampedVolume(amount, R);
+    })();
+    const got = r.sheetFar.out / r.far.out, wantSheet = wantFar * solved;
+    check('and is local: its push falls off away from the dent, 70 cells out under 0.6 of the glass\'s falloff, and far off moves the colour as much as the solve says leaves that disc, to 25%',
+      r.sheetFar.out / r.sheetDefault.out < 0.6 * (r.far.out / r.kickDefault.out) && Math.abs(got / wantSheet - 1) < 0.25,
+      `30 → 70 cells out the sheet's ring goes ${r.sheetDefault.out.toFixed(2)} → ${r.sheetFar.out.toFixed(2)} cells, the glass's ${r.kickDefault.out.toFixed(1)} → ${r.far.out.toFixed(1)}; far off ${got.toFixed(3)} of the glass's, the solve says ${wantSheet.toFixed(3)} (${solved.toFixed(3)} of the stamp's ${wantFar.toFixed(3)} leaves the disc)`);
+    check('let go, it comes back at least three quarters of the way', share(r.sheetDefault) >= 0.75 && share(r.sheetFull) >= 0.75,
+      `default ${(100 * share(r.sheetDefault)).toFixed(0)}%, full ${(100 * share(r.sheetFull)).toFixed(0)}%`);
+  }
   /*
     3b. And the ferrofluid is given back too. With the kicks of 27b,
     Classic's ring of ferrofluid was drawn into the middle while the band

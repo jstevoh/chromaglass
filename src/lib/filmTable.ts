@@ -49,10 +49,14 @@ function planck(l: number, T: number): number {
   return 1 / (m ** 5 * (Math.exp(1.4388e-2 / (m * T)) - 1));
 }
 
-/** Airy reflectance of a film of index n1, d nm thick, between n0 and n2, at `l` nm, straight on. */
-export function filmReflectance(n0: number, n1: number, n2: number, d: number, l: number): number {
+/**
+ * Airy reflectance of a film of index n1, d nm thick, between n0 and n2, at `l` nm,
+ * at incidence cosine `cosI` in medium n0 (default 1, straight on).
+ */
+export function filmReflectance(n0: number, n1: number, n2: number, d: number, l: number, cosI = 1): number {
   const r01 = (n0 - n1) / (n0 + n1), r12 = (n1 - n2) / (n1 + n2);
-  const ph = (4 * Math.PI * n1 * d) / l;
+  const cosT = cosI === 1 ? 1 : Math.sqrt(Math.max(0, 1 - (n0 * n0 * (1 - cosI * cosI)) / (n1 * n1)));
+  const ph = (4 * Math.PI * n1 * (cosI === 1 ? d : d * cosT)) / l;
   const c = Math.cos(ph), s = Math.sin(ph);
   // (r01 + r12 e^{i ph}) / (1 + r01 r12 e^{i ph}), as real and imaginary parts.
   const nr = r01 + r12 * c, ni = r12 * s;
@@ -84,12 +88,12 @@ function weights(T: number) {
  * The film's colour, in sRGB 0..1, and its luminance Y (of the lamp's, 0..1),
  * reflected ('R', times `gain`) or transmitted ('T').
  */
-export function filmColour(n0: number, n1: number, n2: number, d: number, mode: 'R' | 'T', gain = 1, T = 5500): { rgb: [number, number, number]; Y: number } {
+export function filmColour(n0: number, n1: number, n2: number, d: number, mode: 'R' | 'T', gain = 1, T = 5500, cosI = 1): { rgb: [number, number, number]; Y: number } {
   let X = 0, Y = 0, Z = 0, Xw = 0, Yw = 0, Zw = 0;
   const w = weights(T);
   for (let j = 0; j < LAMBDAS.length; j++) {
     const l = LAMBDAS[j], S = w.S[j], [x, y, z] = w.xyz[j];
-    const R = filmReflectance(n0, n1, n2, d, l), f = mode === 'R' ? R : 1 - R;
+    const R = filmReflectance(n0, n1, n2, d, l, cosI), f = mode === 'R' ? R : 1 - R;
     X += S * f * x; Y += S * f * y; Z += S * f * z;
     Xw += S * x; Yw += S * y; Zw += S * z;
   }

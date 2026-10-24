@@ -1,3 +1,4 @@
+import { sheetReach } from './sheet.ts';
 /**
  * A hand on the top glass, and the glass coming back up (PLAN.md §10 step 4,
  * roadmap G in docs/bubbles-plan.md).
@@ -396,6 +397,82 @@ export function kickDepth(squeeze: number, bass01: number, accent: number): numb
 }
 /** How long a kick's press stays down before the glass lets go (s): the same pause that tells a hand's press from its lift. */
 export const KICK_HOLD = RELEASE_MS / 1000;
+
+/*
+  Where the kick presses, and how far its press reaches (PLAN 27f-3).
+
+  KICK_RADII above is a rigid glass pressed: a glass bends so little over a
+  dish that the gap closes across most of it at once, and the liquid under
+  all of it goes out toward the rim and back, which is the whole picture
+  breathing in and out on every kick. That is a frame move (PLAN 27a-8),
+  which is why Beat Squeeze sat at 0 on every look but Bass Drop.
+
+  A press that stays where it is pressed needs a cover that bends: a thin
+  sheet laid on the liquid (the rhythm sheet, 0.1 mm of polyester film, an
+  overhead projector's transparency) under a fingertip. How far a pressed
+  sheet's dent spreads is elastohydrodynamics: the sheet's bending against
+  the film's lubrication flow, w_t = (h³/12μ)∇²(D∇⁴w − F), a sixth-order
+  diffusion whose only length after a press held for T is the bending length
+
+      ℓ = (D h³ T / 12 μ)^(1/6)
+
+  (Hosoi and Mahadevan 2004; Lister, Peng and Neufeld 2013), D the sheet's
+  bending stiffness E t³/12(1 − ν²). The dent a held point force leaves is,
+  in Fourier, (F/D)(1 − e^(−(kℓ)⁶))/k⁴: it crosses zero at 2.28ℓ (DENT_REACH,
+  integrated numerically), and inside that it is within a tenth of the
+  clamped bowl (1 − r²/R²)² that squishDisc already lays on a thin gap, with
+  0.29 of its cylinder's volume against the bowl's third. So the kick lays one
+  such bowl of radius 2.28ℓ.
+
+  The liquid sets the reach. On the default oil (Thickness 0.45) the dent is
+  28 cells of a 128 plate across its radius, a fifth of the dish; in water 47,
+  most of the middle; in glycerine 15, a fingertip's dimple. A thin liquid
+  runs out from under the sheet fast enough for the bend to spread before the
+  kick lets go, a thick one holds the sheet up round the finger. (As the
+  lubrication equation has it, which is the liquid's own pace only in
+  glycerine: in 6 mm of the default oil the layer's viscous time h²/ν is
+  1.6 s, a hundred times the dent's, and the liquid's inertia rings the
+  sheet; PLAN 27f-8(f).)
+
+  That was 27f-3, and its reach left out the liquid's weight. A sheet
+  floating on a layer is held up where it is pushed down by Archimedes as
+  well as by its stiffness, and at a dent's size the weight is the larger
+  (they balance at (D/ρg)^(1/4), 14 mm). The sheet is now solved
+  (lib/sheet.ts, PLAN 27f-4) with its weight and the dish's rim, and the
+  dent's reach is the solved one's (sheetReach, the same equation by
+  quadrature): 35 cells of 128 in water, 27 on the default oil, 15 in
+  glycerine. The weight makes the thin liquids' dents narrower than the
+  bending length alone did (water's 47 was most of the dish) and leaves
+  the thick ones' as they were, where the kick's hold is too short for the
+  weight to matter. The bending-length stamp, DENT_REACH and SHEET_D are
+  kept for the record and for the frame-moving looks' glass, which is not
+  a sheet.
+*/
+/** The rhythm sheet's bending stiffness, N·m: 0.1 mm of polyester (E 4 GPa, ν 0.4). */
+export const SHEET_D = (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4));
+/** Where the dent of a held point force on an elastic sheet over a thin film crosses zero, in bending lengths, its weight left out (27f-3). */
+export const DENT_REACH = 2.28;
+/**
+ * The sheet's dent radius, in plate widths, for a liquid of kinematic
+ * viscosity `nu` (m²/s; lib/turntable.ts thicknessViscosity) under a press
+ * held `hold` seconds, at a gap `gapMetres` deep, on a plate `plateMetres`
+ * across: where the solved sheet's held dent crosses zero (lib/sheet.ts sheetReach).
+ */
+export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = 0.006, plateMetres = 0.2, density = 1000): number {
+  return sheetReach(nu, hold, gapMetres, density, SHEET_D) / plateMetres;
+}
+/**
+ * The discs a kick presses, in cells of a 128-cell plate, and each one's
+ * share of the press: the glass's three across the dish where the look may
+ * move the frame (Frame Sway above 0, the cover loose; lib/plateRock.ts
+ * FRAME_MOVING_LOOKS), and otherwise the sheet's one dent, as deep in the
+ * middle as the glass's three stacked (each bowl's middle is three times its
+ * amount, so the one dent carries all three's).
+ */
+export function kickPress(nu: number, sway: number): { radii: number[]; share: number } {
+  if (Number.isFinite(sway) && sway > 0) return { radii: KICK_RADII, share: 1 };
+  return { radii: [Math.max(4, Math.round(dentRadius(nu) * 128))], share: KICK_RADII.length };
+}
 /** How long the glass takes to give a kick's press back (s): a third of a second, done before the next kick at 120 bpm. */
 export const KICK_RELEASE = 1 / 3;
 
@@ -550,9 +627,38 @@ export function bassPressLevel(routeValue: number, energyRoute: boolean): number
  * absent one is 1). One function so the plate and `npm run breakdown` press
  * the same glass.
  */
-export function bassPressFor(routeValue: number, energyRoute: boolean, impact: number, passage: number | undefined): number {
+export function bassPressFor(routeValue: number, energyRoute: boolean, impact: number, passage: number | undefined, boost = 1): number {
   const g = Number.isFinite(passage) ? Math.max(0, Math.min(1, passage as number)) : 1;
-  return bassPressDepth(bassPressLevel(routeValue, energyRoute), impact) * g;
+  return bassPressDepth(bassPressLevel(routeValue, energyRoute), impact) * g * bassBoostGain(boost);
+}
+/*
+  Bass Boost, as the hand takes it (PLAN 27g). What was reported: "I don't feel
+  like it actually does anything". The slider multiplied the ranged bass
+  reading, 0 to 85 at the default Sensitivity, and everything that reads the
+  bass takes it over 70 or 85 and stops: at 2× the reading sat over the
+  hand's ceiling 0.57 of the time on the band's chorus (0.00 at 1×), at 3×
+  0.70, and the press's change a second fell from 3.06 to 1.83 and 0.90 while
+  its deepest rose only 8% (`npm run bassboost`). So turning Bass Boost up
+  held the glass flat and the kicks moved less. The kick detector reads the
+  spectrum and never saw it (29 kicks at every setting).
+
+  A bass boost on a rig is a gain: more cone excursion for the same line, the
+  line's shape kept. So the hand follows the reading with the boost taken back
+  off (`routeValue` here is that, the dynamics the kicks ride kept in range:
+  the caller divides the boost out of the bass before `getAudioValue` clips
+  it at 100, or a boosted bass would lose its shape there) and lays the boost
+  as a gain on the force: the press's depth, the burst's push, the kick's dye. At 1× it
+  is exactly the hand it was. Only the velocity route when it is the bass
+  takes this; a route the owner sent to the mids or the energy has no bass to
+  boost.
+*/
+/** The bass route's value (`getAudioValue`'s 'bass', 0–1) with the boost taken back off the reading first. */
+export function bassRouteValue(bass: number, boost: number | undefined): number {
+  return Math.max(0, Math.min(1, (Number.isFinite(bass) ? bass : 0) / bassBoostGain(boost) / 100));
+}
+/** The boost as a gain, kept to the slider's travel (and away from a zero or a NaN a bad save could leave). */
+export function bassBoostGain(boost: number | undefined): number {
+  return Number.isFinite(boost) ? Math.max(0.25, Math.min(3, boost as number)) : 1;
 }
 export const BASS_PRESS = 0.004;
 /** The bass's depth for the velocity route's level (0–1) and Sound Drive (`impact`): see above. */

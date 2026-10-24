@@ -8,6 +8,11 @@ import { HIT_FEATURES, HIT_FEATURE_LABELS } from '../lib/hitSource';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
 import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
+import { AREA_TARGETS, isAreaTarget } from '../lib/areaCords';
+import { plateAreas, areaFamily, areaDye } from '../lib/plateAreas';
+import { PRESET_CONTRACTS } from '../presetPlate';
+import { PALETTE } from '../constants';
+import { AreaPicker } from './phone/AreaPicker';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
@@ -21,6 +26,8 @@ import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
+import { helpFor } from '../lib/controlHelp';
+import { useControlTip } from './ui/ControlTip';
 
 /**
  * Pinning a control onto a desk.
@@ -119,6 +126,8 @@ interface SettingsPanelProps {
   mixTakes?: MixTakes;
   /** The look the back plate is on, for the Mixer's Back Plate row (PLAN.md §16a). */
   backLook?: string | null;
+  /** The look on the plate, by id, for its areas of the dish in the patch bay (PLAN 25h). */
+  lookId?: string | null;
   onMarkFile?: (file: File) => void;
   onMarkClear?: () => void;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
@@ -297,8 +306,13 @@ const TARGET_GROUPS = SETTINGS_SECTIONS
 const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, settingKey }: { label: string; value: number | undefined; min: number; max: number; step: number; onChange: (v: number) => void; icon?: React.ComponentType<{ size?: number }>; disabled?: string | false; settingKey?: keyof VisualizerSettings }) => {
   const safeValue = value ?? 0;
   const curve = settingKey ? curveOf(settingKey) : 1;
+  // What the control does, as the desk's hover card says it (PLAN.md 8j); a
+  // tap on the name opens it where there is no hover.
+  const line = helpFor(settingKey);
+  const tip = useControlTip({ name: label, help: line, value: disabled ? undefined : readSetting(String(settingKey ?? ''), safeValue, min, max), disabled: !!disabled });
   return (
-    <div className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
+    <div ref={el => { tip.anchor.current = el; }} {...tip.bind} className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
+      {tip.card}
       <div className="flex items-center justify-between gap-2">
         {/*
           The rail beside this pane is sentence case and so is every control
@@ -310,7 +324,10 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
         */}
         <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-text-2">
           {Icon && <Icon size={14} />}
-          <span className="truncate">{label}</span>
+          <span
+            className={`truncate ${line ? '[@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4' : ''}`}
+            onClick={line ? tip.toggle : undefined}
+          >{label}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {settingKey && <PinChips settingKey={settingKey} />}
@@ -369,9 +386,17 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
+  /*
+    The look's areas of the dish, for the patch bay's area picker (PLAN 25h),
+    each drawn in its family's colours from the look's own dyes. None for a
+    look built the old way, and then the picker is not drawn at all.
+  */
+  const lookAreas = useMemo(() => plateAreas(lookId), [lookId]);
+  const areaColours = useMemo(() => (lookAreas ?? []).map(a => areaFamily(a).map((_, k) =>
+    PALETTE[areaDye(a, PRESET_CONTRACTS[lookId ?? ''] ?? [0], 0, k)]?.hex ?? '#888')), [lookAreas, lookId]);
   const markInputRef = useRef<HTMLInputElement>(null);
   /** Whether this browser can capture a window at all. Every phone cannot. */
   const canCaptureWindow = typeof navigator !== 'undefined'
@@ -872,7 +897,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             ))}
           </div>
           <Info>
-            A new song is heard as a gap of a few seconds between tracks, or named by track identification. The sequencer keeps control while it is running.
+            A new song is heard as the last one falling away into the next, even a half-second gap, or named by song recognition when one song crossfades into another. The new look comes in on a beat: quickly after a gap, slowly under a crossfade. The sequencer keeps control while it is running.
           </Info>
         </div>
         {settings.autoCalibrate !== false && (
@@ -1171,6 +1196,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ hueJourney: v })}
           settingKey="hueJourney"
         />
+        <Slider
+          label="Kick Bloom"
+          value={settings.kickBloom ?? 1}
+          min={0}
+          max={1.5}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ kickBloom: v })}
+          settingKey="kickBloom"
+        />
+        <Info>
+          Kick Bloom is the dye each kick throws outward from the bass spot. Beat Squeeze presses a thin sheet on the liquid where the kick lands: a dent as wide as the sheet bends over this liquid, wide on thin oil, a fingertip on syrup. Plate Rock is the slow one: a hand tipping the dish on the one and three, the heavier colour running downhill each way.
+        </Info>
         <Slider
           label="Beat Squeeze"
           value={settings.beatSqueeze ?? 0}
@@ -1613,6 +1650,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ turingPrint: v })}
           settingKey="turingPrint"
+        />
+        <Slider
+          label="↳ Print Ink (0 is Starch)"
+          value={settings.turingInk ?? 0}
+          min={0}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ turingInk: v })}
+          settingKey="turingInk"
+        />
+        <Slider
+          label="↳ Print Drift (0 is Still)"
+          value={settings.turingDrift ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ turingDrift: v })}
+          settingKey="turingDrift"
         />
         <Slider
           label="Gel Wheel"
@@ -2063,6 +2118,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
+                    {/*
+                      What it moves. Aimed at an area, what a hand does there
+                      (lib/areaCords.ts): a setting is one number for the
+                      whole plate, so an area takes the four acts and nothing
+                      else, and the whole plate takes settings.
+                    */}
                     <select
                       value={m.setting}
                       aria-label="Control"
@@ -2074,7 +2135,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-control-${i}`}
                     >
-                      {TARGET_GROUPS.map(g => (
+                      {m.area !== undefined ? AREA_TARGETS.map(t => (
+                        <option key={t.key} value={t.key} title={t.hint}>{t.label}</option>
+                      )) : TARGET_GROUPS.map(g => (
                         <optgroup key={g.id} label={g.name}>
                           {g.targets.map(t => (
                             <option key={String(t.key)} value={String(t.key)}>{t.label}</option>
@@ -2105,8 +2168,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     <select
                       value={String(m.layer ?? 'all')}
                       aria-label="Plate"
-                      disabled={!PER_LAYER.has(String(m.setting))}
-                      title={PER_LAYER.has(String(m.setting))
+                      disabled={m.area !== undefined || !PER_LAYER.has(String(m.setting))}
+                      title={m.area !== undefined ? 'An area cord works on the plate the music plays'
+                        : PER_LAYER.has(String(m.setting))
                         ? 'Which plate this patch moves'
                         : `${sceneTargets.find(t => t.key === m.setting)?.label ?? 'This control'} is part of the finished picture, not one plate`}
                       onChange={(e) => {
@@ -2139,6 +2203,79 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     />
                     <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
+                  {/*
+                    Where on the plate (PLAN 25h): on a look with areas of the
+                    dish, the cord can work one of them alone. Aiming it at an
+                    area turns its control into what a hand does there (Stir,
+                    to start), and aiming it back at the plate gives it a
+                    setting again (Turbulence), so the cord is never left
+                    naming something its aim cannot take.
+                  */}
+                  {lookAreas && (
+                    <div className="mt-2">
+                      <AreaPicker
+                        areas={lookAreas}
+                        colours={areaColours}
+                        value={m.area !== undefined && m.area < lookAreas.length ? m.area : undefined}
+                        testId={`patch-area-${i}`}
+                        onChange={(area) => {
+                          const next = [...(settings.sceneMappings ?? [])];
+                          const { area: _drop, layer: _layer, ...rest } = m;
+                          next[i] = area === undefined
+                            ? { ...rest, layer: m.layer ?? 'all', setting: isAreaTarget(m.setting) ? 'turbulenceScale' : m.setting }
+                            : { ...rest, area, setting: isAreaTarget(m.setting) ? m.setting : 'areaStir' };
+                          onUpdate({ sceneMappings: next });
+                        }}
+                      />
+                    </div>
+                  )}
+                  {/*
+                    The cord's gate (the least of PLAN 30a), on an area cord:
+                    off, it follows its reading as every cord always has; on,
+                    it fires when the reading crosses Gate, swells in over
+                    Rise and lets go over Fall, so the kick that opens a ring
+                    is the kick and not the room.
+                  */}
+                  {m.area !== undefined && (
+                    <div className="mt-2 flex flex-col gap-1.5" data-testid={`patch-gate-${i}`}>
+                      <label className="flex items-center gap-2 text-[12px] min-h-[32px]">
+                        <input
+                          type="checkbox"
+                          checked={m.threshold !== undefined || m.attack !== undefined || m.release !== undefined}
+                          onChange={(e) => {
+                            const next = [...(settings.sceneMappings ?? [])];
+                            const { threshold: _t, attack: _a, release: _r, ...rest } = m;
+                            next[i] = e.target.checked ? { ...rest, threshold: 0.3, attack: 0.02, release: 0.4 } : rest;
+                            onUpdate({ sceneMappings: next });
+                          }}
+                          data-testid={`patch-gate-on-${i}`}
+                        />
+                        Fire on a hit, not the room
+                      </label>
+                      {m.threshold !== undefined && ([
+                        ['threshold', 'Gate', 0, 1, 0.05, (v: number) => v.toFixed(2)],
+                        ['attack', 'Rise', 0, 2, 0.01, (v: number) => `${v.toFixed(2)} s`],
+                        ['release', 'Fall', 0, 4, 0.05, (v: number) => `${v.toFixed(2)} s`],
+                      ] as const).map(([key, label, min, max, step, show]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <span className="text-[12px] text-white/60 w-9">{label}</span>
+                          <input
+                            type="range" min={min} max={max} step={step}
+                            value={m[key] ?? 0}
+                            aria-label={label}
+                            onChange={(e) => {
+                              const next = [...(settings.sceneMappings ?? [])];
+                              next[i] = { ...m, [key]: parseFloat(e.target.value) };
+                              onUpdate({ sceneMappings: next });
+                            }}
+                            className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                            data-testid={`patch-${key}-${i}`}
+                          />
+                          <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2974,6 +3111,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={5}
           onChange={(v: number) => onUpdate({ tiltDirection: v })}
           settingKey="tiltDirection"
+        />
+        <Slider
+          label="Slosh"
+          value={settings.slosh ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ slosh: v })}
+          settingKey="slosh"
         />
         <Slider
           label="Heat Spread"

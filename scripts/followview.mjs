@@ -143,7 +143,7 @@ try {
     page.setDefaultTimeout(30_000);
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     await page.addInitScript(() => {
-      localStorage.setItem('chromaglass-audio-source', 'simulated');
+      sessionStorage.setItem('chromaglass-audio-source', 'simulated');
       localStorage.setItem('chromaglass-desk-mode', 'perform');
     });
     await page.goto(`${ORIGIN}/?debug&gpu=mid&tier=local&look=classic`, { waitUntil: 'load' });

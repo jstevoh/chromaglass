@@ -548,12 +548,31 @@ const sendSrc = app.slice(app.indexOf('const sendLook ='), app.indexOf('/** Go: 
 check('every look that comes in stops a take on the gel and the lumia (a preset, a saved look, Lucky), and New drops every take',
   [presetSrc, userPresetSrc, luckySrc].every(s => /lookTakesLevels\(\)/.test(s))
   && /rowFades\.clear\(\)/.test(newSrc) && /rowFades\.forget\(FADE_ROWS\)/.test(newSrc) && /setRowFading\(\{\}\)/.test(newSrc));
+/*
+  Which changes lay the ferrofluid ring through the handoff, and so dip its amount.
+  The Go and Send to wall hand the plate over (the ring is swapped in one frame at the
+  middle of the clock), so they pass `swapsRing`; the unattended changes (a new song,
+  Lucky) have no handoff and keep their straight line; and the handoff's swap point is
+  the middle the dip is centred on. If any of these moves, the desk's ring check is
+  measuring a swap that is no longer where the dip is.
+*/
+const fadeCalls = [...app.matchAll(/fadeSettingsTo\((?:[^;]|\n)*?\);/g)].map(m => m[0]);
+const ringCalls = fadeCalls.filter(c => /,\s*true\);$/.test(c));
+const lvSrc = code(src('src/components/LiquidVisualizer.tsx'));
+check('a Go, a Back and Send to wall dip the ring for the handoff, and the unattended changes do not; the handoff swaps at the middle the dip is centred on',
+  ringCalls.length === 2 && /\[\], true\)/.test(ringCalls[0]) && /true, blackoutRef/.test(ringCalls[1])
+  && /lookFadeStep\(false, true\)/.test(app.slice(app.indexOf('const sendDraftToWall'), app.indexOf('const sendDraftToWall') + 3000))
+  && /if \(h\.dosed === 1 && p >= 0\.5\) \{/.test(lvSrc),
+  `${fadeCalls.length} fadeSettingsTo calls, ${ringCalls.length} with the ring`);
+check('a hand on the wall\'s ferrofluid slider mid-fade, or a magnet or bottle in the hand, is not overwritten with the amount 0.6 while a look is changing',
+  /!lookFadeRef\.current\) patch\.phaseAmount = 0\.6/.test(app)
+  && /if \(lookFadeRef\.current\) return;\s*(\/\/[^\n]*\n\s*)*updateSettings\(\{ phaseAmount: 0\.6 \}\)/.test(app));
 check('a Back fades to the look a Go and Lucky left, through the Back\'s step, holding the dimmer in a blackout, and stops every take',
-  /fadeSettingsTo\(prev\.settings, fadeSeconds, true, blackoutRef\.current \? \['dimmer'\] : \[\]\)/.test(revertSrc)
+  /fadeSettingsTo\(prev\.settings, fadeSeconds, true, blackoutRef\.current \? \['dimmer'\] : \[\], true\)/.test(revertSrc)
   && /rowFades\.handOn\(FADE_LEVEL_KEYS\)/.test(revertSrc)
   && /previousLook\.current = \{ id: pinnedPresetId, settings: settingsRef\.current \};/.test(luckySrc)
   && /const from = settingsRef\.current;\s*previousLook\.current = \{ id: pinnedPresetId, settings: from \};/.test(sendSrc)
-  && /back = false, hold: readonly string\[\] = \[\]\) =>/.test(lookFadeSrc) && /const step = lookFadeStep\(back\);/.test(lookFadeSrc)
+  && /back = false, hold: readonly string\[\] = \[\], swapsRing = false\) =>/.test(lookFadeSrc) && /const step = lookFadeStep\(back, swapsRing && seconds >= 1\);/.test(lookFadeSrc)
   && /const started = showNow\(\);/.test(lookFadeSrc)
   && /const laterWrites = useRef\(new LaterWrites\(\)\)\.current;/.test(app));
 /*

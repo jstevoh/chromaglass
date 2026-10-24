@@ -12,6 +12,8 @@ import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
+import type { CartoonShelfProps } from './components/CartoonShelf';
+import { CARTOON_BY_ID } from './lib/cartoons';
 import { SETTINGS_SECTIONS, sectionSearchText, resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
@@ -49,6 +51,7 @@ import { relayInfo, parseRemoteGesture, type RemoteState, type RelayInfo } from 
 import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
 import type { CastState, CastMessage } from './lib/castProtocol';
 import type { RemoteMessage } from './lib/remoteProtocol';
+import { fitMarkForCast } from './lib/markFit';
 import { runBench, formatBench, readRenderer } from './lib/bench';
 import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
@@ -124,13 +127,19 @@ type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'dr
 
 const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 /**
- * Where the show listened last time.
+ * Where the show is listening, for as long as this tab lives.
  *
  * It used to open the microphone on load, every load, which meant a permission
- * prompt in front of the plate before anyone had asked for one. Now the choice
- * is remembered and nothing is opened on its own: the microphone comes back
- * only if the browser already says permission is granted (so no prompt
- * appears), and anything else waits for a click.
+ * prompt in front of the plate before anyone had asked for one. Then the choice
+ * was remembered in `localStorage` and came back with every launch, and a first
+ * visit's first click started the band on its own, so the Sound panel's Source
+ * opened on Mic or Band and not on Off (the owner, 2026-10-22: the source is
+ * None whenever the app opens). It is `sessionStorage` now: a new tab or a
+ * relaunched app opens on Off whatever look loads, and the pick still survives a
+ * reload of the tab, which a gig has to be able to do without losing the input.
+ * Nothing is opened on its own: the microphone comes back only if the browser
+ * already says permission is granted (so no prompt appears), and anything else
+ * waits for a click.
  */
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
@@ -152,25 +161,11 @@ const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 
 function rememberedSource(): AudioSource {
   try {
-    const raw = localStorage.getItem(AUDIO_SOURCE_KEY);
+    const raw = sessionStorage.getItem(AUDIO_SOURCE_KEY);
     // 'file' needs a file nobody has chosen yet, and 'system' opens a picker in a browser (never in the Mac app).
     if (raw === 'microphone' || raw === 'simulated' || (raw === 'system' && isDesktopApp())) return raw;
   } catch { /* private */ }
   return 'none';
-}
-
-/**
- * Has anyone ever told this browser where to listen?
- *
- * Not the same question as `rememberedSource() === 'none'`, which is also the
- * answer for someone who turned the microphone off on purpose. This one
- * separates a first visit from a considered silence, and it is the difference
- * between a stranger's first five seconds being the thing the project is —
- * a plate moving to music — and being a plate sitting still while they look
- * for the button that makes it do something.
- */
-function everChoseSource(): boolean {
-  try { return localStorage.getItem(AUDIO_SOURCE_KEY) !== null; } catch { return true; }
 }
 
 /** True only if the browser will hand over the microphone without asking. */
@@ -962,36 +957,47 @@ export default function App() {
 
   const videoInputRef = useRef<HTMLInputElement>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
-  const videoFrameRaf = useRef<number | null>(null);
-
+  /** A poured file's object URL, revoked when the pour moves on. */
+  const pourUrlRef = useRef<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  /** The shelf's cartoon pouring as dye (lib/cartoons.ts), or null for a file or nothing. */
+  const [pouringCartoon, setPouringCartoon] = useState<string | null>(null);
+  /*
+    The video pour: one hidden, muted, looping <video>, handed to the plate
+    once when it starts playing. It used to be handed over again on every
+    animation frame, which made the plate pause and play it every frame
+    (PLAN 14ab-1, fixed in `pourVideo`); the plate's own frame loop reads the
+    picture, so once is enough. A cartoon is given by address, so it pours
+    while it is still arriving; a file by an object URL.
+  */
+  const pourVideoFrom = useCallback((src: string, objectUrl: boolean) => {
+    const v = videoPlayerRef.current;
+    if (!v) return;
+    if (pourUrlRef.current) URL.revokeObjectURL(pourUrlRef.current);
+    pourUrlRef.current = objectUrl ? src : null;
+    v.onplay = () => { setIsVideoPlaying(true); visualizerRef.current?.pourVideo(v); };
+    v.onpause = () => setIsVideoPlaying(false);
+    v.onended = () => setIsVideoPlaying(false);
+    v.src = src;
+    v.play().catch(() => { /* autoplay policy: plays on the next gesture */ });
+  }, []);
+  const stopPour = useCallback(() => {
+    visualizerRef.current?.stopPourVideo();
+    const v = videoPlayerRef.current;
+    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+    if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
+    setIsVideoPlaying(false);
+    setPouringCartoon(null);
+  }, []);
+  const pourFile = useCallback((file: File) => {
+    pourVideoFrom(URL.createObjectURL(file), true);
+    setPouringCartoon(null);
+  }, [pourVideoFrom]);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !videoPlayerRef.current) return;
-    videoPlayerRef.current.src = URL.createObjectURL(file);
-    videoPlayerRef.current.play();
-    setIsVideoPlaying(true);
-    
-    const loop = (time: number) => {
-      if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
-        visualizerRef.current?.pourVideo(videoPlayerRef.current);
-        videoFrameRaf.current = requestAnimationFrame(loop);
-      } else {
-        setIsVideoPlaying(false);
-      }
-    };
-    
-    videoPlayerRef.current.onplay = () => {
-      setIsVideoPlaying(true);
-      if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
-      loop(performance.now());
-    };
-
-    videoPlayerRef.current.onpause = () => setIsVideoPlaying(false);
-    videoPlayerRef.current.onended = () => setIsVideoPlaying(false);
-
+    if (file) pourFile(file);
     e.target.value = '';
-  }, []);
+  }, [pourFile]);
 
   const userPresetsRef = useRef<UserPreset[]>([]);
 
@@ -1029,7 +1035,7 @@ export default function App() {
     stopDrone();
 
     setAudioSource(source);
-    try { localStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
+    try { sessionStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
     if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
     if (source === 'none') return;
     if (source === 'file') {
@@ -1324,22 +1330,22 @@ export default function App() {
   // The browser will not run audio before a gesture, so a restored band stays
   // silent until the first click anywhere. One listener, then gone.
   //
-  // The same gesture starts the band for anyone who has never chosen a source
-  // at all. A first visit used to land on a plate with nothing driving it:
-  // the fluid moved, but the thing the project *is* — a light show played by
-  // the music — needed the visitor to find a button first. The band is
-  // synthesised, silent and opens no device, so it needs no permission and
-  // asks for nothing; it is the demo this app already had and never showed
-  // anybody. It is written to storage like any other choice, so this happens
-  // once per browser and the microphone is still one click away.
+  // That gesture used to start the band for anyone who had never chosen a
+  // source, so a stranger's first five seconds were a plate moving to music.
+  // The owner asked for the opposite (2026-10-22): the Source is None whenever
+  // the app opens, and a click anywhere does not choose it. The band is still
+  // one press away in the Sound panel and on the phone's Sound tab.
   useEffect(() => {
+    let kiosk = false;
+    try { kiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'; } catch { /* no query to read */ }
     const wake = () => {
       void simulatedRef.current?.resume();
-      // After the click has been handled: if the visitor's first gesture was
-      // the Mic button, that choice is already recorded and this does nothing.
-      setTimeout(() => {
-        if (audioSourceRef.current === 'none' && !everChoseSource()) void handleSourceChange('simulated');
-      }, 0);
+      // `?kiosk=1`, below, is the one open that picks a source for itself.
+      if (kiosk) {
+        setTimeout(() => {
+          if (audioSourceRef.current === 'none') void handleSourceChange('simulated');
+        }, 0);
+      }
     };
     window.addEventListener('pointerdown', wake, { once: true });
     window.addEventListener('keydown', wake, { once: true });
@@ -1357,8 +1363,6 @@ export default function App() {
       visit than a silent one, and on a normal browser the context would
       refuse anyway and the click handler above would still be waiting.
     */
-    let kiosk = false;
-    try { kiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'; } catch { /* no query to read */ }
     if (kiosk) wake();
     return () => {
       window.removeEventListener('pointerdown', wake);
@@ -1449,9 +1453,12 @@ export default function App() {
   }, []);
   startBenchRef.current = startBench;
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
+  /** The shelf's cartoon playing as the film; read only while the film is a file (a camera or window replaces it). */
+  const [filmCartoon, setFilmCartoon] = useState<string | null>(null);
   const loadFilm = async (file: File) => {
     await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
+    setFilmCartoon(null);
   };
   const startFilmCamera = async () => {
     try {
@@ -1490,6 +1497,28 @@ export default function App() {
   const clearFilm = () => {
     wallRef.current?.clearFilm();
     setFilmSource('none');
+    setFilmCartoon(null);
+  };
+  const filmCartoonNow = async (id: string) => {
+    const c = CARTOON_BY_ID.get(id);
+    if (!c) return;
+    await wallRef.current?.loadFilmUrl(c.src);
+    setFilmSource('file');
+    setFilmCartoon(id);
+  };
+  /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
+  const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
+  const cartoons: CartoonShelfProps = {
+    pouring: pouringCartoon,
+    filming: filmingCartoon,
+    onPour: (id) => {
+      const c = CARTOON_BY_ID.get(id);
+      if (!c) return;
+      pourVideoFrom(c.src, false);
+      setPouringCartoon(id);
+    },
+    onFilm: (id) => { if (filmingCartoon === id) clearFilm(); else void filmCartoonNow(id); },
+    onStopPour: stopPour,
   };
   // ── The room ────────────────────────────────────────────────────
   // The camera as a sensor: it stirs the plate, puts hands on it and rides
@@ -2234,6 +2263,8 @@ export default function App() {
   const lookPhase = (s: Partial<VisualizerSettings>) => ({ phaseAmount: s.phaseAmount ?? 0, phaseScale: s.phaseScale ?? DEFAULT_SETTINGS.phaseScale });
   const ferrofluidPoured = () => {
     if ((settingsRef.current.phaseAmount ?? 0) > 0.002) return;
+    // A fading look has the amount at nothing at the ring's swap on purpose (lib/lookFade's ringDip).
+    if (lookFadeRef.current) return;
     updateSettings({ phaseAmount: 0.6 });
   };
 
@@ -2279,7 +2310,9 @@ export default function App() {
     const s = settingsRef.current;
     const patch: Partial<VisualizerSettings> = {};
     if ((s.magnetStrength ?? 0) <= 0) patch.magnetStrength = 0.8;
-    if (ferrofluid && (s.phaseAmount ?? 0) <= 0.002) patch.phaseAmount = 0.6;
+    // Not while a look is fading: the fade takes the amount to nothing at the ring's swap
+    // (lib/lookFade's ringDip), and this would read that as "turned down" and write 0.6 over it.
+    if (ferrofluid && (s.phaseAmount ?? 0) <= 0.002 && !lookFadeRef.current) patch.phaseAmount = 0.6;
     if (Object.keys(patch).length) updateSettings(patch);
   };
 
@@ -2642,7 +2675,8 @@ export default function App() {
     if (wallFadeRef.current) clearShowInterval(wallFadeRef.current);
     const started = showNow();
     const ms = Math.max(1, fadeSeconds) * 1000;
-    const step = lookFadeStep(false);
+    // The handoff above swaps the ring in one frame, so the fade dips its amount there (lib/lookFade's ringDip).
+    const step = lookFadeStep(false, true);
     wallFadeRef.current = showInterval(() => {
       const t = Math.min(1, (showNow() - started) / ms);
       setWallLook(prev => prev && { ...prev, settings: step(from, to, t, prev.settings), target: t >= 1 ? null : prev.target });
@@ -2875,14 +2909,18 @@ export default function App() {
     What a hand wrote after the Back began is left where the hand put it,
     and so is whatever `hold` names (the dimmer, while a blackout is on).
   */
-  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = []) => {
+  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = [], swapsRing = false) => {
     if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
     lookTakesLevels();
     flushRide();
     evolveLetsGo();
     // From where a fader has the plate now, not where React last heard it.
     const from = ride.lay(settingsRef.current as unknown as Record<string, unknown>, () => true, rideSlot()) as unknown as VisualizerSettings;
-    const step = lookFadeStep(back);
+    // `swapsRing`: the caller ran the visualizer's handoff, which swaps the
+    // ferrofluid ring in one frame at the middle; the amount dips to nothing there (lib/lookFade's ringDip).
+    // The handoff never runs shorter than a second, so a fade under a second would dip and come
+    // back before the swap and then swap the ring at full strength: it keeps its straight line.
+    const step = lookFadeStep(back, swapsRing && seconds >= 1);
     if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
     const started = showNow();
     const ms = seconds * 1000;
@@ -2925,7 +2963,7 @@ export default function App() {
     // evaporate for minutes under the new ones. A cut still gets a second.
     const target = targetLook(from, next.settings);
     visualizerRef.current?.handoff(Math.max(1, seconds), lookPhase(target));
-    fadeSettingsTo(target, seconds);
+    fadeSettingsTo(target, seconds, false, [], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
 
@@ -3011,7 +3049,7 @@ export default function App() {
     if (rowFades.handOn(FADE_LEVEL_KEYS)) setRowFading(rowFades.running());
     // A blackout on stays on: a Back that faded the dimmer up would light the
     // wall with the Blackout button still lit.
-    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : []);
+    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : [], true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
 
@@ -3283,9 +3321,23 @@ export default function App() {
   };
 
   // ── A new song, a new look ──────────────────────────────────────
-  // Heard as a gap between tracks, or named by track identification. The
-  // sequencer owns the evolution while it runs, so it is left alone then.
-  const songChange = useSongChange(audioData, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
+  // Heard as a gap between tracks, or named by track identification, on the
+  // ear's own clock and landed on a beat (PLAN 14z). The sequencer owns the
+  // evolution while it runs, so it is left alone then.
+  const songChange = useSongChange(ear.onReading, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
+  /*
+    How long the new song's look takes to come in, by how the song came.
+
+    After a gap the new song starts clean and the change lands on one of its
+    first beats, so it comes in quickly: a second, short enough to read as the
+    show answering the song and long enough not to read as a cut. Named by
+    identification, the new song has been playing for several seconds already
+    (a crossfade, or a gapless join; `npm run songends` measures 6 to 17 s at the
+    median), so the look blends in under it instead: twice the desk's fade,
+    and never under four seconds. Both were a fixed desk fade at whatever
+    moment the gap rule happened to fire.
+  */
+  const songFadeSeconds = (reason: 'gap' | 'track') => reason === 'gap' ? 1 : Math.max(4, fadeSeconds * 2);
   const lastSongChangeSeq = useRef(0);
   useEffect(() => {
     if (!songChange || songChange.seq === lastSongChangeSeq.current) return;
@@ -3326,7 +3378,7 @@ export default function App() {
       setPinnedPresetId(null);
       // The song boundary's own stream, not Lucky's default: a Lucky press
       // between songs must not decide which look the next song brings.
-      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), fadeSeconds);
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), songFadeSeconds(songChange.reason));
       return;
     }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
@@ -3337,7 +3389,7 @@ export default function App() {
     if (!next) return;
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);
-    fadeSettingsTo(evolvedLook(from, next.settings), fadeSeconds);
+    fadeSettingsTo(evolvedLook(from, next.settings), songFadeSeconds(songChange.reason));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songChange?.seq]);
 
@@ -3375,6 +3427,14 @@ export default function App() {
    * rather than only in the visualizer for that reason.
    */
   const markUrlRef = useRef<string | null>(null);
+  /*
+    The same mark as it crosses the show server to a network display: the
+    original when it fits a relay frame, else a smaller copy (PLAN 14m-mark,
+    `lib/markFit.ts`). The relay closes a socket on a frame over 512 KB, and a
+    print-sized logo is several megabytes, so before this a big logo never
+    reached the network display at all.
+  */
+  const markRelayUrlRef = useRef<string | null>(null);
   const [markLoaded, setMarkLoaded] = useState(false);
   /*
     The state, at most fifteen times a second.
@@ -3453,7 +3513,7 @@ export default function App() {
     if (withMark) send({ type: 'mark', dataUrl: markUrlRef.current });
     if (mirrorCountRef.current > 0) {
       relaySendRef.current?.({ type: 'cast', message: { type: 'state', state } });
-      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
+      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
     }
   }, []);
   useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
@@ -3481,9 +3541,10 @@ export default function App() {
       img.onload = () => {
         for (const v of bothEngines()) v.loadMark?.(img, img.naturalWidth, img.naturalHeight);
         markUrlRef.current = url;
+        markRelayUrlRef.current = fitMarkForCast(img, url);
         setMarkLoaded(true);
         castSend({ type: 'mark', dataUrl: url });
-        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: url } });
+        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
         setToastRef.current?.('Mark on the wall');
       };
       img.onerror = () => setToastRef.current?.('That file would not open as a picture');
@@ -3495,6 +3556,7 @@ export default function App() {
   const clearMark = useCallback(() => {
     for (const v of bothEngines()) v.clearMark?.();
     markUrlRef.current = null;
+    markRelayUrlRef.current = null;
     setMarkLoaded(false);
     castSend({ type: 'mark', dataUrl: null });
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
@@ -4822,6 +4884,7 @@ export default function App() {
     <SettingsPanel
       mixTakes={mixTakes}
       backLook={backLookName}
+      lookId={activePresetId}
       songDetection={musicSettings.enabled}
       onSongDetection={(on) => updateMusicSettings({ enabled: on })}
       settings={settings}
@@ -4875,6 +4938,7 @@ export default function App() {
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       onFilmFile={loadFilm}
+      onPourVideo={pourFile}
       onFilmCamera={startFilmCamera}
       onFilmWindow={startFilmWindow}
       onFilmClear={clearFilm}
@@ -5794,6 +5858,7 @@ export default function App() {
             onPalette={selectPalette}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
+            cartoons={cartoons}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -5863,6 +5928,8 @@ export default function App() {
               pattern: settings.chemistryPattern ?? 0,
               width: settings.chemistryWidth ?? 0.5,
               print: settings.turingPrint ?? 0,
+              ink: settings.turingInk ?? 0,
+              drift: settings.turingDrift ?? 0,
             }}
             onReaction={(patch) => updateSettings(patch)}
             lampGround={settings.lampGround ?? 0}
@@ -5871,6 +5938,8 @@ export default function App() {
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
+            slosh={settings.slosh ?? 0}
+            onSlosh={(v) => updateSettings({ slosh: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}
@@ -6486,6 +6555,7 @@ export default function App() {
           onPalette={selectPalette}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
+          cartoons={cartoons}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}

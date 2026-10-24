@@ -62,6 +62,11 @@ const LIGHT_STACK = new Set([
   // Starch in the dish (PLAN 26d): the reaction printed black on white or
   // deposited in the look's colours, a choice for a look, made by hand.
   'turingPrint',
+  // And the colour it prints in: an indicator is chosen, not wandered to.
+  'turingInk',
+  // And how far its chemistry wanders: a look's choice, and Evolve's own slow
+  // changes would be a second clock on a clock already slow (PLAN 26d-6).
+  'turingDrift',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',
@@ -111,6 +116,17 @@ const NOT_THE_LOOK = new Set([
   // start the frame sliding under the viewer by itself, the very thing the
   // owner turned off (2026-10-11).
   'frameSway',
+  // How far a tilt sloshes the liquid (lib/slosh.ts): the owner's hand on the
+  // tilt, like the direction above, and a dial that would set the plate
+  // slopping by itself in a look that was still.
+  'slosh',
+  // How much of a burst each kick throws (Kick Bloom): the owner's hand, as
+  // Frame Sway is. It is 1 on every look so none changes, and a wander would
+  // walk a look off the amount it ships with and into the dye-free calm of 0
+  // with nobody touching it; it also joined Evolve's pool of dials and moved
+  // which one it reached for, so `npm run slowevolve`'s answer-in-half-a-minute
+  // check read 63.5 s with this dial in the pool and passes without it.
+  'kickBloom',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*

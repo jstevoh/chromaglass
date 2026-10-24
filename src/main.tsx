@@ -41,6 +41,26 @@ const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./components/SignInScreen'))
   : null;
 const LazyLicenseGate = lazy(() => import('./components/LicenseGate'));
+// The page a first visit meets before the sign-in (PLAN.md 34a). Its own chunk,
+// with no Firebase and no engine in it.
+const LazyLanding = lazy(() => import('./components/Landing'));
+const LANDING_SEEN_KEY = 'chromaglass-landing-seen';
+
+/**
+ * Does this visit meet the landing page before the sign-in?
+ *
+ * Only the hosted site's own sign-in, on a first visit: not the iPhone app
+ * (whose first screen is the plate), nor a desktop launch that asks for a
+ * licence, nor a visit that is already part way through signing in. Google and
+ * Apple sign in by a redirect that reloads the page, and the sign-in screen is
+ * what collects it; the emailed link opens the page with its code in the
+ * address. Both go straight to the sign-in. The tab remembers that the page
+ * has been seen (sessionStorage), so the reload after a redirect does.
+ */
+function landingFirst(): boolean {
+  if (!LazySignIn || isPhoneApp() || requiresDesktopSignInSync() || hasEmailSignInLink()) return false;
+  try { return sessionStorage.getItem(LANDING_SEEN_KEY) !== '1'; } catch { return true; }
+}
 
 // Installable: the service worker is what lets Chrome and Edge offer
 // "Install app", for a dock icon and a window with no browser chrome. Only
@@ -73,6 +93,27 @@ async function startOver(): Promise<boolean> {
   } catch { /* private window, or storage refused: the reload is still worth a try */ }
   location.reload();
   return true;
+}
+
+/**
+ * The page opened at an address on the Wi-Fi rather than at localhost (PLAN
+ * 14m-lan). Browsers give WebGPU only to a secure page, which is https or the
+ * machine's own name, so the laptop's own page opened at its Wi-Fi address
+ * (`http://192.168.1.5:3000/`) cannot start at all: what it said was the
+ * bare "GPUTextureUsage is not defined" of the first shader module. The show
+ * server also hands the display key only to localhost, so even in a browser
+ * told to treat the address as secure that page could not link phones. The
+ * way out is the same page at localhost on the same port, said in plain words.
+ * A network display at a Wi-Fi address meets the same wall and has no such way
+ * out yet (PLAN 14m-https). Null on a secure page, where the failure is something else.
+ */
+function insecureAddress(): { local: string; cast: boolean } | null {
+  if (typeof window === 'undefined' || window.isSecureContext) return null;
+  const { hostname, port, search } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') return null;
+  // A network display (`?cast=true`) is another machine: its localhost is not
+  // the laptop, so it is told only why, not sent somewhere that is not the show.
+  return { local: `http://localhost${port ? `:${port}` : ''}/`, cast: new URLSearchParams(search).has('cast') };
 }
 
 /**
@@ -110,6 +151,16 @@ class Boot extends Component<{ children: any }, { failed: any; recovering: boole
         {!recovering && (
           <>
             <p className="max-w-md text-[13px] leading-relaxed text-white/50">{String(failed?.message ?? failed)}</p>
+            {insecureAddress() && (
+              <p className="max-w-md text-[13px] leading-relaxed text-white/80" data-testid="boot-insecure">
+                This page was opened at a Wi-Fi address, and browsers run the GPU only on a secure page (https, or the computer's own localhost).{' '}
+                {insecureAddress()!.cast ? (
+                  'A network display cannot start from this address.'
+                ) : (
+                  <>On the laptop running the show, open <a className="font-mono underline" href={insecureAddress()!.local}>{insecureAddress()!.local}</a> instead.</>
+                )}
+              </p>
+            )}
             <button
               onClick={() => { sessionStorage.removeItem(RESET_ONCE); void startOver(); }}
               className="rounded-md border border-white/20 px-4 py-2 text-[13px] text-white/90 transition-colors hover:bg-white/10"
@@ -163,6 +214,14 @@ function Gate() {
     return 'signin';
   });
 
+  // The landing page is up behind the sign-in; the sign-in opens over it.
+  const [landing] = useState(landingFirst);
+  const [asking, setAsking] = useState(!landing);
+  const play = () => {
+    try { sessionStorage.setItem(LANDING_SEEN_KEY, '1'); } catch { /* the page is simply shown again */ }
+    setAsking(true);
+  };
+
   useEffect(() => {
     if (!gateActive) return;
     if (phase === 'app') {
@@ -208,7 +267,12 @@ function Gate() {
   }
   if (phase === 'signin') {
     if (LazySignIn) {
-      return <LazySignIn onSignedIn={() => setPhase('app')} />;
+      return (
+        <>
+          {landing && <LazyLanding onPlay={play} covered={asking} />}
+          {asking && <LazySignIn onSignedIn={() => setPhase('app')} />}
+        </>
+      );
     }
     return <LazyLicenseGate onUnlocked={() => setPhase('app')} />;
   }
