@@ -8,7 +8,7 @@ import {
   Laptop, Save, Video, User,
   Crosshair,
 } from 'lucide-react';
-import { Slider, LIT, LIVE } from '../ui';
+import { Slider, LIT } from '../ui';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -331,7 +331,7 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
       aria-pressed={on}
       data-testid={testId}
       className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-lg border text-[13px] transition-colors active:scale-[0.97] ${
-        tone === 'live' && on ? LIVE
+        tone === 'live' && on ? 'border-live-border bg-live-bg text-live'
           : on ? LIT
           : 'border-border bg-elevated text-text-2 active:bg-active'
       }`}
