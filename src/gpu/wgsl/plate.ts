@@ -1977,11 +1977,14 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
   and shadowgraph Becke line intensity doublets under projector defocus.
 
   Named shortcuts:
-  1. Small-angle deflection θ ≈ |∇density| · 0.0148 · dyeGain is evaluated from the dye
-     gradient rather than ∇(n·h); it omits oil, film and gap thickness terms that the
-     Laplacian includes, and operates per-texel so it scales with grid resolution.
-  2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the step.
-  3. Pupil overlap is approximated by a smoothstep with a 0.0 extinction floor.
+  1. Small-angle deflection θ ≈ |∇density| · 0.35 (from the air-masked slope g0 on Layer 0,
+     PLAN 33b) plus the hue-gated two-dye boundary deflection bEdge · edgeK · 1.1 (PLAN 33a)
+     is evaluated from the dye slope and colour step rather than ∇(n·h); it omits oil, film
+     and gap thickness terms that the Laplacian includes, and operates per-texel so it scales
+     with grid resolution.
+  2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the OPL step.
+  3. Pupil overlap is approximated by a smoothstep with a 0.0 extinction floor, weighted by
+     reliefK (Edge Relief × plateAmt) on the meniscus slope and edgeK on the two-dye boundary.
   4. The shadowgraph transport 1 - Δz · ∇²OPL is divided by local OPL, scaled by
      boundaryContrast * 2 and masked by an edge-deflection smoothstep; at default
      projectorFocus = 0.5, Δz = 0 so the Becke term is 1 until the slider moves.
@@ -2002,28 +2005,28 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      this function returns early where the dye's gradient is flat (gLen, from note 1),
      so that edge draws no line yet. PLAN 18e-2: deflect by ∇OPL, not the dye's slope.
 */
-fn refractionOptics(near: vec4f) -> f32 {
+fn refractionOptics(near: vec4f, bEdge: f32, reliefK: f32, edgeK: f32) -> f32 {
   let grad = near.xy;
   let gLen = length(grad);
-  let strength = max(U.edgeRelief, select(0.0, U.boundaryContrast, U.boundaryContrast > 0.005));
-  if (strength <= 0.005 || gLen <= 0.005) {
+  let strength = max(reliefK, max(edgeK, abs(U.projectorFocus - 0.5)));
+  if (strength <= 0.005 || (gLen <= 0.005 && bEdge <= 0.005)) {
     return 1.0;
   }
   let lap = near.z;
   let opl = max(1.0, near.w);
 
   let na = DROP_NA;
-  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
-  let theta = gLen * 0.0148 * dyeGain;
+  let theta = gLen * 0.35;
   let u = clamp(theta / (2.0 * na), 0.0, 1.0);
-  let aperture = 1.0 - smoothstep(0.0, 1.0, u);
+  let uBound = clamp((bEdge * edgeK * 1.1) / (2.0 * na), 0.0, 1.0);
+  let aperture = 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK + uBound, 0.0, 1.0);
 
   let deltaZ = (U.projectorFocus - 0.5) * 1.5;
   let shadowGain = max(1.0, U.boundaryContrast * 2.0);
-  let edgeDeflect = smoothstep(0.005, 0.05, gLen);
+  let edgeDeflect = smoothstep(0.005, 0.05, max(gLen, bEdge));
   let shadow = clamp(1.0 - deltaZ * (lap / opl) * shadowGain * edgeDeflect, 0.2, 2.5);
 
-  return mix(1.0, aperture * shadow, strength);
+  return aperture * shadow;
 }
 `;
 
@@ -2663,7 +2666,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   if (sharp0 && fluid0.a > 0.03) {
     if (!isCamera && U.derivedOn > 0.5) {
-      fluid0 = vec4f(fluid0.rgb * refractionOptics(near0), fluid0.a);
+      let g0 = -normal0.xy / (0.9 * max(normal0.z, 1e-4));
+      var bEdge0 = 0.0;
+      if (U.boundaryContrast > 0.005) { bEdge0 = boundaryEdge(layer0, fuv0); }
+      let reliefK0 = select(0.0, U.edgeRelief * plateAmt, plateOn && U.edgeRelief > 0.005);
+      fluid0 = vec4f(fluid0.rgb * refractionOptics(vec4f(g0, near0.zw), bEdge0, reliefK0, edgeK), fluid0.a);
     } else if (U.boundaryContrast > 0.005) {
       var edge0 = boundaryLine(near0.z);
       if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
@@ -3198,13 +3205,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
     if (sharp1 && fluid1.a > 0.03) {
       if (!isCamera && U.derivedOn > 0.5) {
-        fluid1 = vec4f(fluid1.rgb * refractionOptics(near1), fluid1.a);
+        fluid1 = vec4f(fluid1.rgb * refractionOptics(near1, 0.0, 0.0, 0.0), fluid1.a);
         // Painted shortcut (see refractionOptics note 5, PLAN 18e-1 / 31a):
         // keeps the upper dish's boundary brightness until 31a separates the
         // two dishes' focal heights Δz in the projector cone.
         if (U.boundaryContrast > 0.005) {
           let edge1 = smoothstep(0.1, 0.6, length(near1.xy));
-          fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6, fluid1.a);
+          fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * edgeK * 1.6 + vec3f(edge1 * edgeK * 0.25), fluid1.a);
         }
       } else if (U.boundaryContrast > 0.005) {
         var edge1 = boundaryLine(near1.z);
