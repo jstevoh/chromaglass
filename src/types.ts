@@ -748,7 +748,7 @@ export interface VisualizerSettings {
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
-  plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
+  plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid
    * (lib/plateRock.ts): Plate Rock's cover glass sliding the whole picture,
@@ -839,7 +839,7 @@ export interface VisualizerSettings {
   transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
-  beatSqueeze: number;        // the rhythm plate: a squeeze pulse pressed into the lead plate on every kick
+  beatSqueeze: number;        // the rhythm sheet: each kick presses a dent as wide as the sheet bends over the liquid (lib/squish.ts kickPress)
   /**
    * Kick Bloom: how far each kick throws a ring of dye outward from the bass
    * spot, and the little push on each droplet. 1 is the ring every look has

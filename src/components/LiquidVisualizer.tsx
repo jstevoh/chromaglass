@@ -45,7 +45,7 @@ import { AutoSpin, GRIP_SECONDS, OPEN_RIM, SpinHand, carrierViscosity, dishFollo
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { kickRock, stepRock, rockSwing, swayAt, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
@@ -63,7 +63,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_RADII, KICK_HOLD, KICK_RELEASE, kickDepth, BassPress, bassPressFor, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
@@ -1139,7 +1139,7 @@ class FluidSimulation {
     plate units, how deep each of its three discs went, and how long ago.
   */
   private sloshClock = new SloshClock();
-  private dishKicks: { x: number; y: number; amount: number; t: number }[] = [];
+  private dishKicks: { x: number; y: number; amount: number; radii: number[]; t: number }[] = [];
   // The lasting current on the CPU engine — the twin of GpuFluid.stepCurrent,
   // at half the logical grid: velocity, warm pressure and divergence.
   private readonly CM = GRID_SIZE / 2;
@@ -2969,19 +2969,24 @@ class FluidSimulation {
   }
 
   /**
-   * Beat Squeeze's kick: the top glass pressed over three nested discs
-   * across most of the dish (KICK_RADII: a rough dome, so the dye spreads
-   * from the middle instead of only at one hard ring), remembered for the lift like a hand's press, and let go a
-   * moment later (`kickRelease`). `amount` is each disc's press.
+   * Beat Squeeze's kick (lib/squish.ts `kickPress`): the rhythm sheet's one
+   * dent, as wide as the sheet bends over this liquid in the time the kick
+   * holds it, or on a look that may move the frame the glass over three
+   * nested discs across most of the dish. `radii` in cells of a 128 plate,
+   * `amount` each disc's press. Remembered for the lift like a hand's press,
+   * and let go a moment later (`kickRelease`).
    */
-  pressKick(x: number, y: number, amount: number, fingering: number): void {
+  pressKick(x: number, y: number, amount: number, fingering: number, radii: readonly number[]): void {
     x = Math.round(x);
     y = Math.round(y);
-    KICK_RADII.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
-    this.kickRelease.kick(x, y, KICK_RADII.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
-    // And the same glass on the slosh dish (stepSlosh): the liquid it pushes down runs out as a ring and back off the rim.
+    radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
+    this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
+    // And the same glass on the slosh dish (stepSlosh), over the same radii the
+    // gap was pressed with: off the frame-moving looks that is the sheet's one
+    // dent (kickPress), so the dish is pushed down where the plate is and no
+    // wider, and the liquid it moves runs out as a ring and back off the rim.
     if (this.thinGap && amount > 0) {
-      this.dishKicks.push({ x: (x + 0.5) / this.size, y: (y + 0.5) / this.size, amount, t: 0 });
+      this.dishKicks.push({ x: (x + 0.5) / this.size, y: (y + 0.5) / this.size, amount, radii: [...radii], t: 0 });
       if (this.dishKicks.length > 2) this.dishKicks.shift();
     }
   }
@@ -3829,11 +3834,11 @@ class FluidSimulation {
     const [hx, hy] = sloshAccel(settings.slosh ?? 0, p.plateUpright ?? 0, p.gravityX ?? 0, p.gravityY ?? 0, this.extTiltX, this.extTiltY);
     const [rx, ry] = rockAccel(this.swingX, this.swingY, frameSway(settings.frameSway));
     const ax = hx + rx, ay = hy + ry;
-    // The kicks' glass: three nested discs (KICK_RADII, in the 128 grid's cells), held and let go as the thin gap's are.
+    // The kicks' glass, over the radii the gap was pressed with (kickPress: the sheet's one dent, or the glass's three nested discs on a frame-moving look), held and let go as the thin gap's are.
     const presses: SloshPress[] = [];
     for (const k of this.dishKicks) {
       const held = glassHeld(k.t, KICK_HOLD, KICK_RELEASE);
-      for (const r of KICK_RADII) presses.push({ x: k.x, y: k.y, radius: r / 128, depth: k.amount * held });
+      for (const r of k.radii) presses.push({ x: k.x, y: k.y, radius: r / 128, depth: k.amount * held });
       k.t += dt;
     }
     this.dishKicks = this.dishKicks.filter((k) => k.t < KICK_HOLD + KICK_RELEASE + dt);
@@ -5017,7 +5022,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const bubbleDebugRef = useRef({ count: 0, strength: 0, amount: 0 });
   const beadsRef = useRef(new BeadField(GRID_SIZE));
   /** The plate's tilt: a damped spring kicked by the beat, plus a slow ambient sway. */
-  const rockRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 });
+  const rockRef = useRef<RockHand & { lastBass: number }>({ ...restingHand(), lastBass: 0 });
   const coverRef = useRef<CoverGlass>({ x: 0, y: 0, vx: 0, vy: 0 });
   /** Where the projector lamp sits under the plate (fluid uv), and the second one. */
   const lampRef = useRef({ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 });
@@ -8529,7 +8534,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // the density route gated this whole block, so setting density to
               // "none" silenced every reaction to the music, bursts included.
               const velRoute = currentSettings.audioMappings.velocity as AudioFeatureKey;
-              const velRaw = getAudioValue(currentAudioData, velRoute);
+              /*
+                Bass Boost (squish.ts, `bassBoostGain`, PLAN 27g): the reading
+                carries the slider as a multiplier, which pins every hand that
+                reads it at its ceiling (and getAudioValue clips it at 100), so
+                the hands take it back off the bass and lay it as a gain on the
+                force instead. 1 at the default, and on a route that is not
+                the bass.
+              */
+              const boostGain = bassBoostGain(currentSettings.bassBoost);
+              const bassGain = velRoute === 'bass' ? boostGain : 1;
+              const velRaw = velRoute === 'bass' ? bassRouteValue(currentAudioData.bass, boostGain) : getAudioValue(currentAudioData, velRoute);
               // Same scale as bass01 below (feature / 70) so the default route,
               // bass, behaves exactly as before; energy is already 0–1.
               const vel01 = velRoute === 'energy' ? velRaw : Math.min(1, velRaw * (100 / 70));
@@ -8664,14 +8679,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   bassPressAt = {
                     x: bassX, y: bassY,
                     r: Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity, 18 * GRID_SCALE * 1.5 * Math.max(0.6, Math.min(1.5, impactMul))),
-                    depth: bassPressFor(velRaw, velRoute === 'energy', currentSettings.audioImpact ?? 0.45, currentAudioData.passage),
+                    depth: bassPressFor(velRaw, velRoute === 'energy', currentSettings.audioImpact ?? 0.45, currentAudioData.passage, bassGain),
                   };
                   // A hit on the velocity route: radial burst — scales with impact + auto mode (the old plate's)
                   if (vel01 > 0.25 && !activeFluid.thinGap) {
                     // In an area, no wider than the area: the push is that well's, not the plate's.
                     const burstR = Math.round(Math.min(bassArea ? bassArea.r * GRID_SIZE : Infinity,
                       18 * GRID_SCALE * Math.max(0.4, impactMul)));
-                    const bassStr = (vel01 - 0.25) * autoAmp;
+                    const bassStr = (vel01 - 0.25) * autoAmp * bassGain;
                     for (let bj = -burstR; bj <= burstR; bj += 3) {
                       for (let bi = -burstR; bi <= burstR; bi += 3) {
                         const dist = Math.sqrt(bi * bi + bj * bj);
@@ -8732,11 +8747,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                       const rx2 = Math.floor(bx0 + Math.cos(a) * rad);
                       const ry2 = Math.floor(by0 + Math.sin(a) * rad);
                       if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * (0.33 + 1.17 * DICE.music.float()) * autoAmp * pourDt * bloomGain;
+                        const dropStr = bass01 * boostGain * (0.33 + 1.17 * DICE.music.float()) * autoAmp * pourDt * bloomGain;
                         if (dropStr > 0.001) activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
                         // Outward from the burst's own centre, with a wide swirl and a speed of its own
                         const swirl = 0.9 * (DICE.music.float() - 0.5);
-                        const speed = (0.1 + 0.3 * DICE.music.float()) * bass01 * bloomGain;
+                        const speed = (0.1 + 0.3 * DICE.music.float()) * bass01 * boostGain * bloomGain;
                         activeFluid.addVelocity(rx2, ry2, (Math.cos(a) - Math.sin(a) * swirl) * speed, (Math.sin(a) + Math.cos(a) * swirl) * speed);
                       }
                     }
@@ -8855,9 +8870,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
 
           // ── Rock the plate ─────────────────────────────────────
-          // A hand on the clock face: the beat tips the whole plate one way
-          // and a damped spring rocks it back, so the field sloshes instead
-          // of only churning. Between beats a slow sway keeps it alive.
+          // A hand on the clock face: on the one and on three it tips the
+          // dish to its other side, and the colour runs downhill through the
+          // clear liquid each way (lib/plateRock.ts, PLAN 27f-2). Between
+          // leans a small sway keeps it alive.
           {
             const rock = rockRef.current;
             const R = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
@@ -8881,8 +8897,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const accentAt = songClockRef.current + (kickRef.current.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
             const accent = kickStep ? accentRef.current.kick(barGridRef.current, accentAt, currentSettings.beatAccent ?? 0) : 1;
-            // The hand's spring and sway, the slider applied once (lib/plateRock.ts, PLAN 27a).
-            if (R > 0 && kickStep) kickRock(rock, bass01, accent);
+            /*
+              The hand's lean and sway, the slider applied once (lib/plateRock.ts,
+              PLAN 27a). The hand leans on the strong beats only, so it is told
+              where in the bar this kick fell, at the same beat the accent means,
+              and the grid's tempo for when the grid is unsure (27f-2).
+            */
+            if (R > 0 && kickStep) kickRock(rock, bass01, accent, barGridRef.current.placeAt(accentAt), barGridRef.current.now.period);
             // The rhythm plate: on a kick the projectionist presses the top
             // glass and the dye spreads out in a ring, then relaxes back.
             const squeezeAmt = Math.max(0, Math.min(1, currentSettings.beatSqueeze ?? 0));
@@ -8892,8 +8913,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 // On an area look, the press lands on the kick's bass area.
                 const sqAreas = areasOf(0);
                 const sqArea = sqAreas ? areaForBand(sqAreas, 'bass', areaKicksRef.current) : null;
+                /*
+                  The press is the rhythm sheet's dent, as wide as the sheet bends
+                  over this liquid, or the glass's across the dish where the look
+                  may move the frame (lib/squish.ts kickPress, PLAN 27f-3). The
+                  dent lands anywhere in the middle half of the dish, a finger
+                  finding the glass where it falls; the glass about the middle.
+                */
+                const press = kickPress(thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), currentSettings.frameSway ?? 0);
+                const sheet = press.radii.length === 1;
                 const sqAt = sqArea ? areaCentre(sqArea, GRID_SIZE) : { x: GRID_SIZE / 2, y: GRID_SIZE / 2 };
-                const sqSpread = sqArea ? sqArea.r * GRID_SIZE : 30 * GRID_SCALE;
+                const sqSpread = sqArea ? sqArea.r * GRID_SIZE : (sheet ? GRID_SIZE / 2 : 30 * GRID_SCALE);
                 const cx = sqAt.x + DICE.music.centred() * sqSpread;
                 const cy = sqAt.y + DICE.music.centred() * sqSpread;
                 // Twice what it was: at full it showed on 6 looks of 24 with the band playing.
@@ -8915,8 +8945,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   deep as a hard one; now two thirds (kickDepth).
                 */
                 const a = kickDepth(squeezeAmt, bass01, accent);
-                leadPlate.pressKick(cx, cy, a, currentSettings.fingering ?? 0);
-                if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, 30 * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
+                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii);
+                if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, (sheet ? press.radii[0] : 30) * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }
             stepRock(rock, simStepS);
@@ -9985,7 +10015,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         and the closeup slew toward what they read, and a finger stroke
         Evolve had begun would have carried on into the film.
       */
-      rockRef.current = { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7, lastBass: 0 };
+      rockRef.current = { ...restingHand(), lastBass: 0 };
       /*
         And the cover glass the rock slides (PLAN 27a-1), which carries its
         own swing from frame to frame: left where the live show had swung it,

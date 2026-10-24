@@ -3944,6 +3944,52 @@ its controls (the gate removed, the random walk restored, the snap removed) turn
 where there were 336). The desk and the phone share the camera, and Frame Sway is on
 both; the Guide's Music Sync line says what rides it.
 
+### 27f-2. Plate Rock leans on the one and three (2026-10-22)
+
+The owner, 2026-10-21: Plate Rock and Beat Squeeze "feel the same", and on 10-22: "make sure
+we are using legit physics and simulations, as opposed to faking it." The hand was a 0.9 Hz
+spring shoved on every kick, at its fastest the instant the kick landed, beside the kick's dye
+burst and the squeeze's press: three moves on one beat, read as one.
+
+Now (lib/plateRock.ts) the hand leans on the strong beats only (the one and three from
+`BarGrid.placeAt`; the half bar's strong beats where only that is known; every other kick, two
+beats apart, where the grid is unsure), each lean to the other side of an axis that turns 26°
+a time, along a minimum-jerk reach (Flash and Hogan 1985, with the hand's speed carried into
+the next reach) that takes 0.8 of the time to the next lean. With no kick for 3 s it puts the
+dish down level. The lean is half the spring's peak: held as steeply for most of a half bar it
+moved the colour three times as far as the spring (0.622 against 0.204 in the lab) and drove
+the colour a loose cover glass piles at the grid's wall fast enough to cost the carries 1.38
+substeps a step against 1.00 (27a-6). The liquid's answer is unchanged physics: the dye's weight
+down the tipped plate in the gap (Darcy–Boussinesq, hsBody, ROCK_FALL).
+
+`npm run rides`: 16 leans in 8 bars, all on one and three; consecutive leans opposite (cos
+−0.90); a kick changes the hand's speed 0.80× as much as half way between kicks (the spring
+16.0×); level 4.2 s after the last kick; the colour moved 0.368 at the default (the spring
+0.204) and 0.666 at full; with a loose cover the carries take 1.00 substeps a step at the default (still 1.00) and 1.50 at full; rides 5c reads its drift guard on the old spring now, which still drifts the film over a cell a step. `npm run framesway`'s "half way slides it
+less" line is read at full Plate Rock (the gentler default leaves the glass inside half its
+room). The old spring stays as `springKick`/`springStep` for the lab's before.
+
+### 27f-3. Beat Squeeze presses a sheet, where the kick lands (2026-10-22)
+
+The glass press (KICK_RADII) closed the gap across most of the dish, so every kick breathed the
+whole picture in and out: a frame move (27a-8), which is why Beat Squeeze sat at 0 on every look
+but Bass Drop. A press that stays where it lands needs a cover that bends. Off the looks that
+may move the frame (Frame Sway 0), the kick now presses a 0.1 mm polyester sheet laid on the
+liquid, whose dent is set by elastohydrodynamics: w_t = (h³/12μ)∇²(D∇⁴w − F), whose only length
+after a press held T is the bending length ℓ = (D h³ T / 12 μ)^(1/6) (Hosoi and Mahadevan 2004;
+Lister, Peng and Neufeld 2013). The held point force's dent, (F/D)(1 − e^(−(kℓ)⁶))/k⁴ in
+Fourier, crosses zero at 2.28ℓ and inside that is within a tenth of the clamped bowl squishDisc
+already lays, so the kick lays one bowl of radius 2.28ℓ, as deep in the middle as the glass's
+three stacked: 28 cells of 128 on the default oil, 15 in glycerine, 47 in water. It lands
+anywhere in the middle half of the dish. Bass Drop (Frame Sway 0.35) keeps the glass.
+
+`npm run rides`: the reach goes as μ^(−1/6) exactly; the dent moves a ring inside it 3.0
+cells at the default and 6.8 at full; 30 → 70 cells out it falls from 2.99 to 1.35 cells where the glass's
+barely falls (4.1 to 3.9); far off it moves the colour by its own displaced volume (0.345 of the glass's, the volumes saying 0.356); let go it comes
+back 95% of the way at the default, 89% at full. Shortcuts (27f-4): the ring the dent lifts round itself is not laid (the gap is
+never opened past rest), the reach is read at the 6 mm middle, and the release is KickRelease's
+third of a second rather than the sheet's own slower relaxation.
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
@@ -4551,3 +4597,33 @@ under its own 0.15 line, because the cells are irregular and have no lattice; a 
 follows the dye" correlation came out negative; and a ΔE that includes lightness moved
 14 on `lava-lamp` from the relief alone. Each was dropped for a line that failed on the
 control before it was trusted on the fix.
+
+## 34. What a competitor's page showed
+
+### 34a. A landing page before the sign-in wall (2026-10-22)
+
+What was reported: a first visit loaded the app ("Warming the lamp") and landed on a name over
+three sign-in buttons. It said nothing of what ChromaGlass is or costs, and asked for an account
+before the visitor had seen a drop of dye. A competitor's page (PLAN 34) showed the gap: a promise,
+a price, pictures of the product, and a way in that needs no account.
+
+What changed: `Landing.tsx` (its own chunk; the entry chunk grew 517 B gzipped against a 6000 B
+bar, and the engine and Firebase are not in it) is drawn in the sign-in's place on a first visit to
+the hosted site. A headline, one plain line, "Play free", the prices ("Home $35 · Pro $199 · one-time
+payment, no subscription"), eight real looks from the app's own renders, four steps, what the free
+site includes and what the app adds (read from `APP_FEATURE_TILES` and the free caps in
+`tierGates.ts`, so the page says what the code does), a note from the maker and the refund line
+(14 days, from the Terms). "Play free" mounts the sign-in over the page; the tab remembers it
+(sessionStorage) because Google and Apple sign in by a redirect that reloads the page and the
+sign-in is what collects it. The never-lock-out rule is untouched: the page exists only in the
+gate's "signin" phase, before the app, and nothing after it unmounts the plate.
+
+What was tried first and set aside: a looping video of the lab's plate for the hero. The lab lays
+a few drops that barely move in a hero's seconds (four frames 150 solver steps apart were
+near-identical), and a render took four minutes on SwiftShader. A cross-fade of five real frames
+costs 40 KB and moves only by opacity and transform. A filmed loop is PLAN 34a-2.
+
+Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is 48 px tall at
+1024 × 768, 390 × 844 and 844 × 390, with nothing wider than the screen; a returning visit's plate
+comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
+returning visit nor for `?remote` and `?cast`.

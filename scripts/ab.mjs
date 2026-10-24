@@ -75,7 +75,7 @@ await new Promise((r) => setTimeout(r, 2500));
 fs.mkdirSync(OUT, { recursive: true });
 const browser = await launchChromium(chromium);
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-await page.addInitScript(() => { try { localStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
+await page.addInitScript(() => { try { sessionStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
 await installFrameReader(page);
 await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic`, { waitUntil: 'load' });
 await page.mouse.click(8, 8);

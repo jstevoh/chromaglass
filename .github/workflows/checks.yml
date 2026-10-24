@@ -773,6 +773,14 @@ jobs:
       - name: The input picker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run inputpick
+      # The app opens with the sound Source on Off (scripts/opensource.mjs,
+      # PLAN.md 14y): on the desk and the phone, on three looks, a click starts
+      # no sound and opens no device, the Band when chosen is kept through a
+      # reload of the tab, and a new tab opens on Off again. The sound the show
+      # hears and the controls' state, not the plate, so no GPU; on the same dist/.
+      - name: The Source opens on Off
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run opensource
 
       # Following a known song by ear (PLAN.md 28g-2): the app's own band
       # playing, its map made from its score, and the Perform desk's status
@@ -960,6 +968,14 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         timeout-minutes: 6
         run: npm run musicforce
+      # Bass Boost is a gain on the bass's hand (PLAN 27g): the old arithmetic
+      # pinned the press and calmed the plate as the slider rose; now the
+      # glass presses deeper and the kicks still press and let go, in the
+      # ear, in the frame loop's source, and on the thin gap in the lab.
+      - name: Bass Boost presses harder
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 6
+        run: npm run bassboost
       # Each poured liquid as thick as it is (PLAN 18d): on a thin gap a pool
       # of glycerine falls under Rain Drip at Darcy's 2λ/(1+λ) of a pool of
       # colour, syrup in a thick look runs ahead of it, a liquid as thin as

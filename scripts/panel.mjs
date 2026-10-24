@@ -50,6 +50,7 @@ import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
+import { helpFor, CONTROL_HELP } from '../src/lib/controlHelp.ts';
 import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
@@ -1771,6 +1772,34 @@ check('and neither starts over the limit',
     'src/components/LiquidVisualizer.tsx');
   check('and the burst is clumps at random angles, not droplets evenly round one circle',
     burst.includes('lobeAt') && !/\(d \/ drops\) \* Math\.PI \* 2/.test(burst));
+}
+
+// ── What each control says it is (PLAN.md 8j) ───────────────────────
+//
+// The hover card on the desk and the tap card on the phone read one line per
+// control from `lib/controlHelp.ts`, by the setting's key. A control with no
+// line draws a card with only its name, which looks like a design choice
+// rather than an omission, so every pinnable control is held to having one.
+// And the lines are held to being a line: one sentence a person can read in a
+// glance, in plain words (no dashes standing in for a clause, no filler the
+// label already says).
+{
+  const none = PINNABLE.filter(s => !helpFor(String(s.key)));
+  check('every control a desk can hold has a line saying what it does', none.length === 0,
+    none.length ? `${none.map(s => `${s.label} (${String(s.key)})`).join(', ')}: add to src/lib/controlHelp.ts` : `${PINNABLE.length} lines`);
+  const strays = Object.keys(CONTROL_HELP).filter(k => !PIN_RANGE.has(k));
+  check('and no line is left for a control that is gone', strays.length === 0, strays.join(', ') || 'none');
+  const lines = PINNABLE.map(s => [s, helpFor(String(s.key)) ?? '']);
+  const long = lines.filter(([, l]) => l.length > 135 || l.length < 20);
+  check('each is a short sentence, 20 to 135 characters', long.length === 0,
+    long.map(([s, l]) => `${s.label} (${l.length})`).join(', ') || 'all');
+  const dashed = lines.filter(([, l]) => /[—–]|\s-\s/.test(l) || !/[.)]$/.test(l));
+  check('written in plain sentences: they end with a stop and use no dash for a clause', dashed.length === 0,
+    dashed.map(([s]) => s.label).join(', ') || 'all');
+  const same = new Map();
+  for (const [s, l] of lines) same.set(l, [...(same.get(l) ?? []), s.label]);
+  const dup = [...same.values()].filter(v => v.length > 1);
+  check('and no two controls share a line', dup.length === 0, dup.map(v => v.join(' = ')).join('; ') || 'all different');
 }
 
 // ── Result ──────────────────────────────────────────────────────────

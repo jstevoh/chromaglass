@@ -56,7 +56,7 @@ const browser = await launchChromium(chromium);
 const rolls = [];
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
-  await page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
+  await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
   await installFrameReader(page);
   await page.goto(`http://localhost:${port}/?debug&gpu=mid&tier=local&look=classic`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);

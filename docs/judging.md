@@ -1481,7 +1481,41 @@ and distances, some small and some large, not an even wreath round one circle. K
 unchanged should leave only the tilt; at 1 it should be as much dye as before, at 1.5 more.
 Check that the burst reads as the kick, not as the plate being pressed.
 
-## 62. Oil sloshes on water, and bores (PLAN 18a-13a, 13d)
+## 61. Plate Rock rocks with the bar, Beat Squeeze presses where the kick lands (PLAN 27f-2, 27f-3)
+
+Play Classic with a band at 120 bpm or so, Plate Rock at its 0.45 and Beat Squeeze at 0.5,
+Kick Bloom at 0, then at 1. Plate Rock should be the slow move: the heavier colour sliding one
+way across a half bar and back across the next, the direction turning a little each time, and
+nothing jolting on the kick itself. Beat Squeeze should be the quick one: each kick a dent
+where it lands, a fifth of the dish across on the default oil, the colour pushed out of it and
+running back in a third of a second later (fingering back in where Fingering is up). Turn
+Thickness up: the dent should tighten to a fingertip; down toward water, it should widen.
+Bass Drop should still press the whole glass. Say whether the rock's pace (one lean every two
+beats) is right or wants one a bar, and whether the dent wants to be bigger.
+
+## 62. The landing page (PLAN 34a)
+
+Open the site in a private window, at a laptop's width and on a phone. The page should say what
+ChromaGlass is in the first screen, and "Play free" should be the one obvious thing to press; the
+sign-in then opens over the page. Say whether: the headline and the line under it are the words you
+would use (they are drafts); the hero's cross-fade of five frames is slow enough not to be noticed
+and not so soft on a big screen that it looks like a blur (it is 480 px frames, PLAN 34a-3); "From
+the maker" is something you would sign, and the 14-day refund line matches what you will honour;
+the Free, Home and Pro cards promise only what the app does today. Then sign in, sign out and come
+back: the page should not flash for a returning visit.
+
+
+## 63. Bass Boost presses harder (PLAN 27g)
+
+Play a track with a clear kick and bass line (the Sound panel's Bass Boost, in Audio Input; on the
+phone, the same slider in Settings). At 1 nothing has changed. Turn it to 2, then 3: each kick and
+bass note should dent the glass visibly deeper, the colour pushed out from under it harder and
+running back as the bass falls, and each kick's dye should throw further. It should read as more
+bass, not as a busier or shakier plate, and nothing should move the whole frame. Say whether 3
+is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
+bass you wanted.
+
+## 64. Oil sloshes on water, and bores (PLAN 18a-13a, 13d)
 
 The slosh dish is two layers now, oil lenses riding on water, solved on the GPU with a
 Riemann flux, so a hard tip makes a running jump (a bore) instead of a smooth slope. The

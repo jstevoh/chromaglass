@@ -151,7 +151,7 @@ async function open(browser, screen, { source, desk, fader = false }) {
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.addInitScript(({ source, desk, fader, map }) => {
     try {
-      localStorage.setItem('chromaglass-audio-source', source);
+      sessionStorage.setItem('chromaglass-audio-source', source);
       localStorage.setItem('chromaglass-desk-mode', desk);
       if (fader) {
         localStorage.setItem('chromaglass-midi-enabled', '1');

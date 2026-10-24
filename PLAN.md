@@ -553,6 +553,7 @@ Where each batch stands, as of 2026-09-27:
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
+| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1204,6 +1205,21 @@ Open from Desk v2, each its own thread (the UI lane):
     Master and Manual Interaction sit on it. Kaleidoscope was split out of Show on
     purpose (`settingsMap.ts`); the other two are the owner's call if three still reads
     as too thin on a deck.
+
+- ~~**8j** What a knob is called, and what it does~~ (the owner, 2026-10-22: the names
+  on the deck's knobs were cut to the knob's width, and a drag swapped the name for the
+  value under a chip laid over the row above, so a hand could not tell which knob it
+  had). A hover or focus card with the whole name, one plain line on what it does and
+  the live value, drawn into the body so no panel clips it and never over the knob; it
+  stays up through a drag, and the knob keeps its own name while it is turned. One line
+  for each of the 205 controls in `src/lib/controlHelp.ts` (`npm run panel` fails on a
+  pinnable control without one). On the phone there is no hover: the name is the button,
+  dotted underlined, and a tap or a hold opens the same card (`TouchSlider`, the touch
+  `Slider`, a knob's label on a coarse pointer). Checks: `npm run panel`, `npm run
+  layout` (hover, drag, release), `npm run phone` (the tap). Not changed: what any
+  control does.
+  - **8j-1** (S) The remote page (`RemoteControl.tsx`) has its own sliders and no card;
+    its names are whole, but the line would help there too.
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
@@ -3434,6 +3450,35 @@ tablet showing `?cast=` gets the same page.
   thump; a MacBook's own microphone on its own trackpad is the owner's to try: pick
   tools and ride Speed in a quiet room on the microphone, and the plate should not
   move on the clicks.
+
+### 14y. The sound Source opens on Off (shipped, asked 2026-10-22)
+
+The owner: the source should always be None when the app opens, whatever look loads.
+Read as the sound Source (Off / Mic / System / File / Band; the phone's Sound tiles).
+The video Source already opened on Off and a look never sets either (a look carries how
+hard a source drives the plate, never which one is on). What opened on something else
+was the sound: a first visit's first click anywhere started the band, and the last
+Mic or Band pick came back on every launch from `localStorage`.
+
+- **Shipped:** `App.tsx` keeps the pick in `sessionStorage`, so a new tab or a
+  relaunched app opens on Off and a reload of the tab keeps the input (a gig can reload
+  without losing the interface). The first-click band is gone; the Band is one press in
+  the Sound panel and on the phone. `?kiosk=1`, a box with nobody to click, still starts
+  the band on its own. The phone is the same App state, so it opens on Off too.
+- **Measured:** `npm run opensource`: the desk and the phone open with the sound on Off,
+  a click starts nothing and opens no device, a pick is kept through a reload of the
+  tab, and a new tab opens on Off again. Before: a fresh page's first click started the
+  band; a remembered Mic reopened on launch.
+- **Check changes:** `qa`'s "a first visit is driven by the band after one click" now
+  asks that the click starts nothing, and the band is then chosen with its button;
+  `kickbubbles` chooses the band by the Sound control after its dials are set (a band
+  started at load would play before Audio Impact 0 is held, and the Mac runner's Chromium
+  plays without a gesture); `gallery`, `pixels`, `shots`, `swirlcost`, `ferrodrift`'s band
+  pages and the sixteen harnesses that set the remembered source write it to
+  `sessionStorage` now.
+- **Judged by the owner:** a landing visitor no longer meets a plate moving to music
+  before choosing anything (14y reverses that first-visit choice at the owner's word); if
+  the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
 
 ## 15. Every tool on every liquid
 
@@ -6438,15 +6483,44 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     droplet, the burst off-centre by up to a third of the radius, each droplet pushed with a wide
     swirl and its own speed. Fewer droplets on average (5–11 against 6–12), about the same dye.
     `npm run panel` greps the source for both (the picture is judging.md §60).
-  - **27f-2, open. Plate Rock distinct from the squeeze.** Rock shoves the spring on every kick like
-    the burst does, so the two read as one pulse. The idea: a slower spring that wallows across
-    several kicks, or a shove on the bar's one only (`beatAccent` already weighs it), with the
-    shove halved to keep the peak tilt. Changes numbers `npm run rides` holds (it kicks the spring
-    as the app does), so it wants the owner's eyes on a Mac first. Stays inside Frame Sway's rule:
-    it tips the liquid, not the frame.
-  - **27f-3, open.** Beat Squeeze itself (the glass press, 4.1 cells at the default, 11 at full) is
-    the dish-wide press 27a-8 lists among frame moves; whether to keep, localise (the press in the
-    kick's bass area) or remove it is the owner's call.
+  - **27f-2. Plate Rock leans on the one and three (shipped; story in docs/plan-shipped.md §27f-2).**
+    A hand's minimum-jerk reach to the other side of a turning axis on the strong beats, never a
+    shove on each kick; `npm run rides` holds it (judging.md §61).
+  - **27f-3. Beat Squeeze presses a sheet, locally (shipped pending the owner's pick on the
+    thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
+    lays one dent as wide as a 0.1 mm sheet bends over the liquid in the kick's hold
+    (elastohydrodynamic bending length); Bass Drop keeps the glass. `npm run rides` holds it.
+  - **27f-4, open. The sheet solved, not stamped.** 27f-3 lays the dent's held shape (a clamped
+    bowl, within a tenth of the true profile) and gives it back over KickRelease's third of a
+    second. The real sheet is w_t = (h³/12μ)∇²(D∇⁴w − F): linear at these depths, so exactly
+    solvable per Fourier mode on its own grid (an exponential integrator, unconditionally
+    stable), which would also give the release its true pace (the dent spreading as t^(1/6)
+    and shallowing as t^(−1/3), slow on syrup) and the ring the dent lifts round itself (13% of
+    its depth at 3.4ℓ). That ring needs the gap opened past rest, which the shader's
+    squeezeUpdate never does (a lift stops at rest): the same item as the lift's ceiling.
+  - **27f-5, open. The rock tips the layers, not only the dye.** The hand's tilt drives the
+    dye's weight down the plate (Darcy–Boussinesq in the gap). A dish of oil on water tipped
+    the same way also sloshes at the layers' interface (reduced gravity, a wave of several
+    seconds across the dish, underdamped in water, overdamped in the default oil): once the
+    two-layer slosh (18a-13a) lands, the rock's tilt should drive its internal mode. Not the
+    single-layer slosh's surface mode, which moves the whole picture together and would be a
+    frame move from the sound (the owner's rule); a design call for the owner when 18a-13a ships.
+- **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't feel
+  like it actually does anything").** The slider multiplied the ranged bass reading, which every
+  hand takes over 70 or 85 and stops: on the band's chorus the reading sat over the press's
+  ceiling 0.00 of the time at 1×, 0.57 at 2× and 0.70 at 3×, so turning it up held the glass flat
+  and the kicks moved it less (the press's change a second 3.06, 1.83, 0.90; its deepest rose
+  only 8%), while the kick detector never saw the slider (29 kicks at every setting). A bass boost
+  on a rig is a gain, more cone excursion for the same line. Now the hand follows the bass with the
+  boost taken back off (`bassRouteValue`) and lays the boost as a gain on its force (`bassPressFor`,
+  the burst's push, the kick's dye and speed): change a second 3.06, 6.12, 9.19, deepest press
+  1.13, 2.25, 3.38, pinned 0.00 at each; in the lab on the thin gap the hand moves 0.240, 0.403 and
+  0.521 of the plate's colour at 1×, 2× and 3×, and gives it back. At 1× it is the hand it was.
+  `npm run bassboost`. The reading itself still carries the boost (the mappings, the meter and the
+  camera follow it, clipped at 100 as before); the phone's Settings is the same panel.
+  - **27g-1, open. The readings that clip.** Presets' bass mappings (`getAudioValue`, clipped at
+    100) and the camera's punch still saturate at a high boost, as the reading did. Whether the
+    boost should reach them as a gain on their depth too is the owner's call once he has felt this.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)
@@ -7515,6 +7589,110 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   distance 1.21 to 3.11, half-turned crop least 9.25, 1x chroma least 7.62. These match
   SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
   line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
+
+## 34. What Photism showed: the page and the app (asked 2026-10-22)
+
+*Asked 2026-10-22: the owner shared a phone screenshot of photism.app (an audio-reactive
+visualizer sold at $29 once, as a DAW plugin, a standalone app and a browser version)
+and asked what ChromaGlass should change on its page and in the app. The owner said to
+put the findings into the plan. Everything below about Photism is from its own page
+(fetched 2026-10-22); nothing was run or measured, and its claims are its own.*
+
+**What Photism sells.** One promise in the headline ("Your music, made visible."), one
+price button ("Get Photism · $29 once", "no subscription" under it), and a buy-on-the-phone
+flow that emails the download link for the computer. A thumbnail grid of about twenty-five
+scenes with a watch-with-sound clip; a VST3 and AU plugin that sits on the master bus,
+plus a standalone app and a free browser version ("No download · No account"); automation
+lanes that play a drawn look across a song; one-button MP4 with the track's audio in
+it; Syphon (Mac) and Spout (Windows, beta) for Resolume, OBS, VDMX, MadMapper and
+TouchDesigner; new scenes free for life. Proof is a count ("1,000+ users in 82 countries"),
+testimonials, a note from its one maker, and a refunds link.
+
+**Where ChromaGlass already stands.** The solver, the Perform and Design desks, MIDI
+learn and clock, the phone remote, several projectors and Art-Net are things its page
+does not list. Record and Render a Song (§6) already write MP4 with the sound. The DAW
+bridge (13.7, with its automatable slots), Syphon (13.2) and NDI and Spout (13.3) are
+planned and not built. Pouring a picture into the plate exists (`injectImage`), but a
+dropped picture or 3D model driven by the music as its own look does not.
+
+**What not to copy.** A user count before ours is real; a "download link emailed" flow,
+because our free site asks for a login and needs its own reason to (saves your looks);
+a grid of generic stock thumbnails: ours are the plate itself.
+
+- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version; the
+  story is in `docs/plan-shipped.md` §34a, the owner's look is `docs/judging.md` §62.* A first
+  visit meets `src/components/Landing.tsx` (its own lazy chunk, no Firebase, no engine) and
+  "Play free" opens the sign-in over it; a returning visit, `?remote`, `?cast`, the iPhone app,
+  a desktop launch and a visit part way through a redirect or an emailed link never see it.
+  `npm run signin` holds it (3a, 3, 6, 7, 10, 11b).
+- **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
+  video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
+  the app's own frames, because a cloud session cannot film the app and the lab's plate barely
+  moves in a hero's seconds. A 10 to 15 second loop of the real show (`npm run film` records
+  through `scripts/recorder.mjs`), 1280 wide, under 1.5 MB as WebM and MP4, would replace it: the
+  page then loads it after its first paint and keeps the stills for reduced motion. The loop is
+  filmed with the track it was filmed to (the recorder takes the audio, and the show's own music in
+  `public/music` is ours to use), and a browser will not start sound on its own: the video starts
+  muted, and a "Sound on" button (and a tap on the video) unmutes it, with the sound off again when
+  the visitor leaves for the sign-in. More than one clip (a ferrofluid, a dye pour, a close macro)
+  would be the "video examples" row under the hero, each its own filmed look with its sound.
+  *Measure:*
+  the loop's first and last frames differ by less than a frame of motion; `npm run signin` 3a still
+  true with the plate not up.
+- **34a-3. Sharper looks in the grid.** *(S.)* The cards are 480 × 300 frames from the preset
+  contact sheets (28i-1) and are soft where a Retina screen draws them at 2x. `pixels.yml` renders
+  every look one to one at a laptop's size: take the eight from it and keep the file sizes under
+  60 KB each.
+- **34a-4. Buy buttons, when the Lemon Squeezy webhook is set (23).** *(S.)* The page prints the
+  prices and says "Buying opens soon". When 23's webhook issues a key from a test purchase, the
+  tier cards get Buy buttons (`CHECKOUT_HOME_URL`, `CHECKOUT_PRO_URL` in `lib/tierGates.ts`) and
+  the "opens soon" line goes. Until a test purchase has been made, no button.
+- **34a-5. The owner's words and the share card.** *(S; owner.)* "From the maker" and the refund
+  line are drafts in plain words for the owner to rewrite or sign. `og-card.png` is still the old
+  card; a new one would be the hero's frame with the name and the one line.
+- **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
+  (paused until hovered or tapped, as Photism's browser does), picked from before the
+  desk is opened. Previews run the real shader at a small size and one at a time, so
+  the frame budget (Wave 4) is not touched. Phone: the Looks sheet gets the same grid.
+  Line 1211 above already asks for a still saved in each preset file; that is the
+  cheap first step, and the live preview follows.
+- **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
+  scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
+  alone. Built from the same bands the plate already hears. Fast readings only (the
+  owner's patch rule). Phone: the same row in the Mixer sheet.
+- **34d. Chladni figures from the spectrum.** *(M; real physics.)* A thin plate driven
+  at the song's strongest partials shows nodal lines where grains settle; it is the
+  phenomenon behind the sand scene Photism lists. §18 tried the glass ringing in a Chladni
+  mode and set it aside, so this is a separate look where the plate is the vibrating
+  plate, not a ripple on the liquid. Needs a look and a check that the figure matches the
+  analytic mode for a held tone (the script to be named in the PR).
+- **34e. A drawn automation lane per setting.** *(M–L.)* Photism lets a user draw a
+  curve for a setting and play it with the song. §13's DAW bridge covers a DAW's own
+  lanes, and the sequencer (§10) covers cues; neither lets a user draw a curve on the
+  site. A lane on a song's timeline, bound to a setting by the same learn flow as MIDI
+  (§5), saved with the song map. Phone: lanes are read and switched there, drawn on
+  the desk. Waits on the sequencer's cue model; no default look changes.
+- **34f. One-button share export.** *(S.)* §6's Render and Record make the file; the
+  gap is a single "Save a clip with sound" on the desk and the phone that picks the
+  container and size itself, with the small mark on the free site (§23). First the 3-minute
+  1080p render in §6 has to be measured on a Mac.
+- **34g. Legible reactions, named on the page.** *(S, copy.)* Kicks that stir the dye,
+  a hit that seeds a bubble: these already exist in the sound patches (§28i-3). Name each
+  look's reaction on its card in 34a and 34b ("kicks stir the ink") so a viewer sees that
+  the picture is listening.
+- **34h. A dropped picture or 3D model as a look.** *(L; check first.)* Photism's
+  Limitless warps the user's own picture or a dragged-in 3D model with the music.
+  `injectImage` pours a picture as dye, which is not the same. Find whether a picture
+  source exists as a Mixer row (§11) before adding one; the logo-on-the-wall item in
+  §23 would use it too. A 3D model is a later step, not part of the first piece.
+- **34i. The DAW bridge, Syphon and NDI stay on the order they hold.** 13.7, 13.2 and 13.3
+  are what a producer and a VJ pay for, and Photism has both. No change in scope, but
+  13.7 is the one a music-maker audience (Home's buyers) asks for first: when the signed
+  Mac app (13.1-sign) is out, take 13.7 before 13.3.
+
+**Order.** 34a first (it needs no engine work and the site is the demo), then 34f and 34g
+(small), then 34b and 34c; 34d, 34e and 34h are for when the planned VJ and DAW steps
+have shipped. Not started.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

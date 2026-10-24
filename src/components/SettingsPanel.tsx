@@ -21,6 +21,8 @@ import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
+import { helpFor } from '../lib/controlHelp';
+import { useControlTip } from './ui/ControlTip';
 
 /**
  * Pinning a control onto a desk.
@@ -297,8 +299,13 @@ const TARGET_GROUPS = SETTINGS_SECTIONS
 const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, settingKey }: { label: string; value: number | undefined; min: number; max: number; step: number; onChange: (v: number) => void; icon?: React.ComponentType<{ size?: number }>; disabled?: string | false; settingKey?: keyof VisualizerSettings }) => {
   const safeValue = value ?? 0;
   const curve = settingKey ? curveOf(settingKey) : 1;
+  // What the control does, as the desk's hover card says it (PLAN.md 8j); a
+  // tap on the name opens it where there is no hover.
+  const line = helpFor(settingKey);
+  const tip = useControlTip({ name: label, help: line, value: disabled ? undefined : readSetting(String(settingKey ?? ''), safeValue, min, max), disabled: !!disabled });
   return (
-    <div className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
+    <div ref={el => { tip.anchor.current = el; }} {...tip.bind} className={`mb-3 flex min-w-0 flex-col gap-1 ${disabled ? 'opacity-35' : ''}`} title={disabled || undefined} data-disabled={disabled ? 'true' : undefined} data-slider="">
+      {tip.card}
       <div className="flex items-center justify-between gap-2">
         {/*
           The rail beside this pane is sentence case and so is every control
@@ -310,7 +317,10 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
         */}
         <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-text-2">
           {Icon && <Icon size={14} />}
-          <span className="truncate">{label}</span>
+          <span
+            className={`truncate ${line ? '[@media(pointer:coarse)]:underline [@media(pointer:coarse)]:decoration-dotted [@media(pointer:coarse)]:decoration-white/25 [@media(pointer:coarse)]:underline-offset-4' : ''}`}
+            onClick={line ? tip.toggle : undefined}
+          >{label}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {settingKey && <PinChips settingKey={settingKey} />}
@@ -1181,7 +1191,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="kickBloom"
         />
         <Info>
-          Kick Bloom is the ring of dye each kick throws outward from the bass spot. Beat Squeeze presses the glass instead, and Plate Rock tips the dish: three different moves on the kick, each with its own dial.
+          Kick Bloom is the dye each kick throws outward from the bass spot. Beat Squeeze presses a thin sheet on the liquid where the kick lands: a dent as wide as the sheet bends over this liquid, wide on thin oil, a fingertip on syrup. Plate Rock is the slow one: a hand tipping the dish on the one and three, the heavier colour running downhill each way.
         </Info>
         <Slider
           label="Beat Squeeze"

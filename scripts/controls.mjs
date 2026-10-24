@@ -105,7 +105,7 @@ try {
       to follow. How many kicks each look heard is logged, so a run that
       says a beat ride does nothing also says whether there was a beat.
     */
-    await page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
+    await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
     await installFrameReader(page);
     await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=${id}${engineQuery()}`, { waitUntil: 'load' });
     await page.mouse.click(8, 8);   // the gesture the band needs: the rides that follow the beat need a beat

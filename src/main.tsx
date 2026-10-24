@@ -41,6 +41,26 @@ const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./components/SignInScreen'))
   : null;
 const LazyLicenseGate = lazy(() => import('./components/LicenseGate'));
+// The page a first visit meets before the sign-in (PLAN.md 34a). Its own chunk,
+// with no Firebase and no engine in it.
+const LazyLanding = lazy(() => import('./components/Landing'));
+const LANDING_SEEN_KEY = 'chromaglass-landing-seen';
+
+/**
+ * Does this visit meet the landing page before the sign-in?
+ *
+ * Only the hosted site's own sign-in, on a first visit: not the iPhone app
+ * (whose first screen is the plate), nor a desktop launch that asks for a
+ * licence, nor a visit that is already part way through signing in. Google and
+ * Apple sign in by a redirect that reloads the page, and the sign-in screen is
+ * what collects it; the emailed link opens the page with its code in the
+ * address. Both go straight to the sign-in. The tab remembers that the page
+ * has been seen (sessionStorage), so the reload after a redirect does.
+ */
+function landingFirst(): boolean {
+  if (!LazySignIn || isPhoneApp() || requiresDesktopSignInSync() || hasEmailSignInLink()) return false;
+  try { return sessionStorage.getItem(LANDING_SEEN_KEY) !== '1'; } catch { return true; }
+}
 
 // Installable: the service worker is what lets Chrome and Edge offer
 // "Install app", for a dock icon and a window with no browser chrome. Only
@@ -163,6 +183,14 @@ function Gate() {
     return 'signin';
   });
 
+  // The landing page is up behind the sign-in; the sign-in opens over it.
+  const [landing] = useState(landingFirst);
+  const [asking, setAsking] = useState(!landing);
+  const play = () => {
+    try { sessionStorage.setItem(LANDING_SEEN_KEY, '1'); } catch { /* the page is simply shown again */ }
+    setAsking(true);
+  };
+
   useEffect(() => {
     if (!gateActive) return;
     if (phase === 'app') {
@@ -208,7 +236,12 @@ function Gate() {
   }
   if (phase === 'signin') {
     if (LazySignIn) {
-      return <LazySignIn onSignedIn={() => setPhase('app')} />;
+      return (
+        <>
+          {landing && <LazyLanding onPlay={play} covered={asking} />}
+          {asking && <LazySignIn onSignedIn={() => setPhase('app')} />}
+        </>
+      );
     }
     return <LazyLicenseGate onUnlocked={() => setPhase('app')} />;
   }
