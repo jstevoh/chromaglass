@@ -439,17 +439,23 @@ try {
         // 'load', not 'networkidle': the desk's own fetches at the Wi-Fi address
         // keep the network busy past any idle window, and the waits below poll.
         await fpage.goto(`${base}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
-        for (let i = 0; i < 40 && (await fpage.getByTestId('mode-segmented-loadin').count()) === 0; i++) await fpage.waitForTimeout(300);
+        // Up to 36 s for the desk to come up: this is a fresh browser, whose first
+        // page compiles every shader on the CPU, and a runner is slower than a
+        // laptop at that. A poll, so a quick start costs nothing.
+        for (let i = 0; i < 120 && (await fpage.getByTestId('mode-segmented-loadin').count()) === 0; i++) await fpage.waitForTimeout(300);
         if (await fpage.getByTestId('mode-segmented-loadin').count()) await clickAt(fpage, 'mode-segmented-loadin');
         for (let i = 0; i < 40 && (!(await words()) || /looking/i.test(await words())); i++) await fpage.waitForTimeout(300);
         await fpage.waitForTimeout(3000);
       };
       await openAt(lanBase);
       const w = await words();
+      // What the page shows instead, when the panel is not there: the start-up
+      // screen's words, or the desk's, so a red line says why on a runner.
+      const instead = w ? '' : (await fpage.evaluate(() => document.body?.innerText ?? '')).replace(/\s+/g, ' ').slice(0, 220);
       const hasCode = (await fpage.getByTestId('phone-link-qr').count()) > 0;
       const hasUrl = (await fpage.getByTestId('phone-link-url').count()) > 0;
       check('treated as secure, the desk there says to open the page at localhost to link phones',
-        (await fpage.getByTestId('phone-link-local').count()) > 0 && w.includes(local) && /Wi-Fi address/.test(w), w.replace(/\s+/g, ' ').slice(0, 160) || 'no panel');
+        (await fpage.getByTestId('phone-link-local').count()) > 0 && w.includes(local) && /Wi-Fi address/.test(w), w.replace(/\s+/g, ' ').slice(0, 160) || `no panel; the page says: ${instead || 'nothing'}`);
       check('and draws no code and no address: a phone could never join with a keyless code', !hasCode && !hasUrl,
         `${hasCode ? 'code' : 'no code'}, ${hasUrl ? 'address' : 'no address'}`);
       const n = await relaySockets();
