@@ -6192,8 +6192,8 @@ export default function App() {
                   {relay ? (
                     <>
                       <div className="text-[11px] opacity-50 leading-snug mt-0.5">Any browser on the same Wi-Fi:</div>
-                      {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-                        <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1" data-testid="cast-network-address">{relay.httpsPort ? `https://${h}:${relay.httpsPort}` : `http://${h}:${relay.port}`}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
+                      {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((lanHost) => (
+                        <div key={lanHost} className="font-mono text-[11px] text-white/80 select-all mt-1" data-testid="cast-network-address">{relay.httpsPort ? `https://${lanHost}:${relay.httpsPort}` : `http://${lanHost}:${relay.port}`}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
                       ))}
                       {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
                         <div className="font-mono text-[11px] text-white/80 select-all mt-1">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>

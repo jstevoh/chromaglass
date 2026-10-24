@@ -84,6 +84,7 @@ const TEMPLATE_HOSTS = {
   'info.hosts[0]': 'own network: the show server\'s LAN address, for the phone',
   'raw': 'own network: the laptop address the person types into the phone',
   'host': 'own network: the show server printing its LAN address at start',
+  'lanHost': 'own network: the show server\'s LAN address in the Cast menu, for a network display (14m-https)',
 };
 /** What every visitor reaches whatever the code says: the hosts of the site itself and its fonts. */
 const ALWAYS = ['fonts.gstatic.com', 'Firebase Hosting', 'Cloudflare'];
