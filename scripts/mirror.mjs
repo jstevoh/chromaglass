@@ -110,7 +110,7 @@ try {
     await page.addInitScript(() => {
       try {
         localStorage.setItem('chromaglass-desk-mode', 'design');
-        localStorage.setItem('chromaglass-audio-source', 'none');
+        sessionStorage.setItem('chromaglass-audio-source', 'none');
       } catch { /* none */ }
     });
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${sc.look}${engineQuery()}`, { waitUntil: 'load' });

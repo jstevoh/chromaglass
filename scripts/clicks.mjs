@@ -277,7 +277,7 @@ async function app() {
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     await page.addInitScript(([src, room]) => {
-      localStorage.setItem('chromaglass-audio-source', src);
+      sessionStorage.setItem('chromaglass-audio-source', src);
       localStorage.setItem('chromaglass-desk-mode', 'perform');
       // eslint-disable-next-line no-new-func
       if (src === 'microphone') new Function(`(${room})()`)();

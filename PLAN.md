@@ -3451,6 +3451,35 @@ tablet showing `?cast=` gets the same page.
   tools and ride Speed in a quiet room on the microphone, and the plate should not
   move on the clicks.
 
+### 14y. The sound Source opens on Off (shipped, asked 2026-10-22)
+
+The owner: the source should always be None when the app opens, whatever look loads.
+Read as the sound Source (Off / Mic / System / File / Band; the phone's Sound tiles).
+The video Source already opened on Off and a look never sets either (a look carries how
+hard a source drives the plate, never which one is on). What opened on something else
+was the sound: a first visit's first click anywhere started the band, and the last
+Mic or Band pick came back on every launch from `localStorage`.
+
+- **Shipped:** `App.tsx` keeps the pick in `sessionStorage`, so a new tab or a
+  relaunched app opens on Off and a reload of the tab keeps the input (a gig can reload
+  without losing the interface). The first-click band is gone; the Band is one press in
+  the Sound panel and on the phone. `?kiosk=1`, a box with nobody to click, still starts
+  the band on its own. The phone is the same App state, so it opens on Off too.
+- **Measured:** `npm run opensource`: the desk and the phone open with the sound on Off,
+  a click starts nothing and opens no device, a pick is kept through a reload of the
+  tab, and a new tab opens on Off again. Before: a fresh page's first click started the
+  band; a remembered Mic reopened on launch.
+- **Check changes:** `qa`'s "a first visit is driven by the band after one click" now
+  asks that the click starts nothing, and the band is then chosen with its button;
+  `kickbubbles` chooses the band by the Sound control after its dials are set (a band
+  started at load would play before Audio Impact 0 is held, and the Mac runner's Chromium
+  plays without a gesture); `gallery`, `pixels`, `shots`, `swirlcost`, `ferrodrift`'s band
+  pages and the sixteen harnesses that set the remembered source write it to
+  `sessionStorage` now.
+- **Judged by the owner:** a landing visitor no longer meets a plate moving to music
+  before choosing anything (14y reverses that first-visit choice at the owner's word); if
+  the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
+
 ## 15. Every tool on every liquid
 
 Asked 2026-09-27 ("Shouldn't blowing and finger also move around the ferrofluid?",

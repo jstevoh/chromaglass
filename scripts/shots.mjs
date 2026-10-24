@@ -142,6 +142,8 @@ try {
   // The band drives it, so the plate is doing what it does in front of music
   // rather than sitting in whatever state automation happens to leave it.
   await installFrameReader(page);
+  // The app opens on Source None (PLAN.md 14y), so the band this run plays is chosen the way a reload keeps it.
+  await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
   await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic${engineQuery()}${EXTRA ? `&${EXTRA}` : ''}`, { waitUntil: 'load' });
   await page.mouse.click(8, 8);              // the gesture the band needs
   await page.waitForTimeout(6000);
