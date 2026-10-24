@@ -532,7 +532,7 @@ Where each batch stands, as of 2026-09-27:
 
 | | Batch | State |
 |---|---|---|
-| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; the Finger's own "adds none" reds traced to the ambient seeder being left on in that one section (2026-10-22: off, the plate's idle drift falls from +35 to 1 and the hand adds nothing on pools of 357 and 611; thin pools still unmeasured); it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
+| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; the Finger's own "adds none" reds traced to the ambient seeder being left on in that one section (2026-10-22: off, the plate's idle drift falls from +35 to 1 and the hand adds nothing on pools of 357 and 611); its slack and quiet bars **set from the shards' noise** (#449: 48 trials on pools of 39 to 357, at most 0.17% outside the bracket; both bars now 2% of the pool and 1, the slack was 15% and 5), thin pools included; it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
@@ -627,19 +627,21 @@ the broader one it cannot, that the window is unbiased *when a stroke happened*.
 that, the `fIdle`/`fIdleAfter` pair in the check's own detail is the evidence, and the
 control calibrates that pair rather than replacing it.
 
-*A decision for the check's owner:* `fSlack` is still `0.15 * total + 5`, chosen when
-the idle windows were the seeder's +35. They are now about 1, and the hand's own
-contribution is under a unit, so on a pool of 357 the check grants ±59 — it would still
-pass a Finger that created a sixth of the pool. Something nearer 2–3% would be five to
-seven times sharper and still twenty times the measured noise. The same holds for the
-new `quiet` bar, deliberately set at 5% rather than the 2% the Mac alone would justify.
-What stops either being tightened here is that CI's pool is 49 to 279 and the idle
-variance across 40 shards *with the seeder off* has never been measured; only the shards
-can measure it, and a bar resting on an unmeasured quantity is the flake this repo keeps
-relearning.
+*Done (PR #449): both bars set from the shards' own noise.* `TOOLS_FINGER_TRIALS=<n>`
+repeats the stroke on the same helpers, cycling the Drop's hold from 300 to 1500 ms so
+one runner reads thin pools and thick ones, and prints each trial's excess over the
+bracket as a share of the pool (reporting, not gating). Run twelve times on four Mac
+runners, 48 trials on pools of 39 to 357: the stroke landed at most **0.48 outside the
+bracket, 0.17% of its pool**, and the plate left alone gained at most **+0.74, 0.26%**.
+The six seeder-off shard runs before them and the five `adds none` lines beside them
+read the same. So `fSlack` is now `0.02 * pool + 1`, was `0.15 * pool + 5` (±8.1 on a pool
+of 357, was ±59; the nearest trial is a sixteenth of it), and the `quiet` bar is
+`0.02 * pool + 1`, was `max(5, 0.05 * pool)` (the nearest trial is a tenth of it). The
+check's detail now prints its Δ and windows to two places, so `npm run flakes -- --check
+'and adds none'` reads the margin from ordinary pushes.
 
-*Open:* whether the Finger adds dye on a genuinely thin pool, which is now measurable
-for the first time and has not been measured. `TOOLS_POOL_MS` shortens the Drop hold to
+*Measured (PR #449):* the Finger adds no dye on a genuinely thin pool: twelve trials on
+pools of 39 to 80 landed at most 0.05 outside the bracket. `TOOLS_POOL_MS` shortens the Drop hold to
 put a CI-sized pool on a fast machine; it is floored at 100 ms because under that the
 Blow's pool comes out at single figures and its checks measure nothing. Laying the pool
 by solver steps rather than milliseconds would make it one size every run. Also open,
@@ -5564,6 +5566,21 @@ Not a gate and no bar: a rate depends on what was pushed.
   be split the way the Mac shards already are. Until then a red `open` on a branch that
   cannot reach the failing check is not evidence about the branch. Found while measuring
   0-tap (PR #429).
+
+- **19ad-3. Measured: `open` is not at the edge of its runner, and is not split (PR #449,
+  2026-10-24).** Every `WebGPU (macOS)` job from 2026-10-17 to 24, 210 per shard, read
+  from the API. Green medians: plate 14.7 min (p90 16.6), fifth 14.2, show 14.1, open
+  14.0 (p90 15.4, longest 17.3), tools 14.0, against `timeout-minutes: 20`. The five
+  are within 0.7 min of each other, so `open` is neither the longest nor near its wall,
+  and the runner-stopped red in 19ad-2 was not a timeout. It does go red most: 54 jobs,
+  against plate 9, fifth 14, show 22 and tools 27. But 38 of the 54 are one step, `The
+  show opens without stopping` (`startup`, 14v-6/14v-7), then `The sound's renders, with
+  a plate` 11, `The ear behind the wall` 3, and five others once or twice. A split does
+  not change the rate of any of them, because none of them depends on what ran before
+  it. It would cost a sixth Mac runner on every run, against the account's five at a
+  time, so one shard of every run would wait for another to finish. What a split would
+  buy is a cheaper re-run of a startup red (half a shard), and that is better bought by
+  fixing startup. Revisit if a shard's median passes about 15 minutes (the 19w rule).
 
 ## 20. Lace and holes: a pale film torn open over colour
 
