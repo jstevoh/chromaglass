@@ -4032,9 +4032,12 @@ constant coefficients, every Fourier mode has its own exact step, e^(−λdt) an
 in one corner and its negated mirror images in the others, so every mode is a product of sines and
 the sheet is held at rest, at the open air's pressure, on the plate's edges (the dish's open rim,
 whose reservoir lets the liquid out and back). One inverse transform a step, done as half a complex
-one because the sheet is real: 0.7 ms in node on the app's 192 plate. Each kick presses as deep at
-its middle as the stamp closed the gap (stampedDepth, the shader's Stefan closing of the bowl), so
-the dial means what it did. The change is laid each step through its own channel (applyDeltas'
+one because the sheet is real: 0.7 ms in node on the app's 192 plate. Each kick presses out from
+under the sheet, within the dent's reach, as much liquid as the stamped bowl closed there
+(stampedVolume, the shader's Stefan closing of the bowl), its middle capped at two thirds of the
+gap, so the dial moves the colour as it did. Pressed first only as deep in the middle as the bowl,
+the finger's sharper dent moved `npm run rides`' ring 1.9 cells at the default and 3.4 at full,
+against the stamp's 3.0 and 6.8 and the line's 4. The change is laid each step through its own channel (applyDeltas'
 `sheet`, squeezeUpdate's `sheetT`), as solved: no Stefan closing on top, and no ceiling at rest, which
 would have cut the ring and ratcheted the gap closed where it went. The plate's spring is taken on
 the sheet too, so what is laid is only the sheet's own motion. Off the GPU or off a thin gap the
@@ -4061,8 +4064,13 @@ water's last of it goes as the dish's slowest mode (0.231 a frame against e^(−
 plate the gap is the solve's cell for cell to 0.03% of a dent, held, letting go, after a dozen kicks
 and let go; the ring stands 7.6% of a dent past rest where the same change laid as a press is cut
 at rest; a dozen kicks and twenty seconds later the dish's mean is within 0.02% of a dent of rest;
-and past 4ℓ from a held kick the liquid moves 0.30 of what the stamp drives there. `npm run rides`'
-Beat Squeeze lines now press the solved sheet. Shortcuts (27f-8): the mobility is the rest depth's,
+and past 4ℓ from a held kick the liquid moves 0.43 as fast as under the stamp. `npm run rides`'
+Beat Squeeze lines now press the solved sheet: its ring 30 cells out goes 2.7 cells at the default
+and 4.6 at full (the stamp's 3.0 and 6.8), 70 cells out 0.69, far off 0.175 of the glass's where a
+stamp's volume would say 0.339, and comes back 99% and 100%. The line that asked the reach to go
+exactly as μ^(−1/6) now asks it to narrow with thickness, the solve's (`npm run sheet` holds it
+against the grid), and the one that asked the far ring to move by the stamp's displaced volume now
+asks it to move less. Shortcuts (27f-8): the mobility is the rest depth's,
 the sheet's rim is the plate's square, the gap under it the 6 mm middle, the force set from the
 depth, and the slosh dish's press keeps the stamp's timings.
 

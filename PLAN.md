@@ -6658,8 +6658,10 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     step with the linear one as its preconditioner is stable while the mobility is under twice
     the rest's), at about five transforms a step against one. (b) The sheet's rim is the plate's
     square; the dish's is its circle. (c) The gap under the sheet is the 6 mm middle everywhere,
-    not the dome Plate Curve makes. (d) Each kick's force is set from the depth the stamp pressed,
-    not a hand's: a fixed fingertip force would press glycerine's dent shallower. (e) The slosh
+    not the dome Plate Curve makes. (d) Each kick's force is set from the volume the stamp pressed out,
+    not a hand's (a fixed fingertip force would press glycerine's dent shallower), and the
+    middle is capped at two thirds of the gap (SHEET_DEEPEST), where (a) bites hardest: full
+    Beat Squeeze reaches it on every liquid with 61 to 78% of the stamp's volume. (e) The slosh
     dish's press (stepSlosh's dishKicks) still holds and lets go on the stamp's timings
     (glassHeld, KICK_RELEASE), not the sheet's.
   - **27f-5. The rock lifts the oil, not the frame (shipped 2026-10-24; story in

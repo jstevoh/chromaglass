@@ -23,7 +23,7 @@ import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlat
 import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
 import { squishDisc, glassSpring, PressLift, KICK_HOLD, kickPress, type Stroke } from '../src/lib/squish';
-import { RhythmSheet, stampedDepth } from '../src/lib/sheet';
+import { RhythmSheet, stampedVolume } from '../src/lib/sheet';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
@@ -210,14 +210,16 @@ const api = {
    * Beat Squeeze's kick on the rhythm sheet, as the app presses it
    * (LiquidVisualizer pressKick, lib/sheet.ts): a fingertip at plate
    * fraction (x, y) on a liquid of viscosity `nu`, held `hold` seconds,
-   * as deep at its middle as the stamped bowl of a kick of `amount` closed
-   * the gap to. Laid by `sheetStep`.
+   * pushing out as much liquid as the stamped bowl of a kick of `amount`
+   * closed over the dent's reach (kickPress's radius). Laid by `sheetStep`.
+   * Returns the depth its middle reaches.
    */
   sheetPress(x: number, y: number, amount: number, nu: number, hold = KICK_HOLD) {
     const l = lab!;
     if (!l.sheet) l.sheet = new RhythmSheet();
     l.sheet.setLiquid(nu);
-    l.sheet.press(x, y, stampedDepth(amount), hold);
+    const R = kickPress(nu, 0).radii[0] / 128;
+    return l.sheet.pressVolume(x, y, stampedVolume(amount, R), R, hold);
   },
   /** One step of the sheet (`dt` seconds, the gap's spring `spring` a step), its change laid for the next flush, as the app's liftStep lays it. Returns the cells laid. */
   sheetStep(dt = 1 / 60, spring = BASE.gapSpring) {

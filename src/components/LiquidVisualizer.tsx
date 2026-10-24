@@ -63,7 +63,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { RhythmSheet, stampedDepth } from '../lib/sheet';
+import { RhythmSheet, stampedVolume } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -3009,16 +3009,16 @@ class FluidSimulation {
     if (radii.length === 1 && this.gpu && this.thinGap) {
       /*
         The rhythm sheet, solved (lib/sheet.ts, PLAN 27f-4): a fingertip on
-        it here, held KICK_HOLD and lifted, pressing as deep at its middle as
-        the stamped bowl closed the gap to (stampedDepth), and from then on
-        the sheet's own equation lays the gap, step by step (liftStep). The
-        lift's memory still hears the kick as a press, so Fingering's fingers
-        follow it as they followed the bowl.
+        it here, held KICK_HOLD and lifted, pushing out from under it as much
+        liquid as the stamped bowl closed over the same reach (stampedVolume),
+        and from then on the sheet's own equation lays the gap, step by step
+        (liftStep). The lift's memory still hears the kick as a press, so
+        Fingering's fingers follow it as they followed the bowl.
       */
       const radius = Math.round(radii[0] * GRID_SCALE);
       this.pressLift.press('kick', x, y, radius, amount, fingering, showNow());
       this.sheet.setLiquid(nu);
-      this.sheet.press((x + 0.5) / this.size, (y + 0.5) / this.size, stampedDepth(amount), KICK_HOLD);
+      this.sheet.pressVolume((x + 0.5) / this.size, (y + 0.5) / this.size, stampedVolume(amount, radii[0] / 128), radii[0] / 128, KICK_HOLD);
     } else {
       radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
       this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);

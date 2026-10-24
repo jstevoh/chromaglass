@@ -41,7 +41,7 @@
   6 mm of water, 8e-3 on the default oil, 2e-4 in glycerine.
 
   So the sheet's whole life follows, none of it drawn (`npm run sheet`,
-  on the plate's 20 cm at the 6 mm middle, the stamp's depth):
+  on the plate's 20 cm at the 6 mm middle):
   - Water: the dent is a floating plate's (a Kelvin kei), 57 mm to its
     zero with a ring of 2% round it, and let go it levels within a frame
     (96% of it), and what is left goes as the dish's own slowest mode.
@@ -74,13 +74,18 @@
   `npm run sheet`). The finger's load is a Gaussian of FINGER_SIGMA, a
   fingertip's contact; finer, it would only add modes too fast to see.
 
-  How deep. The force is set so that each kick's own dent, held from a flat
-  sheet, reaches at its middle the depth the stamped dent closed the gap to
-  (the shader closing the bowl as Stefan's film does, h³), so the dial reads
-  as it did: 28% of the gap at the default, half at full. Held that deep in
-  water or oil the dent is the floating plate's, F/8√(Dρg), so the force is
-  the same 3 to 5 grams there; glycerine has to be pressed harder to reach
-  it in the kick's hold.
+  How deep. A kick presses as hard as pushes out from under the sheet,
+  within the dent's reach, the liquid the stamped bowl closed there
+  (stampedVolume: the bowl closed as the shader's Stefan film closes it), so
+  the dial moves the colour as it did; but its middle never closes past
+  SHEET_DEEPEST, two thirds of the gap. Pressed only as deep in the middle
+  as the bowl was (the first cut), the finger's sharper dent pushed out two
+  thirds of the bowl's liquid inside 30 cells, and `npm run rides`' ring
+  there went 1.9 cells at the default and 3.4 at full against the stamp's
+  3.0 and 6.8. Now the default oil's middle closes 39% of the gap (the
+  stamp's 28%), water's 50%, glycerine's 32%, and full stops at the cap on
+  every liquid with 61 to 78% of the bowl's volume. Held that deep in water
+  or oil the dent is the floating plate's, F/8√(Dρg): a few grams' weight.
 
   How it reaches the plate. Each step the change in w, sampled on the app's
   grid, is laid as the gap's change through its own channel (`sheetGap` in
@@ -95,8 +100,8 @@
   h³ of the gap under the dent (at full the dent's middle is half the gap,
   where the film drains an eighth as fast); the sheet's rim is the plate's
   square, the dish's is its circle; the gap under it is the plate's 6 mm
-  middle everywhere, not the dome; the force is set from the depth, not
-  the hand.
+  middle everywhere, not the dome; the force is set from the stamp's
+  volume, not a hand's.
 */
 
 /** Cells across the sheet's own grid (a power of two). */
@@ -105,6 +110,14 @@ export const SHEET_N = 128;
 export const SHEET_SPAN = 2;
 /** The fingertip's load, a Gaussian this wide (m). */
 export const FINGER_SIGMA = 0.005;
+/**
+ * The deepest a kick presses the sheet's middle (plate widths): two thirds of
+ * the 0.03 rest gap. Past it the linear sheet's drainage is no longer the
+ * film's (the film under the middle drains at (1/3)³, a twenty-seventh, of the
+ * rest's; PLAN 27f-8(a)), and the shader's floor is near. Only full Beat
+ * Squeeze on the thin liquids reaches it.
+ */
+export const SHEET_DEEPEST = 0.02;
 /** Below this anywhere on the plate (plate widths, 2 µm on a 20 cm plate: under a three-thousandth of the gap) a sheet with nothing on it stops being stepped. */
 export const SHEET_QUIET = 1e-5;
 
@@ -174,6 +187,9 @@ export class RhythmSheet {
   private readonly unitGain: { M: number; hold: number; g: Float64Array };
   private readonly sx: Float64Array;
   private readonly sy: Float64Array;
+  /** A unit force's held dent in Fourier, for pressVolume to integrate. */
+  private readonly ur: Float64Array;
+  private readonly ui: Float64Array;
   /** Whether anything on the sheet is still moving: false until the first press and again once it is quiet. */
   live = false;
   /** Steps laid, presses taken, and the gap laid summed over every cell (plate widths): for the checks. */
@@ -213,6 +229,7 @@ export class RhythmSheet {
     this.decay = { dt: -1, M: -1, e: new Float64Array(n2), g: new Float64Array(n2) };
     this.unitGain = { M: -1, hold: -1, g: new Float64Array(n2) };
     this.sx = new Float64Array(n); this.sy = new Float64Array(n);
+    this.ur = new Float64Array(n2); this.ui = new Float64Array(n2);
     this.rev = new Uint16Array(n);
     const bits = Math.round(Math.log2(n));
     for (let i = 0; i < n; i++) { let r = 0; for (let b = 0; b < bits; b++) r |= ((i >> b) & 1) << (bits - 1 - b); this.rev[i] = r; }
@@ -263,7 +280,48 @@ export class RhythmSheet {
     // Inside the dish's square: a finger on the rim presses nothing (the rim holds the sheet at rest).
     const X = this.metres(Math.max(0.01, Math.min(0.99, x))), Y = this.metres(Math.max(0.01, Math.min(0.99, y)));
     const force = (depth * this.plateMetres) / this.unitCentre(X, Y, hold);
-    this.presses.push({ x: X, y: Y, force, hold, age: 0 });
+    this.load(X, Y, force, hold);
+  }
+
+  /**
+   * A kick: a fingertip at plate fraction (x, y), held `hold` seconds, pressing
+   * as hard as pushes `volume` (plate widths³: gap closed × area) out from
+   * under the sheet within `radius` (plate widths) of it by the time it lets
+   * go, the stamped bowl's own (stampedVolume), but never so hard that the
+   * middle closes past SHEET_DEEPEST. Returns the depth its own middle reaches.
+   *
+   * Why the volume and not the stamp's middle depth: the colour a press
+   * moves is the liquid it pushes out. A finger's dent on a floating sheet
+   * is sharper in the middle than the clamped bowl was, so pressed only as
+   * deep it pushed out two thirds of the bowl's liquid inside 30 cells, and
+   * `npm run rides`' ring 30 cells out went 1.9 cells at the default and 3.4
+   * at full, where the stamp's went 3.0 and 6.8 and the line asks 4 at full.
+   */
+  pressVolume(x: number, y: number, volume: number, radius: number, hold: number): number {
+    if (!(volume > 0) || !(hold > 0) || !(radius > 0)) return 0;
+    const X = this.metres(Math.max(0.01, Math.min(0.99, x))), Y = this.metres(Math.max(0.01, Math.min(0.99, y)));
+    const centre = this.unitCentre(X, Y, hold);
+    // The unit force's held dent, in space: the same modes as the load would lay, with its gain.
+    const n = this.n, sx = this.sx, sy = this.sy, g = this.unitGain.g, ur = this.ur;
+    for (let m = 0; m < n; m++) { sx[m] = Math.sin(this.kx[m] * X); sy[m] = Math.sin(this.kx[m] * Y); }
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const q = i + j * n; ur[q] = -4 * g[q] * sx[i] * sy[j]; }
+    this.ui.fill(0);
+    const w = this.toSpace(ur, this.ui);
+    const R = radius * this.plateMetres, R2 = R * R;
+    let v = 0;
+    for (let j = 0; j < n / 2; j++) for (let i = 0; i < n / 2; i++) {
+      const dx = i * this.dx - X, dy = j * this.dx - Y;
+      if (dx * dx + dy * dy < R2) v += w[i + j * n];
+    }
+    v *= this.dx * this.dx;
+    const want = volume * this.plateMetres ** 3;
+    const force = Math.min(want / Math.max(v, 1e-30), (SHEET_DEEPEST * this.plateMetres) / centre);
+    this.load(X, Y, force, hold);
+    return (force * centre) / this.plateMetres;
+  }
+
+  private load(x: number, y: number, force: number, hold: number): void {
+    this.presses.push({ x, y, force, hold, age: 0 });
     this.loadsStale = true;
     this.live = true;
     this.pressCount++;
@@ -320,7 +378,7 @@ export class RhythmSheet {
   }
 
   /** The sheet in real space on its own grid (metres), into the scratch's real part. */
-  private toSpace(): Float64Array {
+  private toSpace(wr: Float64Array = this.wr, wi: Float64Array = this.wi): Float64Array {
     /*
       The sheet is real, so its transform is Hermitian, ŵ(−k) = ŵ(k)*, and
       half the work of a plain inverse is the other half's conjugate. Down
@@ -332,7 +390,7 @@ export class RhythmSheet {
     */
     const n = this.n, h = n / 2, tr = this.tr, ti = this.ti, out = this.sr, cr = this.cr, ci = this.ci;
     for (let i = 0; i <= h; i++) {
-      for (let j = 0; j < n; j++) { tr[j] = this.wr[i + j * n]; ti[j] = this.wi[i + j * n]; }
+      for (let j = 0; j < n; j++) { tr[j] = wr[i + j * n]; ti[j] = wi[i + j * n]; }
       ifft1(tr, ti, 0, 1, n, this.cos, this.sin, this.rev);
       for (let j = 0; j < n; j++) { cr[i + j * (h + 1)] = tr[j]; ci[i + j * (h + 1)] = ti[j]; }
     }
@@ -481,6 +539,26 @@ export function stampedDepth(amount: number, rest = 0.03): number {
   if (!(amount > 0)) return 0;
   const h = 1 / Math.sqrt(1 / (rest * rest) + (2 * 3 * amount) / rest ** 3);
   return rest - Math.max(0.004, h);
+}
+
+/**
+ * The gap the stamped bowl closed (plate widths³: closed depth × area), for a
+ * kick of `amount` over a bowl of `radius` (plate widths): squishDisc's
+ * 3 × amount × (1 − r²/R²)² at each radius, closed as squeezeUpdate closes a
+ * press (stampedDepth's Stefan film), summed over the bowl. pressVolume
+ * pushes as much out from under the solved sheet, so the dial moves the
+ * colour as it did.
+ */
+export function stampedVolume(amount: number, radius: number, rest = 0.03): number {
+  if (!(amount > 0) || !(radius > 0)) return 0;
+  let v = 0;
+  const steps = 400;
+  for (let k = 0; k < steps; k++) {
+    const r = ((k + 0.5) / steps) * radius, q = 1 - (r * r) / (radius * radius);
+    const h = 1 / Math.sqrt(1 / (rest * rest) + (2 * 3 * amount * q * q) / rest ** 3);
+    v += (rest - Math.max(0.004, h)) * 2 * Math.PI * r * (radius / steps);
+  }
+  return v;
 }
 
 /** J₀ (Abramowitz and Stegun 9.4.1 and 9.4.3, to 5e-8). */

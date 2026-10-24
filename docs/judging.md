@@ -1560,6 +1560,6 @@ most of it springs back at once and the last of it settles over a fifth of a sec
 ring of colour pushed out round the dent and drawn back. Turn Thickness to full: the dent should
 tighten and hold, coming back slowly over a second or two, the ring round it plainer. Toward water
 it should be wide and gone almost as it lands. Little outside the dent and its ring should move on
-the kick (a third of what the old dent moved there). Say whether the thick liquid's slow give-back reads as syrup or as lag, and whether
+the kick (under half of what the old dent moved there). Say whether the thick liquid's slow give-back reads as syrup or as lag, and whether
 the default oil's dent still reads as a press.
 

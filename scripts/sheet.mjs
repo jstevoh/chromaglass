@@ -11,31 +11,33 @@
  * w_t = (h³/12μ)∇²(D∇⁴w − F), exactly, per Fourier mode, with the ring the
  * dent lifts round itself and the release at the sheet's own pace.
  *
- * Every claim here is the equation's, and each is asked against something
- * the solve does not compute itself:
+ * The sheet floats on the layer, so its weight is in it as well as its
+ * bending: w_t = M∇²(D∇⁴w + ρg w − F), the dish's rim holding it at rest at
+ * the open air's pressure. Every claim here is the equation's, and each is
+ * asked against something the solve does not compute itself:
  *
  *   Node (the solve against the theory):
- *   1. Held, the dent is the held point load's: the solve's profile against
- *      the Hankel integral of (1 − e^(−(kℓ)⁶))/k⁴ (with the finger's Gaussian),
- *      worked out here by quadrature, within 2% of its depth; it crosses zero
- *      at 2.28ℓ and lifts a ring of 13 to 15% of its depth at 3.4ℓ.
+ *   1. Held, the dent is the floating sheet's: the solve's profile against
+ *      the Hankel integral of the same equation (with the finger's Gaussian),
+ *      worked out here by quadrature, within 2% of its depth out to 60 mm in
+ *      water, the default oil and glycerine; and the thicker the liquid, the
+ *      narrower its dent and the higher its ring.
  *   2. Exact per mode: a hold stepped once, in nine steps or in uneven
  *      steps that end inside the hold comes out the same to 1e-9.
- *   3. The film's mean never moves: the dent holds no net volume (the ring
- *      is what the finger pushed out), under 1e-6 of it.
- *   4. The reach is 27f-3's: the zero crossing as dentRadius says, viscosity
- *      to the minus one sixth, in water, the default oil and glycerine.
- *   5. Let go, every liquid relaxes in the same multiple of the hold (the
- *      solution's only time is t/T): the middle's depth at 2, 8 and 32 holds
- *      within 5% across the three; and late it shallows as t^(−2/3), the
- *      zero-volume dent's law, and spreads as t^(1/6).
- *   6. The depth is the stamp's: the middle at the lift is stampedDepth, at
- *      the default and at full.
- *   7. The ring opens the gap: the sheet lays openings past rest round the
- *      dent, at least a tenth of its depth.
- *   8. The plate's spring, taken on the sheet: with a spring s a step the
- *      laid dent is (1 − s)^n of the springless one, and a sheet left alone
- *      goes quiet (stops being stepped) within the spring's own time.
+ *   3. The rim: the sheet at rest on every edge, and kicked twice a second
+ *      for two minutes the dish's mean gap stays near rest (without the
+ *      weight and the rim it sank by over half a dent).
+ *   4. The press's reach (dentRadius, by quadrature) is the grid's solve's.
+ *   5. Let go, the dent is given back at the theory's pace while it is the
+ *      finger's, and as the dish's slowest mode once it is the rim's; the
+ *      thicker the liquid, the slower.
+ *   6. As much pushed out as the stamp: the held dent's volume within its
+ *      reach is the stamped bowl's (stampedVolume), its middle capped at
+ *      SHEET_DEEPEST.
+ *   7. The ring opens the gap: the sheet lays openings past rest round its dent.
+ *   8. The plate's spring, taken on the sheet: let go, with a spring s a step
+ *      the laid dent is (1 − s)^n of the springless one, and a sheet left
+ *      alone goes quiet (stops being stepped) within the spring's own time.
  *
  *   Lab (the solved sheet laid on a thin gap through its own channel):
  *   9.  The plate's gap is the solve's: rest minus the sheet's dent, cell for
@@ -46,9 +48,9 @@
  *   11. No ratchet: a dozen kicks and the sheet let go, with no spring, the
  *       gap's mean over the dish is back to rest within 1% of a dent's depth.
  *   12. The frame stays still: under an off-centre kick held, the liquid's
- *       speed far from the dent (past 4ℓ) is under a third of what the
- *       stamped bowl drives there at the same depth, which sends what it
- *       presses out through the whole film to the rim.
+ *       speed far from the dent (past 4ℓ) is under half what the stamped
+ *       bowl drives there, the same liquid pushed out, which the stamp sent
+ *       all at once through the whole film to the rim.
  *
  * And any GPU validation error fails the run.
  */
@@ -62,7 +64,7 @@ const check = (name, ok, detail = '') => {
 
 const out = 'node_modules/.cache/sheet-lib.mjs';
 await build({ stdin: { contents: "export * from './src/lib/sheet.ts'; export { dentRadius, kickDepth, kickPress, KICK_HOLD, SHEET_D } from './src/lib/squish.ts'; export { thicknessViscosity } from './src/lib/turntable.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { RhythmSheet, stampedDepth, FINGER_SIGMA, SHEET_QUIET, SHEET_D, dentRadius, kickDepth, kickPress, KICK_HOLD, thicknessViscosity } = await import(`../${out}`);
+const { RhythmSheet, stampedDepth, stampedVolume, SHEET_DEEPEST, FINGER_SIGMA, SHEET_QUIET, SHEET_D, dentRadius, kickDepth, kickPress, KICK_HOLD, thicknessViscosity } = await import(`../${out}`);
 
 const T = KICK_HOLD;
 const LIQUIDS = { water: thicknessViscosity(0), 'the default oil': thicknessViscosity(0.45), glycerine: thicknessViscosity(1) };
@@ -142,11 +144,13 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
   // Kicked twice a second for two minutes about the middle half: the dish's mean gap, against a dent's depth.
   const kicked = (nu) => {
     const k = new RhythmSheet(); k.setLiquid(nu);
-    const L = 96, d = stampedDepth(AMOUNT.def), buf = new Float32Array(L * L);
+    const L = 96, R = kickPress(nu, 0).radii[0] / 128, buf = new Float32Array(L * L);
+    let d = 0;
     let seed = 3; const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648) - 0.5;
     let worst = 0;
     for (let n = 0; n < 60 * 120; n++) {
-      if (n % 30 === 0) k.press(0.5 + rnd() * 0.5, 0.5 + rnd() * 0.5, d, T);
+      // As the app presses a kick (pressVolume), d the middle the last one reached.
+      if (n % 30 === 0) d = k.pressVolume(0.5 + rnd() * 0.5, 0.5 + rnd() * 0.5, stampedVolume(AMOUNT.def, R), R, T);
       k.step(L, 1 / 60, 0, buf);
       if (n % 300 === 299 && n > 60 * 20) {
         const h = k.heldNow(); let m = 0, c = 0;
@@ -213,16 +217,28 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
     w.got[2] < 0.01 && o.got[2] < 0.1 && g.got[2] > 0.15 && w.got[2] < o.got[2] && o.got[2] < g.got[2],
     rows.map((r) => `${r.name} ${(100 * r.got[2]).toFixed(1)}%`).join(', '));
 }
-// ── 6. The stamp's depth ───────────────────────────────────────────────
+// ── 6. As much pushed out as the stamp ─────────────────────────────────
 {
-  const rows = [];
+  /*
+    A kick presses as hard as pushes out from under the sheet, within the dent's reach, the liquid
+    the stamped bowl closed there (stampedVolume, the bowl closed as the shader's Stefan film closes
+    it), so the dial moves the colour as it did; but never past SHEET_DEEPEST at its middle. Asked
+    on the app's 192 plate, the held dent summed over the reach.
+  */
+  const L = 192, rows = [];
   for (const [name, nu] of Object.entries(LIQUIDS)) for (const [k, a] of Object.entries(AMOUNT)) {
-    const want = stampedDepth(a), got = held(nu, want).depthAt(0.5, 0.5);
-    rows.push({ name, k, want, got });
+    const s = new RhythmSheet(); s.setLiquid(nu);
+    const R = kickPress(nu, 0).radii[0] / 128, want = stampedVolume(a, R);
+    const mid = s.pressVolume(0.5, 0.5, want, R, T);
+    s.step(L, T, 0, new Float32Array(L * L));
+    const h = s.heldNow(); let got = 0;
+    for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) if (Math.hypot((i + 0.5) / L - 0.5, (j + 0.5) / L - 0.5) < R) got += h[i + j * L] / (L * L);
+    rows.push({ name, k, want, got, mid, depth: s.depthAt(0.5, 0.5) });
   }
-  check('pressed as deep as the stamp closed the gap: the middle at the lift is stampedDepth, at the default and at full, in every liquid, to 1e-6',
-    rows.every((r) => Math.abs(r.got / r.want - 1) < 1e-6),
-    `${(rows[0].want / 0.03 * 100).toFixed(0)}% of the gap at the default, ${(rows[1].want / 0.03 * 100).toFixed(0)}% at full`);
+  const capped = (r) => Math.abs(r.mid / SHEET_DEEPEST - 1) < 1e-9;
+  check('pressed out as much as the stamp closed: the held dent\'s volume within its reach is stampedVolume to 2%, or its middle is at SHEET_DEEPEST and short of it; the default never capped',
+    rows.every((r) => (capped(r) ? r.got < r.want : Math.abs(r.got / r.want - 1) < 0.02) && Math.abs(r.depth / r.mid - 1) < 1e-6) && rows.filter((r) => r.k === 'def').every((r) => !capped(r)),
+    rows.map((r) => `${r.name} ${r.k} ${(100 * r.mid / 0.03).toFixed(0)}% of the gap${capped(r) ? ` (capped, ${(100 * r.got / r.want).toFixed(0)}% of the volume)` : ` (${(100 * r.got / r.want).toFixed(1)}% of the volume)`}`).join(', '));
 }
 // ── 7. The ring opens the gap ──────────────────────────────────────────
 {
@@ -273,6 +289,9 @@ if (!process.env.SHEET_NODE) {
   const { openLab } = await import('./lab.mjs');
   // The default oil: its viscosity, its bending length in plate widths, and the stamped bowl's radius on the lab's 192 (27f-3).
   const oilSheet = new RhythmSheet(); oilSheet.setLiquid(LIQUIDS['the default oil']);
+  // The middle a default kick at the middle reaches on it, which the lab's lines are read against.
+  const R45 = kickPress(LIQUIDS['the default oil'], 0).radii[0] / 128;
+  const DEF_DEPTH = (() => { const k = new RhythmSheet(); k.setLiquid(LIQUIDS['the default oil']); return k.pressVolume(0.5, 0.5, stampedVolume(AMOUNT.def, R45), R45, T); })();
   const OIL = { nu: LIQUIDS['the default oil'], lp: oilSheet.bendingLength(T) / 0.2, stampCells: Math.round(kickPress(LIQUIDS['the default oil'], 0).radii[0] * 1.5) };
   const { page, close } = await openLab();
   const gpuErrors = [];
@@ -372,7 +391,7 @@ if (!process.env.SHEET_NODE) {
       }
       return res;
     }, { AMOUNT, T, NU: OIL });
-    const depth = stampedDepth(AMOUNT.def);
+    const depth = DEF_DEPTH;
     check('the plate\'s gap is the solve\'s, cell for cell: rest minus the sheet\'s dent, held, letting go and after a dozen kicks, to 1% of a dent\'s depth',
       Math.max(r.heldWorst, r.lettingWorst, r.kicksWorst, r.afterWorst) < 0.01 * depth,
       `worst ${(100 * r.heldWorst / depth).toFixed(3)}% held, ${(100 * r.lettingWorst / depth).toFixed(3)}% letting go, ${(100 * r.kicksWorst / depth).toFixed(3)}% after twelve kicks, ${(100 * r.afterWorst / depth).toFixed(3)}% let go`);
@@ -380,7 +399,13 @@ if (!process.env.SHEET_NODE) {
       `${(100 * r.ringPlate / depth).toFixed(1)}% of the dent's depth through the sheet's channel, ${(100 * Math.max(0, r.ringPress) / depth).toFixed(2)}% through the press's`);
     check('no ratchet: a dozen kicks and twenty seconds let go with no spring, the dish\'s mean gap back within 1% of a dent\'s depth', Math.abs(r.ratchet) < 0.01 * depth,
       `mean ${(r.ratchet >= 0 ? '+' : '') + (100 * r.ratchet / depth).toFixed(3)}% of a dent`);
-    check('the frame stays still: past 4ℓ from a held kick the liquid moves under a third of what the stamped bowl drives there', r.far.sheet < r.far.stamp / 3,
+    /*
+      The stamp laid its whole bowl in the kick's first step and sent it all out through the film
+      to the rim; the sheet spreads its press over the hold, and keeps some of it in its ring. At
+      the same liquid pushed out (pressVolume) the far plate moves 0.43 as fast as under the stamp
+      while the finger is down; pressed only to the stamp's middle depth, a first cut, it was 0.30.
+    */
+    check('the frame stays still: past 4ℓ from a held kick the liquid moves under half as fast as the stamped bowl drives it there, the same liquid pushed out', r.far.sheet < r.far.stamp / 2,
       `${r.far.sheet.toExponential(2)} against the stamp's ${r.far.stamp.toExponential(2)} (${(r.far.sheet / r.far.stamp).toFixed(3)})`);
   } finally {
     await close();
