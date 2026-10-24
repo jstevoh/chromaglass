@@ -935,6 +935,8 @@ export interface LiquidVisualizerHandle {
   plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[]; flow: number; swirl: number } | null;
   /** Film projector: a video file, the camera, or another window, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
+  /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
+  loadFilmUrl: (url: string) => Promise<void>;
   startFilmCamera: () => Promise<void>;
   /**
    * A window, a tab or a screen, picked from the browser's own chooser.
@@ -6000,12 +6002,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
     },
+    /*
+      PLAN 14ab-1: the pour paused and played its video on every frame. The
+      app called this once a frame with the same element, and this paused
+      whatever was pouring before taking the new one, so the one video was
+      paused and played sixty times a second: a stutter on Chrome, and on
+      Safari a play() promise refused every frame. The frame loop reads the
+      video itself (below, "Video Pour"), so this is now a hand-over, called
+      once: the same element again only makes sure it is playing.
+    */
     pourVideo: (video: HTMLVideoElement) => {
-      if (videoPourRef.current) {
-        videoPourRef.current.pause();
+      if (videoPourRef.current === video) {
+        if (video.paused) video.play().catch(() => { /* plays on the next gesture */ });
+        return;
       }
+      videoPourRef.current?.pause();
       videoPourRef.current = video;
-      video.play();
+      videoFlowPrevRef.current = null;   // the last video's frame is no reference for this one's motion
+      video.play().catch(() => { /* plays on the next gesture */ });
     },
     stopPourVideo: () => {
       if (videoPourRef.current) {
@@ -6227,6 +6241,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       f.url = URL.createObjectURL(file);
       v.src = f.url;
       f.kind = 'file';
+      try { await v.play(); } catch { /* autoplay policy: plays on the next gesture */ }
+    },
+    loadFilmUrl: async (url: string) => {
+      stopFilm();
+      const v = filmVideo();
+      // Not kept in `f.url`: that is for an object URL `stopFilm` revokes.
+      v.src = url;
+      filmRef.current.kind = 'file';
       try { await v.play(); } catch { /* autoplay policy: plays on the next gesture */ }
     },
     /*

@@ -64,6 +64,7 @@
     "inputpick": "node scripts/inputpick.mjs",
     "opensource": "node scripts/opensource.mjs",
     "phone": "npm run build && node --experimental-strip-types scripts/phone.mjs",
+    "cartoons": "npm run build && node --experimental-strip-types scripts/cartoons.mjs",
     "saves": "npm run build && node scripts/saves.mjs",
     "switches": "npm run build && node scripts/switches.mjs",
     "draw": "npm run build && node --experimental-strip-types scripts/draw.mjs",
