@@ -203,13 +203,19 @@ function Loading() {
   );
 }
 
+const orSignIn = () => (hasValidLicenseSync() || isSignedInCached() ? 'app' : 'signin');
+
 function Gate() {
   const gateActive =
     show && (Boolean(import.meta.env.VITE_FIREBASE_API_KEY) || requiresDesktopSignInSync());
   const [phase, setPhase] = useState<'app' | 'verifying-license' | 'completing-link' | 'signin'>(() => {
     if (!gateActive) return 'app';
-    if (hasValidLicenseSync() || isSignedInCached()) return 'app';
+    // An emailed sign-in link is finished before anything else: a browser that
+    // holds a licence used to go straight to the app with the link's code left
+    // unused, so signing in by email from the profile sheet, on a licensed
+    // machine, came back still signed out (`npm run signin` 16).
     if (hasEmailSignInLink() && getPendingEmail()) return 'completing-link';
+    if (hasValidLicenseSync() || isSignedInCached()) return 'app';
     if (hasStoredLicenseCandidateSync()) return 'verifying-license';
     return 'signin';
   });
@@ -250,10 +256,12 @@ function Gate() {
           .then((m) => m.completeEmailLinkSignIn())
           .then((res) => {
             if (cancelled) return;
-            setPhase(res.needsEmail ? 'signin' : 'app');
+            setPhase(res.needsEmail ? orSignIn() : 'app');
           })
           .catch(() => {
-            if (!cancelled) setPhase('signin');
+            // A spent or broken link never locks out a browser that was let in
+            // before it (a licence, or a session): it goes on to the show.
+            if (!cancelled) setPhase(orSignIn());
           });
         return () => {
           cancelled = true;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, CirclePlus, Shuffle, User } from 'lucide-react';
+import { ChevronDown, CirclePlus, LogIn, Shuffle, User } from 'lucide-react';
+import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { TouchSlider } from '../ui/TouchSlider';
 import type { VisualizerSettings } from '../../types';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
@@ -125,6 +126,7 @@ function Pill({ onPress, label, testId, children, pressed }: { onPress: () => vo
 
 export function PhonePlay(p: PhonePlayProps) {
   const [sheet, setSheet] = useState(false);
+  const signedOut = ACCOUNTS_ON && !useSignedIn();
   const [picked, setPicked] = useState<PlayTool>('dropper');
   const [touched, setTouched] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -318,13 +320,15 @@ export function PhonePlay(p: PhonePlayProps) {
             <button
               type="button"
               onClick={p.onOpenAccount}
-              aria-label="Account"
+              aria-label={signedOut ? 'Sign in' : 'Account'}
               data-cg-account-open=""
+              data-cg-account-signin={signedOut ? '' : undefined}
               className="pointer-events-auto flex h-12 min-w-12 items-center justify-center"
             >
-              <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[13px] font-medium text-text ${GLASS_PILL}`}>
-                <User size={15} className="shrink-0 text-amber-300" />
-                <span>Account</span>
+              {/* Signed out, lit: the way back in (the owner, 2026-10-24). */}
+              <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[13px] font-medium ${signedOut ? 'bg-primary text-on-primary' : `text-text ${GLASS_PILL}`}`}>
+                {signedOut ? <LogIn size={15} className="shrink-0" /> : <User size={15} className="shrink-0 text-muted" />}
+                <span>{signedOut ? 'Sign in' : 'Account'}</span>
               </span>
             </button>
           )}
@@ -495,7 +499,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 )}
                 {p.onOpenAccount && (
                   <button onClick={() => { setSheet(false); p.onOpenAccount?.(); }} data-testid="play-sheet-account"
-                    className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Account</button>
+                    className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">{signedOut ? 'Sign in' : 'Account'}</button>
                 )}
               </div>
               </div>

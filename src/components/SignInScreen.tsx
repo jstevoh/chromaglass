@@ -16,7 +16,13 @@ interface SignInScreenProps {
 // Initialize Firebase Auth as soon as this lazy chunk loads so popup handlers fire synchronously.
 getFirebaseAuth();
 
-export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
+/**
+ * The sign-in's buttons and the emailed-link form, without the screen around
+ * them, so the profile sheet can offer the same sign-in to someone already in
+ * the app (the owner, 2026-10-24: signed out while using the app, "there is no
+ * way to re-sign in"). The first-visit screen below wraps the same form.
+ */
+export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   const isCompletingLink = hasEmailSignInLink();
   const [emailOpen, setEmailOpen] = useState(isCompletingLink);
   const [email, setEmail] = useState('');
@@ -84,19 +90,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   };
 
   return (
-    <div
-      data-cg-signin=""
-      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 overflow-y-auto"
-      style={{ background: 'rgba(5, 5, 8, 0.55)', backdropFilter: 'blur(12px)' }}
-    >
-      <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/85 px-5 py-3.5 text-neutral-100 shadow-2xl">
-        <div className="mb-2.5 text-center">
-          <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
-          <p className="mt-0.5 text-xs text-neutral-400">
-            Sign in to enter the studio
-          </p>
-        </div>
-
+    <>
         <div className="flex flex-col gap-2">
           <button
             type="button"
@@ -152,13 +146,13 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               aria-label="Email address"
-              className="min-h-[40px] w-full rounded-xl border border-white/20 bg-black/50 px-3.5 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-amber-400/60 focus:outline-none"
+              className="min-h-[40px] w-full rounded-xl border border-white/20 bg-black/50 px-3.5 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-accent focus:outline-none"
             />
             <button
               type="submit"
               data-cg-signin-send=""
               disabled={sending}
-              className="min-h-[40px] w-full rounded-xl bg-amber-500/90 px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-amber-400 disabled:opacity-50"
+              className="min-h-[40px] w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary transition hover:opacity-90 disabled:opacity-50"
             >
               {isCompletingLink
                 ? 'Complete sign-in'
@@ -193,7 +187,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
               setMarketingOptInState(next);
               setMarketingOptIn(next);
             }}
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/30 bg-black accent-amber-500"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/30 bg-black accent-accent"
           />
           <span>
             Email me occasional ChromaGlass updates, new looks &amp; release notes (optional).
@@ -221,8 +215,25 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
           </a>
           <span>.</span>
         </div>
-      </div>
-    </div>
+    </>
   );
 };
+
+export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => (
+  <div
+    data-cg-signin=""
+    className="fixed inset-0 z-50 flex items-center justify-center p-2.5 overflow-y-auto"
+    style={{ background: 'rgba(5, 5, 8, 0.55)', backdropFilter: 'blur(12px)' }}
+  >
+    <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/85 px-5 py-3.5 text-neutral-100 shadow-2xl">
+      <div className="mb-2.5 text-center">
+        <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
+        <p className="mt-0.5 text-xs text-neutral-400">
+          Sign in to enter the studio
+        </p>
+      </div>
+      <SignInForm onSignedIn={onSignedIn} />
+    </div>
+  </div>
+);
 export default SignInScreen;

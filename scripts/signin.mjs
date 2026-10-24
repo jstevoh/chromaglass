@@ -52,6 +52,20 @@
  *  12. the account sheet opens from the desk and from the phone, and names
  *      the account
  *  13. deleting the account from the sheet removes it from the auth server
+ *  14. an account that holds a Pro key reads Pro once the app starts signed in,
+ *      with the sheet never opened: the key comes from the licence Worker
+ *      (server/license-worker.js, run here in Node against the emulator). The
+ *      owner, 2026-10-24: his Pro account read Free, because the key was fetched
+ *      only while the sheet was open (and the live Worker refused real
+ *      sign-ins; `npm run license-worker` 8). Read on `?tierGates=1`, where an
+ *      unlicensed browser is Free, and the same desk is read Free first, before
+ *      the key is filed, so Pro is not what an ungated build says anyway.
+ *  15. signed out with the plate up, the account button on the desk and on the
+ *      phone becomes a lit "Sign in" (the owner, 2026-10-24: "there is no way to
+ *      re-sign in"), a thumb's height on the phone; on the desk it opens the
+ *      sign-in in the sheet with the plate still up behind it
+ *  16. signing in from that sheet brings the account back: the button says
+ *      Account again and the sheet names the account
  *
  * The hooks it reads (the brief, docs/handoff-signin.md, names each):
  *   [data-cg-signin]                               the sign-in screen
@@ -60,6 +74,7 @@
  *   [data-cg-account-open] [data-cg-account] [data-cg-account-signout]
  *   [data-cg-account-signout-confirm]
  *   [data-cg-account-delete] [data-cg-account-delete-confirm]
+ *   [data-cg-account-signin] (the lit Sign in)  [data-cg-tier] (the tier the app gates by)
  *   window.chromaglassSettings, a function once the App is up (App.tsx)
  *
  * Build-time variables: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN,
@@ -74,6 +89,8 @@ import { readFileSync, readdirSync, existsSync, statSync, writeFileSync, mkdtemp
 import { join, extname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { gzipSync } from 'node:zlib';
+import licenseWorker from '../server/license-worker.js';
+import { signLicenseKey } from '../server/license-key.js';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -93,12 +110,15 @@ const HOLD_MS = 10_000;
 const BOOT_MS = 90_000;
 const EMAIL = 'check@example.com';
 
+const LIC_PORT = 5283;
 const FIREBASE_ENV = {
   VITE_FIREBASE_API_KEY: 'demo-key',
   VITE_FIREBASE_AUTH_DOMAIN: `${PROJECT}.firebaseapp.com`,
   VITE_FIREBASE_PROJECT_ID: PROJECT,
   VITE_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000',
   VITE_FIREBASE_AUTH_EMULATOR: EMU,
+  // The licence Worker (14): the hosted site's build has its address too (deploy.yml).
+  VITE_FIREBASE_LICENSES_URL: `http://127.0.0.1:${LIC_PORT}`,
 };
 
 // ── the two builds ──────────────────────────────────────────────────────────
@@ -164,6 +184,58 @@ function serve(dist, port) {
   });
   return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok(server)));
 }
+
+/**
+ * The licence Worker itself (server/license-worker.js), in Node: its KV a Map,
+ * its signing key made for this run, and the emulator's unsigned tokens let in
+ * the way the Worker lets them in when told it is talking to the emulator. The
+ * page is told the run's public key (`__cgTestLicensePublicKey`, as `tiers`
+ * does), so the key it is handed verifies offline exactly as a real one would.
+ */
+const licKV = new Map();
+const licPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+const licPublic = await crypto.subtle.exportKey('jwk', licPair.publicKey);
+const licEnv = {
+  LICENSE_KV: { get: async (k) => licKV.get(k) ?? null, put: async (k, v) => { licKV.set(k, String(v)); }, delete: async (k) => { licKV.delete(k); } },
+  LICENSE_PRIVATE_KEY: JSON.stringify(await crypto.subtle.exportKey('jwk', licPair.privateKey)),
+  LICENSE_PUBLIC_KEY: JSON.stringify(licPublic),
+  FIREBASE_AUTH_EMULATOR: EMU,
+  FIREBASE_PROJECT_ID: PROJECT,
+};
+/** File a Pro key under an account, as the store's webhook would. */
+async function fileProKey(email) {
+  const now = Date.now();
+  const token = await signLicenseKey({ id: 'check-pro-1', tier: 'pro', email, issuedAt: now }, licEnv.LICENSE_PRIVATE_KEY);
+  licKV.set(`keys:${email}`, JSON.stringify([{ id: 'check-pro-1', tier: 'pro', email, token, issuedAt: now, maxMachines: 2, revoked: false }]));
+}
+const LICENSE_PUBLIC_INIT = `window.__cgTestLicensePublicKey = ${JSON.stringify(licPublic)};`;
+function serveWorker(port) {
+  const server = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const headers = new Headers();
+    for (const [k, v] of Object.entries(req.headers)) if (typeof v === 'string') headers.set(k, v);
+    const r = await licenseWorker.fetch(new Request(`http://127.0.0.1:${port}${req.url}`, {
+      method: req.method, headers, body: req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks),
+    }), licEnv);
+    res.writeHead(r.status, Object.fromEntries(r.headers));
+    res.end(Buffer.from(await r.arrayBuffer()));
+  });
+  return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok(server)));
+}
+/** The tier the app gates by, as its account button says it (`data-cg-tier`). */
+const tierShown = (page) => page.evaluate(() => [...document.querySelectorAll('[data-cg-tier]')].map((e) => e.getAttribute('data-cg-tier')).join(',')).catch(() => '');
+/**
+ * The lit Sign in: drawn, and lit, which is a light fill (the desk's primary
+ * button) on it or on the pill inside it, where the account button's resting
+ * look is a dark one. And its height, for the phone's thumb.
+ */
+const signInButton = (page) => page.evaluate(() => {
+  const el = [...document.querySelectorAll('[data-cg-account-signin]')].find((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+  if (!el) return { shown: false, lit: false, h: 0 };
+  const light = (n) => { const m = getComputedStyle(n).backgroundColor.match(/[\d.]+/g); if (!m) return false; const [r, g, b, a = 1] = m.map(Number); return a > 0.5 && (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.7; };
+  return { shown: true, lit: [el, ...el.querySelectorAll('*')].some(light), h: el.getBoundingClientRect().height };
+}).catch(() => ({ shown: false, lit: false, h: 0 }));
 
 // The emulator, in a directory of its own so the repo's firebase.json (the
 // hosting config) is neither read nor touched.
@@ -305,7 +377,7 @@ try {
   check('2. the entry and what it preloads carry no Firebase, and grow at most ' + ENTRY_GROWTH_MAX + ' B gzipped', onEntry && !frontFirebase.length && growth <= ENTRY_GROWTH_MAX, `${onFront.length} files up front, grew ${growth} B gzipped${frontFirebase.length ? '; Firebase in ' + frontFirebase.map((f) => f.slice(ON_DIST.length)).join(', ') : ''}`);
 
   if (!(await emuReady())) throw new Error('the Firebase Auth emulator did not start');
-  servers.push(await serve(ON_DIST, ON_PORT), await serve(OFF_DIST, OFF_PORT));
+  servers.push(await serve(ON_DIST, ON_PORT), await serve(OFF_DIST, OFF_PORT), await serveWorker(LIC_PORT));
   // `?debug` is what makes the App hang its harness hooks on window
   // (App.tsx), `chromaglassSettings` among them: the sign of the App being up.
   const ORIGIN = `http://127.0.0.1:${ON_PORT}/`;
@@ -490,19 +562,64 @@ try {
   check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));
 
   const sheet = {};
+  const lit = {};
   for (const s of [sizes[0], sizes[1]]) {
     await deleteAccount(EMAIL);
+    licKV.clear();
     const c = await browser.newContext({ viewport: s.viewport, isMobile: s.touch, hasTouch: s.touch, deviceScaleFactor: 2 });
+    await c.addInitScript(LICENSE_PUBLIC_INIT);
     const p = await c.newPage();
-    await p.goto(ON);
+    // Gated (`?tierGates=1`), as the hosted site is: unlicensed reads Free (14).
+    await p.goto(ON + '&tierGates=1');
     await waitFor(() => signinOpen(p), 30_000);
     const r = await signInByEmail(p, ORIGIN);
+    if (s === sizes[0] && r.up) {
+      // 14. Free first, with nothing on the account; then a Pro key filed on
+      // it, and the next start reads Pro with the sheet never opened.
+      await p.waitForTimeout(3000);
+      const before = await tierShown(p);
+      await fileProKey(EMAIL);
+      await p.reload();
+      const upAgain = await waitFor(() => appUp(p), BOOT_MS);
+      const pro = upAgain && await waitFor(async () => (await tierShown(p)).split(',').includes('pro'), 20_000);
+      const opened = await p.evaluate(() => !!document.querySelector('[data-cg-account]'));
+      check('14. an account holding a Pro key reads Pro once the app starts signed in, the sheet never opened', before.split(',').includes('free') && pro && !opened, `before the key: ${before || 'no tier drawn'}; after: ${await tierShown(p) || 'no tier drawn'}${opened ? '; the sheet was open' : ''}`);
+    }
     let named = false;
     if (r.up) {
       await p.click('[data-cg-account-open]', { timeout: 10_000 }).catch(() => {});
       named = await p.waitForSelector('[data-cg-account]', { state: 'visible', timeout: 10_000 }).then(async (el) => (await el.textContent())?.includes(EMAIL), () => false);
     }
     sheet[s.name] = named;
+    if (process.env.SIGNIN_SHOTS && named) await p.screenshot({ path: `${process.env.SIGNIN_SHOTS}/12-${s.viewport.width}.png` });
+    if (s === sizes[0] && named) {
+      // 15–16 on the desk: sign out from the sheet, close it, and the way
+      // back in is on the desk, lit; it opens the sign-in in the sheet, over
+      // a plate that is still up, and signing in there brings the account back.
+      await p.click('[data-cg-account-signout]').catch(() => {});
+      await p.click('[data-cg-account-signout-confirm]', { timeout: 5000 }).catch(() => {});
+      await p.keyboard.press('Escape');
+      // Waited for lit, not only drawn: the desk's button eases its colour in
+      // (transition-colors), and a read mid-ease saw it half dark (a red run).
+      await waitFor(async () => { const b = await signInButton(p); return b.shown && b.lit; }, 10_000);
+      lit[s.name] = await signInButton(p);
+      await p.click('[data-cg-account-signin]').catch(() => {});
+      const offered = await waitFor(() => p.evaluate(() => document.querySelectorAll('[data-cg-account] [data-cg-signin] [data-cg-signin-provider]').length >= 3), 15_000);
+      lit[s.name].opens = offered && await appUp(p);
+      if (process.env.SIGNIN_SHOTS) await p.screenshot({ path: `${process.env.SIGNIN_SHOTS}/15-signed-out.png` });
+      const again = await signInByEmail(p, ORIGIN);
+      let back = false, why = '';
+      if (again.up) {
+        const button = await waitFor(async () => !(await signInButton(p)).shown && await p.evaluate(() => !!document.querySelector('[data-cg-account-open]')), 15_000);
+        await p.click('[data-cg-account-open]', { timeout: 10_000 }).catch(() => {});
+        const renamed = await p.waitForSelector('[data-cg-account]', { state: 'visible', timeout: 10_000 }).then(async (el) => (await el.textContent())?.includes(EMAIL), () => false);
+        back = button && renamed;
+        why = `, button ${button ? 'Account' : 'still Sign in or missing'}, sheet ${renamed ? 'names the account' : 'does not'}`;
+        if (process.env.SIGNIN_SHOTS) await p.screenshot({ path: `${process.env.SIGNIN_SHOTS}/16.png` });
+      }
+      check('16. signing in again from the sheet brings the account back: the button says Account and the sheet names the account', back, `sent ${again.sent}, plate ${again.up}${why}`);
+      await p.keyboard.press('Escape');
+    }
     if (s === sizes[1]) {
       // 13. Deleting the account, from the phone: the store's rule
       // (App Store 5.1.1(v)) and the owner's privacy page both promise it.
@@ -510,10 +627,16 @@ try {
       await p.click('[data-cg-account-delete-confirm]').catch(() => {});
       const gone = await waitFor(async () => !(await accounts()).some((u) => u.email === EMAIL), 15_000);
       check('13. deleting the account from the sheet removes it from the auth server', named && gone);
+      // 15 on the phone: the deletion signed this phone out; its header says so.
+      await p.keyboard.press('Escape');
+      await waitFor(async () => { const b = await signInButton(p); return b.shown && b.lit; }, 10_000);
+      lit[s.name] = { ...(await signInButton(p)), opens: await appUp(p) };
     }
     await c.close();
   }
   check('12. the account sheet opens from the desk and from the phone, and names the account', Object.values(sheet).every(Boolean), JSON.stringify(sheet));
+  const litOk = (l, phone) => !!l && l.shown && l.lit && l.opens && (!phone || l.h >= 44);
+  check('15. signed out with the plate up, the desk and the phone show a lit Sign in (44 px on the phone) that opens the sign-in over the running plate', litOk(lit[sizes[0].name], false) && litOk(lit[sizes[1].name], true), JSON.stringify(lit));
 } catch (e) {
   check('the check ran to its end', false, String(e?.message ?? e).split('\n')[0]);
 } finally {

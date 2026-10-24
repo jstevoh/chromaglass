@@ -5,10 +5,11 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save, Video, User,
+  Laptop, Save, Video, User, LogIn,
   Crosshair,
 } from 'lucide-react';
 import { Slider } from '../ui';
+import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -344,6 +345,7 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
 
 export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
+  const signedOut = ACCOUNTS_ON && !useSignedIn();
   const [amountOpen, setAmountOpen] = useState(false);
   // Whether the Looks sheet opened on a printed plate: its Ben-Day slider
   // stays for as long as the sheet is up, so taking it to 0 does not take
@@ -410,12 +412,13 @@ export function PhoneStage(p: PhoneStageProps) {
             <button
               type="button"
               onClick={p.onOpenAccount}
-              aria-label="Account"
+              aria-label={signedOut ? 'Sign in' : 'Account'}
               data-cg-account-open=""
-              className="flex h-12 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 active:bg-active"
+              data-cg-account-signin={signedOut ? '' : undefined}
+              className={`flex h-12 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium ${signedOut ? 'bg-primary text-on-primary' : 'text-text-2 active:bg-active'}`}
             >
-              <User size={15} className="shrink-0 text-amber-300" />
-              <span>Account</span>
+              {signedOut ? <LogIn size={15} className="shrink-0" /> : <User size={15} className="shrink-0 text-muted" />}
+              <span>{signedOut ? 'Sign in' : 'Account'}</span>
             </button>
           )}
           <button
