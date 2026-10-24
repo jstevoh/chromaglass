@@ -1504,3 +1504,13 @@ the maker" is something you would sign, and the 14-day refund line matches what 
 the Free, Home and Pro cards promise only what the app does today. Then sign in, sign out and come
 back: the page should not flash for a returning visit.
 
+
+## 63. Bass Boost presses harder (PLAN 27g)
+
+Play a track with a clear kick and bass line (the Sound panel's Bass Boost, in Audio Input; on the
+phone, the same slider in Settings). At 1 nothing has changed. Turn it to 2, then 3: each kick and
+bass note should dent the glass visibly deeper, the colour pushed out from under it harder and
+running back as the bass falls, and each kick's dye should throw further. It should read as more
+bass, not as a busier or shakier plate, and nothing should move the whole frame. Say whether 3
+is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
+bass you wanted.

@@ -946,6 +946,14 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         timeout-minutes: 6
         run: npm run musicforce
+      # Bass Boost is a gain on the bass's hand (PLAN 27g): the old arithmetic
+      # pinned the press and calmed the plate as the slider rose; now the
+      # glass presses deeper and the kicks still press and let go, in the
+      # ear, in the frame loop's source, and on the thin gap in the lab.
+      - name: Bass Boost presses harder
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 6
+        run: npm run bassboost
       # Each poured liquid as thick as it is (PLAN 18d): on a thin gap a pool
       # of glycerine falls under Rain Drip at Darcy's 2λ/(1+λ) of a pool of
       # colour, syrup in a thick look runs ahead of it, a liquid as thin as

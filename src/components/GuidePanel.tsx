@@ -265,7 +265,7 @@ const SECTIONS: Section[] = [
         <H>The controls</H>
         <Rows items={[
           ['Sensitivity', <>How hard the analysis drives everything downstream. The first thing to reach for in a room that is louder or quieter than the last one.</>],
-          ['Bass Boost', <>Weights the 20–250 Hz band before it is mapped. A PA with no low end, or too much of it, is fixed here rather than by re-tuning every slider.</>],
+          ['Bass Boost', <>A gain on the bass's push: the glass presses deeper under each kick and bass note and every kick throws more dye, at up to three times the strength, while the beat detection is untouched. A PA with no low end is fixed here rather than by re-tuning every slider.</>],
           ['Speed', <>How fast the whole plate lives, independent of the music. In Settings → Live → Master, with the house lights.</>],
           ['Dimmer / Blackout', <>The house lights for the plate, in Settings → Live → Master. <C>B</C> fades to black and back, as does the Blackout button on the phone or a controller.</>],
           ['Room calibration', <>Learns this room's noise floor and dynamics and drives the visuals from where the music sits between them, rather than from an absolute level. A quiet room and a loud one then look the same.</>],

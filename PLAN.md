@@ -6439,6 +6439,22 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     two-layer slosh (18a-13a) lands, the rock's tilt should drive its internal mode. Not the
     single-layer slosh's surface mode, which moves the whole picture together and would be a
     frame move from the sound (the owner's rule); a design call for the owner when 18a-13a ships.
+- **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't feel
+  like it actually does anything").** The slider multiplied the ranged bass reading, which every
+  hand takes over 70 or 85 and stops: on the band's chorus the reading sat over the press's
+  ceiling 0.00 of the time at 1×, 0.57 at 2× and 0.70 at 3×, so turning it up held the glass flat
+  and the kicks moved it less (the press's change a second 3.06, 1.83, 0.90; its deepest rose
+  only 8%), while the kick detector never saw the slider (29 kicks at every setting). A bass boost
+  on a rig is a gain, more cone excursion for the same line. Now the hand follows the bass with the
+  boost taken back off (`bassRouteValue`) and lays the boost as a gain on its force (`bassPressFor`,
+  the burst's push, the kick's dye and speed): change a second 3.06, 6.12, 9.19, deepest press
+  1.13, 2.25, 3.38, pinned 0.00 at each; in the lab on the thin gap the hand moves 0.240, 0.403 and
+  0.521 of the plate's colour at 1×, 2× and 3×, and gives it back. At 1× it is the hand it was.
+  `npm run bassboost`. The reading itself still carries the boost (the mappings, the meter and the
+  camera follow it, clipped at 100 as before); the phone's Settings is the same panel.
+  - **27g-1, open. The readings that clip.** Presets' bass mappings (`getAudioValue`, clipped at
+    100) and the camera's punch still saturate at a high boost, as the reading did. Whether the
+    boost should reach them as a gain on their depth too is the owner's call once he has felt this.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)
