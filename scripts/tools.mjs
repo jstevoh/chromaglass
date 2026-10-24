@@ -516,7 +516,7 @@ try {
       };
       // `sign` 1 toward B, -1 toward A: the way this stroke goes.
       const toward = (sign, dx, dy) => sign * (dx * dirB.x + dy * dirB.y) / Math.max(1e-6, Math.hypot(dirB.x, dirB.y));
-      const windRun = async (from, to, sign) => {
+      const windRun = async (from, to, sign, strokeWallMs = 1500) => {
         await clear();
         await pool(from);
         await settle(3000);
@@ -525,7 +525,7 @@ try {
         const rb0 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
         const w0p = await snap('wind0');
         const t0 = Date.now();
-        await stroke('blow', from, to, 1500);
+        await stroke('blow', from, to, strokeWallMs);
         const strokeMs = Date.now() - t0;
         await settle(700);
         await snap('wind1');
@@ -564,6 +564,15 @@ try {
         how long the 30 moves took and where the pool's middle sat.
       */
       const again = await windRun(C, [C[0] + half, C[1]], 1);
+      /* PROBE (draft only, never merged): the same stroke at three speeds, twice each, alternating ways. */
+      if (process.env.TOOLS_BLOW_PROBE !== '0') {
+        for (const ms of [750, 1500, 3000, 3000, 1500, 750]) {
+          const sign = ((ms / 750) | 0) % 2 ? 1 : -1;
+          const rate0 = await page.evaluate(async () => { const f = () => window.chromaglassDebug().fluids?.[0]?.stepIndex ?? 0; const a = f(); await new Promise((r) => setTimeout(r, 1000)); return f() - a; });
+          const r = await windRun(C, [C[0] + sign * half, C[1]], sign, ms);
+          console.log(`     PROBE move_wall_ms=${ms} dir=${sign} steps_per_s_before=${rate0} along=${(r.along * 100).toFixed(2)} wind=${r.wind} directed=${r.directed} straw=${r.straw} strokeSteps=${r.strokeSteps} strokeMs=${r.strokeMs} readings=${r.readings} pool=${r.wa.total.toFixed(0)}->${r.wb.total.toFixed(0)} idle=${(r.idle * 100).toFixed(2)}`);
+        }
+      }
       for (const [name, r] of [['right', fwd], ['left', back], ['right again', again]]) {
         console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
       }
