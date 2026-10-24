@@ -153,9 +153,6 @@
  *       clipping at the crests and the first-order cells by the rim (`npm run
  *       slosh` holds the rate within 15%). A finer grid or a fifth-order WENO
  *       reconstruction would take most of it out, at four times the work or more.
- *   (j), (k) Plate Rock's rise of the oil under the cover: the cover's pressure
- *       taken off as a reference density, not solved, and a lens held at the rim
- *       by dropping the force's outward part (`rockRise`, PLAN 27f-6).
  *
  * Pure and deterministic, so `npm run slosh` holds it to its numbers in node.
  */
@@ -276,57 +273,6 @@ export function rockAccel(swingX: number, swingY: number, sway: number): [number
 }
 
 /**
- * What Plate Rock's lean does to the layers (PLAN 27f-5): the oil's rise up the
- * tipped plate under the cover glass, plate widths a second squared, a body
- * force on the oil alone. `sinX, sinY` is the plate's tilt, sinθ along each of
- * its axes, downhill: the rock's swing (lib/plateRock.ts rockSwing) times
- * CUR_ROCK, the same tilt that slides the dye's weight downhill in the gap
- * (wgsl/thinGap.ts hsBody). Zero with no oil on the plate.
- *
- * Why a force on the oil and none on the water. The rock's tilt puts g sinθ along
- * the plate on every parcel, ρ a per volume. Split it as ρ_w a + (ρ − ρ_w) a: the
- * first part is the gradient of ρ_w a·x, the same for any liquid wherever it is,
- * and between the plate's two glasses (the thin gap's plate, 18a; the rock tips
- * the pair, cover and all, lib/plateRock.ts) a gradient is taken up whole by the
- * pressure against the cover, as the thin gap's own solve takes up a uniform tilt
- * and moves nothing. What is left is the buoyancy, (ρ₁ − ρ_w) a on the oil and
- * nothing on the water: per unit of the oil's mass, (1 − 1/r) a, which with r <
- * 1 points uphill. A bubble under a tipped glass does this, and so does a lens
- * of oil under a cover glass: it runs to the high side, and the water it leaves
- * goes down under it. That is the dish's inner (baroclinic) motion, the two
- * layers going opposite ways with no net flow, and not its outer one, the whole
- * dish of liquid running down and back, which would carry the whole picture with
- * the beat (the owner's rule on the frame, 2026-10-11; rockAccel above keeps that
- * one to the frame-moving looks).
- *
- * The size: on the default Plate Rock (swing about 0.45, sinθ 0.09) the oil is
- * pushed with 0.136 × 0.09 g, 0.12 m/s², against its drag on the cover and the
- * water, 1/τ ≈ 17/s for the default oil (twoLayerDrag), so it rises at about 7
- * mm/s, a few of the plate's cells a lean, and comes back on the next; the
- * Darcy speed a light body in a Hele-Shaw cell rises at, Δρ g sinθ h²/12μ₁, is the
- * same number. `npm run slosh` §16 holds the dish to it.
- *
- * Shortcuts, named. (j) The cover is a pressure, not solved: the dish keeps its
- * free surface, so the water the oil drags with it and the water it pushes out
- * of its way go into a small rise of the surface instead of a counterflow under
- * a rigid lid (a lid's pressure is a Poisson solve over the dish). The check
- * holds that leak to a tenth of the oil's speed. (k) A lens pressed to the rim
- * is stopped by the wall's reaction, the force's outward part dropped in the
- * cells against the rim (the dish's staircase of the circle), rather than by the
- * lens piling up and thickening there, which a raft of fixed thickness cannot do
- * (shortcut a; PLAN 18a-13g). And so the interface's own restoring weight, the
- * reduced gravity g(1 − r) that would make the layers ring at the inner mode's
- * several seconds, is not in it either: a raft on the default oil is over-damped
- * anyway (17/s against an inner mode of a fraction of a hertz), and on a thin
- * oil the ring is the item 18a-13g replaces.
- */
-export function rockRise(sinX: number, sinY: number, oil: boolean): [number, number] {
-  if (!oil) return [0, 0];
-  const k = -((1 - SLOSH_OIL_DENSITY) / SLOSH_OIL_DENSITY) * SLOSH_G;
-  return [k * clampUnit(sinX), k * clampUnit(sinY)];
-}
-
-/**
  * The steady laminar drag of two liquids stacked between two no-slip glasses,
  * water (depth h, viscosity μ) on the floor and oil (thickness h₁, μ₁) above it:
  * the matrix M with [F₁, F₂] = M [U₁, U₂], F the stress each layer feels and U
@@ -393,10 +339,9 @@ export type SloshPress = { x: number; y: number; radius: number; depth: number }
  * What the visualizer hands the GPU's dish for a step (gpu/fluid.ts setSlosh):
  * the tilt's acceleration, plate widths a second squared; the water's
  * viscosity, plate widths² a second (`sloshNu`); the presses on the liquid; and
- * whether to lay it level and still first. And the oil's own body force,
- * `bx, by` (`rockRise`), plate widths a second squared, 0 when left out.
+ * whether to lay it level and still first.
  */
-export type SloshDrive = { ax: number; ay: number; nu: number; presses: SloshPress[]; level: boolean; bx?: number; by?: number };
+export type SloshDrive = { ax: number; ay: number; nu: number; presses: SloshPress[]; level: boolean };
 
 /** The lowest mode's angular frequency, c k with k = 1.8412/R (the first zero of J1' on a round dish): 4.46 /s. */
 export const SLOSH_OMEGA = (SLOSH_C * 1.8412) / SLOSH_RADIUS;
@@ -559,10 +504,6 @@ export class SloshDish {
   courant = 0;
   /** Times the grid went non-finite and was put back to rest: the check holds this at zero. */
   blowups = 0;
-  /** The oil's own body force for the step being taken (`rockRise`), and whether any cell holds oil for it to push. */
-  private bx = 0;
-  private by = 0;
-  private oiled = false;
   /** The density ratio and the oil's viscosity, the dish's own constants, settable for the check's one-liquid case. */
   oilDensity = SLOSH_OIL_DENSITY;
   oilNu = SLOSH_OIL_NU;
@@ -652,7 +593,6 @@ export class SloshDish {
       const s = share && this.wet[k] ? Math.max(0, Math.min(1, share[k])) : 0;
       this.h1[k] = s > SLOSH_THIN ? SLOSH_LENS * s : 0;
     }
-    this.oiled = this.h1.some((v) => v > 0);
   }
 
   /** Lay a press in slot `slot` (0..SLOSH_PRESSES−1), or take it away with depth 0. */
@@ -727,30 +667,25 @@ export class SloshDish {
    * is not being tipped has nothing left to ring, and its drag would otherwise
    * only approach that for ever.
    */
-  step(seconds: number, ax: number, ay: number, r: number, bx = 0, by = 0): boolean {
-    bx = Number.isFinite(bx) ? bx : 0;
-    by = Number.isFinite(by) ? by : 0;
-    // The oil's own force (rockRise) moves nothing where there is no oil.
-    if (!this.oiled) { bx = 0; by = 0; }
-    if (!(seconds > 0) || !Number.isFinite(seconds)) return this.live(ax, ay, bx, by);
+  step(seconds: number, ax: number, ay: number, r: number): boolean {
+    if (!(seconds > 0) || !Number.isFinite(seconds)) return this.live(ax, ay);
     ax = Number.isFinite(ax) ? ax : 0;
     ay = Number.isFinite(ay) ? ay : 0;
     r = Number.isFinite(r) ? Math.max(0, r) : 0;
     // Level, still, not tipped and not pressed: nothing to compute, and the cost of a dish nobody is tilting is zero.
-    if (this.resting && ax === 0 && ay === 0 && bx === 0 && by === 0 && !this.pressing()) return false;
+    if (this.resting && ax === 0 && ay === 0 && !this.pressing()) return false;
     this.resting = false;
-    this.bx = bx; this.by = by;
     const subs = sloshSteps(seconds);
     const dt = seconds / subs;
     const nu = sloshNu(r, this.restDepth);
     for (let s = 0; s < subs; s++) this.substep(dt, ax, ay, nu);
-    return this.live(ax, ay, bx, by);
+    return this.live(ax, ay);
   }
 
-  private live(ax: number, ay: number, bx = 0, by = 0): boolean {
+  private live(ax: number, ay: number): boolean {
     const sp = this.maxSpeed(), rise = this.maxRise();
     if (!(sp < 1e3 && rise < 1e3)) { this.blowups++; this.rest(); return false; }
-    if (ax !== 0 || ay !== 0 || bx !== 0 || by !== 0 || this.pressing()) return true;
+    if (ax !== 0 || ay !== 0 || this.pressing()) return true;
     // Speed alone is not rest: a standing wave stops dead at each end of its swing, with all its energy in the head, so the rise counts too.
     if (sp > SLOSH_REST_SPEED || rise > SLOSH_REST_RISE) return true;
     this.rest();
@@ -845,11 +780,8 @@ export class SloshDish {
       else if (wr) { advX += a * (ox[k + 1] - a); advY += a * (oy[k + 1] - b); }
       if (b > 0) { if (wd) { advX += b * (a - ox[k - n]); advY += b * (b - oy[k - n]); } }
       else if (wu) { advX += b * (ox[k + n] - a); advY += b * (oy[k + n] - b); }
-      // The oil's own force (rockRise), less its outward part against the rim: the wall's reaction (shortcut k).
-      const bx = this.bx > 0 ? (wr ? this.bx : 0) : (wl ? this.bx : 0);
-      const by = this.by > 0 ? (wu ? this.by : 0) : (wd ? this.by : 0);
-      dox[k] = -g * gx - advX * inv + bx;
-      doy[k] = -g * gy - advY * inv + by;
+      dox[k] = -g * gx - advX * inv;
+      doy[k] = -g * gy - advY * inv;
     }
     this.courant = Math.max(this.courant, 2 * courant * dt * inv);
   }

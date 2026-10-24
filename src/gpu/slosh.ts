@@ -32,7 +32,7 @@ export class WebGPUSlosh {
   readonly depth: GPUTexture;
   /** One uniform block per stage; the oil, rest and out passes read the first. */
   private readonly uni: [GPUBuffer, GPUBuffer];
-  private readonly data = new Float32Array(16 + 4 * SLOSH_PRESSES);
+  private readonly data = new Float32Array(12 + 4 * SLOSH_PRESSES);
   private disposed = false;
 
   static prepare(device: GPUDevice): Prep[] {
@@ -82,7 +82,7 @@ export class WebGPUSlosh {
    * or put back to rest). Encoded as one compute pass on `enc`.
    */
   step(enc: GPUCommandEncoder, seconds: number, ax: number, ay: number, nu: number, presses: readonly SloshPress[],
-    oil: { tex: GPUTexture; n: number } | null, level: boolean, timing?: GPUComputePassTimestampWrites, bx = 0, by = 0): void {
+    oil: { tex: GPUTexture; n: number } | null, level: boolean, timing?: GPUComputePassTimestampWrites): void {
     if (this.disposed) return;
     const subs = sloshSteps(seconds);
     const dt = seconds / subs;
@@ -95,8 +95,6 @@ export class WebGPUSlosh {
       const p = presses[s];
       if (p && p.depth > 0 && p.radius > 0) d.set([p.x, p.y, p.radius, p.depth], 12 + s * 4);
     }
-    // The oil's own force (rockRise), and none with no oil to push (the reference's step drops it the same way).
-    if (oil) { d[12 + 4 * SLOSH_PRESSES] = Number.isFinite(bx) ? bx : 0; d[13 + 4 * SLOSH_PRESSES] = Number.isFinite(by) ? by : 0; }
     d[3] = 1;
     this.device.queue.writeBuffer(this.uni[0], 0, d);
     d[3] = 2;

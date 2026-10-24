@@ -3992,36 +3992,6 @@ third of a second rather than the sheet's own slower relaxation.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
-
-### 27f-5. The rock tips the layers (2026-10-24)
-
-The owner, 2026-10-24: "kick off the liquid physics improvements", the Plate Rock items
-first. 27f-2 made the rock a hand's lean on the bar's strong beats; what it tipped was only
-the dye's weight in the thin gap (Darcy–Boussinesq, `hsBody`). A dish of oil on water tipped
-the same way also moves its layers apart, and the two-layer dish (18a-13a) is where that can
-live.
-
-- **Why only the oil is pushed.** The tilt puts ρ g sinθ on every parcel. Split as ρ_w a +
-  (ρ − ρ_w) a, the first part is a gradient the same for any liquid, which between the two
-  glasses the pressure against the cover takes up whole (as the thin gap's own solve takes a
-  uniform tilt and moves nothing). What is left is the oil's buoyancy, (1 − 1/r) a per unit of
-  its mass, uphill. The dish's free-surface slosh, the whole dish running down and back, is
-  the frame moving from the sound, which stays held to the frame-moving looks (`rockAccel`).
-- **Measured** (`npm run slosh` §16, node): with no oil nothing moves, bit for bit; a lens
-  under the default rock's held tilt (sinθ 0.09) rises at 8.5, 5.5 and 3.9 mm/s on water, the
-  default Thickness and 0.6, each between its two-layer drag's bounds (water held under it and
-  water dragged free; the plate's water viscosity sets how hard the lens drags on it); rocked
-  a lean a second, the water away from the lens moves at 2.8% (water) and 3.6% (default) of
-  the lens's speed, the lens following the lean at r 0.98 and 0.99; a lens pushed into the rim
-  is held there (its fastest outward 1.1e-5 plate widths/s against its mean 2.3e-2; 2.1e-2
-  with the wall's reaction taken out, shortcut k); let go, the dish rests within its ring time.
-  `npm run sloshgpu` runs the same force on two lenses, one against the rim, on both axes.
-- **Controls** (each run on §16 alone, then put back): the force laid on the water too, the
-  frame move this is meant not to make, turns four lines red (the far water past a tenth); the
-  sign flipped, the oil sinking, five; the rim's reaction taken out, the rim line.
-- **Shortcuts, named in lib/slosh.ts:** (j) the cover's pressure is taken off as a constant
-  reference density rather than solved, so the dish keeps its free surface (PLAN 27f-6); (k) a
-  lens pressed to the rim is stopped by dropping the force's outward part, not by piling up.
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
 
 Reported by the showreel (28d, 2026-10-11): every look rendered on the Mac to the same

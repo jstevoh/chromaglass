@@ -32,7 +32,7 @@
  * cannot pass by agreeing.
  */
 import { openLab } from './lab.mjs';
-import { SloshDish, SLOSH_N, SLOSH_PRESSES, SLOSH_C, SLOSH_REST_DEPTH, SLOSH_LENS, sloshAccel, sloshDrag, sloshNu, rockRise } from '../src/lib/slosh.ts';
+import { SloshDish, SLOSH_N, SLOSH_PRESSES, SLOSH_C, SLOSH_REST_DEPTH, SLOSH_LENS, sloshAccel, sloshDrag, sloshNu } from '../src/lib/slosh.ts';
 import { thicknessViscosity } from '../src/lib/turntable.ts';
 
 let bad = 0;
@@ -60,13 +60,13 @@ async function both(name, seconds, f, share = null) {
   let peak = 0;
   for (let k = 0; k < Math.round(seconds * 60); k++) {
     const t = k * DT;
-    const { ax = 0, ay = 0, r = DEF_R, presses = [], bx = 0, by = 0 } = f(t);
+    const { ax = 0, ay = 0, r = DEF_R, presses = [] } = f(t);
     for (let s = 0; s < SLOSH_PRESSES; s++) ref.press(s, presses[s] ?? null);
-    ref.step(DT, ax, ay, r, bx, by);
+    ref.step(DT, ax, ay, r);
     // The reference rests itself once still; so that the two step the same frames, keep it awake.
     ref['resting'] = false;
     peak = Math.max(peak, ref.maxSpeed());
-    frames.push({ seconds: DT, ax, ay, nu: sloshNu(r), presses, level: k === 0, bx, by });
+    frames.push({ seconds: DT, ax, ay, nu: sloshNu(r), presses, level: k === 0 });
   }
   const gpu = await page.evaluate((fr) => window.slosh.run(fr), frames);
   let dh = 0, du = 0, dOil = 0, dFlow = 0, dDepth = 0;
@@ -122,13 +122,6 @@ await both('a tilt held and turned round, default Thickness', 2, (t) => ({ ax: (
 await both('the same on water', 2, (t) => ({ ax: (t < 1 ? 1 : -1) * AX, ay: 0.5 * AX, r: WATER_R }));
 // 2. oil on it.
 await both('an oil lens on the water while the dish is rocked', 2, (t) => ({ ax: Math.sin(2 * Math.PI * t / 1.4) * AX, r: WATER_R }), lens(0.62, 0.45, 0.14));
-// And Plate Rock's lean on the oil alone (rockRise, PLAN 27f-5): two lenses, one against the rim, rocked a lean a
-// second along a turning axis at full Plate Rock (sinθ 0.3), so the rim's reaction and both axes are in it.
-await both('Plate Rock\'s lean raising two lenses under the cover, one against the rim', 2.5, (t) => {
-  const s = 0.3 * Math.sin(Math.PI * t), a = 0.4 * t;
-  const [bx, by] = rockRise(s * Math.cos(a), s * Math.sin(a), true);
-  return { bx, by };
-}, lens(0.5, 0.5, 0.12).map((v, k) => Math.max(v, lens(0.07, 0.5, 0.07)[k])));
 // 3. a press and its release.
 await both('a glass pressed on the liquid and let go', 1.5, (t) => ({
   r: WATER_R,

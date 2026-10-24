@@ -5,7 +5,7 @@ import { WebGPUSlosh } from '../src/gpu/slosh';
 import { readTextureF32 } from '../src/gpu/kit';
 import { SLOSH_N, type SloshPress } from '../src/lib/slosh';
 
-type Frame = { seconds: number; ax: number; ay: number; nu: number; presses: SloshPress[]; level: boolean; bx?: number; by?: number };
+type Frame = { seconds: number; ax: number; ay: number; nu: number; presses: SloshPress[]; level: boolean };
 
 let device: GPUDevice | null = null;
 let dish: WebGPUSlosh | null = null;
@@ -36,7 +36,7 @@ const api = {
   async run(frames: Frame[]) {
     for (const f of frames) {
       const enc = device!.createCommandEncoder();
-      dish!.step(enc, f.seconds, f.ax, f.ay, f.nu, f.presses, oilTex ? { tex: oilTex, n: SLOSH_N } : null, f.level, undefined, f.bx ?? 0, f.by ?? 0);
+      dish!.step(enc, f.seconds, f.ax, f.ay, f.nu, f.presses, oilTex ? { tex: oilTex, n: SLOSH_N } : null, f.level);
       device!.queue.submit([enc.finish()]);
     }
     await device!.queue.onSubmittedWorkDone();
