@@ -1988,6 +1988,51 @@ map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` boun
 `NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
 governor's ladder and the cache as they were.
 
+#### 14v-7. A frame gap while the intro is held still counts only the page's own work
+
+Shipped 2026-10-24, the owner's choice on a card ("judge pauses the audience sees").
+`npm run startup`'s "no stop in the opening" was the loudest check on CI: 41 FAIL of 193
+Mac runs in the week to 10-24 (`npm run flakes`), 25 branches, 4 of them main's, 20 green
+on the same commit; the week before 14v-6 it was 16%. Every one of the 41 logs read:
+
+- the longest frame gap 2.02 to 3.97 s, beginning 0.24 to 4.08 s in;
+- inside Chromium's own waits: the device given up to 3.7 s after it was asked, or the
+  first compute kernel of all (`fluid/fill`, a few lines) given 2.4 to 4.6 s after;
+- the page's own long tasks in the gap 0.83 s at most, none in 38 of them, and nothing
+  made, written or submitted in it;
+- every gap over before the intro let go of its still (4.64 to 11.96 s), the stretch
+  `introStill` (14v-5) holds the mark still exactly because the GPU stops the frames then.
+
+4b already took out the time the page's thread was held as well; in these the thread ran
+and only the frames stopped. Two fixes on the app's side had failed (#396 warmed the
+compiler, 14v-6 reordered the asks), and nothing a page does makes Chromium give it a
+device sooner. So, in `openingGaps`, a frame gap that would count past the bar loses,
+inside the still stretch, the time the page was seen free: between two ticks of its own
+100 ms timer no more than `TICK_FREE_MS` (250 ms) apart. At most `STILL_IDLE_CAP_S`
+(4.5 s, above the 41 gaps' 3.97 s and Chromium's start's 4.18 s) comes out all told, only
+of a still that let go (capped at the intro's leaving), and only when long tasks and the
+timer can be seen at all. Outside the still stretch, and for heartbeats and steps,
+nothing changed, and the 2 s bar did not move. The line prints how much of its gap was
+the still intro with the page seen free.
+
+The first draft took out everything but the page's long tasks and pagehold's after-await
+stretches. The check-skeptic fed it synthetic openings: 2.5 s of the page's code after a
+pipeline's promise at 3.5 s, or a chain of 0.45 s continuations, read as idle, since such
+code is not a long task in every Chromium and pagehold's stretches begin only in the first
+3 s; a still that never let go excused everything up to the intro's 60 s cap. The timer
+answers all three, and `stillCases` now runs six such openings on every run (excused,
+code after an await, a continuation chain, a gap across the still's end, a still never let
+go, the cap), each of which a mutant of the rule turns red. Replayed on the 41 logs by
+their printed long tasks: 0 red; the timer's ticks inside the gaps are not printed (its
+median was 108 to 118 ms in all 41), so the week after, by `npm run flakes`, decides. The
+new count is never more than the old, so no green run turns red.
+
+Named limit: a stop the GPU process makes for the page while the intro is still (its
+compiles of the app's shaders) is no longer counted here; its length is held by checks 1
+and 1b and the first step's cap. Weighed and not taken: one automatic re-run (about 4%
+red instead of 21%, and it hides a real one-in-five), warming Chromium's GPU in a page
+before the measured one (untested, and #396's warm in the same page did not help).
+
 ### 14m. Anyone on the venue's network can drive the show
 
 **Shipped** (this PR). What changed, in `server/remote-server.js` unless named:
@@ -3576,6 +3621,27 @@ The check-skeptic's mutants: `failure` without its redaction fails the URL check
 sync wrapper rethrowing Node's own error fails two. `deploygate.sh` still puts the header
 on curl's command line, readable through `ps` while it runs on the owner's machine:
 19aa-4.
+
+### 19ac-1. The double tap's two taps carry a finger's times
+
+Shipped 2026-10-24. `npm run phone`'s "Play: a double tap on Speed puts it back to the
+look's own speed" was red on 10 of 173 Mac runs in the week to 10-24, 5 of them green on
+the same commit, every one reading `0.009 → 0.28 → 0.005`: both taps landed (0.005 is
+Speed at a third of the track) and the second was not taken as the other half of a double
+tap. `TouchSlider` reads a double tap from the two lifts' `timeStamp`s, at most 320 ms
+apart, which on a phone are the finger's times. Playwright's `touchscreen.tap` stamps
+none, so Chromium stamps each event when it reaches it, and the second tap is sent only
+once the page has handled the first: in a plain page whose pointerup kept the thread
+busy, two such taps 60 ms apart read 95 ms apart idle, 217 ms busy 150 ms and 466 ms busy
+400 ms; the same taps sent with their own times read 80 ms apart busy 400 ms. So the
+check measured how quickly the page answered the first tap, which a finger never waits
+for. The taps are now sent through `Input.dispatchTouchEvent` with times 90 ms apart; a
+second tap is sent no sooner than 0.4 s after the first, past the window, so the line
+passes only if the stamps are what the app reads, and no stamp is ever in the future;
+both lifts must reach the app within 15 ms of their stamps, so a red names the instrument;
+and a control stamped 0.6 s apart must leave Speed where one tap there puts it. The line
+prints how far apart the app handled the lifts (the page's own lag, which no check bounds
+for the phone's sheet yet: 19ac-2).
 
 ## 21. Looks after painters
 
