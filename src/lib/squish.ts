@@ -619,9 +619,38 @@ export function bassPressLevel(routeValue: number, energyRoute: boolean): number
  * absent one is 1). One function so the plate and `npm run breakdown` press
  * the same glass.
  */
-export function bassPressFor(routeValue: number, energyRoute: boolean, impact: number, passage: number | undefined): number {
+export function bassPressFor(routeValue: number, energyRoute: boolean, impact: number, passage: number | undefined, boost = 1): number {
   const g = Number.isFinite(passage) ? Math.max(0, Math.min(1, passage as number)) : 1;
-  return bassPressDepth(bassPressLevel(routeValue, energyRoute), impact) * g;
+  return bassPressDepth(bassPressLevel(routeValue, energyRoute), impact) * g * bassBoostGain(boost);
+}
+/*
+  Bass Boost, as the hand takes it (PLAN 27g). What was reported: "I don't feel
+  like it actually does anything". The slider multiplied the ranged bass
+  reading, 0 to 85 at the default Sensitivity, and everything that reads the
+  bass takes it over 70 or 85 and stops: at 2× the reading sat over the
+  hand's ceiling 0.57 of the time on the band's chorus (0.00 at 1×), at 3×
+  0.70, and the press's change a second fell from 3.06 to 1.83 and 0.90 while
+  its deepest rose only 8% (`npm run bassboost`). So turning Bass Boost up
+  held the glass flat and the kicks moved less. The kick detector reads the
+  spectrum and never saw it (29 kicks at every setting).
+
+  A bass boost on a rig is a gain: more cone excursion for the same line, the
+  line's shape kept. So the hand follows the reading with the boost taken back
+  off (`routeValue` here is that, the dynamics the kicks ride kept in range:
+  the caller divides the boost out of the bass before `getAudioValue` clips
+  it at 100, or a boosted bass would lose its shape there) and lays the boost
+  as a gain on the force: the press's depth, the burst's push, the kick's dye. At 1× it
+  is exactly the hand it was. Only the velocity route when it is the bass
+  takes this; a route the owner sent to the mids or the energy has no bass to
+  boost.
+*/
+/** The bass route's value (`getAudioValue`'s 'bass', 0–1) with the boost taken back off the reading first. */
+export function bassRouteValue(bass: number, boost: number | undefined): number {
+  return Math.max(0, Math.min(1, (Number.isFinite(bass) ? bass : 0) / bassBoostGain(boost) / 100));
+}
+/** The boost as a gain, kept to the slider's travel (and away from a zero or a NaN a bad save could leave). */
+export function bassBoostGain(boost: number | undefined): number {
+  return Number.isFinite(boost) ? Math.max(0.25, Math.min(3, boost as number)) : 1;
 }
 export const BASS_PRESS = 0.004;
 /** The bass's depth for the velocity route's level (0–1) and Sound Drive (`impact`): see above. */

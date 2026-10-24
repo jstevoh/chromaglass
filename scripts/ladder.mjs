@@ -86,7 +86,7 @@ await new Promise((r) => setTimeout(r, 2500));
 
 const browser = await launchChromium(chromium);
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: DEVICE_PIXELS });
-await page.addInitScript(() => { try { localStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
+await page.addInitScript(() => { try { sessionStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
 
 const url = (rung) => `http://localhost:${PORT}/?debug&look=classic&gpu=${GPU}&tier=${TIER}&rung=${rung}${STEPS ? `&steps=${STEPS}` : ''}`;
 

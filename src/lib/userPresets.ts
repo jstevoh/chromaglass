@@ -73,7 +73,11 @@ function inertOptics<T extends Partial<VisualizerSettings>>(version: unknown, se
   const out = { ...settings };
   if (lens > 0.001) {
     // The old pass was mix(plain, optics + sensor, Lens): the optics at Lens times their dial.
-    for (const k of OPTICS) out[k] = Math.round(Math.min(1, (saved[k] ?? OLD_OPTIC_DEFAULT[k]) * lens * OPTIC_SCALE[k]) * 1000) / 1000;
+    for (const k of OPTICS) {
+      // A hand-edited file can hold a string or NaN here; read it as the old default rather than carry NaN into a uniform.
+      const was = Number.isFinite(saved[k]) ? (saved[k] as number) : OLD_OPTIC_DEFAULT[k];
+      out[k] = Math.round(Math.min(1, Math.max(0, was * lens * OPTIC_SCALE[k])) * 1000) / 1000;
+    }
     return out;
   }
   if (OPTICS.every((k) => !(settings[k] ?? 0))) return settings;

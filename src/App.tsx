@@ -123,13 +123,19 @@ type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'dr
 
 const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 /**
- * Where the show listened last time.
+ * Where the show is listening, for as long as this tab lives.
  *
  * It used to open the microphone on load, every load, which meant a permission
- * prompt in front of the plate before anyone had asked for one. Now the choice
- * is remembered and nothing is opened on its own: the microphone comes back
- * only if the browser already says permission is granted (so no prompt
- * appears), and anything else waits for a click.
+ * prompt in front of the plate before anyone had asked for one. Then the choice
+ * was remembered in `localStorage` and came back with every launch, and a first
+ * visit's first click started the band on its own, so the Sound panel's Source
+ * opened on Mic or Band and not on Off (the owner, 2026-10-22: the source is
+ * None whenever the app opens). It is `sessionStorage` now: a new tab or a
+ * relaunched app opens on Off whatever look loads, and the pick still survives a
+ * reload of the tab, which a gig has to be able to do without losing the input.
+ * Nothing is opened on its own: the microphone comes back only if the browser
+ * already says permission is granted (so no prompt appears), and anything else
+ * waits for a click.
  */
 const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 /** Perform or Design. A property of this desk, not of the look, so not a setting. */
@@ -151,25 +157,11 @@ const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 
 function rememberedSource(): AudioSource {
   try {
-    const raw = localStorage.getItem(AUDIO_SOURCE_KEY);
+    const raw = sessionStorage.getItem(AUDIO_SOURCE_KEY);
     // 'file' needs a file nobody has chosen yet, and 'system' opens a picker.
     if (raw === 'microphone' || raw === 'simulated') return raw;
   } catch { /* private */ }
   return 'none';
-}
-
-/**
- * Has anyone ever told this browser where to listen?
- *
- * Not the same question as `rememberedSource() === 'none'`, which is also the
- * answer for someone who turned the microphone off on purpose. This one
- * separates a first visit from a considered silence, and it is the difference
- * between a stranger's first five seconds being the thing the project is —
- * a plate moving to music — and being a plate sitting still while they look
- * for the button that makes it do something.
- */
-function everChoseSource(): boolean {
-  try { return localStorage.getItem(AUDIO_SOURCE_KEY) !== null; } catch { return true; }
 }
 
 /** True only if the browser will hand over the microphone without asking. */
@@ -997,7 +989,7 @@ export default function App() {
     stopDrone();
 
     setAudioSource(source);
-    try { localStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
+    try { sessionStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
     if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
     if (source === 'none') return;
     if (source === 'file') {
@@ -1240,22 +1232,22 @@ export default function App() {
   // The browser will not run audio before a gesture, so a restored band stays
   // silent until the first click anywhere. One listener, then gone.
   //
-  // The same gesture starts the band for anyone who has never chosen a source
-  // at all. A first visit used to land on a plate with nothing driving it:
-  // the fluid moved, but the thing the project *is* — a light show played by
-  // the music — needed the visitor to find a button first. The band is
-  // synthesised, silent and opens no device, so it needs no permission and
-  // asks for nothing; it is the demo this app already had and never showed
-  // anybody. It is written to storage like any other choice, so this happens
-  // once per browser and the microphone is still one click away.
+  // That gesture used to start the band for anyone who had never chosen a
+  // source, so a stranger's first five seconds were a plate moving to music.
+  // The owner asked for the opposite (2026-10-22): the Source is None whenever
+  // the app opens, and a click anywhere does not choose it. The band is still
+  // one press away in the Sound panel and on the phone's Sound tab.
   useEffect(() => {
+    let kiosk = false;
+    try { kiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'; } catch { /* no query to read */ }
     const wake = () => {
       void simulatedRef.current?.resume();
-      // After the click has been handled: if the visitor's first gesture was
-      // the Mic button, that choice is already recorded and this does nothing.
-      setTimeout(() => {
-        if (audioSourceRef.current === 'none' && !everChoseSource()) void handleSourceChange('simulated');
-      }, 0);
+      // `?kiosk=1`, below, is the one open that picks a source for itself.
+      if (kiosk) {
+        setTimeout(() => {
+          if (audioSourceRef.current === 'none') void handleSourceChange('simulated');
+        }, 0);
+      }
     };
     window.addEventListener('pointerdown', wake, { once: true });
     window.addEventListener('keydown', wake, { once: true });
@@ -1273,8 +1265,6 @@ export default function App() {
       visit than a silent one, and on a normal browser the context would
       refuse anyway and the click handler above would still be waiting.
     */
-    let kiosk = false;
-    try { kiosk = new URLSearchParams(window.location.search).get('kiosk') === '1'; } catch { /* no query to read */ }
     if (kiosk) wake();
     return () => {
       window.removeEventListener('pointerdown', wake);

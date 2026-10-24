@@ -1206,6 +1206,21 @@ Open from Desk v2, each its own thread (the UI lane):
     purpose (`settingsMap.ts`); the other two are the owner's call if three still reads
     as too thin on a deck.
 
+- ~~**8j** What a knob is called, and what it does~~ (the owner, 2026-10-22: the names
+  on the deck's knobs were cut to the knob's width, and a drag swapped the name for the
+  value under a chip laid over the row above, so a hand could not tell which knob it
+  had). A hover or focus card with the whole name, one plain line on what it does and
+  the live value, drawn into the body so no panel clips it and never over the knob; it
+  stays up through a drag, and the knob keeps its own name while it is turned. One line
+  for each of the 205 controls in `src/lib/controlHelp.ts` (`npm run panel` fails on a
+  pinnable control without one). On the phone there is no hover: the name is the button,
+  dotted underlined, and a tap or a hold opens the same card (`TouchSlider`, the touch
+  `Slider`, a knob's label on a coarse pointer). Checks: `npm run panel`, `npm run
+  layout` (hover, drag, release), `npm run phone` (the tap). Not changed: what any
+  control does.
+  - **8j-1** (S) The remote page (`RemoteControl.tsx`) has its own sliders and no card;
+    its names are whole, but the line would help there too.
+
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
 pick lists). `gallery.yml` already photographs every preset; ship those photographs as
@@ -3435,6 +3450,35 @@ tablet showing `?cast=` gets the same page.
   thump; a MacBook's own microphone on its own trackpad is the owner's to try: pick
   tools and ride Speed in a quiet room on the microphone, and the plate should not
   move on the clicks.
+
+### 14y. The sound Source opens on Off (shipped, asked 2026-10-22)
+
+The owner: the source should always be None when the app opens, whatever look loads.
+Read as the sound Source (Off / Mic / System / File / Band; the phone's Sound tiles).
+The video Source already opened on Off and a look never sets either (a look carries how
+hard a source drives the plate, never which one is on). What opened on something else
+was the sound: a first visit's first click anywhere started the band, and the last
+Mic or Band pick came back on every launch from `localStorage`.
+
+- **Shipped:** `App.tsx` keeps the pick in `sessionStorage`, so a new tab or a
+  relaunched app opens on Off and a reload of the tab keeps the input (a gig can reload
+  without losing the interface). The first-click band is gone; the Band is one press in
+  the Sound panel and on the phone. `?kiosk=1`, a box with nobody to click, still starts
+  the band on its own. The phone is the same App state, so it opens on Off too.
+- **Measured:** `npm run opensource`: the desk and the phone open with the sound on Off,
+  a click starts nothing and opens no device, a pick is kept through a reload of the
+  tab, and a new tab opens on Off again. Before: a fresh page's first click started the
+  band; a remembered Mic reopened on launch.
+- **Check changes:** `qa`'s "a first visit is driven by the band after one click" now
+  asks that the click starts nothing, and the band is then chosen with its button;
+  `kickbubbles` chooses the band by the Sound control after its dials are set (a band
+  started at load would play before Audio Impact 0 is held, and the Mac runner's Chromium
+  plays without a gesture); `gallery`, `pixels`, `shots`, `swirlcost`, `ferrodrift`'s band
+  pages and the sixteen harnesses that set the remembered source write it to
+  `sessionStorage` now.
+- **Judged by the owner:** a landing visitor no longer meets a plate moving to music
+  before choosing anything (14y reverses that first-visit choice at the owner's word); if
+  the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
 
 ## 15. Every tool on every liquid
 
@@ -6439,6 +6483,22 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     two-layer slosh (18a-13a) lands, the rock's tilt should drive its internal mode. Not the
     single-layer slosh's surface mode, which moves the whole picture together and would be a
     frame move from the sound (the owner's rule); a design call for the owner when 18a-13a ships.
+- **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't feel
+  like it actually does anything").** The slider multiplied the ranged bass reading, which every
+  hand takes over 70 or 85 and stops: on the band's chorus the reading sat over the press's
+  ceiling 0.00 of the time at 1×, 0.57 at 2× and 0.70 at 3×, so turning it up held the glass flat
+  and the kicks moved it less (the press's change a second 3.06, 1.83, 0.90; its deepest rose
+  only 8%), while the kick detector never saw the slider (29 kicks at every setting). A bass boost
+  on a rig is a gain, more cone excursion for the same line. Now the hand follows the bass with the
+  boost taken back off (`bassRouteValue`) and lays the boost as a gain on its force (`bassPressFor`,
+  the burst's push, the kick's dye and speed): change a second 3.06, 6.12, 9.19, deepest press
+  1.13, 2.25, 3.38, pinned 0.00 at each; in the lab on the thin gap the hand moves 0.240, 0.403 and
+  0.521 of the plate's colour at 1×, 2× and 3×, and gives it back. At 1× it is the hand it was.
+  `npm run bassboost`. The reading itself still carries the boost (the mappings, the meter and the
+  camera follow it, clipped at 100 as before); the phone's Settings is the same panel.
+  - **27g-1, open. The readings that clip.** Presets' bass mappings (`getAudioValue`, clipped at
+    100) and the camera's punch still saturate at a high boost, as the reading did. Whether the
+    boost should reach them as a gain on their depth too is the owner's call once he has felt this.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)
@@ -7522,7 +7582,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   height the lens focuses on is the dye's column (`aux.z`), not the gap's real depth.
 - **33i-2. Depth of field costs 64 taps a pixel and leaves hair at aperture 1.** Where a
   sharp dye ramp sits over a defocused ground the stochastic disc leaves a faint noise
-  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §63); if it
+  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §64); if it
   costs frames, gather at half resolution for the wide discs. The gather weights also lack
   the disc-area share (about 64 over the radius squared of the physical strength); a naive
   area weight is noisier, so the wide discs are somewhat fainter than a real lens's.
@@ -7537,7 +7597,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   to the refraction and shrank the blur by `1-bub*0.5` where a bubble sat; the new one reads
   no bubble mask (`aux.w`). A bubble is a diverging lens (a gas pocket in a liquid): bend by
   the bubble's own slope, and let Aperture treat it as the thing it is. Judge whether the
-  closeup misses it first (`docs/judging.md` §63).
+  closeup misses it first (`docs/judging.md` §64).
 - **33i-7. Saved looks with Lens up are close, not identical.** Each optic is rescaled by
   Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`); the old defaults sit
   2.0 to 2.3 levels from the old pass, an every-optic-at-.8 look 3.4 to 3.95, at .25 1.1 to
