@@ -32,6 +32,9 @@
  * each the last 40 s of one song into the first 30 of the next. And every song
  * whole, from room tone to room tone, in the quiet room and the noisy one,
  * where a change anywhere is a false one.
+ And eight seconds from the middle of each song, two of room, then the next
+ * song: a sound too short to be a song, so nothing ended, and a change there
+ * is false too.
  *
  * What counts. For a join with a gap or none, the boundary's own `startedAt`
  * (where it says the new song began) must fall within a second of the new
@@ -73,6 +76,7 @@ const FPS = 60;
 const LEAD = 3;          // seconds of room before the first note
 const TAIL_A = 40;       // the end of the song before the join
 const HEAD_B = 30;       // the start of the song after it
+const SHORT_SEC = 8;     // a sound too short to be a song (SongBoundary's MIN_SONG_SEC is 20)
 const QUIET_ROOM_DB = -66, NOISY_ROOM_DB = -48;
 const JOINS = {
   gap05: { gap: 0.5 }, gap2: { gap: 2 }, gapless: { gap: 0 },
@@ -111,6 +115,16 @@ function addRoom(out, db, rnd, from = 0) {
 function build(spec, pcm, rate) {
   const S = (s) => Math.round(s * rate);
   const rnd = prng(spec.seed);
+  if (spec.kind === 'short') {
+    // Eight seconds from the middle of one song (a sound check, a phone's
+    // ringtone, someone trying the speakers), two of room, then the next song.
+    const a = pcm[spec.a].subarray(S(60), S(60 + SHORT_SEC)), b = pcm[spec.b].subarray(0, S(HEAD_B));
+    const out = new Float32Array(S(LEAD) + a.length + S(2) + b.length);
+    out.set(a, S(LEAD));
+    out.set(b, S(LEAD) + a.length + S(2));
+    addRoom(out, QUIET_ROOM_DB, rnd);
+    return { samples: out, boundary: (S(LEAD) + a.length + S(2)) / rate };
+  }
   if (spec.kind === 'whole') {
     const a = pcm[spec.a];
     const out = new Float32Array(S(LEAD) + a.length + S(LEAD));
@@ -247,6 +261,7 @@ async function main() {
   let seed = 1;
   for (const noisy of [false, true]) for (let a = 0; a < n; a++) specs.push({ kind: 'whole', a, noisy, seed: seed++ });
   for (const join of Object.keys(JOINS)) for (let a = 0; a < n; a++) specs.push({ kind: 'join', join, a, b: (a + 1) % n, seed: seed++ });
+  for (let a = 0; a < n; a++) specs.push({ kind: 'short', a, b: (a + 1) % n, seed: seed++ });
 
   // Spread over the machine's cores: the ear's arithmetic over two hours of
   // audio is several minutes on one.
@@ -273,7 +288,15 @@ async function main() {
   const xf6 = specs.filter((s) => s.join === 'xfade6');
   const named12 = new Map(xf6.map((s) => [s.seed, names(s, fp, index, 12)]));
   // The new song missing from the library: a song the show has never heard.
-  const strangers = xf6.map((s) => names(s, fp, buildIndex(records.filter((_, i) => i !== s.b)), ID_EVERY));
+  // Every join, not only the crossfades: one stranger in a few dozen captures
+  // is what a matcher that counts a held chord over and over gives, and the
+  // crossfades alone caught that by two names (38 over the whole songs).
+  const joinSpecs = specs.filter((s) => s.kind === 'join');
+  const without = new Map();
+  const strangers = joinSpecs.map((s) => {
+    if (!without.has(s.b)) without.set(s.b, buildIndex(records.filter((_, i) => i !== s.b)));
+    return names(s, fp, without.get(s.b), ID_EVERY);
+  });
   await listening;
 
   const checks = [];
@@ -295,6 +318,12 @@ async function main() {
     const out = { whole: { false: 0, seconds: 0, where: [] }, wholer: { false: 0, seconds: 0, where: [] } };
     for (const r of results) {
       const fires = r[key].filter((f) => f.at > LEAD + 5);
+      if (r.spec.kind === 'short') {
+        out.short ??= { false: 0, where: [] };
+        out.short.false += fires.length;
+        for (const f of fires) out.short.where.push(`${name(r.spec.a)} (${SHORT_SEC} s) → ${name(r.spec.b)} at ${(f.at - r.boundary).toFixed(1)} s`);
+        continue;
+      }
       if (r.spec.kind === 'whole') {
         const o = out[r.spec.noisy ? 'wholer' : 'whole'];
         o.false += fires.length; o.seconds += r.seconds - LEAD - 5;
@@ -326,6 +355,13 @@ async function main() {
   const gaps = ['gap05', 'gap2', 'gap2r', 'gap2rise'], gapless = ['gapless', 'gaplessr'];
   check('no song changes the look in the middle of itself, in a quiet room or a noisy one', wholeFalse === 0,
     `${now.whole.false} quiet, ${now.wholer.false} noisy, in ${hours.toFixed(2)} h of whole songs`);
+  /*
+    A sound shorter than a song, then a gap, then music: nothing ended, so
+    nothing changes. Against a boundary that let any sound end in a gap
+    (MIN_SONG_SEC at 5) every one of these fires where the music begins.
+  */
+  check(`a sound of ${SHORT_SEC} s, a gap and then a song is not a song ending`, now.short.false === 0,
+    `${now.short.false} changes${now.short.where.length ? `: ${now.short.where.join('; ')}` : ''}`);
   check('and no join is heard anywhere but where its new song begins', sum(Object.keys(JOINS), (o) => o.false) === 0, `${sum(Object.keys(JOINS), (o) => o.false)} elsewhere`);
   /*
     Nine in ten, not all. The one gap the boundary misses here is a song that
@@ -335,7 +371,7 @@ async function main() {
     joins, whole files, 70 s tails) it was 65 of 66, that join the miss, and
     no false change in 5.8 hours.
   */
-  check('nine gaps in ten between two songs (half a second or two, quiet room, noisy, or one that filled up) are heard where the new song begins',
+  check('nine gaps in ten between two songs (half a second or two, quiet room, noisy, or a room that filled up 95 s before the gap) are heard where the new song begins',
     sum(gaps, (o) => o.hits) >= 0.9 * sum(gaps, (o) => o.n), gaps.map((j) => `${j} ${now[j].hits}/${now[j].n}`).join(', '));
   check('the change lands within two seconds of the new song\'s first note at the median, on one of its hits at least three times in four',
     med(gaps.flatMap((j) => now[j].late)) <= 2 && sum(gaps, (o) => o.onBeat) >= 0.75 * sum(gaps, (o) => o.hits),
@@ -357,6 +393,7 @@ async function main() {
   const wrongWhere = [];
   for (const r of results) {
     const got = named.get(r.spec.seed).map((x) => ({ ...x, at: x.at + 0 }));
+    if (r.spec.kind === 'short') continue;
     if (r.spec.kind === 'whole') { wrongWhole += got.length; for (const x of got) wrongWhere.push(`${name(r.spec.a)}${r.spec.noisy ? ' (noisy)' : ''} named ${x.isrc} at ${x.at.toFixed(0)} s`); continue; }
     const o = (byJoin[r.spec.join] ??= { n: 0, hits: 0, late: [], wrong: 0, changes: [] });
     o.n++;
@@ -375,9 +412,9 @@ async function main() {
   for (const [j, o] of Object.entries(byJoin)) console.log(`  ${j.padEnd(9)} named the new song ${o.hits}/${o.n}${o.hits ? `, median ${med(o.late).toFixed(1)} s after it began` : ''}, ${o.wrong} wrong`);
   const late12 = xf6.map((s, k) => { const r = results.find((x) => x.spec.seed === s.seed); const x = named12.get(s.seed).find((y) => y.isrc === name(s.b) && y.at > r.boundary); return x ? x.at - r.boundary : null; }).filter((x) => x !== null);
   const strangerNames = strangers.reduce((s, got) => s + got.length, 0);
-  strangers.forEach((got, k) => { for (const x of got) wrongWhere.push(`${name(xf6[k].a)} → ${name(xf6[k].b)} (not in the library) named ${x.isrc} at ${x.at.toFixed(0)} s`); });
+  strangers.forEach((got, k) => { for (const x of got) wrongWhere.push(`${joinSpecs[k].join} ${name(joinSpecs[k].a)} → ${name(joinSpecs[k].b)} (not in the library) named ${x.isrc} at ${x.at.toFixed(0)} s`); });
   if (wrongWhere.length) console.log(`  wrong names: ${wrongWhere.join('; ')}`);
-  console.log(`  a capture every twelve seconds, 6 s crossfades: median ${med(late12).toFixed(1)} s; with the new song not in the library: ${strangerNames} names\n`);
+  console.log(`  a capture every twelve seconds, 6 s crossfades: median ${med(late12).toFixed(1)} s; with the new song not in the library, over all ${joinSpecs.length} joins: ${strangerNames} names\n`);
 
   const xf = ['xfade6', 'xfade16'].map((j) => byJoin[j]);
   check('every crossfade\'s new song is named by song identification', xf.every((o) => o.hits === o.n), xf.map((o) => `${o.hits}/${o.n}`).join(', '));

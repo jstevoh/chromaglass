@@ -322,7 +322,9 @@ export function matchSnippet(pcm: Float32Array, sampleRate: number, index: Finge
   // strangers are named, and the songs it knows are named in 978 captures of
   // 4 s, not 929. Genuine alignment is many different pairs agreeing on one
   // delta, which this keeps; a repeated pair agreeing with itself it no longer
-  // counts more than once.
+  // counts more than once. (Once per bucket of thirteen deltas, so a run that
+  // straddles a bucket's edge can vote twice: bounded, and well under the
+  // twelve a match needs.)
   const VOTE_BUCKET = 2 * NEIGHBOR_FRAMES + 1;
   const order = Array.from(q.hashes.keys()).sort((a, b) => q.hashes[a] - q.hashes[b]);
   const voted = new Set<number>();
