@@ -394,13 +394,13 @@ try {
       - the relay hands that address neither key;
       - in a browser as it ships, the failure screen says why and gives the
         localhost address on the same port;
-      - in a browser told to treat the address as secure (a flag, so the page
-        does start), the panel says to open the page at localhost and draws
-        no code (it used to draw one of the remote with no key, which a phone
-        could scan and never join with), and the page opens no socket to the
-        relay. The count is read by wrapping the page's WebSocket, and the
-        same count on the localhost desk must see its socket, so the line
-        cannot pass by counting nothing.
+      - a desk the relay hands no key (as it answers that address) says to
+        open the page at localhost and draws no code (it used to draw one of
+        the remote with no key, which a phone could scan and never join
+        with), and opens no socket to the relay. The count is read by
+        wrapping the page's WebSocket, and the same count on a desk handed
+        its key must see its socket, so the line cannot pass by counting
+        nothing.
   */
   const lan = hosts.find(h => h !== 'localhost' && h !== '127.0.0.1');
   /** An element's text, or '' at once when it is not there (a locator's own wait is a minute). */
@@ -424,9 +424,17 @@ try {
     check('a network display there is told why, and not sent to its own localhost', /secure page/.test(castBoot) && !castBoot.includes('localhost:'),
       castBoot ? castBoot.replace(/\s+/g, ' ').slice(0, 120) : 'no such words');
 
-    const flagged = await launchChromium(chromium, { headless: !HEADED, args: [`--unsafely-treat-insecure-origin-as-secure=${lanBase}`] });
+    /*
+      The panel's own case, asked on the localhost desk with the relay's answer
+      rewritten to hand it no key: that is exactly what the relay says to a page
+      at its Wi-Fi address. A browser flag that treats the Wi-Fi address as
+      secure would ask it more literally, but the runner's Chromium ignored the
+      flag (the page still was not a secure context and never started), so the
+      line read the start-up screen, not the panel.
+    */
+    const keyless = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     try {
-      const fpage = await (await flagged.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+      const fpage = await keyless.newPage();
       fpage.setDefaultTimeout(60_000);
       await fpage.addInitScript(() => {
         const W = window.WebSocket;
@@ -436,35 +444,34 @@ try {
       const relaySockets = () => fpage.evaluate(() => (window.__cgSockets ?? []).filter(u => u.includes('/remote-ws')).length);
       const words = () => textOf(fpage, 'phone-link');
       const openAt = async (base) => {
-        // 'load', not 'networkidle': the desk's own fetches at the Wi-Fi address
-        // keep the network busy past any idle window, and the waits below poll.
         await fpage.goto(`${base}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
-        // Up to 36 s for the desk to come up: this is a fresh browser, whose first
-        // page compiles every shader on the CPU, and a runner is slower than a
-        // laptop at that. A poll, so a quick start costs nothing.
         for (let i = 0; i < 120 && (await fpage.getByTestId('mode-segmented-loadin').count()) === 0; i++) await fpage.waitForTimeout(300);
         if (await fpage.getByTestId('mode-segmented-loadin').count()) await clickAt(fpage, 'mode-segmented-loadin');
         for (let i = 0; i < 40 && (!(await words()) || /looking/i.test(await words())); i++) await fpage.waitForTimeout(300);
         await fpage.waitForTimeout(3000);
       };
-      await openAt(lanBase);
+      const asWifi = async (route) => {
+        const res = await route.fetch();
+        await route.fulfill({ response: res, json: { ...(await res.json()), key: null, displayKey: null } });
+      };
+      await fpage.route('**/remote-info.json', asWifi);
+      await openAt(`http://localhost:${PORT}`);
       const w = await words();
-      // What the page shows instead, when the panel is not there: the start-up
-      // screen's words, or the desk's, so a red line says why on a runner.
       const instead = w ? '' : (await fpage.evaluate(() => document.body?.innerText ?? '')).replace(/\s+/g, ' ').slice(0, 220);
       const hasCode = (await fpage.getByTestId('phone-link-qr').count()) > 0;
       const hasUrl = (await fpage.getByTestId('phone-link-url').count()) > 0;
-      check('treated as secure, the desk there says to open the page at localhost to link phones',
+      check('handed no key, as the relay answers a Wi-Fi address, the desk says to open the page at localhost to link phones',
         (await fpage.getByTestId('phone-link-local').count()) > 0 && w.includes(local) && /Wi-Fi address/.test(w), w.replace(/\s+/g, ' ').slice(0, 160) || `no panel; the page says: ${instead || 'nothing'}`);
-      check('and draws no code and no address: a phone could never join with a keyless code', !hasCode && !hasUrl,
-        `${hasCode ? 'code' : 'no code'}, ${hasUrl ? 'address' : 'no address'}`);
+      check('and draws no code and no address: a phone could never join with a keyless code', !!w && !hasCode && !hasUrl,
+        `${w ? 'a panel' : 'no panel'}, ${hasCode ? 'code' : 'no code'}, ${hasUrl ? 'address' : 'no address'}`);
       const n = await relaySockets();
-      check('and that page opens no socket to the relay', n === 0, `${n} socket${n === 1 ? '' : 's'} to /remote-ws`);
+      check('and that page opens no socket to the relay', !!w && n === 0, `${n} socket${n === 1 ? '' : 's'} to /remote-ws`);
+      await fpage.unroute('**/remote-info.json', asWifi);
       await openAt(`http://localhost:${PORT}`);
       const m = await relaySockets();
-      check('the same count on the localhost desk sees its socket (the count is not blind)', m >= 1, `${m} socket${m === 1 ? '' : 's'} to /remote-ws`);
+      check('the same count on the desk handed its key sees its socket (the count is not blind)', m >= 1, `${m} socket${m === 1 ? '' : 's'} to /remote-ws`);
     } finally {
-      await flagged.close();
+      await keyless.close();
     }
   } else {
     total += 1; failed += 1;
