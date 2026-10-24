@@ -952,7 +952,16 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   stockGrainSize: 2,
   stockWeave: 0.6,
   stockGate: 0.35,
-  onNewSong: 'preset',      // a new song gets a new look
+  /*
+    Keep, until the boundary can be trusted. This was 'preset', and the owner
+    found on 2026-10-24 that it does not catch where songs start and end: it
+    fires only on 1.8 s of quiet after 20 s of song, or when song ID (asked
+    every 12 to 35 s) names a different track, so a crossfade or a gapless set
+    never changes the look and a quiet bridge can. A look that changes at the
+    wrong moment is worse on a wall than one that never changes, so a new song
+    keeps the look unless someone asks for more. `npm run music` holds this.
+  */
+  onNewSong: 'off',
   beatPrediction: 0.7,
   beatLead: 80,
   /*
