@@ -3776,7 +3776,10 @@ number for the whole plate and every area drew on one palette.
   the glycerine with a slow paddle, the hats pour the syrup's two bottles in turn. Jellyfish
   Bloom (25b-6): its four bells are areas now and its seed lays them there (`OWN_SEED_AREAS`;
   they were scattered at random), the kick pours the lowest bell's pink and teal, the hats
-  ruffle the top bell, the brilliance band picks its bottle, the mids pour the side bells.
+  ruffle the top bell, the brilliance band picks its bottle (for the treble's sparks that land
+  there: the music's own hands in an area read its Bottle cord, `AreaHands.picked`, which the
+  first build left to the area's pour cords alone, and that bell had none), the mids pour the
+  side bells.
   Bass Drop (25b-3): three soap wells on the bass, taken in turn by the kicks, Center
   Gravity 0.4 → 0.15; the snare stirs the low well and the sub warms the left. Preset depths
   stay at 0.6 or under, the most a one-second look change crossfades within `npm run desk`'s
@@ -3792,7 +3795,12 @@ number for the whole plate and every area drew on one palette.
   13.6x, and the heat 1.302 K on the run's mean of 1.310 K laid, against nothing outside;
   with two areas on two bands, band 2 worked the well 773x (dye) and 17.4x (flow) more than
   the syrup, and band 7 the syrup 286x and 18.4x more than the well; each gate opened once a
-  burst (8 of 8). In node, a gate opened 14 times for 8 bursts and 6 stretches dithering on
+  burst (8 of 8). The flow held to the paddle's own arithmetic (the review): 0.090 cells a step
+  meaned over the well, on 0.016 that the paddle's solid laid there and a paddle going 0.337
+  round its circle (the floors half and a tenth); with the paddle cut to a cell across (0.05 of
+  the area) the well went 0.006 and the check failed, where the ratio alone had passed. In
+  node, a hit that grows after the gate opens ends at 0.887 for 0.9 (0.500 with the height
+  untracked), and two cords alike keep a gate each. In node, a gate opened 14 times for 8 bursts and 6 stretches dithering on
   its line, where reading the line alone opened 51; rise 0.250 s for 0.25 and fall 0.333 s for
   0.35, for a hit of 0.9 and one of 0.5. The 25e
   count of lit places, each look played by its own cords for four seconds of a groove with

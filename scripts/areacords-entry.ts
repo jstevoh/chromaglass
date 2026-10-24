@@ -9,6 +9,7 @@ import { cordReading, type PatchContext } from '../src/lib/sceneMap';
 import { areaDye, type PlateArea } from '../src/lib/plateAreas';
 import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
+import { layFinger } from '../src/lib/handSolid';
 import type { SceneMapping } from '../src/types';
 
 /** A burst of one reading: on from `t0` for `dur` seconds at `level`, falling by half across it, as a hit's hold does. */
@@ -65,6 +66,15 @@ const api = {
       nothing moved it, which the measured change is held against.
     */
     const laidHeat = new Float32Array(L * L), laidDye = new Float32Array(L * L);
+    /*
+      And the paddle as the solver is handed it: the same solid laid again
+      (layFinger, as lab.finger lays it) into a sheet of its own, read each
+      step as χ·|U| in cells a step, which is the speed the liquid under it
+      is gripped to (thinGap.ts). Its time mean is what the pool would move
+      at if the liquid went with the solid and nothing round it moved; and
+      every cell it ever covered is the part of the pool it worked.
+    */
+    const paddleNow = new Float32Array(L * L * 4), paddleDry = new Float32Array(L * L), swept = new Uint8Array(L * L);
     const GS = L / 128;
     const plate: AreaFluid = {
       addTemp(x, y, k) { vel[(x + y * L) * 4 + 2] += k; laidHeat[x + y * L] += k; },
@@ -73,7 +83,11 @@ const api = {
         dye[k] += amount * ar; dye[k + 1] += amount * ag; dye[k + 2] += amount * ab; dye[k + 3] += amount;
         laidDye[x + y * L] += amount;
       },
-      fingerDrag(x, y, radius, _strength, dx, dy, _phase, moved) { lab.finger(x, y, Math.round(radius * GS), moved?.x ?? dx, moved?.y ?? dy); },
+      fingerDrag(x, y, radius, _strength, dx, dy, _phase, moved) {
+        const r = Math.round(radius * GS), mx = moved?.x ?? dx, my = moved?.y ?? dy;
+        lab.finger(x, y, r, mx, my);
+        layFinger(paddleNow, L, x, y, r, mx, my);
+      },
     };
     const sink = fluidSink(plate, GS);
     /*
@@ -108,20 +122,26 @@ const api = {
       const acts = hands.step(cords, at, (m) => cordReading(ctx, m, 0), DT);
       hands.lay(sink, L, DT, (a, k) => PALETTE_RGB[areaDye(a, contract, 0, k)]);
       if (s % 6 === 0) trace.push({ t, env: acts.map(a => a.amount) });
+      for (let i = 0; i < L * L; i++) if (paddleNow[i * 4 + 2] > 0) swept[i] = 1;
       lab.addDye(dye); lab.addVel(vel); dye.fill(0); vel.fill(0);
       lab.flush(over.dt);
       await lab.step(1, over, true);
       if (s % cfg.every === cfg.every - 1) {
         const v = await lab.field('vel');
-        for (let i = 0; i < L * L; i++) { speed[i] += Math.hypot(v[i * 4], v[i * 4 + 1]); temp[i] += v[i * 4 + 2]; heatDry[i] += laidHeat[i]; }
+        for (let i = 0; i < L * L; i++) {
+          speed[i] += Math.hypot(v[i * 4], v[i * 4 + 1]); temp[i] += v[i * 4 + 2]; heatDry[i] += laidHeat[i];
+          paddleDry[i] += Math.hypot(paddleNow[i * 4], paddleNow[i * 4 + 1]);
+        }
         samples++;
       }
+      paddleNow.fill(0);
     }
-    for (let i = 0; i < L * L; i++) { speed[i] /= Math.max(1, samples); temp[i] /= Math.max(1, samples); heatDry[i] /= Math.max(1, samples); }
+    for (let i = 0; i < L * L; i++) { speed[i] /= Math.max(1, samples); temp[i] /= Math.max(1, samples); heatDry[i] /= Math.max(1, samples); paddleDry[i] /= Math.max(1, samples); }
     return {
       dye: Array.from(await lab.field('dye')),
       speed: Array.from(speed), temp: Array.from(temp),
       laidDye: Array.from(laidDye), heatDry: Array.from(heatDry),
+      paddleDry: Array.from(paddleDry), swept: Array.from(swept),
       fires: cords.map(m => hands.fires(m)),
       trace,
     };

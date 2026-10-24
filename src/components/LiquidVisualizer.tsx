@@ -4988,7 +4988,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const lead = lock ? 0 : paletteWindowRef.current.lead + journeyRef.current.lead;
     return areaDye(a, lock ?? presetContractRef.current ?? harmonyRef.current, lead + shift, k);
   };
-  const areaColor = (layer: number, a: PlateArea) => PALETTE_RGB[areaDyeOf(layer, a)];
+  /*
+    The bottle an area's Bottle cord holds it to (PLAN 25h, AreaHands.picked),
+    on the plate the area cords work, or null: then the music's hands and the
+    automation's pours there draw on the family as they did. Read here so a
+    Bottle cord changes what is laid in its area whatever lays it, not only
+    its own area's pours (which have it from AreaHands.bottle).
+  */
+  const heldBottle = (layer: number, a: PlateArea): number | null => {
+    if (layer !== activeLayerRef.current) return null;
+    const i = areasOf(layer)?.indexOf(a) ?? -1;
+    return i < 0 ? null : areaHandsRef.current.picked(i, a);
+  };
+  const areaColor = (layer: number, a: PlateArea) => PALETTE_RGB[areaDyeOf(layer, a, 0, heldBottle(layer, a) ?? 0)];
   /**
    * The music's colour in an area: the Color route's cycle (colFor's), run
    * between the area's own dye and the next one, as its laid pool has them.
@@ -5000,7 +5012,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     Within the area's own family (PLAN 25h). An area with none set has the
     family its dye and the next, which is the pair this cycled before.
   */
-  const areaCycle = (layer: number, a: PlateArea, t: number) => harmonyCycle(areaFamily(a).map((_, k) => areaDyeOf(layer, a, 0, k)), t);
+  const areaCycle = (layer: number, a: PlateArea, t: number) => {
+    const held = heldBottle(layer, a);
+    if (held !== null) return PALETTE_RGB[areaDyeOf(layer, a, 0, held)];
+    return harmonyCycle(areaFamily(a).map((_, k) => areaDyeOf(layer, a, 0, k)), t);
+  };
   /** An area look's liquids, poured into its areas: `per` doses each, where it lays its pools. */
   const layAreaLiquids = (fluid: FluidSimulation, layer: number, areas: readonly PlateArea[], per: number) => {
     for (const a of areas) for (let i = 0; i < per; i++) {
@@ -8889,7 +8905,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             if (isActiveRef.current && drainFrameRef.current === 0) {
               const hands = areaHandsRef.current;
-              const acts = hands.step(currentSettings.sceneMappings, areasOf(activeLayerRef.current), (m) => cordReading(patchCtx, m, patchNow), simStepS);
+              /*
+                Not on a back plate with a look of its own (PLAN 25h-3): the
+                front look's cords name the front look's areas, and that look's
+                areas are others, which index alone would match them to.
+              */
+              const own = activeLayerRef.current >= 1 && backDyesRef.current;
+              const acts = hands.step(currentSettings.sceneMappings, own ? null : areasOf(activeLayerRef.current), (m) => cordReading(patchCtx, m, patchNow), simStepS);
               const af = fluidsRef.current[activeLayerRef.current];
               if (af && acts.length > 0) {
                 const target = dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget);

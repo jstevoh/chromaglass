@@ -43,7 +43,8 @@
  *   - **Bottle** (`areaHue`): which of the area's bottles its pours come from
  *     next. A pigment does not change colour where it lies, so this changes
  *     nothing on the plate by itself: it picks the bottle the next pour, kick
- *     ring or drop in that area is drawn from.
+ *     ring or drop in that area is drawn from (`picked`, which the
+ *     visualizer's areaCycle reads for the music's own hands there).
  *
  * A setting the solver reads (Turbulence, Viscosity, the Dimmer) is one number
  * per plate, a uniform in the shaders, and making each of them a field over
@@ -169,6 +170,8 @@ export interface AreaAct {
   target: AreaTarget;
   /** The envelope times the cord's depth: −1..1 at full. */
   amount: number;
+  /** Its state's key: what the cord is, and its turn among cords alike. */
+  key: string;
 }
 
 /** Where an area's acts are laid: grid cells of a `size`-cell plate. */
@@ -231,11 +234,20 @@ export class AreaHands {
     this.acts = [];
     for (const s of this.state.values()) s.seen = false;
     if (cords && areas) {
+      /*
+        Two cords alike (same source, reading, act and area, which only a
+        hand-made patch has) each keep a gate of their own: the second is
+        keyed by its turn among its twins. Shared, the one gate was stepped
+        twice a step and rose twice as fast (the review of #454).
+      */
+      const twins = new Map<string, number>();
       for (const m of cords) {
         if (!m || !isAreaCord(m) || !m.depth) continue;
         const area = areas[m.area!];
         if (!area) continue;
-        const k = keyOf(m);
+        const base = keyOf(m), turn = twins.get(base) ?? 0;
+        twins.set(base, turn + 1);
+        const k = turn ? `${base}#${turn}` : base;
         let s = this.state.get(k);
         if (!s) { s = { gate: new CordGate(), angle: 0, dir: 1, seen: true }; this.state.set(k, s); }
         s.seen = true;
@@ -243,7 +255,7 @@ export class AreaHands {
         const v = s.gate.step(read(m) ?? 0, dt, m);
         // A gated paddle turns back on each hit: a hand folding, not a motor.
         if (m.setting === 'areaStir' && gated(m) && s.gate.fires > before && before > 0) s.dir = -s.dir;
-        this.acts.push({ cord: m, area, index: m.area!, target: m.setting as AreaTarget, amount: v * m.depth });
+        this.acts.push({ cord: m, area, index: m.area!, target: m.setting as AreaTarget, amount: v * m.depth, key: k });
       }
     }
     for (const [k, s] of this.state) if (!s.seen) this.state.delete(k);
@@ -254,19 +266,36 @@ export class AreaHands {
   fires(m: SceneMapping): number { return this.state.get(keyOf(m))?.gate.fires ?? 0; }
 
   /**
+   * The bottle an area's Bottle cord holds it to, or null with none on it.
+   * Read by this area's pours (`bottle`) and by the music's own hands in the
+   * area (the visualizer's areaCycle: the kick's ring, the treble's drops,
+   * the swell), which otherwise turn through the whole family: so a Bottle
+   * cord on an area with no pour cord of its own still says what colour the
+   * music lays there. Without that it did nothing at all (the review of
+   * #454: Jellyfish's band 7 on its treble bell), since a pigment does not
+   * change colour where it already lies.
+   */
+  picked(index: number, area: PlateArea): number | null {
+    const n = areaFamily(area).length;
+    for (const a of this.acts) {
+      if (a.index !== index || a.target !== 'areaHue') continue;
+      return Math.min(n - 1, Math.floor(Math.min(1, Math.abs(a.amount)) * n));
+    }
+    return null;
+  }
+
+  /**
    * Which of an area's bottles (an index into its family) pours next: what
    * its Bottle cord says, else the next in turn on each opening of its pour
    * cord, so a kick pours one bottle and the next kick the other.
    */
   bottle(index: number, area: PlateArea): number {
     const n = areaFamily(area).length;
-    for (const a of this.acts) {
-      if (a.index !== index || a.target !== 'areaHue') continue;
-      return Math.min(n - 1, Math.floor(Math.min(1, Math.abs(a.amount)) * n));
-    }
+    const held = this.picked(index, area);
+    if (held !== null) return held;
     for (const a of this.acts) {
       if (a.index !== index || a.target !== 'areaPour') continue;
-      const fires = this.state.get(keyOf(a.cord))?.gate.fires ?? 0;
+      const fires = this.state.get(a.key)?.gate.fires ?? 0;
       return gated(a.cord) ? Math.max(0, fires - 1) % n : 0;
     }
     return 0;
@@ -292,7 +321,7 @@ export class AreaHands {
         const rgb = colour(area, this.bottle(a.index, area));
         disc(cx, cy, R * AREA_POUR_SPREAD, size, (x, y, w) => sink.dye(x, y, k * w, rgb));
       } else if (a.target === 'areaStir') {
-        const s = this.state.get(keyOf(a.cord));
+        const s = this.state.get(a.key);
         if (!s || a.amount === 0) continue;
         const orbit = AREA_PADDLE_ORBIT * R;
         const turn = (2 * Math.PI / AREA_STIR_TURN_S) * a.amount * s.dir * dt;

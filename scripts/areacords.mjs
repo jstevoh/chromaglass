@@ -45,9 +45,10 @@
  *     before areas. Printed before and after; the areas' run holds at least
  *     as many places as the look has areas that pour, the middle's one.
  */
-import { CordGate, AreaHands, isAreaCord, AREA_TARGETS, GATE_HYSTERESIS } from '../src/lib/areaCords.ts';
+import { readFileSync } from 'node:fs';
+import { CordGate, AreaHands, isAreaCord, AREA_TARGETS, GATE_HYSTERESIS, AREA_PADDLE_ORBIT, AREA_STIR_TURN_S } from '../src/lib/areaCords.ts';
 import { PatchBay, cordReading } from '../src/lib/sceneMap.ts';
-import { PRESET_AREAS, areaFamily } from '../src/lib/plateAreas.ts';
+import { PRESET_AREAS, areaFamily, areasForBand } from '../src/lib/plateAreas.ts';
 import { PRESET_CONTRACTS } from '../src/presetPlate.ts';
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
@@ -112,6 +113,28 @@ const DT = 1 / 60;
   let worst = 0;
   for (let s = 0; s < 600; s++) worst = Math.max(worst, Math.abs(f.step(at(s * DT), DT, follow) - at(s * DT)));
   check('a cord with no threshold, attack or release follows its reading exactly, as every cord before', worst === 0, `worst ${worst}`);
+
+  /*
+    A hit that grows after the gate opens (a kick's swell, a band rising
+    through a fill) opens it further: the height is the most the reading
+    reached while open, not what it was on the line. A burst from 0.5 to 0.9
+    over half a second: the envelope must end near 0.9, where a gate that
+    kept the opening height would sit at 0.5 (the review of #454: with the
+    tracking taken out, the flat bursts above all still passed).
+  */
+  const grow = new CordGate();
+  let grown = 0;
+  for (let s = 0; s < Math.round(0.5 / DT); s++) grown = grow.step(0.5 + 0.4 * (s * DT) / 0.5, DT, cord);
+  check('a hit that grows after the gate opens opens it further', grown >= 0.85, `a burst rising 0.5 → 0.9 ends at ${grown.toFixed(3)}`);
+
+  // Two cords alike keep a gate each, so neither rises at twice its attack.
+  const twin = { ...cord, setting: 'areaHeat' };
+  const one = new AreaHands(), two = new AreaHands(), areas1 = [{ x: 0.5, y: 0.5, r: 0.1, liquid: 'water', dye: 0, band: 'any' }];
+  let a1 = [], a2 = [];
+  for (let s = 0; s < 6; s++) { a1 = one.step([twin], areas1, () => 0.9, DT); a2 = two.step([twin, twin], areas1, () => 0.9, DT); }
+  check('two cords alike each rise at their own attack, not one gate stepped twice',
+    a2.length === 2 && a2.every(a => Math.abs(a.amount - a1[0].amount) < 1e-12),
+    `after 6 steps: one cord ${a1[0]?.amount.toFixed(3)}, two alike ${a2.map(a => a.amount.toFixed(3)).join(' and ')}`);
 }
 
 // ── 2. The tables ────────────────────────────────────────────────────
@@ -137,6 +160,50 @@ const DT = 1 / 60;
   }
   check('every area cord a look ships aims at an area it has, with an act, on a fast reading it really has',
     bad.length === 0 && cords >= 8, bad.join('; ') || `${cords} cords on ${PRESETS.filter(p => (p.settings.sceneMappings ?? []).some(isAreaCord)).length} looks`);
+
+  /*
+    A Bottle cord changes nothing where the pigment already lies; it picks
+    what is laid next in its area. So each one a look ships needs something
+    there that lays from the bottle: a pour cord on the same area, or the
+    music's own hands, which land in an area by its band (areasForBand: the
+    visualizer's areaCycle reads AreaHands.picked for the kick's ring, the
+    treble's drops and the swell). And it must turn the bottle: quiet, the
+    first; loud, another. Jellyfish's band 7 on its treble bell shipped with
+    neither reading it (the review of #454).
+  */
+  const deaf = [];
+  let hues = 0;
+  for (const p of PRESETS) {
+    const all = (p.settings.sceneMappings ?? []).filter(isAreaCord);
+    for (const m of all.filter(c => c.setting === 'areaHue')) {
+      hues++;
+      const areas = PRESET_AREAS[p.id] ?? [], area = areas[m.area];
+      if (!area) continue;
+      const pour = all.some(c => c.setting === 'areaPour' && c.area === m.area);
+      const music = ['bass', 'mid', 'treble'].filter(b => areasForBand(areas, b).includes(area));
+      if (!pour && music.length === 0) deaf.push(`${p.id} area ${m.area}: nothing lays from its bottle`);
+      const turned = [0.02, 1].map(level => {
+        const h = new AreaHands();
+        for (let s = 0; s < 120; s++) h.step([m], areas, () => level, DT);
+        return [h.picked(m.area, area), h.bottle(m.area, area)];
+      });
+      if (areaFamily(area).length < 2) deaf.push(`${p.id} area ${m.area}: one bottle`);
+      else if (!(turned[0][0] === 0 && turned[1][0] > 0 && turned.every(([a, b]) => a === b))) deaf.push(`${p.id} area ${m.area}: bottles ${JSON.stringify(turned)}`);
+    }
+  }
+  /*
+    The music's hands read the bottle in the visualizer, which node cannot
+    run: so the source is read. The area's colour for the music (areaCycle)
+    and for the automation's pours (areaColor) must go through heldBottle,
+    and heldBottle through AreaHands.picked, or the hands above lay from the
+    whole family whatever the Bottle cord says.
+  */
+  const viz = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  const body = (name) => viz.slice(viz.indexOf(`const ${name} = `), viz.indexOf(`const ${name} = `) + 600).split(/\n  const /)[0];
+  const wired = ['areaCycle', 'areaColor'].every(n => viz.includes(`const ${n} = `) && body(n).includes('heldBottle(')) && body('heldBottle').includes('.picked(');
+  if (!wired) deaf.push('the visualizer\'s areaCycle or areaColor does not read heldBottle, or heldBottle not AreaHands.picked');
+  check('every Bottle cord a look ships has something in its area that lays from the bottle, and turns it',
+    deaf.length === 0 && hues >= 1, deaf.join('; ') || `${hues} Bottle cord(s), each read by its area's pours or the music's hands there (areaCycle and areaColor read it)`);
 
   const looks = ['velvet-underground', 'jellyfish-bloom', 'bass-drop'];
   const shared = [];
@@ -209,6 +276,8 @@ if (!process.argv.includes('--node')) {
     const run = (cords, bursts, extra = {}) => page.evaluate((cfg) => window.areas.run(cfg),
       { L, seconds: 4, areas, contract, cords, bursts, over, every: 12, pools: true, ...extra });
 
+    // The solver's velocity times this is cells a step, the paddle's own unit (as `npm run fingerflow` reads it).
+    const disp = over.dt * over.advection * (L - 2) / L;
     const t0 = Date.now();
     const control = await run([], [...groove('band2', 4), ...groove('band7', 4, 0.25, 0.08)]);
     const cell = (i) => ({ x: (i % L + 0.5) / L, y: (Math.floor(i / L) + 0.5) / L });
@@ -216,17 +285,17 @@ if (!process.argv.includes('--node')) {
     const outside = (p) => Math.hypot(p.x - 0.5, p.y - 0.5) < 0.45 && areas.every(a => Math.hypot(p.x - a.x, p.y - a.y) > 1.25 * a.r);
     /** Mean change per cell against the control, over the cells `where` picks: dye (all four channels), speed and temperature. */
     const change = (got, where) => {
-      let d = 0, v = 0, T = 0, n = 0, a = 0, la = 0, lt = 0;
+      let d = 0, v = 0, T = 0, n = 0, a = 0, la = 0, lt = 0, pd = 0, sw = 0;
       for (let i = 0; i < L * L; i++) {
         if (!where(cell(i))) continue;
         for (let c = 0; c < 4; c++) d += Math.abs(got.dye[i * 4 + c] - control.dye[i * 4 + c]);
         a += got.dye[i * 4 + 3] - control.dye[i * 4 + 3];
         v += Math.abs(got.speed[i] - control.speed[i]);
         T += Math.abs(got.temp[i] - control.temp[i]);
-        la += got.laidDye[i]; lt += got.heatDry[i];
+        la += got.laidDye[i]; lt += got.heatDry[i]; pd += got.paddleDry[i]; sw += got.swept[i];
         n++;
       }
-      return { dye: d / n, speed: v / n, temp: T / n, density: a / n, laid: la / n, heatLaid: lt / n };
+      return { dye: d / n, speed: v / n, cells: v / n * disp * L, temp: T / n, density: a / n, laid: la / n, heatLaid: lt / n, paddle: pd / n, swept: sw / n };
     };
     const fmt = (c) => `dye ${c.dye.toExponential(2)}, flow ${c.speed.toExponential(2)}, heat ${c.temp.toExponential(2)}`;
     const ratio = (a, b) => a / Math.max(b, 1e-12);
@@ -252,7 +321,29 @@ if (!process.argv.includes('--node')) {
     check('a band\'s cord on one area changes the dye there at least 5x what it changes outside every area, and keeps half of what it poured there',
       ratio(inW.dye, out.dye) >= 5 && inW.density >= 0.5 * inW.laid && inW.laid > 0.1,
       `${ratio(inW.dye, out.dye).toFixed(1)}x; ${inW.density.toFixed(3)} of density there of ${inW.laid.toFixed(3)} poured`);
-    check('and the flow (the paddle)', ratio(inW.speed, out.speed) >= 5 && inW.speed > 1e-4, `${ratio(inW.speed, out.speed).toFixed(1)}x`);
+    /*
+      The flow's floor is the paddle's own arithmetic too (the review of #454:
+      a paddle cut to a cell across moved the well 15x less and the ratio
+      alone still passed, the outside having fallen with it). Two halves, in
+      cells a step, the paddle's unit.
+      The grip: what the paddle laid is the speed the liquid under it is held
+      to (χ·|U|, from the entry's own copy of the solid), meaned over the
+      well, and the liquid there must carry at least half of it, the liquid
+      round a moving solid going with it as well as the liquid under it.
+      The stir: a hand stirring a pool moves the pool, not a point in it. The
+      paddle's own speed round its circle is the orbit (AREA_PADDLE_ORBIT of
+      the area) times its turn (AREA_STIR_TURN_S a turn at full) times how
+      open its cord was, meaned over the run from the cord's envelope; the
+      well's mean flow must be a tenth of that, as a tenth of the pool going
+      at the paddle's speed would be. Not from the paddle's size, which is
+      what this holds: a paddle 0.3 of the area across covers about a tenth
+      of it by itself, and one of a cell, a hundredth.
+    */
+    const stirEnv = one.trace.reduce((a, s) => a + Math.abs(s.env[1] ?? 0), 0) / Math.max(1, one.trace.length);
+    const paddleSpeed = AREA_PADDLE_ORBIT * well.r * L * (2 * Math.PI / AREA_STIR_TURN_S) * stirEnv / 60;
+    check('and the flow (the paddle): the well carries half the speed the paddle laid there, and moves at a tenth of the paddle\'s own',
+      ratio(inW.speed, out.speed) >= 5 && inW.paddle > 0 && inW.cells >= 0.5 * inW.paddle && inW.cells >= 0.1 * paddleSpeed,
+      `${ratio(inW.speed, out.speed).toFixed(1)}x; ${inW.cells.toFixed(3)} cells a step in the well, on ${inW.paddle.toFixed(3)} laid and a paddle going ${paddleSpeed.toFixed(3)} (swept ${(100 * inW.swept).toFixed(0)}% of the well)`);
     check('and the heat, at least half of what was laid there (what cooling and spreading may take in four seconds)',
       ratio(inW.temp, out.temp) >= 5 && inW.temp >= 0.5 * inW.heatLaid && inW.heatLaid > 0.1,
       `${ratio(inW.temp, out.temp).toFixed(1)}x, ${inW.temp.toFixed(3)} K inside on the run's mean of ${inW.heatLaid.toFixed(3)} K laid`);

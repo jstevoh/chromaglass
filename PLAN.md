@@ -6392,6 +6392,12 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     kick's ring and press on Jellyfish's lowest bell) live in the visualizer's loop, which
     only the Mac's app run reaches. That is 25e's lit-region count in `watch.mjs`, run on
     the three looks before and after this.
+  - **25h-8. A Go between two area looks lands the old look's cords on the new one's
+    areas.** The crossfade fades the outgoing look's cords out over the Go (lookFade.ts),
+    and an area cord names its area by index, so for up to the fade's length Velvet's kick
+    heat on its soap well (area 1) heats Jellyfish's lowest bell. A cord should carry the
+    look it was written for, or the fade should drop the outgoing look's area cords at once
+    (they are hands, which a Go can let go of, not settings that must not jump).
 - **25i. Colour that answers the music** (direction C, 2026-10-24; after 25h). Once each
   area has its own family (25h), the music picks which bottle pours next. (1) **By the
   note**: a patch source that maps the lead note's pitch class (a fast reading: the

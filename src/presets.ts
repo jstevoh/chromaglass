@@ -554,8 +554,10 @@ export const PRESETS: Preset[] = [
         pours from the lowest bell (area 1), its pink and then the teal it
         sends out, a pulse a kick, while Beat Squeeze's press lands on it; the
         hats ruffle the top bell's fringe (area 2) with a quick paddle, and the
-        brilliance band picks that bell's bottle, icy blue when the top is
-        bright; the mids (band 4) pour the two side bells (areas 0 and 3).
+        brilliance band picks that bell's bottle for what the music lays there
+        (the treble's sparks land on it): its icy blue when the top is bright
+        (band 7 over 0.83, at this depth), its first dye under that. The mids
+        (band 4) pour the two side bells (areas 0 and 3).
       */
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.5, threshold: 0.3, attack: 0.02, release: 0.4 },
