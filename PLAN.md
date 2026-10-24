@@ -6239,7 +6239,15 @@ once the login works (23.14).*
   and joined with a tap and no address typed while the QR code stays on `Phone · iPad`, a
   third page on another account sees nothing, and cutting off the internet and account
   service leaves the local remote socket driving the show.
-- **23.15** (with §12's iPhone app): Sign in with Apple native in the iPhone app, and
+- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (the owner,
+  2026-10-24: "I don't want to do the apple developer account or accept logins from
+  them. maybe later - but not now."). The button is held behind `APPLE_SIGN_IN` in
+  `SignInScreen.tsx`, the landing page and the privacy page say Google or an emailed
+  link. *Measure:* `npm run signin` line 4 fails if an Apple button is drawn.
+- **23.15** (*later*, the owner 2026-10-24: no Apple sign-in for now; with §12's iPhone
+  app, which needs it beside Google's under App Store guideline 4.8, and the paid Apple
+  Developer account): Sign in with Apple on the site (`APPLE_SIGN_IN`, the Services ID
+  and key in the Firebase console) and native in the iPhone app, and
   deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
   laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
   `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).

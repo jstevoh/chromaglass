@@ -5,7 +5,7 @@
  *   npm run signin          (software WebGPU off a Mac; the Firebase Auth emulator)
  *
  * What was asked (the owner, 2026-10-11): accounts for ChromaGlass, signed in
- * with Google, Apple or an emailed link through Firebase Authentication, and
+ * with Google or an emailed link through Firebase Authentication, and
  * the free site behind that sign-in (PLAN.md 23.10). The rule the owner set
  * for anything sold to performers is that a show never locks out mid-gig, so
  * the half of this check that matters most is the second half: once the plate
@@ -15,7 +15,7 @@
  *
  * Firebase's own Auth emulator stands in for Google's servers, so a cloud
  * session and CI run the real SDK against a real (local) auth server: the
- * email link is read from the emulator's outbox, Google and Apple are asked
+ * email link is read from the emulator's outbox, Google is asked
  * for through the emulator's stand-in for their pages, and the accounts are
  * read and deleted through its admin API. Nothing here needs a real Firebase
  * project or a secret. The emulator is fetched with npx at a pinned version
@@ -31,8 +31,9 @@
  *      ENTRY_GROWTH_MAX bytes gzipped: the SDK is fetched beside the app, not
  *      in front of the intro
  *   3. a first visit sees the sign-in, and the plate does not start behind it
- *   4. it offers Google, Apple and an emailed link, and each provider button
- *      asks the emulator for that provider
+ *   4. it offers Google and an emailed link, and not Apple (the owner,
+ *      2026-10-24: no Apple sign-in for now), and the Google button asks the
+ *      emulator for Google
  *   5. the emailed link signs in and the plate starts
  *   6. a returning visit goes straight to the plate: the sign-in is never
  *      drawn, not even for a frame
@@ -361,6 +362,12 @@ async function signInByEmail(page, origin) {
   return { sent, link, back, up: back && await waitFor(() => appUp(page), BOOT_MS) };
 }
 /** Everything on the sign-in inside the screen's width, each button a thumb's height. */
+// The sign-in's buttons: Google and the emailed link. It was three with Apple,
+// which the owner took off for now (2026-10-24; line 4 fails if it comes back
+// without this changing too). 11 and 15 count up to this, so a form missing
+// one of the two still fails them.
+const PROVIDER_BUTTONS = 2;
+
 const fits = (page) => page.evaluate(() => {
   const W = innerWidth, H = innerHeight;
   const over = document.documentElement.scrollWidth > W + 1;
@@ -422,7 +429,10 @@ try {
 
   const providers = await page.evaluate(() => [...document.querySelectorAll('[data-cg-signin-provider]')].map((b) => b.getAttribute('data-cg-signin-provider')));
   const asksFor = {};
-  for (const id of ['google.com', 'apple.com']) {
+  // Apple is held off (SignInScreen.tsx, APPLE_SIGN_IN; the owner, 2026-10-24),
+  // so only Google is pressed, and the line below fails if an Apple button is
+  // drawn at all: a sign-in that cannot complete is worse than none.
+  for (const id of ['google.com']) {
     // A popup or a redirect: either is Firebase's way of sending the browser to the provider.
     const popup = ctx.waitForEvent('page', { timeout: 10_000 }).catch(() => null);
     const nav = page.waitForURL((u) => u.toString().includes(`providerId=${encodeURIComponent(id)}`) || u.toString().includes(`providerId=${id}`), { timeout: 10_000 }).then(() => page.url(), () => null);
@@ -438,7 +448,7 @@ try {
     asksFor[id] = !!p && p.startsWith(`${EMU}/emulator/auth/handler`) && p.includes('apiKey=demo-key') && p.includes(id);
     if (!page.url().startsWith(ORIGIN)) { await page.goto(ON); await waitFor(() => signinOpen(page), 30_000); }
   }
-  check('4. Google, Apple and an emailed link are offered, and Google and Apple go to their provider', ['google.com', 'apple.com', 'email'].every((p) => providers.includes(p)) && asksFor['google.com'] && asksFor['apple.com'], `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}`);
+  check('4. Google and an emailed link are offered, Apple is not, and Google goes to its provider', ['google.com', 'email'].every((p) => providers.includes(p)) && !providers.includes('apple.com') && asksFor['google.com'], `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}`);
 
   const first = await signInByEmail(page, ORIGIN);
   check('5. the emailed link signs in, lands on the page the visitor was on, and the plate starts', first.sent && first.back && first.up, `sent ${first.sent}, link ${first.link ? (first.back ? 'back to the same page' : 'to this site but not the same page') : 'none'}, plate ${first.up}`);
@@ -534,7 +544,7 @@ try {
     await waitFor(() => signinOpen(p), 30_000);
     const f = await fits(p);
     fit.push(`${s.name}: ${f.n} buttons, ${f.bad} outside or under 44 px (shortest ${Math.round(f.minH)} px)${f.over ? ', wider than the screen' : ''}`);
-    s.ok = f.n >= 3 && f.bad === 0 && !f.over;
+    s.ok = f.n >= PROVIDER_BUTTONS && f.bad === 0 && !f.over;
     await c.close();
   }
   check('11. the sign-in fits a laptop and a phone, upright and on its side', sizes.every((s) => s.ok), fit.join('; '));
@@ -604,7 +614,7 @@ try {
       await waitFor(async () => { const b = await signInButton(p); return b.shown && b.lit; }, 10_000);
       lit[s.name] = await signInButton(p);
       await p.click('[data-cg-account-signin]').catch(() => {});
-      const offered = await waitFor(() => p.evaluate(() => document.querySelectorAll('[data-cg-account] [data-cg-signin] [data-cg-signin-provider]').length >= 3), 15_000);
+      const offered = await waitFor(() => p.evaluate((n) => document.querySelectorAll('[data-cg-account] [data-cg-signin] [data-cg-signin-provider]').length >= n, PROVIDER_BUTTONS), 15_000);
       lit[s.name].opens = offered && await appUp(p);
       if (process.env.SIGNIN_SHOTS) await p.screenshot({ path: `${process.env.SIGNIN_SHOTS}/15-signed-out.png` });
       const again = await signInByEmail(p, ORIGIN);

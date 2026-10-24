@@ -42,13 +42,12 @@
 <p>We do not sell anything about you, show you ads, or use analytics or tracking of any kind.</p>
 
 <h2>Your account</h2>
-<p>To use the site you sign in with Google, with Apple, or with a link we email you. Sign-in is run by Google's Firebase Authentication, which keeps:</p>
+<p>To use the site you sign in with Google or with a link we email you. Sign-in is run by Google's Firebase Authentication, which keeps:</p>
 <ul>
   <li>your email address,</li>
   <li>an account id it makes for you,</li>
   <li>which way you signed in, and when you made the account and last signed in.</li>
 </ul>
-<p>If you sign in with Apple and choose to hide your email, we only ever see the relay address Apple gives us.</p>
 <p>While a signed-in show is running with its local show server, your account also holds a short-lived entry for that running show (its name, its local network address and its show key, expiring after 90 seconds once the show closes) so a phone, tablet or laptop signed in to the same account can join it with a tap. Once linked, the remote talks to the show directly over your own network. If you buy a Home or Pro licence, our Cloudflare Worker also keeps your signed licence key and up to two activated machine identifiers under your email address in Workers KV, so signing in restores your licence and lets you move it between machines.</p>
 <p>We use your email to sign you in and, if you buy a licence, to send you your key and receipt. We only send product updates or newsletter emails if you explicitly tick the optional opt-in box on the sign-in screen or in <a href="/profile">Profile &amp; Store</a> (stored as an opt-in flag and timestamp under your email in Workers KV), and you can unsubscribe at any time in <a href="/profile">/profile</a> or at <a href="/unsubscribe">/unsubscribe</a>. We never hand or sell your address to anyone.</p>
 
