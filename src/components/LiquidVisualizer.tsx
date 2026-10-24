@@ -20,7 +20,7 @@ import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pi
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
-import { SloshDish, sloshAccel, sloshDrag, SLOSH_N } from '../lib/slosh';
+import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, type SloshPress } from '../lib/slosh';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
 import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
@@ -63,7 +63,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
-import { squishDisc, glassSpring, PressLifts, KickRelease, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
+import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
 import { Phrasing, type Phrase } from '../lib/phrasing';
@@ -1129,11 +1129,17 @@ class FluidSimulation {
   */
   extTiltX = 0;
   extTiltY = 0;
-  /** The dish of liquid the tilt sloshes (lib/slosh.ts), built on the first tilt, one to a layer. */
-  private slosh: SloshDish | null = null;
-  private sloshField = new Float32Array(SLOSH_N * SLOSH_N * 4);
-  /** Whether the solver holds a slosh field now, so a rest is told to it once. */
-  private sloshOn = false;
+  /** Plate Rock's swing alone (lib/plateRock.ts rockSwing), for the slosh dish where Frame Sway lets it (stepSlosh, rockAccel). */
+  swingX = 0;
+  swingY = 0;
+  /**
+    The slosh dish (lib/slosh.ts) runs on the GPU and is never read back, so
+    its clock says when it is driven and when its ring has gone (SloshClock).
+    And the kicks' presses on it (Beat Squeeze, `pressKick`): where each landed,
+    plate units, how deep each of its three discs went, and how long ago.
+  */
+  private sloshClock = new SloshClock();
+  private dishKicks: { x: number; y: number; amount: number; radii: number[]; t: number }[] = [];
   // The lasting current on the CPU engine — the twin of GpuFluid.stepCurrent,
   // at half the logical grid: velocity, warm pressure and divergence.
   private readonly CM = GRID_SIZE / 2;
@@ -2975,6 +2981,14 @@ class FluidSimulation {
     y = Math.round(y);
     radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
     this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
+    // And the same glass on the slosh dish (stepSlosh), over the same radii the
+    // gap was pressed with: off the frame-moving looks that is the sheet's one
+    // dent (kickPress), so the dish is pushed down where the plate is and no
+    // wider, and the liquid it moves runs out as a ring and back off the rim.
+    if (this.thinGap && amount > 0) {
+      this.dishKicks.push({ x: (x + 0.5) / this.size, y: (y + 0.5) / this.size, amount, radii: [...radii], t: 0 });
+      if (this.dishKicks.length > 2) this.dishKicks.shift();
+    }
   }
 
   /**
@@ -3795,27 +3809,43 @@ class FluidSimulation {
   }
 
   /**
-    The tilt's slosh: the dish of liquid (lib/slosh.ts) stepped one frame and
-    its flow handed to the solver. Led only by what the owner's hand sets, the
-    Gravity and Tilt Direction faders and the phone's tilt, never by the sound
-    or the frame's sway (`npm run slosh`). With no Slosh, or no tilt and the
-    dish at rest, it does nothing at all and the solver is told once, so the
-    default plate is the same bits it was.
+    The slosh dish (lib/slosh.ts, gpu/slosh.ts): what drives it this frame,
+    handed to the solver, which steps it on the GPU before its own step. Led
+    by what the owner's hand sets (the Gravity and Tilt Direction faders and the
+    phone's tilt, through the Slosh dial) and by Beat Squeeze's glass on the
+    kick (`pressKick`), the same glass the thin gap is pressed by. And by Plate
+    Rock's swing only as far as Frame Sway lets the music move the frame
+    (rockAccel: a rocked dish sways the whole picture), so at Frame Sway's
+    default 0 not at all, and on Bass Drop at its 0.35. With nothing driving it and its ring gone (SloshClock) it is
+    not stepped at all and the solver is told once, so the default plate is the
+    same bits it was (`npm run slosh`, `npm run sloshgpu`).
   */
   private stepSlosh(settings: VisualizerSettings, p: GpuStepParams) {
     const gpu = this.gpu;
     if (!gpu) return;
-    const [ax, ay] = sloshAccel(settings.slosh ?? 0, p.plateUpright ?? 0, p.gravityX ?? 0, p.gravityY ?? 0, this.extTiltX, this.extTiltY);
-    const dish = this.slosh;
+    const dt = p.magnetSeconds ?? 1 / 60;
     // The CPU film and the other layers' solvers without a thin gap ignore it (PLAN 18a-13).
-    if (!this.thinGap || (!dish && ax === 0 && ay === 0)) {
-      if (this.sloshOn) { dish?.rest(); gpu.setSlosh(null); this.sloshOn = false; }
+    if (!this.thinGap) {
+      if (this.sloshClock.live) gpu.setSlosh(null);
+      this.sloshClock.stop();
+      this.dishKicks.length = 0;
       return;
     }
-    const d = dish ?? (this.slosh = new SloshDish());
-    const moving = d.step(p.magnetSeconds ?? 1 / 60, ax, ay, sloshDrag(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS)));
-    if (moving) { gpu.setSlosh(d.field(this.sloshField)); this.sloshOn = true; }
-    else if (this.sloshOn) { gpu.setSlosh(null); this.sloshOn = false; }
+    const [hx, hy] = sloshAccel(settings.slosh ?? 0, p.plateUpright ?? 0, p.gravityX ?? 0, p.gravityY ?? 0, this.extTiltX, this.extTiltY);
+    const [rx, ry] = rockAccel(this.swingX, this.swingY, frameSway(settings.frameSway));
+    const ax = hx + rx, ay = hy + ry;
+    // The kicks' glass, over the radii the gap was pressed with (kickPress: the sheet's one dent, or the glass's three nested discs on a frame-moving look), held and let go as the thin gap's are.
+    const presses: SloshPress[] = [];
+    for (const k of this.dishKicks) {
+      const held = glassHeld(k.t, KICK_HOLD, KICK_RELEASE);
+      for (const r of k.radii) presses.push({ x: k.x, y: k.y, radius: r / 128, depth: k.amount * held });
+      k.t += dt;
+    }
+    this.dishKicks = this.dishKicks.filter((k) => k.t < KICK_HOLD + KICK_RELEASE + dt);
+    const r = sloshDrag(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS));
+    const driven = ax !== 0 || ay !== 0 || presses.some((q) => q.depth > 0);
+    const tick = this.sloshClock.tick(dt, driven, r);
+    gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level } : null);
   }
 
   private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
@@ -8958,6 +8988,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
               fluid.coverX = cover.vx; fluid.coverY = cover.vy;
               fluid.extTiltX = ext.x * extK; fluid.extTiltY = ext.y * extK;
+              fluid.swingX = swingX; fluid.swingY = swingY;
             }
 
             // ── Oil beads ───────────────────────────────────────

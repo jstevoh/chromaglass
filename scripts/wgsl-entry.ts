@@ -5,6 +5,7 @@ import { plateWgsl, DISPLAY_MAIN, DERIVE_WGSL } from '../src/gpu/wgsl/plate';
 import { SPIKES_WGSL } from '../src/gpu/wgsl/spikes';
 import { STAND_WINDOW, standingKernels } from '../src/gpu/wgsl/standing';
 import { DROP_KERNELS } from '../src/gpu/wgsl/ferroDrop';
+import { SLOSH_KERNELS } from '../src/gpu/wgsl/slosh';
 
 const FORMATS: Record<string, string> = {};
 (window as unknown as { runWgsl: () => Promise<string[]> }).runWgsl = async () => {
@@ -28,6 +29,8 @@ const FORMATS: Record<string, string> = {};
   await check('standing.window', STAND_WINDOW);
   // The closeup's ferrofluid drop (PLAN §29a), built behind the show too.
   for (const [name, code] of Object.entries(DROP_KERNELS)) await check(`drop.${name}`, code);
-  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length} shaders`);
+  // The slosh dish (PLAN 18a-13a, 13d): two layers of shallow water under the plate's tilt and presses.
+  for (const [name, code] of Object.entries(SLOSH_KERNELS)) await check(`slosh.${name}`, code);
+  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length} shaders`);
   return out;
 };
