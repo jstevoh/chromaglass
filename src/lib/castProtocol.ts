@@ -27,6 +27,8 @@ export interface CastAudio {
   spectralCentroid: number;
   timbre: number;
   complexity: number;
+  /** The passage's loudness (AudioData's `passage`), so a breakdown calms the wall as it does the laptop. Absent from an older sender. */
+  passage?: number;
 }
 
 export interface CastState {

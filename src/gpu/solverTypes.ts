@@ -66,6 +66,13 @@ export interface GpuStepParams {
   */
   magnetRadius?: number;
   /**
+    1 on a sparse dark look laid with a composition, where `decayDye` clears
+    the thin mist between its bodies first (the surface-to-volume term); 0, and
+    the same uniform decay as ever, on every other look. See `sparseDark` in
+    lib/dyeTarget.ts.
+  */
+  surfaceClear?: number;
+  /**
     The other fingers holding a magnet on a touch screen, up to three, in
     plate coordinates; each at this magnet's height and strength. Only read
     while this one is on.
@@ -143,6 +150,10 @@ export interface GpuStepParams {
    * liquid round it.
    */
   ferroViscosity?: number;
+  /** The ferrofluid's momentum carried with it (phaseMomentum), 1 on; 0 is the lab's control, the step without it. */
+  phaseMomentum?: number;
+  /** The moving edge's compression (phaseCompress, PLAN 29c-1) as a share of the strength the step runs at, 1 on; 0 is the lab's control, the step without it. */
+  phaseCompress?: number;
   /**
    * For the lab only: 0 carries the ferrofluid by area under Thin Gap too,
    * as before the Press on the ferrofluid (PLAN 15d), so `npm run
@@ -213,8 +224,10 @@ export interface GpuStepParams {
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
-  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
-  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number, drift?: number, clock?: number): void;
+  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number, wetOnly?: number): void;
+  /** The print is no longer being drawn: the plate shows the dye itself again (`WebGPUFluid.endPrint`). */
+  endPrint?(): void;
   chem?: any;
   /** The Gray–Scott field has been seeded or poured into since it was last cleared. */
   chemLive?: boolean;
@@ -316,6 +329,12 @@ export interface PlateSolver {
    * (PLAN 15g; lib/breath.ts, hsBody).
    */
   applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null): void;
+  /**
+   * The slosh dish's flow for the next step (lib/slosh.ts `SloshDish.field`:
+   * 64 by 64 RGBA32F, plate widths a second), or null for none: laid over the
+   * flow the dye rides on a thin gap, after the gap's solve (PLAN 18a-13).
+   */
+  setSlosh(field: Float32Array | null): void;
   /** Start a read and take whatever has landed; false before the first. */
   readbackAsync(): boolean;
   readonly rbDyeView: Float32Array;
@@ -331,8 +350,10 @@ export interface PlateSolver {
   clearChemistry?(): void;
   seedChemistry?(x: number, y: number, radius: number): void;
   addReagent?(x: number, y: number, radius: number, amount: number, pattern_val: number): void;
-  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number): void;
-  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number): void;
+  stepChemistry?(iters: number, feed?: number, kill?: number, Du?: number, Dv?: number, bath?: number, drift?: number, clock?: number): void;
+  depositChemistry?(chem: any, amount: number, colour: [number, number, number], threshold?: number, print?: number, bath?: number, wetOnly?: number): void;
+  /** The print is no longer being drawn: the plate shows the dye itself again (`WebGPUFluid.endPrint`). */
+  endPrint?(): void;
   chem?: any;
   /** The Gray–Scott field has been seeded or poured into since it was last cleared. */
   chemLive?: boolean;

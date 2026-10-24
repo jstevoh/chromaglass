@@ -11,7 +11,26 @@
  */
 const { contextBridge } = require('electron');
 
+function parseArg(prefix) {
+  const arg = (process.argv || []).find((a) => typeof a === 'string' && a.startsWith(prefix));
+  return arg ? arg.slice(prefix.length) : null;
+}
+
+let license = { valid: false, tier: 'free', email: null, id: null, exp: null, error: null, enforced: false };
+try {
+  const encoded = parseArg('--chromaglass-license=');
+  if (encoded) {
+    const json = Buffer.from(encoded, 'base64url').toString('utf8');
+    const parsed = JSON.parse(json);
+    if (parsed && typeof parsed === 'object') license = parsed;
+  }
+} catch { /* fallback to default */ }
+
+const requireSignIn = parseArg('--chromaglass-require-signin=') === '1';
+
 contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   shell: 'desktop',
   platform: process.platform,
+  requireSignIn,
+  license,
 });

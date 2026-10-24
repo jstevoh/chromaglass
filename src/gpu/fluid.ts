@@ -33,7 +33,8 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
+import { SLOSH_N } from '../lib/slosh';
+import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR, dyeAbsorbances } from '../lib/dye';
@@ -143,6 +144,16 @@ const DRIFT_MOST = 8;
 const DRIFT_LEAST = 0.2;
 /** Iterations a step of the ferrofluid's own pressure, which keeps it from packing past full (phaseRelax). */
 const PHASE_RELAX = 6;
+/*
+  C_α, how much of what the flux step's limiter withheld at a moving edge of
+  the ferrofluid is given back (phaseCompress in wgsl/fluid.ts, PLAN 29c-1).
+  1 is all of it: the second-order flux the limiter cut at each face to stay
+  monotone, ½c(1 − c) of the face's slope by the share withheld (wgsl/fluid.ts,
+  withheld), which is what spreads a dragged drop's trailing edge. Nothing at
+  rest whatever it is, nothing on a smooth profile, and nothing on the deep
+  plate (the step).
+*/
+const PHASE_COMPRESS = 1;
 /*
   The mix's forces, each in plate widths a second at full strength (see
   mixForce), set in the lab (scripts/lab.mjs) so each effect is plainly
@@ -394,8 +405,8 @@ const MAX_SPEED = 0.002;
   The turntable's dish, because hsPrep reads the clear liquid's viscosity
   back out of 12ν/W² with that width (PLAN 18d) and the two must agree.
 */
-const PLATE_METRES = DISH_METRES;
-const REST_GAP = 0.03;
+export const PLATE_METRES = DISH_METRES;
+export const REST_GAP = 0.03;
 /*
   Real molecular diffusion of food dye in water (PLAN 18h).
   Audit correction: the old Jacobi diffusion rate at default 0.0002 measured an
@@ -410,12 +421,6 @@ const D_MOLECULAR = 4.0e-10; // m²/s
 */
 const KAPPA_WATER = 1.4e-7; // m²/s
 /*
-  The dish's rim, in plate widths from the middle: the plate's inscribed
-  circle, which is all the picture ever shows of it (plate.ts keeps both
-  dishes inside it). Past it the liquid is open to the air.
-*/
-const OPEN_RIM = 0.5;
-/*
   The forces' own physics on a thin gap (PLAN 18a-2, wgsl/thinGap.ts's
   hsBody, hsPrep and hsDivergence).
 
@@ -424,7 +429,7 @@ const OPEN_RIM = 0.5;
   at the rest gap, so on the default Thickness nothing moves differently,
   and on any other the liquid answers as its viscosity says (hsPrep).
 */
-const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
+export const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
 /*
   Rain Drip's weight: the speed a unit of dye over the plate's mean drives
   the reference liquid to at the rest gap, per unit of the slider, in the
@@ -517,7 +522,7 @@ const DYE_CAP = 6;
   liquids are water and oils, 0.8 to 1.26 of water's; the clear liquid is
   taken as water's, as liquidProps takes the poured ones' against it.
 */
-const LIQUID_DENSITY = 1000;
+export const LIQUID_DENSITY = 1000;
 /*
   The liquid's thickness, as a kinematic viscosity in m²/s, from the
   Thickness dial (0 to 1): water (1 mm²/s) at 0, glycerine (about a thousand)
@@ -537,13 +542,38 @@ export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
 }
 /*
   How hard the magnet pulls the liquid where the ferrofluid is, per unit of
-  magnetic energy gradient, in real seconds (phaseForce). Calibrated in the
-  lab (scripts/lab.mjs): a hand-held magnet a fifth of the plate from a pool
-  draws it in at a quarter of the plate a second, fast enough to follow a
-  hand dragging it, and a pool a sixth of the plate off arrives in about a
-  second.
+  magnetic energy gradient, in real seconds (phaseForce): the speed, in
+  plate widths a second, that one unit of ∇ψ a plate width drives the
+  reference liquid to at the rest gap, which is how hsPrep reads a body
+  force (PLAN 18a-2). What that is in tesla, metres and seconds is worked
+  out and printed by `npm run magnetgain` (PLAN 29c-2): the solver's ψ is
+  the Langevin energy of a ferrofluid in the rod's field, so one unit of
+  it is (χ/2μ₀)(SPIKE_B_REF·Br)²/MAGNET_E joules a cubic metre, and
+  Darcy's speed for a force f between the glasses is f·h²/12μ, so the pull
+  of Ferrotec's EFH1 (χ 2.64 by its sheet) under an N52 rod comes to
+  GAIN_phys = (χ/2μ₀)(SPIKE_B_REF·Br)² h₀² / (12 ρ ν_ref L² MAGNET_E),
+  5.8e-5 seconds. This is 0.10 of it (0.22 at the χ of 1.2 some papers
+  give the same fluid).
+
+  Kept at a tenth of the real pull, and why. Nearer a magnet than 0.3 of
+  the plate the pull asks for more than a step can carry at any gain the
+  plate has had: the hand's magnet asks 7.8 plate widths a second at
+  this gain, against the 0.375 that MAGNET_CELLS allows on 384², so
+  there the guard is the drop's speed and the gain does not show (a
+  real drop under a hand's magnet is pinned to it, at metres a second;
+  the solver draws it following at the grid's own limit, PLAN 29c-5).
+  The gain sets only the far field: how fast a pool a third of the
+  plate off creeps toward a look's own magnet, which every look with a
+  magnet was tuned on, and at the real pull Magnet Garden's and Ferro
+  Paint's own would gather the whole plate at the guard's speed. A real
+  plate's far pools stay where they were poured for a reason the solver
+  does not have, the contact line's pinning on the glass, which holds a
+  small drop against a weak field's pull outright (PLAN 29c-6: add it,
+  then set the gain to the physics). Calibrated in the lab before any of
+  this was known: a hand-held magnet a fifth of the plate from a pool
+  draws it in at a quarter of the plate a second.
 */
-const MAGNET_GAIN = 6e-6;
+export const MAGNET_GAIN = 6e-6;
 /*
   The most one step of the magnet may add to a cell, in plate widths a
   second: a guard, not a limit on the pull. At half a plate a second it
@@ -551,7 +581,7 @@ const MAGNET_GAIN = 6e-6;
   flattened the pull, and a dragged magnet left the ferrofluid behind (CI:
   0.023 of the plate against a hand that crossed 0.65 of it).
 */
-const MAGNET_CAP = 3;
+export const MAGNET_CAP = 3;
 /*
   And never more than this many cells a step, whatever the look's clock.
 
@@ -568,7 +598,7 @@ const MAGNET_CAP = 3;
   second of pull), the flux step was asked for more than its limit and the
   plate lost an eighth of its ferrofluid in a few seconds (CI: 86% kept).
 */
-const MAGNET_CELLS = 2.4;
+export const MAGNET_CELLS = 2.4;
 
 /*
   Ferro Pushes Dye's two exchanges at full (phaseDisplace in wgsl/fluid.ts),
@@ -612,7 +642,7 @@ const RG32 = 'rg32float';
 const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48
+const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49
 
 export class WebGPUFluid {
   readonly N: number;
@@ -627,6 +657,15 @@ export class WebGPUFluid {
   public readonly chem: PingPong;
   public readonly activeMat: PingPong;
   public chemLive = false;
+  /**
+   * The plate's dye while a print is drawn: the dye in the solver with the
+   * print laid over it (depositChem). Separate from the dye so the print is a
+   * picture of the reaction as it stands, never a thing the flow carries or
+   * the dye accumulates, and so liquid poured on the plate stays in the
+   * solver as poured (PLAN 26d-3). Null until the first print.
+   */
+  private printDye: GPUTexture | null = null;
+  private printLive = false;
   /** Turing Reagent has been poured since the chemistry was last cleared: the reaction runs on it even on a look without Chemistry. */
   public reagentLive = false;
   private readonly liquids0: PingPong;
@@ -682,6 +721,13 @@ export class WebGPUFluid {
   private readonly divMean: GPUBuffer;
   private readonly curDiv: GPUTexture;
   private readonly velForced: GPUTexture;
+  /**
+    The slosh dish's flow (lib/slosh.ts, PLAN 18a-13), 64 by 64 in plate widths a
+    second, while the dial is up and the dish is moving; null otherwise, and the
+    thin stage then copies the gap's velocity exactly as it always did.
+  */
+  private sloshTex: GPUTexture | null = null;
+  private sloshStore: GPUTexture | null = null;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
   private readonly velRide: GPUTexture;
   private readonly scratchA: GPUTexture;
@@ -941,6 +987,8 @@ export class WebGPUFluid {
   private psi: PingPong | null = null;
   /** Its chemical potential (phaseMu), kept for the next step's maze force. */
   private phaseMuT: GPUTexture | null = null;
+  /** The ferrofluid blurred once a step (phaseBlur), for phaseCompress's edge normal. */
+  private phaseBlurT: GPUTexture | null = null;
   /*
     The ferrofluid standing up under a close magnet (standing.ts, PLAN §9t):
     the film, made the first time a magnet is that close, and the window the
@@ -1032,6 +1080,8 @@ export class WebGPUFluid {
       ['liquidForces', [VEL], true],
       ['squeezeUpdate', [RG32], true],
       ['scaleDye', [dye], true],
+      // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
+      ['addSlosh', [VEL], false],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
@@ -1123,6 +1173,8 @@ export class WebGPUFluid {
       ['phaseAdvect', [R32], open.phase],
       ['phaseGapSeen', [R32], open.phase],
       ['phaseSeparate', [R32], open.phase],
+      ['phaseBlur', [R32], open.phase],
+      ['phaseCompress', [R32], open.phase],
       // The two volume forms (phaseGridPlan, phaseCHVolume) run only on a thin
       // gap. Every look opens on one now (Thin Gap, on in every look), so a
       // ferrofluid look carries its ferrofluid as a volume from its first
@@ -1139,6 +1191,7 @@ export class WebGPUFluid {
       ['phaseCH', [R32], open.phase],
       ['phaseCHVolume', [R32], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
+      ['phaseMomentum', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
       // The ferrofluid pushing the dye (Pushes Dye), on the dye's own grid.
       ['phaseDisplace', [dye], open.displace],
@@ -1478,6 +1531,27 @@ export class WebGPUFluid {
   }
 
   /**
+   * phaseCompress: run's bindings, then the phase's substep plan (phasePlan's
+   * psub: 1/m and m), for the substeps the step's carry ran, which the
+   * step's deficit at each face is summed over.
+   */
+  private runPhaseCompress(pass: GPUComputePassEncoder, stand: GPUTexture, args: GPUBuffer): void {
+    const pipe = this.pipeline('phaseCompress', this.phase.write.format);
+    if (!pipe) return;
+    const reads = [this.phase.read, this.phaseBlurT!, this.ride(), this.squeeze.read, stand];
+    const key = `phaseCompress:${this.phase.write.label}:${reads.map((r) => r.label).join(',')}:${args.label}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ...reads, this.phase.write, this.phaseSub!]);
+      this.groups.set(key, group);
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+  }
+
+  /**
    * The ferrofluid carried as a volume on a thin gap: phasePlan picks the
    * substeps from the colour's plan this step (planCarry, run in the advect
    * dye stage before this), at least `least`, and each is phaseAdvectPlan from
@@ -1579,6 +1653,7 @@ export class WebGPUFluid {
       f[38 + k * 4] = fin(p.magnetHeight, 0.05); f[39 + k * 4] = m ? magStrength : 0;
     }
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
+    f[49] = p.surfaceClear ? 1 : 0;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -1587,6 +1662,9 @@ export class WebGPUFluid {
   /** Wipe the plate: no dye, no motion, the gap at rest. */
   clear(): void {
     this.heatSeconds = 0;
+    // A wiped plate has no print: it is rebuilt from the dye and the reaction
+    // on the next deposit, and until then the plate shows the (empty) dye.
+    this.printLive = false;
     this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
@@ -1647,6 +1725,25 @@ export class WebGPUFluid {
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.grainAge = 0;
+  }
+
+  /**
+    Hand the solver the slosh dish's flow for the coming step (a `SloshDish.field`,
+    SLOSH_N² RGBA32F), or null to leave it out: the texture is made the first
+    time it is wanted, and null keeps it for the next, so a dial turned up and
+    down does not allocate on a frame. Left out, the thin stage is the one it
+    was before this existed.
+  */
+  setSlosh(field: Float32Array | null): void {
+    if (!field) { this.sloshTex = null; return; }
+    if (!this.sloshStore) {
+      this.sloshStore = this.disposer.track(this.device.createTexture({
+        label: 'slosh', size: [SLOSH_N, SLOSH_N], format: RGBA32,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      }));
+    }
+    this.device.queue.writeTexture({ texture: this.sloshStore }, field, { bytesPerRow: SLOSH_N * 16 }, [SLOSH_N, SLOSH_N]);
+    this.sloshTex = this.sloshStore;
   }
 
   /**
@@ -1910,7 +2007,7 @@ export class WebGPUFluid {
    * unit of time is cut into as many substeps as D needs. The reaction's
    * own terms are the same per unit of time at any substep.
    */
-  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5, bath = 0): void {
+  stepChemistry(iters: number, feed = 0.037, kill = 0.06, Du = 1.0, Dv = 0.5, bath = 0, drift = 0, clock = 0): void {
     if (!this.chemLive) return;
     const s = (this.N / CHEM_REF) ** 2;
     const du = Du * s, dv = Dv * s;
@@ -1921,7 +2018,8 @@ export class WebGPUFluid {
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     // bath: the reagent the whole plate stands in (grayScott), 0 when only pours feed it.
-    const args = this.arg('chem rates', [du, dv, feed, kill, bath, 1 / sub, 0, 0]);
+    // drift: how far the feed/kill map wanders (grayScott), at `clock` seconds on the reaction's slow clock.
+    const args = this.arg('chem rates', [du, dv, feed, kill, bath, 1 / sub, drift, clock]);
     for (let i = 0; i < n; i++) {
       this.run(pass, 'grayScott', this.chem.write, [this.chem.read], args, this.N);
       this.chem.swap();
@@ -1938,18 +2036,36 @@ export class WebGPUFluid {
    * looks have always grown. With `print` above 0 the colour is an indicator
    * in the liquid the reaction runs in, starch with the iodine of a CIMA dish
    * (26d, Turing Print): the blue-black complex forms and comes apart with
-   * the activator, so the dye where the reaction is fed is the complex's
+   * the activator, so the print where the reaction is fed is the complex's
    * equilibrium with the field as it stands, `print` its depth, and nothing
-   * piles up. `bath` is the reagent the whole plate stands in, as stepChemistry
+   * piles up. It is drawn over the dye into `printDye`, which the plate then
+   * shows in the dye's place; the solver's dye is left as poured. `bath` is the reagent the whole plate stands in, as stepChemistry
    * takes it, so the print covers what the reaction is fed.
    */
-  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0): void {
-    if (amount <= 0 && print <= 0) return;
+  depositChemistry(chem: GPUTexture, amount: number, colour: [number, number, number], threshold = 0.22, print = 0, bath = 0, wetOnly = 0): void {
+    if (amount <= 0 && print <= 0) { this.printLive = false; return; }
     const log = dyeAbsorbances(...colour);
     const enc = this.device.createCommandEncoder({ label: 'chemistry deposit' });
     const pass = enc.beginComputePass({ label: 'chemistry deposit' });
-    this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], this.arg('deposit', [amount, threshold, Math.max(0, print), Math.max(0, bath), ...log, 0]));
-    this.dye.swap();
+    const args = this.arg('deposit', [amount, threshold, Math.max(0, print), Math.max(0, bath), ...log, wetOnly]);
+    if (print > 0) {
+      /*
+        The print is drawn into its own picture and the dye is left as it is.
+        Before it replaced the dye on every fed cell, every frame: a liquid
+        poured on the plate was gone the frame it landed, and since the
+        print was written into the dye the solver carried it as well.
+      */
+      this.printDye ??= this.disposer.track(this.device.createTexture({
+        label: 'print dye', size: [this.N, this.N], format: this.dyeFormat,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+      }));
+      this.run(pass, 'depositChem', this.printDye, [this.dye.read, chem], args);
+      this.printLive = true;
+    } else {
+      this.run(pass, 'depositChem', this.dye.write, [this.dye.read, chem], args);
+      this.dye.swap();
+      this.printLive = false;
+    }
     pass.end();
     this.device.queue.submit([enc.finish()]);
   }
@@ -2222,6 +2338,16 @@ export class WebGPUFluid {
     }, visc.some((v) => v > 0));
 
     /*
+      The ferrofluid's momentum travels with it (phaseMomentum, and why there):
+      the velocity carried along itself by the ferrofluid's share of each
+      cell, before the snapshot below so every force is still read apart.
+    */
+    stage('phase momentum', (pass) => {
+      this.run(pass, 'phaseMomentum', this.vel.write, [this.vel.read, this.phase.read], this.arg('phase momentum', [disp, 0, 0, 0]));
+      this.vel.swap();
+    }, thin && this.phaseLive && (p.phaseMomentum ?? 1) > 0);
+
+    /*
       A thin gap keeps the velocity from before the forces, so it can read
       what they asked for as a speed to drive the liquid to (hsPrep).
     */
@@ -2246,9 +2372,13 @@ export class WebGPUFluid {
         // rings round it rather than a maze (the gradient orders the
         // stripes across it). Still enough that the maze follows the hand.
         const pull = (1 - 0.75 * maze) * (maze > 0.001 ? 1 - (1 - SPIKE_PULL) * spikeAmt : 1);
+        // The clear liquid's viscosity over the ferrofluid's, for the rim's
+        // force to be read against the ferrofluid's own drag (phaseForce, and
+        // why); hsPrep reads the same two (thinProject).
+        const nuRatio = thin ? thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS) / (p.ferroViscosity ?? FERRO_NU) : 1;
         this.run(pass, 'phaseForce', this.vel.write, [this.vel.read, this.phase.read, this.ensureStand()],
           this.arg('magnet force', [p.magnetX, p.magnetY, p.magnetHeight, p.magnetStrength, MAGNET_GAIN * perStep * pull,
-            Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), 0, 0]));
+            Math.min(MAGNET_CAP * perStep, MAGNET_CELLS / Math.max(disp * N, 1e-9)), nuRatio, 0]));
         this.vel.swap();
       });
     }
@@ -2428,7 +2558,13 @@ export class WebGPUFluid {
       stage('thin gap', (pass) => {
         this.thinProject(pass, p, disp, hands);
         // What the dye rides is the flow itself: the current is in it now.
-        this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
+        if (this.sloshTex && this.pipeline('addSlosh', VEL)) {
+          // And the dish's own flow over it, when the dial is up (setSlosh): the unit is the swirl's, plate widths a second to this solver's.
+          const sloshScale = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
+          this.run(pass, 'addSlosh', this.velForced, [this.vel.read, this.sloshTex], this.arg('add slosh', [0, 0, SLOSH_N, sloshScale]));
+        } else {
+          this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
+        }
         // Less the glass's drift for the carries, when it has one (driftCells).
         const [wx, wy, fx, fy] = this.driftCells;
         this.riding = (wx !== 0 || wy !== 0 || fx !== 0 || fy !== 0) && this.driftIsReady();
@@ -2783,6 +2919,33 @@ export class WebGPUFluid {
         this.run(pass, 'phaseRelax', this.phase.write, [this.phase.read, stand], none);
         this.phase.swap();
       }
+      /*
+        What the flux step spread of a moving edge this step, given back
+        at each face (phaseCompress, PLAN 29c-1): the second-order flux the
+        step's limiter withheld there, nothing where the ferrofluid is at
+        rest or its profile smooth, bounded by the cells' share and room.
+        The normal is read from the field blurred once here (phaseBlur),
+        not blurred face by face. The thin gap's only, where it was
+        measured (ferrodrag, ferropress): the deep plate's looks were
+        measured with the spreading in them, and the compression at its
+        first strength, run there too, broke three (spikes 2/6, maze 3/4,
+        fingers 3/4 on the Mac, 2026-10-17); what the limiter's deficit,
+        given back, does to them is not measured yet (PLAN 29c-1).
+      */
+      if (thin) {
+        if (!this.phaseBlurT) {
+          this.phaseBlurT = this.disposer.track(this.device.createTexture({
+            label: 'phase blur', size: [this.N, this.N], format: R32,
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+          }));
+        }
+        this.run(pass, 'phaseBlur', this.phaseBlurT, [this.phase.read], none);
+        // The faces' Courant numbers are the flux step's: the mixture's velocity,
+        // which carries the share, over the substeps the carry ran (runPhaseCompress).
+        this.runPhaseCompress(pass, stand, this.arg('phase compress', [PHASE_COMPRESS * (p.phaseCompress ?? 1), disp, volume, subs]));
+        this.phase.swap();
+      }
+
       /*
         Cahn–Hilliard keeps the two liquids apart, maze or not: it conserves
         and it rounds. The pairwise sharpening that stood in for it without
@@ -4681,6 +4844,12 @@ export class WebGPUFluid {
 
   /** One frame of the drain: inward spiral, transport, evaporate. */
   drainStep(t: number): void {
+    // The drain carries the solver's dye, and the print is not in it (it is
+    // laid over the dye in its own texture, 26d-3). While it runs the
+    // visualizer deposits nothing, so a print left live would hold its last
+    // picture still over the draining pour for fifty frames and then jump to
+    // the emptied plate. The plate shows the dye that is draining instead.
+    this.printLive = false;
     const pull = Math.pow(t, 0.4) * 4.0;
     this.simF[0] = this.N; this.simF[1] = this.L;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
@@ -4910,10 +5079,13 @@ export class WebGPUFluid {
    */
   get grainTexture(): GPUTexture | null { return this.grain?.read ?? null; }
 
+  /** The print stops: the plate shows the solver's dye alone again (no reaction on the plate, or a look that does not print). */
+  endPrint(): void { this.printLive = false; }
+
   /** The fields, for the compositor (P3) to read directly. */
   get fields() {
     return {
-      dye: this.dye.read,
+      dye: this.printLive && this.printDye ? this.printDye : this.dye.read,
       vel: this.vel.read,
       velForced: this.velForced,
       grain: this.grain?.read ?? null,

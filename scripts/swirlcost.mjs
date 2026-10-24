@@ -55,7 +55,7 @@ const argOf = (name, fallback) => {
 };
 // The thin looks with music routed to rotation (src/presets.ts): nine when
 // this was written, eight since Boiling Point was retired (PLAN.md 28a).
-const THIN = ['galaxy', 'cyberpunk', 'acid-trip', 'timbre-shifter',
+const THIN = ['galaxy', 'cyberpunk', 'acid-trip', 'microscopic-chaos',
   'aurora-borealis', 'solar-flare', 'fractal-dream', 'stardust-collapse'];
 const LOOKS = argOf('looks', null)?.split(',') ?? THIN;
 /**
@@ -172,6 +172,8 @@ try {
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     for (const look of LOOKS) {
+      // The app opens on Source None (PLAN.md 14y), so the band this run plays is chosen the way a reload keeps it.
+      await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
       await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${look}&play=0${engineQuery()}`, { waitUntil: 'load' });
       await page.waitForFunction(() => typeof window.chromaglassDebug === 'function' && !!window.chromaglassDebug().webgpu?.swirl, null, { timeout: 60_000 });
       // A plate that draws, not one still building its shaders (flick.mjs says why).

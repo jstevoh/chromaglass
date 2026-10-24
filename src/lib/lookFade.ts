@@ -28,7 +28,7 @@
  * anything has moved; switching at the end pops once the eye has settled.
  */
 
-import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { DEFAULT_SETTINGS, type SceneMapping, type VisualizerSettings } from '../types';
 import { PIN_RANGE } from './deskPins';
 import { MIX_KEYS, MIX_FADE_KEYS } from './mixer';
 
@@ -224,8 +224,73 @@ export class LaterWrites {
   clear(): void { this.at.clear(); }
 }
 
-/** Which step a look fade lays down: a Back's, which puts the room back too, or a Go's, which keeps it. */
-export const lookFadeStep = (back: boolean): typeof lookStep => (back ? backStep : lookStep);
+/** How far either side of the eased fade's middle the ring's amount stays at nothing. */
+const RING_FLOOR = 0.1;
+
+/**
+ * The ferrofluid's amount on its way across a look change that swaps the ring.
+ *
+ * What was reported (the owner, 2026-10-19): changes between looks are "a little
+ * jumpy here and there". Part of that is here. The handoff
+ * (`LiquidVisualizer.handoff`) lays the new look's ferrofluid ring, or takes the
+ * old one away, in one frame at the middle of the change, because a ring is a
+ * shape in the fluid and has no halfway: there is no ring between one pattern
+ * and another to fade through. Meanwhile the amount the plate draws it with
+ * (`phaseAmount`) was travelling in a straight line from the old look's value to
+ * the new one's, so at that frame the picture held a ring at 0.3 to 0.5 of its
+ * strength and the whole pattern changed under it, which reads as a flick.
+ *
+ * So the amount goes down to nothing before the middle, stays there, and comes
+ * back up after it, the way a dissolve through black hides a cut. At the swap
+ * the ring is drawn with no strength, so the frame it changes in is the same as
+ * the one before it, and the new ring grows in from there. The bottom is flat
+ * (`RING_FLOOR` either side of the middle of the eased fade) because the swap
+ * is not at the instant ease(t) = 0.5: the fade's value is set on a 33 ms timer
+ * and holds until the next tick, the handoff swaps on the first render frame
+ * after its own clock passes half, and that clock started a moment before the
+ * fade's, with React's frame of lag on top. Measured over the tick before the
+ * middle, a pointed V still drew 0.090 of the amount at the swap (Magnet Garden
+ * to Classic); a flat bottom draws nothing wherever in that span the swap lands.
+ * Eased with the same curve as the rest of the fade (`ease`). A look that has
+ * no ferrofluid on either side is untouched: 0 stays 0.
+ *
+ * Only a Go, a Back and Send to wall ask for it (`swapsRing`), the changes that
+ * run the handoff. An unattended change (a new song, Lucky) has no handoff and
+ * keeps the ring it has, so its amount still travels straight.
+ *
+ * Measured by `npm run desk`: the drawn amount at the swap, on 992 pairs of looks.
+ */
+export function ringDip(
+  step: VisualizerSettings, from: VisualizerSettings, to: VisualizerSettings, t: number,
+): VisualizerSettings {
+  if (t >= 1) return step;
+  const k = ease(t);
+  const a = from.phaseAmount ?? 0;
+  const b = to.phaseAmount ?? 0;
+  const run = SWITCH_AT - RING_FLOOR;
+  const amount = k < SWITCH_AT - RING_FLOOR ? a * (1 - k / run)
+    : k > SWITCH_AT + RING_FLOOR ? b * ((k - SWITCH_AT - RING_FLOOR) / run)
+    : 0;
+  return { ...step, phaseAmount: amount };
+}
+
+/**
+ * Which step a look fade lays down: a Back's, which puts the room back too, or a Go's, which keeps it.
+ *
+ * `swapsRing` is for the changes that run the visualizer's handoff, which swaps
+ * the ferrofluid ring in a single frame (`ringDip` says why that wants the
+ * amount to be nothing at that frame). A setting a hand wrote after the fade
+ * began (`held`) is never dipped over.
+ */
+export const lookFadeStep = (back: boolean, swapsRing = false): typeof lookStep => {
+  const base = back ? backStep : lookStep;
+  if (!swapsRing) return base;
+  return (from, to, t, now, held = []) => {
+    const taken = [...held];
+    const out = base(from, to, t, now, taken);
+    return taken.includes('phaseAmount') ? out : ringDip(out, from, to, t);
+  };
+};
 
 /** Where a look change is aiming: the room as it is, with the look complete over it. */
 export function targetLook(current: VisualizerSettings, look: Partial<VisualizerSettings>): VisualizerSettings {
@@ -344,6 +409,8 @@ export function blendLooks(from: VisualizerSettings, to: VisualizerSettings, t: 
       // backlight and the paper behind a photograph used to change colour in
       // one frame at the midpoint, the one thing on the wall that visibly cut.
       out[key] = k >= 1 ? b : mixHex(a, b, k);
+    } else if (key === 'sceneMappings' && Array.isArray(a) && Array.isArray(b)) {
+      out[key] = k <= 0 ? a : k >= 1 ? b : crossfadePatches(a as SceneMapping[], b as SceneMapping[], k);
     } else {
       out[key] = past ? b : a;
     }
@@ -364,8 +431,51 @@ export function blendLooks(from: VisualizerSettings, to: VisualizerSettings, t: 
  * the film stock's type are rounded where they are used, so faded they
  * stepped through every value between — 2, 3, 4, 5, 6 folds, or slide film,
  * faded negative and Super 8 on the way to the stock asked for.
+ *
+ * `turingInk` is a hue where 0 means "starch indigo" rather than "red": faded
+ * from 0 to a third it passed 0.01 to 0.1, which is saturated red then orange,
+ * a jump away from the indigo at the first frame, and a fade between two hues
+ * would sweep the whole wheel on its way. A print's colour does not have an
+ * in-between that reads as a blend of the two, so it switches at the midpoint
+ * as a choice does.
  */
-const WHOLE_STEPS: ReadonlySet<string> = new Set(['kaleidoscope', 'stockType']);
+const WHOLE_STEPS: ReadonlySet<string> = new Set(['kaleidoscope', 'stockType', 'turingInk']);
+
+/**
+ * The room-patch list (`sceneMappings`) crossed over rather than switched.
+ *
+ * Each patch is a depth on a setting (the plate's speed riding the room's
+ * motion, say) and the list used to change over in one tick at the middle of a
+ * fade: every patch of the old look gone and every patch of the new one on at
+ * full depth, in one frame. A patch moves a number the picture shows, so that
+ * was a step in the plate's motion at the middle of an otherwise smooth change
+ * (572 of 992 pairs of looks have different lists). Now a patch the old look
+ * has fades its depth out, a patch the new one has fades in, and one both have
+ * (the same source, feature, setting and plate) walks from one depth to the
+ * other. The depth is the only thing that travels; a patch at depth 0 is
+ * skipped by the reader (`sceneMap.ts`), so the end of the fade is the new
+ * list exactly (the `k >= 1` case hands back `to`'s own array, not a copy).
+ *
+ * The audio patches (`audioMappings`) are a sound reading riding a setting
+ * and still switch at the middle: their own shape (a feature name per row, a
+ * fixed number of rows) does not cross over, and they are listed as an open
+ * item in PLAN.md rather than faked here.
+ */
+function crossfadePatches(a: SceneMapping[], b: SceneMapping[], k: number): SceneMapping[] {
+  const id = (m: SceneMapping) => `${m.source ?? 'room'}|${m.feature}|${String(m.setting)}|${m.layer ?? 'all'}`;
+  // Each patch of the new list claims at most one patch of the old, so a list
+  // that names the same aim twice keeps both rather than losing one.
+  const unclaimed = b.filter(Boolean);
+  const out: SceneMapping[] = [];
+  for (const m of a) {
+    if (!m) continue;
+    const at = unclaimed.findIndex(n => id(n) === id(m));
+    const then = at < 0 ? 0 : (unclaimed.splice(at, 1)[0].depth || 0);
+    out.push({ ...m, depth: (m.depth || 0) + (then - (m.depth || 0)) * k });
+  }
+  for (const m of unclaimed) out.push({ ...m, depth: (m.depth || 0) * k });
+  return out;
+}
 
 const HEX = /^#[0-9a-f]{6}$/i;
 function mixHex(a: string, b: string, k: number): string {

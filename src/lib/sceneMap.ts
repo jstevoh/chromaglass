@@ -76,6 +76,8 @@ import { MIX_FADE_KEYS } from './mixer.ts';
 const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
   'frameSway',
+  // A hand's alone too: the tilt is the owner's, and a kick routed to Slosh would be the sound rocking the liquid (lib/slosh.ts).
+  'slosh',
   ...MIX_FADE_KEYS.map(String)]);
 
 export const PATCH_TARGETS = PINNABLE.filter(s =>

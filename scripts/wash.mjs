@@ -66,7 +66,7 @@ const browser = await launchChromium(chromium);
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${process.env.WASH_BASE ?? 'fillmore-1969'}`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${process.env.WASH_BASE ?? 'poster-1969'}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
   /*
     The whole rolled look, not a selection from it.

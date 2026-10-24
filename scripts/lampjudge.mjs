@@ -92,17 +92,18 @@ export const OWNER = {
   // pair at 30 s). The rule kept it on black on the colour gates (0% lit
   // colour on either ground: a graphite look has none to keep) and the bare
   // platen (70%), which for reactions on a platen is the look.
-  'sensual-laboratory': [1, 'the owner found it washed out on black ("looks washed out by the light"); on the lamp its graphite reads dark on the platen'],
+  //
+  // That look retired in PLAN 28i-1, into Turing Print. The override was the
+  // owner's word on that one look, not on Turing Print, so it does not carry
+  // over, and the table is empty until the owner overrules the rule on another.
 };
 
 export const INTENT = {
   classic: ['dish', '"the 1960s overhead projector at its most meditative"'],
   galaxy: ['light', '"spiral arms of starlight swirl through the void"'],
-  'deep-ocean': ['dish', '"light coming through them from below"'],
   cyberpunk: ['light', '"neon fluids": neon is light, not a filter'],
   'acid-trip': ['dish', '"under a turning colour gel": a gel is a filter on a lamp'],
   'bass-drop': ['dish', '"crimson and ultramarine thrown across ice": dye in a dish'],
-  'timbre-shifter': ['dish', 'says nothing of its ground: a dish of fluid'],
   'microscopic-chaos': ['dish', '"a stained slide on a bright field ... under the lamp"'],
   'aurora-borealis': ['light', '"curtains ... across a night sky"'],
   'solar-flare': ['light', '"plumes of plasma ... from a white-hot core"'],
@@ -112,27 +113,20 @@ export const INTENT = {
   'neon-coral-reef': ['dish', '"a reaction grows coral across the glass"'],
   'stardust-collapse': ['light', '"motes of white, lavender and amber dust": glints of light'],
   lumia: ['light', '"Thomas Wilfred\'s aurora: slow folded sheets of light"'],
-  'sensual-laboratory': ['dish', '"reactions on the platen": Mark Boyle\'s overhead projector'],
-  'oil-wheel': ['dish', '"an Optikinetics wheel warming under a 250 W lamp"'],
   'poster-1969': ['dish', '"two opaque dyes on a single plate"'],
-  'oil-on-water': ['picture', '"the macro photograph ... over blue paper": lit from the front'],
-  'colorful-cosmos': ['picture', '"big round drops over a warm gradient ... two lamps": a photograph'],
   'macro-bead': ['dish', '"one travelling bead ... on a deep sea-green ground": a dish, close up'],
   'cell-bloom': ['dish', '"paint cells ... across a magnified violet pool"'],
   'lace-run': ['dish', '"a tongue of amber dye spreading over dark red ground"'],
-  'fillmore-1969': ['dish', '"the Joshua Light Show": overhead projectors'],
   'crowd-plate': ['dish', '"everyone dancing is a hand on the glass"'],
   'milk-marble': ['dish', '"a dish of milk": milk is white, which the lamp gives and black does not'],
   'soap-film': ['picture', '"one sheet of interference colour": reflected light, all but gone in transmission'],
   'oil-and-water': ['dish', '"amber oil on teal water between two glasses"'],
   'red-cabbage': ['dish', '"violet red-cabbage dye as a pH indicator": a dish of dye'],
   'chemical-clock': ['dish', '"the Belousov-Zhabotinsky reaction in a dish of gel"'],
-  agate: ['dish', '"a reagent seeping out through a gel"'],
   'magnet-garden': ['dish', '"black ferrofluid on a bright golden pool"'],
   'lava-lamp': ['dish', '"the plate stood upright over a warm lamp": a lamp behind wax'],
   'home-movie': ['dish', '"a light show filmed on Super 8": a projector'],
   'clock-glass': ['dish', '"two curved clock glasses with coloured oil and water between them ... a thin bright film"'],
-  'ferro-maze': ['dish', '"black ferrofluid on a white light table"'],
   'ferro-paint': ['dish', '"ferrofluid worked through amber, teal and coral dye ... bright cells of colour"'],
   roy: ['picture', '"printed as a Lichtenstein panel": ink on paper, with dense dye printed as black ink'],
 };

@@ -5,7 +5,7 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save, Video,
+  Laptop, Save, Video, User,
   Crosshair,
 } from 'lucide-react';
 import { Slider } from '../ui';
@@ -14,7 +14,9 @@ import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
@@ -161,6 +163,19 @@ export interface PhoneStageProps {
   onSoundDrive: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
+  /*
+    The score (PLAN 28h): the song the show has heard as a lane of sections,
+    its show's cues on it, and the nudge. On the Play sheet under the show's
+    tile, because watching the show against the song and nudging it back into
+    step is playing the show; the same component the desk's Score panel draws,
+    at the phone's sizes.
+  */
+  score?: SongScoreProps;
+  /**
+   * Following a known song's map by ear (PLAN.md 28g-2, lib/followedPlace.ts
+   * `followLine`): which song, and how sure; null with no map to follow.
+   */
+  mapLine: string | null;
   /** Listening but hearing nothing (hooks/useAudioAnalyzer.ts): the dock's dot turns amber and the sound sheet says so. */
   deaf: boolean;
   /*
@@ -229,8 +244,8 @@ export interface PhoneStageProps {
    * opens on a look with the reaction running, as Ben-Day is, because they
    * are the look's own rather than a hand's.
    */
-  reaction: { on: boolean; pattern: number; width: number; print: number };
-  onReaction: (patch: Partial<Pick<VisualizerSettings, 'chemistryPattern' | 'chemistryWidth' | 'turingPrint'>>) => void;
+  reaction: { on: boolean; pattern: number; width: number; print: number; ink: number; drift: number };
+  onReaction: (patch: Partial<Pick<VisualizerSettings, 'chemistryPattern' | 'chemistryWidth' | 'turingPrint' | 'turingInk' | 'turingDrift'>>) => void;
   /**
    * Lamp Ground (PLAN 18b): what the dye is seen on, black or the lamp
    * shining up through it. On the Looks sheet, always: it turns a look
@@ -262,6 +277,9 @@ export interface PhoneStageProps {
    */
   clearFilm: number;
   onClearFilm: (v: number) => void;
+  // Slosh: how far a tilt sloshes the liquid (lib/slosh.ts), beside the Tilt tile.
+  slosh: number;
+  onSlosh: (v: number) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -278,6 +296,7 @@ export interface PhoneStageProps {
   onFullLayout: () => void;
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
+  onOpenAccount?: () => void;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
@@ -368,6 +387,7 @@ export function PhoneStage(p: PhoneStageProps) {
     return () => clearTimeout(t);
   }, [zoomed]);
 
+  const accountShows = useAccountShows();
   const groups = [...new Set(p.looks.map(l => l.group))];
 
   return (
@@ -393,6 +413,18 @@ export function PhoneStage(p: PhoneStageProps) {
           <ChevronDown size={16} className="shrink-0 text-muted" />
         </button>
         <div className="pointer-events-auto flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
+          {p.onOpenAccount && (
+            <button
+              type="button"
+              onClick={p.onOpenAccount}
+              aria-label="Account"
+              data-cg-account-open=""
+              className="flex h-12 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 active:bg-active"
+            >
+              <User size={15} className="shrink-0 text-amber-300" />
+              <span>Account</span>
+            </button>
+          )}
           <button
             onClick={p.onZoom}
             aria-pressed={zoomed}
@@ -448,6 +480,27 @@ export function PhoneStage(p: PhoneStageProps) {
       )}
 
       <div className="flex-1" />
+
+      {accountShows.length > 0 && !sheet && !amountOpen && (
+        <div className="pointer-events-auto mx-3 mb-2 flex flex-col gap-1.5" data-testid="account-shows">
+          {accountShows.map((show) => (
+            <button
+              key={show.id}
+              type="button"
+              onClick={() => joinAccountShow(show)}
+              data-testid="account-show-join"
+              data-cg-account-show={show.id}
+              className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-xl border border-border-strong bg-surface/90 px-3.5 py-2 text-left text-[14px] font-medium text-text backdrop-blur-xl"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                <span className="truncate">{show.name}</span>
+              </span>
+              <span className="shrink-0 text-[13px] font-medium text-accent-text">Join show</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── The tool's Amount, when its button is tapped again ── */}
       {amountOpen && (
@@ -784,7 +837,11 @@ export function PhoneStage(p: PhoneStageProps) {
                 display={`${Math.round(p.reaction.width * 100)}%`} touch testId="phone-reaction-width" midiKey="setting:chemistryWidth" />
               <Slider label="Turing Print" value={p.reaction.print} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingPrint: v })}
                 display={`${Math.round(p.reaction.print * 100)}%`} touch testId="phone-turing-print" midiKey="setting:turingPrint" />
-              <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp.</p>
+              <Slider label="Print Ink" value={p.reaction.ink} min={0} max={1} step={0.01} onChange={(v) => p.onReaction({ turingInk: v })}
+                display={p.reaction.ink > 0 ? `${Math.round(p.reaction.ink * 360)}°` : 'Starch'} touch testId="phone-turing-ink" midiKey="setting:turingInk" />
+              <Slider label="Print Drift" value={p.reaction.drift} min={0} max={1} step={0.05} onChange={(v) => p.onReaction({ turingDrift: v })}
+                display={p.reaction.drift > 0 ? `${Math.round(p.reaction.drift * 100)}%` : 'Still'} touch testId="phone-turing-drift" midiKey="setting:turingDrift" />
+              <p className="-mt-3 text-[12px] leading-snug text-dim">The reaction growing on the plate: its pattern, the stripe's width, and starch in the dish, which prints it black on the lamp, or another indicator's colour.</p>
             </div>
           )}
           {/* The second projector's look routing (§16a) is temporarily hidden per user request */}
@@ -873,6 +930,14 @@ export function PhoneStage(p: PhoneStageProps) {
               {p.songLine ? <>The song: <span className="text-text">{p.songLine}</span></> : 'Listening for builds, drops and breakdowns.'}
             </p>
           )}
+          {/*
+            The desk's track panel says the same under its playhead: whether
+            the show reads the song's map where the band is heard to be, or,
+            unsure, follows the song's shape above.
+          */}
+          {p.audioSource !== 'none' && p.mapLine && (
+            <p className="mt-2 text-[13px] leading-snug text-muted" role="status" data-testid="phone-song-map">{p.mapLine}</p>
+          )}
           {p.audioSource !== 'none' && (
             <div className={`mt-3 transition-opacity ${p.show.running ? '' : 'opacity-50'}`}>
               <Slider label="Follow the song" value={p.songFollow} min={0} max={1} step={0.01} onChange={p.onSongFollow}
@@ -916,7 +981,17 @@ export function PhoneStage(p: PhoneStageProps) {
               {p.show.paused ? `${p.show.name ?? 'The show'} is paused.` : `Playing ${p.show.name ?? 'a show'}${p.show.scenes ? ': a scene every twenty-odd seconds, the light going down between them.' : '.'}`}
             </p>
           )}
-          {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level.</p>}
+          {p.score && (
+            <>
+              <SectionLabel>The song</SectionLabel>
+              <SongScore {...p.score} touch />
+            </>
+          )}
+          {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level. Tip it one way and then the other, and with Slosh up it slops across.</p>}
+          <div className="mt-3">
+            <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
+              display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />
+          </div>
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
@@ -1022,11 +1097,33 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.onPlayScreen && <Tile icon={Waves} label="Play screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
+            {p.onOpenAccount && <Tile icon={Settings} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
           </div>
+          {accountShows.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">
+              <SectionLabel>Running shows on your account</SectionLabel>
+              {accountShows.map((show) => (
+                <button
+                  key={show.id}
+                  type="button"
+                  onClick={() => { close(); joinAccountShow(show); }}
+                  data-testid="account-show-join"
+                  data-cg-account-show={show.id}
+                  className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-lg border border-border-strong bg-elevated px-3.5 py-2 text-left text-[14px] font-medium text-text active:bg-active"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                    <span className="truncate">{show.name}</span>
+                  </span>
+                  <span className="shrink-0 text-[13px] font-medium text-accent-text">Join show</span>
+                </button>
+              ))}
+            </div>
+          )}
           <p className="mt-3 text-[12px] leading-snug text-dim">
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
             {p.onPlayScreen && ' Play screen is the simple one: the plate, the dyes and three hands.'}

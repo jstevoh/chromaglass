@@ -1,6 +1,8 @@
 import { useRef, type CSSProperties } from 'react';
 import { curveOf, handValueAt, travelOf } from '../../lib/midi';
+import { helpFor } from '../../lib/controlHelp';
 import type { VisualizerSettings } from '../../types';
+import { useControlTip } from './ControlTip';
 
 /*
   The touch slider (Desk v2's design system, "Touch slider"): one row 44
@@ -34,7 +36,7 @@ import type { VisualizerSettings } from '../../types';
 const DOUBLE_TAP_MS = 320;
 const DOUBLE_TAP_PX = 24;
 
-export function TouchSlider({ label, value, min, max, setting, onChange, display, glass, testId, resetTo }: {
+export function TouchSlider({ label, value, min, max, setting, onChange, display, glass, testId, resetTo, help }: {
   label: string;
   value: number; min: number; max: number;
   /** The setting it rides, for its curve. */
@@ -45,13 +47,24 @@ export function TouchSlider({ label, value, min, max, setting, onChange, display
   testId?: string;
   /** Where a double tap puts it back: the look's own value. */
   resetTo?: number;
+  /** What it does, one line. The setting's own line is found by `setting`. */
+  help?: string;
 }) {
+  /*
+    The label is 84 px and cut to fit, and a phone has no hover. The name is
+    the button: a tap (or a hold, which a touch browser sends as the same
+    click) opens the card with the whole name, what it does and the value.
+    The dotted underline is the same mark the desk uses for "there is more".
+  */
+  const line = help ?? helpFor(setting);
+  const tip = useControlTip({ name: label, help: line, value: display });
   const lastTap = useRef<{ t: number; x: number } | null>(null);
   const curve = setting ? curveOf(setting) : 1;
   const at = Math.max(0, Math.min(1, travelOf(value, min, max, curve)));
   const style = { '--fill': `${at * 100}%`, ...(glass ? { '--color-track': 'rgba(255,255,255,.14)' } : {}) } as CSSProperties;
   return (
     <div
+      ref={el => { tip.anchor.current = el; }}
       className="flex h-11 items-center gap-3"
       data-testid={testId}
       onPointerUp={resetTo === undefined ? undefined : e => {
@@ -64,7 +77,22 @@ export function TouchSlider({ label, value, min, max, setting, onChange, display
         lastTap.current = { t: e.timeStamp, x: e.clientX };
       }}
     >
-      <span className="w-[84px] shrink-0 truncate text-[14px] font-medium text-text-2">{label}</span>
+      {tip.card}
+      {line ? (
+        <button
+          type="button"
+          onClick={tip.toggle}
+          onContextMenu={e => e.preventDefault()}
+          // A tap on the name is not half of a double tap on the value.
+          onPointerUp={e => e.stopPropagation()}
+          aria-expanded={tip.open}
+          aria-describedby={tip.open ? tip.id : undefined}
+          data-info="name"
+          className="h-11 w-[84px] shrink-0 select-none truncate text-left text-[14px] font-medium text-text-2 underline decoration-dotted decoration-white/25 underline-offset-4 [-webkit-touch-callout:none]"
+        >{label}</button>
+      ) : (
+        <span className="w-[84px] shrink-0 truncate text-[14px] font-medium text-text-2">{label}</span>
+      )}
       <input
         type="range"
         min={0} max={1} step={0.001}

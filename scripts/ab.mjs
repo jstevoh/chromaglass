@@ -15,7 +15,7 @@
  * is only one of it.
  *
  *   npm run ab -- --preset macro-bead --set particles=0.8
- *   npm run ab -- --preset fillmore-1969 --set "particles=0.7;particleMix=0.3"
+ *   npm run ab -- --preset poster-1969 --set "particles=0.7;particleMix=0.3"
  *   npm run ab -- --preset macro-bead --set particles=0.8 --settle 10
  *
  * It writes `before.png` and `after.png` and prints what `scripts/detail.mjs`
@@ -43,7 +43,7 @@ const argOf = (name, fallback) => {
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
 
-const PRESET = argOf('preset', 'fillmore-1969');
+const PRESET = argOf('preset', 'poster-1969');
 const SECONDS = Number(argOf('seconds', 34)) || 34;
 const SETTLE = Number(argOf('settle', 6)) || 6;
 const WIDTH = Number(argOf('width', 1400)) || 1400;
@@ -75,7 +75,7 @@ await new Promise((r) => setTimeout(r, 2500));
 fs.mkdirSync(OUT, { recursive: true });
 const browser = await launchChromium(chromium);
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-await page.addInitScript(() => { try { localStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
+await page.addInitScript(() => { try { sessionStorage['chromaglass-audio-source'] = 'simulated'; } catch { /* first run */ } });
 await installFrameReader(page);
 await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=classic`, { waitUntil: 'load' });
 await page.mouse.click(8, 8);
