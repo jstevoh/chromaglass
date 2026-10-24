@@ -5451,13 +5451,21 @@ Not a gate and no bar: a rate depends on what was pushed.
   the first harness. Found on the way: **Playwright's own check of this does nothing
   in 1.63** — it looks for binaries in `chrome-linux` while the linux-x64 builds unpack
   to `chrome-linux64`, and it skips itself for 30 days behind a `DEPENDENCIES_VALIDATED`
-  file that the cache now carries from runner to runner — so before this, a missing
-  library could never have been named on CI. Measured in a cloud session: 13 binaries
-  checked, both launches, 3.4 s; with an `ldd` that reports `libatk-1.0.so.0` missing,
-  exit 1 naming it in both builds; with no build in place, exit 1 saying so. The
+  file that the cache now carries from runner to runner — so before this, a library
+  missing from Chromium's own binary was named only in the first harness's launch error,
+  mid-shard, and one missing from a helper not at all. Measured in a cloud session: 13
+  binaries checked, 3.4 s; with an `ldd` that reports `libatk-1.0.so.0` missing, exit 1
+  naming it in both builds; with an `ldd` that fails, or no build in place, exit 1
+  saying so. The two launches there both start the sandbox's full Chromium
+  (`chromiumPath`), so the headless shell's own launch is first run on CI. The
   ffmpeg step keeps fetching every run (it is a real need) with apt's own retries
-  and a 30 s stall timeout added. Left: the fonts no longer installed; the step prints
-  the runner's `sans-serif` and `emoji` fallbacks so a font change shows in the log.
+  and a 30 s stall timeout added.
+  - **19ab-3. Open: the runner's fonts are printed, not held.** `--with-deps` pinned
+    fonts-liberation and fonts-noto-color-emoji; they are on the runner today
+    (its preinstalled Google Chrome depends on them), but an image that drops them
+    would move the layout and phone checks' text measurements with nothing red. The
+    step prints `fc-match sans-serif` and `emoji`; make it fail on a fallback that
+    is not the one the checks were measured with, once CI's own reading is known.
 
 ## 20. Lace and holes: a pale film torn open over colour
 

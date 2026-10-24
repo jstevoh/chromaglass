@@ -34,8 +34,10 @@
  * days once a `DEPENDENCIES_VALIDATED` file sits in the browser's directory, and
  * since #444 that directory comes out of `actions/cache`, marker and all, from
  * whichever runner first filled it. A launch alone is not enough either: a
- * library missing from Chromium's own binary stops the launch, but one missing
- * from a helper it starts later only shows when that helper is needed. ldd over
+ * library missing from Chromium's own binary stops the launch (the loader's
+ * "error while loading shared libraries" is in Playwright's error, but only in
+ * the first harness to launch, mid-shard), while one missing from a helper it
+ * starts later shows only when that helper is needed. ldd over
  * every binary in both directories, on this runner, every run, takes a second.
  *
  * Why both browsers. The harnesses start Playwright's headless shell
@@ -92,6 +94,14 @@ for (const build of builds) {
       encoding: 'utf8',
       env: { ...process.env, LD_LIBRARY_PATH: [process.env.LD_LIBRARY_PATH, dirname(path)].filter(Boolean).join(':') },
     });
+    // An ldd that is missing or fails would read as "nothing missing" and
+    // quietly leave only the launches: so either is a failure, except on a
+    // file the loader does not link at all (a static helper), which is fine.
+    const said = `${r.stdout || ''}${r.stderr || ''}`;
+    if (r.error || (r.status !== 0 && !/not a dynamic executable/.test(said))) {
+      failures.push(`ldd could not read ${path.slice(registry.length + 1)}: ${r.error ? r.error.message : said.trim() || `exit ${r.status}`}`);
+      continue;
+    }
     for (const line of (r.stdout || '').split('\n')) {
       const m = line.trim().match(/^(\S+) => not found$/);
       if (m) missing.set(m[1], [...(missing.get(m[1]) || []), path.slice(registry.length + 1)]);

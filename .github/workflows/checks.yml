@@ -617,7 +617,7 @@ jobs:
           node scripts/chromiumlibs.mjs && exit 0
           echo "::warning title=Chromium's system libraries::the runner is missing one (listed above); installing Playwright's packages from apt"
           printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-ci-retries > /dev/null
-          npx playwright install-deps chromium
+          npx playwright install-deps chromium || { echo "::error title=Chromium's system libraries::a library is missing (listed above) and apt could not install Playwright's packages"; exit 1; }
           node scripts/chromiumlibs.mjs || { echo "::error title=Chromium's system libraries::still missing after apt (listed above); every browser check after this fails on it"; exit 1; }
       # Every shader compiles, on SwiftShader, in two seconds (PLAN.md 19b).
       # It runs again on the Mac's show shard, against Metal; here it is found
