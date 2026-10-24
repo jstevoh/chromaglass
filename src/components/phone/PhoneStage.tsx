@@ -8,7 +8,9 @@ import {
   Laptop, Save, Video, User,
   Crosshair,
 } from 'lucide-react';
-import { Slider } from '../ui';
+import { Slider, Toggle } from '../ui';
+import { TiltPad } from '../ui/TiltPad';
+import { bearingName, readSpring, writeSpring } from '../../lib/tiltPad';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -270,6 +272,10 @@ export interface PhoneStageProps {
   // Slosh: how far a tilt sloshes the liquid (lib/slosh.ts), beside the Tilt tile.
   slosh: number;
   onSlosh: (v: number) => void;
+  // The tilt pad (PLAN 18a-13f): Gravity and Tilt Direction as a stick under the thumb, for a phone with no motion sensor, an iPad on a stand, or a hand that wants to flick the liquid across without tipping the glass.
+  gravity: number;
+  tiltDirection: number;
+  onTilt: (t: { upright: number; direction: number }) => void;
   barLine: string;
   /*
     The mixer (lib/mixer.ts): the same panel the desk and the settings sheet
@@ -309,6 +315,28 @@ function PhoneSheet({ title, onClose, children, testId }: { title: string; onClo
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-2">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The tilt pad on the phone (PLAN 18a-13f), a thumb's size. While the motion
+ * sensor is steering (Tilt is on) the pad shows where the plate is and does
+ * not take a drag, or the two would fight over the same two numbers.
+ */
+function PhoneTiltPad({ gravity, direction, onTilt, sensorOn }: {
+  gravity: number; direction: number; onTilt: (t: { upright: number; direction: number }) => void; sensorOn: boolean;
+}) {
+  const [spring, setSpring] = useState(readSpring);
+  return (
+    <div className="flex flex-col items-center gap-2" data-testid="phone-tilt-pad-block">
+      <TiltPad upright={gravity} direction={direction} onTilt={onTilt} spring={spring} size={224} disabled={sensorOn} testId="phone-tilt-pad" />
+      <div className="font-mono text-[13px] text-text-2" data-testid="phone-tilt-says">
+        {gravity > 0 ? `${Math.round(gravity * 100)}% · runs ${bearingName(direction)}` : 'Level'}
+      </div>
+      <div className="w-full">
+        <Toggle label="Spring back" on={spring} onChange={v => { setSpring(v); writeSpring(v); }} testId="phone-tilt-spring" />
       </div>
     </div>
   );
@@ -973,6 +1001,8 @@ export function PhoneStage(p: PhoneStageProps) {
             </>
           )}
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level. Tip it one way and then the other, and with Slosh up it slops across.</p>}
+          <SectionLabel>Tip the plate</SectionLabel>
+          <PhoneTiltPad gravity={p.gravity} direction={p.tiltDirection} onTilt={p.onTilt} sensorOn={p.tilt.on} />
           <div className="mt-3">
             <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
               display={`${Math.round(p.slosh * 100)}%`} touch testId="phone-slosh" midiKey="setting:slosh" />

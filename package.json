@@ -118,6 +118,7 @@
     "dish": "node scripts/dish.mjs",
     "turntable": "node --experimental-strip-types scripts/turntable.mjs",
     "slosh": "node --experimental-strip-types scripts/slosh.mjs",
+    "tiltpad": "npm run build && node --experimental-strip-types scripts/tiltpad.mjs",
     "sloshgpu": "node --experimental-strip-types scripts/sloshgpu.mjs",
     "flick": "npm run build && node scripts/flick.mjs",
     "swirlcost": "npm run build && node scripts/swirlcost.mjs",

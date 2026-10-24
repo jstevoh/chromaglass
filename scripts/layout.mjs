@@ -347,7 +347,7 @@ try {
     const deck = await measureIn('[data-testid="desk-deck"]');
     // Each panel drew its own body, not just its frame: a section's knobs, the
     // section itself (with that section in it), or the desk panel's own list.
-    const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer', score: 'song-score' };
+    const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', tilt: 'tilt-panel', phone: 'phone-link', mixer: 'deck-mixer', score: 'song-score' };
     // Why each one failed, so a red run says which of three things it was:
     // the panel never reached the deck, it did and drew no body, or the body
     // is there and has no height.
