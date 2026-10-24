@@ -228,8 +228,17 @@ jobs:
       # byte-identical. Then the shelf's real MP3s, decoded with ffmpeg, which
       # the ubuntu runner does not have until it is installed here; with no
       # decoder the script fails on CI rather than skipping the real music.
+      # Bounded for the reason in PLAN 19ab: on 2026-10-22 this step hung twice,
+      # 1474 s and 1471 s, both ended by the job's 25-minute wall rather than by
+      # finishing, against 22 s on the runs either side of the outage. The sound
+      # shard's own work is about three minutes, so an unbounded apt buries it on
+      # its own and the shard dies before its first sound check runs — every PR in
+      # the repo red for an hour, whatever it changed. Four minutes is ten times
+      # the warm cost; past that the mirror is not answering and the useful
+      # output is this step's name, not a cancelled harness.
       - name: ffmpeg, for the shelf and the render's files
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        timeout-minutes: 4
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: The bands
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
@@ -538,8 +547,39 @@ jobs:
       # mode switch stays put. The same measurements run again inside the show
       # night on macOS; here they fail in two minutes rather than fifteen, and
       # before the GPU shards have a chance to hide them behind another step.
+      # The browser is fetched inside the same 25 minutes as the measuring, so a
+      # cold download is a red with nothing wrong in the diff (PLAN 19ab). On
+      # 2026-10-22 this step took 650 s on the browser shard and 683 s on the lab
+      # shard, against 33 s where the browser was already on the runner; the
+      # browser shard's own work is about eighteen minutes, so eleven minutes of
+      # download puts it at twenty-nine against a limit of twenty-five and the
+      # harnesses are cancelled mid-flight. Two PRs went red that way in one
+      # afternoon, neither of them touching a browser check.
+      #
+      # Keyed on the Playwright version alone, not on the lockfile's hash: the
+      # browser build a given version installs never changes, so the version is
+      # the whole of what the cache depends on, while a lockfile key would throw
+      # the browser away on every unrelated dependency bump and pay the eleven
+      # minutes again. Read from the installed package rather than parsed out of
+      # the lockfile, so it is the version actually in use.
+      - name: Which Playwright
+        id: pw
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
+        run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: The browser, from the cache when it is there
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ steps.pw.outputs.v }}
+      # `--with-deps` still runs apt for the system libraries, which the cache
+      # above does not hold, so this step can still meet a slow mirror. Six
+      # minutes is about ten times the warm cost and well under the work it would
+      # otherwise cancel: a mirror that is not answering now fails as itself, with
+      # this step's name on it, instead of reading as a harness that hung.
       - name: Install Chromium
         if: ${{ !cancelled() && steps.install.outcome == 'success' && (matrix.part == 'browser' || matrix.part == 'lab') }}
+        timeout-minutes: 6
         run: npx playwright install --with-deps chromium
       # Every shader compiles, on SwiftShader, in two seconds (PLAN.md 19b).
       # It runs again on the Mac's show shard, against Metal; here it is found
@@ -842,7 +882,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The Mac shards have headroom (19w) and no Metal-side download has gone slow
+      # yet, but the fetch is as unbounded here as the two above were, and the Mac
+      # queue is the one that costs: bound it so a slow mirror spends six minutes
+      # and names itself rather than eating a shard's budget before its checks.
       - name: Install Chromium
+        timeout-minutes: 6
         run: npx playwright install chromium
       # Once, first: the scripts run with plain `node` read the built app.
       - name: Build
@@ -1418,8 +1463,12 @@ jobs:
       # ffmpeg is not on the macOS image; imageio-ffmpeg is a static build that
       # scripts/watch.mjs finds by itself. Homebrew's Python refuses a plain
       # pip install (PEP 668), hence the second try.
+      # Bounded with the other fetches (PLAN 19ab): two pip tries against PyPI on
+      # the shard that costs the Mac queue most, and nothing above stops them
+      # taking the shard's whole budget.
       - name: ffmpeg, to watch a take
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
+        timeout-minutes: 5
         run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
       - name: The show keeps moving
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
