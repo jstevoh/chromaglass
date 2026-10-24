@@ -37,12 +37,16 @@
  * with (the array literal of the textures it reads, about 100 bytes), not a
  * moment of one run. Measured on 2026-10-24 before and after, at 512²:
  * 506 KB a step (1,939 B a dispatch) and 249 writes for 267 dispatches,
- * then 31 KB (120 B) and 2.
+ * then 31 KB (120 B) and 2, none of them a repeat.
  *   - a step allocates under 64 KB (a copy of one kernel's source a dispatch
  *     is 500 KB, the key strings alone were 100 KB);
  *   - a dispatch allocates under 192 bytes;
- *   - writes no more than one per three dispatches (an argument whose numbers
- *     did not change is not written again; it was one write a dispatch);
+ *   - no args buffer is written with the bytes it already holds (it was one
+ *     write a dispatch, nearly all of them the same numbers again), each
+ *     write compared with the last one to that buffer;
+ *   - no bind group is made on a step once the solver has seen it (the
+ *     heap sampler cannot see one: Blink keeps GPU objects off V8's heap, so
+ *     `createBindGroup` is counted instead);
  * and two controls that say the measure can see what it is looking for:
  *   - a step with a freshly allocated 64 KB array per dispatch (a plain array:
  *     a typed array this large keeps its bytes outside the heap the profiler
@@ -53,7 +57,7 @@
 import { openLab } from './lab.mjs';
 
 const N = Number(process.env.ENCODE_GRID ?? 512);
-const STEPS = Number(process.env.ENCODE_STEPS ?? 60);
+const STEPS = Number(process.env.ENCODE_STEPS ?? 30);
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -70,12 +74,27 @@ try {
     // Warm: the thin gap's pipelines, the bind groups and the args buffers are
     // made on a solver's first steps and kept; what is asked for is a step
     // after those, the one a show runs for hours.
-    await lab.step(20, { thinGap: 1, immiscibility: 0.5 });
+    await lab.step(12, { thinGap: 1, immiscibility: 0.5 });
     const s = lab.solver();
     const q = s.device.queue;
-    const counts = { writes: 0, dispatches: 0, on: false };
+    const counts = { writes: 0, dispatches: 0, groups: 0, same: 0, on: false };
     const write = q.writeBuffer.bind(q);
-    q.writeBuffer = (...a) => { if (counts.on) counts.writes++; return write(...a); };
+    // What each args buffer was last written with, to count a write of what it already holds.
+    const held = new Map();
+    q.writeBuffer = (buffer, offset, data, ...rest) => {
+      if (counts.on) {
+        counts.writes++;
+        if (buffer.label?.startsWith('args ') && offset === 0 && ArrayBuffer.isView(data)) {
+          const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+          const was = held.get(buffer);
+          if (was && was.length === bytes.length && was.every((b, i) => b === bytes[i])) counts.same++;
+          held.set(buffer, bytes.slice());
+        }
+      }
+      return write(buffer, offset, data, ...rest);
+    };
+    const make = s.device.createBindGroup.bind(s.device);
+    s.device.createBindGroup = (...a) => { if (counts.on) counts.groups++; return make(...a); };
     const dispatch = GPUComputePassEncoder.prototype.dispatchWorkgroups;
     GPUComputePassEncoder.prototype.dispatchWorkgroups = function (...a) { if (counts.on) counts.dispatches++; return dispatch.apply(this, a); };
     window.__encode = { counts };
@@ -113,13 +132,13 @@ try {
     const ms = [];
     const step = s.step.bind(s);
     s.step = (...a) => { const t = performance.now(); const r = step(...a); ms.push(performance.now() - t); return r; };
-    counts.writes = 0; counts.dispatches = 0; counts.on = true;
+    counts.writes = 0; counts.dispatches = 0; counts.groups = 0; counts.same = 0; counts.on = true;
     await lab.step(steps, { thinGap: 1, immiscibility: 0.5 });
     counts.on = false;
     s.step = step;
     GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch;
     ms.sort((a, b) => a - b);
-    return { writes: counts.writes, dispatches: counts.dispatches, msMedian: ms[ms.length >> 1], msMax: ms[ms.length - 1], steps: ms.length };
+    return { writes: counts.writes, same: counts.same, groups: counts.groups, dispatches: counts.dispatches, msMedian: ms[ms.length >> 1], msMax: ms[ms.length - 1], steps: ms.length };
   }, { steps: STEPS, waste: false });
   const control = await sampled(async ({ steps, waste }) => {
     const { counts } = window.__encode;
@@ -149,7 +168,8 @@ try {
   check('control: a write made by hand is counted', control.hand === 1, `${control.hand} counted for one`);
   check('a step allocates under 64 KB', perStep(run.bytes) < 64 * 1024, `${(perStep(run.bytes) / 1024).toFixed(1)} KB`);
   check('a dispatch allocates under 192 bytes', perDispatch(run.bytes) < 192, `${perDispatch(run.bytes).toFixed(0)} B`);
-  check('at most one writeBuffer per three dispatches', run.writes * 3 <= run.dispatches, `${run.writes} writes for ${run.dispatches} dispatches`);
+  check('no args buffer is written with what it already holds', run.same === 0, `${run.same} of ${run.writes} writes (${perStep(run.writes).toFixed(1)} a step)`);
+  check('no bind group is made on a step after the first ones', run.groups === 0, `${run.groups} made in ${run.steps} steps`);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

@@ -601,12 +601,13 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       was (a load that went away is won back as soon as before) and makes
       the fifth a matter of twenty-four minutes.
     */
-    const hunt = (minutes, cooledAt = Infinity) => {
+    const hunt = (minutes, cooledAt = Infinity, burst = null) => {
       const g = new QualityGovernor(rungs, 1, 0);
       let now = 0;
       const moves = [];
       while (now < minutes * 60) {
-        const ms = g.rungIndex <= 1 && now < cooledAt ? 26 : 16;
+        const inBurst = burst !== null && now >= burst && now < burst + 4;
+        const ms = inBurst || (g.rungIndex <= 1 && now < cooledAt) ? 26 : 16;
         now += ms / 1000;
         if (g.sample(ms / 1000, 1, now, false, ms - 10)) moves.push({ at: now, index: g.rungIndex });
       }
@@ -626,6 +627,17 @@ for (const devicePx of [1, 1.5, 2, 3]) {
     check('a machine that cooled gets its rung back within the longest wait (24 min)',
       cooled.g.rungIndex <= 1 && cooled.moves.some((m) => m.at > 600 && m.index <= 1 && m.at < 600 + 24 * 60 + 30),
       `on rung ${cooled.g.rungIndex} after 40 minutes; climbs after cooling at ${cooled.moves.filter((m) => m.at > 600 && m.index <= 1).map((m) => m.at.toFixed(0)).join(', ')} s`);
+    /*
+      And it forgets. The same hunt for half an hour, the machine cooling,
+      an hour held on the rung, then one four-second burst (a tab, a held
+      tool): the first version of the doubling remembered the half hour and
+      waited 24 minutes to climb back (the check-skeptic's model). Ten
+      minutes held clears the count, so it is the first retry's wait again.
+    */
+    const burst = hunt(100, 1800, 5400);
+    const back = burst.moves.find((m) => m.at > 5404 && m.index <= 1);
+    check('a rung held for an hour and lost to a 4 s burst is back within 150 s',
+      back !== undefined && back.at - 5400 <= 150, back ? `back ${(back.at - 5400).toFixed(0)} s after the burst` : 'not back in 100 minutes');
   }
 
   {

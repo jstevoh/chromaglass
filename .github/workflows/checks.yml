@@ -598,7 +598,8 @@ jobs:
       # PLAN.md Wave 4.1, H2c-4): the bytes it allocates and the writes it
       # makes a dispatch, counted in the page by Chromium's own heap sampler.
       # JavaScript's cost, which is the same on SwiftShader as on Metal, so it
-      # sits here rather than in the Mac queue. About two minutes.
+      # sits here rather than in the Mac queue. Two to five minutes,
+      # most of it SwiftShader stepping a 512² plate.
       - name: A step asks for nothing it throws away
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run encode

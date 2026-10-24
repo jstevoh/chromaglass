@@ -61,6 +61,14 @@ const HELD_RETRY_AFTER_S = 30;
  * burst of work that says less about the rung.
  */
 const RETRY_DOUBLINGS = 4;
+/**
+ * And it forgets: ten minutes on one rung, step rate and post level with no
+ * move, and the counts for those and everything easier go back to nothing.
+ * Without this a show that hunted early and then held its rung for an hour
+ * lost it to one four-second burst and waited 24 minutes to have it back
+ * (the check-skeptic's model of the first version; `npm run rungs`).
+ */
+const FORGIVE_AFTER_S = 600;
 
 /**
  * How many solver steps a second to ask for (H2b, docs/roadmap.md).
@@ -113,6 +121,8 @@ export class QualityGovernor {
   private slowSince: number | null = null;
   private fastSince: number | null = null;
   private settleUntil: number;
+  /** When it last moved anything (seconds), for `FORGIVE_AFTER_S`. */
+  private lastMoveAt: number;
   private everSteppedDown = false;
   private hugeStreak = 0;
   private post: PostLevel = 0;
@@ -147,6 +157,7 @@ export class QualityGovernor {
     this.start = this.index;
     this.pinned = pin;
     this.settleUntil = now + SETTLE_S;
+    this.lastMoveAt = now;
   }
 
   get rung(): QualityRung {
@@ -274,6 +285,7 @@ export class QualityGovernor {
     this.emaWork += (Math.max(workMs, gpuMs) - this.emaWork) * 0.1;
 
     if (now < this.settleUntil) return false;
+    if (now - this.lastMoveAt >= FORGIVE_AFTER_S) this.forgive();
 
     if (this.emaFrame > SLOW_MS) {
       this.fastSince = null;
@@ -400,7 +412,16 @@ export class QualityGovernor {
     return RETRY_AFTER_S * 2 ** Math.min(RETRY_DOUBLINGS, Math.max(0, n - 1));
   }
 
+  /** What it holds now has held: its counts, and those of everything easier, start again. */
+  private forgive(): void {
+    for (const [which, at] of [['rung', this.index], ['post', this.post], ['steps', this.steps]] as const) {
+      const m = this.failCounts[which];
+      for (const k of m.keys()) if (k >= at) m.delete(k);
+    }
+  }
+
   private moved(now: number): boolean {
+    this.lastMoveAt = now;
     this.settleUntil = now + SETTLE_S;
     this.slowSince = null;
     this.fastSince = null;

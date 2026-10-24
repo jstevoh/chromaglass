@@ -1526,7 +1526,7 @@ whether the wall and the laptop hitch together, and whether the hitch is the liq
 picture (the second is a dropped frame, a different thing). Also say if the quality ever visibly
 steps down and back up again: it should do that once at most, early, not every minute and a half.
 
-Measured: `npm run cadence` (the old loop, modelled on a 60 Hz display, stopped or doubled the
-liquid on 11–44 % of frames depending on where its remainder sat; the new clock on none, at 60,
-59.94, 120 and 30 Hz and at thirty steps); `npm run encode` (a step's garbage 506 KB → 31 KB);
+Measured: `npm run cadence` (the old loop, modelled, stopped or doubled the liquid on 7–40 % of
+frames on 60, 59.94 and 120 Hz displays, by the median of nine seeds; the new clock on none, and
+it keeps time with the wall up at another refresh rate); `npm run encode` (a step's garbage 506 KB → 31 KB);
 `npm run rungs` (a rung the machine cannot hold retried 38 times in half an hour → 10).
