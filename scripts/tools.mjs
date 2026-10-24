@@ -350,7 +350,7 @@ try {
   const fSlack = 0.15 * fa.total + 5;
   const fDelta = fb.total - fa.total;
   check('and adds none', fPooled && fQuiet && fDelta >= fMinIdle - fSlack && fDelta <= fMaxIdle + fSlack,
-    `${!fPooled ? `no pool to judge (${fa.total.toFixed(1)}); ` : !fQuiet ? 'the plate was not quiet, so nothing below is the hand; ' : ''}${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(0)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(0)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(0)}] ± ${fSlack.toFixed(0)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after`);
+    `${!fPooled ? `no pool to judge (${fa.total.toFixed(1)}); ` : !fQuiet ? 'the plate was not quiet, so nothing below is the hand; ' : ''}${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(2)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(2)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(2)}] ± ${fSlack.toFixed(1)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(2)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(2)} after`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
   /*
@@ -453,6 +453,45 @@ try {
       `${matched ? ' — within a tenth, so the same stage of the pool' : ' — not the same stage of the pool, so this run says nothing'}`);
     if (cVoid) console.log(`    the control measured nothing${!(ca.total > 5) ? ` (no pool: ${ca.total.toFixed(1)})` : ''}\n`);
     else console.log(`    with no stroke the second window is ${gap <= fQuietBar ? 'not' : ''} biased by where it sits in the run\n`);
+  }
+  /*
+    The noise `fSlack` is set from, measured where it lives.
+
+    The bar above is only as sharp as the plate's noise allows, and that noise
+    is a property of the runner: the pool a 1.5 s Drop lays follows the
+    machine's speed (49 to 356 across CI's shards, 611 on the owner's Mac), and
+    a thin pool is where advection's rounding is largest against what is
+    there. One run reads one pool, so a slack set from the shards' own `adds
+    none` lines needs forty pushes. This repeats the same stroke on the same
+    helpers, cycling the Drop's hold so one runner reads thin pools and thick
+    ones, and prints each with the hand's excess over the plate's own bracket,
+    as a share of the pool. Reporting, not gating. Set TOOLS_FINGER_TRIALS=<n>.
+  */
+  const fTrials = Number(process.env.TOOLS_FINGER_TRIALS ?? 0);
+  if (fTrials > 0) {
+    const holds = [300, 600, 1000, 1500];
+    let worst = 0, worstShare = 0;
+    for (let i = 0; i < fTrials; i++) {
+      await clear();
+      await hold('dropper', A, holds[i % holds.length]);
+      await settle(1500);
+      await settle(3000);
+      const tIdle = await idleChange(A, 3800);
+      const t0p = await snap('trial0');
+      await stroke('finger', A, B, 1500, 1500);
+      await settle(700);
+      await snap('trial1');
+      const ta = await measure('trial0', t0p), tb = await measure('trial1', t0p);
+      const tIdleAfter = await idleChange(A, 3800);
+      const tDelta = tb.total - ta.total;
+      const excess = Math.max(tDelta - Math.max(0, tIdle, tIdleAfter), Math.min(0, tIdle, tIdleAfter) - tDelta, 0);
+      const share = ta.total > 5 ? excess / ta.total : NaN;
+      if (Number.isFinite(share)) { worst = Math.max(worst, excess); worstShare = Math.max(worstShare, share); }
+      console.log(`  finger trial ${i + 1}/${fTrials}: hold ${holds[i % holds.length]} ms, pool ${ta.total.toFixed(2)}, Δ ${tDelta >= 0 ? '+' : ''}${tDelta.toFixed(2)}, ` +
+        `alone ${tIdle >= 0 ? '+' : ''}${tIdle.toFixed(2)} before and ${tIdleAfter >= 0 ? '+' : ''}${tIdleAfter.toFixed(2)} after, ` +
+        `outside the bracket by ${excess.toFixed(2)} (${Number.isFinite(share) ? `${(share * 100).toFixed(2)}% of the pool` : 'no pool'})`);
+    }
+    console.log(`  finger trials: worst ${worst.toFixed(2)} outside the bracket, ${(worstShare * 100).toFixed(2)}% of its pool\n`);
   }
   /*
     The seeder back on for everything after the Finger, as the Blow and the

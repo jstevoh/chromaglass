@@ -1,0 +1,35 @@
+name: Finger noise (temporary)
+
+# A one-off measurement for the Finger's `adds none` slack (PLAN.md §0): the
+# same stroke repeated on four Mac runners with the ambient seeder off, cycling
+# the Drop's hold so each runner reads thin pools and thick ones. Removed again
+# before its PR merges; the numbers it printed are in the PR and in PLAN.md.
+
+on:
+  pull_request:
+
+jobs:
+  trials:
+    if: github.head_ref == 'claude/project-thread-w33l0n'
+    name: Finger noise · ${{ matrix.runner }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [a, b, c, d]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        timeout-minutes: 6
+        run: npx playwright install chromium
+      - run: npm run build
+      - name: The Finger, twelve times
+        env:
+          TOOLS_FINGER_TRIALS: 12
+        run: node scripts/tools.mjs
