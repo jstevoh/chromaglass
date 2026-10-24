@@ -4658,3 +4658,26 @@ Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is
 1024 × 768, 390 × 844 and 844 × 390, with nothing wider than the screen; a returning visit's plate
 comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
 returning visit nor for `?remote` and `?cast`.
+
+### 34a-2, 34a-3, 34a-4. Films with their music, sharp looks, Buy buttons (2026-10-22)
+
+What was asked: real clips of the plate with the music audible, sharper look cards on a Retina
+screen, and Buy buttons for Home and Pro.
+
+What changed: `npm run landingfilm` films the app on the Mac (the recorder's own take, with the
+track the show played) and encodes WebM and MP4: a 12 s hero loop folded with a 2 s cross-fade so it
+repeats, and ferrofluid, dye pour and macro clips of 8 s. The hero is the poster (a JPEG) until the
+page has loaded, then the video fades in; the three clips sit in a "See it move" row, each with a
+poster, `preload="none"`, and a video that is added only when the card nears the viewport. All start
+muted (browsers refuse sound without a tap); a "Sound on" button unmutes one film and mutes the rest,
+and sound stops on scroll-away, on a hidden tab and when the sign-in opens. Reduced motion, Data Saver
+and a link slower than 4g play nothing on their own and offer "Play with sound". `npm run
+landinglooks` redraws the eight look cards at 960 × 600 from 1440 × 900 frames. The tier cards carry
+Buy buttons to the Lemon Squeezy checkout (new tab) and a line asking buyers to use their sign-in email.
+Nothing on the page moves with the sound; only the films do. Sizes: hero 290 KB WebM / 450 KB MP4,
+clips 170 to 880 KB; the entry chunk grew 507 B gzipped (bar 6000 B); the Landing chunk is 5.3 KB
+gzipped. `npm run signin` 16/16, with 11b now holding that both Buy buttons are 44 px tall, open a
+`lemonsqueezy.com` URL in a new tab and that three clip cards are drawn at laptop, phone and phone-on-its-side.
+
+What is not proven: a purchase. The store is in test mode and this session may not pay, so the
+webhook-to-licence path after checkout is still the owner's to try (PLAN 34a-4).

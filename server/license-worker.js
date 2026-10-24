@@ -131,6 +131,21 @@ async function handleWebhook(request, env, cors) {
   const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
   const rawOrderId = body.orderId || body.data?.id || lsItem.order_id || '';
   const orderId = rawOrderId ? String(rawOrderId).trim() : '';
+
+  // A test-mode order is one nobody paid for: Lemon Squeezy's checkout takes its published test
+  // card, so anyone who finds the buy link could otherwise mint a real signed key for nothing. A
+  // test order (`meta.test_mode`, or the order's own `test_mode`) files nothing unless the buyer's email is on `TEST_MODE_EMAILS`
+  // (comma separated, a Worker secret, never committed), which is how the owner proves the path
+  // end to end. It answers 200 so the store does not retry; a payload without the flag (our own
+  // direct JSON) is untouched.
+  const flagged = (v) => v === true || v === 'true';
+  if (flagged(body.meta?.test_mode) || flagged(lsAttr.test_mode)) {
+    const allowed = String(env.TEST_MODE_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (!email || !allowed.includes(email)) return json({ ok: true, ignored: 'test mode' }, 200, cors);
+  }
   const keyId =
     (typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : '') ||
     (orderId ? `key_${orderId}` : `key_${Date.now().toString(36)}_${rand(6)}`);
