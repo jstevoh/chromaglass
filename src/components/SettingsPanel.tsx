@@ -882,7 +882,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             ))}
           </div>
           <Info>
-            A new song is heard as a gap of a few seconds between tracks, or named by track identification. The sequencer keeps control while it is running.
+            A new song is heard as the last one falling away into the next, even a half-second gap, or named by song recognition when one song crossfades into another. The new look comes in on a beat: quickly after a gap, slowly under a crossfade. The sequencer keeps control while it is running.
           </Info>
         </div>
         {settings.autoCalibrate !== false && (

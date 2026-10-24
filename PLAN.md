@@ -199,8 +199,9 @@ film's measure.
 Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
 bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
 (S) then **10.3-4otf, 10.3-sure, 10.3-half, 10.3-newsong, 10.3-fill** (S each);
-**10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11):
-**30a** shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
+**10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11,
+re-read 2026-10-24): **25h** areas that listen for themselves (M–L, first of §30's, the
+owner's 2026-10-24 ask for parts of the plate answering the music), **30a** shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
@@ -226,7 +227,7 @@ style (§31).
   **15d-maze**, **18a-7**, **18a-10**, **RM-E**.
 - **6.2** ~~**18b** the lamp through the dye~~ #256 (behind Lamp Ground); ~~**18b-1** which looks
   go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
-  it), then **18f** heat from the lamp (which unblocks 10.6
+  it), then ~~**18f** heat from the lamp~~ #352 (which unblocks 10.6
   and the slide plan's S2) and ~~**18j** milk~~ #353 (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   ~~**18g-1**~~ colour leaves by flushing #362 (18g-2..5 open) and **18k-spray**.
@@ -531,7 +532,7 @@ Where each batch stands, as of 2026-09-27:
 
 | | Batch | State |
 |---|---|---|
-| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
+| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; the Finger's own "adds none" reds traced to the ambient seeder being left on in that one section (2026-10-22: off, the plate's idle drift falls from +35 to 1 and the hand adds nothing on pools of 357 and 611; thin pools still unmeasured); it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
@@ -567,29 +568,86 @@ stop for a second or two either (#181); the magnet stays where the hand leaves i
 
 `src/gpu/wgsl/fluid.ts` (advection), `scripts/tools.mjs`
 
-*Found 2026-09-27, not yet done:* **"adds none" still goes red on runs that do not
-touch the Finger.** #182's tools shard (a Pacing change; the same code had passed the
-shard one commit earlier) read 50 → 64 against −12 before and +9 after, red by 1.5.
-The check allows |Δ − d| < 0.15·total + 5 + |d| with d the larger-magnitude idle
-reading, signed. So when the plate's two idle readings have opposite signs, the
-allowance is centred on one of them rather than spanning both, which is not the
-bracket its comment describes ("a Finger that makes dye still has to beat both").
-Whether to bracket it (Δ within the two idle readings ± the allowance) is a decision
-for the check's owner, taken with §0's "what the check should mean" below, since on
-the positive side it is looser whenever the larger idle reading is the negative one.
-*Measured 2026-09-27 over 40 Mac tools shards, and not a flake:* the Finger adds dye
-on a thin plate. The pool the check strokes is laid by holding Drop for 1.5 s of wall
-time, so its size follows the runner's speed: 49 to 279 across the 40. On all 12 pools
-under 150 the stroke added +11 to +21 while the plate alone had lost 1 to 34 before it
-(and gained 7 to 11 after); on settled pools it read about what the plate did alone.
-That is up to a third of a thin pool, §0's fault at a smaller size, and the three reds
-(106 → 127, 50 → 66, 73 → 90) were all thin pools. Bracketing would have made all 40
-pass, which is why it was not done (the check-skeptic review: the after window carries
-the stroke's own aftermath). Two things follow, in order: a control on the Mac (the
-same timing with the Finger picked and no stroke) to settle whether the after window
-is the plate or the stroke; then the advection fix below, which is what makes this
-check green for good. Laying the pool by solver steps rather than milliseconds would
-make it one size every run, but only after the fault is fixed, or it hides it.
+*Found 2026-09-27, **cause found 2026-10-22**:* **"adds none" went red on runs that did
+not touch the Finger, because the window it was measured against was the ambient
+seeder, not the plate.** #182's tools shard (a Pacing change; the same code had passed
+the shard one commit earlier) read 50 → 64 against −12 before and +9 after, red by 1.5:
+the allowance was centred on the larger-magnitude idle reading rather than spanning
+both, which is not the bracket its comment described. That part is bracketed now
+(`fMinIdle`/`fMaxIdle`, spanning both readings and 0), and bracketing alone made the
+reds stop without explaining them.
+
+The explanation is that the Finger section, alone among the tool checks, left the
+ambient seeding on. The Blow and the Press both turn it off and say why ("so 'left
+alone' was the seeder's drift, not the plate's"). Measured on the Mac with the seeder
+on and **nothing dropped at all**, the plate reads 64 and gains +26 then +18 over the
+two idle windows — so "what the plate did alone" was mostly the seeder's rate. That is
+why the idle reading sat at +31 to +36 whether the pool was 66 or 728, an eleven-fold
+range: a window dominated by a term that does not depend on how much dye is on the
+plate. And a bracket built from it is wide in proportion to nothing: at a pool of 66 it
+accepted any Δ in [−15, +46], so a Finger that created 70% of the pool again in new dye
+would have passed (check-skeptic).
+
+Two findings are withdrawn rather than confirmed. The 2026-09-27 reading — 40 Mac
+shards, pools 49 to 279, the stroke adding +11 to +21 on all 12 pools under 150 — was
+read through those seeded windows, and at that size the seeder alone lays about as much
+as the Drop does, so it is not evidence about the Finger. And a Mac sweep at four pool
+sizes (728, 176, 152, 66) that put the hand's own contribution at +3 to +5 by
+subtracting a no-stroke control is measured on the same seeded plate, so it bounds the
+hand only against a background it did not control.
+
+*Done:* the seeder is off for the Finger section now, as for the Blow and the Press,
+with a new `quiet` check: left alone, the pool may not *gain* more than 5% of itself, or
+5, over an idle window. Gains only, because the fault is dye arriving from something the
+check does not control — a window that loses dye only narrows the bracket downward and
+cannot excuse a hand, and the Mac's after window reads −1, so a two-sided bar would
+charge it for nothing. It is ANDed into `adds none`, as the Press ANDs its own guard
+into both of its claims, so a plate the harness has declared unquiet cannot also print
+"adds none: ok".
+
+The idle windows fell from +35 to about 1, so the bracket closes on nothing and the
+check measures the hand. On the owner's Mac, four runs: idle +1 before and −1 to −0
+after, on pools of 357 and 611, and **the hand adds nothing** — Δ under ±0.5 every
+time. Thin pools are still unmeasured (below).
+
+A control (`TOOLS_FINGER_CONTROL=1`) runs the same shape with the mouse never going
+down, on the same helpers, and prints the hand's own contribution by subtraction: +0.1
+to −1.1 across three runs, against a slack of ±59 to ±97. It waits out the stroke in
+solver steps rather than milliseconds, because the real path pays 30 `mouse.move` round
+trips the control does not: at equal wall time the stroke ran 274 steps against the
+control's 122, a factor of two apart in the pool's age, and the comparison was void —
+the same fault the Hover check was rewritten to fix. Step-matched it reads 273 against
+272 on a pool of 611, and 138 against 137 on a pool of 357, and it prints both spans
+with the verdict, so a run that is not comparable, that timed out, or whose span did not
+read says nothing instead of implying the opposite. It reports and does not gate: with
+no pool it says so and stands down rather than throwing, because a reporting-only block
+that can end the run is a gate whatever its comment claims. And it states the narrower
+claim it can support — the second window is not biased by where it sits in the run — not
+the broader one it cannot, that the window is unbiased *when a stroke happened*. For
+that, the `fIdle`/`fIdleAfter` pair in the check's own detail is the evidence, and the
+control calibrates that pair rather than replacing it.
+
+*A decision for the check's owner:* `fSlack` is still `0.15 * total + 5`, chosen when
+the idle windows were the seeder's +35. They are now about 1, and the hand's own
+contribution is under a unit, so on a pool of 357 the check grants ±59 — it would still
+pass a Finger that created a sixth of the pool. Something nearer 2–3% would be five to
+seven times sharper and still twenty times the measured noise. The same holds for the
+new `quiet` bar, deliberately set at 5% rather than the 2% the Mac alone would justify.
+What stops either being tightened here is that CI's pool is 49 to 279 and the idle
+variance across 40 shards *with the seeder off* has never been measured; only the shards
+can measure it, and a bar resting on an unmeasured quantity is the flake this repo keeps
+relearning.
+
+*Open:* whether the Finger adds dye on a genuinely thin pool, which is now measurable
+for the first time and has not been measured. `TOOLS_POOL_MS` shortens the Drop hold to
+put a CI-sized pool on a fast machine; it is floored at 100 ms because under that the
+Blow's pool comes out at single figures and its checks measure nothing. Laying the pool
+by solver steps rather than milliseconds would make it one size every run. Also open,
+and unrelated to the seeder: `and draws it back when the hand lets go` read 78%, 76%,
+80% and 48% back on four Mac runs against its 50% `backOf` bar, so it sits on its
+threshold. Its detail labels only `cameIn`'s quarter ("a quarter needed") and leaves the
+50% bar unlabelled, so the 48% red reads like a pass to anyone who has not read the
+condition.
 
 *Found 2026-10-03 (#225), open:* **with presses that move the dye, the grid pass
 holds less of the grid-band detail.** `npm run grating`'s pressed plate (gap −0.3 in a
@@ -2579,7 +2637,11 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      a VJ app's effects can follow the plate.
    *Not started.*
 6. **Video in from a VJ app** (one PR): Syphon and NDI arrive as a Mixer source
-   (§11), not through a virtual camera. *Not started.*
+   (§11), not through a virtual camera. *Not started.* Beside the Mixer layer, the
+   picture can also be poured into the liquid as dye that the flow then carries (the
+   `pourVideo` path), the way the 1960s shows laid film loops and slides under the oil;
+   VS 2 (§30, 2026-10-24) takes a camera, Syphon or Spout feed as a source, and this
+   is ours. The phone gets the source picker.
 
 7. **A DAW bridge plugin** (asked 2026-10-04; two or three PRs, after step 2): an
    AU and VST3 plugin for Logic and Ableton that draws nothing and plays the running
@@ -3201,7 +3263,9 @@ code.**
   and ended after the second; the track-end advance goes the same way. Inferred for
   Safari: that context is made in `oncanplay`, outside a gesture, and never resumed.
   Never stop the destination's own tracks; resume it from the play gesture.
-- *Song ID can switch itself off for the session.* Its silence branch sets `busyRef` and
+- *Song ID can switch itself off for the session.* (The flag half **shipped** in 14z-2:
+  the silence branch's `finalizeListen` is in a `finally` now; the two leaked
+  `AudioContext`s are still open.) Its silence branch sets `busyRef` and
   awaits `finalizeListen` with no `finally` (`useMusicIntelligence.ts`), unlike the two
   branches beside it: one throw leaves identification, the local match and the song-end
   detector off. A failed `decodeAudioData` in `songMap.ts` and an error in `capturePcm`
@@ -3310,11 +3374,8 @@ read in the code.**
   about four times a second while a song plays; `getLiveEngineStatus` is passed inline,
   so Settings' 1 s tick is re-armed by every App render and does not tick while the App
   renders fast.
-- *After 14f's sound half (#211):* the cast's feed now listens to the ear itself, but
-  `useSongChange` still has no dependency list, so the song-gap detector is sampled at
-  the App's render rate, now about 11 a second (it was about 70). A tenth of a second
-  may be fine enough for a gap between songs; if it is not, it wants the ear's
-  `onReading`, as the cast's feed has.
+- ~~*After 14f's sound half (#211):* `useSongChange` sampled the song-gap detector at
+  the App's render rate.~~ It listens on the ear's `onReading` now (14z-2).
 
 *Measure:* `npm run desk` and `npm run layout` for the frame after Esc and after a
 switch (the frame is the hole; a click on the preview reaches the plate); a node check
@@ -3502,15 +3563,51 @@ effect). `npm run music` only feeds it synthetic level traces.
   a boundary nobody trusts; New preset and Random are still one press in Settings.
   `npm run music`: "a new song keeps the look unless someone asks for more" (FAIL on
   'preset', ok on 'off').
-- **14z-2**: hear a song change from what the music is, not only from silence: a
-  sustained change in timbre, key and tempo across a few bars (a novelty curve over
-  chroma, MFCC-like bands and tempo, with a slow baseline), confirmed by song ID when it
-  answers, on the ear's own clock. Judged on recorded songs and real transitions (CD
-  gaps, streaming gaps, DJ crossfades, gapless albums, a quiet bridge that must not
-  fire), not synthetic traces, with hits, misses and lateness counted per transition.
-- **14z-3**: time the change to the music: land it on the new song's first downbeat
-  (or the next phrase start), and size the fade to the transition heard (a cut for a
-  gap, a long fade under a crossfade). Then On a New Song can open on New preset again.
+- **14z-2** (**shipped**): where a song ends and the next begins, measured on real songs.
+  `npm run songends` joins eight CC-BY songs (`scripts/fixtures/songs`, credits there) with
+  half-second and two-second gaps, gapless and crossfaded, in a quiet room and a noisy one
+  (the room 30 dB under the music), runs the app's own ear over them, and plays each song
+  whole. The old rule, timed against the room tracker: 16 of 48 gaps and gapless joins, 0
+  of 16 crossfades. `SongBoundary` now: 43 of 48, no change inside any whole song; a song's
+  end is a dip 40 dB under its own loud level (over 40 s) or a second on the room's floor,
+  and the next song is sound that carries on for 0.75 s (a last chord after a stop does
+  not). On the lab's twenty-three songs: 65 of 66 gaps, 39 of 44 gapless, no false change
+  in 5.8 h. It is heard on every reading of the ear (`onReading`), not on the App's renders
+  (14u). Crossfades are song identification's: measured, no summary of the sound (harmony,
+  spectral shape, level, hits) moved further between two songs than between a verse and a
+  chorus of one. The local matcher now captures every 6 s, not 12: it names every
+  crossfade's new song with none wrong, 7.9 s in after a 6 s crossfade (9.4 s at 12), 6.7 s
+  gapless in a noisy room. It no longer names songs it has never heard: a held chord made
+  one pair at every frame, and n of them against m in a stored song summed to thousands of
+  votes at one place in it; each pair now votes once per alignment (`localFingerprint.ts`).
+  With each fixture left out of the library in turn, strangers named 38 times before, 0
+  after, and the known songs named in 978 captures of 4 s, not 929. The busy flag can no
+  longer hang on a throw (14s's `finalizeListen`).
+- **14z-3** (**shipped**): the change lands on a hit of the new song (27 of 31 gaps; else
+  1 s after it is confirmed), a median 1.0 s after its first note. After a gap the look fades
+  in over 1 s; named by identification, mid-crossfade, it blends in over twice the desk's
+  fade, at least 4 s. Judged on the owner's GPU: `docs/judging.md` §65.
+- **14z-4**: once the owner has judged §65 with their own music, On a New Song opens on
+  New preset again (the `music` check's default line moves with it).
+- **14z-5**: the room tracker seeds its floor on the analyser's first frame, and an analyser
+  with nothing through it yet hands it digital silence (-140): the floor then climbs about a
+  tenth of a decibel a second, so every room reads as "sound" for minutes. Measured in
+  `npm run songends`: the old gap rule with a tracker seeded that way caught 0 of 56 joins.
+  The boundary no longer leans on it, but the analyser's window (the visuals' calibration)
+  and the gate still do: seed from the first frame with sound in it (the render's side of
+  the same seeding is under 28e's leftovers). Check that the
+  calibrated window then settles on the room within its calibration time, in `ears`.
+- **14z-6**: a song the show has never heard waits for the recognition service's 35 s
+  re-check when it crossfades in. Ask the service sooner when the sound's character shifts
+  (a candidate, not a change: the measured shifts inside songs make it a poor trigger for
+  the look, a fair one for a question), within its quota. And a live band: applause and
+  talk between songs are neither quiet nor a new song's sound, so the boundary waits for
+  the next song's own decay; hear applause as a gap (broadband, no pitch, no beat).
+  And a room that fills up late in a song: the floor looks back a minute and climbs a
+  decibel a second, so a gap at a room 18 dB louder than it was is heard only once the room
+  has been that loud for about 80 s (with the room rising 35 s before the gap, 1 of 8
+  caught; `songends`' gap2rise gives it 95 s). Follow the floor faster without hearing a
+  quiet passage as the room.
 
 ## 15. Every tool on every liquid
 
@@ -4025,7 +4122,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18c | A pour adds liquid | Large: a drop shoves the colour outward into rings | Free | Better with 18a's open rim |
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None. **Partly shipped** (#355); 18e-1 to 18e-3 open |
-| 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | Better with 18a and 18e |
+| 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | **Shipped** (#352) |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362); 18g-2..5 open |
 | 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Partly shipped** (#358); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; physical pop mode open |
@@ -4286,9 +4383,13 @@ its frame rate live. "Free" means no new passes or texture reads.
     [`docs/plan-shipped.md`](docs/plan-shipped.md) §18a-13; the owner's eyes on the pace
     are `docs/judging.md` §58. Shortcuts, each named in the code, and the items that
     replace them:
-    - **18a-13a. Two layers.** One layer of liquid slops; oil and water would slosh at
-      different speeds and shear past each other. Needs the dish to carry two depths
-      and the oil's interface, which the oil's own fields (`oilBodies`) could seed.
+    - **18a-13a. Two layers: shipped** (2026-10-22). Oil lenses ride the water at their
+      capillary thickness, read from the plate's own oil each frame, with the two-layer
+      laminar drag between them; the dish moved to the GPU (`gpu/slosh.ts`). Plate Rock's
+      swing tips it where Frame Sway lets the frame move (`rockAccel`; how the rock itself is
+      driven is 27f-2's). A kick's glass presses the dish over the same radii it presses the gap
+      (`kickPress`: the sheet's one dent off the frame-moving looks). Story in
+      `docs/plan-shipped.md` §18a-13a; `npm run slosh`, `npm run sloshgpu`.
     - **18a-13b. The rim's boundary layer.** The rim is free-slip; a real dish's wall
       holds a thin layer still and sheds a vortex when the wave turns there. The
       drag too is the covered gap's (12ν/h², Poiseuille between two walls), where a
@@ -4298,11 +4399,20 @@ its frame rate live. "Free" means no new passes or texture reads.
       tuning `SLOSH_LEAN` against it.
     - **18a-13c. Drawing the depth.** The dye does not feel the depth (the dish moves
       it, it does not thin where the liquid is shallow), so a wave never shows as a
-      brighter crest or a lamp-lit slope.
-    - **18a-13d. A shock-capturing scheme.** Breaking is quadratic drag and a speed
-      wall, with upwind (diffusive) momentum advection; a bore is not resolved. Needs
-      a Riemann-solved or MUSCL flux. Also: no Coriolis or centrifugal term (the
-      plate does not turn fast enough to matter), and the CPU film ignores the slosh.
+      brighter crest or a lamp-lit slope. The dish now writes the depth of both layers
+      for the plate (`WebGPUSlosh.depth`, the solver's `sloshDepth`): red the depth
+      over rest, green the oil's share. What draws it: Beer–Lambert through the
+      depth (a crest holds more dye) and the lamp's light bent by the surface's
+      slope and focused by its curvature (a shadowgraph, brightness against
+      −D∇²depth). The display pass is at WebGPU's sixteen textures, so the depth
+      rides in a spare channel (the derive pass's alpha is free) rather than a new
+      binding; touches the plate shader, so `pops`, `straw`, `ferrolook`, `mixer`,
+      `grainedge`, `lampzero` and a `look` render.
+    - **18a-13d. A shock-capturing scheme: shipped** (2026-10-22). HLL fluxes over
+      hydrostatic reconstruction, MUSCL with the MC limiter, Heun in time: a dam
+      break runs at Stoker's speed, two cells wide, and no energy is made. Story in
+      `docs/plan-shipped.md` §18a-13d. Still: no Coriolis or centrifugal term, and the
+      CPU film ignores the slosh.
     - **18a-13e. Hold Gravity's moves out of the slosh.** The dial is hand-only, but the
       tilt it follows is Gravity × Tilt Direction as the plate sees them, so a look
       (Lava Lamp has Gravity 1), Evolve or a patch on Gravity slops the liquid too. If
@@ -4311,6 +4421,16 @@ its frame rate live. "Free" means no new passes or texture reads.
       screen axes while Gravity's direction is turned by the turntable's angle, so with
       the plate turned a tipped phone slops at that angle; Plate Rock's `ext.x * 1.1`
       does the same. Turn both into the fluid frame together.
+    - **18a-13g. Lenses that move and pull back.** The dish reads where the oil is
+      from the plate every frame and holds each lens at its capillary thickness: a
+      lens has no inner wave and one stretched thinner does not dewet into droplets.
+      Carrying h₁ in the dish (its own mass equation, the plate's oil following it)
+      and a disjoining pressure would let the dish move the lens's outline itself.
+    - **18a-13h. One press, not two.** A kick's glass presses the thin gap
+      (`pressKick`, lib/squish.ts) and the dish (its head) at once, so near the glass
+      the liquid is pushed out twice. The one-press answer: the dish takes the gap's
+      squeeze as its source and the gap's own push goes. Moves what `npm run squeeze`
+      measures, so it wants the owner's eyes on Beat Squeeze first (27f-3).
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -4506,35 +4626,14 @@ its frame rate live. "Free" means no new passes or texture reads.
 
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 
-- **Where:** `currentForces` pushes heat along `S.up` (the gravity direction, whatever
-  `plateUpright` says), saturated by tanh(20T). Heat is injected in spots by pours and
-  the music (`addTemp`), and `heatDecay` is per step. Centre gravity and rock use
-  tanh(dye − mean) and are not tied to the dome the gap actually has. The oil has no
-  density, so it never rises on a tilt. `mixForce` already gets this right: gravity
-  only in proportion to how upright the plate is. The noise stirring (`forcesB`) is
-  what moves an untouched plate, with no physical source.
-- **The real phenomenon:**
-  - On a level plate gravity points through the glass, so in-plane buoyancy is zero.
-  - The lamp heats the dish through the dye's absorption, so dark regions warm. A hot
-    spot drives liquid outward along the surface (thermocapillary flow: dσ/dT about
-    −0.15 mN/m per K for water, −0.06 for oils). It thins the film into holes, which is
-    the European school's burning away. From below, the lamp makes Bénard–Marangoni
-    cells once the Marangoni number passes about 80.
-  - Water's viscosity falls about 2% per K.
-  - Downhill on a dished glass is ∇h from the gap's dome.
-- **What it takes:**
-  - A heat source ∝ lamp intensity × absorbed fraction (from 18b), and Newton cooling
-    per second.
-  - ∇T fed into the existing `marangoniFlux` as σ(Γ, T).
-  - Buoyancy gated on `upright`, with the tanh removed. Oil gets a density below
-    water's.
-  - Viscosity falling with temperature, into 18a's mobility.
-  - Heat written to the velocity texture's spare channel in `packVel` (it is thrown
-    away there today) so 18e's shadowgraph shows the convection as shimmer.
-- **Cost:** a few operations in existing passes, and four taps in the plate.
-- **Gain:** an untouched plate breathes where it is dark and hot, speeds up with the
-  Dimmer, and shows the lamp's own cells. It is the mechanism slide-plan S2 is waiting
-  on (heat with a strength). Turbulence stays as the declared stir dial.
+**Shipped (#352):** In-plane thermal buoyancy is strictly gated on plate uprightness (zero on a level plate) with tanh saturation removed (linear Boussinesq). Heat source couples to the lamp dimmer with Beer–Lambert spectral absorption from the dye (using the plate's `lampThrough` decode) and a central hotspot (`1 / (1 + 2.5 r²)` shortcut). Newton cooling decays per-second with a real physical time constant in the tens of seconds (τ ≈ 12.4s via `heatDecay^(4*dt)`). Oil in `mixForce` is given physical buoyant density below water (ρ_oil ≈ 0.85), rising on an upright plate while wax sinks. Water viscosity drops ~2%/K, increasing thin-gap mobility under gravity. Shipped writeup in `docs/plan-shipped.md` §18f. Verified with `npm run heat` (9/9 checks).
+
+Open follow-ups:
+- **18f-1. Full per-channel absorbance across all passes:** decode RGB absorbance per channel for spectral heating across every look and pass rather than single-pass average.
+- **18f-2. Bénard–Marangoni cells:** surface stress −∇T inside an existing force pass (replacing separate marangoniFlux dispatch) so that cellular convection patterns emerge without breaking soap/oil conservation.
+- **18f-3. Convection shimmer (18e):** pack velocity channel z export into plate shader shadowgraph taps to render hot plume optical refraction and shimmer without disturbing raw `(u, v)` reads in `cellride`.
+- **18f-4. Warm water thins only the water (a named shortcut, #352):** `tempVisc = exp(-0.02 T)` in `thinGap.ts` hsPrep multiplies the whole thin-gap mobility, so a warm cell of oil or glycerine speeds up as much as warm water. Water's viscosity really falls about 2%/K, but each liquid has its own slope (glycerine's is about four times steeper near room temperature, a mineral oil's roughly twice), and in a layered cell the temperature belongs on each layer's own viscosity inside the two-layer Poiseuille sum that already builds `filmDrag`, not on the product. Move the factor onto the water layer's viscosity in that sum (and give each liquid its own slope beside its viscosity in `src/lib/chemistry.ts`), and have `npm run heat` show a warm oil-over-water cell speeding up by less than a warm water-only one.
+
 
 ### 18g. Colour leaves by flushing, not by fading
 
@@ -4545,6 +4644,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **18g-3** capDye and solvent evaporation: model real evaporation as solvent loss leaving a coffee ring at the rim, rather than dye loss.
 - **18g-4** r16f flux pass: carrier-thickness field for evaporation and liquid volume fraction.
 - **18g-5** Remove the dye-budget regulator safety cap once 18c-2 (pours add volume) ships and looks cannot saturate.
+- **18g-6, open. An oil body touching the open rim drains through it by its own surface tension** (found 2026-10-24 building 27f-5, on main, no rock). In the lab at Clock Glass's Oil Tension (0.9) a lens of 0.06 laid against the rim with the plate level kept 66% of its oil in the dish after six seconds; a half-dish sheet against the rim moves the picture's mean 0.14 mm/s while it drains (`npm run oillift` prints both). Cause: the rim holds the pressure at zero, the water's reservoir pressure, also inside the oil where the rim cuts it, so the oil's Laplace pressure has a way out; a real body touching the rim keeps its interface (the reservoir past it is water) and stays. The fix is the oil's capillary force taken as its closed-dish circulation the way 27f-5's lift is (its gradient part a pressure that moves nothing), or the rim's held pressure read from the phase there. Clock Glass's bodies are laid inside 0.44 of the middle so it bites on a pour, a stir or a slosh that carries one to the rim.
 
 - **Where:** the dye-budget regulator and "evaporation" (`LiquidVisualizer.tsx`,
   applied in `decayDye`), `capDye`, the `airExclude` multiply, a still bubble's
@@ -5284,6 +5384,129 @@ Not a gate and no bar: a rate depends on what was pushed.
   (`-K -`, as `scripts/ghapi.mjs` does) and check with `npm run deploygate -- --history 20`
   that the same merges are trusted. Found by the check-skeptic on 19aa-3.
 
+### 19ab. A shard's tool fetches are bounded, and the browser is cached
+
+- **19ab-1. A slow download no longer reads as a failing check (shipped 2026-10-24).**
+  Every shard fetched its tools inside the same clock as its measuring, so an unbounded
+  download cancelled the harnesses at the job's wall and the red said nothing about the
+  diff. Seen five times across four runs of one PR on 2026-10-22, on three different
+  shards, none of them touching a check that failed:
+
+  | shard | the step | took | warm |
+  |---|---|---|---|
+  | `browser` | Install Chromium | 650s | 33s |
+  | `lab` | Install Chromium | 683s | 33s |
+  | `sound` | ffmpeg (apt) | 1474s, 1471s | 22s |
+
+  Both apt hangs were ended by the 25-minute wall rather than by finishing: between
+  about 19:30 and 20:30 UTC the step did not return at all, and while that lasted **no
+  PR in the repo could go green**, because the sound shard dies before its first sound
+  check runs. The browser shard's own work is about eighteen minutes, so eleven minutes
+  of cold download puts it at twenty-nine against a limit of twenty-five; the sound
+  shard's is about three, so an unbounded apt buries it alone.
+
+  Two changes, because the two halves are different faults. The browser is now cached
+  (`actions/cache` on `~/.cache/ms-playwright`), keyed on the **Playwright version read
+  from the installed package** and deliberately not on the lockfile's hash: the browser
+  a version installs never changes, so the version is the whole of the dependency, while
+  a lockfile key would discard the browser on every unrelated bump and pay the eleven
+  minutes again. And every fetch now carries its own `timeout-minutes` — six for the two
+  Chromium installs, four for apt's ffmpeg, five for the Mac's pip — so a mirror that is
+  not answering fails as itself, with the step's name on it, in minutes rather than
+  cancelling the measuring at the wall. `--with-deps` still runs apt for the system
+  libraries, which the cache does not hold, which is why that step keeps a bound as well
+  as a cache.
+
+  Why bounds and not a bigger limit: raising the job to 35 would have hidden this and
+  made a genuinely hung harness cost ten more minutes before anyone heard about it. 19w
+  moved the *Mac* shards off their timeouts for the same family of reason; the ubuntu
+  shards were never costed the same way, because their own work is steady and nobody
+  counted the downloads in front of it. The Mac fetches were bounded here too, though
+  none has gone slow yet, because the Mac queue is the one that costs.
+
+  What a session should know when this goes red again: a retry is not a fix, and the
+  two cases show it from both ends. The browser's cold install cleared on a re-run, so
+  green by luck read exactly like green by merit; the apt hang never cleared, so three
+  full runs were spent proving the thing that failed was not the diff. Measured by the
+  steps' own seconds over the runs after this merge, and the cold path stays honest
+  because a version bump changes the key.
+  Found while measuring 0-tap (PR #429).
+
+### 19ac. The phone's double tap on Speed is judged on two taps landing in time
+
+- **19ac-1. `Play: a double tap on Speed puts it back to the look's own speed` has no
+  grip on the window it depends on.** `scripts/phone.mjs:1159`. Red once on PR #429
+  (`377/378`, the Mac `show` shard) and green on four other runs of the same afternoon,
+  on a PR that touches neither the phone nor the app. The detail it printed was
+  `0.009 → 0.28 → 0.005`: the slider was moved to 0.28 by the first part of the test,
+  then the two taps at three-tenths of the track left it at 0.005 rather than back at
+  0.009. 0.005 is where a *single* tap at three-tenths puts it, so what failed is not
+  the reset — the app never saw a double tap at all. The second tap fell outside its
+  window.
+
+  The check waits 60 ms between the taps and asserts `reset === before` as strings, and
+  that is the whole of its grip: nothing asserts that the app registered a double tap, so
+  a missed window and a broken reset are the same red, and the printed line reads like
+  the reset went to the wrong value when in fact it never ran. Under a loaded runner a
+  synthetic `touchscreen.tap` pair can straddle any fixed window, which is the flake.
+  Two things to do, and the first matters more than the fixing of the flake: have the
+  check read whatever the app exposes for "a double tap was seen" (or the edited flag
+  clearing) and fail *separately* when the gesture did not land, so the red names its
+  own cause; then make the gap deterministic against the app's own window rather than a
+  bare 60 ms — read the constant the phone uses instead of guessing under it. Do not
+  simply widen the tolerance on `reset`: a value that is close to the look's speed is
+  not the same claim as the look's speed, and the check is right to compare exactly.
+  Found while measuring 0-tap (PR #429).
+ Lace and holes: a pale film torn open over colour
+
+### 19ad. The `open` shard flakes on four unrelated faults
+
+- **19ad-1. `WebGPU (macOS) · open` goes red on marginal timing and on a stray reading.**
+  Seen twice on branches that could not reach it — PR #429 (which changes
+  `scripts/tools.mjs`) and PR #444 (workflow YAML only) — and green on four other runs of
+  the same shard across other branches in the same afternoon, so it is intermittent
+  rather than a regression on main. Two different checks:
+  `and it is moving for good no later than the old way was` read a
+  **longest wait for a frame of 2.03 s against a 2.00 s bar** (2026-10-22), which is the
+  kind of margin a loaded runner closes on its own; and
+  `The ear behind the wall: and it hears on the wall's asks, one a frame, not on its own
+  frames or the tick` read **61 ask, 0 frame, 1 tick over 61 frames asked for**
+  (2026-10-24), where the single tick reading is the whole of the violation — one stray
+  reading out of 61 fails a check written to allow none.
+  Both want the same treatment and neither should get a looser bar first: measure the
+  quantity over a run of shards to see what it actually swings between, and only then
+  decide whether the bar is wrong or the app is. For the ear, find out whether one tick
+  reading in sixty-one is a real path through the code (a first frame, a resize, a
+  reading taken before the wall asked) or noise; "allow one" would be the wrong fix if
+  the one is a genuine route. Found while measuring 0-tap and 19ab (PRs #429, #444).
+
+- **19ad-2. The same shard failed with no check having failed, and with a check that is
+  green seven times out of seven on the owner's Mac.** Two more presentations on PR
+  #429, which still reaches none of them (it changes `scripts/tools.mjs` and this file).
+  The first: the job ran 14m0s and died with `Bass Boost presses harder` having printed
+  `10/10 ok` at 17:04:34, then **twelve minutes of no log at all** and `Post job cleanup`
+  at 17:16:57. The API agrees and says more: step 25 `success`, and then **fifty-two
+  steps with no record at all** — no `started_at`, no conclusion, never begun. Six steps
+  succeeded, thirteen skipped. The runner stopped executing after a step that passed, so
+  no check failed and no check was even reached; the Mac job's own `timeout-minutes: 20`
+  was never hit either. The second, on the re-run: `draftwall` read
+  `FAIL the dimmer still reaches the wall in Preview — wall dimmer 1` and finished 19/20.
+  The reading is the **default**, 1, not a wrong value: the dimmer had not arrived, which
+  points at the fixed `await page.waitForTimeout(400)` on `scripts/draftwall.mjs:153`
+  being short of what a loaded runner needs rather than at the room settings not reaching
+  the wall. That is a guess, though, and it stayed a guess: the check is green **seven
+  runs out of seven** on the owner's Mac on this exact tree — four idle, and three with
+  every one of the ten cores spinning on a busy loop — so the mechanism is not reproduced
+  and the wait must not be lengthened or the bar loosened on the strength of the
+  theory. What the four presentations have in common is the shard, not the check: each
+  red has been a **different** check, never the same one twice, and `open` is the longest
+  shard with the most steps (the comment above its `musicforce` step already notes a
+  shard near its timeout). So the thing to measure is the shard, not any one of its
+  checks: whether `open` is at the edge of the runner it is given, and whether it should
+  be split the way the Mac shards already are. Until then a red `open` on a branch that
+  cannot reach the failing check is not evidence about the branch. Found while measuring
+  0-tap (PR #429).
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
@@ -5982,6 +6205,14 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   source (`notes`: velocity, pitch, held, per channel), so a note can ride any setting
   the way a band does. The measure adds a held note whose pour rises over its attack
   and falls over its release, each within 10% of its time.
+  *Chords placed (VS 2, 2026-10-24).* VS plays four voices a layer, held notes stacking
+  into a chord with each voice somewhere else on screen. Here a chord lands as several
+  drops at once, spread across the plate by pitch (a scale across it, as above), each a
+  real pipette drop whose volume is its velocity, meeting the others by the liquids' own
+  immiscibility. Each channel has a voice cap (four by default; the oldest held note gives
+  way) so a pad held on ten fingers does not flood the plate, and a channel can be sent to
+  an area (25h). The measure adds a three-note chord: three drops in one frame, ordered
+  across the plate by pitch, and a fifth held note releasing the first.
 - **24.4** *CV out* (after 24.1b). The plate back into the rack through the interface's
   DC-coupled outputs: how much dye is moving, where the brightest pool sits on the plate
   (x and y), the colour under a point, and a trigger when a drop lands. Then the liquid
@@ -6078,6 +6309,31 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   Underground, fire kicks, difference the dye frames: the change should centre within
   about 0.06 of the bass area (turned by the plate's angle), and on classic at the
   middle (the check-skeptic's design).
+- **25h. Areas that listen for themselves** (added 2026-10-24 from Imaginando's VS 2,
+  §30; M–L, first of §30's list). The owner, 2026-10-24: the presets want more
+  complexity, more varied palettes and parts of the canvas reacting to the music. VS
+  gives each of its eight layers its own modulation matrix, MIDI channel, audio
+  modulators and hue cords, so a kick drives one layer and the melody another. Here an
+  area (`PlateArea`, `plateAreas.ts`) already takes the music's hands by band
+  (`areasForBand`: where a kick drops, where the bass pours), but every patch-bay cord
+  (`SceneMapping`) still moves one number for the whole plate, and every area draws on
+  one palette. Add an optional `area` to a cord, so its setting acts as a field that is
+  the plate's value outside the area and the cord's value inside it, eased over the
+  area's rim; and a colour family per area, so each area's bottles pour from their own
+  hues and one look holds two or three palettes. What acts in one place is what a
+  projectionist does to one place: the lamp's heat there (`addTemp` today; with 18f the
+  real thermocapillary spreading and thinning it drives, and until 18f that is a
+  shortcut named in the PR), stirring there (a paddle's local force, not a whole-plate
+  swirl), dye released there, and the pigment's hue there. A setting with no local
+  meaning (the Dimmer, the frame's grade) refuses an area. Nothing moves the frame, and
+  each cord reads only fast readings (the owner's rules). A cord with no area plays as
+  today, so every saved look and preset loads unchanged. A MIDI channel can take an
+  area too, with 24.3. On the phone, the patch view gets an area picker that shows the
+  areas on a thumbnail of the plate. *Measure:* in the lab, a band's cord with an area
+  changes the dye and velocity inside that area by at least 5x what it changes outside
+  (synthetic bursts in that band only, other bands silent); with two areas on two bands,
+  each answers only its own band; and the 25e count of lit regions on the looks
+  rebuilt with it, before and after. Then 28i's presets use it.
 
 
 ## 26. A reaction that prints: Turing stripes in black and white (proposed 2026-10-05)
@@ -6459,8 +6715,8 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - **27f-2. Plate Rock leans on the one and three (shipped; story in docs/plan-shipped.md §27f-2).**
     A hand's minimum-jerk reach to the other side of a turning axis on the strong beats, never a
     shove on each kick; `npm run rides` holds it (judging.md §61).
-  - **27f-3. Beat Squeeze presses a sheet, locally (shipped pending the owner's pick on the
-    thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
+  - **27f-3. Beat Squeeze presses a sheet, locally (shipped 2026-10-22; the owner picked the
+    local sheet on the thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
     lays one dent as wide as a 0.1 mm sheet bends over the liquid in the kick's hold
     (elastohydrodynamic bending length); Bass Drop keeps the glass. `npm run rides` holds it.
   - **27f-4, open. The sheet solved, not stamped.** 27f-3 lays the dent's held shape (a clamped
@@ -6471,13 +6727,26 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     and shallowing as t^(−1/3), slow on syrup) and the ring the dent lifts round itself (13% of
     its depth at 3.4ℓ). That ring needs the gap opened past rest, which the shader's
     squeezeUpdate never does (a lift stops at rest): the same item as the lift's ceiling.
-  - **27f-5, open. The rock tips the layers, not only the dye.** The hand's tilt drives the
-    dye's weight down the plate (Darcy–Boussinesq in the gap). A dish of oil on water tipped
-    the same way also sloshes at the layers' interface (reduced gravity, a wave of several
-    seconds across the dish, underdamped in water, overdamped in the default oil): once the
-    two-layer slosh (18a-13a) lands, the rock's tilt should drive its internal mode. Not the
-    single-layer slosh's surface mode, which moves the whole picture together and would be a
-    frame move from the sound (the owner's rule); a design call for the owner when 18a-13a ships.
+  - **27f-5. The rock lifts the oil, not the frame (shipped 2026-10-24; story in
+    docs/plan-shipped.md §27f-5).** On a tipped thin gap oil rises uphill through the water at
+    Hele-Shaw's speed (`OIL_LIFT`, in SI), laid as the closed dish's circulation so an even sheet
+    feels nothing, the frame stays still and the rim holds a lens; the water's colour alone weighs.
+    `npm run oillift` holds it.
+    - On the frame-moving looks the dish's own tilt (`rockAccel`, SLOSH_LEAN × Frame Sway) and the
+      gap's (CUR_ROCK) are two different sizes of the same tilt; say which is the plate's.
+  - **27f-6, open. A standing plate lifts the oil too.** Rain Drip's weight and Comet's pull still
+    weigh all the colour, oil's included, over the app's mean, and a plate stood up (Plate Upright,
+    Rain Drip) lifts no oil: the same circulation with gravity's in-plane share in place of the
+    rock's tilt.
+  - **27f-7, open (a shortcut named). The lift's circulation is the even gap's.** Ψ is solved with
+    the plate's mobility taken as even, then the gap's own solve takes what is left where the gap is
+    not (a press, a domed plate), with its open rim: exact on an even gap, and under a press a little
+    of the lift can reach the rim. The full answer is the lift's own solve with the gap's mobility
+    and a closed rim, a second multigrid; or one solve with the rim's held pressure set per liquid
+    (18g-6 wants the same). And the oil in the mix has the water's viscosity in the gap: a light
+    mineral oil is fifty times thicker (OIL_NU), which would slow a lens to about 1/25 of this in
+    water looks (Darcy's inclusion, 2μ₂/(μ₁+μ₂)) and change how every oil body moves; its own item
+    when the mix's oil gets its viscosity.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't feel
   like it actually does anything").** The slider multiplied the ranged bass reading, which every
   hand takes over 70 or 85 and stops: on the band's chorus the reading sat over the press's
@@ -7146,6 +7415,18 @@ check written first and built by Antigravity. None moves the whole frame by defa
 NDI, Syphon and Spout out (13.2, 13.3) stay where they are: VS ships all three, so a VJ
 expects them. The lights (14q, R8, 14m) stay next. §23 has VS's price.
 
+**Re-read 2026-10-24 (VS 2).** The owner sent VS 2's page and asked what to bring in;
+nothing in the list above had shipped. VS 2 shows one thing new to this plan: each
+layer listens and modulates on its own. That is **25h** (areas that listen for
+themselves), and it goes first, since it answers the owner's same-day ask for parts of
+the plate reacting to the music and more varied palettes. The rest folds into items
+already here: chords placed across the plate (24.3), a smoothed random and a restarted
+LFO (30b), a live picture poured in as dye (§13 step 6, video in) and a portrait clip
+(34f). The order now: 25h, 30a, 24.3, 30b, 14t-pc, then the rest as above. Not copied,
+as before: the shader editor and imports, the feedback layer, and anything that moves
+the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
+analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
+
 ### 30a. A sound cord has only a depth
 
 A patch whose source is `sound` or `bands` carries a depth and nothing else, so a kick
@@ -7176,6 +7457,12 @@ that moves the frame stays off by default as every frame-moving source is. On th
 rate and shape on the patch view. *Measure:* `npm run shapes` with each rate and shape
 set: the period within a frame of its bars at 120 and at 90 bpm, and an envelope fired
 by the kick on a recorded loop once per kick.
+*Added from VS 2 (2026-10-24).* Two shapes VS has and this lacks: a smoothed random (a new
+random target each period, glided to rather than stepped) beside the stepped one; and an
+LFO that restarts its cycle on a trigger (a note on a channel, the kick, a pad), so a
+sweep begins with the phrase rather than wherever the bar clock left it. The measure adds
+the smoothed random's slope bounded (no step larger than a frame's share of its range)
+and a restart landing within a frame of each kick on the recorded loop.
 
 **Not copied.** A shader editor and imports from Shadertoy, ISF or GLSL Sandbox: the
 plate is a simulated liquid, not a stack of shaders (the owner's rule to model the real
@@ -7648,7 +7935,9 @@ a grid of generic stock thumbnails: ours are the plate itself.
 - **34f. One-button share export.** *(S.)* §6's Render and Record make the file; the
   gap is a single "Save a clip with sound" on the desk and the phone that picks the
   container and size itself, with the small mark on the free site (§23). First the 3-minute
-  1080p render in §6 has to be measured on a Mac.
+  1080p render in §6 has to be measured on a Mac. A portrait frame (9:16, for Reels and
+  TikTok) beside landscape, as VS 2's recorder offers (§30, 2026-10-24): the plate
+  rendered at that aspect, not a crop of the landscape frame.
 - **34g. Legible reactions, named on the page.** *(S, copy.)* Kicks that stir the dye,
   a hit that seeds a bubble: these already exist in the sound patches (§28i-3). Name each
   look's reaction on its card in 34a and 34b ("kicks stir the ink") so a viewer sees that

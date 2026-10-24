@@ -2610,6 +2610,51 @@ M_f·ΔP) keeps both.
     sheet carries it too; the phone's own tilt (`useDeviceTilt`) writes the same settings
     the dish reads, so a tilted phone sloshes the plate it shows.
 
+- **18a-13a and 18a-13d, two layers and bores (shipped 2026-10-22; the owner: "make sure
+  we are using legit physics and simulations, as opposed to faking it. I want state of the
+  art").**
+  - The scheme, and why this one. Two-layer shallow water is usually solved as one coupled
+    system (path-conservative Roe or IFCP schemes, Castro, Parés and others). Those need an
+    entropy fix and lose hyperbolicity where the layers' speeds part, and the oil here is
+    lenses that come and go, so most cells have no second layer at all. Instead each layer is
+    solved on its own with the other's weight in its floor (the splitting Bouchut and Morales
+    de Luna analyse, 2008): the water by the hydrostatic reconstruction of Audusse, Bouchut,
+    Bristeau, Klein and Perthame (2004) with an HLL flux and Toro's dry-bed speeds, MUSCL with
+    the MC limiter on depth, head and velocity, first order beside the rim, Heun (SSP RK2) at
+    a fixed 1/420 s. It is well balanced (a lake at rest is exact, a lens floating on it too),
+    never makes a negative depth, and captures a bore as a jump.
+  - The oil. A lens at its capillary thickness e² = 2|S|ρ/(gρ₁Δρ) (S = −6 mN/m, ρ₁/ρ = 0.88,
+    3.4 mm), read every frame from the plate's own oil share, rides the water as a raft
+    pushed down the water's head; its weight is in the water's floor. Between the layers and
+    the two glasses, the steady laminar drag of two stacked liquids (the 2×2 matrix the
+    profile gives, reducing to 12ν/h² for one), solved implicitly.
+  - The presses. Beat Squeeze's glass on the kick presses the dish too, as a pressure head
+    over three nested discs (`KICK_RADII`), held and let go on the gap's own envelope
+    (`glassHeld`): the ring runs out at the wave speed and back off the rim.
+  - The rock. Plate Rock's swing tips the dish only as far as Frame Sway lets the music move
+    the frame (`rockAccel`: the Slosh dial's top lean times Frame Sway), because a rocked dish
+    moves all its liquid one way and back and the whole picture sways. So not at all at Frame
+    Sway's default 0; on Bass Drop (0.35) at a third of the dial's lean.
+  - Where it runs. The GPU (`gpu/slosh.ts`, kernels in `wgsl/slosh.ts`), before the solver's
+    step on its encoder: the oil is a GPU field, and the dish is ten million flops a frame.
+    Never read back: `SloshClock` runs it while driven and for its ring time after
+    (`sloshRingSeconds`), then lays it level. The water's depth is stored as its departure
+    from rest: stored whole in float32, a liquid creeping back to level at Thickness 0.6 lost
+    1.0e-5 of its water in ten seconds (3e-15 in float64), now 4.3e-8.
+  - Measured (`npm run slosh`, four processes, about five minutes): the lowest mode rings at
+    1.425 s (theory 1.407); a held tilt settles to a/g exactly and stops (1.6e-7 plate
+    widths/s); water reversed overshoots 82% with 14 crossings, the default Thickness 0.5%
+    with one (the pace kept: 1% before); the ring dies at 0.335/s against the drag's 0.300
+    (shortcut (i)); mass to 4.3e-8; resonant rocking at four half-periods inside the Courant
+    limit (0.75 at worst), and at twice the dial's lean it still holds; a dam break's front at
+    0.6719 against Stoker's 0.6684, two cells wide, the depth behind it 1.0882 against 1.0904,
+    energy never rising a frame (69% spent); the two-layer drag within 0.14% of a numerical
+    profile, 12ν/h² exactly for one liquid; a lens floats with nothing moving, and rocked moves
+    at 35% of the water under it; a press's ring at 1.200 plate widths/s against √(gh) 1.213.
+    `npm run sloshgpu` steps the GPU and the reference together through seven forcings and
+    holds them to 1e-4 of the depth and the wave speed: 2e-7 to 1.8e-5 on SwiftShader.
+  - Shortcuts, named in `lib/slosh.ts` (a) to (i); open items 18a-13b, 13c, 13e, 13g, 13h.
+
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
 - **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the
@@ -3282,6 +3327,28 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   - `npm run mixer`: 68/68 (back plate Screen/Multiply 10.3 > 10).
   - `npm run lamp`: 9/9 and `npm run lampzero`: 4/4 (every look at Lamp Ground 0 as before the lamp, none different; two projectors add their light, mean error 0.51).
   - `npm run stages` (round 2): drawing pass at 768², two layers, 3.57 vs 3.46 ms base/branch.
+
+### 18f. Heat comes from the lamp, and a level plate has no "up"
+
+**Shipped (#352):**
+- **Where:** `currentForces` previously pushed heat along `S.up` regardless of whether the plate was level or upright, saturated by an artificial `tanh(20T)` clamp. Centre gravity and rock used `tanh(dye - mean)`. The oil in `mixForce` had no buoyant density contrast, so oil never floated upward relative to water when the plate was tilted. Heat decayed per step rather than per second, meaning 60 Hz and 120 Hz simulations cooled at vastly different rates.
+- **The real phenomenon and changes:**
+  1. **Level plate has no in-plane buoyancy:** On a level dish, gravity points straight through the glass normal to the plate ($g_z$), so in-plane buoyancy ($g_x, g_y$) is identically zero. In `currentForces` and `mixForce`, in-plane thermal buoyancy is strictly gated on `upright` (zero on a level plate, active on a tilted/vertical plate).
+  2. **Linear Boussinesq:** Removed the artificial `tanh(20T)` clamp. For temperature differences of tens of kelvin, density changes are linear in temperature ($\Delta \rho = -\rho \beta \Delta T$), so buoyant acceleration scales linearly with temperature. Doubling temperature doubles plume acceleration (verified by `npm run heat` check 5).
+  3. **Beer–Lambert spectral absorption:** The lamp heats the dish in proportion to how much light the dye absorbs. In `decayVel`, dye absorption is decoded using the plate's `lampThrough` Beer–Lambert model (`exp(-d.rgb / d.a)` per unit depth), so dark dyes absorb strongly while pale dyes and clear water stay cool (verified by `npm run heat` checks 1 and 8). The central lamp hotspot is modeled by the spatial shortcut $1 / (1 + 2.5 r^2)$.
+  4. **Anchored physical units & Newton cooling:** Temperature is modeled in kelvin. The heating rate constant `LAMP_HEATING = 0.24` K/s is derived from physical irradiance absorbed in a thin layer: $I / (\rho \cdot c \cdot h) \approx 1000\text{ W/m}^2 / (1000\text{ kg/m}^3 \times 4184\text{ J/(kg K)} \times 0.001\text{ m})$. Newton cooling decays per-second with a real physical time constant in the tens of seconds ($\tau \approx 12.4\text{ s}$ via `heatDecay^(4*dt)`), remaining dt-independent across frame rates.
+  5. **Oil buoyant density:** In `mixForce`, oil ($\rho \approx 0.85\text{ g/cm}^3$) is less dense than water ($\rho = 1.0$), so oil experiences upward buoyancy along the tilted plate while heavier wax sinks.
+  6. **Temperature-dependent viscosity:** Water viscosity drops by ~2% per kelvin ($\mu(T) \approx \mu_0 / (1 + 0.02 \Delta T)$), causing thin-gap mobility under gravity to rise with temperature (~1.5× at 30°C).
+  7. **CPU twin alignment:** `LiquidVisualizer.tsx`'s `stepCurrent` mirrors the GPU solver: `fy = upright * p.currentBuoy * Math.min(50, Math.max(0, this.temp[q])) + p.rockY * dd`, removing `tanh(20T)` and gating on `upright`.
+- **Measured:**
+  - `npm run heat`: 9/9 checks passing on Metal and SwiftShader.
+  - Check 1 & 8: Dark dye heats to 0.0707 K in 0.5s under full dimmer, clear water stays at 0.0000 K; dark dye absorbs 12.95× more heat than pale dye of equal total density.
+  - Check 2: Dimmer at 0 produces 0.0000 K; dimmer at 0.5 heats to 0.0353 K (0.500× linear scaling).
+  - Check 3: 60 steps at dt=1/60s cool to 9.0703, 120 steps at dt=1/120s cool to 9.0625; ratio 1.0009 confirms dt-independence (per-step would diverge by 3.36×).
+  - Check 4: Level plate produces 0.000000 in-plane vy; upright plate produces upward plume vy = 0.126343.
+  - Check 5: Plume vy is 0.22839 at T=15 and 0.41284 at T=30; ratio 1.808 confirms linear Boussinesq scaling (tanh clamp would saturate to 1.10).
+  - Check 6: Thin-gap terminal velocity increases from 0.12048 to 0.18945 at 30°C (ratio 1.572), matching the ~2%/K viscosity drop.
+  - Check 7: Oil rises with vy = +0.00809, wax sinks with vy = -0.03311, level plate is 0.000000.
 
 ### 18g. Colour leaves by flushing, not by fading
 
@@ -3997,6 +4064,42 @@ barely falls (4.1 to 3.9); far off it moves the colour by its own displaced volu
 back 95% of the way at the default, 89% at full. Shortcuts (27f-4): the ring the dent lifts round itself is not laid (the gap is
 never opened past rest), the reach is read at the 6 mm middle, and the release is KickRelease's
 third of a second rather than the sheet's own slower relaxation.
+
+### 27f-5. The rock lifts the oil, not the frame (2026-10-24)
+
+Oil on a tipped plate is lighter than the water round it (light mineral oil, 880 kg/m³), so
+under the cover it rises the other way from the heavy colour, a bubble under a tipped glass.
+Built in the thin gap's `hsBody` (wgsl/thinGap.ts): the force c·Δρ g sinθ uphill (fluid.ts
+`OIL_LIFT`, in SI: 0.16 m/s a unit of sinθ at the 6 mm rest gap through the default 22 cSt, no
+tuning), laid as the closed dish's own circulation, u = ∇⊥ψ with −∇²Ψ = ∇c and Ψ = 0 near the
+rim (`hsLiftSource`, `hsLiftRelax`: over-relaxed red-black sweeps, eight a step, warm from the
+last step, ψ multiplied by the tilt). So an even sheet of oil feels nothing, the picture's mean
+flow is zero by construction, and the rim holds what reaches it. The tilt is the step's
+`rockX`, the hand's swing and the phone's tilt both. With the oil there the colour's weight is
+the water's colour alone (Oil Bodies' own share taken off, `WATER_DYE`), over its own mean taken
+on the GPU this step (`hsOilMean`): weighed whole, a Clock Glass body's colour pulled it
+downhill about nine times as hard as its oil lifts, so the bodies sank against their buoyancy.
+
+Measured (`npm run oillift`, lab, sinθ 0.1): a lens rises at 6.22 mm/s against Hele-Shaw's 6.40
+worked out in SI for its soft edge (Δρ g sinθ h²/12μ, halved for the water it pushes round it,
+× (1 − a²/R²), × ∫c²/∫c); a level one stays put; a lens carrying Clock Glass's colour rises at
+88% of a plain one (the 6% of its colour Oil Bodies leaves in the water at its edge weighs as
+dyed water); what the tilt adds to the picture's mean flow is 0.000 mm/s on a full sheet and
+under 0.02 mm/s on half sheets (the first try, below, 4.2), and Clock Glass's own lay rocked
+keeps its mean at 1.5% of its liquid's speed; a lens rocked into the rim keeps 99% of its oil
+over six seconds of a steady tilt and stops.
+
+Tried first, and taken out of #440: the buoyancy on the two-layer dish's oil rafts alone slid
+an oil sheet across the dish, the whole picture, at −4.2 mm/s a lean (Oil & Water and Clock
+Glass both run the default Plate Rock at Frame Sway 0), and a lens at the rim drove into it.
+Then, in this PR's first cut, the force laid as the oil's share over the dish's mean,
+(c − c̄) L, as the colour's weight is: the frame held, but through the gap's open rim (p = 0, the
+plate's free edge) a lens that reached it went out, 88% of it in three seconds at 6°. Laid as
+the circulation but held to zero only on the rim's own cells, it lost 7%; three cells in, 0.9%
+over six seconds, of which the same lens left level there loses 0.2%. Open: 27f-6 (a standing
+plate), 27f-7 (the lift's circulation is the even gap's; the mix's oil has the water's
+viscosity), 18g-6 (a body touching the rim drains through it by its own surface tension, on
+main).
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 

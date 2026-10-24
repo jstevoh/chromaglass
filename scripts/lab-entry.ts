@@ -273,6 +273,8 @@ const api = {
   thinGapViscosity,
   /** The real seconds a lab step takes, for `npm run thick`'s kept share and `npm run flush`'s pours. */
   stepSeconds: BASE.magnetSeconds ?? 1 / 60,
+  /** How far a unit of the flow carries the liquid in a lab step, in plate widths (the app's stepDisplacement), so a check can say a velocity in m/s. */
+  stepDisplacement(n: number) { return stepDisplacement(BASE.dt, BASE.advection, n); },
   ferroViscosity: FERRO_NU,
   /** The dye's depth per unit (PLAN 18m), so `npm run slump` lays the drop it means to. */
   dyeLayer: DYE_LAYER,
