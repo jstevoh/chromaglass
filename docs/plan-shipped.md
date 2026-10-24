@@ -2132,6 +2132,59 @@ playing, the beat clock fired 303 kicks for the band's 258 and fires 257; in the
 on the Perform desk 10 kicks for 10 presses and none, on the phone 9 for 9 taps and
 none, while knocks with no hand on anything are still all heard.
 
+### 14aa. The plate stutters in bursts on a machine with room to spare (shipped 2026-10-24)
+
+Asked: "things are a little jittery sometimes", and the GPU used across the code. No GPU
+in the session that did it, so what was measurable without one was measured, and what
+needs the owner's eyes is `docs/judging.md` §64.
+
+**The step count.** The loop turned time into solver steps with an accumulator,
+`floor(acc / step)`, and read the time from `Date.now()`: whole milliseconds, part way
+into the frame, after a varying amount of work. On a display whose refresh matches the
+step, the remainder sits wherever the frame's work puts its clock read, and when that
+is near a step's edge the scatter carries it back and forth: a frame with no step, then
+one with two. On a 59.94 Hz panel the remainder drifts through the edge every so often,
+so it comes in bursts. `npm run cadence` models both loops on seeded displays (a refresh
+stamp a few microseconds either side of the refresh, 3.5 ± 1.5 ms of work before the old
+loop's clock read, 0.4 % of refreshes missed): the old loop left 44 % of a 60 Hz
+display's runs uneven, 11 % at 59.94 Hz, 20 % at 120 Hz with sixty steps, 12 % at thirty;
+the new one none. It is a model, not a GPU run (14aa-2). `src/lib/stepClock.ts` now
+takes the refresh's own stamp (the draw gate's `lastDraw`, whichever window's refresh
+drew), judges the refresh from a median of the last 32 intervals, and when the step is a
+whole ratio of it counts refreshes: one step every refresh, every second, or two each,
+as the film render always has. A missed refresh is counted as the refreshes it was, so
+steps are still caught up within the old cap. A 90 or 144 Hz panel keeps the
+accumulator, on the stamps, with a twentieth of a step's slack against the float
+remainder. Every other per-frame integrator in the loop gets the steadier interval too.
+
+**The step's garbage (Wave 4.1, H2c-4).** `npm run encode` steps the real solver in the
+lab, 512² on a thin gap, and reads the page's allocations with Chromium's sampling heap
+profiler (collected objects included). Before: 506 KB a step, 1,939 B a dispatch, 249
+`writeBuffer` calls for 267 dispatches, 3.4 ms median of main thread in `step()`. Where
+it went: `kernel()`'s `replaceAll` over the source on every dispatch, re-hashed by the
+pipeline cache's map (`get`, 207 KB); the failure check's `split` and template strings
+(65 KB); the bind group keys spelled from labels; `arg()`'s array and write. Now: kernel
+sources made once per format; the pipeline cache answers a name it answered a moment
+ago from a hot map (dropped whenever any pipeline fails, and bypassed while a harness
+listens, so `npm run startup`'s ledger still sees every ask); `arg()` writes only when
+its eight numbers changed (what a buffer holds when the step runs is the last write, so
+skipping an equal one changes nothing the GPU sees); the multigrids' names made once;
+bind groups found by the objects they bind. After: 31 KB a step, 120 B a dispatch, 2
+writes a step, 0.4 ms. The remainder is the array literals the dispatches are written
+with.
+
+**The governor's hunting (14j's governor line).** A machine that holds one rung and not
+the one above was retried every ninety seconds for ever: in `npm run rungs`'s model, 38
+rung changes in half an hour, each retry a grid rebuilt twice and four seconds of
+stutter. The wait now doubles each time the same rung, post level or step rate fails
+with no tool held, up to sixteen times: 10 changes, retries 191, 367 and 727 s apart,
+the first still at 99 s, and a machine that cools gets its rung back.
+
+Found along the way and written in as 14ab: the video pour's pause and play every frame,
+its CPU optical flow, the CPU field means, the whole-grid delta upload, per-frame bind
+groups outside the solver, the beads' canvas, the ear's allocations, the gamepad, the
+thick liquid's share.
+
 ### 15i. Picking a bottle pours nothing (shipped)
 
 **Shipped.** The owner, 2026-10-04: "when I pick the ferrofluid liquid - it deposits a

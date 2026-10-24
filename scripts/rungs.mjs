@@ -588,6 +588,47 @@ for (const devicePx of [1, 1.5, 2, 3]) {
   }
 
   {
+    /*
+      Hunting (PLAN.md 14j). A machine that holds one rung and not the one
+      above it: a fill-bound laptop that draws 26 ms frames on its opening
+      rung and 16 ms one below, whatever the step rate. The governor gives
+      the rate up, then the rung, and is fast; ninety seconds on it offers the
+      rung again, drops frames for a second and a half finding it still too
+      slow, and comes back down. With the same ninety seconds every time that
+      was 38 rung changes in half an hour, a grid rebuilt both ways and four
+      seconds of stutter every minute and a half, for ever. Doubling the wait
+      each time the same rung fails again leaves the first retry where it
+      was (a load that went away is won back as soon as before) and makes
+      the fifth a matter of twenty-four minutes.
+    */
+    const hunt = (minutes, cooledAt = Infinity) => {
+      const g = new QualityGovernor(rungs, 1, 0);
+      let now = 0;
+      const moves = [];
+      while (now < minutes * 60) {
+        const ms = g.rungIndex <= 1 && now < cooledAt ? 26 : 16;
+        now += ms / 1000;
+        if (g.sample(ms / 1000, 1, now, false, ms - 10)) moves.push({ at: now, index: g.rungIndex });
+      }
+      return { g, moves };
+    };
+    const { moves } = hunt(30);
+    const climbs = moves.filter((m, i) => i > 0 && m.index < moves[i - 1].index).map((m) => m.at);
+    const gaps = climbs.slice(1).map((t, i) => t - climbs[i]);
+    check('a rung that keeps failing is offered less and less often: at most 12 rung changes in 30 minutes',
+      moves.length <= 12, `${moves.length} changes; climbs at ${climbs.map((t) => t.toFixed(0)).join(', ')} s`);
+    check('each retry of it waits about twice the one before',
+      gaps.length >= 2 && gaps.slice(1).every((d, i) => d >= 1.8 * gaps[i]), gaps.map((d) => d.toFixed(0)).join(', ') + ' s apart');
+    check('and the first retry is as soon as it always was (under two minutes)',
+      climbs.length > 0 && climbs[0] < 120, climbs.length ? `${climbs[0].toFixed(0)} s` : 'never retried');
+    // The same machine cooling after ten minutes: the rung is still won back, within the longest wait.
+    const cooled = hunt(40, 600);
+    check('a machine that cooled gets its rung back within the longest wait (24 min)',
+      cooled.g.rungIndex <= 1 && cooled.moves.some((m) => m.at > 600 && m.index <= 1 && m.at < 600 + 24 * 60 + 30),
+      `on rung ${cooled.g.rungIndex} after 40 minutes; climbs after cooling at ${cooled.moves.filter((m) => m.at > 600 && m.index <= 1).map((m) => m.at.toFixed(0)).join(', ')} s`);
+  }
+
+  {
     // `?rung=` holds the whole rung for measuring. It has to hold the rate
     // too, or a measurement of a rung is a measurement of something else.
     const g = new QualityGovernor(rungs, 1, 0, true);

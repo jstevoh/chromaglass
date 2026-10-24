@@ -52,6 +52,9 @@ import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
 const AIR_CAPACITY = 512;
 
 /** What `handOver` copies out: the fields, on the device they were copied on. */
+/** One step of `groupAt`'s walk: what it found here, and where each next object leads. */
+type GroupNode = { kids: Map<unknown, GroupNode>; group?: GPUBindGroup };
+
 interface FieldCarry extends SolverCarry {
   readonly device: GPUDevice;
   readonly phase: GPUTexture | null;
@@ -753,7 +756,7 @@ export class WebGPUFluid {
   private readonly simF = new Float32Array(this.simData);
   private readonly simI = new Int32Array(this.simData);
   /** One small uniform for each call site that needs its own numbers within a step. */
-  private readonly args = new Map<string, GPUBuffer>();
+  private readonly args = new Map<string, { buf: GPUBuffer; last: Float32Array; written: boolean }>();
   private readonly sampler: GPUSampler;
 
   private readonly rbRow: number;
@@ -1422,20 +1425,118 @@ export class WebGPUFluid {
 
   // ── Plumbing ──────────────────────────────────────────────────────
 
+  /**
+   * A dispatch's eight numbers, in a buffer of their own under `name`, written
+   * only when they differ from what that buffer was last given (H2c-4).
+   *
+   * It made a `Float32Array` and a slice and wrote the buffer on every call:
+   * a write a dispatch, about 250 a step at 512², when most of those numbers
+   * (a sweep's parity, a level's size, `none`) are the same every step of a
+   * show. Skipping the write when the numbers match changes nothing the GPU
+   * sees. A `writeBuffer` lands on the queue in call order, ahead of the next
+   * submit, so what a buffer holds when a step's commands run is whatever was
+   * written to it last, and that is exactly what `last` remembers. (Which is
+   * also why one name must not carry two values in one step: both dispatches
+   * read the second. That was so before, and this keeps it so, no worse.)
+   */
   private arg(name: string, values: number[]): GPUBuffer {
-    let buf = this.args.get(name);
-    if (!buf) {
-      buf = this.disposer.track(this.device.createBuffer({ label: `args ${name}`, size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
-      this.args.set(name, buf);
-    }
-    const v = new Float32Array(8);
-    v.set(values.slice(0, 8));
-    this.device.queue.writeBuffer(buf, 0, v);
-    return buf;
+    const v = this.argScratch;
+    const n = Math.min(8, values.length);
+    for (let i = 0; i < 8; i++) v[i] = i < n ? values[i] : 0;
+    return this.argWrite(name);
   }
 
+  /**
+   * `arg` with four numbers and no array to carry them: for the multigrids'
+   * sweeps, the most asked of all, where the array literal a call is written
+   * with was most of what was left of a step's garbage (`npm run encode`).
+   */
+  private arg4(name: string, x: number, y = 0, z = 0, w = 0): GPUBuffer {
+    const v = this.argScratch;
+    v[0] = x; v[1] = y; v[2] = z; v[3] = w; v[4] = 0; v[5] = 0; v[6] = 0; v[7] = 0;
+    return this.argWrite(name);
+  }
+
+  /** `argScratch` into the buffer under `name`, if it differs from what that buffer holds. */
+  private argWrite(name: string): GPUBuffer {
+    let a = this.args.get(name);
+    if (!a) {
+      const buf = this.disposer.track(this.device.createBuffer({ label: `args ${name}`, size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+      a = { buf, last: new Float32Array(8), written: false };
+      this.args.set(name, a);
+    }
+    const v = this.argScratch;
+    let same = a.written;
+    for (let i = 0; same && i < 8; i++) same = Object.is(v[i], a.last[i]);
+    if (!same) {
+      a.last.set(v);
+      a.written = true;
+      this.device.queue.writeBuffer(a.buf, 0, a.last);
+    }
+    return a.buf;
+  }
+
+  private readonly argScratch = new Float32Array(8);
+
+  /**
+   * The pipeline for a kernel and the format it writes, asked on every
+   * dispatch: the `name:format` it is cached under made once, not a new
+   * string each time (`npm run encode`).
+   */
   private pipeline(name: string, format: GPUTextureFormat): GPUComputePipeline | null {
-    return this.pipelines.computePipeline(`${name}:${format}`, kernel(name, format));
+    let byFormat = this.pipelineKeys.get(name);
+    if (!byFormat) { byFormat = new Map(); this.pipelineKeys.set(name, byFormat); }
+    let key = byFormat.get(format);
+    if (key === undefined) { key = `${name}:${format}`; byFormat.set(format, key); }
+    return this.pipelines.computePipeline(key, kernel(name, format));
+  }
+
+  private readonly pipelineKeys = new Map<string, Map<string, string>>();
+
+  /** `pipeline`'s key for a kernel built under a suffix of its own (`hsRun`'s `:thin`), made once. */
+  private pipelineKey(name: string, suffix: string): string {
+    let bySuffix = this.pipelineKeys.get(name);
+    if (!bySuffix) { bySuffix = new Map(); this.pipelineKeys.set(name, bySuffix); }
+    let key = bySuffix.get(suffix);
+    if (key === undefined) { key = `${name}:${suffix}`; bySuffix.set(suffix, key); }
+    return key;
+  }
+
+  /**
+   * The names the multigrids ask for on every sweep (`mg smooth 3 1`,
+   * `hsSmooth:3:1`), each made once. A template literal is a new string every
+   * time it runs, and the map it is looked up in hashes it again: the two
+   * V-cycles a step asked for some two hundred of each (`npm run encode`).
+   * Each prefix is used with one separator, so the prefix alone keys the table.
+   */
+  private nameOf(prefix: string, b: number, sep?: string, c?: number): string {
+    let byB = this.names.get(prefix);
+    if (!byB) { byB = new Map(); this.names.set(prefix, byB); }
+    let byC = byB.get(b);
+    if (!byC) { byC = new Map(); byB.set(b, byC); }
+    const k = c ?? -1;
+    let name = byC.get(k);
+    if (name === undefined) { name = c === undefined ? `${prefix}${b}` : `${prefix}${b}${sep}${c}`; byC.set(k, name); }
+    return name;
+  }
+
+  private readonly names = new Map<string, Map<number, Map<number, string>>>();
+
+  /**
+   * The dispatches' bind groups, found by the very objects they bind rather
+   * than by a key string spelled out from their labels on every dispatch
+   * (`run`, `runPressed`, `runThinFaced`): a walk down maps keyed by the
+   * pipeline, the target, the args and each texture read, which makes nothing
+   * once the step has been seen. By object, too, where the labels only stood
+   * for the objects: a texture made again under the same label could never be
+   * served a group that binds the one it replaced. Cleared with `groups`.
+   */
+  private groupRoot: GroupNode = { kids: new Map() };
+
+  private groupAt(node: GroupNode, k: unknown): GroupNode {
+    let n = node.kids.get(k);
+    if (!n) { n = { kids: new Map() }; node.kids.set(k, n); }
+    return n;
   }
 
   /** A dispatch: the kernel, its args, the textures it reads, the one it writes, and a sampler if it wants one. */
@@ -1449,11 +1550,12 @@ export class WebGPUFluid {
   ): void {
     const pipe = this.pipeline(name, dst.format);
     if (!pipe) return;
-    const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => (r instanceof GPUTexture ? r.label : 'sampler')).join(',')}:${args.label}`;
-    let group = this.groups.get(key);
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupRoot, pipe), dst), args);
+    for (const r of reads) at = this.groupAt(at, r);
+    let group = at.group;
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...reads.filter((r) => r instanceof GPUTexture) as GPUTexture[], dst, ...reads.filter((r) => !(r instanceof GPUTexture)) as GPUSampler[]]);
-      this.groups.set(key, group);
+      at.group = group;
     }
     pass.setPipeline(pipe);
     pass.setBindGroup(0, group);
@@ -1465,11 +1567,12 @@ export class WebGPUFluid {
   private runPressed(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, reads: GPUTexture[], args: GPUBuffer): void {
     const pipe = this.pipeline(name, dst.format);
     if (!pipe) return;
-    const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => r.label).join(',')}:${args.label}:press`;
-    let group = this.groups.get(key);
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'press'), pipe), dst), args);
+    for (const r of reads) at = this.groupAt(at, r);
+    let group = at.group;
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...reads, dst, this.press]);
-      this.groups.set(key, group);
+      at.group = group;
     }
     pass.setPipeline(pipe);
     pass.setBindGroup(0, group);
@@ -1486,11 +1589,12 @@ export class WebGPUFluid {
     const pipe = this.pipeline(name, dst.format);
     if (!pipe) return;
     const ride = this.ride();
-    const key = `${name}:${dst.format}:${dst.label}:${src.label}:${args.label}:${this.squeeze.read.label}:${ride.label}`;
-    let group = this.groups.get(key);
+    const at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'thin faced'), pipe), dst), src), args), this.squeeze.read);
+    const last = this.groupAt(at, ride);
+    let group = last.group;
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.squeeze.read, this.hsMob!]);
-      this.groups.set(key, group);
+      last.group = group;
     }
     pass.setPipeline(pipe);
     pass.setBindGroup(0, group);
@@ -1577,7 +1681,7 @@ export class WebGPUFluid {
     const gap = this.ensurePhaseGap();
     const there = this.phase.read, back = this.phase.write;
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
-      const a = this.arg(`phase advect plan ${j}`, [1, j, 0, REST_GAP, 0, disp, 1, 0]);
+      const a = this.arg(this.nameOf('phase advect plan ', j), [1, j, 0, REST_GAP, 0, disp, 1, 0]);
       const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.ride().label}`;
       let ga = this.groups.get(ka);
       if (!ga) {
@@ -1587,7 +1691,7 @@ export class WebGPUFluid {
       pass.setPipeline(adv);
       pass.setBindGroup(0, ga);
       pass.dispatchWorkgroupsIndirect(this.phaseInd!, 12 * j);
-      const g = this.arg(`phase grid plan ${j}`, [j, 0, 0, 0]);
+      const g = this.arg4(this.nameOf('phase grid plan ', j), j);
       const kg = `phaseGridPlan:${back.label}:${this.squeeze.read.label}:${g.label}:${stand.label}`;
       let gg = this.groups.get(kg);
       if (!gg) {
@@ -1823,6 +1927,7 @@ export class WebGPUFluid {
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       }));
       this.groups.clear();
+      this.groupRoot = { kids: new Map() };
     }
     q.writeBuffer(this.splatBuf, 0, list.records);
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
@@ -1864,6 +1969,7 @@ export class WebGPUFluid {
       if (this.splatBuf) this.disposer.release(this.splatBuf);
       this.splatBuf = this.disposer.track(this.device.createBuffer({ label: 'splats', size: 1024, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
       this.groups.clear();
+      this.groupRoot = { kids: new Map() };
     }
     this.device.queue.writeBuffer(this.splatBuf, 0, rec);
     this.simF[0] = this.N; this.simF[1] = this.L;
@@ -2276,11 +2382,11 @@ export class WebGPUFluid {
       if (rb) {
         const half = Math.ceil((this.N * (this.N / 2)) / 64);
         for (let k = 0; k < SQUEEZE_SWEEPS; k++) {
-          for (const parity of [0, 1]) {
+          for (let parity = 0; parity < 2; parity++) {
             const key = `squeezeRedBlack:${parity}:${this.squeeze.read.label}`;
             let group = this.groups.get(key);
             if (!group) {
-              group = bindGroup(this.device, rb, [this.sim, this.arg(`squeeze ${parity}`, [parity, 0, 0, 0]), this.squeeze.read, this.spress]);
+              group = bindGroup(this.device, rb, [this.sim, this.arg4(this.nameOf('squeeze ', parity), parity), this.squeeze.read, this.spress]);
               this.groups.set(key, group);
             }
             pass.setPipeline(rb);
@@ -4199,8 +4305,8 @@ export class WebGPUFluid {
     if (!pipe) return;
     const half = Math.ceil((this.N * (this.N / 2)) / 64);
     for (let k = 0; k < sweeps; k++) {
-      for (const parity of [0, 1]) {
-        const args = this.arg(`pressure ${parity}`, [parity, 0, 0, 0]);
+      for (let parity = 0; parity < 2; parity++) {
+        const args = this.arg4(this.nameOf('pressure ', parity), parity);
         const key = `pressureRedBlack:${parity}`;
         let group = this.groups.get(key);
         if (!group) {
@@ -4254,8 +4360,8 @@ export class WebGPUFluid {
       if (level === 0) { this.smooth0(pass, sweeps); return; }
       const lv = this.mg[level - 1];
       for (let k = 0; k < sweeps; k++) {
-        for (const parity of [0, 1]) {
-          this.dispatchBuf(pass, 'mgSmooth', `mgSmooth:${level}:${parity}`, this.arg(`mg smooth ${level} ${parity}`, [lv.n, parity, 0, 0]),
+        for (let parity = 0; parity < 2; parity++) {
+          this.dispatchBuf(pass, 'mgSmooth', this.nameOf('mgSmooth:', level, ':', parity), this.arg4(this.nameOf('mg smooth ', level, ' ', parity), lv.n, parity),
             [lv.b, lv.p], lv.n * Math.ceil(lv.n / 2));
         }
       }
@@ -4267,16 +4373,16 @@ export class WebGPUFluid {
       this.dispatchBuf(pass, 'mgRestrict0', 'mgRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.press, below.b], below.n * below.n);
     } else {
       const here = this.mg[l - 1];
-      this.dispatchBuf(pass, 'mgRestrict', `mgRestrict:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [here.p, here.b, below.b], below.n * below.n);
+      this.dispatchBuf(pass, 'mgRestrict', this.nameOf('mgRestrict:', l), this.arg4(this.nameOf('mg level ', l), here.n), [here.p, here.b, below.b], below.n * below.n);
     }
-    this.dispatchBuf(pass, 'mgZero', `mgZero:${l + 1}`, this.arg(`mg zero ${l + 1}`, [below.n * below.n, 0, 0, 0]), [below.p], below.n * below.n);
+    this.dispatchBuf(pass, 'mgZero', this.nameOf('mgZero:', l + 1), this.arg4(this.nameOf('mg zero ', l + 1), below.n * below.n), [below.p], below.n * below.n);
     this.vcycle(pass, l + 1);
     if (l === 0) {
       // Into level 0's packed buffer (A.a.y = 1): `mgProlong` in wgsl/fluid.ts.
       this.dispatchBuf(pass, 'mgProlong', 'mgProlong0', this.arg('mg prolong 0', [this.N, 1, 0, 0]), [below.p, this.press], this.N * this.N);
     } else {
       const here = this.mg[l - 1];
-      this.dispatchBuf(pass, 'mgProlong', `mgProlong:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [below.p, here.p], here.n * here.n);
+      this.dispatchBuf(pass, 'mgProlong', this.nameOf('mgProlong:', l), this.arg4(this.nameOf('mg level ', l), here.n), [below.p, here.p], here.n * here.n);
     }
     smooth(l, MG_SWEEPS);
   }
@@ -4671,7 +4777,7 @@ export class WebGPUFluid {
 
   /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */
   private hsRun(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count?: number): void {
-    const pipe = this.pipelines.computePipeline(`${name}:thin`, kernel(name, 'rgba16float'));
+    const pipe = this.pipelines.computePipeline(this.pipelineKey(name, 'thin'), kernel(name, 'rgba16float'));
     if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
@@ -4755,7 +4861,7 @@ export class WebGPUFluid {
       // Level 0 has no face buffer (its faces are its cells' harmonic means), so its
       // cells fill the slot too: read twice is allowed, read and written in one dispatch is not.
       const faces = l === 0 ? mob : this.hsFaceC[l - 1];
-      this.hsRun(pass, 'hsCoarsen', `hsCoarsen:${l}`, this.arg(`thin coarsen ${l}`, [fineN, l === 0 ? 1 : 0, 0, 0]),
+      this.hsRun(pass, 'hsCoarsen', this.nameOf('hsCoarsen:', l), this.arg4(this.nameOf('thin coarsen ', l), fineN, l === 0 ? 1 : 0),
         [cells, faces, this.hsMobC[l], this.hsFaceC[l]], this.mg[l].n * this.mg[l].n);
     }
     /*
@@ -4784,12 +4890,12 @@ export class WebGPUFluid {
     const mob = this.hsMob!;
     const smooth = (level: number, sweeps: number) => {
       for (let k = 0; k < sweeps; k++) {
-        for (const parity of [0, 1]) {
+        for (let parity = 0; parity < 2; parity++) {
           if (level === 0) {
-            this.hsRun(pass, 'hsSmooth0', `hsSmooth0:${parity}`, this.arg(`pressure ${parity}`, [parity, 0, 0, 0]), [this.div, this.hsP!, mob], this.N * (this.N / 2));
+            this.hsRun(pass, 'hsSmooth0', this.nameOf('hsSmooth0:', parity), this.arg4(this.nameOf('pressure ', parity), parity), [this.div, this.hsP!, mob], this.N * (this.N / 2));
           } else {
             const lv = this.mg[level - 1];
-            this.hsRun(pass, 'hsSmooth', `hsSmooth:${level}:${parity}`, this.arg(`mg smooth ${level} ${parity}`, [lv.n, parity, 0, 0]),
+            this.hsRun(pass, 'hsSmooth', this.nameOf('hsSmooth:', level, ':', parity), this.arg4(this.nameOf('mg smooth ', level, ' ', parity), lv.n, parity),
               [lv.b, lv.p, this.hsMobC[level - 1], this.hsFaceC[level - 1]], lv.n * Math.ceil(lv.n / 2));
           }
         }
@@ -4802,15 +4908,15 @@ export class WebGPUFluid {
       this.hsRun(pass, 'hsRestrict0', 'hsRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.hsP!, mob, below.b], below.n * below.n);
     } else {
       const here = this.mg[l - 1];
-      this.hsRun(pass, 'hsRestrict', `hsRestrict:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [here.p, here.b, this.hsMobC[l - 1], this.hsFaceC[l - 1], below.b], below.n * below.n);
+      this.hsRun(pass, 'hsRestrict', this.nameOf('hsRestrict:', l), this.arg4(this.nameOf('mg level ', l), here.n), [here.p, here.b, this.hsMobC[l - 1], this.hsFaceC[l - 1], below.b], below.n * below.n);
     }
-    this.dispatchBuf(pass, 'mgZero', `mgZero:${l + 1}`, this.arg(`mg zero ${l + 1}`, [below.n * below.n, 0, 0, 0]), [below.p], below.n * below.n);
+    this.dispatchBuf(pass, 'mgZero', this.nameOf('mgZero:', l + 1), this.arg4(this.nameOf('mg zero ', l + 1), below.n * below.n), [below.p], below.n * below.n);
     this.hsCycle(pass, l + 1);
     if (l === 0) {
       this.hsRun(pass, 'hsProlong0', 'hsProlong0', this.arg('none', [0, 0, 0, 0]), [below.p, this.hsP!, mob], this.N * this.N);
     } else {
       const here = this.mg[l - 1];
-      this.hsRun(pass, 'hsProlong', `hsProlong:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [below.p, here.p, this.hsMobC[l - 1]], here.n * here.n);
+      this.hsRun(pass, 'hsProlong', this.nameOf('hsProlong:', l), this.arg4(this.nameOf('mg level ', l), here.n), [below.p, here.p, this.hsMobC[l - 1]], here.n * here.n);
     }
     smooth(l, MG_SWEEPS);
   }
@@ -5116,5 +5222,6 @@ export class WebGPUFluid {
     this.air = null;
     this.disposer.dispose();
     this.groups.clear();
+    this.groupRoot = { kids: new Map() };
   }
 }

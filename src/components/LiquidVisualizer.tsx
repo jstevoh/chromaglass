@@ -6,6 +6,7 @@ import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
+import { StepClock } from '../lib/stepClock';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
@@ -5475,7 +5476,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const macroCamRef = useRef(new MacroCamera());
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
-  const simAccumRef = useRef(0);
+  /** Live steps a frame, counted by the refresh where the refresh allows (lib/stepClock.ts); made on the first frame. */
+  const stepClockRef = useRef<StepClock | null>(null);
+  /** The refresh stamp the last frame drew at (ms, `drawGate.lastDraw`), for the interval the step clock is given. */
+  const lastStampRef = useRef(Number.NaN);
   /** Milliseconds the last frame spent in the solver: the catch-up cap adapts to it. */
   const simMsRef = useRef(0);
   /** Solver steps a second, smoothed — 60 when the show is keeping wall-clock time. */
@@ -6886,7 +6890,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // A render's frame is exactly 1/fps: the clock's own difference of two
         // large doubles is that to within a last bit, which would still be a
         // different last bit in every uniform downstream.
-        const realDt = rendering ? 1 / rendering.fps : now - lastTimeRef.current;
+        /*
+          Live, the interval is the refresh's, from the stamps the draw gate
+          let through, when that agrees with the wall clock to within 20 ms
+          (lib/stepClock.ts): the browser's refresh timestamp is the display's
+          own clock, where `Date.now()` here counts whole milliseconds read
+          part way into the frame, and that scatter is what made the step
+          count stutter. Everything downstream that integrates over the
+          frame (the wheel, the camera, the chemistry) gets the steadier
+          number too. A frame with no believable stamp, after a pause, or a
+          window whose frames come from a timer, keeps the wall clock.
+        */
+        const stamp = drawGate.lastDraw;
+        const wallDt = now - lastTimeRef.current;
+        const refreshDt = (stamp - lastStampRef.current) / 1000;
+        lastStampRef.current = stamp;
+        const realDt = rendering ? 1 / rendering.fps
+          : refreshDt > 0 && Math.abs(refreshDt - wallDt) < 0.02 ? refreshDt : wallDt;
         lastTimeRef.current = now;
         frameS = realDt;
         // One verdict per frame on whether this is a kick: from the beat
@@ -7081,9 +7101,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const behind = SIM_MAX_CATCHUP > 4 ? SIM_MAX_CATCHUP : frameMsNow > 40 ? 1 : frameMsNow > 24 ? 2 : SIM_MAX_CATCHUP;
         const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
-        simAccumRef.current = Math.min(simAccumRef.current + realDt, simStepS * catchUp);
-        let simSteps = Math.floor(simAccumRef.current / simStepS);
-        simAccumRef.current -= simSteps * simStepS;
+        // Counted by the refresh where the display's rate is a whole ratio of
+        // the step's, by the accumulator elsewhere (`npm run cadence`).
+        const stepClock = stepClockRef.current ??= new StepClock();
+        let simSteps = rendering ? 0 : stepClock.steps(realDt, simStepS, catchUp);
         if (rendering) {
           /*
             A render's steps are counted, not measured: frame i is owed the
@@ -7095,7 +7116,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           */
           const i = rendering.frame;
           simSteps = Math.floor(((i + 1) * rendering.stepRate) / rendering.fps) - Math.floor((i * rendering.stepRate) / rendering.fps);
-          simAccumRef.current = 0;
         }
         stepsThisFrame = simSteps;
         /*
@@ -9879,6 +9899,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     const resetStamps = () => {
       lastTimeRef.current = showEpochS();
+      lastStampRef.current = Number.NaN;
       /*
         Evolve's own stamps, on the show clock like the rest of these: a thin
         and a flood are each held back for a few seconds after the last
@@ -9956,7 +9977,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const resetPlateClocks = () => {
       resetStamps();
       simulationTimeRef.current = 0;
-      simAccumRef.current = 0;
+      stepClockRef.current?.reset();
       wanderClockRef.current = 0;
       loudnessRef.current = 0;
       evolveLoudRef.current = 0;

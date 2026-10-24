@@ -177,11 +177,16 @@ merge conflicts are the shared documents', which 0.6 ends.
 
 ### Wave 4. The frame budget (lane C, measured with `npm run stages` and `npm run renders`)
 
-- **4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.
+- ~~**4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.~~
+  Shipped with 14aa (`npm run encode`, 512², thin gap: 506 KB allocated a step → 31 KB,
+  249 writes for 267 dispatches → 2, the main thread in `step()` 3.4 ms → 0.4). Story in
+  `docs/plan-shipped.md` §14aa.
 - **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
-  after a step, a heat-aware governor.
+  after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
+- **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa, the video pour's
+  pause and play every frame first (a bug, read in the code).
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
@@ -3015,12 +3020,15 @@ widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
   and the readback go on at the display's rate. Read back only on a frame that stepped
   or wrote deltas.
 - *The governor knows nothing of heat.* It climbs whenever frames are fast and
-  retries a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
+  retried a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
   is warming up climbs, drops frames for a second and a half, steps down, and does it
-  again every minute and a half. Every Apple GPU classes as `strong` (`device.ts`), so
+  again every minute and a half. **The doubling shipped with 14aa** (`npm run rungs`,
+  "hunting": 38 rung changes in half an hour → 10, the first retry still at 99 s); what
+  follows on the phone's ladder, the adapter and a cool setting is still open. Every
+  Apple GPU classes as `strong` (`device.ts`), so
   an iPhone opens at 512² and climbs; the phone layout does not touch the ladder; and
   the adapter is always asked for `high-performance`, which wakes the discrete GPU on
-  dual-GPU laptops. Double the wait each time the same rung fails, cap a phone's climb
+  dual-GPU laptops. Cap a phone's climb
   at its starting rung, and consider a "cool / battery" output setting (low-power
   adapter, 30 steps, a capped top rung) that ships with its phone control.
 - *The gamepad* is polled every 16 ms with no pad connected (`useGamepad.ts`); start
@@ -3479,6 +3487,58 @@ Mic or Band pick came back on every launch from `localStorage`.
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
+
+### 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
+
+The owner: "things are a little jittery sometimes"; make sure the GPU is used across
+the code. Three causes, each with its check: the step count stopped and doubled the
+liquid in bursts (`npm run cadence`), each solver step made half a megabyte of garbage
+for the page's collector to stop for (`npm run encode`), and the governor retried a
+rung the machine could not hold every ninety seconds for ever (`npm run rungs`,
+"hunting"). How each was found and measured is in `docs/plan-shipped.md` §14aa.
+
+- **14aa-1** (open, the owner's eyes): on the owner's 120 Hz laptop and on the wall, does
+  the plate still stutter now and then? `docs/judging.md` §64.
+- **14aa-2** (open): the old loop's stutter is modelled, not measured on a GPU. The app
+  could count its own frames that stepped none then two (`StepClock.locked/free` are
+  there) and a Mac check print them over a minute of a look; `npm run stages` is the
+  likeliest home.
+
+### 14ab. What else runs on the CPU every frame (found with 14aa, read in the code)
+
+An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show pays.
+
+- **14ab-1** *The video pour pauses and plays its video every frame* (a bug). `App.tsx`'s
+  frame loop calls `pourVideo` each frame, and `pourVideo` pauses the element it holds
+  and plays it again, which fires `pause` and `play`, which set React state twice a frame
+  and restart the loop. Fix: `pourVideo` does nothing for the video it already pours, and
+  is asked once, on play. Check: a page with a video poured counts `play` events and App
+  renders a second.
+- **14ab-2** *The video pour's optical flow is a CPU loop* over a 192² `getImageData`
+  each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
+  pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
+  belongs in a compute pass beside it.
+- **14ab-3** *Every frame reads both fields back and averages them on the CPU*
+  (`syncFromGpu`, a loop over every cell of each layer for the mean density and colour)
+  where `measure()` on the GPU returns the same means in 32 bytes. With 14j's "read back
+  only on a frame that stepped".
+- **14ab-4** *A CPU pour uploads the whole grid every step* (`flushDeltas`: about 1.3 MB
+  through three to five `writeTexture`s and the upsamples), for a few changed cells.
+  Splat records on the GPU (`applySplats`) are the path; what still goes through the
+  delta grids is the bubbles' rims, the hands, the breath and the room stir.
+- **14ab-5** *The plate, post chain, camera, output and particles make their bind groups
+  and views every frame* (10–20 `createBindGroup`, 40–60 `createView`); the solver
+  caches its own (H2c-11).
+- **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
+  gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
+- **14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
+  `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort
+  on their history. A ring and a selection median.
+- **14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
+  object each tick) and sets `connected` on every poll through a stale closure (with
+  14j's timer line).
+- **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
+  sixty steps (`speciesShare`); a ring like the readback's.
 
 ## 15. Every tool on every liquid
 

@@ -1514,3 +1514,19 @@ running back as the bass falls, and each kick's dye should throw further. It sho
 bass, not as a busier or shakier plate, and nothing should move the whole frame. Say whether 3
 is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
 bass you wanted.
+
+
+## 64. The plate does not stutter now and then (PLAN 14aa)
+
+Play any look for five minutes on the laptop, then with the wall up, the way a show runs. Watch
+the liquid's own motion, not the music's: before this, a plate on a machine with room to spare
+could stop for a frame and jump two, in bursts of a second or two a few times a minute, worst on a
+120 Hz screen. It should glide evenly the whole time. If it still hitches, say roughly how often,
+whether the wall and the laptop hitch together, and whether the hitch is the liquid or the whole
+picture (the second is a dropped frame, a different thing). Also say if the quality ever visibly
+steps down and back up again: it should do that once at most, early, not every minute and a half.
+
+Measured: `npm run cadence` (the old loop, modelled on a 60 Hz display, stopped or doubled the
+liquid on 11–44 % of frames depending on where its remainder sat; the new clock on none, at 60,
+59.94, 120 and 30 Hz and at thirty steps); `npm run encode` (a step's garbage 506 KB → 31 KB);
+`npm run rungs` (a rung the machine cannot hold retried 38 times in half an hour → 10).

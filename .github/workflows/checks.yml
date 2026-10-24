@@ -350,6 +350,13 @@ jobs:
       - name: The ladder's shape
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run rungs
+      # The plate takes its steps evenly (scripts/cadence.mjs, PLAN.md
+      # 14aa): on a display whose refresh is a whole ratio of the step
+      # no frame stops or doubles the liquid, dropped refreshes are caught up,
+      # and the model makes the old loop stutter as its control.
+      - name: The step cadence
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run cadence
 
       # Soap, milk, silicone and glycerine, each measured on the thing it is
       # for — and first, that an empty plate is left completely alone.
@@ -587,6 +594,14 @@ jobs:
       - name: A bubble's middle is the plate
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run bubblelook
+      # What a solver step costs the main thread to ask for (scripts/encode.mjs,
+      # PLAN.md Wave 4.1, H2c-4): the bytes it allocates and the writes it
+      # makes a dispatch, counted in the page by Chromium's own heap sampler.
+      # JavaScript's cost, which is the same on SwiftShader as on Metal, so it
+      # sits here rather than in the Mac queue. About two minutes.
+      - name: A step asks for nothing it throws away
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run encode
       # Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):
       # against the Firebase Auth emulator, Google, Apple and magic-link
       # sign-in, offline returning sessions, sign-out and account deletion.
