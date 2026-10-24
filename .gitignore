@@ -51,3 +51,6 @@ desktop/release/
 # The show server's key and local licence state, kept between launches (PLAN 14m, 23.4): private to the machine.
 server/.show-key
 server/.license.json
+
+# The show server's https certificate (PLAN 14m-https), made on its first launch.
+server/.tls/

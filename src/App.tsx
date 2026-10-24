@@ -6193,7 +6193,7 @@ export default function App() {
                     <>
                       <div className="text-[11px] opacity-50 leading-snug mt-0.5">Any browser on the same Wi-Fi:</div>
                       {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-                        <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
+                        <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1" data-testid="cast-network-address">{relay.httpsPort ? `https://${h}:${relay.httpsPort}` : `http://${h}:${relay.port}`}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
                       ))}
                       {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
                         <div className="font-mono text-[11px] text-white/80 select-all mt-1">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
@@ -6201,7 +6201,7 @@ export default function App() {
                       <div className="mt-2">
                         <Info label="">
                           Open one of these on a projector, a TV or a tablet and it shows the
-                          show. Across buildings or other access points: run{' '}
+                          show.{relay.httpsPort ? ' Its browser warns once that the connection is not private: choose Advanced, then Proceed.' : ' This show server has no https, and a display needs it to start: see the server\'s window.'} Across buildings or other access points: run{' '}
                           <span className="font-mono">npm run tunnel</span> and use the https
                           address it prints, with the same{' '}
                           <span className="font-mono">?cast=true&amp;key=…</span>.

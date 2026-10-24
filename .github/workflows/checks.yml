@@ -689,6 +689,15 @@ jobs:
       - name: The phone link
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node --experimental-strip-types scripts/phonelink.mjs
+      # A network display over https (scripts/netdisplay.mjs, PLAN.md 14m-https):
+      # the show server serves https beside http with a certificate it makes,
+      # and a network display at the https address it prints is a secure page
+      # with WebGPU that joins the relay; at the http address it is not secure;
+      # with the https port taken the show still starts, http only, and says
+      # why. No GPU; dist/ is the phone step's build.
+      - name: The network display over https
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/netdisplay.mjs
       # The show key (scripts/showkey.mjs, PLAN.md 14m): the show server and a
       # phone and a laptop in browsers. A phone without the key, with a wrong
       # one, or past three wrong ones is refused; only the laptop is handed
