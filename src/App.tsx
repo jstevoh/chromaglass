@@ -12,6 +12,8 @@ import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
+import type { CartoonShelfProps } from './components/CartoonShelf';
+import { CARTOON_BY_ID } from './lib/cartoons';
 import { SETTINGS_SECTIONS, sectionSearchText, resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
@@ -924,36 +926,47 @@ export default function App() {
 
   const videoInputRef = useRef<HTMLInputElement>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
-  const videoFrameRaf = useRef<number | null>(null);
-
+  /** A poured file's object URL, revoked when the pour moves on. */
+  const pourUrlRef = useRef<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  /** The shelf's cartoon pouring as dye (lib/cartoons.ts), or null for a file or nothing. */
+  const [pouringCartoon, setPouringCartoon] = useState<string | null>(null);
+  /*
+    The video pour: one hidden, muted, looping <video>, handed to the plate
+    once when it starts playing. It used to be handed over again on every
+    animation frame, which made the plate pause and play it every frame
+    (PLAN 14ab-1, fixed in `pourVideo`); the plate's own frame loop reads the
+    picture, so once is enough. A cartoon is given by address, so it pours
+    while it is still arriving; a file by an object URL.
+  */
+  const pourVideoFrom = useCallback((src: string, objectUrl: boolean) => {
+    const v = videoPlayerRef.current;
+    if (!v) return;
+    if (pourUrlRef.current) URL.revokeObjectURL(pourUrlRef.current);
+    pourUrlRef.current = objectUrl ? src : null;
+    v.onplay = () => { setIsVideoPlaying(true); visualizerRef.current?.pourVideo(v); };
+    v.onpause = () => setIsVideoPlaying(false);
+    v.onended = () => setIsVideoPlaying(false);
+    v.src = src;
+    v.play().catch(() => { /* autoplay policy: plays on the next gesture */ });
+  }, []);
+  const stopPour = useCallback(() => {
+    visualizerRef.current?.stopPourVideo();
+    const v = videoPlayerRef.current;
+    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+    if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
+    setIsVideoPlaying(false);
+    setPouringCartoon(null);
+  }, []);
+  const pourFile = useCallback((file: File) => {
+    pourVideoFrom(URL.createObjectURL(file), true);
+    setPouringCartoon(null);
+  }, [pourVideoFrom]);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !videoPlayerRef.current) return;
-    videoPlayerRef.current.src = URL.createObjectURL(file);
-    videoPlayerRef.current.play();
-    setIsVideoPlaying(true);
-    
-    const loop = (time: number) => {
-      if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
-        visualizerRef.current?.pourVideo(videoPlayerRef.current);
-        videoFrameRaf.current = requestAnimationFrame(loop);
-      } else {
-        setIsVideoPlaying(false);
-      }
-    };
-    
-    videoPlayerRef.current.onplay = () => {
-      setIsVideoPlaying(true);
-      if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
-      loop(performance.now());
-    };
-
-    videoPlayerRef.current.onpause = () => setIsVideoPlaying(false);
-    videoPlayerRef.current.onended = () => setIsVideoPlaying(false);
-
+    if (file) pourFile(file);
     e.target.value = '';
-  }, []);
+  }, [pourFile]);
 
   const userPresetsRef = useRef<UserPreset[]>([]);
 
@@ -1356,9 +1369,12 @@ export default function App() {
   }, []);
   startBenchRef.current = startBench;
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
+  /** The shelf's cartoon playing as the film; read only while the film is a file (a camera or window replaces it). */
+  const [filmCartoon, setFilmCartoon] = useState<string | null>(null);
   const loadFilm = async (file: File) => {
     await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
+    setFilmCartoon(null);
   };
   const startFilmCamera = async () => {
     try {
@@ -1397,6 +1413,28 @@ export default function App() {
   const clearFilm = () => {
     wallRef.current?.clearFilm();
     setFilmSource('none');
+    setFilmCartoon(null);
+  };
+  const filmCartoonNow = async (id: string) => {
+    const c = CARTOON_BY_ID.get(id);
+    if (!c) return;
+    await wallRef.current?.loadFilmUrl(c.src);
+    setFilmSource('file');
+    setFilmCartoon(id);
+  };
+  /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
+  const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
+  const cartoons: CartoonShelfProps = {
+    pouring: pouringCartoon,
+    filming: filmingCartoon,
+    onPour: (id) => {
+      const c = CARTOON_BY_ID.get(id);
+      if (!c) return;
+      pourVideoFrom(c.src, false);
+      setPouringCartoon(id);
+    },
+    onFilm: (id) => { if (filmingCartoon === id) clearFilm(); else void filmCartoonNow(id); },
+    onStopPour: stopPour,
   };
   // ── The room ────────────────────────────────────────────────────
   // The camera as a sensor: it stirs the plate, puts hands on it and rides
@@ -4814,6 +4852,7 @@ export default function App() {
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       onFilmFile={loadFilm}
+      onPourVideo={pourFile}
       onFilmCamera={startFilmCamera}
       onFilmWindow={startFilmWindow}
       onFilmClear={clearFilm}
@@ -5733,6 +5772,7 @@ export default function App() {
             onPalette={selectPalette}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
+            cartoons={cartoons}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -6425,6 +6465,7 @@ export default function App() {
           onPalette={selectPalette}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
+          cartoons={cartoons}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}
