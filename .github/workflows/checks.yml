@@ -1217,6 +1217,16 @@ jobs:
       - name: Enough colours, and the hues between them
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run colours
+      # The open rim holds a body of oil that touches it (PLAN 18g-6): held at
+      # the water's pressure in the oil too, the rim drained a lens against it
+      # to 9.6% in six seconds by its own surface tension; held at the oil's
+      # Laplace pressure it keeps it, the middle of the dish is untouched, and
+      # a pour still pushes oil out over the rim. In the fifth shard: the
+      # plate shard is near its timeout.
+      - name: The rim holds the oil that touches it
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        timeout-minutes: 4
+        run: npm run rimhold
       # A pour is liquid (PLAN 18c, 18d-2): water poured at the middle pushes a
       # ring of colour out by its volume, glycerine poured is all accounted
       # for, and a dish of glycerine flushed with a quarter of its volume of

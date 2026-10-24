@@ -153,7 +153,7 @@ fn hsRowSums(x: i32, y: i32, n: i32) -> vec2f {
     the lift. Held at the rim's own cells, the cells just inside it still had
     ψ, and a lens rocked into the rim lost 7% of its oil through it in three
     seconds at 6° (lab, at a hundredth of the looks' Oil Tension, so the
-    surface tension's own drain, PLAN 18g-6, is out of it); two cells in, it
+    surface tension's own drain, PLAN 18g-6 then, was out of it); two cells in, it
     lost 2.3% in six; three, 0.9%, of which the same lens left level there
     loses 0.2%. The lens stops three cells short of the rim, 3 mm on a 192
     plate, a meniscus's width.
