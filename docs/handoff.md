@@ -24,11 +24,15 @@ what the job needs, not by lane:
 
 **Antigravity takes:**
 
-- **What only a real GPU can show.** It runs on the owner's Mac and can read the app's
-  frames, which a cloud session cannot (the "What can be verified where" table in
+- **What needs a real GPU, by default.** It runs on the owner's Mac and can read the
+  app's frames, which a cloud session cannot (the "What can be verified where" table in
   `CLAUDE.md`): reproducing a red that only the Mac shards show, `npm run stages`
   numbers (frame budget, a tool's cost), `film.yml` runs (cloud sessions get a 403 on
-  `workflow_dispatch`), and the before and after pictures a look change needs.
+  `workflow_dispatch`), and the before and after pictures a look change needs. A Claude
+  Code session can do the same through a Remote Control session on that Mac (and drive
+  its screen and browser), but that spends Claude's quota rather than Antigravity's and
+  holds the one GPU, so it is for when Antigravity is out of credit or the GPU run is
+  part of a root cause Claude Code is already chasing.
 - **Builds with "done" already written down.** A plan item whose check exists and fails
   on `main`, with the number to reach: UI panels and their phone versions, settings
   plumbing, layout, ports, renames, deleting code a plan item already decided to delete,
