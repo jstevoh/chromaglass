@@ -23,7 +23,18 @@ import { usePortalBody } from '../portalBody';
 
   The card never takes the pointer, so it cannot get between a hand and the
   thing it is turning.
+
+  One card at a time, whatever asked for it. The owner found two up at once,
+  Macro Zoom's under Evolve Speed's, and neither going: each knob thought a
+  hand was still on it (see `Knob`'s drag, which now ends however the release
+  is lost). A card coming up puts down whichever was up before, so a control
+  that has lost track of the hand can at worst leave its card up until the
+  next one opens, never stack them. The newest wins because it is the one
+  under the hand, or under the keyboard's focus, now.
 */
+
+/** The card up now, if any: its id, and how to put it down. */
+let current: { id: string; close: () => void } | null = null;
 
 const SHOW_AFTER_MS = 380;
 /** A tapped card goes by itself: a phone has no pointer-leave to end it. */
@@ -50,6 +61,8 @@ export function useControlTip({ name, help, value, hint, held = false, disabled 
   const [want, setWant] = useState(false);
   const [shown, setShown] = useState(false);
   const [tapped, setTapped] = useState(false);
+  /** Put down for another control's card; up again only on its own next hover, focus, tap or drag. */
+  const [superseded, setSuperseded] = useState(false);
   const [rect, setRect] = useState<{ x: number; top: number; bottom: number } | null>(null);
 
   useEffect(() => {
@@ -72,7 +85,17 @@ export function useControlTip({ name, help, value, hint, held = false, disabled 
     return () => { window.clearTimeout(t); window.clearTimeout(arm); doc.removeEventListener('pointerdown', away); };
   }, [tapped]);
 
-  const visible = !disabled && (shown || held || tapped);
+  // A new drag is a fresh ask, even on a card another put down.
+  useEffect(() => { if (held) setSuperseded(false); }, [held]);
+
+  const visible = !disabled && !superseded && (shown || held || tapped);
+  useEffect(() => {
+    if (!visible) return;
+    if (current && current.id !== id) current.close();
+    const me = { id, close: () => { setSuperseded(true); setWant(false); setTapped(false); } };
+    current = me;
+    return () => { if (current === me) current = null; };
+  }, [visible, id]);
   useLayoutEffect(() => {
     if (!visible) return;
     const el = anchor.current;
@@ -83,14 +106,17 @@ export function useControlTip({ name, help, value, hint, held = false, disabled 
 
   const bind = {
     // A finger's pointerenter is a tap on its way, not a hover.
-    onPointerEnter: (e: { pointerType: string }) => { if (e.pointerType !== 'touch') setWant(true); },
+    onPointerEnter: (e: { pointerType: string }) => { if (e.pointerType !== 'touch') { setSuperseded(false); setWant(true); } },
     onPointerLeave: () => setWant(false),
     onFocus: (e: FocusEvent) => {
-      try { if (e.target instanceof HTMLElement && e.target.matches(':focus-visible')) setWant(true); } catch { /* an old engine: hover still works */ }
+      try { if (e.target instanceof HTMLElement && e.target.matches(':focus-visible')) { setSuperseded(false); setWant(true); } } catch { /* an old engine: hover still works */ }
     },
     onBlur: () => setWant(false),
   };
-  const toggle = useCallback(() => setTapped(t => !t), []);
+  // A tap on a card another put down opens it again rather than toggling a card no one can see.
+  const toggle = useCallback(() => {
+    if (superseded) { setSuperseded(false); setTapped(true); } else setTapped(t => !t);
+  }, [superseded]);
 
   let card: ReactNode = null;
   if (visible && rect) {

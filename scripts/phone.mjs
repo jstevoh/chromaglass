@@ -1183,6 +1183,25 @@ try {
           !none && !!tipped && tipped.name === 'Soap' && tipped.help.length > 20 && tipped.value === soapBefore?.trim() && tipped.inside,
           tipped ? `"${tipped.help.slice(0, 40)}…", ${tipped.value}, ${tipped.inside ? 'on screen' : 'off screen'}` : 'no card');
         await shot(page, 'Play-portrait-name-card');
+        /*
+          8j: one card at a time. The owner found two desk cards up at once,
+          stacked; on the phone a tap on another slider's name must swap the
+          card, not lay a second over the first, and that second card must
+          shut on its own second tap like the first.
+        */
+        const swirlName = page.getByTestId('play-slider-swirl').locator('[data-info="name"]');
+        const sb = await swirlName.boundingBox();
+        await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.waitForTimeout(250);
+        const cards = await page.evaluate(() => [...document.querySelectorAll('[data-control-tip] [data-tip=name]')].map(n => n.textContent));
+        check('Play: a tap on another slider\'s name swaps the card for its own, one card at a time',
+          cards.length === 1 && cards[0] === 'Swirl', cards.join(' + ') || 'no card');
+        await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.waitForTimeout(250);
+        check('Play: and a second tap on it shuts it', !(await readTip()));
+        // Soap's again, for the second-tap check below.
+        await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+        await page.waitForTimeout(250);
         await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
         await page.waitForTimeout(250);
         check('Play: a second tap shuts it, and two taps on a name leave the value alone', !(await readTip()) && (await soapText()) === soapBefore,
