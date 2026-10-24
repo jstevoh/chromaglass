@@ -316,7 +316,7 @@ export const PRESETS: Preset[] = [
       blendMode: 'lighter',
       gooeyEffect: 0.6,
       rotationSpeed: 0.146,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.4,
+      centerGravity: 0.15,       // was 0.4, which slid every well's dye into the middle (PLAN 25b-3)
       ledPlatform: false,
       diffusionRate: 0.0002,
       buoyancy: 0.3,
@@ -351,7 +351,15 @@ export const PRESETS: Preset[] = [
           picture, as nothing else on the shelf does.
         */
         { source: 'hits', feature: 'kickHit', setting: 'plateRock', depth: 0.5 },
-        { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 }
+        { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 },
+        /*
+          Its three wells (PLAN 25b-3, 25h): the kicks take them in turn
+          (areaForBand), and on top of that the snare stirs the low well (area
+          2) and the sub (band 1, 40 to 85 Hz) warms the left one (area 0)
+          while it holds.
+        */
+        { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 2, depth: 0.5, threshold: 0.3, attack: 0.02, release: 0.3 },
+        { source: 'bands', feature: 'band1', setting: 'areaHeat', area: 0, depth: 0.6, threshold: 0.5, attack: 0.05, release: 1.0 },
       ],
       audioMappings: {
         velocity: 'bass',
@@ -541,6 +549,21 @@ export const PRESETS: Preset[] = [
       transmission: 0.3,
       secondLamp: 0.3,
       ledColor: '#03102a',
+      /*
+        A band per bell (PLAN 25b-6, 25h; the bells are its areas). The kick
+        pours from the lowest bell (area 1), its pink and then the teal it
+        sends out, a pulse a kick, while Beat Squeeze's press lands on it; the
+        hats ruffle the top bell's fringe (area 2) with a quick paddle, and the
+        brilliance band picks that bell's bottle, icy blue when the top is
+        bright; the mids (band 4) pour the two side bells (areas 0 and 3).
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.5, threshold: 0.3, attack: 0.02, release: 0.4 },
+        { source: 'hits', feature: 'hatsHit', setting: 'areaStir', area: 2, depth: 0.5, threshold: 0.3, attack: 0.01, release: 0.2 },
+        { source: 'bands', feature: 'band7', setting: 'areaHue', area: 2, depth: 0.6 },
+        { source: 'bands', feature: 'band4', setting: 'areaPour', area: 0, depth: 0.25, threshold: 0.45, attack: 0.3, release: 1.0 },
+        { source: 'bands', feature: 'band4', setting: 'areaPour', area: 3, depth: 0.25, threshold: 0.45, attack: 0.3, release: 1.0 },
+      ],
       audioMappings: {
         velocity: 'mid',
         density: 'mid',
@@ -632,6 +655,23 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.45,
       boundaryContrast: 0.5,
       dyeBudget: 0.45,          // dark violet between the pools: at the default 0.85 they ran into one wash
+      /*
+        Each pool hears its own instrument (PLAN 25h, lib/areaCords.ts). The
+        kick warms and stirs the soap well (area 1): a heat source under it
+        and a paddle that folds it back the other way on each kick, over the
+        ring the kick's own hand lands there. The mids (band 4, 380 to 800 Hz)
+        fold the glycerine (area 0) with a slow paddle that swells in over
+        0.4 s and lets go over 1.5. The hats pour the syrup's bottles (area
+        2), ultramarine and purple in turn, a drop a hat. All on the gate, so
+        it is the instrument and not the room; all fast readings; nothing on
+        the frame.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'areaHeat', area: 1, depth: 0.6, threshold: 0.3, attack: 0.02, release: 0.8 },
+        { source: 'hits', feature: 'kickHit', setting: 'areaStir', area: 1, depth: 0.6, threshold: 0.3, attack: 0.05, release: 0.5 },
+        { source: 'bands', feature: 'band4', setting: 'areaStir', area: 0, depth: 0.4, threshold: 0.45, attack: 0.4, release: 1.5 },
+        { source: 'hits', feature: 'hatsHit', setting: 'areaPour', area: 2, depth: 0.3, threshold: 0.35, attack: 0.01, release: 0.15 },
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'bass',

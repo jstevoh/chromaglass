@@ -3748,6 +3748,59 @@ Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
   drawn at its zoom.
 
 
+### 25h. Areas that listen for themselves (shipped)
+
+The owner, 2026-10-24: the presets want more complexity, more varied palettes and parts of
+the canvas reacting to the music; of the four directions explored that day, all taken, this
+one first. Areas already took the music's hands by band, but every patch cord moved one
+number for the whole plate and every area drew on one palette.
+
+- **A cord aimed at an area** (`SceneMapping.area`, an index into the look's areas) does one
+  of four things a hand does to one place (`lib/areaCords.ts`): **Heat here** (heat in
+  kelvin, 1.5 K/s at full, carried and cooled as the lamp's is; 25h-1 names that it opens no
+  hole until 18f-2), **Stir here** (a paddle drawn round the pool: the Finger's own solid on
+  a thin gap, one turn in 1.2 s, turning back on each hit of a gated cord), **Pour here**
+  (the area's bottles, 1.5 of density a second, under the look's fill as the music's pours
+  are) and **Bottle here** (which bottle pours next). A setting is one number per plate, a
+  uniform in the shaders, so an area takes the four acts and nothing else; the patch bay's
+  fold leaves an area cord alone. Every act eases to nothing over the area's rim.
+- **A gate on an area cord**, the least of 30a: a threshold (closing 0.05 under it, so a
+  reading dithering on the line is one hit), an attack and a release, linear, so the
+  envelope reaches a hit's height in the attack and falls from it in the release. None of
+  the three set, the cord follows its reading as every cord did.
+- **A colour family per area** (`PlateArea.dyes`). Absent, the family is the area's dye and
+  the next, which is what its pool's second colour and the Color route's cycle already took,
+  so Lumia and Cell Bloom lay and play as before. Velvet Underground's contract grew to six
+  (lavender, coral and purple after its three), one pair per pool.
+- **The looks.** Velvet Underground: the kick warms and stirs the soap well, the mids fold
+  the glycerine with a slow paddle, the hats pour the syrup's two bottles in turn. Jellyfish
+  Bloom (25b-6): its four bells are areas now and its seed lays them there (`OWN_SEED_AREAS`;
+  they were scattered at random), the kick pours the lowest bell's pink and teal, the hats
+  ruffle the top bell, the brilliance band picks its bottle, the mids pour the side bells.
+  Bass Drop (25b-3): three soap wells on the bass, taken in turn by the kicks, Center
+  Gravity 0.4 → 0.15; the snare stirs the low well and the sub warms the left. Preset depths
+  stay at 0.6 or under, the most a one-second look change crossfades within `npm run desk`'s
+  0.03 a tick.
+- **The panel.** On a look with areas each patch gets an area picker over a thumbnail of the
+  plate (`components/phone/AreaPicker.tsx`, the areas drawn where they are in their
+  families' colours, 40 px targets for a thumb, the same sheet on the phone), and an area
+  cord gets the gate: Fire on a hit, Gate, Rise, Fall.
+- **Measured** (`npm run areacords`, the lab on SwiftShader, Velvet's pools on a thin gap,
+  laid through the app's own sink, each run against a control of the same plate with no
+  cords): one band's cords on the soap well changed the dye there 2×10⁵ times what they
+  changed outside every area and kept 1.946 of the 1.967 of density poured there, the flow
+  13.6x, and the heat 1.302 K on the run's mean of 1.310 K laid, against nothing outside;
+  with two areas on two bands, band 2 worked the well 773x (dye) and 17.4x (flow) more than
+  the syrup, and band 7 the syrup 286x and 18.4x more than the well; each gate opened once a
+  burst (8 of 8). In node, a gate opened 14 times for 8 bursts and 6 stretches dithering on
+  its line, where reading the line alone opened 51; rise 0.250 s for 0.25 and fall 0.333 s for
+  0.35, for a hit of 0.9 and one of 0.5. The 25e
+  count of lit places, each look played by its own cords for four seconds of a groove with
+  every act in the plate's middle (where the music landed before areas) and then in its
+  areas: Jellyfish Bloom 1 → 3, Velvet Underground 1 → 1 (its cords pour in one pool; the
+  other two are stirred and warmed), Bass Drop 0 → 0 (its cords pour nothing; its wells take
+  the music's own hands, 25h-7).
+
 ## 26. A reaction that prints: Turing stripes in black and white
 
 ### 26a. Gray–Scott on the GPU, carried by the flow (#327; carried once since 26d)

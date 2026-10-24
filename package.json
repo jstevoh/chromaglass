@@ -78,6 +78,7 @@
     "ship": "npm run update && npm run deploy && npm run remote",
     "show": "npm run update && npm run remote",
     "panel": "esbuild scripts/panel.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/panel.mjs && node node_modules/.cache/panel.mjs",
+    "areacords": "esbuild scripts/areacords.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:esbuild --outfile=node_modules/.cache/areacords.mjs && node node_modules/.cache/areacords.mjs",
     "plate": "esbuild scripts/plate.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/plate.mjs && node node_modules/.cache/plate.mjs",
     "wall": "npm run build && node --experimental-strip-types scripts/wall.mjs",
     "ears": "npm run build && node --experimental-strip-types scripts/ears.mjs",

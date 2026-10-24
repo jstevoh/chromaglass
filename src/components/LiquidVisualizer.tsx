@@ -11,7 +11,7 @@ import { lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE, WORKING_DYES, dyesOnPlate } from '../presetPlate';
 import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
-import { plateAreas, areaForBand, areaCentre, areaDye, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
+import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, pointInArea, pickArea, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
 import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -56,7 +56,8 @@ import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
-import { PatchBay } from '../lib/sceneMap';
+import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
+import { AreaHands, fluidSink, type AreaSink } from '../lib/areaCords';
 import { BackLook } from '../lib/backLook';
 import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
@@ -2291,12 +2292,13 @@ class FluidSimulation {
     for (const a of areas) {
       const R = a.r * S / GRID_SCALE;     // in the 128-grid units splatBlob takes
       const fill = a.fill ?? 1;
-      const c = col(a.dye);
+      const fam = areaFamily(a);
+      const c = col(fam[0]);
       this.splatBlob(a.x * S, a.y * S, R * 0.45, 3.2 * fill, c.r, c.g, c.b);
       for (let i = 0; i < 6; i++) {
         const ang = (i / 6) * Math.PI * 2 + this.rng.centred() * 0.5;
         const d = (0.55 + this.rng.float() * 0.3) * a.r * S;
-        const cc = i % 3 === 2 ? col(a.dye + 1) : c;
+        const cc = i % 3 === 2 ? col(fam[1 % fam.length]) : c;
         this.splatBlob(a.x * S + Math.cos(ang) * d, a.y * S + Math.sin(ang) * d,
           R * (0.14 + this.rng.float() * 0.1), 2.2 * fill, cc.r, cc.g, cc.b);
       }
@@ -2377,7 +2379,7 @@ class FluidSimulation {
     const beforeMean = dishSum();
 
     const areas = plateAreas(presetId);
-    if (areas) {
+    if (areas && !OWN_SEED_AREAS.has(presetId)) {
       this.layAreas(areas, col);
       this.seedMean = Math.max(0, dishSum() - beforeMean);
       this.seedBudget = findPreset(presetId)?.settings.dyeBudget ?? 0.85;
@@ -2549,10 +2551,20 @@ class FluidSimulation {
       }
 
       case 'jellyfish-bloom': {
+        /*
+          The bells sit in the look's areas (lib/plateAreas.ts), where its
+          music lands, each in its area's dye; they were at random across the
+          top half (x ±0.05, y 0.15 to 0.45 of the plate), so the music's hands
+          had no bell to find (PLAN 25b-6, 25h). The same draws are made, so
+          the rest of the seed is laid as it was.
+        */
+        const bells = plateAreas('jellyfish-bloom')!;
         for (let jf = 0; jf < 4; jf++) {
-          const jx = S * (0.2 + jf * 0.2 + this.rng.centred() * 0.1);
-          const jy = S * (0.3 + this.rng.centred() * 0.3);
-          const c = col(jf);
+          const bell = bells[jf];
+          this.rng.centred(); this.rng.centred();
+          const jx = S * bell.x;
+          const jy = S * bell.y;
+          const c = col(bell.dye);
           const bellR = (8 + this.rng.float() * 6) * k;
           for (let a = -Math.PI; a < 0; a += 0.06)
             for (let r = 0; r < bellR; r += 1.5) {
@@ -4969,12 +4981,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * Not from the working harmony, which a hue journey narrows by one dye, so
    * two of three areas would share a colour.
    */
-  const areaDyeOf = (layer: number, a: PlateArea, shift = 0): number => {
+  const areaDyeOf = (layer: number, a: PlateArea, shift = 0, k = 0): number => {
     const own = layer >= 1 ? backDyesRef.current : null;
     const lock = harmonyLockRef.current;
-    if (own) return areaDye(a, lock ?? own.contract ?? own.harmony, shift);
+    if (own) return areaDye(a, lock ?? own.contract ?? own.harmony, shift, k);
     const lead = lock ? 0 : paletteWindowRef.current.lead + journeyRef.current.lead;
-    return areaDye(a, lock ?? presetContractRef.current ?? harmonyRef.current, lead + shift);
+    return areaDye(a, lock ?? presetContractRef.current ?? harmonyRef.current, lead + shift, k);
   };
   const areaColor = (layer: number, a: PlateArea) => PALETTE_RGB[areaDyeOf(layer, a)];
   /**
@@ -4984,7 +4996,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * still shows as a colour against its pool, without the area taking on the
    * whole palette and becoming every other area.
    */
-  const areaCycle = (layer: number, a: PlateArea, t: number) => harmonyCycle([areaDyeOf(layer, a), areaDyeOf(layer, a, 1)], t);
+  /*
+    Within the area's own family (PLAN 25h). An area with none set has the
+    family its dye and the next, which is the pair this cycled before.
+  */
+  const areaCycle = (layer: number, a: PlateArea, t: number) => harmonyCycle(areaFamily(a).map((_, k) => areaDyeOf(layer, a, 0, k)), t);
   /** An area look's liquids, poured into its areas: `per` doses each, where it lays its pools. */
   const layAreaLiquids = (fluid: FluidSimulation, layer: number, areas: readonly PlateArea[], per: number) => {
     for (const a of areas) for (let i = 0; i < per; i++) {
@@ -5096,6 +5112,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    */
   const modRef = useRef(new Modulators());
   const patchRef = useRef<PatchBay | null>(null);
+  /** The area cords' gates and paddles (PLAN 25h), stepped with the solver. */
+  const areaHandsRef = useRef(new AreaHands());
+  /** Where they lay, one sink per plate, made once (lib/areaCords.ts fluidSink: the lab lays through it too). */
+  const areaSinksRef = useRef(new WeakMap<FluidSimulation, AreaSink>());
   if (!patchRef.current) patchRef.current = new PatchBay(settings);
   const gelAngleRef = useRef(0);
   /** The mark: a still over the finished frame, uploaded once and then left alone. */
@@ -6715,7 +6735,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // One object, reused: a copy per frame of a hundred-key settings object
       // is sixty allocations a second for a show that runs for hours.
       const patch = patchRef.current!;
-      patch.fold(settingsRef.current, {
+      // Kept for the area cords (lib/areaCords.ts), which read the same sources the same way below.
+      const patchCtx: PatchContext = {
         room: clockIsFixed() ? null : sceneRef?.current ?? null,
         film: clockIsFixed() ? null : filmSenseRef?.current ?? null,
         sound: currentAudioData,
@@ -6725,7 +6746,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
         shapeImpact: settingsRef.current.shapeImpact ?? 1,
-      }, settingsRef.current.layerCount ?? 1, showNow(),
+      };
+      const patchNow = showNow();
+      patch.fold(settingsRef.current, patchCtx, settingsRef.current.layerCount ?? 1, patchNow,
       // Sound learn's mappings: the rig's, not the look's, folded the same way.
       soundLearnRef.current.patchesOf(soundBindingsRef.current),
       // The back plate's own look, when it has one (§16a): its base, which
@@ -8852,6 +8875,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     if (pourDt > 0.001) activeFluid.autoInject(st, ex, ey, energy01 * 0.06 * autoAmp * pourDt, swellCol.r, swellCol.g, swellCol.b, energy01);
                   }
                 }
+              }
+            }
+            /*
+              The area cords (PLAN 25h, lib/areaCords.ts): a cord aimed at one
+              area of the dish is a hand there, warming it, stirring it with a
+              paddle, pouring its bottles or picking which bottle pours. On the
+              plate the music plays, in its areas, every running step, read
+              from the same sources the patch bay folds this frame. Apart from
+              the music's hands above because a cord need not be on the sound
+              at all (the room, a film, an LFO), and its pours are held under
+              the look's fill as the music's are (28d-A's regulator).
+            */
+            if (isActiveRef.current && drainFrameRef.current === 0) {
+              const hands = areaHandsRef.current;
+              const acts = hands.step(currentSettings.sceneMappings, areasOf(activeLayerRef.current), (m) => cordReading(patchCtx, m, patchNow), simStepS);
+              const af = fluidsRef.current[activeLayerRef.current];
+              if (af && acts.length > 0) {
+                const target = dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget);
+                const room = Math.max(0, Math.min(1, (1.0 - af.meanDensity / Math.max(0.06, target)) * 2.5));
+                let sink = areaSinksRef.current.get(af);
+                if (!sink) { sink = fluidSink(af, GRID_SCALE); areaSinksRef.current.set(af, sink); }
+                hands.lay(sink, GRID_SIZE, simStepS, (a, k) => PALETTE_RGB[areaDyeOf(activeLayerRef.current, a, 0, k)], room);
               }
             }
             /*
