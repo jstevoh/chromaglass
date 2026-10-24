@@ -200,8 +200,12 @@ Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock a
 bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
 (S) then **10.3-4otf, 10.3-sure, 10.3-half, 10.3-newsong, 10.3-fill** (S each);
 **10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11,
-re-read 2026-10-24): **25h** areas that listen for themselves (M–L, first of §30's, the
-owner's 2026-10-24 ask for parts of the plate answering the music), **30a** shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
+re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering the
+music, explored as four directions the same day and all four taken, in this order:
+**25h** areas that listen for themselves (A, M–L, with its palette per area and 30a's gate
+on an area cord), then **24.3-place** the melody walks across the plate (B, M), then **25i**
+colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
+14r read per area); then **30a**'s rest, shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
@@ -6250,6 +6254,16 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   way) so a pad held on ten fingers does not flood the plate, and a channel can be sent to
   an area (25h). The measure adds a three-note chord: three drops in one frame, ordered
   across the plate by pitch, and a fifth held note releasing the first.
+  *The melody walks across the plate (24.3-place, direction B of the owner's 2026-10-24
+  exploration; after 25h).* The same scale across the plate, heard from the microphone as
+  well as MIDI: the lead note's pitch (the `note` source, a fast reading) places its drop,
+  low on one side and high on the other, so a played line draws across the plate; how hard
+  it was hit sets the drop's volume. Each is a real pipette drop of the look's liquid, so
+  neighbours merge or hold apart by immiscibility. First on **Aurora Borealis** (lead notes
+  drop jade and lavender along the curtain's top and the current draws each run into a
+  ribbon) and **Oil and Water** (each note a bead of amber oil, a chord a cluster that
+  rounds into bodies and merges where they touch). *Measure:* a synthetic rising scale on
+  the microphone path lands its drops in pitch order across the plate, one drop per note.
 - **24.4** *CV out* (after 24.1b). The plate back into the rack through the interface's
   DC-coupled outputs: how much dye is moving, where the brightest pool sits on the plate
   (x and y), the colour under a point, and a trigger when a drop lands. Then the liquid
@@ -6371,6 +6385,49 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   (synthetic bursts in that band only, other bands silent); with two areas on two bands,
   each answers only its own band; and the 25e count of lit regions on the looks
   rebuilt with it, before and after. Then 28i's presets use it.
+  *Widened 2026-10-24 (the owner took all four directions of that day's exploration; this
+  is direction A and goes first, since the other three plug into areas).* Two parts of
+  other items ship inside it: the colour family per area above (direction C's palette), and
+  the least of **30a** an area cord needs to fire on the instrument and not the room: a
+  threshold, an attack and a release on the cord (absent, it reads as today). The first
+  looks: **Velvet Underground** (the kick warms and stirs the soap well, so each kick opens
+  a ring there; the mids fold the glycerine with a local paddle; the hats set beads in the
+  syrup; the violet between stays dark), **Jellyfish Bloom** (a band per bell: the kick
+  presses the lowest so it contracts and sends out a pulse, the hats ruffle the top bell's
+  fringe, the mids land at the side bells; 25b-6), then **Bass Drop** (kicks take three
+  wells in turn; 25b-3). The plate holds five dyes (18l), so three areas get about two
+  colours each; a look that wants three full families waits on 25i-3.
+- **25i. Colour that answers the music** (direction C, 2026-10-24; after 25h). Once each
+  area has its own family (25h), the music picks which bottle pours next. (1) **By the
+  note**: a patch source that maps the lead note's pitch class (a fast reading: the
+  `note` source's pitch) to one of the area's bottles, the colour-organ idea behind
+  Wilfred's Lumia. First on Poster, 1969: the lead chooses between orange, ultramarine and
+  a third ink, still flat and hard-edged. (2) **By chemistry**: a hit is a drop of reagent
+  and the colour change is the reaction's own. Red Cabbage already simulates pH: the snare
+  drops acid in one area (pink), the kick base in another (green), and where they meet they
+  cancel to purple. Chemical Clock: each kick touches the gel in one of three areas and
+  starts a new wave centre there, as a touch sets off a real dish of the reaction. No hue
+  dial is turned in either: the colour is the bottle chosen or the chemistry. (3) **More
+  than five dyes**, only if (1) and (2) show three areas starved for colour: the dye count
+  is a GPU cost (each dye a channel in the dye's step), measured with `npm run stages`
+  before and after. *Measure:* a synthetic note sequence of known pitch classes pours the
+  mapped bottle each time (in the lab); on Red Cabbage, synthetic snare and kick bursts
+  move the pH inside their own areas at least 5x more than outside.
+- **25j. A lamp under each area** (direction D, 2026-10-24; after 25i). Each area sits over
+  its own lamp whose brightness and warmth follow its band, and a gel can turn a step on a
+  hit, as the old shows ran several projectors and colour wheels. Since 18f the plate's
+  heat comes from the lamp, so a brighter lamp warms its area too and the liquid answers
+  (the warm water thins and spreads; 18f-4's warm-water shortcut still applies and is named
+  in the PR). First on **Lava Lamp** (two lamps under the wax; the bass warms one side, the
+  mids the other, and the wax rises from whichever the music feeds), **Cell Bloom** (the
+  kick warms each cell pool's lamp in turn) and Velvet Underground (each pool a little
+  warmer while its instrument plays). A lamp that pumps reads as flicker, so each takes
+  25h's attack and release, never a frame's step; and the flash guard reads one number for
+  the whole wall (14r), so 14r reads per area first, in the same PR or before it.
+  Nothing moves the frame. *Measure:* in the lab, a band's lamp raises the light and the
+  heat inside its area at least 5x more than outside, its rise and fall within 10% of the
+  cord's attack and release; and the flash guard's per-area reading catches a pumping lamp
+  that the whole-wall number misses.
 
 
 ## 26. A reaction that prints: Turing stripes in black and white (proposed 2026-10-05)
@@ -7141,6 +7198,10 @@ Turing Print" work (#331), which also made the reaction grow at all.
     bands, onsets and notes only (28f), and Milk Marbling's treble → airVelocity at
     depth .02, which reads nothing, is fixed. Film: 2 to 3.5 swells a minute, six or
     more colour changes a minute, r1 between −.13 and .22 (the Dregs and the Sheep).
+    *Split 2026-10-24* (the owner took the four directions of that day's exploration,
+    25h first): the eight looks' frame fixes and Milk Marbling's dead patch run now; the
+    two or three patches per look wait for 25h, so each look's music is written once, per
+    area, rather than plate-wide and then again. 28i-2 runs now as briefed.
   - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
     magenta cells, no rainbow); then four or more hues on the film.
 
