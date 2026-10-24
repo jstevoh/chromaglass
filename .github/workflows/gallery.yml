@@ -82,3 +82,35 @@ jobs:
           name: preset-gallery
           path: gallery/
           retention-days: 14
+
+  # What a hand pour does on the looks the grey-wash fix reaches, and which
+  # looks those are (PLAN 28d-A, #401): the plate mean 1, 3 and 10 s after a
+  # pour with the bank off and on, and the black share over time. A job of its
+  # own so the photographs above keep the time they were given, and a
+  # `lamp-gallery` run, which asks for other pictures, does not pay for it.
+  # It is one more Mac job, and a long one, for every `gallery` labelling: it
+  # opens every distinct preset for six seconds, pours five times on each of
+  # four sparse looks, then runs two long series. Budget the Mac queue for it
+  # (`npm run macqueue`) before labelling a PR with other Mac work going.
+  handpour:
+    name: Hand pour (macOS)
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'gallery'
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Hand pours and black share on the looks the fix reaches
+        run: npm run handpour
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: handpour
+          path: handpour.json
+          retention-days: 14

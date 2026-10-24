@@ -4,7 +4,7 @@
  * shows were.
  *
  *   npm run film
- *   FILM_ONLY=fillmore-1969,soap-film FILM_SECONDS=90 FILM_TAKES=1 npm run film
+ *   FILM_ONLY=poster-1969,soap-film FILM_SECONDS=90 FILM_TAKES=1 npm run film
  *   FILM_SHARD=2/6 npm run film        every sixth look from the second
  *   FILM_COMBINE=shards npm run film   one table from the shards' film.json
  *

@@ -30,7 +30,7 @@ import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { controlKindOf, apc40Mk2Map, launchControlXlMap, nanoKontrol2Map, apcMiniMk2Map } from '../src/lib/midi.ts';
 import { KNOB_SWEEP, onRing, ringTravel } from '../src/lib/knobDrag.ts';
-import { blendLooks, targetLook, evolvedLook, STRUCTURE, ease, LOOK_BASE, RIG_KEYS, lookOf } from '../src/lib/lookFade.ts';
+import { blendLooks, targetLook, evolvedLook, STRUCTURE, ease, LOOK_BASE, RIG_KEYS, lookOf, lookFadeStep } from '../src/lib/lookFade.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -180,7 +180,7 @@ function drive({ from, to, seconds, clearing }) {
     stale.length === 0 && opened.globalSpeed === 0.05 && opened.lacing === 0.4, stale.slice(0, 4).join(', '));
 
   // The sequencer's stages aim at the same thing.
-  const stage = lookOf(PRESETS.find(p => p.id === 'deep-ocean').settings);
+  const stage = lookOf(PRESETS.find(p => p.id === 'jellyfish-bloom').settings);
   const short = Object.keys(LOOK_BASE).filter(k => !(k in stage));
   check('a sequencer stage that names a look aims at all of it', short.length === 0, short.join(', '));
   const t1 = lookOf({}), t2 = lookOf({});
@@ -229,7 +229,7 @@ function drive({ from, to, seconds, clearing }) {
 // ── 5. Nothing is dropped on the way ─────────────────────────────────
 {
   const from = look('classic');
-  const to = targetLook(from, PRESETS.find(p => p.id === 'fillmore-1969').settings);
+  const to = targetLook(from, PRESETS.find(p => p.id === 'poster-1969').settings);
   const missing = Object.keys(to).filter(k => !(k in blendLooks(from, to, 0.5)));
   check('every setting survives a fade', missing.length === 0, missing.join(', '));
   const end = blendLooks(from, to, 1);
@@ -356,6 +356,104 @@ function drive({ from, to, seconds, clearing }) {
   check('a step across the bottom is the short way round', Math.abs(gap - (-10 * Math.PI / 180) / KNOB_SWEEP) < 1e-9, gap.toFixed(4));
   check('a step at the centre turns nothing', ringTravel([1, 0], [0, 1]) === 0);
   check('a hold on the ring is the ring, on the cap the cap', onRing(15, 0, 20) && !onRing(8, 6, 20));
+}
+
+// ── A look change that does not jump ─────────────────────────────────────
+//
+// The owner, 2026-10-19: "transitions between presets are also a little jumpy
+// here and there". `blendLooks` travels every number and colour, but a patch
+// list cannot travel by being switched, and the ferrofluid ring is swapped in
+// one frame by the handoff while its amount was mid-blend. This fades every
+// ordered pair of looks through the same step the App's timer lays down and
+// reads the biggest single tick of each, so a jump is a number.
+//
+// Control first: the same measure on a list that is switched at the middle (what
+// the fade used to do) must read as a jump, or a low number below means nothing.
+{
+  const N = 30;                     // the shortest fade the desk offers, one second at 33 ms: the steepest ticks
+  const patchId = (m) => `${m.source ?? 'room'}|${m.feature}|${m.setting}|${m.layer ?? 'all'}`;
+  const depths = (list) => {
+    const d = new Map();
+    for (const m of list ?? []) d.set(patchId(m), (d.get(patchId(m)) ?? 0) + (m.depth || 0));
+    return d;
+  };
+  /** The biggest depth any one patch moves in one tick. */
+  const biggestStep = (series) => {
+    let worst = 0;
+    for (let i = 1; i < series.length; i++) {
+      const a = depths(series[i - 1]), b = depths(series[i]);
+      for (const key of new Set([...a.keys(), ...b.keys()])) worst = Math.max(worst, Math.abs((b.get(key) ?? 0) - (a.get(key) ?? 0)));
+    }
+    return worst;
+  };
+  const ticks = Array.from({ length: N + 1 }, (_, i) => i / N);
+  const goStep = lookFadeStep(false, true);
+  const backStep = lookFadeStep(true, true);     // a Back lays the ring through the same handoff
+  const plainStep = lookFadeStep(false);
+  /** A step's numbers must be numbers: a NaN compares false against every bar below and reads as a pass. */
+  const finite = (v, what) => { if (!Number.isFinite(v)) throw new Error(`${what} read ${v}, not a number`); return v; };
+
+  let patchWorst = 0, patchAt = '', switched = 0, ringNear = 0, ringAt = '', plainNear = 0, plainAt = '';
+  let pairs = 0, endsExact = true, evolveLinear = true, peak = 0;
+  for (const a of PRESETS) {
+    const from = targetLook(DEFAULT_SETTINGS, a.settings);
+    for (const b of PRESETS) {
+      if (a.id === b.id) continue;
+      pairs++;
+      const to = targetLook(from, b.settings);
+      const go = ticks.map(t => goStep(from, to, t, from));
+      for (const s of go) if (!Array.isArray(s.sceneMappings)) throw new Error(`${a.id} → ${b.id}: a step's patch list is ${typeof s.sceneMappings}, not a list`);
+      for (const s of go) for (const m of s.sceneMappings) finite(m.depth, `a patch depth on ${a.id} → ${b.id}`);
+      const w = biggestStep(go.map(s => s.sceneMappings));
+      if (w > patchWorst) { patchWorst = w; patchAt = `${a.id} → ${b.id}`; }
+      // What the fade did before: the whole list at the middle.
+      const old = ticks.map(t => (ease(t) >= 0.5 ? to : from).sceneMappings);
+      switched = Math.max(switched, biggestStep(old));
+      // The ring's drawn amount across the tick before the middle and the tick after
+      // it. The fade's value is set on a 33 ms timer and holds to the next tick; the
+      // handoff swaps on a render frame timed from a clock that started a moment
+      // before the fade's, so the frame that swaps draws whichever tick came last,
+      // up to a whole tick away from t = 0.5 either side, and the clock's head start
+      // plus React's frame of lag can make that a second tick. Two ticks each way are
+      // read, in quarter-tick steps. (Half a tick was tried first and passed a pointed
+      // V that drew 0.090 at the swap, one tick out.) The Back is read as well as the Go.
+      for (let q = -8; q <= 8; q++) {
+        const t = 0.5 + q / (4 * N);
+        const dip = Math.max(
+          finite(Math.abs(goStep(from, to, t, from).phaseAmount), `the Go's amount on ${a.id} → ${b.id}`),
+          finite(Math.abs(backStep(from, to, t, from).phaseAmount), `the Back's amount on ${a.id} → ${b.id}`));
+        const line = finite(Math.abs(plainStep(from, to, t, from).phaseAmount), `the straight line on ${a.id} → ${b.id}`);
+        if (dip > ringNear) { ringNear = dip; ringAt = `${a.id} → ${b.id}`; }
+        if (line > plainNear) { plainNear = line; plainAt = `${a.id} → ${b.id}`; }
+      }
+      const back = ticks.map(t => backStep(from, to, t, from));
+      for (const series of [go, back])
+        for (let i = 1; i < series.length; i++) peak = Math.max(peak, Math.abs(series[i].phaseAmount - series[i - 1].phaseAmount));
+      if (go[N].phaseAmount !== to.phaseAmount || go[N].sceneMappings !== to.sceneMappings) endsExact = false;
+      if (go[0].sceneMappings !== from.sceneMappings && JSON.stringify(go[0].sceneMappings) !== JSON.stringify(from.sceneMappings)) endsExact = false;
+      // An unattended change (no handoff) keeps its straight line.
+      const mid = plainStep(from, to, 0.4, from).phaseAmount;
+      if (mid !== blendLooks(from, to, 0.4).phaseAmount) evolveLinear = false;
+    }
+  }
+  check(`control: a patch list switched at the middle reads as a jump (${switched.toFixed(2)} of a depth in one tick)`, switched >= 0.5, `over ${pairs} pairs`);
+  check(`no patch moves more than 0.03 of a depth in one tick of a one-second change, on ${pairs} pairs of looks`,
+    patchWorst <= 0.03, `biggest ${patchWorst.toFixed(3)} (${patchAt})`);
+  check(`control: the ferrofluid amount on a straight line is still ${plainNear.toFixed(2)} at the swap (${plainAt})`, plainNear >= 0.2);
+  check(`the ferrofluid amount drawn anywhere within two ticks either side of the ring's swap is under 0.01 on all ${pairs} pairs (a Go, a Back and Send to wall)`,
+    ringNear <= 0.01, `worst ${ringNear.toFixed(3)} (${ringAt}); the straight line left ${plainNear.toFixed(2)}`);
+  check('and the dip does not lurch: the amount moves at most 0.15 in one tick on the way down and up', peak <= 0.15, `biggest ${peak.toFixed(3)}`);
+  check('the change still ends on the new look exactly (the amount, and the patch list itself)', endsExact);
+  check('an unattended change (a new song, Lucky: no handoff) keeps its amount on a straight line', evolveLinear);
+  const c = look('classic'), hand = { ...c, phaseAmount: 0.33 };
+  // Only a Back is told which keys a hand holds (`revertLook` passes the dimmer), and the
+  // ring's amount is one a hand can hold, so the Back is what is driven here. Without the
+  // hold the dip is the computed 0.6 · (ease(0.75) − 0.6) / 0.4; with it, the hand's 0.33.
+  const held = backStep(c, { ...c, phaseAmount: 0.6 }, 0.75, hand, ['phaseAmount']);
+  const dipped = backStep(c, { ...c, phaseAmount: 0.6 }, 0.75, hand);
+  const wantDip = 0.6 * (ease(0.75) - 0.6) / 0.4;
+  check('a hand on the ferrofluid slider during the change is not dipped over', held.phaseAmount === 0.33 && Math.abs(dipped.phaseAmount - wantDip) < 1e-9,
+    `held ${held.phaseAmount}, the same tick without the hand ${dipped.phaseAmount.toFixed(4)} (computed ${wantDip.toFixed(4)})`);
 }
 
 console.log('');

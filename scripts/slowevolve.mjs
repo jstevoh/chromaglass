@@ -61,7 +61,7 @@ const check = (name, ok, detail = '') => {
 
 const DT = 0.5;
 const look = (id) => ({ ...DEFAULT_SETTINGS, ...(PRESETS.find(p => p.id === id)?.settings ?? {}) });
-const LOOKS = ['classic', 'ferro-paint', 'lava-lamp', 'oil-wheel'].map(id => [id, look(id)]);
+const LOOKS = ['classic', 'ferro-paint', 'lava-lamp', 'clock-glass'].map(id => [id, look(id)]);
 const span = (k) => { const s = PIN_RANGE.get(k); return s ? s.max - s.min : 1; };
 
 /*

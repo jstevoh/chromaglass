@@ -1239,6 +1239,17 @@ white lamp, every stripe about the same width. Then stir it with a hand or a Blo
   Looks sheet moves it; say where you would set it;
 - On Sensual Laboratory and Neon Coral Reef the coral is now half the size it was, and
   grows where it grew. Better, or did the bigger coral suit those looks?
+- Pour a bottle of colour into Turing Print (PLAN 26d-3): does it show through the
+  stripes, or do they hide it? Where the colour and the dark print meet, is the
+  multiplied look right, or should the print win (26d-3b)?
+- Print Ink (the lamp pins, the phone's Settings rail): drag it from Starch round the wheel.
+  Is each hue a solid colour on the white lamp, with the same stripe edge as the indigo?
+  Does a Go between two looks with different inks switch cleanly?
+- Let Turing Print run with music and Evolve for a minute: pours now pile up under the
+  stripes (the dye budget counts the pours, not the print). Is the paper darkening under the
+  print too much by then, so the budget on this look should be lower than 0.35?
+- Drain the plate while Turing Print is on: the print should drop away as the dye drains
+  (it no longer holds still), then the plate empties and the print grows back.
 
 ## 47. The test pattern and Identify on a real wall (PLAN 8e)
 
@@ -1346,3 +1357,197 @@ at 0 (the default).
    its edge from frame to frame.
 4. Say whether Auto's slow breathing zoom, which is not from the sound, is a signature
    worth keeping or one more move the rig should not make (27a-8-1).
+
+## 54. Ferrofluid halos are blacker and ripening slower in every look (PLAN 29c)
+
+The thin gap's Cahn–Hilliard step (`phaseCHVolume`) now uses a degenerate mobility,
+`4m(1 − m)` at each face's mean share, and `phaseCompress` returns what the flux limiter
+withheld at a moving edge. Because every look opens on Thin Gap, ferrofluid halos are
+blacker (less brown leak into the oil round a drop or domain, `npm run ferrorest`: cells
+over 0.01 grow +94 at rest against +248 before, and the drop holds 90 of 100 half-full
+cells against 84) and Ostwald ripening across the oil is slower in every look with
+ferrofluid:
+- On Magnet Garden, Ferro Maze and Ferro Paint, watch a poured drop and the domains' edges
+  over a minute: the rims should stay blacker with a narrower brown halo, and small drops
+  sitting apart from a pool should hold their size longer instead of bleeding into the oil.
+- A drop dragged fast by hand still sheds its trailing rim into the oil's return flow
+  (PLAN 29c-8).
+- The magnet's pull on a drop is felt at its rim first. The force a cell gets is the
+  Kelvin gradient times the cell's ferrofluid share times (ν_clear/ν_ff)^(1−φ): a cell
+  of ferrofluid alone moves about four and a half times faster than the same push on the
+  oil, and a drop in the oil goes at about 0.8 of the reference speed, so the rim runs
+  ahead of the oil and a drop should lean into the pull and then follow the magnet as a
+  whole, not tear. `phaseMomentum` carries the ferrofluid share along itself, so a
+  dragged drop should keep its edge rather than smearing behind it. Drag a drop slowly
+  at a deep magnet and then fast at a strong one: slowly it should hold together at
+  Darcy's speed; fast it may leave a thin trailing film (29c-8), but its front should
+  stay sharp.
+
+## 55. The Turing Print keeps changing (PLAN 26d-6)
+
+Turing Print now has a Drift control (`turingDrift`; the look sets 0.7), which slides the
+reaction's feed and kill across the plate on a 40 to 90 second clock so the maze keeps
+rearranging after the chemicals meet. In the lab a settled maze correlated 0.90 with itself
+fifty seconds later without it, 0.64 with it at 0.7 and 0.59 at 1.0 (0.67 and 0.50 before the
+stripes-to-spots glide of PLAN 26d-6a). The Mac's numbers for
+the same line are unmeasured: read them off the first run of the `fifth` shard. On a real GPU:
+- Open Turing Print, pour reagent, and watch for two minutes without touching the plate. The
+  stripes should keep sliding, branching and joining in different parts of the plate at
+  different times, slowly enough that no single frame looks like motion, and with no music
+  playing or with music: the music must not change the pace.
+- The grey patch should be gone, at 0.7 and at 1.0: the lab's flattest tile (searched every
+  16 pixels) keeps 0.93 and 0.77 of the stripes' contrast. If a soft grey area still shows on the Mac, that is Metal's
+  rounding and the cap line needs refitting there (PLAN 26d-6a).
+- Watch for stripes breaking into dots in some regions and dots running back into stripes
+  in others, over a minute or two. It should read as the chemistry changing, not the plate
+  emptying and refilling; if a region goes nearly bare for a moment between the two, the
+  glide is too fast. Is Drift 0.7 the right pace, or too busy?
+- Drift at 0 should be the print as it was: settled, then only creeping.
+- The control is on the Perform desk's lamp pins, the phone's Settings rail and the remote,
+  and it takes a MIDI knob.
+
+## 56. A bubble's middle is the plate, not a tinted disc (PLAN 33e)
+
+Bubbles were drawn with a dim dye-coloured disc inside a dark band, the donut. The middle
+is now the plate itself with at most a tenth of the film's tint. The lab's numbers are in
+`docs/plan-shipped.md` §33e; the Mac's are unmeasured (`bubblelook` runs in the open
+shard on software WebGPU). On a real GPU:
+- Pour a dye, blow bubbles with Bubbles at the default, and look at a small and a large
+  bubble on a dark look and on a lamp-ground look. A large one should be a clear window
+  edged in a thin dark line; a small one a dark dot with a pin-point; neither a coloured
+  disc inside a ring.
+- A bubble in clear water should not be a grey disc. It is drawn at 70 % strength there
+  (PLAN 33e, third bullet); say whether that reads as a flaw.
+- Zoom in past the middle of the zoom's fade: the closeup's bubble is lit and domed, as
+  before, and the change between the two views is as smooth as it was.
+
+## 57. No soft glow round a bubble's hole (PLAN 33b)
+
+The dye beside the hole a bubble cuts was lit like a ridge, a pale soft ring two to four
+cells wide. The dye's normal is now flat beside the air. The lab's numbers are in
+`docs/plan-shipped.md` §33b; the Mac's are unmeasured (`holeline` runs on software WebGPU).
+On a real GPU:
+- Pour a dye with Edge Relief at the default, blow bubbles and look at the dye round a
+  small and a large one on a dark look and on a lamp-ground look. There should be no pale
+  ring outside the bubble's own dark edge.
+- Look at the pool's own edge into clear liquid: it should keep its relief as before.
+- Where two dyes meet beside a bubble the relief may be weaker within a few cells of the
+  bubble (PLAN 33b-2); say whether that shows.
+
+
+## 58. Tilting sloshes the liquid (PLAN 18a-13)
+
+The new **Slosh** dial (0 by default) makes a tilt send the liquid across the plate, pile
+on the low side and come back when the tilt is reversed. The CPU half's numbers are in
+`docs/plan-shipped.md` §18a-13 (`npm run slosh`); the GPU half is unmeasured here. On a
+real GPU:
+- Pour two or three dyes, raise Slosh to about half, then tip with Tilt Direction (or
+  the phone's Tilt) one way and, a second later, the other. The colour should slop across
+  and back and mix. Say whether the pace is right: the top of the dial is the fastest the
+  scheme is stable at (`SLOSH_LEAN`), and the owner may want it faster.
+- At the default Thickness the liquid does not ring, it flows to the new level (about 1%
+  overshoot). Lower Thickness to about 0.3 and tip again: it should now run past the
+  level and return. Say whether the default should be thinner for this.
+- With Slosh at 0, and with no tilt, the plate should look exactly as before.
+- Shake or music: nothing should slosh from sound, Plate Rock or Frame Sway. (Gravity itself
+  can be moved by a look, Evolve or a patch on it, and the slosh follows that tilt; say if
+  that should be held out.)
+- On the phone, a held tilt fades out of the remote 2.5 s after the last reading, so the
+  liquid runs back to level on its own while the phone is held still: the same fade Plate
+  Rock has, now visible as a slop. Say whether it reads wrong.
+
+## 59. The closeup is the liquid, not cells (PLAN 33g)
+
+Paint Cells and Macro Lacing now default to 0, and the closeup's relief is lit by a lower
+lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmeasured
+(`macroview` runs on software WebGPU). On a real GPU:
+- Pour a dye, stir it, and zoom in to 4x and 6x (the pinch, the Auto camera) on `classic`,
+  `jellyfish-bloom` and a dark look. It should read as the same liquid seen nearer: a
+  glossy, domed surface with a raking highlight, no ring-packed cells and no dark
+  filaments.
+- Say whether it is 3d enough. If not, the next steps are PLAN 33g-2 (refraction, depth of
+  field, parallax); the lamp's lowering and the dome gain (×14) are the two numbers to move.
+- Say whether the highlight burns out on a bright pool, and whether a pool's edge reads
+  as relief without a drawn outline.
+- `macro-bead`, `cell-bloom` and `lace-run` still draw cells, by name. Say whether they
+  should (PLAN 33g-3).
+
+## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
+
+Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
+throw a burst of dye droplets that breaks into two or three uneven clumps at different angles
+and distances, some small and some large, not an even wreath round one circle. Kick Bloom
+(Show section; remote; MIDI) at 0 should stop it entirely and Beat Squeeze 0 and Plate Rock
+unchanged should leave only the tilt; at 1 it should be as much dye as before, at 1.5 more.
+Check that the burst reads as the kick, not as the plate being pressed.
+
+## 61. Plate Rock rocks with the bar, Beat Squeeze presses where the kick lands (PLAN 27f-2, 27f-3)
+
+Play Classic with a band at 120 bpm or so, Plate Rock at its 0.45 and Beat Squeeze at 0.5,
+Kick Bloom at 0, then at 1. Plate Rock should be the slow move: the heavier colour sliding one
+way across a half bar and back across the next, the direction turning a little each time, and
+nothing jolting on the kick itself. Beat Squeeze should be the quick one: each kick a dent
+where it lands, a fifth of the dish across on the default oil, the colour pushed out of it and
+running back in a third of a second later (fingering back in where Fingering is up). Turn
+Thickness up: the dent should tighten to a fingertip; down toward water, it should widen.
+Bass Drop should still press the whole glass. Say whether the rock's pace (one lean every two
+beats) is right or wants one a bar, and whether the dent wants to be bigger.
+
+## 62. The landing page (PLAN 34a)
+
+Open the site in a private window, at a laptop's width and on a phone. The page should say what
+ChromaGlass is in the first screen, and "Play free" should be the one obvious thing to press; the
+sign-in then opens over the page. Say whether: the headline and the line under it are the words you
+would use (they are drafts); the hero's cross-fade of five frames is slow enough not to be noticed
+and not so soft on a big screen that it looks like a blur (it is 480 px frames, PLAN 34a-3); "From
+the maker" is something you would sign, and the 14-day refund line matches what you will honour;
+the Free, Home and Pro cards promise only what the app does today. Then sign in, sign out and come
+back: the page should not flash for a returning visit.
+
+
+## 63. Bass Boost presses harder (PLAN 27g)
+
+Play a track with a clear kick and bass line (the Sound panel's Bass Boost, in Audio Input; on the
+phone, the same slider in Settings). At 1 nothing has changed. Turn it to 2, then 3: each kick and
+bass note should dent the glass visibly deeper, the colour pushed out from under it harder and
+running back as the bass falls, and each kick's dye should throw further. It should read as more
+bass, not as a busier or shakier plate, and nothing should move the whole frame. Say whether 3
+is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
+bass you wanted.
+
+## 64. Oil sloshes on water, and bores (PLAN 18a-13a, 13d)
+
+The slosh dish is two layers now, oil lenses riding on water, solved on the GPU with a
+Riemann flux, so a hard tip makes a running jump (a bore) instead of a smooth slope. The
+numbers are in `docs/plan-shipped.md` §18a-13a (`npm run slosh`, `sloshgpu`); the Metal run
+is the plate shard. On a real GPU:
+- On a look with oil on the plate, raise Slosh to about half and tip one way,
+  then the other. The water should run ahead and the oil lag behind it and shear past it:
+  two speeds, not one sheet. Say whether the oil reads as floating.
+- Lower Thickness to about 0.2 and tip hard and fast: the first wave should steepen into a
+  sharp front that runs to the rim and back. Say whether it reads as a wave or as a jolt.
+- Bass Drop with music: its Beat Squeeze should now send a ring out from each kick that runs
+  to the rim and back, and its Plate Rock should slosh the whole dish, a little (Frame Sway
+  0.35). Off Bass Drop, Beat Squeeze's ring starts from the sheet's one dent where the kick
+  lands (27f-3), narrower. Say whether the whole-dish slosh is too much (the frame-motion rule).
+- Any other look (Frame Sway 0) with Plate Rock up: the rock should tip the dye as it did,
+  and not slosh the whole dish.
+- With Slosh at 0, Plate Rock at 0 and Beat Squeeze at 0, the plate should look exactly as
+  before.
+
+## 65. A new song brings a new look, on its beat (PLAN 14z)
+
+Settings, Audio Input, On a New Song: pick New preset (it opens on Keep until you have judged
+this; on the phone, the same control in Settings). Then play your own music the ways you play it
+at a show, through the microphone in the room as well as through the laptop:
+
+- An album or playlist with gaps: the new look should come in about a second into each new
+  song, on one of its first beats, fading in over a second. Nothing should change during a quiet
+  bridge, a stop before a last chord, or a long fade-out.
+- A crossfade (a DJ set, or a player's crossfade setting): the change waits for the show to
+  recognise the song, usually 7 to 8 s into it for a song it has heard before, and then blends in
+  slowly under the music (about four seconds). A song it has never heard waits for the song
+  recognition service, up to about 35 s.
+
+Say whether a change ever lands in the middle of a song, whether one is ever missed, and whether
+the speeds feel right; if they do, On a New Song can open on New preset again (14z-4).

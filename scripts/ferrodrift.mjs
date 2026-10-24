@@ -123,12 +123,12 @@ try {
   for (const pg of PAGES) {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
-    if (!pg.band) {
-      // A chosen silence, so the page's first click starts no band (scripts/mirror.mjs).
-      await page.addInitScript(() => {
-        try { localStorage.setItem('chromaglass-audio-source', 'none'); } catch { /* none */ }
-      });
-    }
+    // The app opens on Source None (PLAN.md 14y), so the band's pages choose it the
+    // way a reload keeps it, and the first click below is still what lets it play;
+    // the silent page is a chosen silence (scripts/mirror.mjs).
+    await page.addInitScript((source) => {
+      try { sessionStorage.setItem('chromaglass-audio-source', source); } catch { /* private window */ }
+    }, pg.band ? 'simulated' : 'none');
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForTimeout(9000);
     // A cold Mac takes longer than nine seconds to open the stage, as bottles.mjs

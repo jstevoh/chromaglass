@@ -265,7 +265,7 @@ const SECTIONS: Section[] = [
         <H>The controls</H>
         <Rows items={[
           ['Sensitivity', <>How hard the analysis drives everything downstream. The first thing to reach for in a room that is louder or quieter than the last one.</>],
-          ['Bass Boost', <>Weights the 20–250 Hz band before it is mapped. A PA with no low end, or too much of it, is fixed here rather than by re-tuning every slider.</>],
+          ['Bass Boost', <>A gain on the bass's push: the glass presses deeper under each kick and bass note and every kick throws more dye, at up to three times the strength, while the beat detection is untouched. A PA with no low end is fixed here rather than by re-tuning every slider.</>],
           ['Speed', <>How fast the whole plate lives, independent of the music. In Settings → Live → Master, with the house lights.</>],
           ['Dimmer / Blackout', <>The house lights for the plate, in Settings → Live → Master. <C>B</C> fades to black and back, as does the Blackout button on the phone or a controller.</>],
           ['Room calibration', <>Learns this room's noise floor and dynamics and drives the visuals from where the music sits between them, rather than from an absolute level. A quiet room and a loud one then look the same.</>],
@@ -301,7 +301,9 @@ const SECTIONS: Section[] = [
           ['Edge Relief', <>The meniscus: the little bright lip where dye meets clear glass.</>],
           ['Lacing', <>The dark dendritic threads that outline a boundary, drawn by the strain across it.</>],
           ['Bubbles', <>Air between the plates. A bubble is not drawn over the dye — it is a standing squeeze on its own footprint, so the dye pumps out to its rim and the field flows round it.</>],
-          ['Plate Rock', <>The beat tips the whole plate and a damped spring rocks it back, so the field sloshes instead of only churning.</>],
+          ['Plate Rock', <>A hand tipping the dish with the music: one way on the one, back on three, the axis turning a little each time. The heavier colour runs downhill through the clear liquid each way. It never jolts on the kick; that is Beat Squeeze and Kick Bloom.</>],
+          ['Beat Squeeze', <>Each kick presses a thin sheet laid on the liquid where the kick lands. The dent is as wide as the sheet bends over the liquid while it is held: wide on a thin oil, a fingertip on syrup. Let go, the colour runs back in, fingering where Fingering is up. On a look that may move the frame (Frame Sway) it is the whole glass pressed instead.</>],
+          ['Slosh', <>Tip the plate one way and then back (Gravity and Tilt Direction, or the phone's tilt) and the liquid piles to the low side, runs back past the middle and mixes. Only your hand drives it, never the sound; thin liquid rings, thick liquid creeps.</>],
           ['Boundary Glow', <>A bright line where two distinct dyes meet — the oil-water interface, without a multi-fluid solve.</>],
           ['Saturation / Glossiness / Post Blur', <>The final grade. Glossiness defaults to zero: flat, evenly lit matte dye is the projected look, and a specular highlight makes it read as glossy 3D spheres instead.</>],
         ]} />
@@ -374,14 +376,15 @@ const SECTIONS: Section[] = [
           A tracking camera that magnifies the plate and chases a single travelling bead
           of liquid, from 1× to 16×. <C>+</C> and <C>−</C>, the wheel over the plate, or the
           chip under the title. It is a different subject, not a zoom: at 8× the frame is
-          cells, lacing and razor edges, and the presets built for it (Macro Bead, Cell
-          Bloom, Lacing Run) are composed for that.
+          the liquid itself, shaded as a thick film under a low lamp, in the dye's own
+          colour. Paint cells and lacing are opt-in, off unless a look asks for them, and
+          the presets built around them (Macro Bead, Cell Bloom, Lacing Run) do.
         </P>
         <Rows items={[
           ['Chase Speed / Shot Length', <>How eagerly the camera follows its subject, and how long it stays on one before cutting.</>],
           ['Music Sync', <>The camera cuts on kicks. Its punch on the bass, push with the energy and tremor from the treble are the frame moving with the music, so they ride Frame Sway (Show), which is 0 unless you turn it up.</>],
-          ['Paint Cells / Cell Size', <>Synthesised cells at magnification — the rings a pour painting makes.</>],
-          ['Macro Lacing / Edge Detail / Relief', <>The filaments, the fine boundary structure and the apparent thickness of the film.</>],
+          ['Paint Cells / Cell Size', <>Opt-in, off by default: synthesised cells at magnification, the rings a pour painting makes. Macro Bead and Cell Bloom turn them on.</>],
+          ['Macro Lacing / Edge Detail / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Edge Detail is the fine boundary structure, and Relief the apparent thickness of the film, which is always on.</>],
           ['Depth / Focus', <>Shallow depth of field, the way a real macro lens has no choice about.</>],
         ]} />
         <Note>
@@ -411,7 +414,7 @@ const SECTIONS: Section[] = [
           ['Chemistry', <>Reaction–diffusion that grows coral and cells on the plate, the way Mark Boyle's Sensual Laboratory projected reactions on the platen instead of oil in a dish.</>],
           ['Gel Wheel', <>A rotating colour wheel over the lamp, in revolutions per minute. Half a turn a minute is the Optikinetics look.</>],
           ['Film projector', <>A video file on a loop, a live camera or another window, played <Em>through</Em> the dye rather than beside it. <Em>Film Mix</Em> and <Em>Film Key</Em> set how much and what it keys on; <Em>Film Drive</Em> lets the reel's own motion move the liquid.</>],
-          ['Lamp Warmth / Exposure', <>The halogen grade, for the sealed oil-wheel look, and how hot the whole image is driven.</>],
+          ['Lamp Warmth / Exposure', <>The halogen grade, for the looks that sit under the lamp, and how hot the whole image is driven.</>],
           ['Dish Spread / Round Dish', <>Settings → Look → Show. Each layer gets its own dish on a black screen, circular the way a real clock face is. The Fillmore East, 1969 preset is three of them at once.</>],
         ]} />
       </>

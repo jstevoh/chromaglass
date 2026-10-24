@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * Where on the screen the plate should be painted, measured from a hole left
@@ -29,7 +29,7 @@ export function usePreviewFrame(enabled: boolean) {
       : { top: r.top, left: r.left, width: r.width, height: r.height });
   }, [enabled]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     measure();
     if (!enabled) return;
     const el = ref.current;

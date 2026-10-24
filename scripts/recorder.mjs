@@ -27,7 +27,7 @@
 export const AUTOPLAY = '--autoplay-policy=no-user-gesture-required';
 
 /** Before `goto`: the synthesised band plays instead of asking for a microphone. */
-export const withBand = page => page.addInitScript(() => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
+export const withBand = page => page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch {} });
 
 /**
  * Resolves once the show's loop has beaten in every quarter second for two

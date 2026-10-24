@@ -49,8 +49,14 @@ for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); p
 await new Promise((r) => setTimeout(r, 2500));
 
 const browser = await launchChromium(chromium);
+/*
+  Set once the page exists, and run in the `finally` below: `page` itself is
+  scoped to the `try`, so the restore cannot reach it from there.
+*/
+let restoreSeeding = async () => {};
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  restoreSeeding = () => page.evaluate(() => window.chromaglassDebug?.().ambientSeed?.(true)).catch(() => {});
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(8000);
@@ -120,7 +126,25 @@ try {
     await page.mouse.up();
   };
   /** Lay a pool of dye at a point to work on, and let it settle. */
-  const pool = async (at) => { await hold('dropper', at, 1500); await settle(1500); };
+  /*
+    `TOOLS_POOL_MS` exists for §0's thin-pool fault, and for nothing else.
+
+    The pool is laid by holding Drop for wall time, so how big it comes out
+    follows how fast the machine is: 49 to 279 across forty CI shards, and 728
+    on this Mac. The open fault is only visible under about 150, so a Mac
+    cannot see it at all at the shipped timing. Shortening the hold puts a
+    CI-sized pool on a fast machine, which is the only way to measure the
+    thing here. Left alone it is the shipped 1500 and no run changes.
+  */
+  const POOL_MS = (() => {
+    if (process.env.TOOLS_POOL_MS === undefined) return 1500;
+    const ms = Number(process.env.TOOLS_POOL_MS);
+    // '' is 0 and 'x' is NaN, and either would hand `settle` a hold that lays
+    // no pool while every check below went on reading one.
+    if (!Number.isFinite(ms) || ms < 100) throw new Error(`TOOLS_POOL_MS must be a number of at least 100 (got ${JSON.stringify(process.env.TOOLS_POOL_MS)}); under that the Blow's pool comes out at single figures and its checks measure nothing`);
+    return ms;
+  })();
+  const pool = async (at) => { await hold('dropper', at, POOL_MS); await settle(1500); };
   /**
    * What the plate does on its own over `ms`, from the same pool: the
    * control a tool that adds nothing (Finger) or keeps what it moves
@@ -247,6 +271,25 @@ try {
     `${(st1.disc - st0.disc).toFixed(0)} of ${(st1.total - st0.total).toFixed(0)} within 0.1 of the stroke's middle`);
 
   // ── Finger ──────────────────────────────────────────────────────
+  /*
+    No ambient seeding, as through the Blow and the Press (PLAN.md §0).
+
+    This is what made `adds none` fail on commits that never touched the
+    Finger, and it is measured, not argued: with the seeder on and *nothing
+    dropped at all*, the plate reads 64 and gains +26 then +18 over the two
+    idle windows. So "the plate left alone" was the seeder's rate, not the
+    pool's behaviour — which is why the idle reading sat at +31 to +36
+    whether the pool was 66 or 728, an eleven-fold range, and why the bracket
+    built from it had to be wide enough to accept a Finger that doubled a
+    thin pool. With the seeder off the windows measure the pool.
+
+    The 2026-09-27 finding this item carried — the Finger adding +11 to +21
+    on pools under 150 across 40 shards — was read through those same seeded
+    windows, so it is withdrawn rather than confirmed: at that size the
+    seeder alone lays about as much as the Drop does.
+  */
+  const fSeedOff = await page.evaluate(() => typeof window.chromaglassDebug().ambientSeed === 'function' && (window.chromaglassDebug().ambientSeed(false), true));
+  if (!fSeedOff) throw new Error('chromaglassDebug().ambientSeed is missing: the Finger check cannot stop the ambient seeding');
   await clear();
   await pool(A);
   // Past the pool's own settling, so the plate left alone and the plate
@@ -278,14 +321,144 @@ try {
   // Bracketed by what the plate did alone before and after: a stroke that
   // neither creates nor destroys dye must fall within the plate's natural
   // idle drift bracket (spanning fIdle, fIdleAfter and 0) plus the 15% allowance.
+  /*
+    Gains only, and in proportion to the pool.
+
+    One-sided because the fault is dye *arriving* from something the check does
+    not control — which is what the seeder was doing, and what would make `adds
+    none` pass a Finger that creates dye. A window that loses dye only narrows
+    the bracket downward and cannot excuse a hand; the Press's guard
+    (`own(on) <= 1.01`) is gains-only for the same reason, and the Mac's after
+    window reads −1, so the negative side is live and would be charged for
+    nothing.
+
+    5% of the pool, floored at 5. The Mac reads +1 on pools of 357 and 611, so
+    this is twenty to thirty times the drift measured with the seeder off — and
+    deliberately not the 2% that measurement alone would justify, because CI's
+    pool is 49 to 279 and *no run anywhere has measured this quantity on a
+    shard with the seeder off*. A bar whose value rests on unmeasured variance
+    is the flake this repo keeps relearning. Tighten it when 40 shards have
+    reported, not before.
+  */
+  const fQuietBar = Math.max(5, 0.05 * fa.total);
+  const fQuiet = Math.max(fIdle, fIdleAfter) <= fQuietBar;
+  // A pool, or there is nothing to judge: an empty plate reads 0 → 0 and every
+  // bound below is 0, so `adds none` would pass on nothing (check-skeptic).
+  const fPooled = fa.total > 5;
   const fMinIdle = Math.min(0, fIdle, fIdleAfter);
   const fMaxIdle = Math.max(0, fIdle, fIdleAfter);
   const fSlack = 0.15 * fa.total + 5;
   const fDelta = fb.total - fa.total;
-  check('and adds none', fDelta >= fMinIdle - fSlack && fDelta <= fMaxIdle + fSlack,
-    `${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(0)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(0)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(0)}] ± ${fSlack.toFixed(0)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after`);
+  check('and adds none', fPooled && fQuiet && fDelta >= fMinIdle - fSlack && fDelta <= fMaxIdle + fSlack,
+    `${!fPooled ? `no pool to judge (${fa.total.toFixed(1)}); ` : !fQuiet ? 'the plate was not quiet, so nothing below is the hand; ' : ''}${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(0)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(0)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(0)}] ± ${fSlack.toFixed(0)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
+  /*
+    With the seeder off nothing lays dye but the hand, so the idle windows
+    must be about nothing. A plate still gaining is still being painted by
+    something the check does not control, and its drift is not the pool's —
+    the same guard the Press carries ("colour still arriving with nothing
+    touching it"). The seeded plate missed this by an order of magnitude.
+  */
+  check('and the plate it was measured on was quiet', fQuiet,
+    `left alone, the pool of ${fa.total.toFixed(0)} gained ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(1)} before the stroke and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(1)} after, against ${fQuietBar.toFixed(1)} allowed`);
+
+  /*
+    The control §0 asks for: the same shape of run with the stroke taken out.
+
+    `and adds none` is bracketed by what the plate did alone *before* and
+    *after* the stroke, and the check-skeptic review of that bracket is one
+    sentence: the after window may carry the stroke's own aftermath rather
+    than the plate's behaviour, in which case the stroke is widening its own
+    allowance and the bracket proves nothing.
+
+    What this settles is the narrower claim, and the printed line says so: the
+    second window is not biased by *where it sits in the run* — plate age,
+    ordering, the pointer parked over the pool. It cannot settle bias that
+    only exists when a stroke happened, because it has no stroke; for that,
+    the pair `fIdle`/`fIdleAfter` in the check's own detail is the evidence,
+    and this calibrates that pair rather than replacing it.
+
+    It runs here rather than in a script of its own, on the same helpers and
+    the same timings, because every helper and every timing would otherwise be
+    a near-copy and a near-copy is not a control. Reporting, not gating. Set
+    TOOLS_FINGER_CONTROL=1.
+
+    Counted in solver steps, not milliseconds. The real path pays 30
+    `mouse.move` round trips that the control does not, so matching the wall
+    time leaves the control's second window up to 1.4 s earlier in the pool's
+    life under load — the same fault the Hover check was rewritten to fix. The
+    step spans are printed so a run that is not comparable says so.
+  */
+  if (process.env.TOOLS_FINGER_CONTROL) {
+    await clear();
+    await pool(A);
+    await settle(3000);
+    const cIdle = await idleChange(A, 3800);
+    const c0p = await snap('ctlFinger0');
+    // The stroke's shape, without the stroke: the tool is picked, the pointer
+    // ends where the stroke would have left it, and the same time passes, but
+    // the mouse never goes down.
+    /** Solver steps between two snapshots, read from the page's own store. */
+    const stepsBetween = (a, b) => page.evaluate(([a, b]) => {
+      const s = window.__toolSnaps;
+      return (s[b]?.step ?? -1) - (s[a]?.step ?? -1);
+    }, [a, b]);
+    const stepNow = () => page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.stepIndex ?? -1);
+    const fSpan = await stepsBetween('finger0', 'finger1');
+    await tool('finger');
+    const c0step = await page.evaluate(() => window.__toolSnaps.ctlFinger0.step);
+    /*
+      Wait out the stroke in solver steps, not milliseconds. At equal wall time
+      the real path ran 274 steps against this one's 122 on the Mac, because its
+      30 `mouse.move` round trips cost more than the settles that stand in for
+      them — so the two windows sat at stages of the pool a factor of two apart
+      and the comparison was void. Halfway through, the pointer goes where the
+      stroke would have left it, since hovering is not nothing either (Hover).
+    */
+    let moved2B = false, timedOut = false;
+    // `?? -1` catches a missing stepIndex but not a NaN one, and NaN makes every
+    // `done >= fSpan` false: the loop would burn the deadline and then the
+    // tenth-test, also false, would print "the same stage of the pool" for a run
+    // that measured nothing (check-skeptic).
+    const spanRead = Number.isFinite(fSpan) && fSpan > 0;
+    if (!spanRead) console.log(`\n  control void: the stroke's step span did not read (${fSpan})`);
+    const deadline = Date.now() + 120000;
+    while (spanRead) {
+      const done = (await stepNow()) - c0step;
+      if (!moved2B && done >= fSpan / 2) { await page.mouse.move(...screen(...B)); moved2B = true; }
+      if (done >= fSpan) break;
+      if (Date.now() > deadline) { timedOut = true; break; }
+      await settle(100);
+    }
+    if (!moved2B) await page.mouse.move(...screen(...B));
+    await snap('ctlFinger1');
+    const ca = await measure('ctlFinger0', c0p), cb = await measure('ctlFinger1', c0p);
+    const cIdleAfter = await idleChange(A, 3800);
+    const cDelta = cb.total - ca.total;
+    const cSpan = await stepsBetween('ctlFinger0', 'ctlFinger1');
+    // A pool, or there is nothing to run a control on: zeros would print a
+    // difference of 0 and a sentence of reassurance (check-skeptic). It says so
+    // and stands down rather than throwing, because a reporting-only block that
+    // can end the run is a gate, whatever its comment claims.
+    const cVoid = !(ca.total > 5) || !spanRead || timedOut;
+    const gap = Math.abs(cIdleAfter - cIdle);
+    console.log(`\n  control — the Finger picked, never pressed:`);
+    console.log(`    pool ${ca.total.toFixed(0)} → ${cb.total.toFixed(0)} (Δ ${cDelta >= 0 ? '+' : ''}${cDelta.toFixed(1)}), the stroke's own ${(fDelta - cDelta) >= 0 ? '+' : ''}${(fDelta - cDelta).toFixed(1)} against a slack of ±${fSlack.toFixed(0)}`);
+    console.log(`    plate alone: ${cIdle >= 0 ? '+' : ''}${cIdle.toFixed(1)} before, ` +
+      `${cIdleAfter >= 0 ? '+' : ''}${cIdleAfter.toFixed(1)} after, differing by ${gap.toFixed(1)}`);
+    const matched = spanRead && !timedOut && Math.abs(cSpan - fSpan) <= 0.1 * Math.max(1, fSpan);
+    console.log(`    over ${cSpan} solver steps against the stroke's ${fSpan}` +
+      `${timedOut ? ' — the control timed out before it caught up' : ''}` +
+      `${matched ? ' — within a tenth, so the same stage of the pool' : ' — not the same stage of the pool, so this run says nothing'}`);
+    if (cVoid) console.log(`    the control measured nothing${!(ca.total > 5) ? ` (no pool: ${ca.total.toFixed(1)})` : ''}\n`);
+    else console.log(`    with no stroke the second window is ${gap <= fQuietBar ? 'not' : ''} biased by where it sits in the run\n`);
+  }
+  /*
+    The seeder back on for everything after the Finger, as the Blow and the
+    Press put it back after theirs.
+  */
+  await page.evaluate(() => window.chromaglassDebug().ambientSeed?.(true)).catch((e) => console.log(`     [seeding not put back] ${e.message}`));
 
   // ── Blow, moved ─────────────────────────────────────────────────
   /*
@@ -848,6 +1021,16 @@ try {
     console.log(`     the Press's waits, in the plate's seconds: ${waits.join(', ')}`);
   }
 } finally {
+  /*
+    The seeder back on whatever happened. Three sections turn it off (the
+    Finger, the Blow, the Press) and each puts it back on its own path, but a
+    throw between the off and the restore would leave the page seeded-off. That
+    cannot reach a later check today, because every throw in this file reaches
+    this block and ends the run — but it is accidental, and the Blow's and the
+    Press's own re-offs would mask a leak rather than reveal it. So it is
+    restored here as well, where nothing can step round it.
+  */
+  await restoreSeeding();
   await browser.close();
 }
 

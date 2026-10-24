@@ -211,8 +211,19 @@ const off = song(base), full = song({ ...base, frameSway: 1 }), half = song({ ..
 console.log(`   the defaults (Plate Rock ${base.plateRock}) through the song, per frame: the picture's slide peak ${pc(full.slidePeak)} and mean ${pc(full.slideMean)} as #347 shipped, ${pc(off.slidePeak)} and ${pc(off.slideMean)} now; the lamp's jump on the rock ${pc(full.lampPeak)} then, ${pc(off.lampPeak)} now`);
 check('and it is the dial: at full Frame Sway the same song slides the default look\'s picture as #347 did, 0.05% of the plate a frame or more at the peak',
   full.slidePeak >= 0.0005 && full.lampPeak > 0 && full.beat === 1, `${pc(full.slidePeak)} peak, lamp ${pc(full.lampPeak)}`);
-check('half way slides it less than full and more than none',
-  half.slidePeak > 0 && half.slidePeak < full.slidePeak && half.beat === 0.5, `${pc(half.slidePeak)} against ${pc(full.slidePeak)}`);
+/*
+  The room only holds the glass where the glass slides as far as it. Since
+  Plate Rock's hand leans half as steeply (27f-2, lib/plateRock.ts
+  ROCK_LEAN), at the default rock the glass rests about 5 mm off the middle
+  (R_c sinθ, 2.6 degrees) and swings to under 2 cm, inside half the room as
+  well as all of it, so the default look slides the same at Frame Sway 0.5
+  and 1 (0.343% either way): the dial has nothing to hold. It is read where
+  the glass does reach the rim, the same song at full Plate Rock.
+*/
+const fullRock = song({ ...base, plateRock: 1, frameSway: 1 }), halfRock = song({ ...base, plateRock: 1, frameSway: 0.5 });
+check('half way slides it less than full and more than none (at full Plate Rock, where the glass reaches the rim)',
+  halfRock.slidePeak > 0 && halfRock.slidePeak < fullRock.slidePeak && half.beat === 0.5,
+  `${pc(halfRock.slidePeak)} against ${pc(fullRock.slidePeak)}; at the default rock ${pc(half.slidePeak)} against ${pc(full.slidePeak)}`);
 check('and the plate\'s own tilt still swings with the kicks at Frame Sway 0 (Plate Rock moves the heavier colour, the liquid\'s motion)',
   off.tiltPeak > 0.05 && Math.abs(off.tiltPeak - full.tiltPeak) < 1e-12, `sinθ up to ${off.tiltPeak.toFixed(3)}, the same as at full`);
 check('a Frame Sway that is not a number is off', L.frameSway(NaN) === 0 && L.coverRoom(undefined) === 0 && L.frameSway(2) === 1 && L.frameSway(-1) === 0);

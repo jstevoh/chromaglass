@@ -81,6 +81,8 @@ try {
       errors.push(t.slice(0, 160));
     });
     await installFrameReader(page);
+    // The app opens on Source None (PLAN.md 14y), so the band this run plays is chosen the way a reload keeps it.
+    await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
     await page.goto(`http://localhost:${PORT}/?debug&gpu=strong&tier=local&look=${preset.id}${engineQuery()}`, { waitUntil: 'load' });
     await page.mouse.click(8, 8);   // the gesture the band needs
     const t0 = Date.now();

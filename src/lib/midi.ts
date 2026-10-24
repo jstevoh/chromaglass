@@ -297,6 +297,8 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
   // Frame Sway is a hand's alone (the owner, 2026-10-11): a kick routed to it would slide the whole frame on the beat (lib/plateRock.ts).
   'frameSway',
+  // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
+  'slosh',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
@@ -470,6 +472,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
   { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
   { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
+  { key: 'slosh',           label: 'Slosh',            min: 0, max: 1 },
+  { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 1.5 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   // A knob: a verse wants every kick, a chorus the one.
   { key: 'beatAccent',      label: 'Accent the One',   min: 0, max: 1 },
@@ -512,6 +516,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'chemistryPattern', label: 'Pattern (Spots to Labyrinth)', min: 0, max: 1 },
   { key: 'chemistryWidth',  label: 'Pattern Width',    min: 0.1, max: 1 },
   { key: 'turingPrint',     label: 'Turing Print',     min: 0, max: 1 },
+  { key: 'turingInk',       label: 'Turing Print Ink', min: 0, max: 1 },
+  { key: 'turingDrift',     label: 'Turing Print Drift', min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
   // The mirror rig, which is the one optical trick people reach for mid-song.
   // Folds is a stepped choice and rides a fader as one: the sheet's five

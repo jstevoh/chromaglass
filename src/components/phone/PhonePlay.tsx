@@ -444,7 +444,7 @@ export function PhonePlay(p: PhonePlayProps) {
               <TouchSlider glass label="Soap" setting="surfactantFlow" min={0} max={1} value={s.surfactantFlow ?? 0}
                 display={pct(s.surfactantFlow ?? 0)} resetTo={p.lookValueOf?.('surfactantFlow')} onChange={v => p.onSetting({ surfactantFlow: v })} testId="play-slider-soap" />
               {/* To 8×, not the pinch's 16: past 8 a phone's plate is a few cells across, and the slider's travel is better spent below. */}
-              <TouchSlider glass label="Zoom" min={1} max={8} value={Math.min(8, zoom)}
+              <TouchSlider glass label="Zoom" help="How close the camera looks into the plate. One is the whole plate." min={1} max={8} value={Math.min(8, zoom)}
                 display={`${zoom.toFixed(1)}×`} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
               <TouchSlider glass label="Evolve" setting="automateRate" min={0} max={1} value={s.automateRate ?? 0}
                 display={pct(s.automateRate ?? 0)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />

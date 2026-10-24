@@ -29,7 +29,7 @@
  *      every depth is on −1..1, which is all the travel there is.
  *   2. Every sound patch on the shelf reads what is heard at once (`sound`,
  *      `bands`, `hits`), and the three looks written as the pattern for the
- *      rest (Cyberpunk, Fillmore East, Lava Lamp) each have two or three,
+ *      rest (Cyberpunk, Aurora Borealis, Lava Lamp) each have two or three,
  *      into the liquid and never onto a dial that moves the whole frame.
  *   3. The hits (lib/hitSource.ts), on a song whose drums are known to the
  *      sample (`scripts/arrangement.mjs`, as `npm run shape` uses), heard the
@@ -115,7 +115,7 @@ for (const p of PRESETS) for (const m of p.settings.sceneMappings ?? []) {
   const src = m.source ?? 'room';
   if (!FAST.has(src) && !NOT_SOUND.has(src)) slow.push(`${p.id} ${src}:${m.feature}`);
 }
-const PATTERN = ['cyberpunk', 'fillmore-1969', 'lava-lamp'];
+const PATTERN = ['cyberpunk', 'aurora-borealis', 'lava-lamp'];
 const pattern = PATTERN.map((id) => {
   const ms = PRESETS.find((p) => p.id === id)?.settings.sceneMappings ?? [];
   return { id, n: ms.length, ok: ms.length >= 2 && ms.length <= 3 && ms.every((m) => FAST.has(m.source) && !FRAME_MOTION.has(m.setting)),

@@ -775,6 +775,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Kick Bloom" field="kickBloom" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Slosh" field="slosh" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The dish's own turning (PLAN.md §22): Auto Spin's mode and its
@@ -832,6 +834,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           */}
           {((settings?.chemistry ?? 0) > 0.001 || (settings?.turingPrint ?? 0) > 0.001) && (
             <Slider label="Turing Print" field="turingPrint" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('turingPrint') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {((settings?.turingPrint ?? 0) > 0.001) && (
+            <Slider label="Print Ink" field="turingInk" step={0.01} format={(v) => (v > 0 ? `${Math.round(v * 360)}°` : 'Starch')} value={value('turingInk') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {((settings?.turingPrint ?? 0) > 0.001) && (
+            <Slider label="Print Drift" field="turingDrift" step={0.05} format={(v) => (v > 0 ? `${Math.round(v * 100)}%` : 'Still')} value={value('turingDrift') as number | undefined} {...sliderProps} connected={connected} />
           )}
           {/*
             The plate as a thin gap (PLAN §18a), a switch on the slider's two
