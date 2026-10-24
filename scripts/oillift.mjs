@@ -49,9 +49,11 @@
  *      there by a steady 6° tilt keeps 98.5% of its oil over six seconds (the
  *      first cut kept 12% in three), and in its last second there moves
  *      under 15% of its free speed. Run at a hundredth of the looks' Oil Tension, because a lens
- *      touching the open rim drains through it with no rock at all, by its
- *      own surface tension (printed below, PLAN 18g-6); the lift's own rim
- *      is what this asks about.
+ *      touching the open rim drained through it with no rock at all, by its
+ *      own surface tension, when this was written (66% left after six
+ *      seconds); the lift's own rim is what this asks about. PLAN 18g-6 has
+ *      held it since (98.5% here, printed below; `npm run rimhold` is its
+ *      check).
  *   5. The phone's tilt is the plate's: the step lifts the oil by the
  *      step's rockX, and the frame loop's rockX is the hand's swing plus the
  *      phone's tilt (source).
@@ -227,7 +229,7 @@ check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ halved f
   const named = [['a sheet over the whole dish', r.full], ['half the dish, tipped across its edge', less(r.across, r.halfLevel)], ['half the dish, tipped along it', less(r.along, r.halfLevel)]];
   check('the frame stays still: what the tilt adds to the picture\'s mean flow is under 2% of the lens\'s speed and under 0.15 mm/s, whatever the oil',
     named.every(([, f]) => still(f) < 0.02 * v && still(f) < 0.15),
-    named.map(([n, f]) => `${n} ${show(f)}`).join(', ') + `; the lens ${v.toFixed(2)} mm/s; the first try 4.2 mm/s (the half sheets level, against the rim, already ${show(r.halfLevel)}: their surface tension draining through it, PLAN 18g-6)`);
+    named.map(([n, f]) => `${n} ${show(f)}`).join(', ') + `; the lens ${v.toFixed(2)} mm/s; the first try 4.2 mm/s (the half sheets level, against the rim, already ${show(r.halfLevel)}: their surface tension settling them off the rim in their first second, PLAN 18g-6; it drained them through it, 0.14 mm/s, before)`);
   const clock = still(r.clock) / mms(r.clock.speed * flowToMs);
   check('and on Clock Glass\'s own lay, its bodies, colours and wash, the picture\'s mean is under 3% of the liquid\'s own speed',
     clock < 0.03, `${show(r.clock)} against the liquid's mean speed ${mms(r.clock.speed * flowToMs).toFixed(2)} mm/s (${(100 * clock).toFixed(1)}%)`);
@@ -244,7 +246,7 @@ check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ halved f
     reached && end.amount > 0.985 * a.amount && Math.abs(last) < 0.15 * Math.abs(lens),
     `its centroid ${a.x.toFixed(3)} → ${end.x.toFixed(3)} (the rim at 0, the lens ${R} across its radius), ${(100 * end.amount / a.amount).toFixed(1)}% of its oil kept, its last second ${mms(-last).toFixed(3)} mm/s against ${mms(-lens).toFixed(2)} free; by second ${t.slice(1).map((s) => s.x.toFixed(3)).join(', ')}`);
   const d = r.drain;
-  console.log(`      (the same lens at the looks' own Oil Tension, the plate level: ${(100 * d[d.length - 1].amount / d[0].amount).toFixed(1)}% of its oil left in the dish after six seconds, drained through the open rim by its own surface tension; PLAN 18g-6)`);
+  console.log(`      (the same lens at the looks' own Oil Tension, the plate level: ${(100 * d[d.length - 1].amount / d[0].amount).toFixed(1)}% of its oil left in the dish after six seconds, against 66% when the open rim drained it by its own surface tension; PLAN 18g-6)`);
 }
 // 5.
 {

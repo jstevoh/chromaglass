@@ -23,7 +23,7 @@
 
 import { Disposer, GpuProfiler, PingPong, PipelineCache, ReadbackRing, bindGroup, type Prep } from './kit';
 import type { Opening } from './opening';
-import { kernel } from './wgsl/fluid';
+import { RIM_SAMPLES, kernel } from './wgsl/fluid';
 import { SPIKE_ONSET, fieldOnAxis, spikesOnAxis } from './wgsl/spikes';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { splatKernel } from './wgsl/splat';
@@ -1031,6 +1031,7 @@ export class WebGPUFluid {
   private blankRGBA: GPUTexture | null = null;
   /** Scratch for the vorticity and the ferrofluid's chemical potential. */
   private scratchR: GPUTexture | null = null;
+  private rimPhi: GPUTexture | null = null;
   /** The ferrofluid's long-range repulsion ψ (see screenJacobi), kept between steps. */
   private psi: PingPong | null = null;
   /** Its chemical potential (phaseMu), kept for the next step's maze force. */
@@ -1177,6 +1178,8 @@ export class WebGPUFluid {
       // Except on a look that stands the plate up, whose dye's weight runs
       // the mix force from its first step (Opening.gravity).
       ['mixSmooth', [R32], open.gravity],
+      // The oil's pressure along the open rim, which mixForce reads (PLAN 18g-6): with it, as it runs with it.
+      ['rimLaplace', [R32], open.gravity],
       /*
         The poured liquids' species (PLAN 18d): its pour and fade, and its
         carry in substeps, below. Built behind the show: nothing runs them
@@ -2522,9 +2525,18 @@ export class WebGPUFluid {
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
-      this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth],
-        this.arg('mix force', [oil * OIL_TENSION * perSecond * N * N, OIL_CELLS / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
-          gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]));
+      const args = this.arg('mix force', [oil * OIL_TENSION * perSecond * N * N, OIL_CELLS / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
+        gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]);
+      /*
+        The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
+        wgsl/fluid.ts): φ round the ring, from this step's oil, for the
+        force to take its gradient off near the rim. Run with every mix
+        force, with oil or without (it is then zero), so what mixForce
+        reads is never an earlier oil's. One workgroup.
+      */
+      const rim = this.rimRing();
+      if (thin) this.run(pass, 'rimLaplace', rim, [smooth], args, 1);
+      this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth, rim], args);
       this.vel.swap();
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
     /*
@@ -3695,6 +3707,25 @@ export class WebGPUFluid {
     pass.end();
     this.device.queue.submit([enc.finish()]);
     this.liesLive = true;
+  }
+
+  /**
+   * The oil's pressure round the open rim (rimLaplace, PLAN 18g-6): one row,
+   * a sample about a cell of the rim apart, a multiple of the kernel's 64
+   * threads and at most its arrays' RIM_SAMPLES (past 1024 cells round, a
+   * 330 plate, the samples spread to a cell and a half and more; the
+   * force they sum is a blur five cells wide). Zero until first written,
+   * which on the old plate, whose rim is closed, it never is.
+   */
+  private rimRing(): GPUTexture {
+    if (!this.rimPhi) {
+      const k = Math.min(RIM_SAMPLES, 64 * Math.ceil(Math.PI * this.N / 64));
+      this.rimPhi = this.disposer.track(this.device.createTexture({
+        label: 'rim oil pressure', size: [k, 1], format: R32,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      }));
+    }
+    return this.rimPhi;
   }
 
   private scratch(): GPUTexture {

@@ -181,6 +181,7 @@
     "forces": "node scripts/forces.mjs",
     "rides": "node scripts/rides.mjs",
     "oillift": "node scripts/oillift.mjs",
+    "rimhold": "node scripts/rimhold.mjs",
     "musicforce": "node scripts/musicforce.mjs",
     "bassboost": "node scripts/bassboost.mjs",
     "thick": "node scripts/thick.mjs",
