@@ -127,14 +127,16 @@ async function mintFirebaseToken({
   kid = 'google-key-1',
   alg = 'RS256',
   project = 'chromaglass',
+  iss = `https://securetoken.google.com/${project}`,
+  aud = project,
 }) {
   const nowSec = Math.floor(Date.now() / 1000);
   const header = toBase64Url(new TextEncoder().encode(JSON.stringify({ alg, typ: 'JWT', kid })));
   const payload = toBase64Url(
     new TextEncoder().encode(
       JSON.stringify({
-        iss: `https://securetoken.google.com/${project}`,
-        aud: project,
+        ...(iss === null ? {} : { iss }),
+        ...(aud === null ? {} : { aud }),
         sub: uid,
         user_id: uid,
         email,
@@ -281,14 +283,22 @@ const env = makeEnv();
     env,
     await mintFirebaseToken({ email: 'alice@example.com', alg: 'none' }),
   );
-  const otherProject = await getKeys(
-    env,
-    await mintFirebaseToken({ email: 'alice@example.com', project: 'someone-elses-app' }),
-  );
+  // Each of these the old Worker let through but the first: it read the
+  // audience alone, let 'demo-chromaglass' pass and a missing one too, and
+  // never read the issuer (the review of #460).
+  const foreign = {
+    'another project': await mintFirebaseToken({ email: 'alice@example.com', project: 'someone-elses-app' }),
+    'our audience, another issuer': await mintFirebaseToken({ email: 'alice@example.com', iss: 'https://securetoken.google.com/someone-elses-app' }),
+    "the emulator's demo project": await mintFirebaseToken({ email: 'alice@example.com', project: 'demo-chromaglass' }),
+    'no audience': await mintFirebaseToken({ email: 'alice@example.com', aud: null }),
+    'no issuer': await mintFirebaseToken({ email: 'alice@example.com', iss: null }),
+  };
+  const foreignStatus = {};
+  for (const [name, jwt] of Object.entries(foreign)) foreignStatus[name] = (await getKeys(env, jwt)).status;
   check(
-    '3b. a token Google signed for another Firebase project is refused (401)',
-    otherProject.status === 401,
-    `${otherProject.status}`,
+    "3b. a token Google signed for anyone but this project (another project, another issuer, the demo project, no audience, no issuer) is refused (401)",
+    Object.values(foreignStatus).every((st) => st === 401),
+    JSON.stringify(foreignStatus),
   );
   check(
     '3. missing, forged, expired and unsigned Firebase ID tokens are refused (401)',
@@ -421,6 +431,23 @@ let bobProToken = '';
   delete live.GOOGLE_JWKS;
   await postWebhook(live, { event: 'order_created', email: 'dana@example.com', orderId: 'ord_dana_1', tier: 'pro' });
   const realFetch = globalThis.fetch;
+  const realNow = Date.now;
+  // 8b first, from a cold cache: Google answering 500, and a burst of tokens
+  // (forged ones cost nothing) asks it once, not once each.
+  let downAsked = 0;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).startsWith('https://www.googleapis.com/')) { downAsked++; return new Response('down', { status: 500 }); }
+    return realFetch(url, init);
+  };
+  const burst = await Promise.all(Array.from({ length: 5 }, (_, i) => mintFirebaseToken({ email: 'dana@example.com', kid: `made-up-${i}` }).then((t) => getKeys(live, t))));
+  for (let i = 0; i < 5; i++) await getKeys(live, await mintFirebaseToken({ email: 'dana@example.com', kid: `later-${i}` }));
+  check(
+    '8b. with Google down, ten tokens (five at once, five after) ask Google once, and are refused',
+    downAsked === 1 && burst.every((r) => r.status === 401),
+    `Google asked ${downAsked}×, statuses ${burst.map((r) => r.status).join(',')}`,
+  );
+  // A minute on, the once-a-minute limit has passed: 8 runs from there.
+  Date.now = () => realNow() + 61_000;
   const asked = [];
   globalThis.fetch = async (url, init) => {
     if (String(url).startsWith('https://www.googleapis.com/')) {
@@ -451,6 +478,7 @@ let bobProToken = '';
     );
   } finally {
     globalThis.fetch = realFetch;
+    Date.now = realNow;
   }
 }
 

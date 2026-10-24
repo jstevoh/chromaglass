@@ -126,7 +126,8 @@ function Pill({ onPress, label, testId, children, pressed }: { onPress: () => vo
 
 export function PhonePlay(p: PhonePlayProps) {
   const [sheet, setSheet] = useState(false);
-  const signedOut = ACCOUNTS_ON && !useSignedIn();
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
   const [picked, setPicked] = useState<PlayTool>('dropper');
   const [touched, setTouched] = useState(false);
   const [saved, setSaved] = useState(false);

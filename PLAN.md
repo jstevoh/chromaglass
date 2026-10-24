@@ -6201,12 +6201,16 @@ once the login works (23.14).*
   Worker never had, so it answered 401 to every real sign-in and no account key ever reached a
   browser; and the app asked for the key only while the profile sheet was open. Now the Worker fetches
   Google's published keys for Firebase tokens and keeps them for the endpoint's max-age (about five
-  hours, measured), refetching at most once a minute for an unknown key id, and an RS256 token must
-  name this project as both audience and issuer; the app asks once it starts signed in
+  hours, measured), asking at most once a minute for an unknown key id or while Google is down, one
+  fetch shared by concurrent requests; an RS256 token must name this project as both audience and
+  issuer, and carry an expiry, an issue time not in the future and a subject; the app asks once it starts signed in
   (`src/lib/accountLicense.ts`, from `main.tsx`) and again the moment a sign-in completes in the
-  sheet, keeping the best of Home and Pro. *Measure:* `npm run license-worker` 14/14 (8: no
-  `GOOGLE_JWKS`, a good token gets its Pro key and Google is asked once; red on the old Worker, 0
-  keys, 401; 3b: another project's token refused); `npm run signin` 14 (Free before the key is
+  sheet, keeping the best of Home and Pro; a key taken off the computer by hand stays off until
+  asked back from the sheet (it would otherwise retake a Mac's seat at the next start). *Measure:*
+  `npm run license-worker` 15/15, 12/15 on the old Worker (8: no `GOOGLE_JWKS`, a good token gets
+  its Pro key and Google is asked once, old: 0 keys, 401; 8b: Google down, ten tokens ask it once;
+  3b: tokens for another project, another issuer, the demo project, or with no audience or issuer
+  refused, old: four of five let through); `npm run signin` 14 (Free before the key is
   filed, Pro after a restart with the sheet never opened). *Owed:* `wrangler deploy` of the licence
   Worker from the owner's Mac (its config is not in the repo), then confirm `owner-pro-1` is filed
   under the owner's sign-in email and was signed after the key rotation (the sheet now says so in

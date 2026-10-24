@@ -50,7 +50,8 @@ interface Drag { id: string; x: number; y: number; x0: number; y0: number; moved
 
 export function Desk(p: DeskProps) {
   const l = p.layout;
-  const signedOut = ACCOUNTS_ON && !useSignedIn();
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
   const set = p.onLayout;
   const [browser, setBrowser] = useState<{ top: number; right: number } | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);

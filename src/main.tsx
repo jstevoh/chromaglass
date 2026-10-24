@@ -13,6 +13,8 @@ import {
   hasStoredLicenseCandidateSync,
   verifyStoredLicenseOnLoad,
   requiresDesktopSignInSync,
+  stripEmailSignInParams,
+  clearPendingEmail,
 } from './lib/authFlag';
 
 // The black box, first: whatever goes wrong from here on has a line
@@ -214,7 +216,9 @@ function Gate() {
     // holds a licence used to go straight to the app with the link's code left
     // unused, so signing in by email from the profile sheet, on a licensed
     // machine, came back still signed out (`npm run signin` 16).
-    if (hasEmailSignInLink() && getPendingEmail()) return 'completing-link';
+    // Offline, a browser already let in goes to the show rather than wait on
+    // Firebase's network timeout; the link is still in the address for later.
+    if (hasEmailSignInLink() && getPendingEmail() && (navigator.onLine || orSignIn() === 'signin')) return 'completing-link';
     if (hasValidLicenseSync() || isSignedInCached()) return 'app';
     if (hasStoredLicenseCandidateSync()) return 'verifying-license';
     return 'signin';
@@ -260,8 +264,16 @@ function Gate() {
           })
           .catch(() => {
             // A spent or broken link never locks out a browser that was let in
-            // before it (a licence, or a session): it goes on to the show.
-            if (!cancelled) setPhase(orSignIn());
+            // before it (a licence, or a session): it goes on to the show. And it
+            // is dropped, address and pending email both: left there, every load
+            // tried it again, and the sheet's sign-in offered only "Complete
+            // sign-in" on a dead link (the review of #460).
+            if (cancelled) return;
+            if (navigator.onLine) {
+              stripEmailSignInParams();
+              clearPendingEmail();
+            }
+            setPhase(orSignIn());
           });
         return () => {
           cancelled = true;

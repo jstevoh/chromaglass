@@ -310,7 +310,8 @@ export default function App() {
   const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
   // Signed out with the show up: every account button turns into a lit
   // "Sign in" that opens the sheet's sign-in (the owner, 2026-10-24).
-  const signedOut = ACCOUNTS_ON && !useSignedIn();
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
 
   const openProfileSheet = useCallback(() => {
     if (!hasAccountOrLicenseUI) return;

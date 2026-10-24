@@ -441,7 +441,10 @@ async function verifyFirebaseIdToken(idToken, env) {
   if (!header || !payload) return null;
 
   const nowSec = Math.floor(Date.now() / 1000);
-  if (typeof payload.exp === 'number' && payload.exp <= nowSec) return null;
+  // A token with no expiry, or issued in the future, is not a Firebase token.
+  if (typeof payload.exp !== 'number' || payload.exp <= nowSec) return null;
+  if (typeof payload.iat !== 'number' || payload.iat > nowSec + 300) return null;
+  if (typeof payload.sub !== 'string' || !payload.sub) return null;
   if (typeof payload.email !== 'string' || !payload.email.includes('@')) return null;
   if (payload.email_verified === false) return null;
 
@@ -504,14 +507,17 @@ async function verifyFirebaseIdToken(idToken, env) {
  *
  * So the keys are fetched from Google's endpoint for exactly these tokens and
  * kept for as long as Google says they may be. A token naming a key the cache
- * does not hold fetches again (Google has rotated), at most once a minute, so a
- * stream of tokens with made-up key ids cannot turn into a stream of fetches.
+ * does not hold fetches again (Google has rotated). Every attempt counts toward
+ * the once-a-minute limit, a failed one too, and concurrent requests share the
+ * one fetch in flight: a stream of tokens with made-up key ids, or Google being
+ * down, cannot turn into a stream of fetches (the review of #460 found both).
  * `GOOGLE_JWKS` stays as an override for the check, which signs its own tokens.
  */
 const GOOGLE_JWKS_URL =
   'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 const JWKS_MIN_REFETCH_MS = 60_000;
-const jwksCache = { keys: [], until: 0, fetchedAt: 0 };
+const jwksCache = { keys: [], until: 0, triedAt: 0 };
+let jwksInFlight = null;
 
 async function getGoogleJwks(env, kid) {
   if (env.GOOGLE_JWKS) {
@@ -519,22 +525,27 @@ async function getGoogleJwks(env, kid) {
     return Array.isArray(parsed) ? parsed : parsed?.keys ?? [];
   }
   const now = Date.now();
-  const fresh = now < jwksCache.until;
   const holds = jwksCache.keys.some((k) => k.kid === kid);
-  if (fresh && (holds || now - jwksCache.fetchedAt < JWKS_MIN_REFETCH_MS)) return jwksCache.keys;
-  try {
-    const res = await fetch(GOOGLE_JWKS_URL);
-    if (!res.ok) return jwksCache.keys;
-    const body = await res.json();
-    const keys = Array.isArray(body?.keys) ? body.keys : [];
-    const maxAge = Number(/max-age=(\d+)/.exec(res.headers.get('cache-control') || '')?.[1]) || 3600;
-    jwksCache.keys = keys;
-    jwksCache.fetchedAt = now;
-    jwksCache.until = now + Math.min(maxAge, 6 * 3600) * 1000;
-  } catch {
-    // Google out of reach: the keys already held, if any, still verify.
-  }
-  return jwksCache.keys;
+  if (holds && now < jwksCache.until) return jwksCache.keys;
+  if (jwksInFlight) return jwksInFlight;
+  if (now - jwksCache.triedAt < JWKS_MIN_REFETCH_MS) return jwksCache.keys;
+  jwksCache.triedAt = now;
+  jwksInFlight = (async () => {
+    try {
+      const res = await fetch(GOOGLE_JWKS_URL);
+      if (!res.ok) return jwksCache.keys;
+      const body = await res.json();
+      const keys = Array.isArray(body?.keys) ? body.keys : [];
+      if (!keys.length) return jwksCache.keys;
+      const maxAge = Number(/max-age=(\d+)/.exec(res.headers.get('cache-control') || '')?.[1]) || 3600;
+      jwksCache.keys = keys;
+      jwksCache.until = now + Math.min(maxAge, 6 * 3600) * 1000;
+    } catch {
+      // Google out of reach: the keys already held, if any, still verify.
+    }
+    return jwksCache.keys;
+  })().finally(() => { jwksInFlight = null; });
+  return jwksInFlight;
 }
 
 async function readEmailKeys(env, email) {

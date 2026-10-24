@@ -20,6 +20,7 @@
  */
 
 import { activateLocalLicenseKey, verifyLicenseKey, type LicenseTier } from './licenseKey';
+import { getCachedEmail } from './authFlag';
 import { getActiveLicenseInfo, getMarketingOptIn, hasExplicitMarketingChoice, setMarketingOptIn, syncMarketingPreferenceToServer } from './tierGates';
 
 export type AccountLicenseResult =
@@ -32,12 +33,33 @@ export type AccountLicenseResult =
   /** The account's best key is active here (or a better one already was). */
   | { state: 'active'; tier: LicenseTier }
   /** The account holds a key this app cannot verify (signed by a retired key pair, say). */
-  | { state: 'unverifiable'; tier: LicenseTier; error: string };
+  | { state: 'unverifiable'; tier: LicenseTier; error: string }
+  /** The account's key was removed from this computer by hand, and stays off it until asked back. */
+  | { state: 'declined'; tier: LicenseTier };
+
+/**
+ * Keys taken off this computer with "Remove from this computer". Without this,
+ * the next signed-in start put the key straight back, and on the Mac app took
+ * back the machine seat its owner had just freed for a new Mac (the review of
+ * #460). Asked back from the sheet, which clears it.
+ */
+const DECLINED_KEY = 'chromaglass-account-keys-declined';
+function declined(): string[] {
+  try { return JSON.parse(localStorage.getItem(DECLINED_KEY) || '[]'); } catch { return []; }
+}
+export function declineAccountKey(id: string | null | undefined): void {
+  if (!id) return;
+  try { localStorage.setItem(DECLINED_KEY, JSON.stringify([...new Set([...declined(), id])])); } catch { /* storage refused */ }
+}
+export function allowAccountKeys(): void {
+  try { localStorage.removeItem(DECLINED_KEY); } catch { /* storage refused */ }
+}
 
 const RANK: Record<LicenseTier, number> = { free: 0, home: 1, pro: 2 };
 
 let last: AccountLicenseResult = { state: 'skipped' };
 let lastAt = 0;
+let lastEmail: string | null = null;
 let running: Promise<AccountLicenseResult> | null = null;
 /** A start announces the sign-in more than once (authFlag.ts); one answer serves them all. */
 const FRESH_MS = 30_000;
@@ -53,13 +75,17 @@ export function lastAccountLicense(): AccountLicenseResult {
  * sheet and the app's start can both call it.
  */
 export function syncAccountLicense(force = false): Promise<AccountLicenseResult> {
-  if (!force && !running && last.state !== 'skipped' && last.state !== 'unreachable' && Date.now() - lastAt < FRESH_MS) {
+  // Fresh only for the same account: signed out of one and into another
+  // within the half minute, the second's keys are asked for, not the first's
+  // answer handed back (the review of #460).
+  if (!force && !running && last.state !== 'skipped' && last.state !== 'unreachable' && lastEmail === getCachedEmail() && Date.now() - lastAt < FRESH_MS) {
     return Promise.resolve(last);
   }
   if (!running) {
     running = run().then((r) => {
       last = r;
       lastAt = Date.now();
+      lastEmail = getCachedEmail();
       running = null;
       try { window.dispatchEvent(new Event('cg-account-license')); } catch { /* no window */ }
       return r;
@@ -90,11 +116,14 @@ async function run(): Promise<AccountLicenseResult> {
 
   if (typeof data.marketingOptIn === 'boolean' && !hasExplicitMarketingChoice()) setMarketingOptIn(data.marketingOptIn);
 
-  const offered = (data.keys ?? [])
+  const all = (data.keys ?? [])
     .filter((k) => !k.revoked && (k.token || k.key))
-    .map((k) => ({ token: (k.token || k.key) as string, tier: (k.tier === 'pro' ? 'pro' : 'home') as LicenseTier }))
+    .map((k) => ({ id: (k as { id?: string }).id, token: (k.token || k.key) as string, tier: (k.tier === 'pro' ? 'pro' : 'home') as LicenseTier }))
     .sort((a, b) => RANK[b.tier] - RANK[a.tier]);
-  if (!offered.length) return { state: 'none' };
+  if (!all.length) return { state: 'none' };
+  const off = declined();
+  const offered = all.filter((k) => !k.id || !off.includes(k.id));
+  if (!offered.length && !getActiveLicenseInfo().valid) return { state: 'declined', tier: all[0].tier };
 
   const held = getActiveLicenseInfo();
   let refused: { tier: LicenseTier; error: string } | null = null;

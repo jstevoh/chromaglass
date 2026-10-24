@@ -1,8 +1,8 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { User } from 'lucide-react';
 import { getCachedEmail } from '../lib/authFlag';
 import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
-import { lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
+import { allowAccountKeys, declineAccountKey, lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
 import {
   useAccountShows,
   joinAccountShow,
@@ -82,6 +82,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
   onCloseRef.current = onClose;
   const signedInFlag = useSignedIn();
   const signedIn = ACCOUNTS_ON && signedInFlag;
+  // A stable callback: SignInForm's redirect check re-runs whenever it changes.
+  const onSignedIn = useCallback(() => setEmail(getCachedEmail()), []);
   const [email, setEmail] = useState<string | null>(() => getCachedEmail());
   const [confirmMode, setConfirmMode] = useState<'none' | 'signout' | 'delete'>('none');
   const [busy, setBusy] = useState(false);
@@ -189,6 +191,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
     setLicenseBusy(true);
     setLicenseError(null);
     try {
+      // Kept off on later starts too, until asked back below.
+      declineAccountKey(licenseInfo.id);
       await deactivateLocalLicenseKey();
       refreshLicenseState();
     } finally {
@@ -281,7 +285,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
               </p>
               {LazySignInForm && (
                 <Suspense fallback={<div className="h-[152px]" />}>
-                  <LazySignInForm onSignedIn={() => setEmail(getCachedEmail())} />
+                  <LazySignInForm onSignedIn={onSignedIn} />
                 </Suspense>
               )}
             </div>
@@ -309,6 +313,21 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                 {TIER_NAME[currentTier]}
               </span>
             </div>
+          )}
+
+          {signedIn && !licenseInfo.valid && accountKey.state === 'declined' && (
+            <button
+              type="button"
+              data-cg-account-key-restore=""
+              onClick={() => {
+                allowAccountKeys();
+                void syncAccountLicense(true).then(refreshLicenseState);
+              }}
+              className="flex min-h-10 pointer-coarse:min-h-12 w-full items-center justify-between rounded-lg border border-accent-border bg-accent-bg px-3 text-[13px] font-medium text-text transition-colors hover:bg-accent/30"
+            >
+              <span>Use the {TIER_NAME[accountKey.tier]} licence on your account</span>
+              <span className="text-accent-text">→</span>
+            </button>
           )}
 
           {keyTrouble && (
@@ -529,10 +548,12 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                   </button>
                 </div>
               )}
-              {error && (
-                <p className="mt-2 rounded-lg border border-live-border bg-live-bg px-3 py-2 text-[12px] text-live">{error}</p>
-              )}
             </div>
+          )}
+          {/* Outside the signed-in block: a sign-out or delete that fails can leave
+              the sheet signed out, and its reason must still be read. */}
+          {error && (
+            <p className="rounded-lg border border-live-border bg-live-bg px-3 py-2 text-[12px] text-live">{error}</p>
           )}
         </div>
 

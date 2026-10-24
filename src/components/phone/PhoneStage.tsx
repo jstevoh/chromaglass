@@ -345,7 +345,8 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
 
 export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
-  const signedOut = ACCOUNTS_ON && !useSignedIn();
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
   const [amountOpen, setAmountOpen] = useState(false);
   // Whether the Looks sheet opened on a printed plate: its Ben-Day slider
   // stays for as long as the sheet is up, so taking it to 0 does not take
