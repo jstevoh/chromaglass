@@ -35,8 +35,55 @@ export const USER_PRESETS_KEY = 'chromaglass-user-presets';
   saved before version 2 with Thin Gap off is read with it on; one saved
   from version 2 on keeps whatever it was saved with, off included, since
   off was then a choice.
+
+  3 since the camera's four optics (Aperture, Bloom, Chromatic Aberration,
+  Refraction) began to act with Lens at 0 (PLAN.md 33i). They used to be
+  multiplied by Lens, so a look with Lens at 0 held their old defaults (0.5,
+  0.4, 0.3, 0.6) and showed none of them. Read as saved, every look the owner
+  had saved would open blurred, glowing, fringed and refracted. So a look
+  saved before version 3 with Lens at 0 is read with the four at 0, which is
+  how it looked. One with Lens up was shown the optics at Lens times their
+  dial, through weaker maths than they have now, so each is read as the dial
+  that draws what it drew: Lens times its value times OPTIC_SCALE, which
+  `npm run lens` measured by rendering the look through the old shader and
+  through the new one (the review of that change found the first reading,
+  "keeps its values", moved a third of a Lens-1 look's pixels by eight levels
+  or more).
 */
-export const PRESET_VERSION = 2;
+export const PRESET_VERSION = 3;
+
+/** The optics of a look saved before they acted on their own, read as they looked (PRESET_VERSION). */
+const OPTICS = ['aperture', 'bloom', 'chromaticAberration', 'refraction'] as const;
+/** What each dial held before 33i when a saved look did not say (a key it had not yet been saved with). */
+const OLD_OPTIC_DEFAULT = { aperture: 0.5, bloom: 0.4, chromaticAberration: 0.3, refraction: 0.6 } as const;
+/**
+ * The new dial that draws what the old one drew at Lens 1, found by fitting
+ * the new shader's renders against the old one's on the lab plate for each
+ * dial at 0.25, 0.5, 0.75 and 1: refraction's best fit sat at 0.2 to 0.3 of
+ * the old value (the old maths multiplied by the dye's height and then the
+ * dial, so they were far weaker), aperture's at 0.8, bloom's at 0.4 and
+ * chromatic aberration's at about 0.03 (its old fringe was under half a level).
+ * The blur and the glow are not linear in the dial, so the fit is exact at no
+ * value; what is left is named in PLAN.md 33i.
+ */
+export const OPTIC_SCALE = { aperture: 0.8, bloom: 0.4, chromaticAberration: 0.03, refraction: 0.28 } as const;
+function inertOptics<T extends Partial<VisualizerSettings>>(version: unknown, settings: T, saved: Partial<VisualizerSettings> = settings): T {
+  if (Number(version) >= 3) return settings;
+  const lens = settings.camera ?? 0;
+  const out = { ...settings };
+  if (lens > 0.001) {
+    // The old pass was mix(plain, optics + sensor, Lens): the optics at Lens times their dial.
+    for (const k of OPTICS) {
+      // A hand-edited file can hold a string or NaN here; read it as the old default rather than carry NaN into a uniform.
+      const was = Number.isFinite(saved[k]) ? (saved[k] as number) : OLD_OPTIC_DEFAULT[k];
+      out[k] = Math.round(Math.min(1, Math.max(0, was * lens * OPTIC_SCALE[k])) * 1000) / 1000;
+    }
+    return out;
+  }
+  if (OPTICS.every((k) => !(settings[k] ?? 0))) return settings;
+  for (const k of OPTICS) out[k] = 0;
+  return out;
+}
 
 export interface UserPreset {
   format: typeof PRESET_FORMAT;
@@ -125,7 +172,8 @@ export function serializePreset(p: UserPreset): string {
  */
 export function upgradeSaved(p: UserPreset): UserPreset {
   const old = !(Number(p.version) >= 2) && p.settings?.thinGap === 0;
-  return { ...p, version: PRESET_VERSION, settings: old ? { ...p.settings, thinGap: 1 } : p.settings };
+  const thin = old ? { ...p.settings, thinGap: 1 } : p.settings;
+  return { ...p, version: PRESET_VERSION, settings: p.settings ? inertOptics(p.version, thin, p.settings) : thin };
 }
 
 export function parsePresetFile(text: string): UserPreset {
@@ -138,6 +186,7 @@ export function parsePresetFile(text: string): UserPreset {
   const settings = cleanSettings(o.settings);
   // Off as the old default, not as a choice (PRESET_VERSION says why).
   if (!(Number(o.version) >= 2) && settings.thinGap === 0) settings.thinGap = 1;
+  const upgraded = inertOptics(o.version, settings, o.settings);
   return {
     format: PRESET_FORMAT,
     version: PRESET_VERSION,
@@ -145,7 +194,7 @@ export function parsePresetFile(text: string): UserPreset {
     name,
     description: typeof o.description === 'string' ? o.description : undefined,
     createdAt: typeof o.createdAt === 'string' ? o.createdAt : new Date().toISOString(),
-    settings,
+    settings: upgraded,
     contract: Array.isArray(o.contract) ? o.contract.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < PALETTE.length).slice(0, 8) : undefined,
     injectStyles: Array.isArray(o.injectStyles) ? o.injectStyles.filter((s): s is string => typeof s === 'string').slice(0, 6) : undefined,
     liquids: Array.isArray(o.liquids) ? o.liquids.filter((s): s is string => typeof s === 'string').slice(0, 8) : undefined,

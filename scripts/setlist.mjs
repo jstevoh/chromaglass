@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { readSetListFile, writeSetListFile, moveItem } from '../src/lib/setList.ts';
-import { parsePresetFile, serializePreset } from '../src/lib/userPresets.ts';
+import { PRESET_VERSION, parsePresetFile, serializePreset } from '../src/lib/userPresets.ts';
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => { if (ok) passed++; else failed++; console.log(`${ok ? ' ok ' : ' FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`); };
@@ -81,7 +81,7 @@ const throws = (fn) => { try { fn(); return null; } catch (e) { return e.message
     since.settings.thinGap === 0 && sinceOn.settings.thinGap === 1, `${since.settings.thinGap}, ${sinceOn.settings.thinGap}`);
   const again = parsePresetFile(serializePreset(old));
   check('and an old look read once is saved as the new version, so reading it again changes nothing',
-    old.version === 2 && again.version === 2 && again.settings.thinGap === 1);
+    old.version === PRESET_VERSION && again.version === PRESET_VERSION && again.settings.thinGap === 1);
   // And arriving inside a set list, which takes a saved look whole rather than through the file reader.
   const inSet = (version) => readSetListFile(JSON.stringify({ format: 'chromaglass-setlist', version: 1, items: [{ saved: base.id }],
     presets: [{ ...base, version, settings: { ...DEFAULT_SETTINGS, thinGap: 0 } }] }), known).presets[0];

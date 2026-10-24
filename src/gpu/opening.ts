@@ -25,6 +25,7 @@
  * steps, for a pipeline that was left for later.
  */
 
+import { cameraWanted } from './cameraWanted';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
@@ -127,7 +128,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     maze: on(s.phaseAmount) && on(s.magnetStrength),
     displace: on(s.phaseAmount) && on(s.phaseDisplace),
     particles: on(s.particles),
-    camera: on(s.camera),
+    camera: cameraWanted(s),
     stock: on(s.stock),
     thinGap: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5,
     spin: lookOpensSpinning(s),

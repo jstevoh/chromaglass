@@ -23,7 +23,7 @@ import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid'
 import { SloshDish, sloshAccel, sloshDrag, SLOSH_N } from '../lib/slosh';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
-import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
+import { WebGPUCamera, cameraWanted, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
 import { WebGPUPadGrab } from '../gpu/padGrab';
@@ -10965,8 +10965,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // frame it would do anything and dropped when it would not, so
             // a show without a camera never pays for the second target.
             const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
-            if (camAmt > 0.001 && !camera) { camera = new WebGPUCamera(s.device, s.format); scopeSoon = 2; }
-            else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
+            const camWanted = cameraWanted(view.settings);
+            if (camWanted && !camera) { camera = new WebGPUCamera(s.device, s.format); scopeSoon = 2; }
+            else if (!camWanted && camera) { camera.dispose(); camera = null; }
             const cam = camera;
 
             // The post chain, when an effect is on. None exist yet; the
@@ -11009,7 +11010,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // The plate leaves the grain to the camera when it is on, and
               // still dithers into its 8-bit texture, or a dark ramp bands
               // before the camera ever sees it.
-              cameraOn: !!cam,
+              // (only the sensor's look brings the grain: the optics alone leave it to the plate)
+              cameraOn: !!cam && camAmt > 0.001,
               // With a chain, the finish happens at the end of it instead.
               postChain: !!post,
             });
