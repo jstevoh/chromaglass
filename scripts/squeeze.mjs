@@ -61,7 +61,7 @@ try {
   // The band, chosen before the page loads: simulated audio otherwise waits
   // for a first gesture a harness never makes (`npm run killer` found that).
   await page.addInitScript(() => {
-    try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
+    try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
   });
   await page.goto(`http://localhost:${PORT}/?debug&look=bass-drop`, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.chromaglassDebug === 'function' && window.chromaglassDebug().fluids?.length > 0, null, { timeout: 60_000 });

@@ -748,7 +748,7 @@ export interface VisualizerSettings {
   edgeRelief: number;         // meniscus at every blob edge: dark rim, refracted highlight (plate-wide, not just macro)
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
-  plateRock: number;          // the whole plate tilts on the beat and rocks back, like a hand on the clock face
+  plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid
    * (lib/plateRock.ts): Plate Rock's cover glass sliding the whole picture,
@@ -839,7 +839,16 @@ export interface VisualizerSettings {
   transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes
-  beatSqueeze: number;        // the rhythm plate: a squeeze pulse pressed into the lead plate on every kick
+  beatSqueeze: number;        // the rhythm sheet: each kick presses a dent as wide as the sheet bends over the liquid (lib/squish.ts kickPress)
+  /**
+   * Kick Bloom: how far each kick throws a ring of dye outward from the bass
+   * spot, and the little push on each droplet. 1 is the ring every look has
+   * always had; 0 is none. It is the kick's visible outward pulse, apart from
+   * Beat Squeeze (the glass pressed, 0 on every look but Bass Drop) and Plate
+   * Rock (the dish tipped); before this dial all three read alike and only
+   * the first could be turned off.
+   */
+  kickBloom: number;
   /**
    * Accent the One: how far the kick's press (Beat Squeeze) and push (Plate
    * Rock) follow the kick's place in the bar, as a projectionist plays a
@@ -943,7 +952,16 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   stockGrainSize: 2,
   stockWeave: 0.6,
   stockGate: 0.35,
-  onNewSong: 'preset',      // a new song gets a new look
+  /*
+    Keep, until the boundary can be trusted. This was 'preset', and the owner
+    found on 2026-10-24 that it does not catch where songs start and end: it
+    fires only on 1.8 s of quiet after 20 s of song, or when song ID (asked
+    every 12 to 35 s) names a different track, so a crossfade or a gapless set
+    never changes the look and a quiet bridge can. A look that changes at the
+    wrong moment is worse on a wall than one that never changes, so a new song
+    keeps the look unless someone asks for more. `npm run music` holds this.
+  */
+  onNewSong: 'off',
   beatPrediction: 0.7,
   beatLead: 80,
   /*
@@ -1098,6 +1116,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   layerScaleVariety: 0.5,
   hueJourney: 3,
   beatSqueeze: 0.0,
+  kickBloom: 1,               // the ring each kick has always thrown
   beatAccent: 0,            // off: every kick pressed alike, as every look had it
   backgroundLoop: 0.5,
   kaleidoscope: 0,
@@ -1187,9 +1206,9 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroAimX: 0.5,
   macroAimY: 0.5,
   macroSync: 0.5,
-  macroCells: 0.75,
+  macroCells: 0,           // opt-in since 33g: the default closeup is the liquid, not packed cells
   macroCellScale: 0.5,
-  macroLacing: 0.55,
+  macroLacing: 0,
   macroDepth: 0.5,
   macroEdgeDetail: 0.6,
   macroRelief: 0.7,

@@ -33,7 +33,8 @@ import type { GpuStepParams, SolverCarry } from './solverTypes';
 import { SOLVER_VEL_FORMAT } from './wgsl/pack';
 import { stepDisplacement } from '../lib/detailFlow';
 import { pressShare } from '../lib/pressRing';
-import { SLOSH_N } from '../lib/slosh';
+import { SLOSH_N, type SloshDrive } from '../lib/slosh';
+import { WebGPUSlosh } from './slosh';
 import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
@@ -722,12 +723,17 @@ export class WebGPUFluid {
   private readonly curDiv: GPUTexture;
   private readonly velForced: GPUTexture;
   /**
-    The slosh dish's flow (lib/slosh.ts, PLAN 18a-13), 64 by 64 in plate widths a
-    second, while the dial is up and the dish is moving; null otherwise, and the
-    thin stage then copies the gap's velocity exactly as it always did.
+    The slosh dish (PLAN 18a-13, 18a-13a, 18a-13d): two-layer shallow water on
+    the GPU (gpu/slosh.ts), made the first time the visualizer drives it and
+    stepped on this solver's encoder before the solve while it is driven
+    (`setSlosh`). `sloshTex` is its flow while it is, and null otherwise, and
+    the thin stage then copies the gap's velocity exactly as it always did.
   */
+  private slosh: WebGPUSlosh | null = null;
+  private sloshDrive: SloshDrive | null = null;
+  /** The dish is to be laid level before its next step: it was driven by nothing for a while, or has just been made. */
+  private sloshLevel = true;
   private sloshTex: GPUTexture | null = null;
-  private sloshStore: GPUTexture | null = null;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
   private readonly velRide: GPUTexture;
   private readonly scratchA: GPUTexture;
@@ -1728,22 +1734,33 @@ export class WebGPUFluid {
   }
 
   /**
-    Hand the solver the slosh dish's flow for the coming step (a `SloshDish.field`,
-    SLOSH_N² RGBA32F), or null to leave it out: the texture is made the first
-    time it is wanted, and null keeps it for the next, so a dial turned up and
-    down does not allocate on a frame. Left out, the thin stage is the one it
-    was before this existed.
+    Drive the slosh dish for the coming step (lib/slosh.ts SloshDrive: the tilt,
+    the water's viscosity, the presses, and whether to lay it level first), or
+    null to leave it out and at rest: the plate's thin stage is then the one it
+    was before the dish existed, bit for bit. The visualizer decides, without a
+    readback, when the dish has rung down (`SloshClock`).
   */
-  setSlosh(field: Float32Array | null): void {
-    if (!field) { this.sloshTex = null; return; }
-    if (!this.sloshStore) {
-      this.sloshStore = this.disposer.track(this.device.createTexture({
-        label: 'slosh', size: [SLOSH_N, SLOSH_N], format: RGBA32,
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      }));
-    }
-    this.device.queue.writeTexture({ texture: this.sloshStore }, field, { bytesPerRow: SLOSH_N * 16 }, [SLOSH_N, SLOSH_N]);
-    this.sloshTex = this.sloshStore;
+  setSlosh(drive: SloshDrive | null): void {
+    if (!drive) { this.sloshDrive = null; this.sloshTex = null; this.sloshLevel = true; return; }
+    this.sloshDrive = drive;
+    if (drive.level) this.sloshLevel = true;
+  }
+
+  /** The dish's depth for the plate's drawing (red: both layers over the rest depth; green: the oil's share), while it is driven. */
+  get sloshDepth(): GPUTexture | null { return this.sloshTex && this.slosh ? this.slosh.depth : null; }
+
+  /** Step the dish on `enc` if it is driven and built, and say which flow `addSlosh` lays over the gap's. */
+  private stepSloshDish(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    const drive = this.sloshDrive;
+    if (!drive) { this.sloshTex = null; return; }
+    if (!this.slosh) this.slosh = new WebGPUSlosh(this.device);
+    // Behind the show, as addSlosh is: until its kernels are built the dish waits and the plate is as it was.
+    if (!this.slosh.ready()) { this.sloshTex = null; return; }
+    // The oil is the mix's, while the look has Oil Tension and the mix is made (lib/slosh.ts: the lens floats at its capillary thickness).
+    const oil = this.mix && (p.oilTension ?? 0) > 0 ? { tex: this.mix.read, n: this.N } : null;
+    this.slosh.step(enc, p.magnetSeconds ?? 1 / 60, drive.ax, drive.ay, drive.nu, drive.presses, oil, this.sloshLevel, this.profiler.pass('slosh'));
+    this.sloshLevel = false;
+    this.sloshTex = this.slosh.flow;
   }
 
   /**
@@ -2170,6 +2187,8 @@ export class WebGPUFluid {
     this.airCoverPrev = this.airCover;
     this.airCover = this.air.coverage;
     this.lastDt = p.dt;
+    // The slosh dish, before the step's pass opens: its own pass, whose flow the thin stage reads (PLAN 18a-13).
+    this.stepSloshDish(enc, p);
 
     /*
       One pass, or one per stage.
@@ -2561,7 +2580,9 @@ export class WebGPUFluid {
         if (this.sloshTex && this.pipeline('addSlosh', VEL)) {
           // And the dish's own flow over it, when the dial is up (setSlosh): the unit is the swirl's, plate widths a second to this solver's.
           const sloshScale = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
-          this.run(pass, 'addSlosh', this.velForced, [this.vel.read, this.sloshTex], this.arg('add slosh', [0, 0, SLOSH_N, sloshScale]));
+          // Each layer's own: the oil's share of the cell (the mix's red) rides the oil's flow, the rest the water's (lib/slosh.ts).
+          const sloshOil = !!this.mix && (p.oilTension ?? 0) > 0;
+          this.run(pass, 'addSlosh', this.velForced, [this.vel.read, this.sloshTex, sloshOil ? this.mix!.read : this.sloshTex], this.arg('add slosh', [0, sloshOil ? 1 : 0, SLOSH_N, sloshScale]));
         } else {
           this.run(pass, 'scaleDye', this.velForced, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
         }
@@ -5114,6 +5135,8 @@ export class WebGPUFluid {
     this.particles = null;
     this.air?.dispose();
     this.air = null;
+    this.slosh?.dispose();
+    this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();
   }

@@ -237,8 +237,17 @@ async function waitFor(fn, ms) {
   return false;
 }
 
+// A first visit meets the landing page before the sign-in (PLAN.md 34a), and
+// its Play free is what opens the sign-in; a visit already part way through
+// signing in meets the sign-in itself. True once the sign-in is drawn.
+async function signinOpen(page) {
+  if (await signinShown(page)) return true;
+  await page.click('[data-cg-landing-play]', { timeout: 500 }).catch(() => {});
+  return signinShown(page);
+}
+
 async function signInByEmail(page, email, origin) {
-  await waitFor(() => signinShown(page), 30_000);
+  await waitFor(() => signinOpen(page), 30_000);
   await page.click('[data-cg-signin-provider="email"]').catch(() => {});
   await page.fill('[data-cg-signin-email]', email);
   const before = (await outbox(email)).length;

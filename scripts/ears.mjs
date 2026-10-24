@@ -286,7 +286,7 @@ try {
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.addInitScript(() => {
     // The band, chosen before the page loads (as `npm run squeeze` does).
-    try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
+    try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
     /*
       A covered window, as far as this page can tell: while `__covered` is
       set, animation frames are held and not called back. Held, not dropped,

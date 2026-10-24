@@ -1434,6 +1434,7 @@ On a real GPU:
 - Where two dyes meet beside a bubble the relief may be weaker within a few cells of the
   bubble (PLAN 33b-2); say whether that shows.
 
+
 ## 58. Tilting sloshes the liquid (PLAN 18a-13)
 
 The new **Slosh** dial (0 by default) makes a tilt send the liquid across the plate, pile
@@ -1455,7 +1456,86 @@ real GPU:
   liquid runs back to level on its own while the phone is held still: the same fade Plate
   Rock has, now visible as a slop. Say whether it reads wrong.
 
-## 59. The tilt pad (PLAN 18a-13f)
+## 59. The closeup is the liquid, not cells (PLAN 33g)
+
+Paint Cells and Macro Lacing now default to 0, and the closeup's relief is lit by a lower
+lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmeasured
+(`macroview` runs on software WebGPU). On a real GPU:
+- Pour a dye, stir it, and zoom in to 4x and 6x (the pinch, the Auto camera) on `classic`,
+  `jellyfish-bloom` and a dark look. It should read as the same liquid seen nearer: a
+  glossy, domed surface with a raking highlight, no ring-packed cells and no dark
+  filaments.
+- Say whether it is 3d enough. If not, the next steps are PLAN 33g-2 (refraction, depth of
+  field, parallax); the lamp's lowering and the dome gain (×14) are the two numbers to move.
+- Say whether the highlight burns out on a bright pool, and whether a pool's edge reads
+  as relief without a drawn outline.
+- `macro-bead`, `cell-bloom` and `lace-run` still draw cells, by name. Say whether they
+  should (PLAN 33g-3).
+
+## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
+
+Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
+throw a burst of dye droplets that breaks into two or three uneven clumps at different angles
+and distances, some small and some large, not an even wreath round one circle. Kick Bloom
+(Show section; remote; MIDI) at 0 should stop it entirely and Beat Squeeze 0 and Plate Rock
+unchanged should leave only the tilt; at 1 it should be as much dye as before, at 1.5 more.
+Check that the burst reads as the kick, not as the plate being pressed.
+
+## 61. Plate Rock rocks with the bar, Beat Squeeze presses where the kick lands (PLAN 27f-2, 27f-3)
+
+Play Classic with a band at 120 bpm or so, Plate Rock at its 0.45 and Beat Squeeze at 0.5,
+Kick Bloom at 0, then at 1. Plate Rock should be the slow move: the heavier colour sliding one
+way across a half bar and back across the next, the direction turning a little each time, and
+nothing jolting on the kick itself. Beat Squeeze should be the quick one: each kick a dent
+where it lands, a fifth of the dish across on the default oil, the colour pushed out of it and
+running back in a third of a second later (fingering back in where Fingering is up). Turn
+Thickness up: the dent should tighten to a fingertip; down toward water, it should widen.
+Bass Drop should still press the whole glass. Say whether the rock's pace (one lean every two
+beats) is right or wants one a bar, and whether the dent wants to be bigger.
+
+## 62. The landing page (PLAN 34a)
+
+Open the site in a private window, at a laptop's width and on a phone. The page should say what
+ChromaGlass is in the first screen, and "Play free" should be the one obvious thing to press; the
+sign-in then opens over the page. Say whether: the headline and the line under it are the words you
+would use (they are drafts); the hero's cross-fade of five frames is slow enough not to be noticed
+and not so soft on a big screen that it looks like a blur (it is 480 px frames, PLAN 34a-3); "From
+the maker" is something you would sign, and the 14-day refund line matches what you will honour;
+the Free, Home and Pro cards promise only what the app does today. Then sign in, sign out and come
+back: the page should not flash for a returning visit.
+
+
+## 63. Bass Boost presses harder (PLAN 27g)
+
+Play a track with a clear kick and bass line (the Sound panel's Bass Boost, in Audio Input; on the
+phone, the same slider in Settings). At 1 nothing has changed. Turn it to 2, then 3: each kick and
+bass note should dent the glass visibly deeper, the colour pushed out from under it harder and
+running back as the bass falls, and each kick's dye should throw further. It should read as more
+bass, not as a busier or shakier plate, and nothing should move the whole frame. Say whether 3
+is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
+bass you wanted.
+
+## 64. Oil sloshes on water, and bores (PLAN 18a-13a, 13d)
+
+The slosh dish is two layers now, oil lenses riding on water, solved on the GPU with a
+Riemann flux, so a hard tip makes a running jump (a bore) instead of a smooth slope. The
+numbers are in `docs/plan-shipped.md` §18a-13a (`npm run slosh`, `sloshgpu`); the Metal run
+is the plate shard. On a real GPU:
+- On a look with oil on the plate, raise Slosh to about half and tip one way,
+  then the other. The water should run ahead and the oil lag behind it and shear past it:
+  two speeds, not one sheet. Say whether the oil reads as floating.
+- Lower Thickness to about 0.2 and tip hard and fast: the first wave should steepen into a
+  sharp front that runs to the rim and back. Say whether it reads as a wave or as a jolt.
+- Bass Drop with music: its Beat Squeeze should now send a ring out from each kick that runs
+  to the rim and back, and its Plate Rock should slosh the whole dish, a little (Frame Sway
+  0.35). Off Bass Drop, Beat Squeeze's ring starts from the sheet's one dent where the kick
+  lands (27f-3), narrower. Say whether the whole-dish slosh is too much (the frame-motion rule).
+- Any other look (Frame Sway 0) with Plate Rock up: the rock should tip the dye as it did,
+  and not slosh the whole dish.
+- With Slosh at 0, Plate Rock at 0 and Beat Squeeze at 0, the plate should look exactly as
+  before.
+
+## 65. The tilt pad (PLAN 18a-13f)
 
 A joystick for Gravity and Tilt Direction: the **Tilt** panel on the Gig desk (right column,
 under Rides; the panel browser opens it on any layout), the phone's Play sheet, and the

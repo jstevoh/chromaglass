@@ -1204,13 +1204,21 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     // The grid normal is a gentle slope over many sim cells; scaled up it
     // becomes the dome of the bead, which is what carries the large-scale
     // sense of volume under the cell detail.
-    let n = normalize(vec3f(gridNormal.xy * 5.0 - tilt * r3 * 2.2, 1.0));
+    let n = normalize(vec3f(gridNormal.xy * 14.0 - tilt * r3 * 2.2, 1.0));
 
-    let L = lampDir(fuv, U.lamp);
+    // The lamp lowered toward the plate as a close lens sees it: light that
+    // rakes across the surface turns the same slope into a longer shadow side
+    // and a brighter lit side, which is what reads as height (33g). The plain
+    // lamp lights a dome almost evenly from above.
+    let L0 = lampDir(fuv, U.lamp);
+    let L = normalize(vec3f(L0.xy, L0.z * 0.6));
     let H = normalize(L + vec3f(0.0, 0.0, 1.0));
     let diff = max(0.0, dot(n, L));
-    
-    let spec = pow(max(0.0, dot(n, H)), 80.0);
+
+    // A tight glint where the surface faces the lamp, and a broad sheen under
+    // it: a wet film shows both, and the broad one is what outlines a swell
+    // that is too shallow to catch the glint.
+    let spec = pow(max(0.0, dot(n, H)), 80.0) + 0.16 * pow(max(0.0, dot(n, H)), 12.0);
     let fres = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.8);
     // Recessed cores and grooves sit in their own shadow.
     let ao = 1.0 - clamp(core * k * 0.55 + fineCore * k * 0.25 + lace * 0.4, 0.0, 1.0) * 0.45;
@@ -1218,7 +1226,11 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     // Centred on ~1.0 for a flat, lit surface, so relief shapes the frame
     // without darkening it overall.
     col *= mix(1.0, (0.55 + 0.9 * diff) * ao, r3 * paint);
-    col += vec3f(1.0, 0.97, 0.90) * spec * r3 * paint * 1.2;    // wet highlight on the domes
+    // The glint rolls off instead of clipping, and takes a third of the dye's own
+    // colour: a steep slope under a dense plate drew a streak of pure white
+    // across a fifth of the frame, which read as glare, not as a wet surface.
+    let glint = 1.0 - exp(-spec * 1.6);
+    col += mix(vec3f(1.0, 0.97, 0.90), min(col, vec3f(1.0)), 0.35) * glint * r3 * paint * 0.9;
     col += col * fres * r3 * paint * 0.4;                      // bright refracting edge
   }
 
@@ -2237,6 +2249,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
 
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
+  // The interface line is a width of the solver's own cells, so a closeup
+  // magnifies it into a band as wide as the frame: at 4x it was 18% of a
+  // lab plate drawn pure white, which flattens the very thing the closeup is
+  // for. The band is thinned toward a fifth in the closeup (33g shortcut: the
+  // true line would stay a pixel wide at any zoom, which the grid cannot say).
+  let edgeK = U.boundaryContrast * (1.0 - 0.8 * macroAmt);
   let closeup = macroAmt > 0.001;   // not 'macro': that is a reserved word in WGSL
   /*
     How much of the plate-wide view is left: the plate's own dressing (the
@@ -2465,7 +2483,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
     var edge0 = boundaryLine(near0.z);
     if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
-    fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * U.boundaryContrast * 1.6 + vec3f(edge0 * U.boundaryContrast * 0.25), fluid0.a);
+    fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * edgeK * 1.6 + vec3f(edge0 * edgeK * 0.25), fluid0.a);
   }
   // The per-pixel tests mask the result instead of branching around the
   // call: lacing measures two widths with fwidth, and WGSL reads a
@@ -2993,7 +3011,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (U.boundaryContrast > 0.005 && fluid1.a > 0.03 && sharp1) {
       var edge1 = boundaryLine(near1.z);
       if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
-      fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
+      fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * edgeK * 1.6 + vec3f(edge1 * edgeK * 0.25), fluid1.a);
     }
     // The per-pixel tests mask the result instead of branching around the
     // call: lacing measures two widths with fwidth, and WGSL reads a

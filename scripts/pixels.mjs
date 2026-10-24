@@ -86,6 +86,8 @@ try {
     // ladder (up to 768²), which is not what the website gives a laptop.
     // No ?gpu=: the runner's adapter is classed as the owner's would be.
     const q = `?debug&tier=hosted&look=${preset.id}${RUNG === null ? '' : `&rung=${RUNG}`}`;
+    // The app opens on Source None (PLAN.md 14y), so the band this run plays is chosen the way a reload keeps it.
+    await page.addInitScript(() => { try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
     await page.goto(`http://localhost:${PORT}/${q}`, { waitUntil: 'load' });
     await page.mouse.click(8, 8);   // the gesture the band needs
     const labels = [];

@@ -2068,6 +2068,37 @@ wrong keys lock the address out; a 1 MB frame is refused without the process gro
 silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
 socket's `patch` is dropped.
 
+### 14m-mark. A big logo never reached the network display
+
+**Shipped** (the PR after #391). 14m made the relay close a socket on a frame over 512 KB
+and the desk's link drop any message that large, and the mark crosses the relay as a data
+URL, once, when a network display joins: a print-sized PNG logo is several megabytes, so
+after 14m the network display showed no logo. The cap stays (it is what keeps the relay
+from holding a stranger's megabytes); the desk sends the network display a copy that fits
+(`src/lib/markFit.ts`): a mark under 400 KB goes byte for byte as before, a larger one is
+redrawn at most 1920 px on its long side as WebP (which keeps transparency; JPEG would
+paint the clear parts black) and shrunk in steps until it fits. Safari writes no WebP from
+a canvas and falls back to PNG, which keeps transparency too. The laptop's plate and a cast
+window on the same machine keep the original. `npm run phonelink`: a 2.2 MB PNG with a
+clear border reaches a mirror socket as a 287 KB WebP at 700×700, border alpha 0 and centre
+255; a mirror joining afterwards is handed the same mark (the desk's link survived); a
+48-pixel logo crosses byte for byte. On the code before it: no mark reaches either mirror.
+
+### 14m-lan. The laptop's page at its Wi-Fi address
+
+**Shipped** (with 14m-mark). The plan said the page would sit quiet with no display key;
+measured, it never got that far: a browser gives WebGPU only to a secure page, and
+`http://<laptop-ip>:3000/` is not one, so the page stopped at the first shader module with
+"GPUTextureUsage is not defined" and nothing else. The failure screen (`src/main.tsx`) now
+says why, and links `http://localhost:<port>/` on the same port; a network display
+(`?cast=true`) is told why and is not sent to its own localhost, which is not the laptop
+(the network display's own problem is PLAN 14m-https). In a browser told to treat the
+address as secure, the Phone · iPad panel says to open the page at localhost and draws no
+code: it used to draw one of the remote with no key in it, which a phone could scan and
+never join with. `npm run phonelink` asks all of it, with a WebSocket count that must see
+the localhost desk's socket so that "opens no socket" cannot pass by counting nothing:
+29 of 36 on the code before, 36 of 36 now.
+
 ### 14o. The song-ID Worker is open to anyone
 
 **Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an
@@ -2578,6 +2609,51 @@ M_f·ΔP) keeps both.
   - The phone: the Play sheet carries Slosh under Tilt (`phone-slosh`), and the remote's
     sheet carries it too; the phone's own tilt (`useDeviceTilt`) writes the same settings
     the dish reads, so a tilted phone sloshes the plate it shows.
+
+- **18a-13a and 18a-13d, two layers and bores (shipped 2026-10-22; the owner: "make sure
+  we are using legit physics and simulations, as opposed to faking it. I want state of the
+  art").**
+  - The scheme, and why this one. Two-layer shallow water is usually solved as one coupled
+    system (path-conservative Roe or IFCP schemes, Castro, Parés and others). Those need an
+    entropy fix and lose hyperbolicity where the layers' speeds part, and the oil here is
+    lenses that come and go, so most cells have no second layer at all. Instead each layer is
+    solved on its own with the other's weight in its floor (the splitting Bouchut and Morales
+    de Luna analyse, 2008): the water by the hydrostatic reconstruction of Audusse, Bouchut,
+    Bristeau, Klein and Perthame (2004) with an HLL flux and Toro's dry-bed speeds, MUSCL with
+    the MC limiter on depth, head and velocity, first order beside the rim, Heun (SSP RK2) at
+    a fixed 1/420 s. It is well balanced (a lake at rest is exact, a lens floating on it too),
+    never makes a negative depth, and captures a bore as a jump.
+  - The oil. A lens at its capillary thickness e² = 2|S|ρ/(gρ₁Δρ) (S = −6 mN/m, ρ₁/ρ = 0.88,
+    3.4 mm), read every frame from the plate's own oil share, rides the water as a raft
+    pushed down the water's head; its weight is in the water's floor. Between the layers and
+    the two glasses, the steady laminar drag of two stacked liquids (the 2×2 matrix the
+    profile gives, reducing to 12ν/h² for one), solved implicitly.
+  - The presses. Beat Squeeze's glass on the kick presses the dish too, as a pressure head
+    over three nested discs (`KICK_RADII`), held and let go on the gap's own envelope
+    (`glassHeld`): the ring runs out at the wave speed and back off the rim.
+  - The rock. Plate Rock's swing tips the dish only as far as Frame Sway lets the music move
+    the frame (`rockAccel`: the Slosh dial's top lean times Frame Sway), because a rocked dish
+    moves all its liquid one way and back and the whole picture sways. So not at all at Frame
+    Sway's default 0; on Bass Drop (0.35) at a third of the dial's lean.
+  - Where it runs. The GPU (`gpu/slosh.ts`, kernels in `wgsl/slosh.ts`), before the solver's
+    step on its encoder: the oil is a GPU field, and the dish is ten million flops a frame.
+    Never read back: `SloshClock` runs it while driven and for its ring time after
+    (`sloshRingSeconds`), then lays it level. The water's depth is stored as its departure
+    from rest: stored whole in float32, a liquid creeping back to level at Thickness 0.6 lost
+    1.0e-5 of its water in ten seconds (3e-15 in float64), now 4.3e-8.
+  - Measured (`npm run slosh`, four processes, about five minutes): the lowest mode rings at
+    1.425 s (theory 1.407); a held tilt settles to a/g exactly and stops (1.6e-7 plate
+    widths/s); water reversed overshoots 82% with 14 crossings, the default Thickness 0.5%
+    with one (the pace kept: 1% before); the ring dies at 0.335/s against the drag's 0.300
+    (shortcut (i)); mass to 4.3e-8; resonant rocking at four half-periods inside the Courant
+    limit (0.75 at worst), and at twice the dial's lean it still holds; a dam break's front at
+    0.6719 against Stoker's 0.6684, two cells wide, the depth behind it 1.0882 against 1.0904,
+    energy never rising a frame (69% spent); the two-layer drag within 0.14% of a numerical
+    profile, 12ν/h² exactly for one liquid; a lens floats with nothing moving, and rocked moves
+    at 35% of the water under it; a press's ring at 1.200 plate widths/s against √(gh) 1.213.
+    `npm run sloshgpu` steps the GPU and the reference together through seven forcings and
+    holds them to 1e-4 of the depth and the wave speed: 2e-7 to 1.8e-5 on SwiftShader.
+  - Shortcuts, named in `lib/slosh.ts` (a) to (i); open items 18a-13b, 13c, 13e, 13g, 13h.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
@@ -3913,6 +3989,52 @@ its controls (the gate removed, the random walk restored, the snap removed) turn
 where there were 336). The desk and the phone share the camera, and Frame Sway is on
 both; the Guide's Music Sync line says what rides it.
 
+### 27f-2. Plate Rock leans on the one and three (2026-10-22)
+
+The owner, 2026-10-21: Plate Rock and Beat Squeeze "feel the same", and on 10-22: "make sure
+we are using legit physics and simulations, as opposed to faking it." The hand was a 0.9 Hz
+spring shoved on every kick, at its fastest the instant the kick landed, beside the kick's dye
+burst and the squeeze's press: three moves on one beat, read as one.
+
+Now (lib/plateRock.ts) the hand leans on the strong beats only (the one and three from
+`BarGrid.placeAt`; the half bar's strong beats where only that is known; every other kick, two
+beats apart, where the grid is unsure), each lean to the other side of an axis that turns 26°
+a time, along a minimum-jerk reach (Flash and Hogan 1985, with the hand's speed carried into
+the next reach) that takes 0.8 of the time to the next lean. With no kick for 3 s it puts the
+dish down level. The lean is half the spring's peak: held as steeply for most of a half bar it
+moved the colour three times as far as the spring (0.622 against 0.204 in the lab) and drove
+the colour a loose cover glass piles at the grid's wall fast enough to cost the carries 1.38
+substeps a step against 1.00 (27a-6). The liquid's answer is unchanged physics: the dye's weight
+down the tipped plate in the gap (Darcy–Boussinesq, hsBody, ROCK_FALL).
+
+`npm run rides`: 16 leans in 8 bars, all on one and three; consecutive leans opposite (cos
+−0.90); a kick changes the hand's speed 0.80× as much as half way between kicks (the spring
+16.0×); level 4.2 s after the last kick; the colour moved 0.368 at the default (the spring
+0.204) and 0.666 at full; with a loose cover the carries take 1.00 substeps a step at the default (still 1.00) and 1.50 at full; rides 5c reads its drift guard on the old spring now, which still drifts the film over a cell a step. `npm run framesway`'s "half way slides it
+less" line is read at full Plate Rock (the gentler default leaves the glass inside half its
+room). The old spring stays as `springKick`/`springStep` for the lab's before.
+
+### 27f-3. Beat Squeeze presses a sheet, where the kick lands (2026-10-22)
+
+The glass press (KICK_RADII) closed the gap across most of the dish, so every kick breathed the
+whole picture in and out: a frame move (27a-8), which is why Beat Squeeze sat at 0 on every look
+but Bass Drop. A press that stays where it lands needs a cover that bends. Off the looks that
+may move the frame (Frame Sway 0), the kick now presses a 0.1 mm polyester sheet laid on the
+liquid, whose dent is set by elastohydrodynamics: w_t = (h³/12μ)∇²(D∇⁴w − F), whose only length
+after a press held T is the bending length ℓ = (D h³ T / 12 μ)^(1/6) (Hosoi and Mahadevan 2004;
+Lister, Peng and Neufeld 2013). The held point force's dent, (F/D)(1 − e^(−(kℓ)⁶))/k⁴ in
+Fourier, crosses zero at 2.28ℓ and inside that is within a tenth of the clamped bowl squishDisc
+already lays, so the kick lays one bowl of radius 2.28ℓ, as deep in the middle as the glass's
+three stacked: 28 cells of 128 on the default oil, 15 in glycerine, 47 in water. It lands
+anywhere in the middle half of the dish. Bass Drop (Frame Sway 0.35) keeps the glass.
+
+`npm run rides`: the reach goes as μ^(−1/6) exactly; the dent moves a ring inside it 3.0
+cells at the default and 6.8 at full; 30 → 70 cells out it falls from 2.99 to 1.35 cells where the glass's
+barely falls (4.1 to 3.9); far off it moves the colour by its own displaced volume (0.345 of the glass's, the volumes saying 0.356); let go it comes
+back 95% of the way at the default, 89% at full. Shortcuts (27f-4): the ring the dent lifts round itself is not laid (the gap is
+never opened past rest), the reach is read at the 6 mm middle, and the release is KickRelease's
+third of a second rather than the sheet's own slower relaxation.
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
@@ -4475,3 +4597,78 @@ of the plate shows through the band and the band read 25–28 % where it is draw
 and its flat-window chroma bar compares the window with the plate's own chroma plus 4
 (the lamp's warm white is 8.8 levels apart by itself; the bar was 4 when the ground was
 grey). Every other `airlens` line and its numbers are unchanged: 10 of 10.
+
+### 33g. The closeup: the liquid nearer and in relief, not cells (this PR)
+
+*Reported* (the owner, 2026-10-19): "Macro zoom is also still not great. Things look like
+a bunch of biological cells when you zoom in - this isn't right. I just want a closer and
+more 3d view of the liquid on the plate."
+
+*Cause:* the closeup drew `cellField` (concentric, packed Voronoi-like cells slid by a
+flow map, 20c-1's named shortcut) and the lacing (dark filaments) over the dye, and both
+were on in every look that did not name its own: `macroCells` 0.75 and `macroLacing` 0.55
+were the defaults in `types.ts` (and random in the lucky roll). At 4x and 6x that is a
+texture laid over whatever the dye was, which is exactly what reads as cells under a
+microscope. The relief under it was also weak (the dye's normal ×5 under the plate's lamp
+at its normal height), so what was left of the "3d" was the cells' own domes.
+
+*Fix:* Paint Cells and Macro Lacing default to 0 (`types.ts`, `lucky.ts`). The code and
+the sliders stay: a look that wants cells names them (`macro-bead`, `cell-bloom` and
+`lace-run` still do). The relief block in `macroDetail` is relit as a surface seen
+nearer: the lamp is lowered to 0.6 of its height so it rakes, the dye's normal is read
+×14, the glint rolls off (`1 - exp(-1.6·spec)`) so a bright pool does not burn out, and
+the boundary line is thinned by up to 80 % at full closeup, so a pool's edge is its
+relief and not an outline. Nothing moves: the camera and its clock are as before
+(`steadycam`, `cellride`).
+
+*Shortcuts named:* the relief is the dye's gradient read as a dome under a lowered lamp,
+not a physical height field (33g-2); the thinned boundary line is a taste choice; the
+cells that remain are 20c-1's look-alike, opt-in.
+
+*Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
+256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
+and lacing's own contribution to the frame (the frame against the same frame with both
+at 0, over the frame's mean) was 0.14 at 4x and 0.17 at 6x on the old defaults, and is 0
+on every shipped case (bar 0.01; the old defaults are the control, which must read over
+five times the bar). The relief's contribution (against Macro Relief at 0) is 0.033–0.051
+of the frame, and 0.99 of it lives at scales over 17 px, so it is a swell and a sheen,
+not grain (bars 0.02 and 0.5; the old defaults' 0.76 smooth was the cells' grain). The
+colour is the dye's: the mean CIE76 distance on (a*, b*) from the middle sixth of the 1x
+frame to the 6x frame is 1.2–3.1 (bar 5; the control 3.25).
+
+*The first draft of the check measured nothing,* and is why the final one is a
+contribution test: an autocorrelation's secondary peak read 0.02 on the old defaults,
+under its own 0.15 line, because the cells are irregular and have no lattice; a "relief
+follows the dye" correlation came out negative; and a ΔE that includes lightness moved
+14 on `lava-lamp` from the relief alone. Each was dropped for a line that failed on the
+control before it was trusted on the fix.
+
+## 34. What a competitor's page showed
+
+### 34a. A landing page before the sign-in wall (2026-10-22)
+
+What was reported: a first visit loaded the app ("Warming the lamp") and landed on a name over
+three sign-in buttons. It said nothing of what ChromaGlass is or costs, and asked for an account
+before the visitor had seen a drop of dye. A competitor's page (PLAN 34) showed the gap: a promise,
+a price, pictures of the product, and a way in that needs no account.
+
+What changed: `Landing.tsx` (its own chunk; the entry chunk grew 517 B gzipped against a 6000 B
+bar, and the engine and Firebase are not in it) is drawn in the sign-in's place on a first visit to
+the hosted site. A headline, one plain line, "Play free", the prices ("Home $35 · Pro $199 · one-time
+payment, no subscription"), eight real looks from the app's own renders, four steps, what the free
+site includes and what the app adds (read from `APP_FEATURE_TILES` and the free caps in
+`tierGates.ts`, so the page says what the code does), a note from the maker and the refund line
+(14 days, from the Terms). "Play free" mounts the sign-in over the page; the tab remembers it
+(sessionStorage) because Google and Apple sign in by a redirect that reloads the page and the
+sign-in is what collects it. The never-lock-out rule is untouched: the page exists only in the
+gate's "signin" phase, before the app, and nothing after it unmounts the plate.
+
+What was tried first and set aside: a looping video of the lab's plate for the hero. The lab lays
+a few drops that barely move in a hero's seconds (four frames 150 solver steps apart were
+near-identical), and a render took four minutes on SwiftShader. A cross-fade of five real frames
+costs 40 KB and moves only by opacity and transform. A filmed loop is PLAN 34a-2.
+
+Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is 48 px tall at
+1024 × 768, 390 × 844 and 844 × 390, with nothing wider than the screen; a returning visit's plate
+comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
+returning visit nor for `?remote` and `?cast`.

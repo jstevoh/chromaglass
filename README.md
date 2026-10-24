@@ -33,7 +33,7 @@ ones.
 - **A mixer for everything on the wall** — the LED ring, the gel wheel, the lumia, the front and back plates, the film and the logo in one stack you reorder (the logo under the film, the film between the plates, the LED ring or the lumia raised from the lamp to a beam of its own, the gel from over the lamp to over the lens), each with its own level, brightness, contrast, saturation and hue; on the Perform desk, in Settings → Mixer, on the phone's Mix sheet and on the remote, every control MIDI-learnable, with a pad to walk each source up the stack, and each row laid in by its own way or by screen, add, multiply or key, and each taken out and brought back over its own fade time in bars from a button or a pad. Measured by `npm run mixer` and `npm run rowfade`
 - **Multi-layer compositing** — Up to 5 independent fluid layers with configurable blend modes (screen, lighter, exclusion, multiply, overlay)
 - **LED platform modes** — Simulated backlight with rainbow, ocean, fire, cyberpunk, or single-color conic gradients
-- **Macro closeup** — a tracking camera magnifies the plate and chases a single bead of liquid, with synthesised paint cells, lacing filaments and shallow depth of field for extreme detail at high magnification
+- **Macro closeup** — a tracking camera magnifies the plate and chases a single bead of liquid, shaded as a thick film under a low lamp, with shallow depth of field, for extreme detail at high magnification (paint cells and lacing filaments are optional, off unless a look asks for them)
 - **The room drives the plate** — a camera pointed at the floor is read back rather than shown: the movement in front of it stirs the liquid, everyone it can hold becomes a hand on the glass carrying a dye of their own, and any feature of the room — how busy, how many, how spread out, where, which way, how light, what colour — can ride any control, through the patch bay below (Settings → The Room and Settings → Patches; preset *Crowd Plate*)
 - **A band in the box** — a synthesised kick, snare, hats, bass and pad in verses and choruses, played silently into the analyser so the show can be built and rehearsed with no microphone, no stereo and no permission
 - **Interactive tools** — Dropper (add colored dye) and Blow (straw air bubbles) with touch support
@@ -316,7 +316,7 @@ A **game controller** needs no setup: plug it in (or pair it) and press a button
 
 ### The show key
 
-Every start prints a four-digit **show key**, and phones and network displays must carry it in their address (`&key=1234`) to join; the printed addresses include it. Set `SHOW_KEY=1234 npm run remote` for one that stays the same. The key is what makes it safe to expose the server beyond the room.
+Every start prints an eight-digit **show key**, and phones and network displays must carry it in their address (`&key=…`) to join; the printed addresses include it. It is kept in `server/.show-key`, so a restart keeps it; `SHOW_KEY=… npm run remote` sets your own. The laptop's own page takes a separate display key that the server hands only to `localhost`, so open the show on the laptop at `http://localhost:3000/`, not at its Wi-Fi address. Browsers run WebGPU only on a secure page (https, or localhost), so a network display opened at an `http://` Wi-Fi address cannot start yet (PLAN 14m-https). The key is what makes it safe to expose the server beyond the room.
 
 ### Across buildings, other access points, or the internet
 

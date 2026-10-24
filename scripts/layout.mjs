@@ -682,6 +682,54 @@ try {
       // Moved well away first, so a double-click that did nothing cannot pass.
       check('a double-click puts it back to the look\'s own value', Math.abs(capSide - lookValue) / span > 0.1 && Math.abs(reset - lookValue) / span < 0.01,
         `look ${lookValue.toFixed(3)}, moved to ${capSide.toFixed(3)}, back to ${reset.toFixed(3)}`);
+      /*
+        8j: what a knob is called, and what it does. The owner could not tell
+        which knob was under the hand: names cut to the knob's width ("Magnet …"), and a
+        value swapped in for the name, with a chip over the row above, while
+        a hand was on it. So the card has the whole name, a line on what it
+        does and the value; it never sits on the knob itself; and it, and
+        the knob's own name, are still there while the knob is being turned.
+        Read off the knob that is there (any of the deck's), against its own
+        aria-label, so a renamed control cannot pass by matching a literal.
+      */
+      await page.mouse.move(5, 5);
+      await settle(300);
+      const name = await knob.getAttribute('aria-label');
+      const knobBox = await knob.evaluate(el => { const r = el.closest('[data-knob]').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+      const kcx = knobBox.x + knobBox.w / 2, kcy = knobBox.y + 20;
+      const readTip = () => page.evaluate(() => {
+        const t = document.querySelector('[data-control-tip]');
+        if (!t) return null;
+        const r = t.getBoundingClientRect();
+        return { name: t.querySelector('[data-tip=name]')?.textContent ?? '', help: t.querySelector('[data-tip=help]')?.textContent ?? '', value: t.querySelector('[data-tip=value]')?.textContent ?? '', r: { x: r.x, y: r.y, w: r.width, h: r.height } };
+      });
+      const none = await readTip();
+      await page.mouse.move(kcx, kcy);
+      await settle(700);
+      const tipped = await readTip();
+      const apart = tipped && (tipped.r.y + tipped.r.h <= knobBox.y + 1 || tipped.r.y >= knobBox.y + knobBox.h - 1);
+      check('hovering a knob names it in full and says what it does, clear of the knob itself',
+        !none && !!tipped && tipped.name === name && tipped.help.length > 20 && !!tipped.value && apart,
+        `${name}: ${tipped ? `"${tipped.help.slice(0, 48)}…", ${tipped.value}, card ${Math.round(tipped.r.y)}–${Math.round(tipped.r.y + tipped.r.h)} against the knob's ${Math.round(knobBox.y)}–${Math.round(knobBox.y + knobBox.h)}` : 'no card'}`);
+      await page.mouse.down();
+      // Toward the middle of its travel, so a knob already at a stop still moves.
+      const upward = (await readKnob() - min) / span < 0.5;
+      await page.mouse.move(kcx, kcy + (upward ? -30 : 30), { steps: 6 });
+      await settle(200);
+      const held = await readTip();
+      const labelWhileHeld = await knob.evaluate(el => el.closest('[data-knob]').textContent);
+      const keepsName = labelWhileHeld.includes(name);
+      check('and the knob keeps its own name while it is being turned, with the card still up and the value moving',
+        keepsName && !!held && held.name === name && held.value !== tipped?.value,
+        `knob reads "${labelWhileHeld.slice(0, 40)}", card ${held ? held.value : 'gone'} (was ${tipped?.value})`);
+      await page.mouse.up();
+      await page.mouse.move(5, 5);
+      await settle(300);
+      const gone = await readTip();
+      check('the card goes when the hand does', !gone, gone ? 'still up' : 'gone');
+      // Put the value back for what follows.
+      await knob.dblclick();
+      await settle(200);
     }
   }
   {
@@ -719,9 +767,12 @@ try {
       server behind the preview, so its address is given here, and the code
       drawn is read back into its modules and compared, module for module,
       with the encoder's own for that address (`npm run qr` reads the encoder
-      back to the text).
+      back to the text). The answer is the one the relay gives the laptop,
+      which since 14m (#391) carries the display key too; without it the panel
+      now reads the page as one opened at the Wi-Fi address and draws no code
+      on purpose (14m-lan, `npm run phonelink`).
     */
-    const info = { chromaglass: 'relay', port: 8787, hosts: ['192.168.1.23'], key: '3f9a27c1b4e8d6f0' };
+    const info = { chromaglass: 'relay', port: 8787, hosts: ['192.168.1.23'], key: '3f9a27c1b4e8d6f0', displayKey: '0123456789abcdef0123456789abcdef' };
     await page.route('**/remote-info.json', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(info) }));
     // Out of Load-in and back, so the panel mounts again and asks.
     await clickOn('mode-segmented-perform');
