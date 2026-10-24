@@ -5344,6 +5344,54 @@ Not a gate and no bar: a rate depends on what was pushed.
   (`-K -`, as `scripts/ghapi.mjs` does) and check with `npm run deploygate -- --history 20`
   that the same merges are trusted. Found by the check-skeptic on 19aa-3.
 
+### 19ab. A shard's tool fetches are bounded, and the browser is cached
+
+- **19ab-1. A slow download no longer reads as a failing check (shipped 2026-10-24).**
+  Every shard fetched its tools inside the same clock as its measuring, so an unbounded
+  download cancelled the harnesses at the job's wall and the red said nothing about the
+  diff. Seen five times across four runs of one PR on 2026-10-22, on three different
+  shards, none of them touching a check that failed:
+
+  | shard | the step | took | warm |
+  |---|---|---|---|
+  | `browser` | Install Chromium | 650s | 33s |
+  | `lab` | Install Chromium | 683s | 33s |
+  | `sound` | ffmpeg (apt) | 1474s, 1471s | 22s |
+
+  Both apt hangs were ended by the 25-minute wall rather than by finishing: between
+  about 19:30 and 20:30 UTC the step did not return at all, and while that lasted **no
+  PR in the repo could go green**, because the sound shard dies before its first sound
+  check runs. The browser shard's own work is about eighteen minutes, so eleven minutes
+  of cold download puts it at twenty-nine against a limit of twenty-five; the sound
+  shard's is about three, so an unbounded apt buries it alone.
+
+  Two changes, because the two halves are different faults. The browser is now cached
+  (`actions/cache` on `~/.cache/ms-playwright`), keyed on the **Playwright version read
+  from the installed package** and deliberately not on the lockfile's hash: the browser
+  a version installs never changes, so the version is the whole of the dependency, while
+  a lockfile key would discard the browser on every unrelated bump and pay the eleven
+  minutes again. And every fetch now carries its own `timeout-minutes` — six for the two
+  Chromium installs, four for apt's ffmpeg, five for the Mac's pip — so a mirror that is
+  not answering fails as itself, with the step's name on it, in minutes rather than
+  cancelling the measuring at the wall. `--with-deps` still runs apt for the system
+  libraries, which the cache does not hold, which is why that step keeps a bound as well
+  as a cache.
+
+  Why bounds and not a bigger limit: raising the job to 35 would have hidden this and
+  made a genuinely hung harness cost ten more minutes before anyone heard about it. 19w
+  moved the *Mac* shards off their timeouts for the same family of reason; the ubuntu
+  shards were never costed the same way, because their own work is steady and nobody
+  counted the downloads in front of it. The Mac fetches were bounded here too, though
+  none has gone slow yet, because the Mac queue is the one that costs.
+
+  What a session should know when this goes red again: a retry is not a fix, and the
+  two cases show it from both ends. The browser's cold install cleared on a re-run, so
+  green by luck read exactly like green by merit; the apt hang never cleared, so three
+  full runs were spent proving the thing that failed was not the diff. Measured by the
+  steps' own seconds over the runs after this merge, and the cold path stays honest
+  because a version bump changes the key.
+  Found while measuring 0-tap (PR #429).
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
