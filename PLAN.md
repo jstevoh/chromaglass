@@ -105,8 +105,9 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **1.1** ~~**14m, then 14o**~~ (A, M then S): the show key to loopback only, long and timing-safe,
   a lockout, `maxPayload` and a hello deadline; then the song-ID Worker's origin list
   and limits. **Shipped, this PR** (`npm run showkey` 11 of 33 → 33 of 33, `npm run
-  fingerprint-worker` 7 → 19 of 19). Left: 14m-guest, 14m-tunnel, 14m-mark, 14m-lan,
-  14m-budget, 14o-count, 14o-smoke.
+  fingerprint-worker` 7 → 19 of 19). 14m-mark and 14m-lan shipped in the follow-up
+  (`npm run phonelink` 29 → 36 of 36), and the live Worker answered a lookup (14o-smoke).
+  Left: 14m-https, 14m-guest, 14m-tunnel, 14m-budget, 14o-count.
 - **1.2** ~~**14n**~~ (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks. **Shipped, #322** (`sanitizePatch`, `npm run sanitize`, `npm run remotemix`: malformed patches/gestures dropped, MIDI writes sanitized, DEFAULT_SETTINGS and all 41 presets intact).
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).
@@ -209,7 +210,7 @@ Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back
 (M); **5-actions** (S); **11-pinch** (S).
 
 Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the load-in card
-(S); **14m-guest** (M), **14m-tunnel** (S, the Mac), **14m-mark** (S); **31b** a warp grid for curved walls (M, §31).
+(S); **14m-guest** (M), **14m-tunnel** (S, the Mac), ~~**14m-mark**~~ (S, shipped), **14m-https** (M, network displays at a Wi-Fi address); **31b** a warp grid for curved walls (M, §31).
 
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
 **5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
@@ -3086,18 +3087,19 @@ Left open from it:
   unchanged, which no cloud session can confirm (`npm run showkey` asks it with the
   headers cloudflared is documented to send). *Measure:* on the Mac, a phone through the
   tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
-- **14m-mark** (S): the relay now closes a socket on a frame over 512 KB, so the laptop
-  drops any message that large rather than lose its link (`useRemoteLink.ts`). The
-  cast's `mark` carries the logo as a data URL, and a big PNG logo is over that: the
-  wall then shows no logo where it used to. *Fix:* scale the mark to the wall's size
-  and send it as JPEG or WebP under 400 KB before casting. *Measure:* `npm run showkey`
-  or `remotemix`: a 2 MB logo reaches the network display.
-
-- **14m-lan** (S): the laptop's own page opened at its Wi-Fi address (not `localhost`)
-  is not handed the display key, by design, so it stays off the relay and phones see no
-  laptop. It now stays quiet rather than knock with no key. *Fix:* the desk says "open
-  this page at localhost to link phones" when a relay answers and gives it no key.
-  *Measure:* `npm run phonelink`: that page shows the words and opens no socket.
+- ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
+- ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
+- **14m-https** (M, found in 14m-lan): a **network display cannot start at an `http://`
+  Wi-Fi address**. Browsers give WebGPU only to a secure page (https, or localhost), so
+  `http://<laptop-ip>:3000/?cast=true&key=…`, the address the README and the server give
+  a projector's browser or a second computer, fails at the first shader module with
+  "GPUTextureUsage is not defined" (measured in Chromium on 2026-10-24; `npm run
+  phonelink` now asks for the plain words on that screen). The phone's remote needs no
+  GPU and is unaffected. *Fix, to choose:* the show server serves https on the LAN with a
+  certificate the owner's devices trust (mkcert-style; every device installs it once), or
+  network displays go through the tunnel's https address, or the network display gets a
+  WebGL2 fallback of the plate. *Measure:* a network display opened at the address the
+  server prints draws a plate in a browser as it ships (the Mac's `wall`).
 - **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
   address, the server refuses new joins from everyone but the laptop for 60 s. That is
   what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years
@@ -3120,9 +3122,13 @@ Story in `docs/plan-shipped.md`. Left open from it:
   same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
   (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
   plan's quota. *Measure:* the same harness with a store that allows one write a second.
-- **14o-smoke** (S, the owner): after creating `FINGERPRINT_LIMITS` and redeploying the
-  Worker, identify one song from the site and see it named. Nothing in CI reaches the
-  deployed Worker.
+- ~~**14o-smoke**~~ (S): the deployed Worker, measured from a cloud session on 2026-10-24.
+  The live site's build carries the Worker's address; a POST with no Origin is refused 403;
+  one from the site's origin passes the store, size and rate gates to the body (400 on a
+  non-audio body); a 4 s tone reaches AudD, which answers that it cannot fingerprint a pure
+  tone; and a 10 s clip of the bundled "Live On Rainy Days" comes back 200 `{"match":false}`
+  (not in AudD's catalogue). Whether a well-known commercial track comes back named is
+  the one thing left, and needs a recording no cloud session should send.
 
 ### 14p. Show night runs whatever merged last
 
@@ -3518,8 +3524,8 @@ effect). `npm run music` only feeds it synthetic level traces.
 - **14z-3** (**shipped**): the change lands on a hit of the new song (27 of 31 gaps; else
   1 s after it is confirmed), a median 1.0 s after its first note. After a gap the look fades
   in over 1 s; named by identification, mid-crossfade, it blends in over twice the desk's
-  fade, at least 4 s. Judged on the owner's GPU: `docs/judging.md` §64.
-- **14z-4**: once the owner has judged §64 with their own music, On a New Song opens on
+  fade, at least 4 s. Judged on the owner's GPU: `docs/judging.md` §65.
+- **14z-4**: once the owner has judged §65 with their own music, On a New Song opens on
   New preset again (the `music` check's default line moves with it).
 - **14z-5**: the room tracker seeds its floor on the analyser's first frame, and an analyser
   with nothing through it yet hands it digital silence (-140): the floor then climbs about a
@@ -4315,9 +4321,13 @@ its frame rate live. "Free" means no new passes or texture reads.
     [`docs/plan-shipped.md`](docs/plan-shipped.md) §18a-13; the owner's eyes on the pace
     are `docs/judging.md` §58. Shortcuts, each named in the code, and the items that
     replace them:
-    - **18a-13a. Two layers.** One layer of liquid slops; oil and water would slosh at
-      different speeds and shear past each other. Needs the dish to carry two depths
-      and the oil's interface, which the oil's own fields (`oilBodies`) could seed.
+    - **18a-13a. Two layers: shipped** (2026-10-22). Oil lenses ride the water at their
+      capillary thickness, read from the plate's own oil each frame, with the two-layer
+      laminar drag between them; the dish moved to the GPU (`gpu/slosh.ts`). Plate Rock's
+      swing tips it where Frame Sway lets the frame move (`rockAccel`; how the rock itself is
+      driven is 27f-2's). A kick's glass presses the dish over the same radii it presses the gap
+      (`kickPress`: the sheet's one dent off the frame-moving looks). Story in
+      `docs/plan-shipped.md` §18a-13a; `npm run slosh`, `npm run sloshgpu`.
     - **18a-13b. The rim's boundary layer.** The rim is free-slip; a real dish's wall
       holds a thin layer still and sheds a vortex when the wave turns there. The
       drag too is the covered gap's (12ν/h², Poiseuille between two walls), where a
@@ -4327,11 +4337,20 @@ its frame rate live. "Free" means no new passes or texture reads.
       tuning `SLOSH_LEAN` against it.
     - **18a-13c. Drawing the depth.** The dye does not feel the depth (the dish moves
       it, it does not thin where the liquid is shallow), so a wave never shows as a
-      brighter crest or a lamp-lit slope.
-    - **18a-13d. A shock-capturing scheme.** Breaking is quadratic drag and a speed
-      wall, with upwind (diffusive) momentum advection; a bore is not resolved. Needs
-      a Riemann-solved or MUSCL flux. Also: no Coriolis or centrifugal term (the
-      plate does not turn fast enough to matter), and the CPU film ignores the slosh.
+      brighter crest or a lamp-lit slope. The dish now writes the depth of both layers
+      for the plate (`WebGPUSlosh.depth`, the solver's `sloshDepth`): red the depth
+      over rest, green the oil's share. What draws it: Beer–Lambert through the
+      depth (a crest holds more dye) and the lamp's light bent by the surface's
+      slope and focused by its curvature (a shadowgraph, brightness against
+      −D∇²depth). The display pass is at WebGPU's sixteen textures, so the depth
+      rides in a spare channel (the derive pass's alpha is free) rather than a new
+      binding; touches the plate shader, so `pops`, `straw`, `ferrolook`, `mixer`,
+      `grainedge`, `lampzero` and a `look` render.
+    - **18a-13d. A shock-capturing scheme: shipped** (2026-10-22). HLL fluxes over
+      hydrostatic reconstruction, MUSCL with the MC limiter, Heun in time: a dam
+      break runs at Stoker's speed, two cells wide, and no energy is made. Story in
+      `docs/plan-shipped.md` §18a-13d. Still: no Coriolis or centrifugal term, and the
+      CPU film ignores the slosh.
     - **18a-13e. Hold Gravity's moves out of the slosh.** The dial is hand-only, but the
       tilt it follows is Gravity × Tilt Direction as the plate sees them, so a look
       (Lava Lamp has Gravity 1), Evolve or a patch on Gravity slops the liquid too. If
@@ -4340,6 +4359,16 @@ its frame rate live. "Free" means no new passes or texture reads.
       screen axes while Gravity's direction is turned by the turntable's angle, so with
       the plate turned a tipped phone slops at that angle; Plate Rock's `ext.x * 1.1`
       does the same. Turn both into the fluid frame together.
+    - **18a-13g. Lenses that move and pull back.** The dish reads where the oil is
+      from the plate every frame and holds each lens at its capillary thickness: a
+      lens has no inner wave and one stretched thinner does not dewet into droplets.
+      Carrying h₁ in the dish (its own mass equation, the plate's oil following it)
+      and a disjoining pressure would let the dish move the lens's outline itself.
+    - **18a-13h. One press, not two.** A kick's glass presses the thin gap
+      (`pressKick`, lib/squish.ts) and the dish (its head) at once, so near the glass
+      the liquid is pushed out twice. The one-press answer: the dish takes the gap's
+      squeeze as its source and the gap's own push goes. Moves what `npm run squeeze`
+      measures, so it wants the owner's eyes on Beat Squeeze first (27f-3).
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -6525,8 +6554,8 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - **27f-2. Plate Rock leans on the one and three (shipped; story in docs/plan-shipped.md §27f-2).**
     A hand's minimum-jerk reach to the other side of a turning axis on the strong beats, never a
     shove on each kick; `npm run rides` holds it (judging.md §61).
-  - **27f-3. Beat Squeeze presses a sheet, locally (shipped pending the owner's pick on the
-    thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
+  - **27f-3. Beat Squeeze presses a sheet, locally (shipped 2026-10-22; the owner picked the
+    local sheet on the thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
     lays one dent as wide as a 0.1 mm sheet bends over the liquid in the kick's hold
     (elastohydrodynamic bending length); Bass Drop keeps the glass. `npm run rides` holds it.
   - **27f-4, open. The sheet solved, not stamped.** 27f-3 lays the dent's held shape (a clamped
@@ -6538,12 +6567,32 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     its depth at 3.4ℓ). That ring needs the gap opened past rest, which the shader's
     squeezeUpdate never does (a lift stops at rest): the same item as the lift's ceiling.
   - **27f-5, open. The rock tips the layers, not only the dye.** The hand's tilt drives the
-    dye's weight down the plate (Darcy–Boussinesq in the gap). A dish of oil on water tipped
-    the same way also sloshes at the layers' interface (reduced gravity, a wave of several
-    seconds across the dish, underdamped in water, overdamped in the default oil): once the
-    two-layer slosh (18a-13a) lands, the rock's tilt should drive its internal mode. Not the
-    single-layer slosh's surface mode, which moves the whole picture together and would be a
-    frame move from the sound (the owner's rule); a design call for the owner when 18a-13a ships.
+    dye's weight down the plate (Darcy–Boussinesq in the gap). Oil on the same tipped plate is
+    lighter than the liquid round it (ρ₁/ρ 0.88), so under the cover it should rise the other
+    way, a bubble under a tipped glass. Not the dish's free-surface slosh, which moves the whole
+    picture together and would be a frame move from the sound (the owner's rule).
+    - *Tried 2026-10-24 and taken out before merging (the review of #440):* the buoyancy laid on
+      the two-layer dish's oil rafts alone, (1 − 1/r) g sinθ uphill, water unforced. A lens rose
+      at 5.5 mm/s on the default rock and the water away from it moved under 4% of that, but
+      nothing held the lid's constraint: an oil sheet across the dish (Oil & Water, Clock Glass,
+      both on the default Plate Rock and Frame Sway 0) moved the picture's mean at −4.2 mm/s
+      after a second of lean, the whole frame with the beat, and a lens pushed into the rim kept
+      driving into it, only the wall's own cells held (−4.6 mm/s at 6 s). `rockRise`, its check
+      and the dish's oil-force slot were reverted; the code is on the branch's history (9348529).
+    - *Where it belongs instead:* the thin gap, which already is the covered plate. Put the oil's
+      buoyancy in `hsBody` beside the dye's weight, as the oil share's departure from the plate's
+      mean (Boussinesq, as the dye's `dye.a − meanD`: an even sheet then feels nothing, a lens all
+      of it), through the oil's own mobility, and let the gap's projection make the flow
+      divergence-free: that is the lid's counterflow round the lens and the rim's no-flux, both
+      exact in Darcy. Needs the mix bound in hsBody and a mean oil share (a reduction, or the
+      same route `meanD` takes). Check first whether `dye.a` already weighs the oil's own colour
+      (if it does, the gap sends oil downhill today). The phone's tilt tips the gap
+      (`rockX = swingX + ext.x·1.1`), so the oil should take `rockX`, not the swing alone.
+      Measure: a lens rises at the Hele-Shaw speed Δρ g sinθ h²/12μ₁ written out in SI (not a
+      ratio of the code's own numbers); the plate's mean velocity over a half and a full sheet
+      stays under a bar; a lens at the rim stops as a whole.
+    - On the frame-moving looks the dish's own tilt (`rockAccel`, SLOSH_LEAN × Frame Sway) and the
+      gap's (CUR_ROCK) are two different sizes of the same tilt; say which is the plate's.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't feel
   like it actually does anything").** The slider multiplied the ranged bass reading, which every
   hand takes over 70 or 85 and stops: on the band's chorus the reading sat over the press's

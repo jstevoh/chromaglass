@@ -1515,7 +1515,27 @@ bass, not as a busier or shakier plate, and nothing should move the whole frame.
 is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
 bass you wanted.
 
-## 64. A new song brings a new look, on its beat (PLAN 14z)
+## 64. Oil sloshes on water, and bores (PLAN 18a-13a, 13d)
+
+The slosh dish is two layers now, oil lenses riding on water, solved on the GPU with a
+Riemann flux, so a hard tip makes a running jump (a bore) instead of a smooth slope. The
+numbers are in `docs/plan-shipped.md` §18a-13a (`npm run slosh`, `sloshgpu`); the Metal run
+is the plate shard. On a real GPU:
+- On a look with oil on the plate, raise Slosh to about half and tip one way,
+  then the other. The water should run ahead and the oil lag behind it and shear past it:
+  two speeds, not one sheet. Say whether the oil reads as floating.
+- Lower Thickness to about 0.2 and tip hard and fast: the first wave should steepen into a
+  sharp front that runs to the rim and back. Say whether it reads as a wave or as a jolt.
+- Bass Drop with music: its Beat Squeeze should now send a ring out from each kick that runs
+  to the rim and back, and its Plate Rock should slosh the whole dish, a little (Frame Sway
+  0.35). Off Bass Drop, Beat Squeeze's ring starts from the sheet's one dent where the kick
+  lands (27f-3), narrower. Say whether the whole-dish slosh is too much (the frame-motion rule).
+- Any other look (Frame Sway 0) with Plate Rock up: the rock should tip the dye as it did,
+  and not slosh the whole dish.
+- With Slosh at 0, Plate Rock at 0 and Beat Squeeze at 0, the plate should look exactly as
+  before.
+
+## 65. A new song brings a new look, on its beat (PLAN 14z)
 
 Settings, Audio Input, On a New Song: pick New preset (it opens on Keep until you have judged
 this; on the phone, the same control in Settings). Then play your own music the ways you play it

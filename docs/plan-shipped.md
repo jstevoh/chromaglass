@@ -2068,6 +2068,37 @@ wrong keys lock the address out; a 1 MB frame is refused without the process gro
 silent socket is closed at 5 s; a restart keeps the key and the phone rejoins; a guest
 socket's `patch` is dropped.
 
+### 14m-mark. A big logo never reached the network display
+
+**Shipped** (the PR after #391). 14m made the relay close a socket on a frame over 512 KB
+and the desk's link drop any message that large, and the mark crosses the relay as a data
+URL, once, when a network display joins: a print-sized PNG logo is several megabytes, so
+after 14m the network display showed no logo. The cap stays (it is what keeps the relay
+from holding a stranger's megabytes); the desk sends the network display a copy that fits
+(`src/lib/markFit.ts`): a mark under 400 KB goes byte for byte as before, a larger one is
+redrawn at most 1920 px on its long side as WebP (which keeps transparency; JPEG would
+paint the clear parts black) and shrunk in steps until it fits. Safari writes no WebP from
+a canvas and falls back to PNG, which keeps transparency too. The laptop's plate and a cast
+window on the same machine keep the original. `npm run phonelink`: a 2.2 MB PNG with a
+clear border reaches a mirror socket as a 287 KB WebP at 700×700, border alpha 0 and centre
+255; a mirror joining afterwards is handed the same mark (the desk's link survived); a
+48-pixel logo crosses byte for byte. On the code before it: no mark reaches either mirror.
+
+### 14m-lan. The laptop's page at its Wi-Fi address
+
+**Shipped** (with 14m-mark). The plan said the page would sit quiet with no display key;
+measured, it never got that far: a browser gives WebGPU only to a secure page, and
+`http://<laptop-ip>:3000/` is not one, so the page stopped at the first shader module with
+"GPUTextureUsage is not defined" and nothing else. The failure screen (`src/main.tsx`) now
+says why, and links `http://localhost:<port>/` on the same port; a network display
+(`?cast=true`) is told why and is not sent to its own localhost, which is not the laptop
+(the network display's own problem is PLAN 14m-https). In a browser told to treat the
+address as secure, the Phone · iPad panel says to open the page at localhost and draws no
+code: it used to draw one of the remote with no key in it, which a phone could scan and
+never join with. `npm run phonelink` asks all of it, with a WebSocket count that must see
+the localhost desk's socket so that "opens no socket" cannot pass by counting nothing:
+29 of 36 on the code before, 36 of 36 now.
+
 ### 14o. The song-ID Worker is open to anyone
 
 **Shipped** (with 14m). `server/fingerprint-worker.js` now, before anything costs: an
@@ -2578,6 +2609,51 @@ M_f·ΔP) keeps both.
   - The phone: the Play sheet carries Slosh under Tilt (`phone-slosh`), and the remote's
     sheet carries it too; the phone's own tilt (`useDeviceTilt`) writes the same settings
     the dish reads, so a tilted phone sloshes the plate it shows.
+
+- **18a-13a and 18a-13d, two layers and bores (shipped 2026-10-22; the owner: "make sure
+  we are using legit physics and simulations, as opposed to faking it. I want state of the
+  art").**
+  - The scheme, and why this one. Two-layer shallow water is usually solved as one coupled
+    system (path-conservative Roe or IFCP schemes, Castro, Parés and others). Those need an
+    entropy fix and lose hyperbolicity where the layers' speeds part, and the oil here is
+    lenses that come and go, so most cells have no second layer at all. Instead each layer is
+    solved on its own with the other's weight in its floor (the splitting Bouchut and Morales
+    de Luna analyse, 2008): the water by the hydrostatic reconstruction of Audusse, Bouchut,
+    Bristeau, Klein and Perthame (2004) with an HLL flux and Toro's dry-bed speeds, MUSCL with
+    the MC limiter on depth, head and velocity, first order beside the rim, Heun (SSP RK2) at
+    a fixed 1/420 s. It is well balanced (a lake at rest is exact, a lens floating on it too),
+    never makes a negative depth, and captures a bore as a jump.
+  - The oil. A lens at its capillary thickness e² = 2|S|ρ/(gρ₁Δρ) (S = −6 mN/m, ρ₁/ρ = 0.88,
+    3.4 mm), read every frame from the plate's own oil share, rides the water as a raft
+    pushed down the water's head; its weight is in the water's floor. Between the layers and
+    the two glasses, the steady laminar drag of two stacked liquids (the 2×2 matrix the
+    profile gives, reducing to 12ν/h² for one), solved implicitly.
+  - The presses. Beat Squeeze's glass on the kick presses the dish too, as a pressure head
+    over three nested discs (`KICK_RADII`), held and let go on the gap's own envelope
+    (`glassHeld`): the ring runs out at the wave speed and back off the rim.
+  - The rock. Plate Rock's swing tips the dish only as far as Frame Sway lets the music move
+    the frame (`rockAccel`: the Slosh dial's top lean times Frame Sway), because a rocked dish
+    moves all its liquid one way and back and the whole picture sways. So not at all at Frame
+    Sway's default 0; on Bass Drop (0.35) at a third of the dial's lean.
+  - Where it runs. The GPU (`gpu/slosh.ts`, kernels in `wgsl/slosh.ts`), before the solver's
+    step on its encoder: the oil is a GPU field, and the dish is ten million flops a frame.
+    Never read back: `SloshClock` runs it while driven and for its ring time after
+    (`sloshRingSeconds`), then lays it level. The water's depth is stored as its departure
+    from rest: stored whole in float32, a liquid creeping back to level at Thickness 0.6 lost
+    1.0e-5 of its water in ten seconds (3e-15 in float64), now 4.3e-8.
+  - Measured (`npm run slosh`, four processes, about five minutes): the lowest mode rings at
+    1.425 s (theory 1.407); a held tilt settles to a/g exactly and stops (1.6e-7 plate
+    widths/s); water reversed overshoots 82% with 14 crossings, the default Thickness 0.5%
+    with one (the pace kept: 1% before); the ring dies at 0.335/s against the drag's 0.300
+    (shortcut (i)); mass to 4.3e-8; resonant rocking at four half-periods inside the Courant
+    limit (0.75 at worst), and at twice the dial's lean it still holds; a dam break's front at
+    0.6719 against Stoker's 0.6684, two cells wide, the depth behind it 1.0882 against 1.0904,
+    energy never rising a frame (69% spent); the two-layer drag within 0.14% of a numerical
+    profile, 12ν/h² exactly for one liquid; a lens floats with nothing moving, and rocked moves
+    at 35% of the water under it; a press's ring at 1.200 plate widths/s against √(gh) 1.213.
+    `npm run sloshgpu` steps the GPU and the reference together through seven forcings and
+    holds them to 1e-4 of the depth and the wave speed: 2e-7 to 1.8e-5 on SwiftShader.
+  - Shortcuts, named in `lib/slosh.ts` (a) to (i); open items 18a-13b, 13c, 13e, 13g, 13h.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 

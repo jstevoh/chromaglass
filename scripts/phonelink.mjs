@@ -63,6 +63,7 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
+import zlib from 'node:zlib';
 import { launchChromium } from './chromium.mjs';
 import { clickAt } from './layoutProbe.mjs';
 
@@ -111,6 +112,37 @@ function phone(key = KEY) {
 const hangUp = (ws) => new Promise((resolve) => { if (ws.readyState === WebSocket.CLOSED) return resolve(); ws.onclose = () => resolve(); ws.close(); });
 
 const { encodeQr, qrPath } = await import('../src/lib/qr.ts');
+
+/**
+ * A PNG of `w`×`h` with a fully clear border `border` pixels wide around opaque
+ * noise. Noise because it does not compress, so the file is as big as its
+ * pixels (a 1000-pixel square is about 2.6 MB); the clear border is what a
+ * JPEG on the wall would lose.
+ */
+function noisyPng(w, h, border) {
+  const rows = Buffer.alloc((w * 4 + 1) * h);
+  let seed = 12345;
+  const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed >> 23; };
+  for (let y = 0; y < h; y++) {
+    const at = y * (w * 4 + 1);
+    rows[at] = 0;
+    for (let x = 0; x < w; x++) {
+      const inside = x >= border && x < w - border && y >= border && y < h - border;
+      const i = at + 1 + x * 4;
+      if (inside) { rows[i] = rand(); rows[i + 1] = rand(); rows[i + 2] = rand(); rows[i + 3] = 255; }
+    }
+  }
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(zlib.crc32(body) >>> 0);
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
+}
 
 let relay = null;
 let preview = null;
@@ -270,6 +302,181 @@ try {
   check('the silent socket never counted: back to "No phone linked." with it still open',
     silent.readyState === WebSocket.OPEN && (await panel()).status === 'No phone linked.', `socket state ${silent.readyState}, status "${(await panel()).status}"`);
   silent.close();
+
+  /*
+    PLAN 14m-mark: a logo too big for one relay frame still reaches the
+    network display. The relay closes a socket on a frame over 512 KB (code
+    1009), and the desk's link drops a message that large rather than lose its
+    socket; the mark crosses as a data URL, so a print-sized logo used to reach
+    no network display at all. The display is a mirror socket here, as a
+    network display's page is to the relay. What is asked:
+      - a 2 MB PNG with a transparent border reaches a mirror already on, as a
+        picture under the frame cap, still clear where the file was clear
+        (WebP or PNG; a JPEG would paint that border black on the wall);
+      - the desk's socket survives the send: a mirror that joins afterwards is
+        handed the same mark on its hello;
+      - a small logo crosses byte for byte as the file was, as before 14m-mark.
+    Run against the code before this, the first two lines fail: no mark ever
+    reaches either mirror.
+  */
+  // The relay's cap, MAX_FRAME_BYTES in src/lib/remoteProtocol.ts, written out
+  // because that module's own imports need the bundler, which this check runs without.
+  const MAX_FRAME_BYTES = 512 * 1024;
+  /** A mirror: a network display's socket, collecting every mark the desk sends it. */
+  const mirror = () => {
+    const ws = new WebSocket(`ws://localhost:${PORT}/remote-ws`);
+    const marks = [];
+    ws.onmessage = (e) => {
+      try { const m = JSON.parse(String(e.data)); if (m.type === 'cast' && m.message?.type === 'mark') marks.push(m.message.dataUrl); } catch { /* not ours */ }
+    };
+    return new Promise((resolve, reject) => {
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'hello', role: 'mirror', key: KEY })); resolve({ ws, marks }); };
+      ws.onerror = () => reject(new Error('the mirror could not reach the relay'));
+    });
+  };
+  /** Wait up to `ms` for `marks` to hold a picture (a non-null mark). */
+  const markIn = async (marks, ms = 8000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) { const m = marks.filter(Boolean).at(-1); if (m) return m; await settle(150); }
+    return null;
+  };
+  /** The picture's size and the alpha of a border pixel and the centre one, decoded in the page. */
+  const looks = (url) => page.evaluate(async (u) => {
+    const img = new Image();
+    img.src = u;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const a = (x, y) => g.getImageData(x, y, 1, 1).data[3];
+    return { w: img.naturalWidth, h: img.naturalHeight, edge: a(2, 2), centre: a(img.naturalWidth >> 1, img.naturalHeight >> 1) };
+  }, url);
+  // The file input lives in Settings' Logo & Titles section; the command palette opens it.
+  await page.keyboard.press('Control+k');
+  await page.getByTestId('palette-input').fill('Settings: Logo & Titles');
+  await settle(300);
+  if (await page.getByTestId('palette-row-settings-mark').count()) await clickAt(page, 'palette-row-settings-mark');
+  await settle(600);
+  const markFile = (await page.locator('#mark-file').count()) > 0;
+  check('the desk has the mark\'s file input to load a logo through', markFile);
+  if (markFile) {
+    const first = await mirror();
+    await settle(800);
+    const big = noisyPng(1000, 1000, 100);
+    await page.setInputFiles('#mark-file', { name: 'logo.png', mimeType: 'image/png', buffer: big });
+    const got = await markIn(first.marks);
+    const seen = got ? await looks(got) : null;
+    check(`a ${(big.length / 1e6).toFixed(1)} MB logo reaches a network display already on, under the ${MAX_FRAME_BYTES >> 10} KB frame cap`,
+      !!got && got.length < MAX_FRAME_BYTES && !!seen && seen.w > 0, got ? `${(got.length / 1024).toFixed(0)} KB, ${got.slice(5, got.indexOf(';'))}, ${seen?.w}×${seen?.h}` : 'no mark arrived');
+    check('and it is still clear where the file was clear, and solid where it was solid (no JPEG)',
+      !!seen && seen.edge === 0 && seen.centre === 255 && !/^data:image\/jpe?g/.test(got), seen ? `border alpha ${seen.edge}, centre ${seen.centre}` : 'nothing to read');
+    const second = await mirror();
+    const again = await markIn(second.marks);
+    check('the desk\'s link survived it: a network display joining afterwards is handed the same mark',
+      !!again && again === got, again ? (again === got ? `${(again.length / 1024).toFixed(0)} KB, the same` : 'a different mark') : 'no mark arrived');
+    const small = noisyPng(48, 48, 8);
+    const before = first.marks.length;
+    await page.setInputFiles('#mark-file', { name: 'small.png', mimeType: 'image/png', buffer: small });
+    let tiny = null;
+    for (let i = 0; i < 50 && !tiny; i++) { tiny = first.marks.slice(before).find(Boolean) ?? null; if (!tiny) await settle(150); }
+    check('a small logo crosses byte for byte as the file was', tiny === `data:image/png;base64,${small.toString('base64')}`,
+      tiny ? `${tiny.length} chars, ${tiny.startsWith('data:image/png;base64,') ? 'a PNG' : tiny.slice(0, 20)}` : 'no mark arrived');
+    first.ws.close(); second.ws.close();
+  }
+
+  /*
+    PLAN 14m-lan: the laptop's page opened at its Wi-Fi address. The relay
+    gives the display key only to the machine at its own name (localhost), and
+    a browser gives WebGPU only to a secure page, which an http address on the
+    Wi-Fi is not, so that page cannot even start: it said "GPUTextureUsage is
+    not defined" and nothing else. Asked:
+      - the relay hands that address neither key;
+      - in a browser as it ships, the failure screen says why and gives the
+        localhost address on the same port;
+      - a desk the relay hands no key (as it answers that address) says to
+        open the page at localhost and draws no code (it used to draw one of
+        the remote with no key, which a phone could scan and never join
+        with), and opens no socket to the relay. The count is read by
+        wrapping the page's WebSocket, and the same count on a desk handed
+        its key must see its socket, so the line cannot pass by counting
+        nothing.
+  */
+  const lan = hosts.find(h => h !== 'localhost' && h !== '127.0.0.1');
+  /** An element's text, or '' at once when it is not there (a locator's own wait is a minute). */
+  const textOf = async (pg, id) => ((await pg.getByTestId(id).count()) ? (await pg.getByTestId(id).first().textContent()) ?? '' : '');
+  if (lan) {
+    const lanBase = `http://${lan}:${PORT}`;
+    const local = `http://localhost:${PORT}/`;
+    const lanInfo = await (await fetch(`${lanBase}/remote-info.json`)).json();
+    check('the relay hands its Wi-Fi address neither the show key nor the display key', !lanInfo.key && !lanInfo.displayKey,
+      `key ${lanInfo.key ?? 'none'}, display key ${lanInfo.displayKey ? 'given' : 'none'}`);
+
+    await page.goto(`${lanBase}/?debug&look=classic&dpr=0.35`, { waitUntil: 'networkidle' });
+    let boot = '';
+    for (let i = 0; i < 40 && !boot; i++) { boot = await textOf(page, 'boot-insecure'); if (!boot) await settle(300); }
+    const link = boot ? await page.getByTestId('boot-insecure').locator('a').getAttribute('href') : null;
+    check('at the Wi-Fi address, in a browser as it ships, the failure screen says why and links the localhost address',
+      /Wi-Fi address/.test(boot) && /secure page/.test(boot) && link === local, boot ? `${boot.replace(/\s+/g, ' ').slice(0, 90)}… link ${link}` : 'no such words');
+    await page.goto(`${lanBase}/?cast=true&key=${KEY}`, { waitUntil: 'networkidle' });
+    let castBoot = '';
+    for (let i = 0; i < 40 && !castBoot; i++) { castBoot = await textOf(page, 'boot-insecure'); if (!castBoot) await settle(300); }
+    check('a network display there is told why, and not sent to its own localhost', /secure page/.test(castBoot) && !castBoot.includes('localhost:'),
+      castBoot ? castBoot.replace(/\s+/g, ' ').slice(0, 120) : 'no such words');
+
+    /*
+      The panel's own case, asked on the localhost desk with the relay's answer
+      rewritten to hand it no key: that is exactly what the relay says to a page
+      at its Wi-Fi address. A browser flag that treats the Wi-Fi address as
+      secure would ask it more literally, but the runner's Chromium ignored the
+      flag (the page still was not a secure context and never started), so the
+      line read the start-up screen, not the panel.
+    */
+    const keyless = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    try {
+      const fpage = await keyless.newPage();
+      fpage.setDefaultTimeout(60_000);
+      await fpage.addInitScript(() => {
+        const W = window.WebSocket;
+        window.__cgSockets = [];
+        window.WebSocket = class extends W { constructor(u, p) { super(u, p); window.__cgSockets.push(String(u)); } };
+      });
+      const relaySockets = () => fpage.evaluate(() => (window.__cgSockets ?? []).filter(u => u.includes('/remote-ws')).length);
+      const words = () => textOf(fpage, 'phone-link');
+      const openAt = async (base) => {
+        await fpage.goto(`${base}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
+        for (let i = 0; i < 120 && (await fpage.getByTestId('mode-segmented-loadin').count()) === 0; i++) await fpage.waitForTimeout(300);
+        if (await fpage.getByTestId('mode-segmented-loadin').count()) await clickAt(fpage, 'mode-segmented-loadin');
+        for (let i = 0; i < 40 && (!(await words()) || /looking/i.test(await words())); i++) await fpage.waitForTimeout(300);
+        await fpage.waitForTimeout(3000);
+      };
+      const asWifi = async (route) => {
+        const res = await route.fetch();
+        await route.fulfill({ response: res, json: { ...(await res.json()), key: null, displayKey: null } });
+      };
+      await fpage.route('**/remote-info.json', asWifi);
+      await openAt(`http://localhost:${PORT}`);
+      const w = await words();
+      const instead = w ? '' : (await fpage.evaluate(() => document.body?.innerText ?? '')).replace(/\s+/g, ' ').slice(0, 220);
+      const hasCode = (await fpage.getByTestId('phone-link-qr').count()) > 0;
+      const hasUrl = (await fpage.getByTestId('phone-link-url').count()) > 0;
+      check('handed no key, as the relay answers a Wi-Fi address, the desk says to open the page at localhost to link phones',
+        (await fpage.getByTestId('phone-link-local').count()) > 0 && w.includes(local) && /Wi-Fi address/.test(w), w.replace(/\s+/g, ' ').slice(0, 160) || `no panel; the page says: ${instead || 'nothing'}`);
+      check('and draws no code and no address: a phone could never join with a keyless code', !!w && !hasCode && !hasUrl,
+        `${w ? 'a panel' : 'no panel'}, ${hasCode ? 'code' : 'no code'}, ${hasUrl ? 'address' : 'no address'}`);
+      const n = await relaySockets();
+      check('and that page opens no socket to the relay', !!w && n === 0, `${n} socket${n === 1 ? '' : 's'} to /remote-ws`);
+      await fpage.unroute('**/remote-info.json', asWifi);
+      await openAt(`http://localhost:${PORT}`);
+      const m = await relaySockets();
+      check('the same count on the desk handed its key sees its socket (the count is not blind)', m >= 1, `${m} socket${m === 1 ? '' : 's'} to /remote-ws`);
+    } finally {
+      await keyless.close();
+    }
+  } else {
+    total += 1; failed += 1;
+    console.log(' FAIL the Wi-Fi address lines — the show server named no address but localhost');
+  }
 
   stop(relay); relay = null;
 

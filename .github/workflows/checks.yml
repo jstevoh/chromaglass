@@ -181,8 +181,11 @@ jobs:
       - name: The turntable
         run: npm run turntable
 
-      # The tilt slosh's CPU half: a shallow-water dish that rings, reflects and
-      # damps under a user's tilt, and stays bounded (PLAN §18a).
+      # The tilt slosh's physics on the TypeScript reference (PLAN 18a-13a, 13d):
+      # two layers of shallow water that ring at the gap's wave speed, settle on
+      # a held tilt, damp at the drag's rate, break into bores at Stoker's speed,
+      # float an oil lens and ring out from a press, and stay bounded. Four
+      # processes side by side, about five minutes.
       - name: The slosh
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run slosh
@@ -571,6 +574,17 @@ jobs:
       - name: Lamp Ground 0 is the plate before the lamp
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run lampzero
+      # The slosh dish's GPU kernels are the reference scheme (PLAN 18a-13a, 13d;
+      # scripts/sloshgpu.mjs): the two-layer dish stepped on the GPU and in
+      # TypeScript through a tilt, a rocked oil lens, a press, a kick's dome and
+      # a bore, held together to a ten-thousandth, cell by cell. `npm run slosh`
+      # holds the TypeScript to the physics; this holds the shader to it. It runs
+      # again on the Mac's plate shard, against Metal.
+      - name: The slosh dish on the GPU
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        env:
+          PW_WEBGPU: '1'
+        run: npm run sloshgpu
       # No line round a bubble's hole in one dye (PLAN.md 33a,
       # scripts/holeline.mjs). The owner saw bubbles drawn with a blocky dark
       # outline: the edge line between two dyes fired on the depth step at a
@@ -1015,6 +1029,11 @@ jobs:
       - name: The ferrofluid maze's detail
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run maze
+      # The slosh dish's kernels against the TypeScript reference, on Metal
+      # (the same check runs on SwiftShader in Measure's lab part).
+      - name: The slosh dish on Metal
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        run: npm run sloshgpu
       # The magnet is a disc (PLAN 9v): the shader's field against Biot–Savart,
       # flatter over its face than the dipole was, a bigger one stronger at the
       # glass and reaching further, the default's spikes where they were.
