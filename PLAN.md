@@ -199,8 +199,9 @@ film's measure.
 Lane D: **5-downbeat** (S); **14t with 10.3-fast** (M: half tempo in the clock and in the
 bar grid together); **14e** (M, output latency and one lead per source); **10.2-shelf**
 (S) then **10.3-4otf, 10.3-sure, 10.3-half, 10.3-newsong, 10.3-fill** (S each);
-**10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11):
-**30a** shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
+**10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11,
+re-read 2026-10-24): **25h** areas that listen for themselves (M–L, first of §30's, the
+owner's 2026-10-24 ask for parts of the plate answering the music), **30a** shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
@@ -2579,7 +2580,11 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      a VJ app's effects can follow the plate.
    *Not started.*
 6. **Video in from a VJ app** (one PR): Syphon and NDI arrive as a Mixer source
-   (§11), not through a virtual camera. *Not started.*
+   (§11), not through a virtual camera. *Not started.* Beside the Mixer layer, the
+   picture can also be poured into the liquid as dye that the flow then carries (the
+   `pourVideo` path), the way the 1960s shows laid film loops and slides under the oil;
+   VS 2 (§30, 2026-10-24) takes a camera, Syphon or Spout feed as a source, and this
+   is ours. The phone gets the source picker.
 
 7. **A DAW bridge plugin** (asked 2026-10-04; two or three PRs, after step 2): an
    AU and VST3 plugin for Logic and Ableton that draws nothing and plays the running
@@ -6125,6 +6130,14 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   source (`notes`: velocity, pitch, held, per channel), so a note can ride any setting
   the way a band does. The measure adds a held note whose pour rises over its attack
   and falls over its release, each within 10% of its time.
+  *Chords placed (VS 2, 2026-10-24).* VS plays four voices a layer, held notes stacking
+  into a chord with each voice somewhere else on screen. Here a chord lands as several
+  drops at once, spread across the plate by pitch (a scale across it, as above), each a
+  real pipette drop whose volume is its velocity, meeting the others by the liquids' own
+  immiscibility. Each channel has a voice cap (four by default; the oldest held note gives
+  way) so a pad held on ten fingers does not flood the plate, and a channel can be sent to
+  an area (25h). The measure adds a three-note chord: three drops in one frame, ordered
+  across the plate by pitch, and a fifth held note releasing the first.
 - **24.4** *CV out* (after 24.1b). The plate back into the rack through the interface's
   DC-coupled outputs: how much dye is moving, where the brightest pool sits on the plate
   (x and y), the colour under a point, and a trigger when a drop lands. Then the liquid
@@ -6221,6 +6234,31 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
   Underground, fire kicks, difference the dye frames: the change should centre within
   about 0.06 of the bass area (turned by the plate's angle), and on classic at the
   middle (the check-skeptic's design).
+- **25h. Areas that listen for themselves** (added 2026-10-24 from Imaginando's VS 2,
+  §30; M–L, first of §30's list). The owner, 2026-10-24: the presets want more
+  complexity, more varied palettes and parts of the canvas reacting to the music. VS
+  gives each of its eight layers its own modulation matrix, MIDI channel, audio
+  modulators and hue cords, so a kick drives one layer and the melody another. Here an
+  area (`PlateArea`, `plateAreas.ts`) already takes the music's hands by band
+  (`areasForBand`: where a kick drops, where the bass pours), but every patch-bay cord
+  (`SceneMapping`) still moves one number for the whole plate, and every area draws on
+  one palette. Add an optional `area` to a cord, so its setting acts as a field that is
+  the plate's value outside the area and the cord's value inside it, eased over the
+  area's rim; and a colour family per area, so each area's bottles pour from their own
+  hues and one look holds two or three palettes. What acts in one place is what a
+  projectionist does to one place: the lamp's heat there (`addTemp` today; with 18f the
+  real thermocapillary spreading and thinning it drives, and until 18f that is a
+  shortcut named in the PR), stirring there (a paddle's local force, not a whole-plate
+  swirl), dye released there, and the pigment's hue there. A setting with no local
+  meaning (the Dimmer, the frame's grade) refuses an area. Nothing moves the frame, and
+  each cord reads only fast readings (the owner's rules). A cord with no area plays as
+  today, so every saved look and preset loads unchanged. A MIDI channel can take an
+  area too, with 24.3. On the phone, the patch view gets an area picker that shows the
+  areas on a thumbnail of the plate. *Measure:* in the lab, a band's cord with an area
+  changes the dye and velocity inside that area by at least 5x what it changes outside
+  (synthetic bursts in that band only, other bands silent); with two areas on two bands,
+  each answers only its own band; and the 25e count of lit regions on the looks
+  rebuilt with it, before and after. Then 28i's presets use it.
 
 
 ## 26. A reaction that prints: Turing stripes in black and white (proposed 2026-10-05)
@@ -7309,6 +7347,18 @@ check written first and built by Antigravity. None moves the whole frame by defa
 NDI, Syphon and Spout out (13.2, 13.3) stay where they are: VS ships all three, so a VJ
 expects them. The lights (14q, R8, 14m) stay next. §23 has VS's price.
 
+**Re-read 2026-10-24 (VS 2).** The owner sent VS 2's page and asked what to bring in;
+nothing in the list above had shipped. VS 2 shows one thing new to this plan: each
+layer listens and modulates on its own. That is **25h** (areas that listen for
+themselves), and it goes first, since it answers the owner's same-day ask for parts of
+the plate reacting to the music and more varied palettes. The rest folds into items
+already here: chords placed across the plate (24.3), a smoothed random and a restarted
+LFO (30b), a live picture poured in as dye (§13 step 6, video in) and a portrait clip
+(34f). The order now: 25h, 30a, 24.3, 30b, 14t-pc, then the rest as above. Not copied,
+as before: the shader editor and imports, the feedback layer, and anything that moves
+the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
+analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
+
 ### 30a. A sound cord has only a depth
 
 A patch whose source is `sound` or `bands` carries a depth and nothing else, so a kick
@@ -7339,6 +7389,12 @@ that moves the frame stays off by default as every frame-moving source is. On th
 rate and shape on the patch view. *Measure:* `npm run shapes` with each rate and shape
 set: the period within a frame of its bars at 120 and at 90 bpm, and an envelope fired
 by the kick on a recorded loop once per kick.
+*Added from VS 2 (2026-10-24).* Two shapes VS has and this lacks: a smoothed random (a new
+random target each period, glided to rather than stepped) beside the stepped one; and an
+LFO that restarts its cycle on a trigger (a note on a channel, the kick, a pad), so a
+sweep begins with the phrase rather than wherever the bar clock left it. The measure adds
+the smoothed random's slope bounded (no step larger than a frame's share of its range)
+and a restart landing within a frame of each kick on the recorded loop.
 
 **Not copied.** A shader editor and imports from Shadertoy, ISF or GLSL Sandbox: the
 plate is a simulated liquid, not a stack of shaders (the owner's rule to model the real
@@ -7811,7 +7867,9 @@ a grid of generic stock thumbnails: ours are the plate itself.
 - **34f. One-button share export.** *(S.)* §6's Render and Record make the file; the
   gap is a single "Save a clip with sound" on the desk and the phone that picks the
   container and size itself, with the small mark on the free site (§23). First the 3-minute
-  1080p render in §6 has to be measured on a Mac.
+  1080p render in §6 has to be measured on a Mac. A portrait frame (9:16, for Reels and
+  TikTok) beside landscape, as VS 2's recorder offers (§30, 2026-10-24): the plate
+  rendered at that aspect, not a crop of the landscape frame.
 - **34g. Legible reactions, named on the page.** *(S, copy.)* Kicks that stir the dye,
   a hit that seeds a bubble: these already exist in the sound patches (§28i-3). Name each
   look's reaction on its card in 34a and 34b ("kicks stir the ink") so a viewer sees that
