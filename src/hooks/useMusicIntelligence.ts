@@ -45,8 +45,18 @@ const LOCAL_MATCH_RETRY_MS = 6_000;  // local matching is free — try often whe
  * was 20 seconds, so half a short song could play under the last one's
  * colours. Matching is local and free; the cost is the four-second capture,
  * not the arithmetic.
+ *
+ * Six since PLAN 14z, from twelve. `npm run songends` runs this matcher over the
+ * same transitions the boundary is measured on, every song fingerprinted as
+ * heard before: a crossfade or a gapless join is never quiet, so this is what
+ * changes the look there. At twelve seconds it named the new song a median of
+ * 9.4 s into it after a 6 s crossfade; at six, 7.9 s (7.0 s gapless, 6.7 s
+ * gapless in a noisy room), and no wrong names at either. The capture holds the shared busy flag for
+ * four of every six seconds; the API's re-check, every 35 s, still finds its
+ * turn in the two between (the same share it had while nothing was known,
+ * when the retry here was already six).
  */
-const LOCAL_MATCH_INTERVAL_MS = 12_000;
+const LOCAL_MATCH_INTERVAL_MS = 6_000;
 const SILENCE_END_MS = 5_000;   // this long below the silence floor ⇒ listen ended
 const GAP_MS = 1_600;           // a dip this long looks like a between-song gap
 const SILENCE_VOLUME = 2.5;
@@ -434,8 +444,14 @@ export function useMusicIntelligence(
       if (currentTrack && silentFor > SILENCE_END_MS && !busyRef.current) {
         busyRef.current = true;
         const playedSec = Math.max(0, (lastLoudMsRef.current - listenStartMsRef.current) / 1000);
-        await finalizeListen('silence', playedSec);
-        busyRef.current = false;
+        // In a `finally`, like the two captures below: one throw here used to
+        // leave the flag up for the session, and with it identification, the
+        // local match and so the song-change half that rests on them (14s).
+        try {
+          await finalizeListen('silence', playedSec);
+        } finally {
+          busyRef.current = false;
+        }
         return;
       }
 

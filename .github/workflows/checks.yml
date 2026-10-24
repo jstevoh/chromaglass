@@ -217,8 +217,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run ghapi
 
-      # The ear: level traces through the real calibration into the boundary
-      # detector, synthetic songs through the real matcher, and the tempo
+      # The ear: synthetic songs through the real matcher, and the tempo
       # sources through the real beat clock.
       - name: The ear
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
@@ -246,6 +245,16 @@ jobs:
       - name: The bands
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run bands
+
+      # Where songs end and begin (PLAN.md 14z): eight real songs in
+      # scripts/fixtures/songs, decoded by the ffmpeg installed above, joined
+      # with gaps, gapless and crossfaded, in a quiet room and a noisy one,
+      # through the app's ear into the boundary; every song whole with no
+      # change inside it; and the local matcher naming each crossfade's new
+      # song. About two minutes on the runner's cores.
+      - name: Where songs end and begin
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: npm run songends
 
       # Sound learn: controls bound to the music. A synthesised song through
       # the analyser, the beat clock and the trigger engine frame by frame: a

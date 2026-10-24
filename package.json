@@ -34,6 +34,7 @@
     "cellride": "node --experimental-strip-types scripts/cellride.mjs",
     "scene": "esbuild scripts/scene.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/scene.mjs && node node_modules/.cache/scene.mjs",
     "music": "node --experimental-strip-types scripts/music.mjs",
+    "songends": "node --experimental-strip-types scripts/songends.mjs",
     "bands": "node --experimental-strip-types scripts/bands.mjs",
     "slowevolve": "esbuild scripts/slowevolve.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/slowevolve.mjs && node node_modules/.cache/slowevolve.mjs",
     "pacing": "esbuild scripts/pacing.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/pacing.mjs && node node_modules/.cache/pacing.mjs",

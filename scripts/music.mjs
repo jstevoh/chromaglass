@@ -1,140 +1,32 @@
 #!/usr/bin/env node
 /**
- * Does the show notice that the song changed?
- *
- * "On a New Song" is one of the few settings that changes what the audience
- * sees without anyone touching anything, and it hangs off one question asked
- * of the microphone twenty times a second: is the room quiet? This drives that
- * question with level traces rather than with a stereo and a stopwatch.
+ * Does the show know which song is playing, and keep time with it?
  *
  *   npm run music
  *
- * Each case is a level trace in dBFS at 20 Hz, fed through the same
- * `RoomTracker` the analyser uses and the same `roomIsQuiet` rule the hook
- * uses, into `SongBoundary`. What is reported is whether the boundary fired
- * and how long after the next song's first note it took.
- *
- * The gaps are the ones real players leave: a compact disc's two seconds,
- * a streaming service's one, a DJ's crossfade of none. Anything that needs a
- * gap longer than four seconds does not work on real music.
+ * The local matcher naming songs it has heard before (and never naming one it
+ * has not), the beat clock against a typed tempo and a loud room, and On a New
+ * Song's default. Where one song ends and the next begins is `npm run songends`,
+ * on recordings of real songs.
  */
 
 import { extractPeakHashes, buildIndex, addToIndex, forEachEntry, matchSnippet, FP_RATE } from '../src/lib/localFingerprint.ts';
-import { RoomTracker } from '../src/lib/audioCalibration.ts';
-import { SongBoundary, roomIsQuiet, DEFAULT_BOUNDARY } from '../src/lib/songBoundary.ts';
 import { TempoSource, bpmOf } from '../src/lib/tempo.ts';
 import { BeatClock, LevelOnsets } from '../src/lib/beatClock.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
-const HZ = 20;
-const DT = 1 / HZ;
-
-/** Music at a working level, with the level dipping between beats. */
-const MUSIC_DB = -18;
-/** A room with nobody playing anything: air conditioning and a mic preamp. */
-const ROOM_DB = -62;
-
-/**
- * One trace: seconds of music, a gap, more music. Level in dBFS per frame,
- * with a 2 Hz beat modulation so the "silence between beats" the gate exists
- * for is actually present.
- */
-function trace({ firstSong, gap, secondSong, fadeGap = false, roomDb = ROOM_DB, leadIn = 5 }) {
-  const out = [];
-  const push = (seconds, level) => {
-    for (let i = 0; i < Math.round(seconds * HZ); i++) {
-      const t = out.length * DT;
-      // A kick every half second: 6 dB of dip between hits.
-      const beat = level > roomDb ? -6 * (0.5 + 0.5 * Math.cos(2 * Math.PI * 2 * t)) : 0;
-      out.push(level + beat);
-    }
-  };
-  // Room tone first. The calibration seeds its floor from the first thing it
-  // hears, so a show started in the middle of a song has no idea what quiet
-  // sounds like until the first one arrives — and cannot call a gap until it
-  // does. Five seconds of an empty room is what turning the microphone on
-  // before the music actually looks like.
-  push(leadIn, roomDb);
-  push(firstSong, MUSIC_DB);
-  if (fadeGap) {
-    // A crossfade: never actually quiet.
-    for (let i = 0; i < Math.round(gap * HZ); i++) out.push(MUSIC_DB - 4);
-  } else {
-    push(gap, roomDb);
-  }
-  push(secondSong, MUSIC_DB);
-  return { levels: out, nextSongFrame: Math.round((leadIn + firstSong + gap) * HZ) };
-}
-
-/** Run one trace and report when (or whether) the boundary fired. */
-function run({ levels, nextSongFrame }, { useHeldGate, minGapMs }) {
-  const room = new RoomTracker();
-  const boundary = new SongBoundary(minGapMs ? { ...DEFAULT_BOUNDARY, minGapMs } : {});
-  let firedFrame = null;
-  let quietFrames = 0;
-
-  for (let f = 0; f < levels.length; f++) {
-    const cal = room.update(levels[f], DT);
-    // `useHeldGate` is what the hook did before: time the gap against the
-    // gate that exists to stop the visuals strobing.
-    const quiet = useHeldGate ? !cal.signal : roomIsQuiet(cal, 0, 0);
-    if (quiet) quietFrames++;
-    if (boundary.update(quiet, f * DT * 1000) && firedFrame === null) firedFrame = f;
-  }
-  return {
-    fired: firedFrame !== null,
-    lateMs: firedFrame === null ? null : Math.round((firedFrame - nextSongFrame) * DT * 1000),
-    quietSeconds: +(quietFrames * DT).toFixed(1),
-  };
-}
-
-const CASES = [
-  // A second or less is below what can be told from a break inside a song;
-  // a gapless set is for identification to catch, not for listening.
-  { name: 'gapless, 1 s gap', t: { firstSong: 30, gap: 1.0, secondSong: 10 }, expect: false },
-  { name: 'a CD, 2 s gap', t: { firstSong: 30, gap: 2.0, secondSong: 10 }, expect: true },
-  { name: 'a playlist, 3 s gap', t: { firstSong: 30, gap: 3.0, secondSong: 10 }, expect: true },
-  { name: 'a long 6 s gap', t: { firstSong: 30, gap: 6.0, secondSong: 10 }, expect: true },
-  { name: 'a DJ crossfade', t: { firstSong: 30, gap: 4.0, secondSong: 10, fadeGap: true }, expect: false },
-  { name: 'a rest inside a song', t: { firstSong: 30, gap: 0.4, secondSong: 20 }, expect: false },
-  { name: 'a gap too early to count', t: { firstSong: 8, gap: 3.0, secondSong: 10 }, expect: false },
-  { name: 'a loud room, 2 s gap', t: { firstSong: 30, gap: 2.0, secondSong: 10, roomDb: -44 }, expect: true },
-];
-
-const pad = (s, n) => String(s).padEnd(n);
-const verdict = (r, expect) => (r.fired === expect ? ' ok ' : 'FAIL');
-
-console.log('Timing the gap against the held gate — what the hook used to do:\n');
-console.log(`${pad('case', 26)} ${pad('fired', 7)} ${pad('late', 9)} quiet seen`);
-const before = CASES.map(c => {
-  const r = run(trace(c.t), { useHeldGate: true });
-  console.log(`${pad(c.name, 26)} ${pad(r.fired ? 'yes' : 'no', 7)} ${pad(r.lateMs === null ? '—' : `${r.lateMs} ms`, 9)} ${r.quietSeconds} s`);
-  return r;
-});
-
-console.log('\nTiming it against the unsmoothed verdict, gap 1.8 s:\n');
-console.log(`${pad('case', 26)} ${pad('fired', 7)} ${pad('late', 9)} quiet seen`);
-const after = CASES.map(c => {
-  const r = run(trace(c.t), { useHeldGate: false, minGapMs: 1_800 });
-  console.log(`${pad(c.name, 26)} ${pad(r.fired ? 'yes' : 'no', 7)} ${pad(r.lateMs === null ? '—' : `${r.lateMs} ms`, 9)} ${r.quietSeconds} s`);
-  return r;
-});
-
-console.log('');
 let failed = 0;
 const checks = [];
-CASES.forEach((c, i) => {
-  const ok = after[i].fired === c.expect;
-  if (!ok) failed++;
-  const moved = before[i].fired !== after[i].fired ? `   (was ${before[i].fired ? 'yes' : 'no'})` : '';
-  console.log(`${verdict(after[i], c.expect)}  ${c.name} — should fire: ${c.expect ? 'yes' : 'no'}${moved}`);
-});
 
-// A boundary that fires a second after the next song has started is no use to
-// anything that wants to change the look on the downbeat.
-const worst = Math.max(...after.filter((r, i) => CASES[i].expect && r.fired).map(r => r.lateMs));
-console.log(`${worst <= 400 ? ' ok ' : 'FAIL'}  the latest a real gap is noticed: ${worst} ms after the next song starts`);
-if (worst > 400) failed++;
+/*
+  The gap between songs used to be measured here, on level traces made up for
+  it: a CD's two seconds, a streaming service's one, a crossfade's none. It is
+  measured now on recordings of real songs joined the ways players join them,
+  in a quiet room and a noisy one, with whole songs that must not trigger
+  (`npm run songends`, PLAN 14z): made-up traces had no song ending in its own
+  decay, no last chord after a stop and no soft intro, which is where the old
+  rule went wrong.
+*/
 
 
 // ── Naming the track ────────────────────────────────────────────────
