@@ -107,6 +107,7 @@
     "bubbles": "npm run build && node scripts/bubbles.mjs",
     "dye": "npm run build && node scripts/dye.mjs",
     "sw": "npm run build && node scripts/sw.mjs",
+    "onehost": "node scripts/onehost.mjs",
     "qa:gpu": "QA_GPU=mid npm run qa",
     "bench": "npm run build && node scripts/bench.mjs",
     "map": "node --experimental-strip-types scripts/map.mjs",

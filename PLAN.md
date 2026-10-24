@@ -6187,12 +6187,32 @@ once the login works (23.14).*
   deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
   laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
   `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).
-- **23.16**: carry saved state from `web.app` to `.art`, then move returning users.
-  `index.html` currently redirects `chromaglass.web.app` to `chromaglass.art` only when
-  `navigator.onLine` holds, there is no `navigator.serviceWorker.controller`, there is no
-  saved ChromaGlass state in `localStorage` (licence, signed-in flag, settings, set list),
-  and there is no `?remote` or `?cast`, so returning users and offline shows do not lose
-  their origin-scoped state before a handoff moves it across.
+- **23.16** (**shipped**, this PR): one address. The owner asked (2026-10-24) for
+  `chromaglass.web.app` "to always immediately forward to chromaglass.art"; it moved only a
+  fresh visit, because localStorage belongs to the origin and a plain redirect would have left
+  a returning visitor's licence, presets and set lists behind. `index.html`'s first script now
+  forwards `chromaglass.web.app` and `chromaglass.firebaseapp.com` to the same path, query and
+  fragment on `chromaglass.art`, carrying the old name's `chromaglass*` keys in the fragment;
+  the new name writes them before the app's module runs, only from an old-name referrer, never
+  over a key it has, and leaves behind the signed-in flag, account email, pending email link and
+  crash logs (one sign-in on the new name; the account gives the key back, 23.12). It stays
+  for Firebase's `/__/` pages, offline, a cached show whose network does not reach
+  `chromaglass.art`, a `?cast` window with an opener, and state over 900,000 characters.
+  Hosting's own redirects match paths, not hosts, so firebase.json cannot do it on one site.
+  *Measure:* `npm run onehost` (20/20; 8/20 on the old page, and the referrer guard and the
+  keep-what-it-has rule each turn their checks red when taken out), in `Measure · lab`.
+  The address itself was checked the same day: one A record at GoDaddy (Firebase's
+  199.36.158.100), www and http both 301 to `https://chromaglass.art/`, Google Trust Services
+  certificates for both names (2026-10-18, in CT logs).
+  - **23.16a** (open): what the forward cannot carry. IndexedDB (`chromaglass-music`: song maps,
+    per-track state and fingerprints are worked out again; its `performances` store is not and
+    stays on the old name), the Firebase
+    session (signed in again once), a browser that strips the referrer (its state stays on the
+    old name), and an installed web.app app, whose window now opens chromaglass.art out of its
+    scope: install again from chromaglass.art. A second Hosting site for `chromaglass.art`, with
+    a redirect-only release on the default site, would make the forward a 301, at the cost of
+    moving the custom domain and its certificate; worth it only once 23.16 has carried most
+    returning visitors across.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free

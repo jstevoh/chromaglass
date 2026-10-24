@@ -25,32 +25,131 @@
     -->
     <script>
       if (/[?&](remote|cast)(=|&|$)/.test(location.search)) document.documentElement.classList.add('cg-no-intro');
-      // Only a fresh, online show visit moves from chromaglass.web.app to
-      // chromaglass.art immediately: localStorage and the service worker belong
-      // to the origin, so an offline browser at a gig, a returning browser with
-      // saved state (licence, signed-in flag, settings, set list), or a ?remote
-      // or ?cast view stays on chromaglass.web.app until 23.16 carries saved
-      // state across.
-      if (
-        location.hostname === 'chromaglass.web.app' &&
-        !location.pathname.startsWith('/__/') &&
-        navigator.onLine &&
-        !(navigator.serviceWorker && navigator.serviceWorker.controller) &&
-        !/[?&](remote|cast)(=|&|$)/.test(location.search)
-      ) {
-        try {
-          var hasSavedState =
-            localStorage.getItem('chromaglass:license-key') ||
-            localStorage.getItem('chromaglass-signed-in') ||
-            localStorage.getItem('chromaglass-music-settings') ||
-            localStorage.getItem('chromaglass-setlist') ||
-            localStorage.getItem('chromaglass-sets') ||
-            Object.keys(localStorage).some(function (k) { return k.indexOf('chromaglass') === 0; });
-          if (!hasSavedState) {
-            location.replace('https://chromaglass.art' + location.pathname + location.search + location.hash);
+    </script>
+    <!--
+      One address (PLAN.md 23.16). The owner asked, 2026-10-24, for
+      chromaglass.web.app "to always immediately forward to chromaglass.art",
+      and the same goes for chromaglass.firebaseapp.com, Firebase's other
+      default name for the same site.
+
+      Why here and not in firebase.json: Hosting's redirects match a path,
+      never a host, and every name of a site serves the same release, so a
+      301 there would send chromaglass.art to itself. The other way is a
+      second Hosting site for chromaglass.art with a redirect-only release on
+      this one, which means moving the custom domain and its certificate in
+      the console, an outage while Google issues a new one, and still losing
+      what a returning visitor has saved. This script is the first thing in
+      the page: it runs before any stylesheet, image or module is asked for,
+      so the forward costs the one round trip that fetched this page.
+
+      What a 301 would lose, and this carries: localStorage belongs to the
+      origin, so a returning visitor's licence key, settings, presets, set
+      lists and MIDI map live on chromaglass.web.app and chromaglass.art
+      cannot read them (an iframe of the old name inside the new one gets a
+      partitioned, empty store in Chrome, Safari and Firefox alike). The old
+      name packs its own chromaglass* keys into the address's fragment, which
+      a browser never sends to a server, and the new name writes them back
+      before the app's module runs (modules wait for the parse; this does
+      not), then takes the fragment out of the address bar.
+
+      What is left behind, on purpose:
+        - The signed-in flag and the account's email. Firebase keeps the
+          session itself in IndexedDB under the old origin; a flag carried
+          without it would open the show as "signed in" with no account
+          behind it. The visitor signs in once on chromaglass.art; the
+          account gives their licence key back (23.12) if it was not carried.
+        - A half-finished emailed-link sign-in (the pending email) and a
+          Google redirect in flight. Accepting a pending email from an
+          address would let a link sign someone into another person's
+          account; the sign-in screen asks for the email again instead.
+        - Crash logs, which are this browser's diagnostics, not settings.
+        - What is in IndexedDB: the song maps and per-track state, which are
+          worked out again from the music.
+      The new name only accepts a fragment that came from the old one
+      (document.referrer is the old origin after a script redirect; a link
+      from anywhere else is ignored), never replaces a key it already has,
+      and takes only string values under chromaglass* names.
+
+      What stays on the old name:
+        - Firebase's own /__/ paths (the auth handler is authDomain's page).
+        - A browser that says it is offline: the old name's service worker
+          has the page, and chromaglass.art may not be cached there yet.
+        - A page under the old name's service worker checks chromaglass.art
+          answers first: navigator.onLine is true on a gig's router with no
+          internet, and forwarding there would trade a working cached show
+          for a page that cannot load.
+        - A ?cast window opened by a show still running on the old name: it
+          talks to its opener by postMessage, which needs the same origin.
+        - More saved state than an address can hold (over 900,000
+          characters; Firefox stops at about a million). It stays, whole,
+          rather than arriving in part. `npm run onehost` measures all of it.
+    -->
+    <script>
+      (function () {
+        var OLD = ['chromaglass.web.app', 'chromaglass.firebaseapp.com'];
+        var HOME = 'https://chromaglass.art';
+        var TAG = '#cg-carry=v1.';
+        var LEFT = /^chromaglass(-signed-in|-auth-email|-pending-email|-redirect-pending|-recovered|-landing-seen|-crash|:crash)/;
+        var MAX = 900000;
+        function toB64(s) {
+          var b = new TextEncoder().encode(s), bin = '';
+          for (var i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+          return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+        function fromB64(s) {
+          var bin = atob(s.replace(/-/g, '+').replace(/_/g, '/')), b = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+          return new TextDecoder().decode(b);
+        }
+        var host = location.hostname;
+
+        if (OLD.indexOf(host) >= 0) {
+          if (location.pathname.indexOf('/__/') === 0 || !navigator.onLine) return;
+          if (/[?&]cast(=|&|$)/.test(location.search) && window.opener) return;
+          var go = function () {
+            var saved = {}, any = false;
+            try {
+              for (var i = 0; i < localStorage.length; i++) {
+                var k = localStorage.key(i);
+                if (k && k.indexOf('chromaglass') === 0 && !LEFT.test(k)) { saved[k] = localStorage.getItem(k); any = true; }
+              }
+            } catch (e) { /* storage refused: nothing to carry */ }
+            var hash = location.hash.slice(1), frag = location.hash;
+            if (any) {
+              frag = TAG + toB64(JSON.stringify(saved)) + (hash ? '&cg-hash=' + encodeURIComponent(hash) : '');
+              if (frag.length > MAX) return;
+            }
+            location.replace(HOME + location.pathname + location.search + frag);
+          };
+          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            var late = false;
+            setTimeout(function () { late = true; }, 4000);
+            fetch(HOME + '/favicon.svg?reach=' + Date.now(), { mode: 'no-cors', cache: 'no-store' })
+              .then(function () { if (!late) go(); }, function () { /* unreachable: the cached show plays here */ });
+          } else {
+            go();
           }
-        } catch {}
-      }
+          return;
+        }
+
+        if (location.hash.indexOf(TAG) === 0) {
+          var rest = location.hash.slice(TAG.length), cut = rest.indexOf('&cg-hash=');
+          var payload = cut >= 0 ? rest.slice(0, cut) : rest;
+          var was = cut >= 0 ? '#' + decodeURIComponent(rest.slice(cut + 9)) : '';
+          try { history.replaceState(history.state, '', location.pathname + location.search + was); } catch (e) { /* the fragment stays in the bar */ }
+          var from = '';
+          try { from = new URL(document.referrer).hostname; } catch (e) { /* no referrer */ }
+          if (OLD.indexOf(from) < 0) return;
+          try {
+            var got = JSON.parse(fromB64(payload));
+            for (var key in got) {
+              if (!Object.prototype.hasOwnProperty.call(got, key) || typeof got[key] !== 'string') continue;
+              if (key.indexOf('chromaglass') !== 0 || LEFT.test(key) || localStorage.getItem(key) !== null) continue;
+              localStorage.setItem(key, got[key]);
+            }
+          } catch (e) { /* a broken fragment carries nothing; the old name still has it all */ }
+        }
+      })();
     </script>
     <style>
       html, body { background: #000; }
