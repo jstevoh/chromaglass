@@ -3411,8 +3411,9 @@ for, and the GPU was asked for only after they had arrived and drawn.
   before by `npm run flakes -- --check 'no stop in the opening'` (week before,
   2026-10-11 to 18: 26 FAIL of 167 Mac startup runs, 16%, 11 of them green on the same
   commit; this PR's first version went red on its own first run, 2.07 s from 2.59 s,
-  with the 200 ms cap below fired before the mount frame had rendered, so the number
-  after is still owed: one branch's runs cannot judge a one-in-six flake).
+  with the 200 ms cap below fired before the mount frame had rendered). The week
+  after, 2026-10-17 to 24: 41 FAIL of 193 (21%), on 25 branches and on main, so it did
+  not help; 14v-7 says why and what changed instead.
   Named shortcuts and retunes: four animation frames is a heuristic for "the mount
   frames have been presented" (the compositor keeps up to two frames in flight, and
   the CI Mac's post-mount frames took 0.30–0.39 s over three to four frames), not a
@@ -3439,6 +3440,20 @@ for, and the GPU was asked for only after they had arrived and drawn.
   the remaining compute kernels). `npm run startup` prints the page's first compute
   pipeline ("first compile asked …, given …"), judged by nothing.
 
+- **Shipped, 14v-7: a frame gap while the intro is held still counts only the page's own
+  work in it** (2026-10-24, the owner's choice). All 41 reds of "no stop in the opening"
+  in the week to 10-24 were Chromium giving the device or compiling its first kernel
+  with the page idle (its own long tasks 0.83 s at most) and a still intro on screen,
+  every gap over before the intro let go. Inside the still stretch a gap now loses only
+  the time the page's own timer kept ticking on time (`TICK_FREE_MS` 250), up to
+  `STILL_IDLE_CAP_S` 4.5 s all told, and only of a still that let go; outside it, and for
+  heartbeats and steps, the 2 s bar is unchanged. Six synthetic openings check the rule on
+  every run. Replayed on the logs by long tasks alone: 41 red to 0; the ticks in the gaps
+  are not printed, so the week after decides. Named limit: the GPU process's compiles of
+  the app's shaders inside the still stretch are not counted (1, 1b and the first step's
+  cap hold their length). Story in
+  `docs/plan-shipped.md` §14v-7; judged by `npm run flakes -- --check 'no stop in the
+  opening'` over the week after.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
@@ -5438,6 +5453,30 @@ Not a gate and no bar: a rate depends on what was pushed.
   on 14v-6; the Blow on its paused root cause; render-app's "same seed twice draws the
   same frames" (11 of 128, 8 branches), the renders lines and ferrodrift's have no item
   yet and are next to read.
+  Read again 2026-10-24 (254 runs, 2,722 jobs, the week from 10-17), worst first, with
+  what became of each: startup's "no stop in the opening" 41 of 193 (14v-7, shipped);
+  tools' Blow 13 of 187 on 12 branches (its paused root cause,
+  `/mnt/project-files/handoff/blow-check-flake.md` is the owner's, not the repo's); the
+  phone's double tap on Speed 10 of 173 (19ac-1, shipped); the magnet's two pool lines 9
+  of 164 each, on 6 branches and green on the same commit only once (more a branch's than
+  the check's: read before touching); the renders lines 8 of 191 each, every red on a
+  runner drawing 14 to 22 frames a second where the line wants about 30 (19aa-6);
+  startup's "moving for good no later than the old way" 7 of 193 (19aa-7); the phone's
+  two fingers holding Drop 4 of 172 (19h-2, a solver rebuilt by the governor in the
+  window is the lead). Two deploys went red on one-off Mac flakes on 10-24.
+- **19aa-6. The renders lines on a starved runner.** `renders`' "the ear is reading" and
+  "the plate hears a new reading on four frames in five" (laptop, the band) and "the
+  plate's Dimmer moves at least twice as often as the desk's" (phone, a fader): 8 of 191
+  each, every red with the page drawing 1.7 to 22 frames a second (the band) or 14.6 to
+  22.5 (the fader) in the first of its two windows and the second window fine. So the
+  first window meets a page not yet up to speed. Find what the page is doing then (a
+  look still compiling behind, the governor's first move) and wait for that, by name, not
+  for longer: the line is right to ask for the readings at the page's own rate.
+- **19aa-7. Startup's "moving for good no later than the old way" 7 of 193.** Every red
+  read the show's own wait 1.8 to 3.0 s against the control's 0.7 to 1.1 s, with 1 s
+  spare, and moving for good 2.4 to 7.6 s earlier than the control. Not read further;
+  the next thing is whether the show's "own" here includes the still intro's idle
+  stretch that 14v-7 now sets apart in check 4 (the same Chromium wait, priced twice).
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Red on #390's PR and its deploy
   and about 1 run in 6 in parallel (2 of 12 on main's code), on a line it should not
   have failed: the track panel's section against the band's. Three readings were taken
@@ -5517,30 +5556,16 @@ Not a gate and no bar: a rate depends on what was pushed.
 
 ### 19ac. The phone's double tap on Speed is judged on two taps landing in time
 
-- **19ac-1. `Play: a double tap on Speed puts it back to the look's own speed` has no
-  grip on the window it depends on.** `scripts/phone.mjs:1159`. Red once on PR #429
-  (`377/378`, the Mac `show` shard) and green on four other runs of the same afternoon,
-  on a PR that touches neither the phone nor the app. The detail it printed was
-  `0.009 → 0.28 → 0.005`: the slider was moved to 0.28 by the first part of the test,
-  then the two taps at three-tenths of the track left it at 0.005 rather than back at
-  0.009. 0.005 is where a *single* tap at three-tenths puts it, so what failed is not
-  the reset — the app never saw a double tap at all. The second tap fell outside its
-  window.
-
-  The check waits 60 ms between the taps and asserts `reset === before` as strings, and
-  that is the whole of its grip: nothing asserts that the app registered a double tap, so
-  a missed window and a broken reset are the same red, and the printed line reads like
-  the reset went to the wrong value when in fact it never ran. Under a loaded runner a
-  synthetic `touchscreen.tap` pair can straddle any fixed window, which is the flake.
-  Two things to do, and the first matters more than the fixing of the flake: have the
-  check read whatever the app exposes for "a double tap was seen" (or the edited flag
-  clearing) and fail *separately* when the gesture did not land, so the red names its
-  own cause; then make the gap deterministic against the app's own window rather than a
-  bare 60 ms — read the constant the phone uses instead of guessing under it. Do not
-  simply widen the tolerance on `reset`: a value that is close to the look's speed is
-  not the same claim as the look's speed, and the check is right to compare exactly.
-  Found while measuring 0-tap (PR #429).
- Lace and holes: a pale film torn open over colour
+- **19ac-1. The double tap's two taps carry a finger's times (shipped 2026-10-24).**
+  `scripts/phone.mjs`; red on 10 of 173 Mac runs the week to 10-24, always
+  `0.009 → 0.28 → 0.005`, because the harness's taps were stamped when the busy page took
+  them (95 ms apart idle, 466 ms with the page busy 400 ms), past `DOUBLE_TAP_MS` 320.
+  Now stamped 90 ms apart and sent 0.4 s apart, so only the stamps can make it pass, with
+  a control stamped 0.6 s apart that must not reset. Story in `docs/plan-shipped.md` §19ac-1.
+- **19ac-2. How long a tap on the phone's sheet takes to answer is unjudged.** The double
+  tap now prints it ("handled N ms apart"); the old red implied up to about 400 ms on a
+  busy Mac runner. Bound it where the phone's frame and renders checks live, from a
+  measurement on the Mac, not from this line.
 
 ### 19ad. The `open` shard flakes on four unrelated faults
 
@@ -6856,15 +6881,37 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - **27f-3. Beat Squeeze presses a sheet, locally (shipped 2026-10-22; the owner picked the
     local sheet on the thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
     lays one dent as wide as a 0.1 mm sheet bends over the liquid in the kick's hold
-    (elastohydrodynamic bending length); Bass Drop keeps the glass. `npm run rides` holds it.
-  - **27f-4, open. The sheet solved, not stamped.** 27f-3 lays the dent's held shape (a clamped
-    bowl, within a tenth of the true profile) and gives it back over KickRelease's third of a
-    second. The real sheet is w_t = (h³/12μ)∇²(D∇⁴w − F): linear at these depths, so exactly
-    solvable per Fourier mode on its own grid (an exponential integrator, unconditionally
-    stable), which would also give the release its true pace (the dent spreading as t^(1/6)
-    and shallowing as t^(−1/3), slow on syrup) and the ring the dent lifts round itself (13% of
-    its depth at 3.4ℓ). That ring needs the gap opened past rest, which the shader's
-    squeezeUpdate never does (a lift stops at rest): the same item as the lift's ceiling.
+    (elastohydrodynamic bending length; with the liquid's weight since 27f-4); Bass Drop keeps the
+    glass. `npm run rides` holds it.
+  - **27f-4. The sheet solved, not stamped (shipped 2026-10-24; story in docs/plan-shipped.md
+    §27f-4).** The kick is a fingertip on a sheet floating on the liquid, solved each step on its
+    own grid, exactly per Fourier mode (lib/sheet.ts): its bending, the liquid's weight under it
+    (which 27f-3's reach left out, and which is the larger at a dent's size) and the dish's open
+    rim. Laid on the gap through its own channel, past rest where its ring lifts. `npm run sheet`
+    holds it (judging.md §68).
+  - **27f-8, open (shortcuts named in 27f-4).** (a) The sheet's mobility is the rest depth's,
+    h₀³/12μ, where the film under a deep dent drains as h³: at full Beat Squeeze the dent's middle
+    is half the gap, an eighth of the mobility. The full equation is nonlinear (a semi-implicit
+    step with the linear one as its preconditioner is stable while the mobility is under twice
+    the rest's), at about five transforms a step against one. (b) The sheet's rim is the plate's
+    square; the dish's is its circle. (c) The gap under the sheet is the 6 mm middle everywhere,
+    not the dome Plate Curve makes: on a dome a kick presses no deeper than the rest under its
+    middle (kickRoom) and the shader owes what its floor refuses of a dent's flank, so nothing
+    ratchets, but a dent's shape and pace are the flat plate's. (d) Each kick's force is set from the volume the stamp pressed out,
+    not a hand's (a fixed fingertip force would press glycerine's dent shallower), and the
+    middle is capped at two thirds of the gap (SHEET_DEEPEST), where (a) bites hardest: full
+    Beat Squeeze reaches it on every liquid with 61 to 78% of the stamp's volume. (e) The slosh
+    dish's press (stepSlosh's dishKicks) still holds and lets go on the stamp's timings
+    (glassHeld, KICK_RELEASE), not the sheet's.
+    (f) The layer drains by lubrication (Reynolds), which needs its viscous time h²/ν short against
+    the motion: at 6 mm 36 s in water, 1.6 s on the default oil (Thickness 0.45), 0.036 s in
+    glycerine, where the solved dent (k = 1/14 mm) relaxes in 0.6 ms, 13 ms and 0.57 s. Only
+    glycerine is in the regime; the oil is about 125× outside it, water 6×10⁴. There the liquid's
+    inertia sets the pace: let go, the dent rings as a flexural-gravity wave under the sheet,
+    ω² = (gk + Dk⁵/ρ) tanh kh, a period near 0.27 s at that k, damped by the Stokes layers
+    (δ ≈ 1.4 mm on the oil): a couple of swings on the oil, many in water, where the lubrication
+    sheet has it gone within a frame. The inertial sheet (a damped wave per mode, still exact per
+    step) is the fix; judging.md §68 asks whether the missing swing shows.
   - **27f-5. The rock lifts the oil, not the frame (shipped 2026-10-24; story in
     docs/plan-shipped.md §27f-5).** On a tipped thin gap oil rises uphill through the water at
     Hele-Shaw's speed (`OIL_LIFT`, in SI), laid as the closed dish's circulation so an even sheet

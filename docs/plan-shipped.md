@@ -1988,6 +1988,51 @@ map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` boun
 `NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
 governor's ladder and the cache as they were.
 
+#### 14v-7. A frame gap while the intro is held still counts only the page's own work
+
+Shipped 2026-10-24, the owner's choice on a card ("judge pauses the audience sees").
+`npm run startup`'s "no stop in the opening" was the loudest check on CI: 41 FAIL of 193
+Mac runs in the week to 10-24 (`npm run flakes`), 25 branches, 4 of them main's, 20 green
+on the same commit; the week before 14v-6 it was 16%. Every one of the 41 logs read:
+
+- the longest frame gap 2.02 to 3.97 s, beginning 0.24 to 4.08 s in;
+- inside Chromium's own waits: the device given up to 3.7 s after it was asked, or the
+  first compute kernel of all (`fluid/fill`, a few lines) given 2.4 to 4.6 s after;
+- the page's own long tasks in the gap 0.83 s at most, none in 38 of them, and nothing
+  made, written or submitted in it;
+- every gap over before the intro let go of its still (4.64 to 11.96 s), the stretch
+  `introStill` (14v-5) holds the mark still exactly because the GPU stops the frames then.
+
+4b already took out the time the page's thread was held as well; in these the thread ran
+and only the frames stopped. Two fixes on the app's side had failed (#396 warmed the
+compiler, 14v-6 reordered the asks), and nothing a page does makes Chromium give it a
+device sooner. So, in `openingGaps`, a frame gap that would count past the bar loses,
+inside the still stretch, the time the page was seen free: between two ticks of its own
+100 ms timer no more than `TICK_FREE_MS` (250 ms) apart. At most `STILL_IDLE_CAP_S`
+(4.5 s, above the 41 gaps' 3.97 s and Chromium's start's 4.18 s) comes out all told, only
+of a still that let go (capped at the intro's leaving), and only when long tasks and the
+timer can be seen at all. Outside the still stretch, and for heartbeats and steps,
+nothing changed, and the 2 s bar did not move. The line prints how much of its gap was
+the still intro with the page seen free.
+
+The first draft took out everything but the page's long tasks and pagehold's after-await
+stretches. The check-skeptic fed it synthetic openings: 2.5 s of the page's code after a
+pipeline's promise at 3.5 s, or a chain of 0.45 s continuations, read as idle, since such
+code is not a long task in every Chromium and pagehold's stretches begin only in the first
+3 s; a still that never let go excused everything up to the intro's 60 s cap. The timer
+answers all three, and `stillCases` now runs six such openings on every run (excused,
+code after an await, a continuation chain, a gap across the still's end, a still never let
+go, the cap), each of which a mutant of the rule turns red. Replayed on the 41 logs by
+their printed long tasks: 0 red; the timer's ticks inside the gaps are not printed (its
+median was 108 to 118 ms in all 41), so the week after, by `npm run flakes`, decides. The
+new count is never more than the old, so no green run turns red.
+
+Named limit: a stop the GPU process makes for the page while the intro is still (its
+compiles of the app's shaders) is no longer counted here; its length is held by checks 1
+and 1b and the first step's cap. Weighed and not taken: one automatic re-run (about 4%
+red instead of 21%, and it hides a real one-in-five), warming Chromium's GPU in a page
+before the measured one (untested, and #396's warm in the same page did not help).
+
 ### 14m. Anyone on the venue's network can drive the show
 
 **Shipped** (this PR). What changed, in `server/remote-server.js` unless named:
@@ -3579,6 +3624,27 @@ sync wrapper rethrowing Node's own error fails two. `deploygate.sh` still puts t
 on curl's command line, readable through `ps` while it runs on the owner's machine:
 19aa-4.
 
+### 19ac-1. The double tap's two taps carry a finger's times
+
+Shipped 2026-10-24. `npm run phone`'s "Play: a double tap on Speed puts it back to the
+look's own speed" was red on 10 of 173 Mac runs in the week to 10-24, 5 of them green on
+the same commit, every one reading `0.009 → 0.28 → 0.005`: both taps landed (0.005 is
+Speed at a third of the track) and the second was not taken as the other half of a double
+tap. `TouchSlider` reads a double tap from the two lifts' `timeStamp`s, at most 320 ms
+apart, which on a phone are the finger's times. Playwright's `touchscreen.tap` stamps
+none, so Chromium stamps each event when it reaches it, and the second tap is sent only
+once the page has handled the first: in a plain page whose pointerup kept the thread
+busy, two such taps 60 ms apart read 95 ms apart idle, 217 ms busy 150 ms and 466 ms busy
+400 ms; the same taps sent with their own times read 80 ms apart busy 400 ms. So the
+check measured how quickly the page answered the first tap, which a finger never waits
+for. The taps are now sent through `Input.dispatchTouchEvent` with times 90 ms apart; a
+second tap is sent no sooner than 0.4 s after the first, past the window, so the line
+passes only if the stamps are what the app reads, and no stamp is ever in the future;
+both lifts must reach the app within 15 ms of their stamps, so a red names the instrument;
+and a control stamped 0.6 s apart must leave Speed where one tap there puts it. The line
+prints how far apart the app handled the lifts (the page's own lag, which no check bounds
+for the phone's sheet yet: 19ac-2).
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
@@ -4165,6 +4231,79 @@ back 95% of the way at the default, 89% at full. Shortcuts (27f-4): the ring the
 never opened past rest), the reach is read at the 6 mm middle, and the release is KickRelease's
 third of a second rather than the sheet's own slower relaxation.
 
+### 27f-4. The rhythm sheet solved, not stamped (2026-10-24)
+
+27f-3 laid the kick's dent as its held shape (a clamped bowl 2.28 bending lengths across) and gave it
+back by a cosine over a third of a second. Now the sheet is solved (lib/sheet.ts `RhythmSheet`): a
+fingertip of 5 mm on 0.1 mm of polyester floating on the 6 mm layer, D∇⁴w + ρg w = F − p, the layer
+draining under it by lubrication, so w_t = M∇²(D∇⁴w + ρg w − F) with M = h₀³/12μ. Linear with
+constant coefficients, every Fourier mode has its own exact step, e^(−λdt) and the load's
+(1 − e^(−λdt))/(Dk⁴ + ρg), λ = Mk²(Dk⁴ + ρg): 128² modes on a box twice the plate's side, the plate
+in one corner and its negated mirror images in the others, so every mode is a product of sines and
+the sheet is held at rest, at the open air's pressure, on the plate's edges (the dish's open rim,
+whose reservoir lets the liquid out and back). One inverse transform a step, done as half a complex
+one because the sheet is real: 0.7 ms in node on the app's 192 plate. Each kick presses out from
+under the sheet, within the dent's reach, as much liquid as the stamped bowl closed there
+(stampedVolume, the shader's Stefan closing of the bowl), its middle capped at two thirds of the
+gap, so the dial moves the colour as it did. Pressed first only as deep in the middle as the bowl,
+the finger's sharper dent moved `npm run rides`' ring 1.9 cells at the default and 3.4 at full,
+against the stamp's 3.0 and 6.8 and the line's 4. The change is laid each step through its own channel (applyDeltas'
+`sheet`, squeezeUpdate's `sheetT`), as solved: no Stefan closing on top, and no ceiling at rest, which
+would have cut the ring and ratcheted the gap closed where it went. The plate's spring is taken on
+the sheet too, so what is laid is only the sheet's own motion. Off the GPU or off a thin gap the
+stamp stays.
+
+What the solve found. The liquid's weight was missing from 27f-3's reach: a floating sheet pushed
+down is held up by Archimedes as well as by its stiffness, the two balancing at (D/ρg)^(1/4), 14 mm,
+which is smaller than a dent. And the weight levels the layer as a puddle levels, at Mρg: 0.18 m²/s
+in water, 8e-3 on the default oil, 2e-4 in glycerine. Without it, kicked twice a second the dish's
+mean gap sank by more than half a dent's depth in a minute (the liquid pushed out under the sheet
+stood outside the dish and came back only through the box's slowest modes); with it and the rim,
+within 1.5% on the oil. 27f-4's own text had two things wrong: the dent does not shallow as
+t^(−1/3) (with no net volume an unbounded sheet's goes as t^(−2/3), and on the plate the rim takes it
+first), and syrup is not slower for the bending alone (every time in that solution is t/T; it is
+the weight, levelling a thin liquid fast and a thick one slowly, that makes it so).
+
+Measured (`npm run sheet`, 16 checks, node and the lab): the held dent within 1% of the integral of
+the same equation in water, the default oil and glycerine; 57, 43 and 24 mm to its zero, a ring of
+2%, 7% and 14% round it (the reach dentRadius now takes, by quadrature, within 5% of the solve's:
+35, 27 and 15 cells of 128, where the bending length alone said 47, 28 and 15); let go, water
+levels within a frame (96%), the oil gives back 96% in a fifth of a second and glycerine three
+quarters, each within 1% of the theory while the dent is the finger's and not the rim's, and
+water's last of it goes as the dish's slowest mode (0.231 a frame against e^(−λ₁/60) 0.231). On the
+plate the gap is the solve's cell for cell to 0.03% of a dent, held, letting go, after a dozen kicks
+and let go; the ring stands 7.6% of a dent past rest where the same change laid as a press is cut
+at rest; a dozen kicks and twenty seconds later the dish's mean is within 0.02% of a dent of rest;
+and past 4ℓ from a held kick the liquid moves 0.43 as fast as under the stamp. `npm run rides`'
+Beat Squeeze lines now press the solved sheet: its ring 30 cells out goes 2.7 cells at the default
+and 4.6 at full (the stamp's 3.0 and 6.8), 70 cells out 0.69, far off 0.175 of the glass's where a
+stamp's volume would say 0.339, and comes back 99% and 100%. The line that asked the reach to go
+exactly as μ^(−1/6) now asks it to narrow with thickness, the solve's (`npm run sheet` holds it
+against the grid), and the one that asked the far ring to move by the stamp's displaced volume now
+asks it to move less. Shortcuts (27f-8): the mobility is the rest depth's,
+the sheet's rim is the plate's square, the gap under it the 6 mm middle, the force set from the
+volume, the slosh dish's press keeps the stamp's timings, and (f) the layer drains by lubrication,
+which is the liquid's own pace only in glycerine.
+
+The review (the PR's one Opus pass) held the solve and found two places where it met the plate
+wrongly. On a dome (Plate Shape below zero) the middle rests near the floor; a dent there closed
+more than the gap had, the floor refused it, and the sheet's opening was then laid back in full,
+so every kick near the middle left the gap more open: at Plate Shape −1 a dozen default kicks left
+the middle a whole dent past rest and the dish's mean 10% of a dent open (13.5% at full; −0.5 at
+full 44.8% and 2.2%). Now a kick presses no deeper than the dome's rest under it (`kickRoom`), and
+the shader owes what its floor refuses (the squeeze texel's fourth number, paid out of the sheet's
+next openings, taking the spring as the gap does): read against each dome's own rest, a dozen kicks
+and let go, the gap is the solve's to 0.12% of a dent cell for cell and the mean within 0.06%. And
+the sheet set `pressed` on every cell it moved, which is every cell, so the press memory stopped
+for every other press while a kick's sheet was live: a hand press's push after it went from −4.5e2
+a step to under 3. The memory now carries a rate of its own (the texel's third number, this step's
+without the sheet's), and the same press reads the same, step for step, with a sheet live across
+the plate. The squeeze texture is RGBA32 for those two numbers. Also named by the review: Reynolds
+needs the layer's viscous time h²/ν short against the motion, true only in glycerine (27f-8(f));
+`rides`' far line now asks both ways against the solve's own share of the stamp's volume that
+leaves 70 cells (0.568, so 0.193 against the 0.175 read), and the quiet asks for the slowest
+mode's time (oil 1.400 s against 1.391), not 255 s.
+
 ### 27f-5. The rock lifts the oil, not the frame (2026-10-24)
 
 Oil on a tipped plate is lighter than the water round it (light mineral oil, 880 kg/m³), so
@@ -4180,7 +4319,7 @@ the water's colour alone (Oil Bodies' own share taken off, `WATER_DYE`), over it
 on the GPU this step (`hsOilMean`): weighed whole, a Clock Glass body's colour pulled it
 downhill about nine times as hard as its oil lifts, so the bodies sank against their buoyancy.
 
-Measured (`npm run oillift`, lab, sinθ 0.1): a lens rises at 6.22 mm/s against Hele-Shaw's 6.40
+Measured (`npm run oillift`, lab, sinθ 0.1): a lens rises at 6.21 mm/s against Hele-Shaw's 6.40
 worked out in SI for its soft edge (Δρ g sinθ h²/12μ, halved for the water it pushes round it,
 × (1 − a²/R²), × ∫c²/∫c); a level one stays put; a lens carrying Clock Glass's colour rises at
 88% of a plain one (the 6% of its colour Oil Bodies leaves in the water at its edge weighs as

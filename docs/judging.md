@@ -1591,7 +1591,22 @@ Settings, Patches, on any of the three: each patch has a thumbnail of the plate 
 look's areas; tap one to aim the patch there, and Fire on a hit gives it a gate. On the phone,
 the same sheet. Say whether the picker is clear and big enough under a thumb.
 
-## 68. On reads on (PLAN 35a)
+## 68. Beat Squeeze's sheet gives back at the liquid's own pace (PLAN 27f-4)
+
+Classic with a band at 120 bpm, Beat Squeeze at 0.5, Kick Bloom at 0, Frame Sway 0. Each kick
+should still be a dent where it lands, but now its letting go is the liquid's: on the default oil
+most of it springs back at once and the last of it settles over a fifth of a second, with a faint
+ring of colour pushed out round the dent and drawn back. Turn Thickness to full: the dent should
+tighten and hold, coming back slowly over a second or two, the ring round it plainer. Toward water
+it should be wide and gone almost as it lands. Little outside the dent and its ring should move on
+the kick (under half of what the old dent moved there). Say whether the thick liquid's slow give-back reads as syrup or as lag, and whether
+the default oil's dent still reads as a press. A real sheet on a thin liquid would not just give back: on the
+default oil and toward water it would swing past rest once or twice (a slow wave under the sheet,
+about a quarter of a second a swing) before it settled, which the solve leaves out (PLAN 27f-8(f)).
+Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
+building.
+
+## 69. On reads on (PLAN 35a)
 
 On the laptop in a dark room, and on the phone, with no reading of labels:
 

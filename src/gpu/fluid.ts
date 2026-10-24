@@ -1028,6 +1028,9 @@ export class WebGPUFluid {
   private breathTex: GPUTexture | null = null;
   /** Whether the next step has a breath on it: laid each step the wind blows, gone the step after, as the hands are. */
   private breathLive = false;
+  /** The rhythm sheet's change this step (applyDeltas' `sheet`, lib/sheet.ts), on the CPU's grid and on the solver's, made at the first kick it lays. */
+  private cpuSheetTex: GPUTexture | null = null;
+  private sheetTex: GPUTexture | null = null;
   private blankRGBA: GPUTexture | null = null;
   /** Scratch for the vorticity and the ferrofluid's chemical potential. */
   private scratchR: GPUTexture | null = null;
@@ -1121,13 +1124,13 @@ export class WebGPUFluid {
     */
     const byFormat: [string, GPUTextureFormat[], boolean][] = [
       ['fill', [dye, RGBA32, VEL, R32], true],
-      ['gapRest', [RG32], true],
+      ['gapRest', [RGBA32], true],
       // A change to the plate's shape: a look changed to mid-show, never an opening.
-      ['gapReshape', [RG32], false],
+      ['gapReshape', [RGBA32], false],
       ['deltaDye', [dye], true],
       ['deltaVel', [VEL], true],
       ['liquidForces', [VEL], true],
-      ['squeezeUpdate', [RG32], true],
+      ['squeezeUpdate', [RGBA32], true],
       ['scaleDye', [dye], true],
       // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
       ['addSlosh', [VEL], false],
@@ -1412,7 +1415,7 @@ export class WebGPUFluid {
     this.liquids0 = pp(this.N, 'rgba16float', 'liquids 0');
     this.liquids1 = pp(this.N, 'rgba16float', 'liquids 1');
     this.vel = pp(this.N, VEL, 'vel');
-    this.squeeze = pp(this.N, RG32, 'squeeze');
+    this.squeeze = pp(this.N, RGBA32, 'squeeze');
     /*
       The second phase (H7): one number a cell, how much of the dark liquid is
       there.
@@ -1828,7 +1831,7 @@ export class WebGPUFluid {
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null): void {
     const q = this.device.queue;
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -1866,6 +1869,14 @@ export class WebGPUFluid {
       }
       q.writeTexture({ texture: this.cpuBreathTex! }, breath, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
     }
+    if (sheet) {
+      if (!this.sheetTex) {
+        const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+        this.cpuSheetTex = this.disposer.track(this.device.createTexture({ label: 'sheet (cpu)', size: [this.L, this.L], format: R32, usage }));
+        this.sheetTex = this.disposer.track(this.device.createTexture({ label: 'sheet', size: [this.N, this.N], format: R32, usage }));
+      }
+      q.writeTexture({ texture: this.cpuSheetTex! }, sheet, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
+    }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
     this.writeSplatArgs(0);
@@ -1880,7 +1891,8 @@ export class WebGPUFluid {
     // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
     if (hands) this.handLive = true;
     if (breath) { this.upsample(pass, this.cpuBreathTex!, this.breathTex!); this.breathLive = true; }
-    this.foldDeltas(pass);
+    if (sheet) this.upsample(pass, this.cpuSheetTex!, this.sheetTex!);
+    this.foldDeltas(pass, !!sheet);
     pass.end();
     q.submit([enc.finish()]);
   }
@@ -2004,8 +2016,8 @@ export class WebGPUFluid {
     this.splatRun(pass, 'splatDeltas', 'rgba32float', [this.splatBuf!, this.deltaDyeTex, this.deltaVelTex, this.deltaMulTex], this.N);
   }
 
-  /** Dye, velocity and the plate gap take up whatever is in the delta fields. */
-  private foldDeltas(pass: GPUComputePassEncoder): void {
+  /** Dye, velocity and the plate gap take up whatever is in the delta fields, and with `sheet` the rhythm sheet's change. */
+  private foldDeltas(pass: GPUComputePassEncoder, sheet = false): void {
     /*
       Oil Bodies: the dye that lands this frame is shared between the two
       liquids by how much of each is where it lands (bodyLand), before the
@@ -2022,7 +2034,8 @@ export class WebGPUFluid {
     this.vel.swap();
     this.run(pass, 'liquidForces', this.vel.write, [this.vel.read, this.liquids0.read, this.liquids1.read], this.arg('liquid forces', [1.1, this.thinLive ? 1 : 0, 2.6, 0.9, 3.0, 0.9, 0.22, 0]));
     this.vel.swap();
-    this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
+    if (sheet) this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.sheetTex!], this.arg('squeeze delta sheet', [1, this.thinLive ? 1 : 0, 1, 0]));
+    else this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
     this.squeeze.swap();
   }
 
@@ -2332,7 +2345,7 @@ export class WebGPUFluid {
         this.phaseGapPrimed = false;
       }
       if (!deltasApplied) {
-        this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex], this.arg('squeeze no delta', [0, 0, 0, 0]));
+        this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze no delta', [0, 0, 0, 0]));
         this.squeeze.swap();
       }
       /*
@@ -4139,13 +4152,15 @@ export class WebGPUFluid {
   /**
    * The squeeze film, read back whole: the gap and its rate. For checks.
    *
-   * RG32, so eight bytes a texel and two floats a cell — r is the gap between
-   * the glasses, g is how fast it is changing, which is the thing that moves
-   * any liquid at all.
+   * RGBA32, so sixteen bytes a texel — r is the gap between the glasses, g is
+   * how fast it is changing, which is the thing that moves any liquid at all.
+   * (b is the rate the press's memory carries on, g without the rhythm
+   * sheet's; a what the floor has refused the sheet: squeezeUpdate, PLAN
+   * 27f-4. Not read back.)
    */
   async readSqueeze(): Promise<{ n: number; gap: Float32Array; rate: Float32Array } | null> {
     const n = this.N;
-    const row = Math.ceil((n * 8) / 256) * 256;
+    const row = Math.ceil((n * 16) / 256) * 256;
     const buf = this.device.createBuffer({ label: 'read squeeze', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read squeeze' });
     enc.copyTextureToBuffer({ texture: this.squeeze.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
@@ -4156,8 +4171,8 @@ export class WebGPUFluid {
     const stride = row / 4;
     for (let y = 0; y < n; y++) {
       for (let x = 0; x < n; x++) {
-        gap[y * n + x] = all[y * stride + x * 2];
-        rate[y * n + x] = all[y * stride + x * 2 + 1];
+        gap[y * n + x] = all[y * stride + x * 4];
+        rate[y * n + x] = all[y * stride + x * 4 + 1];
       }
     }
     buf.unmap();

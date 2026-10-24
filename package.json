@@ -181,6 +181,7 @@
     "blowrange": "node scripts/blowrange.mjs",
     "forces": "node scripts/forces.mjs",
     "rides": "node scripts/rides.mjs",
+    "sheet": "node scripts/sheet.mjs",
     "oillift": "node scripts/oillift.mjs",
     "rimhold": "node scripts/rimhold.mjs",
     "musicforce": "node scripts/musicforce.mjs",
