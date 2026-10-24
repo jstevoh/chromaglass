@@ -741,31 +741,37 @@ try {
         down on each, a turn, then a move with no button that the page never
         saw a release before (a raw input event, as the system would leave
         it). Before the fix both cards stayed up, stacked, after the hand had
-        gone; the check asks that none does.
+        gone; the check asks that each goes. The raw move fires both
+        lostpointercapture and a buttonless pointermove, and the knob ends the
+        drag on either, so this line holds the drag ending, not one path.
       */
       const tipNames = () => page.evaluate(() => [...document.querySelectorAll('[data-control-tip]')].map(t => t.querySelector('[data-tip=name]')?.textContent ?? ''));
       const deckKnobs = page.locator('[data-testid="desk-deck"] [data-knob] input[type="range"]');
       const cdp = await page.context().newCDPSession(page);
       const pair = [deckKnobs.nth(0), deckKnobs.nth(1)];
       const pairNames = await Promise.all(pair.map(k => k.getAttribute('aria-label')));
-      let heldUp = 0;
-      for (const k of pair) {
+      // Each knob read on its own, before the next is touched: the next one's
+      // card would put a stuck one's down (one card at a time) and hide it.
+      const reads = [];
+      for (const [i, k] of pair.entries()) {
         const b = await k.boundingBox();
         const x = b.x + b.width / 2, y = b.y + b.height / 2;
         await page.mouse.move(x, y);
         await page.mouse.down();
         await page.mouse.move(x, y + 12, { steps: 3 });
         await settle(100);
-        if ((await tipNames()).length) heldUp++;
+        const held = await tipNames();
         await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5, button: 'none', buttons: 0 });
-        await settle(100);
+        await settle(500);
+        const left = await tipNames();
+        reads.push({ name: pairNames[i], held: held.length === 1 && held[0] === pairNames[i], left });
+        // Playwright still thinks the button is down; let it up only after the
+        // reading, so a release the window does hear cannot hide a stuck drag.
+        await page.mouse.up();
       }
-      await page.mouse.move(6, 6);
-      await settle(500);
-      const stuck = await tipNames();
-      check('a knob whose release the page never hears still lets its card go, and two such never stack',
-        heldUp === 2 && stuck.length === 0,
-        `${pairNames.join(', ')}: ${heldUp}/2 cards up while held, ${stuck.length ? `still up after the hand went: ${stuck.join(' + ')}` : 'none left after'}`);
+      check('a knob whose release the page never hears still lets its card go, each on its own',
+        reads.every(r => r.held && r.left.length === 0),
+        reads.map(r => `${r.name}: ${r.held ? 'its card up while held' : 'no card of its own while held'}, ${r.left.length ? `still up after: ${r.left.join(' + ')}` : 'gone after'}`).join('; '));
       for (const k of pair) await k.dblclick();
       await page.mouse.move(5, 5);
       await settle(300);

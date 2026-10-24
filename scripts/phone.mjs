@@ -1198,7 +1198,7 @@ try {
           cards.length === 1 && cards[0] === 'Swirl', cards.join(' + ') || 'no card');
         await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
         await page.waitForTimeout(250);
-        check('Play: and a second tap on it shuts it', !(await readTip()));
+        check('Play: and a second tap on it shuts it', cards[0] === 'Swirl' && !(await readTip()));
         // Soap's again, for the second-tap check below.
         await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
         await page.waitForTimeout(250);
