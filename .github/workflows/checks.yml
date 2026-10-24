@@ -681,6 +681,14 @@ jobs:
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
+
+      # The cartoons that ship (PLAN 14ac): small, silent, recorded in
+      # SOURCES.md, and on a phone page they pour without the pour pausing
+      # every frame (14ab-1), loop, are what the plate and the projector hold,
+      # and stop. No GPU needed: the hand-over is the same without a plate.
+      - name: The cartoons
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run cartoons
       # Preview builds on a copy while the wall keeps its look (PLAN.md 8b,
       # scripts/draftwall.mjs): which engine each settings change reaches,
       # what a receiver is sent, Send to wall, Live and the wall closing. Its

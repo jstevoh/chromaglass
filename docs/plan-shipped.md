@@ -2163,6 +2163,65 @@ playing, the beat clock fired 303 kicks for the band's 258 and fires 257; in the
 on the Perform desk 10 kicks for 10 presses and none, on the phone 9 for 9 taps and
 none, while knocks with no hand on anything are still all heard.
 
+
+### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped 2026-10-24)
+
+Asked by the owner 2026-10-24: early cartoons in the app to run in the background and feed
+the visuals, The Skeleton Dance first, and then "I don't want a short loop, I want the
+extended cartoon looped."
+
+What shipped. Four cartoons, each the whole film with only its title and end cards cut:
+The Skeleton Dance (1929, 5:08), Steamboat Willie (1928, 6:58), Swing You Sinners! (1930,
+7:28) and Out of the Inkwell's The Tantalizing Fly (1919, 3:19). A Cartoons shelf on the
+desk's Dye panel and in the phone's dye sheet gives each a Pour (into the dish as dye,
+looping, with Stop) and a Film (through the projector, under the dye; pressed again, off).
+They are not also in Settings' Film section: on the desk that section sits beside the Dye
+panel, and `npm run layout` caught the same buttons drawn twice.
+
+Copyright. Every one was published in 1930 or before, so it is in the US public domain
+(95 years from publication at the most). Where each copy came from, what was cut, and the
+caveats (Disney's trademarks in Mickey; later versions of the characters; that The
+Skeleton Dance's only copies online come from a modern transfer, not a print scan; status
+outside the US) are in `public/video/cartoons/SOURCES.md`. Steamboat Willie is a scan of
+an old 16mm print, cropped to the picture (its frame lines measured at rows 47 and 430 and
+its edges at columns 60 and 538 on every tenth second of the reel). Swing You Sinners! is a
+1950s television print whose distributor's title cards are cut.
+
+Size. Silent H.264 MP4, 384 px wide, grey, 24 fps, grain smoothed (hqdn3d) before
+encoding, the index at the front so a cartoon plays while it arrives: 6.1, 5.5, 8.1 and
+1.5 MB, 21.2 MB together. The first pass, 480 px with light smoothing, was 48 MB. Nothing
+is fetched at load (the files are not under `/assets/`, so the service worker leaves them
+alone), so 14v's load time is unchanged; a cartoon is given to the video by address, so it
+starts before it has all arrived.
+
+14ab-1, fixed with it. `App.tsx` handed the poured video to the plate on every animation
+frame, and `pourVideo` paused whatever it held before taking the new one, which was the
+same video: it was paused and played sixty times a second. Now `pourVideo` takes a video
+once (the same one again only makes sure it plays) and the app calls it once, on play.
+Measured by `npm run cartoons`'s pour line, on a phone page in Chromium: with the old pour
+(the per-frame hand-over and the old `pourVideo` put back), the page closed under the pour
+before its two seconds were up (the check's "the page lives through Pour and Film" red,
+10/11); with the fix, 2.00 s of the cartoon played in two seconds, 0 pauses, a picture
+range of 186 read back from it, 14/14.
+
+The film survives a rebuild. The GL effect's cleanup stopped the film, and that cleanup
+also runs when the plate is rebuilt (`glEpoch`: a lost device, a resolution change), so a
+loop, the camera or a window went dark on the projector while the panel still said it was
+playing. Found by `npm run cartoons` under software WebGPU (`PW_WEBGPU=1`), after its review
+made it ask what the projector holds: a second and a half after Film the projector held no
+film and the video had been reset (15/16). The film is now stopped only when the plate goes
+away, in its own effect (16/16 there).
+
+The check, after one review pass: besides the files and the licence record, it asks that
+the video the plate holds as its pour (`__cgVideo` under `?debug`) is the cartoon that
+played, and that the plate's frame loop read it where there is a plate (2–3 frames in two
+seconds on software WebGPU); that each loops (sent half a second from its end, back at its
+start 1.5 s later, no `ended`); and that Stop and Film-off pause that same element and the
+plate and projector let go. It runs in CI's browser part.
+
+Measured: `npm run cartoons` 16/16 (no GPU and `PW_WEBGPU=1`), `layout` 77/77, `phone`
+357/357, `desk` 48/48, `panel` 197/197, `lint` clean.
+
 ### 15i. Picking a bottle pours nothing (shipped)
 
 **Shipped.** The owner, 2026-10-04: "when I pick the ferrofluid liquid - it deposits a

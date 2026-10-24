@@ -936,6 +936,8 @@ export interface LiquidVisualizerHandle {
   plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[]; flow: number; swirl: number } | null;
   /** Film projector: a video file, the camera, or another window, shown through the dye. */
   loadFilmFile: (file: File) => Promise<void>;
+  /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
+  loadFilmUrl: (url: string) => Promise<void>;
   startFilmCamera: () => Promise<void>;
   /**
    * A window, a tab or a screen, picked from the browser's own chooser.
@@ -5167,6 +5169,31 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   };
   /** Told when a captured window is taken away from the browser's side. */
   const filmEndedRef = useRef<(() => void) | null>(null);
+  /** Frames the plate's loop found a poured video ready to read, for `npm run cartoons`. */
+  const videoPourReadsRef = useRef(0);
+  /*
+    What the plate holds as its pour and its film, under `?debug`, so
+    `npm run cartoons` can ask whether the video it watched play is the one the
+    plate reads, not only that some video played. Set apart from
+    `chromaglassDebug` (which waits for the GPU) because the hand-over is the
+    same with or without one.
+  */
+  /*
+    The film stops when the plate goes away, not when it is rebuilt. It was
+    stopped in the GL effect's cleanup, which also runs on a rebuild (a lost
+    device, a resolution change: `glEpoch`), so a loop, the camera or a
+    window went dark on the projector while the panel still said it was
+    playing. Found by `npm run cartoons` on software WebGPU (PW_WEBGPU=1):
+    a second and a half after Film the projector held no film and the video
+    had been reset; with the stop moved here, it plays on (16/16).
+  */
+  useEffect(() => () => stopFilm(), []);
+  useEffect(() => {
+    if (isDraftRef.current || !new URLSearchParams(window.location.search).has('debug')) return;
+    (window as unknown as { __cgVideo?: unknown }).__cgVideo = () => ({
+      pour: videoPourRef.current, film: filmRef.current.video, filmKind: filmRef.current.kind, pourReads: videoPourReadsRef.current,
+    });
+  }, []);
   const injectStyleRef = useRef<string[]>(['drop']);
   const plateLiquidsRef = useRef<string[]>(PRESET_LIQUIDS['classic']);   // the dish, as the contract ref is the dyes
   /**
@@ -6038,12 +6065,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const fluid = fluidsRef.current[activeLayerRef.current];
       if (fluid) fluid.injectImage(imageData);
     },
+    /*
+      PLAN 14ab-1: the pour paused and played its video on every frame. The
+      app called this once a frame with the same element, and this paused
+      whatever was pouring before taking the new one, so the one video was
+      paused and played sixty times a second: a stutter on Chrome, and on
+      Safari a play() promise refused every frame. The frame loop reads the
+      video itself (below, "Video Pour"), so this is now a hand-over, called
+      once: the same element again only makes sure it is playing.
+    */
     pourVideo: (video: HTMLVideoElement) => {
-      if (videoPourRef.current) {
-        videoPourRef.current.pause();
+      if (videoPourRef.current === video) {
+        if (video.paused) video.play().catch(() => { /* plays on the next gesture */ });
+        return;
       }
+      videoPourRef.current?.pause();
       videoPourRef.current = video;
-      video.play();
+      videoFlowPrevRef.current = null;   // the last video's frame is no reference for this one's motion
+      video.play().catch(() => { /* plays on the next gesture */ });
     },
     stopPourVideo: () => {
       if (videoPourRef.current) {
@@ -6265,6 +6304,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       f.url = URL.createObjectURL(file);
       v.src = f.url;
       f.kind = 'file';
+      try { await v.play(); } catch { /* autoplay policy: plays on the next gesture */ }
+    },
+    loadFilmUrl: async (url: string) => {
+      stopFilm();
+      const v = filmVideo();
+      // Not kept in `f.url`: that is for an object URL `stopFilm` revokes.
+      v.src = url;
+      filmRef.current.kind = 'file';
       try { await v.play(); } catch { /* autoplay policy: plays on the next gesture */ }
     },
     /*
@@ -7581,6 +7628,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (videoPourRef.current && !videoPourRef.current.paused && videoPourRef.current.readyState >= 2) {
 
 
+          videoPourReadsRef.current++;
           const v = videoPourRef.current;
 
 
@@ -11936,7 +11984,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         setStaged(stageRef.current !== null);
       }
       renderApiRef.current = null;
-      stopFilm();
+      // Not the film: it is a <video>, not a GPU object, and outlives a rebuild (stopped on unmount, by the effect above `__cgVideo`).
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('mousedown', handleMouseDown);

@@ -80,6 +80,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | Preview's copy (`drafting`, `wallRef` in `App.tsx`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
 | the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
 | sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`, `useAudioAnalyzer`, `lib/earClock.ts`, `lib/audioFeatures.ts`, `lib/handSounds.ts`) | `shelf`, `music`, `ears`, `renders` (what the sound re-renders, and whether the plate hears each frame's reading), `kicks`, `clicks` (a click on the laptop is not a beat; `-- --app` in a browser) |
+| the cartoons (`src/lib/cartoons.ts`, `public/video/cartoons/`, `CartoonShelf.tsx`), the video pour (`pourVideo`, `pourVideoFrom` in `App.tsx`) | `cartoons` (a new cartoon gets its row in `public/video/cartoons/SOURCES.md` first), `phone`, `layout` |
 | `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
 | `scripts/watch.mjs` | `npm run watch -- --selftest` and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |

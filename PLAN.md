@@ -3550,6 +3550,47 @@ Mic or Band pick came back on every launch from `localStorage`.
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
 
+### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
+
+**Shipped** (2026-10-24): four public domain cartoons, each the whole film looping, poured as
+dye or played as the film from a Cartoons shelf on the desk's Dye panel and the phone's dye
+sheet (`src/lib/cartoons.ts`, `CartoonShelf.tsx`; sources and licences in
+`public/video/cartoons/SOURCES.md`; `npm run cartoons`). With it, **14ab-1** (written down
+with 14aa): the video pour no longer pauses and plays its video every frame. And the
+projector's film (a loop, the camera, a window, a cartoon) now survives the plate being
+rebuilt (a lost device, a resolution change), where it used to go dark while the panel still
+said it was playing. The story is in
+`docs/plan-shipped.md` under the same number. The owner's look at them is `docs/judging.md` §66.
+
+The owner: "can we download a couple videos for inclusion into the app? things that can run
+in the background and be used for visualizations? like silly symphonies, skeleton dance? and
+other early animations?", then "I don't want a short loop, I want the extended cartoon looped."
+
+Open, found building it:
+
+- **14ac-1** *A poured file has no Stop.* The desk's Video… and the phone's "A video as dye"
+  pour a file, looping, and nothing in the app stops it short of reloading; only the shelf's
+  cartoons have a Stop. One Stop for whatever is pouring, beside Video… and on the phone.
+- **14ac-2** *The pour's dye is the picture's light, a shortcut.* The pour keys out dark
+  pixels and lays every lighter one as dye of its own colour, and pushes the plate along the
+  picture's brightness gradient where the frame changed (`LiquidVisualizer.tsx`, "Video
+  Pour"). A black-and-white cartoon is mostly a light background, so it pours mostly white
+  over the whole dish, with the figures as holes in it. Nothing in a real liquid show works
+  like this: a film there is projected through the dish (which is what Film does), not
+  dissolved into it. Two ways to look at: an Ink key that pours the picture's *dark* lines
+  as dye (the ink of a cartoon is its drawing), and the picture as light on the plate rather
+  than as dye in it. Judge first (§66), then pick.
+- **14ac-3** *More films for the shelf.* Walter Ruttmann's *Lichtspiel Opus I–IV*
+  (1921–25) are abstract hand-tinted animation, made for exactly this, public domain in
+  the US by date and in Germany since 2012 (Ruttmann died 1941). The Archive's copies are
+  re-uploads of modern restorations or carry an uploader's CC BY claim; they need a print
+  or a transfer whose source is known before they ship. Ub Iwerks' *Fiddlesticks* (1930)
+  and the 1930 Silly Symphonies joined the US public domain in 2026, with the same check.
+  Every addition gets a row in `SOURCES.md` first; `npm run cartoons` refuses one without.
+- **14ac-4** *The cartoons are grey.* The prints are black and white, so the pour lays only
+  greys and Film shows a grey picture. Whether the look's palette should tint them (Film's
+  grade already can, in the Mixer) is the owner's call in §66.
+
 ### 14z. A new song: where songs start and end, and the change on the music (asked 2026-10-24)
 
 The owner: song detection does not work well enough to ship. It does not catch where

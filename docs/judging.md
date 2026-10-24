@@ -1552,7 +1552,24 @@ at a show, through the microphone in the room as well as through the laptop:
 Say whether a change ever lands in the middle of a song, whether one is ever missed, and whether
 the speeds feel right; if they do, On a New Song can open on New preset again (14z-4).
 
-## 66. Areas that listen for themselves (PLAN 25h)
+## 66. The cartoons, poured and filmed (PLAN 14ac)
+
+On the desk, the Dye panel has a Cartoons shelf under Image… and Video…; on the phone, it is at
+the bottom of the dye sheet. Each cartoon has Pour and Film.
+
+- **Pour** The Skeleton Dance on a dark look (Classic) and then on a pale one. It pours the
+  picture's light as dye, so a cartoon with a light background lays a lot of white; say whether
+  that reads as the cartoon or as a wash, and whether pouring the *drawing* (the dark ink) would
+  be better (14ac-2).
+- **Film** Swing You Sinners! with Film Mix at its default and at full: does the cartoon read
+  through the dye, and does the grey picture want the look's colours (14ac-4)?
+- Leave one pouring for a whole loop (five to seven minutes) and say whether it ever stutters
+  or the plate slows; the pour's stutter every frame is fixed (14ab-1), but its per-pixel work
+  on the CPU is still open (14ab-2).
+- Say which of the four earn a place, and whether you want more (Ruttmann's abstract
+  Lichtspiel films are the next candidates, 14ac-3).
+
+## 67. Areas that listen for themselves (PLAN 25h)
 
 Three looks now play their music in parts of the plate rather than over all of it. With a
 record on, through the room microphone and through the laptop:
