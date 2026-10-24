@@ -361,8 +361,11 @@ try {
     trials, pools 39 to 357, the stroke's Δ landed at most 0.48 outside the
     bracket, 0.17% of its pool, and 0.05 at most on pools under 80. The
     nearest of them to this bar is a sixteenth of it. On a 357 pool it is
-    ±8.1, seven times sharper: a Finger that makes 3% of a pool of 150 or
-    more fails, and on a thinner pool two units do.
+    ±8.1, seven times sharper. What fails is a Δ beyond the plate's own
+    bracket by more than 2% of the pool and 1: on a quiet plate a Finger
+    that makes 3% of a pool over 100 fails, and on a pool under 50 two units
+    do. The bracket itself may widen by as much as `quiet` lets the plate
+    gain alone, so the worst case it can pass is 4% and 2.
   */
   const fSlack = 0.02 * fa.total + 1;
   const fDelta = fb.total - fa.total;
