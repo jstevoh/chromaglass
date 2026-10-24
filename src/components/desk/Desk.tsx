@@ -355,8 +355,7 @@ export function Desk(p: DeskProps) {
         onVideo={p.onVideo}
         onWall={p.onOpenWall ?? p.onSendToWall}
         onMidi={p.onMidi}
-        onRecord={p.onRecordOptions ?? p.onToggleVideo}
-        onPerformance={p.onPerformance}
+        onRecord={p.onRecordOptions ?? p.onToggleRecord}
         onSearch={p.onSearch}
         leading={
           <button
@@ -407,9 +406,9 @@ export function Desk(p: DeskProps) {
           <RecordControls
             videoRecording={p.videoRecording ?? false}
             videoSeconds={p.videoSeconds ?? 0}
-            onToggleVideo={p.onToggleVideo ?? (() => {})}
+            choice={p.recordChoice ?? { video: true, take: false }}
+            onToggleRecord={p.onToggleRecord ?? (() => {})}
             performance={p.performance}
-            onTogglePerformance={p.onPerformance}
             onOptions={p.onRecordOptions ?? (() => {})}
           />
           <Layers p={p} report={p.layoutName === 'build'} />

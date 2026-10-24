@@ -3591,6 +3591,37 @@ Open, found building it:
   greys and Film shows a grey picture. Whether the look's palette should tint them (Film's
   grade already can, in the Mixer) is the owner's call in §66.
 
+### 14ae. One Record button (shipped, asked 2026-10-24)
+
+The owner: "all the various recording options are also confusing and overlapping. What's
+video recording? what's audio? what's recording inputs? what's recording the plate?" Three
+things get recorded, under eight names in five places: a video file of the plate (the
+desk's Video, Canvas Video, Record the plate, the Rec dot, the Guide's Record), a replayable
+take of the hands on the plate (Record performance, Perf, the Performance tab) and a
+frame-exact film of a loaded song (Render this song). Audio was never a recording of its
+own: one switch inside the video's options. Nothing records MIDI, mic or camera input.
+
+Shipped: one Record button (R, MIDI and remote `record-toggle`, the palette, the phone's
+tile and Play pill). `lib/recordChoice.ts` keeps what it makes, **Plate video** (default,
+what R did before), **Take**, or both; a press with anything running stops all of it. T
+still records a Take by itself. One Rec dot with one clock replaces Rec and Perf. The Record
+panel (the sliders button) is one page: the choice and the Record button, Plate video's
+options (Sound is a setting here), Takes, and Song film (a button that opens the song's
+render). The phone's More sheet says what Record makes. `npm run record` is the logic and
+the one-of-each; `take`, `layout` and `phone` run the desk and the phone.
+
+- **14ae-1** *Song film still lives in the music player too.* Its film icon stays beside the
+  song it renders; the panel's row opens the same sheet. Phase 3 of the Clear Controls audit
+  (one home per setting) decides which stays.
+- **14ae-2** *A still of the plate.* There is no "Save picture" (only the crash report's
+  screenshot). A fourth card in the Record panel; the plate's frame is one `toBlob` away.
+- **14ae-3** *Recording MIDI or automation.* Nothing records a controller's or a ride's
+  movements; the Take keeps only the hands on the plate. Wanted only if the owner asks.
+- **14ae-4** *Sound's source in the words.* The panel's Sound switch could name the source
+  ("Sound: Mic") the way the header's Sound dot does; with phase 1's renames.
+- **14ae-5** *The phone's Record sheet.* The phone has the choice in More and a Play pill;
+  Sound on/off and quality are desk-only.
+
 ### 14z. A new song: where songs start and end, and the change on the music (asked 2026-10-24)
 
 The owner: song detection does not work well enough to ship. It does not catch where

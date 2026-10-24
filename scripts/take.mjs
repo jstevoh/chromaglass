@@ -46,7 +46,7 @@ try {
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(8000);
 
-  const dot = page.locator('[data-testid=dot-performance]');
+  const dot = page.locator('[data-testid=dot-rec]');
   const stored = () => page.evaluate(() => new Promise((res) => {
     const r = indexedDB.open('chromaglass-music');
     r.onsuccess = () => {
@@ -61,9 +61,9 @@ try {
   // 0. There is a button to do it with, labelled, on the Perform desk: the
   //    only way in used to be an unlabelled dot (reported: "I'm not seeing
   //    any new performance controls or stop/start").
-  const button = page.locator('[data-testid=performance-button]');
+  const button = page.locator('[data-testid=record-button]');
   const idleLabel = (await button.count()) ? ((await button.first().textContent()) ?? '') : '';
-  check('the desk has a Record performance button', (await button.count()) === 1 && /Record/.test(idleLabel)
+  check('the desk has one Record button', (await button.count()) === 1 && /Record/.test(idleLabel)
     && await button.first().isVisible(), idleLabel || 'no button');
 
   // 1. T starts one.
@@ -71,13 +71,30 @@ try {
   await page.keyboard.press('t');
   await page.waitForTimeout(1500);
   const liveTitle = (await dot.first().getAttribute('title')) ?? '';
-  check('T starts a performance, and the Performance dot says so', /^Recording a performance/.test(liveTitle), liveTitle.slice(0, 60));
+  check('T starts a take, and the one Rec dot says so', /^Recording Take /.test(liveTitle), liveTitle.slice(0, 60));
   const liveLabel = (await button.first().textContent().catch(() => '')) ?? '';
   check('and the button turns to Stop with the clock', /Stop · \d+:\d\d/.test(liveLabel), liveLabel);
 
-  // 2. Stopped with nothing painted.
-  await page.keyboard.press('t');
+  // 1b. The one Record button stops a take that T started, and with Take
+  //     chosen it starts one: R is Record, T is a take by itself.
+  await page.keyboard.press('r');
+  await page.waitForTimeout(800);
+  check('Record stops a take that T started', (await dot.count()) === 0, `${await dot.count()} Rec dots`);
   const empty = await note();
+  await page.evaluate(() => localStorage.setItem('chromaglass-record-choice', JSON.stringify({ video: false, take: true })));
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(8000);
+  await page.mouse.click(5, 5);
+  await page.keyboard.press('r');
+  await page.waitForTimeout(1200);
+  const viaR = (await dot.first().getAttribute('title').catch(() => '')) ?? '';
+  check('with Take chosen, R starts a take and nothing else', /^Recording Take /.test(viaR), viaR.slice(0, 50));
+  await page.keyboard.press('r');
+  await page.waitForTimeout(800);
+  check('and R stops it', (await dot.count()) === 0);
+  await page.evaluate(() => localStorage.removeItem('chromaglass-record-choice'));
+
+  // 2. Stopped with nothing painted.
   const none = await stored();
   check('stopped with nothing painted, nothing is kept, and it says so',
     /Nothing was painted/.test(empty) && none.length === 0, `"${empty}", ${none.length} stored`);

@@ -8,7 +8,7 @@ import {
   Laptop, Save, Video, User,
   Crosshair,
 } from 'lucide-react';
-import { Slider } from '../ui';
+import { Slider, Segmented } from '../ui';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -284,7 +284,7 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
-  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void };
+  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void };
   onHide: () => void;
   onFullLayout: () => void;
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
@@ -1078,16 +1078,14 @@ export function PhoneStage(p: PhoneStageProps) {
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
           <div className="grid grid-cols-3 gap-1.5">
-            {p.recording.supported && (
-              <Tile
-                icon={p.recording.on ? Square : Circle}
-                label={p.recording.on ? `${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
-                on={p.recording.on}
-                tone="live"
-                onPress={p.recording.onToggle}
-                testId="phone-record"
-              />
-            )}
+            <Tile
+              icon={p.recording.on ? Square : Circle}
+              label={p.recording.on ? `${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
+              on={p.recording.on}
+              tone="live"
+              onPress={p.recording.onToggle}
+              testId="phone-record"
+            />
             <Tile icon={Clapperboard} label="Songs" onPress={() => { close(); p.onSongs(); }} testId="phone-songs" />
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
@@ -1098,6 +1096,19 @@ export function PhoneStage(p: PhoneStageProps) {
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
+          </div>
+          {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
+          <div className="mt-3 flex flex-col gap-1.5" data-testid="phone-record-makes">
+            <SectionLabel>Record makes</SectionLabel>
+            <Segmented
+              value={p.recording.choice.video && p.recording.choice.take ? 'both' : p.recording.choice.take ? 'take' : 'video'}
+              options={[['video', 'Plate video'], ['take', 'Take'], ['both', 'Both']] as const}
+              onChange={(v) => p.recording.onChoice({ video: v !== 'take', take: v !== 'video' })}
+              height={44}
+              fill
+              testId="phone-record-makes-segmented"
+            />
+            <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
           </div>
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">

@@ -559,11 +559,6 @@ try {
     check(`${name} opened from the palette`, opened);
     if (!opened) continue;
     await visit(desk, name, 'desk');
-    if (name === 'Record' && await count(desk, 'record-tab-performance')) {
-      await tap(desk, 'record-tab-performance');
-      await desk.waitForTimeout(300);
-      await visit(desk, 'Record performance', 'desk');
-    }
     await desk.keyboard.press('Escape');
     await desk.waitForTimeout(300);
   }

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Video,
+  Film,
   Circle,
   Square,
   Volume2,
@@ -14,45 +15,47 @@ import {
   Sliders,
   History,
 } from 'lucide-react';
-import { Sheet, Button, SwitchPill } from './ui';
+import { Sheet, Button, SwitchPill, Toggle } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
 import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
 import { openAccountSheet } from '../lib/tierGates';
+import { makesText, type RecordChoice } from '../lib/recordChoice';
 
 export interface RecordPanelProps {
   onClose: () => void;
   recorder: Recorder;
-  onToggleVideo: () => void;
+  /** The one Record button: starts what is chosen below, or stops whatever is running. */
+  onToggleRecord: () => void;
+  choice: RecordChoice;
+  onChoice: (c: RecordChoice) => void;
   performanceLive: { startedAtMs: number; title?: string } | null;
   perfClock: string | null;
-  onTogglePerformance: () => void;
+  /** The loaded song's film: absent when no song is loaded in the player. */
+  songFilm?: { name: string; running: boolean; onOpen: () => void } | null;
   savedPerformances: SavedPerformance[];
   replayingPerformanceId: string | null;
   onReplayPerformance: (id: string) => void;
   onStopPerformanceReplay: () => void;
   onDeletePerformance: (id: string) => void;
-  initialTab?: 'video' | 'performance';
 }
 
 export function RecordPanel({
   onClose,
   recorder,
-  onToggleVideo,
+  onToggleRecord,
+  choice,
+  onChoice,
   performanceLive,
   perfClock,
-  onTogglePerformance,
+  songFilm,
   savedPerformances,
   replayingPerformanceId,
   onReplayPerformance,
   onStopPerformanceReplay,
   onDeletePerformance,
-  initialTab = 'video',
 }: RecordPanelProps) {
-  const [tab, setTab] = useState<'video' | 'performance'>(() => {
-    if (performanceLive) return 'performance';
-    return initialTab;
-  });
+  const anyRunning = recorder.recording || !!performanceLive;
 
   const videoClock = `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}`;
   const videoOpts = recorder.options;
@@ -68,8 +71,8 @@ export function RecordPanel({
     <Sheet
       title={
         <div className="flex items-center gap-2">
-          <span className="font-semibold tracking-tight">Recording Studio</span>
-          <span className="text-[12px] text-muted">· Video & Performance</span>
+          <span className="font-semibold tracking-tight">Record</span>
+          <span className="text-[12px] text-muted">· Plate video, Take and Song film</span>
         </div>
       }
       onClose={onClose}
@@ -78,84 +81,84 @@ export function RecordPanel({
       testId="record-panel"
     >
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* ── Tab Bar ─────────────────────────────────────────── */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border bg-elevated/50 px-5 py-2.5">
-          <div className="inline-flex rounded-lg border border-border bg-surface p-1" role="tablist" aria-label="Record mode">
-            <button
-              role="tab"
-              aria-selected={tab === 'video'}
-              onClick={() => setTab('video')}
-              data-testid="record-tab-video"
-              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                tab === 'video'
-                  ? 'bg-elevated text-text shadow-sm'
-                  : 'text-muted hover:text-text'
-              }`}
-            >
-              <Video size={14} />
-              <span>Canvas Video</span>
-              {recorder.recording && (
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                </span>
-              )}
-            </button>
-            <button
-              role="tab"
-              aria-selected={tab === 'performance'}
-              onClick={() => setTab('performance')}
-              data-testid="record-tab-performance"
-              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                tab === 'performance'
-                  ? 'bg-elevated text-text shadow-sm'
-                  : 'text-muted hover:text-text'
-              }`}
-            >
-              <History size={14} />
-              <span>Performance (Strokes)</span>
-              {performanceLive && (
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                </span>
-              )}
-            </button>
-          </div>
 
-          <div className="flex items-center gap-2 text-[12px] text-muted">
-            <span className="font-mono">R: Video</span>
-            <span>·</span>
-            <span className="font-mono">T: Performance</span>
-          </div>
-        </div>
-
-        {/* ── Tab Content ─────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto p-5">
-          {tab === 'video' ? (
-            /* ═════════════════════════════════════════════════════════
-               VIDEO RECORDING (CANVAS ONLY)
-               ═════════════════════════════════════════════════════════ */
-            <div className="space-y-6">
-              {/* Feature Explanation */}
-              <div className="rounded-lg border border-border bg-surface/50 p-3.5">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-md bg-accent-soft p-1.5 text-accent-text">
-                    <Video size={16} />
-                  </div>
-                  <div className="text-[13px] leading-relaxed text-muted">
-                    <p className="font-medium text-text">Canvas-Only Video Recording</p>
-                    <p className="mt-0.5">
-                      Directly captures frames rendered on the WebGPU fluid plate via{' '}
-                      <code className="rounded bg-elevated px-1 py-0.5 font-mono text-[11px] text-text">
-                        canvas.captureStream
-                      </code>
-                      . Menus, sliders, dialogs, and the mouse pointer are never included.
+          <div className="space-y-8">
+            {/* ═════════ THE ONE RECORD BUTTON ═════════ */}
+            <section className="space-y-3" data-testid="record-makes">
+              <div className="rounded-xl border border-border bg-surface p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${anyRunning ? 'bg-red-500 animate-pulse' : 'bg-muted'}`} />
+                      <span className="text-[14px] font-semibold text-text">
+                        {anyRunning ? 'Recording' : 'Ready to record'}
+                      </span>
+                    </div>
+                    <p className="text-[12px] text-muted font-mono">
+                      {anyRunning ? (
+                        <>
+                          {recorder.recording && <>Plate video {videoClock} · {videoOpts.includeAudio ? 'with sound' : 'silent'}</>}
+                          {recorder.recording && performanceLive && ' · '}
+                          {performanceLive && <>Take {perfClock ?? '0:00'}{performanceLive.title ? ` · with "${performanceLive.title}"` : ''}</>}
+                        </>
+                      ) : (
+                        <>Record makes: {makesText(choice)}. R starts and stops it.</>
+                      )}
                     </p>
                   </div>
+                  <Button
+                    height={38}
+                    variant={anyRunning ? 'danger' : 'primary'}
+                    kbd="R"
+                    onClick={onToggleRecord}
+                    testId="record-start-stop"
+                  >
+                    {anyRunning ? (
+                      <span className="inline-flex items-center gap-1.5"><Square size={14} className="fill-current" />Stop and keep it</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5"><Circle size={14} className="fill-current" />Record</span>
+                    )}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 border-t border-border pt-2">
+                  <Toggle
+                    label="Plate video: a video file of the plate"
+                    on={choice.video}
+                    onChange={(v) => onChoice(v ? { ...choice, video: true } : { video: false, take: true })}
+                    disabled={anyRunning}
+                    title="Record makes a video file of the plate. Turning this off turns Take on: Record always makes something."
+                    testId="record-makes-video"
+                  />
+                  <Toggle
+                    label="Take: your strokes, to replay with the song"
+                    on={choice.take}
+                    onChange={(v) => onChoice(v ? { ...choice, take: true } : { video: true, take: false })}
+                    disabled={anyRunning}
+                    title="Record also keeps what you paint, replayable with the song (T records a Take by itself). Turning this off turns Plate video on."
+                    testId="record-makes-take"
+                  />
+                </div>
+                {recorder.error && (
+                  <p className="rounded bg-red-950/40 border border-red-800/50 px-3 py-2 text-[12px] text-red-300">
+                    {recorder.error}
+                  </p>
+                )}
+              </div>
+            </section>
+
+            {/* ═════════ PLATE VIDEO ═════════ */}
+            <section className="space-y-4" data-testid="record-section-video">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-md bg-accent-soft p-1.5 text-accent-text"><Video size={16} /></div>
+                <div className="text-[13px] leading-relaxed text-muted">
+                  <p className="font-medium text-text">Plate video</p>
+                  <p className="mt-0.5">
+                    A video file of the plate's picture, made live. Menus, sliders and the pointer are never in it.
+                    Sound is a setting here: it adds what the plate is hearing, and nothing else is recorded.
+                  </p>
                 </div>
               </div>
-
               {recorder.maxDurationSec !== null && (
                 <div
                   data-cg-app-tile="full-record"
@@ -176,64 +179,11 @@ export function RecordPanel({
                 </div>
               )}
 
-              {/* Status & Primary Control Card */}
-              <div className="rounded-xl border border-border bg-surface p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${
-                          recorder.recording ? 'bg-red-500 animate-pulse' : 'bg-muted'
-                        }`}
-                      />
-                      <span className="text-[14px] font-semibold text-text">
-                        {recorder.recording ? 'Recording Canvas Video' : 'Ready to Record'}
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-muted">
-                      {recorder.recording ? (
-                        <span className="font-mono text-[13px] text-text">
-                          Duration: {videoClock} · Quality: {videoOpts.quality} ·{' '}
-                          {videoOpts.includeAudio ? 'Audio included' : 'Silent video'}
-                        </span>
-                      ) : (
-                        'Press R or click button below to start capturing canvas output.'
-                      )}
-                    </p>
-                  </div>
-
-                  <Button
-                    height={38}
-                    variant={recorder.recording ? 'danger' : 'primary'}
-                    kbd="R"
-                    onClick={onToggleVideo}
-                    testId="record-video-start-stop"
-                  >
-                    {recorder.recording ? (
-                      <>
-                        <Square size={14} className="fill-current mr-1.5" />
-                        Stop & Save Video ({videoClock})
-                      </>
-                    ) : (
-                      <>
-                        <Circle size={14} className="fill-current mr-1.5" />
-                        Start Video Recording
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {recorder.error && (
-                  <p className="mt-3 rounded bg-red-950/40 border border-red-800/50 px-3 py-2 text-[12px] text-red-300">
-                    {recorder.error}
-                  </p>
-                )}
-              </div>
 
               {/* Flexible Video Options */}
               <div className="space-y-4">
                 <h3 className="text-[13px] font-semibold uppercase tracking-wider text-muted">
-                  Recording Options
+                  Plate video options
                 </h3>
 
                 {/* Audio Inclusion Toggle */}
@@ -246,11 +196,11 @@ export function RecordPanel({
                         <VolumeX size={16} className="text-muted" />
                       )}
                       <div>
-                        <div className="text-[13px] font-medium text-text">Include Audio Track</div>
+                        <div className="text-[13px] font-medium text-text">Sound in the video</div>
                         <div className="text-[12px] text-muted">
                           {videoOpts.includeAudio
-                            ? 'Muxes live music, microphone, or synthesizer drone directly into the video.'
-                            : 'Produces a clean, silent video stream containing only visual canvas frames.'}
+                            ? 'Adds what the plate is hearing (music, microphone, system sound or the drone) to the video file.'
+                            : 'A silent video of the plate.'}
                         </div>
                       </div>
                     </div>
@@ -262,7 +212,7 @@ export function RecordPanel({
                       data-testid="record-audio-toggle"
                       role="switch"
                       aria-checked={videoOpts.includeAudio}
-                      aria-label="Include Audio Track"
+                      aria-label="Sound in the video"
                       className={`flex h-8 w-11 shrink-0 items-center justify-center rounded-md p-1 ${
                         recorder.recording ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
@@ -399,7 +349,7 @@ export function RecordPanel({
                 <div className="rounded-lg border border-border bg-surface p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-[13px] font-medium text-text">Recent Take Saved</div>
+                      <div className="text-[13px] font-medium text-text">Last plate video</div>
                       <div className="text-[12px] font-mono text-muted">
                         {recorder.lastTake.filename} · {clockText(recorder.lastTake.seconds)} ·{' '}
                         {formatBytes(recorder.lastTake.sizeBytes)}
@@ -412,86 +362,30 @@ export function RecordPanel({
                       data-testid="record-download-last-take"
                     >
                       <Download size={13} />
-                      Download Take Again
+                      Download again
                     </a>
                   </div>
                 </div>
               )}
-            </div>
-          ) : (
-            /* ═════════════════════════════════════════════════════════
-               PERFORMANCE RECORDING (KEYSTROKES & PAINT STROKES)
-               ═════════════════════════════════════════════════════════ */
-            <div className="space-y-6">
-              {/* Feature Explanation */}
-              <div className="rounded-lg border border-border bg-surface/50 p-3.5">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 rounded-md bg-accent-soft p-1.5 text-accent-text">
-                    <History size={16} />
-                  </div>
-                  <div className="text-[13px] leading-relaxed text-muted">
-                    <p className="font-medium text-text">Interactive Gesture & Stroke Recording</p>
-                    <p className="mt-0.5">
-                      Records your exact mouse strokes, dropper drops, tool switches, and dye flows into
-                      ChromaGlass's internal memory. Replayable on cue or in sync with identified songs.
-                    </p>
-                  </div>
+            </section>
+
+            {/* ═════════ TAKES ═════════ */}
+            <section className="space-y-4" data-testid="record-section-takes">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-md bg-accent-soft p-1.5 text-accent-text"><History size={16} /></div>
+                <div className="text-[13px] leading-relaxed text-muted">
+                  <p className="font-medium text-text">Takes</p>
+                  <p className="mt-0.5">
+                    Your strokes, dropper drops, tool switches and dye flows, kept to replay on cue or with the song.
+                    A Take is not a video and has no sound. T records one on its own.
+                  </p>
                 </div>
               </div>
-
-              {/* Status & Primary Control Card */}
-              <div className="rounded-xl border border-border bg-surface p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${
-                          performanceLive ? 'bg-red-500 animate-pulse' : 'bg-muted'
-                        }`}
-                      />
-                      <span className="text-[14px] font-semibold text-text">
-                        {performanceLive ? 'Recording Performance Gestures' : 'Ready to Record Gestures'}
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-muted">
-                      {performanceLive ? (
-                        <span className="font-mono text-[13px] text-text">
-                          Duration: {perfClock ?? '0:00'}
-                          {performanceLive.title ? ` · Attached to "${performanceLive.title}"` : ' · Wall clock'}
-                        </span>
-                      ) : (
-                        'Press T on your keyboard or click below to record your painting actions.'
-                      )}
-                    </p>
-                  </div>
-
-                  <Button
-                    height={38}
-                    variant={performanceLive ? 'danger' : 'secondary'}
-                    kbd="T"
-                    onClick={onTogglePerformance}
-                    testId="record-perf-start-stop"
-                  >
-                    {performanceLive ? (
-                      <>
-                        <Square size={14} className="fill-current mr-1.5" />
-                        Stop & Keep Performance
-                      </>
-                    ) : (
-                      <>
-                        <Circle size={14} className="fill-current mr-1.5" />
-                        Record Performance
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-
               {/* Saved Performances List */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[13px] font-semibold uppercase tracking-wider text-muted">
-                    Saved Performances ({savedPerformances.length})
+                    Saved takes ({savedPerformances.length})
                   </h3>
                   {replayingPerformanceId && (
                     <div className="flex items-center gap-2 text-[12px] text-accent-text font-medium">
@@ -512,10 +406,10 @@ export function RecordPanel({
 
                 {savedPerformances.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                    <p className="text-[13px] font-medium text-text">No recorded performances yet</p>
+                    <p className="text-[13px] font-medium text-text">No takes yet</p>
                     <p className="mt-1 text-[12px] text-muted max-w-md mx-auto">
-                      Paint dye on the plate while recording is active. ChromaGlass will store your gestures
-                      and replay them automatically at the right moment when the song plays.
+                      Turn on Take above (or press T), then paint. ChromaGlass keeps your strokes and replays them
+                      at the right moment when the song plays.
                     </p>
                   </div>
                 ) : (
@@ -530,7 +424,7 @@ export function RecordPanel({
                           <div className="min-w-0 pr-3">
                             <div className="flex items-center gap-2">
                               <span className="text-[13px] font-medium text-text truncate">
-                                {perf.title ?? 'Untitled Performance'}
+                                {perf.title ?? 'Untitled take'}
                               </span>
                               {perf.artist && (
                                 <span className="text-[12px] text-muted truncate">· {perf.artist}</span>
@@ -552,7 +446,7 @@ export function RecordPanel({
                               onClick={() =>
                                 isReplaying ? onStopPerformanceReplay() : onReplayPerformance(perf.id)
                               }
-                              title={isReplaying ? 'Stop replay' : 'Replay this performance'}
+                              title={isReplaying ? 'Stop replay' : 'Replay this take'}
                               className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
                                 isReplaying
                                   ? 'border-accent-border bg-accent-soft text-accent-text'
@@ -565,7 +459,7 @@ export function RecordPanel({
 
                             <button
                               onClick={() => onDeletePerformance(perf.id)}
-                              title="Delete saved performance"
+                              title="Delete this take"
                               className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted hover:border-red-800 hover:text-red-400 transition-colors"
                             >
                               <Trash2 size={13} />
@@ -577,8 +471,36 @@ export function RecordPanel({
                   </div>
                 )}
               </div>
-            </div>
-          )}
+            </section>
+
+            {/* ═════════ SONG FILM ═════════ */}
+            <section className="space-y-3" data-testid="record-section-song-film">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-md bg-accent-soft p-1.5 text-accent-text"><Film size={16} /></div>
+                <div className="text-[13px] leading-relaxed text-muted">
+                  <p className="font-medium text-text">Song film</p>
+                  <p className="mt-0.5">
+                    A frame-exact video of the song loaded in the music player, rendered with none dropped. Unlike
+                    Plate video it is not live: it takes as long as it takes, and it needs a browser with WebCodecs.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3">
+                <span className="min-w-0 truncate text-[13px] text-text">
+                  {songFilm ? songFilm.name : 'No song loaded. Load one in the music player to render its film.'}
+                </span>
+                <Button
+                  height={34}
+                  variant="secondary"
+                  onClick={songFilm?.onOpen ?? (() => {})}
+                  disabled={!songFilm}
+                  testId="record-song-film"
+                >
+                  {songFilm?.running ? 'Show progress' : 'Render the song…'}
+                </Button>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
     </Sheet>
