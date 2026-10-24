@@ -72,6 +72,8 @@ import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
 import { useSceneCamera } from './hooks/useSceneCamera';
+import { useCameras } from './hooks/useCameras';
+import { cameraPresent } from './lib/cameras';
 import { useFilmSense } from './hooks/useFilmSense';
 import { touch } from './lib/midiTouch';
 import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
@@ -185,6 +187,8 @@ async function micAlreadyAllowed(): Promise<boolean> {
  */
 const SCENE_ON_KEY = 'chromaglass-scene-on';
 const SCENE_DEVICE_KEY = 'chromaglass-scene-device';
+/** The film's Webcam has a camera of its own, remembered apart from the motion camera's (PLAN 14ad). */
+const FILM_DEVICE_KEY = 'chromaglass-film-camera';
 
 // Detect which preset (if any) matches the current settings. Only the look is
 // compared: a look does not set the room (see RIG_KEYS).
@@ -1375,16 +1379,61 @@ export default function App() {
     await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
     setFilmCartoon(null);
+    setFilmCameraLost(false);
   };
-  const startFilmCamera = async () => {
+  /*
+    Which camera the film shows (PLAN 14ad).
+
+    It used to be whichever one the browser called "environment", with no
+    say: a second webcam, a capture card or a virtual camera (the way a VJ
+    app's output arrives today, PLAN §13) could not be put on the plate. Now
+    the film's picker chooses, the choice is remembered apart from the motion
+    camera's (one camera usually watches the room while another looks down at
+    a dish), and an unplugged camera takes the film off, says so, and puts it
+    back when the same camera is plugged in again.
+  */
+  const cameras = useCameras();
+  const [filmCameraId, setFilmCameraId] = useState<string>(() => { try { return localStorage.getItem(FILM_DEVICE_KEY) ?? ''; } catch { return ''; } });
+  const filmCameraIdRef = useRef(filmCameraId);
+  filmCameraIdRef.current = filmCameraId;
+  /** What the film's camera opened as: its name, and whether the chosen one was missing. */
+  const [filmCamera, setFilmCamera] = useState<{ label: string | null; fellBack: boolean } | null>(null);
+  /** The film's camera was unplugged while it showed; it comes back when that camera does. */
+  const [filmCameraLost, setFilmCameraLost] = useState(false);
+  const startFilmCamera = async (id: string = filmCameraIdRef.current) => {
     try {
-      await wallRef.current?.startFilmCamera();
+      const got = await wallRef.current?.startFilmCamera(id, () => {
+        setFilmSource('none');
+        setFilmCamera(null);
+        setFilmCameraLost(true);
+        setToast('The film\u2019s camera was unplugged');
+      });
       setFilmSource('camera');
+      setFilmCartoon(null);
+      setFilmCamera(got ?? null);
+      setFilmCameraLost(false);
+      void cameras.refresh();
     } catch (err) {
       console.warn('ChromaGlass: camera unavailable for the film projector.', err);
       setFilmSource('none');
+      setFilmCamera(null);
     }
   };
+  const chooseFilmCamera = (id: string) => {
+    setFilmCameraId(id);
+    try { localStorage.setItem(FILM_DEVICE_KEY, id); } catch { /* private */ }
+    // Showing a camera already: the new one takes over at once, which is
+    // what choosing a camera while it is on the plate means.
+    if (filmSource === 'camera') void startFilmCamera(id);
+  };
+  useEffect(() => {
+    const id = filmCameraIdRef.current;
+    const back = filmCameraLost && cameraPresent(cameras.devices, id);
+    const arrived = filmSource === 'camera' && !!filmCamera?.fellBack && id !== '' && cameraPresent(cameras.devices, id);
+    if (back || arrived) void startFilmCamera(id);
+    // startFilmCamera is a fresh closure each render; the list is what changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameras.devices]);
   /*
     Film from a window.
 
@@ -1405,6 +1454,7 @@ export default function App() {
         () => setToast('That window is coming through black — share the tab instead'),
       );
       setFilmSource('window');
+      setFilmCameraLost(false);
     } catch (err) {
       if ((err as DOMException)?.name === 'NotAllowedError') return;   // picker cancelled
       console.warn('ChromaGlass: could not capture a window for the film projector.', err);
@@ -1414,6 +1464,7 @@ export default function App() {
     wallRef.current?.clearFilm();
     setFilmSource('none');
     setFilmCartoon(null);
+    setFilmCameraLost(false);
   };
   const filmCartoonNow = async (id: string) => {
     const c = CARTOON_BY_ID.get(id);
@@ -1421,6 +1472,7 @@ export default function App() {
     await wallRef.current?.loadFilmUrl(c.src);
     setFilmSource('file');
     setFilmCartoon(id);
+    setFilmCameraLost(false);
   };
   /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
   const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
@@ -1471,6 +1523,8 @@ export default function App() {
     enabled: sceneOn,
     userAsked: sceneAskedRef.current,
     deviceId: sceneDeviceId,
+    cameras: cameras.devices,
+    onOpened: cameras.refresh,
     mirror: settings.sceneMirror !== false,
     deadzone: settings.sceneDeadzone ?? 0.25,
     smooth: settings.sceneSmooth ?? 0.35,
@@ -4847,14 +4901,18 @@ export default function App() {
       sceneOn={sceneOn}
       onSceneToggle={toggleScene}
       sceneState={scene.state}
-      sceneDevices={scene.devices}
+      cameras={cameras.devices}
       sceneDeviceId={sceneDeviceId}
       onSceneDevice={chooseSceneDevice}
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       onFilmFile={loadFilm}
       onPourVideo={pourFile}
-      onFilmCamera={startFilmCamera}
+      onFilmCamera={() => void startFilmCamera()}
+      filmCameraId={filmCameraId}
+      onFilmCameraDevice={chooseFilmCamera}
+      filmCamera={filmSource === 'camera' ? filmCamera : null}
+      filmCameraLost={filmCameraLost}
       onFilmWindow={startFilmWindow}
       onFilmClear={clearFilm}
       markLoaded={markLoaded}
@@ -5148,10 +5206,10 @@ export default function App() {
             className={`absolute ${phone ? 'bottom-44' : 'bottom-20'} left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full border border-white/15 bg-black/80 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl`}
             data-testid="scene-resume"
             role="dialog"
-            aria-label="Room camera"
+            aria-label="Motion camera"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-live)]" />
-            <span>The room camera was on last time. Turn it back on?</span>
+            <span>The motion camera was on last time. Turn it back on?</span>
             <button
               onClick={() => toggleScene(true)}
               className="font-medium text-white hover:underline"

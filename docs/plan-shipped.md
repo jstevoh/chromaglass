@@ -2164,6 +2164,35 @@ on the Perform desk 10 kicks for 10 presses and none, on the phone 9 for 9 taps 
 none, while knocks with no hand on anything are still all heard.
 
 
+### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped 2026-10-24)
+
+Asked by the owner: "I should be able to select any camera as a source any place where we
+use cameras in the settings. I'm also confused what the room control is vs. showing video on
+the plate", and then, of the film's camera button: "this camera button only uses my laptop
+camera".
+
+What main did: two things open a camera. The room's sensor (`useSceneCamera`) had a picker,
+drawn only once it was already on and only when the browser listed two cameras, so the
+moment someone wants to choose, before the light comes on, it was not there. The film's
+camera (`startFilmCamera`) asked for `facingMode: 'environment'` and nothing else, so on a
+laptop it was the built-in camera, always; a second webcam, a capture card or a virtual
+camera (the way a VJ app's output arrives today, §13) could not be put on the plate. A camera
+pulled out left the sensor reading "opening…" and the film reading "camera live" over a dead
+track, and neither came back.
+
+What changed: `src/lib/cameras.ts` names the cameras and opens the chosen one by id, falling
+back to the browser's pick (and saying so) when it is not plugged in; `useCameras` keeps one
+list for both; `CameraPicker` is always drawn, with the remembered camera kept and marked
+"not plugged in" rather than dropped. Both sources hear their track end, come off, say so,
+and reopen when `devicechange` lists the same camera again. The sensor is renamed by what it
+does, **Motion camera**, with a first line ("Its picture is never shown") and a link to the
+film's Webcam, which has the opposite line and links back.
+
+Measured (`npm run cameras`, two stand-in cameras behind `navigator.mediaDevices`): 31 of
+31, desk and phone. The film opens `cam-usb` by id when picked (main could only ask for
+`environment`), switches live, comes off on unplug and back on replug, and each camera's
+choice survives a reload apart.
+
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped 2026-10-24)
 
 Asked by the owner 2026-10-24: early cartoons in the app to run in the background and feed
