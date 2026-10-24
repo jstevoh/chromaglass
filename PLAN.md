@@ -3195,7 +3195,9 @@ code.**
   and ended after the second; the track-end advance goes the same way. Inferred for
   Safari: that context is made in `oncanplay`, outside a gesture, and never resumed.
   Never stop the destination's own tracks; resume it from the play gesture.
-- *Song ID can switch itself off for the session.* Its silence branch sets `busyRef` and
+- *Song ID can switch itself off for the session.* (The flag half **shipped** in 14z-2:
+  the silence branch's `finalizeListen` is in a `finally` now; the two leaked
+  `AudioContext`s are still open.) Its silence branch sets `busyRef` and
   awaits `finalizeListen` with no `finally` (`useMusicIntelligence.ts`), unlike the two
   branches beside it: one throw leaves identification, the local match and the song-end
   detector off. A failed `decodeAudioData` in `songMap.ts` and an error in `capturePcm`
@@ -3304,11 +3306,8 @@ read in the code.**
   about four times a second while a song plays; `getLiveEngineStatus` is passed inline,
   so Settings' 1 s tick is re-armed by every App render and does not tick while the App
   renders fast.
-- *After 14f's sound half (#211):* the cast's feed now listens to the ear itself, but
-  `useSongChange` still has no dependency list, so the song-gap detector is sampled at
-  the App's render rate, now about 11 a second (it was about 70). A tenth of a second
-  may be fine enough for a gap between songs; if it is not, it wants the ear's
-  `onReading`, as the cast's feed has.
+- ~~*After 14f's sound half (#211):* `useSongChange` sampled the song-gap detector at
+  the App's render rate.~~ It listens on the ear's `onReading` now (14z-2).
 
 *Measure:* `npm run desk` and `npm run layout` for the frame after Esc and after a
 switch (the frame is the hole; a click on the preview reaches the plate); a node check
@@ -3496,15 +3495,51 @@ effect). `npm run music` only feeds it synthetic level traces.
   a boundary nobody trusts; New preset and Random are still one press in Settings.
   `npm run music`: "a new song keeps the look unless someone asks for more" (FAIL on
   'preset', ok on 'off').
-- **14z-2**: hear a song change from what the music is, not only from silence: a
-  sustained change in timbre, key and tempo across a few bars (a novelty curve over
-  chroma, MFCC-like bands and tempo, with a slow baseline), confirmed by song ID when it
-  answers, on the ear's own clock. Judged on recorded songs and real transitions (CD
-  gaps, streaming gaps, DJ crossfades, gapless albums, a quiet bridge that must not
-  fire), not synthetic traces, with hits, misses and lateness counted per transition.
-- **14z-3**: time the change to the music: land it on the new song's first downbeat
-  (or the next phrase start), and size the fade to the transition heard (a cut for a
-  gap, a long fade under a crossfade). Then On a New Song can open on New preset again.
+- **14z-2** (**shipped**): where a song ends and the next begins, measured on real songs.
+  `npm run songends` joins eight CC-BY songs (`scripts/fixtures/songs`, credits there) with
+  half-second and two-second gaps, gapless and crossfaded, in a quiet room and a noisy one
+  (the room 30 dB under the music), runs the app's own ear over them, and plays each song
+  whole. The old rule, timed against the room tracker: 16 of 48 gaps and gapless joins, 0
+  of 16 crossfades. `SongBoundary` now: 43 of 48, no change inside any whole song; a song's
+  end is a dip 40 dB under its own loud level (over 40 s) or a second on the room's floor,
+  and the next song is sound that carries on for 0.75 s (a last chord after a stop does
+  not). On the lab's twenty-three songs: 65 of 66 gaps, 39 of 44 gapless, no false change
+  in 5.8 h. It is heard on every reading of the ear (`onReading`), not on the App's renders
+  (14u). Crossfades are song identification's: measured, no summary of the sound (harmony,
+  spectral shape, level, hits) moved further between two songs than between a verse and a
+  chorus of one. The local matcher now captures every 6 s, not 12: it names every
+  crossfade's new song with none wrong, 7.9 s in after a 6 s crossfade (9.4 s at 12), 6.7 s
+  gapless in a noisy room. It no longer names songs it has never heard: a held chord made
+  one pair at every frame, and n of them against m in a stored song summed to thousands of
+  votes at one place in it; each pair now votes once per alignment (`localFingerprint.ts`).
+  With each fixture left out of the library in turn, strangers named 38 times before, 0
+  after, and the known songs named in 978 captures of 4 s, not 929. The busy flag can no
+  longer hang on a throw (14s's `finalizeListen`).
+- **14z-3** (**shipped**): the change lands on a hit of the new song (27 of 31 gaps; else
+  1 s after it is confirmed), a median 1.0 s after its first note. After a gap the look fades
+  in over 1 s; named by identification, mid-crossfade, it blends in over twice the desk's
+  fade, at least 4 s. Judged on the owner's GPU: `docs/judging.md` §64.
+- **14z-4**: once the owner has judged §64 with their own music, On a New Song opens on
+  New preset again (the `music` check's default line moves with it).
+- **14z-5**: the room tracker seeds its floor on the analyser's first frame, and an analyser
+  with nothing through it yet hands it digital silence (-140): the floor then climbs about a
+  tenth of a decibel a second, so every room reads as "sound" for minutes. Measured in
+  `npm run songends`: the old gap rule with a tracker seeded that way caught 0 of 56 joins.
+  The boundary no longer leans on it, but the analyser's window (the visuals' calibration)
+  and the gate still do: seed from the first frame with sound in it (the render's side of
+  the same seeding is under 28e's leftovers). Check that the
+  calibrated window then settles on the room within its calibration time, in `ears`.
+- **14z-6**: a song the show has never heard waits for the recognition service's 35 s
+  re-check when it crossfades in. Ask the service sooner when the sound's character shifts
+  (a candidate, not a change: the measured shifts inside songs make it a poor trigger for
+  the look, a fair one for a question), within its quota. And a live band: applause and
+  talk between songs are neither quiet nor a new song's sound, so the boundary waits for
+  the next song's own decay; hear applause as a gap (broadband, no pitch, no beat).
+  And a room that fills up late in a song: the floor looks back a minute and climbs a
+  decibel a second, so a gap at a room 18 dB louder than it was is heard only once the room
+  has been that loud for about 80 s (with the room rising 35 s before the gap, 1 of 8
+  caught; `songends`' gap2rise gives it 95 s). Follow the floor faster without hearing a
+  quiet passage as the room.
 
 ## 15. Every tool on every liquid
 

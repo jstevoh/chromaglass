@@ -1514,3 +1514,20 @@ running back as the bass falls, and each kick's dye should throw further. It sho
 bass, not as a busier or shakier plate, and nothing should move the whole frame. Say whether 3
 is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
 bass you wanted.
+
+## 64. A new song brings a new look, on its beat (PLAN 14z)
+
+Settings, Audio Input, On a New Song: pick New preset (it opens on Keep until you have judged
+this; on the phone, the same control in Settings). Then play your own music the ways you play it
+at a show, through the microphone in the room as well as through the laptop:
+
+- An album or playlist with gaps: the new look should come in about a second into each new
+  song, on one of its first beats, fading in over a second. Nothing should change during a quiet
+  bridge, a stop before a last chord, or a long fade-out.
+- A crossfade (a DJ set, or a player's crossfade setting): the change waits for the show to
+  recognise the song, usually 7 to 8 s into it for a song it has heard before, and then blends in
+  slowly under the music (about four seconds). A song it has never heard waits for the song
+  recognition service, up to about 35 s.
+
+Say whether a change ever lands in the middle of a song, whether one is ever missed, and whether
+the speeds feel right; if they do, On a New Song can open on New preset again (14z-4).

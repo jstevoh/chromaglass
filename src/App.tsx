@@ -3198,9 +3198,23 @@ export default function App() {
   };
 
   // ── A new song, a new look ──────────────────────────────────────
-  // Heard as a gap between tracks, or named by track identification. The
-  // sequencer owns the evolution while it runs, so it is left alone then.
-  const songChange = useSongChange(audioData, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
+  // Heard as a gap between tracks, or named by track identification, on the
+  // ear's own clock and landed on a beat (PLAN 14z). The sequencer owns the
+  // evolution while it runs, so it is left alone then.
+  const songChange = useSongChange(ear.onReading, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
+  /*
+    How long the new song's look takes to come in, by how the song came.
+
+    After a gap the new song starts clean and the change lands on one of its
+    first beats, so it comes in quickly: a second, short enough to read as the
+    show answering the song and long enough not to read as a cut. Named by
+    identification, the new song has been playing for several seconds already
+    (a crossfade, or a gapless join; `npm run songends` measures 6 to 17 s at the
+    median), so the look blends in under it instead: twice the desk's fade,
+    and never under four seconds. Both were a fixed desk fade at whatever
+    moment the gap rule happened to fire.
+  */
+  const songFadeSeconds = (reason: 'gap' | 'track') => reason === 'gap' ? 1 : Math.max(4, fadeSeconds * 2);
   const lastSongChangeSeq = useRef(0);
   useEffect(() => {
     if (!songChange || songChange.seq === lastSongChangeSeq.current) return;
@@ -3241,7 +3255,7 @@ export default function App() {
       setPinnedPresetId(null);
       // The song boundary's own stream, not Lucky's default: a Lucky press
       // between songs must not decide which look the next song brings.
-      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), fadeSeconds);
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), songFadeSeconds(songChange.reason));
       return;
     }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
@@ -3252,7 +3266,7 @@ export default function App() {
     if (!next) return;
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);
-    fadeSettingsTo(evolvedLook(from, next.settings), fadeSeconds);
+    fadeSettingsTo(evolvedLook(from, next.settings), songFadeSeconds(songChange.reason));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songChange?.seq]);
 
