@@ -1978,10 +1978,11 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
 
   Named shortcuts:
   1. Small-angle deflection θ ≈ |∇density| · 0.35 (from the air-masked slope g0 on Layer 0,
-     PLAN 33b) plus the hue-gated two-dye boundary deflection bEdge · edgeK · 1.1 (PLAN 33a)
-     is evaluated from the dye slope and colour step rather than ∇(n·h); it omits oil, film
-     and gap thickness terms that the Laplacian includes, and operates per-texel so it scales
-     with grid resolution.
+     PLAN 33b) plus the hue-gated two-dye boundary deflection bEdge · edgeK · 0.65 (PLAN 33a,
+     capped at 0.42 pupil loss so an oil drop straddling two dyes keeps each side's colour in
+     npm run droplens) is evaluated from the dye slope and colour step rather than ∇(n·h);
+     it omits oil, film and gap thickness terms that the Laplacian includes, and operates
+     per-texel so it scales with grid resolution.
   2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the OPL step.
   3. Pupil overlap is approximated by a smoothstep with a 0.0 extinction floor, weighted by
      reliefK (Edge Relief × plateAmt) on the meniscus slope and edgeK on the two-dye boundary.
@@ -2018,7 +2019,7 @@ fn refractionOptics(near: vec4f, bEdge: f32, reliefK: f32, edgeK: f32) -> f32 {
   let na = DROP_NA;
   let theta = gLen * 0.35;
   let u = clamp(theta / (2.0 * na), 0.0, 1.0);
-  let uBound = clamp((bEdge * edgeK * 1.1) / (2.0 * na), 0.0, 1.0);
+  let uBound = clamp((bEdge * edgeK * 0.65) / (2.0 * na), 0.0, 0.42);
   let aperture = 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK + uBound, 0.0, 1.0);
 
   let deltaZ = (U.projectorFocus - 0.5) * 1.5;
