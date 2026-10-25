@@ -4976,6 +4976,7 @@ export default function App() {
       pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
       midi={midi}
       onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
+      onOpenSound={() => { setShowSettings(false); setShowSound(true); setShowSongs(false); setShowMidi(false); }}
       sceneOn={sceneOn}
       onSceneToggle={toggleScene}
       sceneState={scene.state}
@@ -6124,6 +6125,7 @@ export default function App() {
             presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
             activity={showActivity}
             onActivity={setShowActivity}
+            onSetup={() => openSettingsAt('midi')}
             onClose={() => setShowMidi(false)}
           />
           </PanelGuard>

@@ -8699,18 +8699,16 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   remote's two share a test id because there is one per layout). The unused
   `desk/PerformanceButton.tsx` was already gone (`record` asserts it). Story in
   `docs/plan-shipped.md` §35.
-- **35c-3** What 35c-2 left, each a change inside surfaces whose checks read the control, so it
-  needs the Mac shards to judge:
-  - **MIDI on** is drawn in Settings' Controller section (`settings-midi-enable`) and again at the
-    top of the MIDI sheet (`midi-enable`, the port, factory maps and Auto-map). The sheet is the
-    teaching surface (Learn, banks, bindings); make it show the state and send the setup to the
-    section, retargeting `qa` (1716), `panel` (742) and `renders`.
-  - **Audio source** is drawn in Settings' Sound (`audio-source`, five options) and in the Sound
-    sheet (`sound-source-*`, six, with the plate as an instrument). The sheet is the superset;
-    Settings' row should become a state line with a link, and `opensource`, `kickbubbles`, `qa`
-    and about twenty harnesses that set `chromaglass-audio-source` by storage stay as they are.
-  - The remote's two Blackouts share the test id `remote-blackout`; the phone has no Blackout
-    outside Settings → Master (35a-2).
+- **35c-3** One home for **MIDI on** and the **audio source**. Shipped: the Controller section of
+  Settings is the one place MIDI is turned on, its ports (in, and now the LEDs out) chosen, a
+  factory map loaded and a controller auto-mapped; the MIDI sheet is the teaching surface and says
+  the state (`midi-state`) with a **Set up…** button into the section. The Sound sheet is the one
+  place the source is chosen (six tiles, with the plate as an instrument); Settings' Sound row is a
+  state line (`audio-source-state`) and **Change in Sound…**, the device picker staying beside it.
+  The phone already had one home for each (its Sound sheet; Web MIDI is not on iOS). Story in
+  `docs/plan-shipped.md` §35. Left from it:
+  - The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
+    (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.
   - 35b-2's pin picker and command palette still list by section, not by the seven groups.
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
