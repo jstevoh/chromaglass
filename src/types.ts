@@ -873,7 +873,7 @@ export interface VisualizerSettings {
   ledFade: number; gelFade: number; lumiaFade: number; frontFade: number;
   backFade: number; filmFade: number; markFade: number;
   exposure: number;           // plate-wide film exposure: dye below the plate's own histogram floor renders as bare glass (ink on white)
-  lampWarmth: number;         // halogen grade: warm tint and a soft vignette, the sealed-wheel look
+  lampWarmth: number;         // halogen grade: the lamp's colour temperature, 0 = 6500 K, 1 = 5100 K (the old end), 3.75 = a 3200 K halogen; with a soft vignette
   transmission?: number;      // light through the dye: thin pale, thick deep (0 = the flat glow)
   layerScaleVariety: number;  // the second layer is viewed magnified with its own slow drift, so one frame carries two scales
   hueJourney: number;         // minutes per step of a slow walk through the preset's dyes (0 = the old random rotation); a set drifts hue over minutes

@@ -52,7 +52,7 @@ import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
 import { helpFor, CONTROL_HELP } from '../src/lib/controlHelp.ts';
 import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
-import { LAMP_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, gradeRedOverBlue, kelvinLabel, warmthKelvin } from '../src/lib/lampKelvin.ts';
+import { HALOGEN_KELVIN, LAMP_WARMTH_MAX, LEGACY_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, kelvinLabel, lampTint, warmthKelvin } from '../src/lib/lampKelvin.ts';
 import { dripFallSeconds, FALL_THIN_S } from '../src/lib/dripPace.ts';
 import { THICK_NU, WATER_NU } from '../src/lib/turntable.ts';
 import { dyeRoomOf } from '../src/lib/dyeTarget.ts';
@@ -1858,25 +1858,55 @@ check('and neither starts over the limit',
   const deskPanels = readFileSync(join(root, 'src/components/desk/DeskPanels.tsx'), 'utf8');
   const phoneStage = readFileSync(join(root, 'src/components/phone/PhoneStage.tsx'), 'utf8');
 
-  // Lamp Warmth in kelvin: a reading of the grade, so it must be the grade the shader applies.
-  const grade = plateWgsl.match(/outColor \* vec3f\(([\d.]+),\s*([\d.]+),\s*([\d.]+)\) \* vig, U\.lampWarmth/);
-  check("the kelvin readout reads the tint the plate's shader applies",
-    !!grade && [1, 2, 3].every(i => Number(grade[i]) === LAMP_GRADE[i - 1]),
-    grade ? `shader vec3f(${grade.slice(1, 4).join(', ')}), reader ${LAMP_GRADE.join(', ')}` : 'the Lamp warmth line in plate.ts was not found');
+  // Lamp Warmth in kelvin (PLAN 35e-2): the plate multiplies by the blackbody's colour at the temperature
+  // the slider names, so the shader has to take that tint from the uniforms the packer fills from the library.
+  const uniformsSrc = readFileSync(join(root, 'src/gpu/plateUniforms.ts'), 'utf8');
+  check("the plate's shader multiplies by the lamp's tint from the uniforms, and the packer fills them from lampTint",
+    /vec3f\(U\.lampTintR, U\.lampTintG, U\.lampTintB\)/.test(plateWgsl) &&
+    /const tint = lampTint\(warmth\);[\s\S]{0,200}'lampTintR', tint\[0\][\s\S]{0,60}'lampTintG', tint\[1\][\s\S]{0,60}'lampTintB', tint\[2\]/.test(uniformsSrc),
+    'plate.ts lamp line and plateUniforms.ts');
 
-  const steps = Array.from({ length: 21 }, (_, i) => i / 20);
+  const steps = Array.from({ length: 76 }, (_, i) => i * LAMP_WARMTH_MAX / 75);
   const kel = steps.map(warmthKelvin);
-  check('Lamp Warmth 0 is the neutral and every notch toward 1 is warmer', kel[0] === NEUTRAL_KELVIN && kel.every((k, i) => i === 0 || k < kel[i - 1]),
-    `0 → ${kelvinLabel(0)}, 0.5 → ${kelvinLabel(0.5)}, 1 → ${kelvinLabel(1)}`);
-  let worstRB = 0, worstGB = 0;
+  check('Lamp Warmth 0 is the neutral, every notch is warmer, and the top is the halogen\'s 3200 K',
+    kel[0] === NEUTRAL_KELVIN && kel.every((k, i) => i === 0 || k < kel[i - 1]) && Math.abs(kel[75] - HALOGEN_KELVIN) < 1e-6 && kelvinLabel(LAMP_WARMTH_MAX) === '3200 K',
+    `0 → ${kelvinLabel(0)}, 1 → ${kelvinLabel(1)}, 2 → ${kelvinLabel(2)}, ${LAMP_WARMTH_MAX} → ${kelvinLabel(LAMP_WARMTH_MAX)}`);
+  const mired = steps.map(w => 1e6 / warmthKelvin(w));
+  const dm = mired.slice(1).map((m, i) => m - mired[i]);
+  check('the slider moves in even steps of mired, the unit colour temperature is stepped in',
+    Math.max(...dm) - Math.min(...dm) < 1e-9, `${dm[0].toFixed(3)} mired a notch, spread ${(Math.max(...dm) - Math.min(...dm)).toExponential(1)}`);
+  // The blackbody it names has the tint's own colour ratios (a reading of what the shader does, not a label).
+  let worstBlackbody = 0;
   for (const w of steps) {
-    const sh = blackbodyShift(warmthKelvin(w));
-    worstRB = Math.max(worstRB, Math.abs(sh[0] / sh[2] / gradeRedOverBlue(w) - 1));
-    const gb = (1 + (LAMP_GRADE[1] - 1) * w) / (1 + (LAMP_GRADE[2] - 1) * w);
-    worstGB = Math.max(worstGB, Math.abs(sh[1] / sh[2] / gb - 1));
+    const t = lampTint(w), sh = blackbodyShift(warmthKelvin(w));
+    worstBlackbody = Math.max(worstBlackbody, Math.abs(t[2] / t[0] / (sh[2] / sh[0]) - 1), Math.abs(t[1] / t[0] / (sh[1] / sh[0]) - 1));
   }
-  check('the blackbody it names has the grade\'s red over blue to half a percent, and its green over blue to 3%',
-    worstRB < 0.005 && worstGB < 0.03, `worst ${(worstRB * 100).toFixed(2)}% and ${(worstGB * 100).toFixed(2)}% over 21 notches`);
+  check('the tint is the blackbody\'s blue and green over red at the temperature named, over the whole travel',
+    worstBlackbody < 1e-9, `worst ${worstBlackbody.toExponential(1)} over ${steps.length} notches`);
+  // Saved looks hold numbers from before the widening: 0 to 1 must stay the colour it was.
+  let worstLegacy = 0;
+  for (let i = 0; i <= 20; i++) {
+    const w = i / 20, t = lampTint(w);
+    for (let c = 0; c < 3; c++) worstLegacy = Math.max(worstLegacy, Math.abs(t[c] / (1 + (LEGACY_GRADE[c] - 1) * w) - 1));
+  }
+  check('from 0 to 1 the tint is the old grade to 1.5% a channel, so every saved look keeps its colour',
+    worstLegacy < 0.015, `worst ${(worstLegacy * 100).toFixed(2)}% over 21 notches`);
+  // The vignette blends as it always did (1 - w + w*g*vig), not tint times a second blend: the review found 6% in the corners.
+  const shaderForm = /tint - \(tint - vec3f\(1\.0 - min\(U\.lampWarmth, 1\.0\)\)\) \* \(1\.0 - vig\)/.test(plateWgsl);
+  let worstCorner = 0;
+  for (let i = 0; i <= 20; i++) for (const vig of [0.55, 0.8, 1]) {
+    const w = i / 20, t = lampTint(w);
+    for (let c = 0; c < 3; c++) {
+      const now = t[c] - (t[c] - (1 - Math.min(w, 1))) * (1 - vig), was = 1 - w + w * LEGACY_GRADE[c] * vig;
+      worstCorner = Math.max(worstCorner, Math.abs(now / was - 1));
+    }
+  }
+  check('the vignette blends as the old grade did, to 1.5% in the corners of the dish, from 0 to 1',
+    shaderForm && worstCorner < 0.015, `shader form ${shaderForm}, worst ${(worstCorner * 100).toFixed(2)}% over 21 notches and three corner depths`);
+  const pinLamp = readFileSync(join(root, 'src/lib/deskPins.ts'), 'utf8'), settingsSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+  check('the pin range, the Settings slider (typed as the number the sheet reads) and the bulb all end at the library\'s top',
+    /key: 'lampWarmth'[^}]*max: LAMP_WARMTH_MAX/.test(pinLamp) && /settingKey="lampWarmth"/.test(settingsSrc) && Number(/label="Lamp Warmth"[\s\S]{0,160}max=\{([\d.]+)\}/.exec(settingsSrc)?.[1]) === LAMP_WARMTH_MAX &&
+    /<Bulb warmth=\{at \* LAMP_WARMTH_MAX\}/.test(readFileSync(join(root, 'src/components/ui/Pace.tsx'), 'utf8')));
   const hot = blackbodyHex(9000), warm = blackbodyHex(1900), halo = blackbodyHex(3200);
   const ch = (h, i) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
   check('the filament is amber when cool and bluer when hot, from the blackbody and not a table',

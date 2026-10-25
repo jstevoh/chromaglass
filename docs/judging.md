@@ -1810,3 +1810,20 @@ On the phone: the look in the list, and Film Hold under Oil Bodies in Settings โ
 Bad: walls between drops so thick the crowd reads as a lattice; drops that jitter against each
 other; colours going brown or black inside the drops; or a crowd that has merged into blobs within
 half a minute with no music playing.
+
+today (widened in ยง80).
+
+## 80. Lamp Warmth reaches a 3200 K halogen (PLAN 35e-2)
+
+In Settings, Lamp & Light, on any look with some colour on the plate (the bulb is also on the phone's Settings):
+
+1. Lamp Warmth now runs from 6500 K at 0 to 3200 K at the right-hand end, and the bulb's figure follows it, even
+   steps of colour all the way. The old 0 to 1 is the first quarter and looks as it did.
+2. Drag it slowly to the end. The picture should go from white through cream and amber to the orange of an old
+   overhead projector's lamp; blues and violets should die away first, as under a real tungsten lamp, and reds
+   and oranges hold. The warm end is dimmer on purpose; Exposure brings it back.
+3. Bad: a jump or a band as you drag, a look that changed colour with the slider where it was, a bulb figure that
+   does not follow, a dark corner that gets worse beyond the old end (the vignette is meant to stop at 1).
+4. Decide: Home Movie (0.45) and Velvet Underground (0.25) kept their colour. Try Home Movie at 2 or 3, which is
+   what an old projector's lamp is; say if you want it, and if you want the end held at the same brightness
+   instead of dimmer (PLAN 35e-3).
