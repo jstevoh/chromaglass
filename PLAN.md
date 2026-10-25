@@ -7701,24 +7701,13 @@ Turing Print" work (#331), which also made the reaction grow at all.
     fails on any quoted retired id in src/, so retiring the look trips it on the layer.
     5b learns to tell a preset id from a setting key (named under `Check changes:`, its
     reach unchanged for preset ids), then the look retires.
-  - **28i-2. Give back the black, make the still ones move** (Antigravity, batch 2). Film
-    near black (5th percentile) at least 20% of the time: Classic (and two or more hues),
-    Galaxy, Stardust Collapse (colours at least .3), Jellyfish Bloom (flat at most .4),
-    Bass Drop (peak at least 2.5 × median). Cell Bloom: flat at most .4 and luma at least
-    half its 8 s value at 40 s. Cyberpunk: near black at the 95th percentile at most 60%,
-    three or more hues. Off the white: Turing Print colours at least .3 by 8 s and luma
-    at most .6; Roy flat at most .5, luma at most .6; Red Cabbage luma at most .5 with
-    three hues; Lava Lamp luma at most .6; Milk Marbling's white tamed. Colour: Macro
-    Bead and Lacing Run two or more hues and six colour changes a minute; Chemical Clock
-    six a minute. Microscopic Chaos detail at most half its 10-19 reading. Motion at
-    least .02 at 20 and 40 s: Velvet Underground, Poster 1969, Home Movie, Clock Glass,
-    Crowd Plate, Lava Lamp, Jellyfish, Microscopic Chaos. `gallery` label and
-    `film.yml` (`FILM_ONLY` the looks changed).
-    Also for this batch, found in #408: **Poster, 1969's plate runs at about 16 steps a
-    second on the Mac runner** (`squeeze` read 191, 215 and 327 steps in 12 s on it, 320
-    to 350 on the Fillmore), under the 30 a second where the plate stops flowing and
-    starts stepping (`PINNED_STEP_RATE`, `LiquidVisualizer.tsx`). Find what makes Poster
-    that heavy (its layers, its dye budget, its plate size) before it is made to move.
+  - ~~**28i-2. Give back the black, make the still ones move**~~ (Antigravity, batch 2,
+    **shipped** in this PR; story in `docs/plan-shipped.md` 28i-2): all 21 reworked looks
+    meet their gallery (`8/20/40 s`) and film (`90 s`) bars; `jellyfish-bloom` appears once
+    in `evolution.ts`'s `calm` bucket and `poster-1969` appears once in `sequencer.ts`'s
+    `Pace` sequence. `poster-1969` now runs on a single plate (`layerCount: 1`), raising its
+    12 s step rate from `15.9 steps/s` (two 384² plates) to `24.8 steps/s` (one 384² plate);
+    reaching `>= 30 steps/s` on a single 256² rung is owned by the governor thread (`14aa-3`).
   - **28i-3. Sound on the liquid, not the frame** (batch 3, **open for the film measure**;
     frame fixes on the eight looks and the Milk Marbling dead-patch fix **shipped** in #473,
     story in `docs/plan-shipped.md` 28i-3).
@@ -7770,7 +7759,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
       `clock-glass` (`3.0 swells/min` on 40 s / `0.0` on 30 s, `0.0 colour changes/min`, `r1 = 0.10`),
       `ferro-paint` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.03`),
       `roy` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.08`).
-      28i-2 stays open as briefed.
   - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
     magenta cells, no rainbow); then four or more hues on the film.
 

@@ -373,7 +373,7 @@ export const PRESETS: Preset[] = [
       // The one look whose music moves the frame (FRAME_MOVING_LOOKS):
       // Frame Sway lets the rock carry the picture on the downbeat without
       // moving any other look on the shelf.
-      frameSway: 0.62,
+      frameSway: 0.96,
       sceneMappings: [
         /*
           The kick throws the plate, a hard kick harder. The patch was written
@@ -385,7 +385,7 @@ export const PRESETS: Preset[] = [
           kicks arrive together, and open the glass smear past its 0.2 rest
           gate on the full kit.
         */
-        { source: 'hits', feature: 'hatsHit', setting: 'plateRock', depth: 0.93 },
+        { source: 'hits', feature: 'hatsHit', setting: 'plateRock', depth: 0.60 },
         { source: 'bands', feature: 'hats', setting: 'glassSmear', depth: 0.35 },
         { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.32, threshold: 0.4, attack: 0.02, release: 0.35 },
         /*
@@ -1684,7 +1684,7 @@ export const PRESETS: Preset[] = [
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'turingDrift', depth: 0.3 },
         { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.2 },
-        { source: 'bands', feature: 'bass', setting: 'bzReaction', depth: -0.95 },
+        { source: 'bands', feature: 'tonalMid', setting: 'chemistry', depth: 0.15 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
