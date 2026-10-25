@@ -150,6 +150,7 @@ const SECTION_OF: Record<string, string> = {
   filmPhysics: 'camera',
   phaseDisplace: 'ferro',
   oilBodies: 'oil',
+  filmHold: 'oil',
   clearFilm: 'oil',
   thinGap: 'squish',
   gapThickness: 'squish',

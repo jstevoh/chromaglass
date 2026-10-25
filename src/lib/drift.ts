@@ -123,6 +123,10 @@ const NOT_THE_LOOK = new Set([
   // tilt, like the direction above, and a dial that would set the plate
   // slopping by itself in a look that was still.
   'slosh',
+  // Film Hold (PLAN 28k): a merge cannot be undone, so a wander down would
+  // tear a look's crowd of drops into a few blobs for good, and up adds
+  // nothing to a look without one. The look's own number, held.
+  'filmHold',
   // How much of a burst each kick throws (Kick Bloom): the owner's hand, as
   // Frame Sway is. It is 1 on every look so none changes, and a wander would
   // walk a look off the amount it ships with and into the dye-free calm of 0

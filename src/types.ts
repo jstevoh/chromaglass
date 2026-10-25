@@ -562,6 +562,14 @@ export interface VisualizerSettings {
     plate. 0 is the plate as it was: one dye, blending across every edge.
   */
   oilBodies: number;
+  /**
+    Film Hold: the water film between two drops of oil pushes back as it
+    thins (the disjoining pressure soap gives a film), so drops crowd edge to
+    edge and sit inside one another without merging, until something presses
+    harder than the film holds. Needs Oil Tension. 0 is the plate as it was:
+    two drops merge the moment their edges meet.
+  */
+  filmHold: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
@@ -1049,6 +1057,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   vorticityConfinement: 0,
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
+  filmHold: 0,              // off: drops merge the moment they touch, as every look had it
   surfactantFlow: 0,
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
   solutalBuoyancy: 0,
