@@ -88,7 +88,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     Video. `MERGED_SECTIONS` below sends its old id here.
   */
   { id: 'audio-input', name: 'Sound', category: 'feed',
-    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation' },
+    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation impact' },
   /*
     Called by what it does (PLAN 14ad, the owner 2026-10-24: "what the room
     control is vs. showing video on the plate"). "The Room" said where the
@@ -96,7 +96,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     one stirs and is never shown. Search still finds it by "room".
   */
   { id: 'room', name: 'Motion camera', category: 'feed',
-    terms: 'room camera video webcam people crowd dancers track tracking hands motion movement sensor floor deadzone smoothing mirror flip presence drive' },
+    terms: 'room camera video webcam people crowd dancers track tracking hands motion movement sensor floor deadzone smoothing mirror flip presence drive impact' },
   /*
     The film projector, out of Projectors.
 
@@ -108,7 +108,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     section to see it.
   */
   { id: 'film', name: 'Film', category: 'feed',
-    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive' },
+    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive impact' },
   /*
     The patch bay, with every master over it.
 
@@ -182,6 +182,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'tilt', name: 'Tilt & Rock', category: 'motion',
     terms: 'tilt rock rocking gravity slosh tip tipping dish upright direction downhill beat plate rock' },
+  /*
+    The plate turning, which was the first half of Plates & LED. That section
+    is Stage's, and Stage is the group that keeps a panel out of Build and Gig,
+    so the dish's spin could not be docked beside the set it is ridden in.
+    Same ids, same keys: only the section a pin is filed under changed.
+  */
+  { id: 'spin', name: 'Plate Spin', category: 'motion',
+    terms: 'spin rotation rotate turn flick auto spin turntable dish rpm tempo beats a turn reverse spin direction wander drag flywheel motor plate speed' },
   // The old names of Momentum, Updraft and Vibration stay findable, as Grain
   // Fineness's does under Light Show Look: someone who learned them as
   // Damping, Blow Velocity, Vibration Freq and Grain Size will type those.
@@ -224,7 +232,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'mark', name: 'Logo & Titles', category: 'stage',
     terms: 'logo mark brand branding title card watermark sponsor client name overlay still image png transparent credit' },
   { id: 'layers', name: 'Plates & LED', category: 'stage',
-    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform spin flick auto spin turntable dish rpm tempo beats a turn reverse spin' },
+    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform' },
   { id: 'simulation', name: 'Simulation', category: 'stage',
     terms: 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain' },
 ];

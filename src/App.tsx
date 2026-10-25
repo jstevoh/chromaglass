@@ -6223,10 +6223,7 @@ export default function App() {
             onStopReplay={musicIntel.stopReplay}
             performance={musicIntel.performance}
             performanceClock={perfClock}
-            onTogglePerformance={togglePerformance}
-            onReplayPerformance={musicIntel.replayPerformance}
-            onStopPerformanceReplay={musicIntel.stopPerformanceReplay}
-            onDeletePerformance={musicIntel.deletePerformance}
+            onOpenRecord={() => { setShowTrackPanel(false); setShowRecordPanel(true); }}
             onClose={() => setShowTrackPanel(false)}
           />
           </PanelGuard>

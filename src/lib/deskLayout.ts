@@ -162,7 +162,7 @@ const empty = (): Omit<DeskLayout, 'plateMode'> => ({ left: [], right: [], deck:
   machine and the phone link in the deck.
 */
 export const SHIPPED: Record<LayoutName, DeskLayout> = {
-  build: { ...empty(), right: ['bottles', 'dyes', 'tools'], deck: ['recipe', 'physics', 'camera', 'audio-input', 'macro', 'patches'], plateMode: 'preview' },
+  build: { ...empty(), right: ['bottles', 'dyes', 'tools'], deck: ['recipe', 'physics', 'squish', 'camera', 'audio-input', 'macro', 'patches'], plateMode: 'preview' },
   gig: { ...empty(), left: ['cues'], right: ['rides'], deck: ['dyes', 'tools', 'patches'], plateMode: 'live' },
   loadin: { ...empty(), left: ['midi', 'audio-input'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' },
 };

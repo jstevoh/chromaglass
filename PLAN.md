@@ -237,7 +237,7 @@ style (§31).
 - **6.4** **18e** edges from refraction, partly shipped #355 (the front plate's edges from projector pupil aperture loss and shadowgraph Becke lines; #219's 20d), then **18e-2** a clear pour's edge, **31a** the projector's
   focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
-- **6.6** ~~**18m**~~ a drop slumps under its own weight (then **18m-1** to **18m-5**), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
+- **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-5**), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12).
 - **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
@@ -4286,7 +4286,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
-| 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (#364); 18m-1 to 18m-5 after |
+| 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (#364); ~~18m-1~~ (#371, 18m-1a implicit step open), 18m-2 to 18m-5 after |
 
 ### 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
 **Partly shipped**: Thin Gap is built and on in every look (#248), the Press draws the liquid back, and 18a-2 (forces that are forces) is done. What is open is below: the findings along the way, 18a-2's open findings, and the steps left for later PRs. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
@@ -4926,15 +4926,29 @@ viscous gravity current (`wgsl/slump.ts`, its own stage in the dye's step, apart
 18h's blur), measured against Huppert's law by `npm run slump`. How it was found, built and
 measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
 
-- **18m-1. The slump's cap (a speed shortcut).** The pass is explicit: a face moves at
-  most 0.24 of the difference across it a substep, in at most six substeps a step. A
-  pool deeper than about 1.4 units (0.5 mm) in water at 768² spreads at the cap's rate
-  until it has thinned to it, which is its first second or so (the drop in `npm run
-  slump` meets the law again by 1 s, and at 768² by a numpy copy of the kernels, 10.96 mm
-  at 60 s against the law's 10.91). Replace with an implicit step (backward Euler, K
-  lagged, the thin gap's multigrid with an identity term), and with the inertial regime
-  a current that deep is really in: it runs at its Froude speed √(g′η), not the viscous
-  law's (Huppert and Simpson 1980).
+- ~~**18m-1. The slump's cap (a speed shortcut).**~~ **Partly shipped** (#371): replaced
+  the viscous-only cap with a per-cell regime switch `min(viscous rate, inertial rate)`
+  using the Huppert–Simpson front Froude number `Fr = 1.19` (`Fr √(g′η(1 − η/b))`,
+  Huppert and Simpson 1980) in `slumpRate`, planned `substeps = Math.ceil(most /
+  SLUMP_FACE)` up to `SLUMP_SUBSTEPS = 20` in `fluid.ts` (covering 1024² at Heavy dye 1),
+  and kept `min(a, SLUMP_FACE)` (`0.24`) in `slump` as a stability guard (`npm run slump`
+  13/13, including deep heavy pools on 768² and 1024²).
+- **18m-1a. Implicit backward-Euler slump step and grid-independent inertial flux.**
+  #371's `min(viscous, inertial)` is a regime switch inside the explicit pass, not an
+  implicit step, and keeps two shortcuts: (1) the pass is still explicit forward Euler in
+  at most `SLUMP_SUBSTEPS = 20` substeps planned against `SLUMP_FACE = 0.24` at `DYE_CAP`,
+  with the per-face `min(a, SLUMP_FACE)` (`0.24`) stability guard in `slump`, rather than
+  an unconditional backward-Euler solve `(I − Δt ∇·K∇)A = A^n` with lagged K on the thin
+  gap's multigrid with an identity term — `SLUMP_SUBSTEPS = 20` covers up to 1024² at
+  `solutalBuoyancy = 1` at 60 Hz (`mostInert ≈ 4.57`, 20 substeps of `≤ 0.23`), so the
+  `min(a, SLUMP_FACE)` guard binds only when `ceil(most / SLUMP_FACE) > 20` (a slow frame
+  with `dt > 1/60 s` on a 1024² heavy-dye water plate, or a locally deeper squeezed gap
+  where `η(1 − η/gap)` exceeds its rest-gap value); and (2) writing the inertial front
+  speed `u_f = Fr √(g′η(1 − η/b))` into the diffusive rate as `K_inert Δt/Δx² = u_f Δt/Δx`
+  assumes the front drops across one cell Δx (`K_inert = u_f Δx`), rather than
+  propagating the front at `u_f` independent of Δx. Replace the explicit substeps and the
+  `min(a, SLUMP_FACE)` guard with the lagged-K backward-Euler multigrid solve and a
+  Δx-independent inertial front flux.
 - **18m-2. Coloured water in oil is a puddle, not a current.** Dye Weight at 1 says the
   dye is water in an oil (15% heavier), and two immiscible liquids do not mix into a
   gravity current: surface tension holds the pool at its puddle height and it stops
@@ -5442,6 +5456,13 @@ commit. *Size:* S.
   Plate video, a Take, or both never widens the button in the plate bar at 1280 or shifts
   Play's top pills. `layout` and `phone` each ask it now. The story is in
   [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+- **19v-5. The plate bar at 1280 still has no slack.** What #470 left of 19v-4's ask. In Build
+  at 1280 × 800 the bar's children and gaps take 935–936 px of its 936, the name already down
+  to its 120 px floor. Record no longer widens it, but any text that renders a pixel wider
+  (Geist arriving late, another platform's fallback) drops the plate by a row (about 42 px),
+  mid-show or at rest, as Record's label did. Give the bar some slack at 1280 (a narrower
+  floor for the name, or a smaller gap, whichever the `layout` check shows keeps the plate
+  where the hand found it); the bar itself is not changed by this item's entry. Desk lane.
 
 ### 19w. A fifth Mac shard, so no shard runs near its timeout
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
@@ -8669,8 +8690,7 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   `docs/plan-shipped.md` §35.
 - **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
   section (35c's work) or a different surface:
-  - Plates & LED holds the platform's spin, which is Motion's, but Stage is also the gate that
-    keeps a panel out of Build and Gig (`isStagePanel`); its spin controls move with 35c.
+  - ~~Plates & LED holds the platform's spin, which is Motion's.~~ Moved to Plate Spin in 35c-2.
   - The pin picker (`PickList`) and the command palette still list by section, not by the seven
     groups; the same headings would find a setting faster there.
 - ~~**35c-1** Squish Plate in five.~~ Shipped: Squish Plate (the glass: pressure, shape, depth drag,
@@ -8680,6 +8700,31 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   Reactions. The registry files each pin under the section that draws it (the desk's Fluid Physics
   panel had been the glass's, the oil's and the magnet's forty knobs), held by `panel`. Story in
   `docs/plan-shipped.md` §35.
+- **35c-2** One home per setting, second half. Shipped: **Flash Limit** has one switch, in Master
+  (Wall → Output draws a state line and no switch); each **Impact** master sits under the Drive of
+  its source (Room, Film, Sound), Shapes Impact alone staying at the bay; the platform's spin is a
+  **Plate Spin** section of its own in Motion (it was the first half of Plates & LED, which Stage's
+  gate keeps out of Build and Gig); Build's deck takes Squish Plate beside Fluid Physics; the
+  sequencer in Songs is a button; the track panel's Takes is a pointer to the Record panel (its
+  own Start a take and replay list were a second copy). Blackout was checked and is already one
+  per surface (the desk header on a desk, Settings' Master only where there is no desk; the
+  remote's two share a test id because there is one per layout). The unused
+  `desk/PerformanceButton.tsx` was already gone (`record` asserts it). Story in
+  `docs/plan-shipped.md` §35.
+- **35c-3** What 35c-2 left, each a change inside surfaces whose checks read the control, so it
+  needs the Mac shards to judge:
+  - **MIDI on** is drawn in Settings' Controller section (`settings-midi-enable`) and again at the
+    top of the MIDI sheet (`midi-enable`, the port, factory maps and Auto-map). The sheet is the
+    teaching surface (Learn, banks, bindings); make it show the state and send the setup to the
+    section, retargeting `qa` (1716), `panel` (742) and `renders`.
+  - **Audio source** is drawn in Settings' Sound (`audio-source`, five options) and in the Sound
+    sheet (`sound-source-*`, six, with the plate as an instrument). The sheet is the superset;
+    Settings' row should become a state line with a link, and `opensource`, `kickbubbles`, `qa`
+    and about twenty harnesses that set `chromaglass-audio-source` by storage stay as they are.
+  - The remote's two Blackouts share the test id `remote-blackout`; the phone has no Blackout
+    outside Settings → Master (35a-2).
+  - 35b-2's pin picker and command palette still list by section, not by the seven groups.
+
 - **35c-2** One home per setting, what is left of phase 3: Flash Limit (Settings' Master and the
   Wall), Blackout, MIDI on (Settings and Controller) and the audio source (Settings and Sound)
   each appear in two places, with record and replay, and the unused `desk/PerformanceButton.tsx`;
