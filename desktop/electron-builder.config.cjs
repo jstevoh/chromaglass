@@ -32,7 +32,7 @@ module.exports = {
     'preload.cjs',
     'package.json',
     { from: '../dist', to: 'dist', filter: ['**/*'] },
-    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'account-shows.js', 'server-license.js', 'license-key.js'] },
+    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'license-key.js'] },
   ],
   // All of it in one archive: Electron reads the site (the server's fs calls)
   // and imports the server (an ES module) from inside it. `npm run desktop --

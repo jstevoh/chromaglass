@@ -1334,7 +1334,7 @@ try {
 
       await page.keyboard.press('Meta+k');
       await settle(700);
-      await page.keyboard.type('Settings: The Room');
+      await page.keyboard.type('Settings: Motion camera');
       await settle(600);
       await page.keyboard.press('Enter');
       await settle(1500);
@@ -1356,11 +1356,11 @@ try {
         !!panel && panel.visible.length === 1 && panel.visible[0] === 'room',
         panel ? `showing ${panel.visible.join(', ') || 'nothing'}` : 'no settings panel');
       check('and the rail says where you are',
-        !!panel && panel.railSays === 'The Room', panel ? String(panel.railSays) : '');
+        !!panel && panel.railSays === 'Motion camera', panel ? String(panel.railSays) : '');
       check('and the room camera is on it', !!panel && panel.reachedRoom);
 
       // The search reaches a section by what it is about, not by its heading:
-      // "people" is the word someone types, and it is nowhere in "The Room".
+      // "people" is the word someone types, and it is nowhere in "Motion camera".
       const found = await page.evaluate(() => {
         const input = document.querySelector('[data-testid="settings-search"]');
         if (!input) return null;

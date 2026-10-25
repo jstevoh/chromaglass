@@ -2,6 +2,38 @@ const SIGNED_IN_KEY = 'chromaglass-signed-in';
 const EMAIL_KEY = 'chromaglass-auth-email';
 const PENDING_EMAIL_KEY = 'chromaglass-pending-email';
 
+/**
+ * Said on `window` whenever this tab's signed-in flag changes, so what reads it
+ * (the Sign in / Profile buttons, the profile sheet) can redraw. Another tab's
+ * change arrives as the browser's own `storage` event instead; `onAuthFlagChange`
+ * listens for both. Before this, the flag was read once at first render, so a
+ * sign-out (here, in another tab, or by the background check finding the session
+ * gone) left the buttons saying "Profile" with nothing behind them, and nothing
+ * on screen offered a way back in short of reloading the page.
+ */
+export const AUTH_CHANGED_EVENT = 'cg-auth-changed';
+
+function announce(): void {
+  try {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  } catch {
+    // no window
+  }
+}
+
+export function onAuthFlagChange(fn: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === null || e.key === SIGNED_IN_KEY || e.key === EMAIL_KEY) fn();
+  };
+  window.addEventListener(AUTH_CHANGED_EVENT, fn);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(AUTH_CHANGED_EVENT, fn);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
 export function isSignedInCached(): boolean {
   try {
     return localStorage.getItem(SIGNED_IN_KEY) === '1';
@@ -19,6 +51,7 @@ export function setSignedInCached(email?: string | null): void {
   } catch {
     // storage unavailable
   }
+  announce();
 }
 
 export function clearSignedInCached(): void {
@@ -29,6 +62,7 @@ export function clearSignedInCached(): void {
   } catch {
     // storage unavailable
   }
+  announce();
 }
 
 export function getCachedEmail(): string | null {

@@ -555,6 +555,40 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
     return () => el.removeEventListener('wheel', onWheel);
   });
 
+  /*
+    A drag ends however the hand lets go, not only by a pointerup on the
+    input. The owner found two knobs' cards up at once and neither going,
+    both reading "⌥ held while dragging goes fine": each knob had missed its
+    release and thought a hand was still on it, and a held card stays up
+    whatever the pointer does. When the button comes up somewhere the page
+    never hears it (the system took the mouse-up), Chromium sends no
+    pointerup at all: on the next move, with no button down, it quietly drops
+    the capture and fires only lostpointercapture, which nothing here heard.
+    Two knobs turned that way drew the owner's picture exactly (`npm run
+    layout` does it). Which gesture on the owner's Mac swallowed the release
+    is not known, so every way it can go ends the drag: the capture going,
+    the button coming up or the pointer cancelled anywhere in the window, a
+    move with no button down, and the window losing focus.
+  */
+  const dragging = drag !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    const view = inputRef.current?.ownerDocument.defaultView ?? window;
+    const end = () => { grab.current = null; setDrag(null); };
+    const up = (e: PointerEvent) => { if (!grab.current || grab.current.id === e.pointerId) end(); };
+    const move = (e: PointerEvent) => { if (grab.current?.id === e.pointerId && (e.buttons & 1) === 0) end(); };
+    view.addEventListener('pointerup', up, true);
+    view.addEventListener('pointercancel', up, true);
+    view.addEventListener('pointermove', move, true);
+    view.addEventListener('blur', end);
+    return () => {
+      view.removeEventListener('pointerup', up, true);
+      view.removeEventListener('pointercancel', up, true);
+      view.removeEventListener('pointermove', move, true);
+      view.removeEventListener('blur', end);
+    };
+  }, [dragging]);
+
   const steps = step ? Math.round((max - min) / step) : 0;
   return (
     <div
@@ -636,6 +670,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           }}
           onPointerUp={e => { if (grab.current?.id === e.pointerId) { grab.current = null; setDrag(null); } }}
           onPointerCancel={() => { grab.current = null; setDrag(null); }}
+          onLostPointerCapture={e => { if (grab.current?.id === e.pointerId) { grab.current = null; setDrag(null); } }}
           onDoubleClick={() => { if (resetTo !== undefined && !disabled) onChange(resetTo); }}
           className="absolute inset-0 h-full w-full cursor-ns-resize touch-none appearance-none rounded-full opacity-0"
         />
