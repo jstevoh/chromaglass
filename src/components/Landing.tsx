@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MAC_DOWNLOAD_URL, onMacComputer } from '../lib/macApp';
+import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
 
 /**
@@ -273,7 +273,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             or a PC there is nothing here to run, so it says where to get it. */}
         <p data-cg-landing-mac="" className="mt-4 text-[13px] leading-relaxed text-muted">
           {mac ? (
-            <>Already on Pro? <a href={MAC_DOWNLOAD_URL} className="underline underline-offset-2 hover:text-text-2">Download the Mac app</a> (Apple silicon).</>
+            <>Already on Pro? <a href={MAC_DOWNLOAD_URL} className="underline underline-offset-2 hover:text-text-2">Download the Mac app</a> (Apple silicon).{!MAC_APP_NOTARISED && <> {MAC_FIRST_OPEN}</>}</>
           ) : (
             <>The Mac app comes with Pro. Download it on your Mac from this page or from Profile &amp; Store.</>
           )}

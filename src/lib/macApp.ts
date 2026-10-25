@@ -14,6 +14,22 @@
 export const MAC_DOWNLOAD_URL = 'https://github.com/jstevoh/chromaglass/releases/latest/download/ChromaGlass-mac-arm64.dmg';
 export const MAC_RELEASES_URL = 'https://github.com/jstevoh/chromaglass/releases';
 
+/**
+ * Whether the download is signed with a Developer ID and notarised (13.1-sign).
+ *
+ * The first release (1.3.622, 2026-10-25) is signed ad hoc, and the owner's Mac
+ * refused it: "Apple could not verify… is free of malware that may harm your
+ * Mac". On macOS 15 the old way round, right-click → Open, no longer offers to
+ * open it; the one way left in Settings is Privacy & Security → Open Anyway,
+ * after one refused open. So until the app is notarised the site says how, next
+ * to the button, and once it is (13-update-signed) this turns true and the line
+ * goes: a notarised app opens on a double-click and needs no instructions.
+ */
+export const MAC_APP_NOTARISED = false;
+
+/** The first open of an app macOS cannot check, in the words of its own Settings. */
+export const MAC_FIRST_OPEN = 'The first time, macOS says it cannot check the app. Click Done, then open System Settings → Privacy & Security and click Open Anyway beside ChromaGlass.';
+
 /** What desktop/updates.js says, as the preload hands it over. */
 export interface DesktopUpdateState {
   status: 'off' | 'idle' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error';
