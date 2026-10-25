@@ -7297,14 +7297,14 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - ~~28f-1 the dead patches, the named looks, the hits as a patch source (desk, phone,
     Sound learn), the first three looks as the pattern~~ (**shipped**, this PR;
     `docs/plan-shipped.md` 28f).
-  - **28f-2, open (Antigravity, from `docs/sound-patches.md`).** Two or three liquid
+  - ~~**28f-2** (Antigravity, from `docs/sound-patches.md`). Two or three liquid
     patches per look from the bands and the hits, following Cyberpunk, Fillmore East and
-    Lava Lamp; judged on a fresh showreel.
-  - **28f-3, open.** Ten looks still sway the dish's turn with the music through the old
+    Lava Lamp; judged on a fresh showreel.~~ (**shipped** with 28i-3b, this PR; `docs/plan-shipped.md` 28i-3).
+  - ~~**28f-3.** Ten looks still sway the dish's turn with the music through the old
     `audioMappings.rotation` slot (27a-8). The owner's rule now says which: whole-plate
     motion from the music only on the named looks (`FRAME_MOVING_LOOKS`). Read it with
     the owner (a slow turn is the oil wheel's move), then move them off or onto the list,
-    and count the slot in `npm run framesway`.
+    and count the slot in `npm run framesway`.~~ (**shipped** with 28i-3, this PR; `docs/plan-shipped.md` 28i-3).
   - **28f-4, open.** Pitch is mostly the bass line on a band (72% of the showreel song's
     frames in the octave above C1): a patch on it walks with the bass, not the melody. A
     lead's pitch needs the analyser to find the strongest note above the bass.
@@ -7444,21 +7444,16 @@ Turing Print" work (#331), which also made the reaction grow at all.
     to 350 on the Fillmore), under the 30 a second where the plate stops flowing and
     starts stepping (`PINNED_STEP_RATE`, `LiquidVisualizer.tsx`). Find what makes Poster
     that heavy (its layers, its dye budget, its plate size) before it is made to move.
-  - **28i-3. Sound on the liquid, not the frame** (Antigravity, batch 3). Eight looks
-    still drive the rotation slot from sound (28f-3): Galaxy (energy), Cyberpunk
-    (complexity), Acid Trip (energy), Aurora (energy), Solar Flare (bass), Fractal Dream
-    (treble), Neon Coral Reef (timbre), Stardust (bass); each moves that reading to a
-    liquid target. Every look that hears sound gets two or three patches from hits,
-    bands, onsets and notes only (28f), and Milk Marbling's treble → airVelocity at
-    depth .02, which reads nothing, is fixed. Film: 2 to 3.5 swells a minute, six or
-    more colour changes a minute, r1 between −.13 and .22 (the Dregs and the Sheep).
-    *Split 2026-10-24* (the owner took the four directions of that day's exploration,
-    25h first): the eight looks' frame fixes and Milk Marbling's dead patch run now; the
-    two or three patches per look wait for 25h, so each look's music is written once, per
-    area, rather than plate-wide and then again. 25h has shipped: an area cord is
-    `{ area, setting: 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue', threshold, attack,
-    release }` (lib/areaCords.ts), and `npm run areacords` holds every look's area cords to
-    their areas and to fast readings. 28i-2 runs now as briefed.
+  - ~~**28i-3. Sound on the liquid, not the frame**~~ (Antigravity, batch 3, **shipped**,
+    this PR; story in `docs/plan-shipped.md` 28i-3): the eight looks that drove
+    `audioMappings.rotation` from sound moved to liquid targets (`rotation: 'none'`, held
+    by `npm run framesway`, 59 of 59 still), Milk Marbling's dead `treble → airVelocity`
+    (`0.02`, gated to `0` under `0.1`) is replaced (`npm run soundpatch` folds each patch
+    on the look's own settings too, 101 of 101 move), and every look that hears sound now
+    carries two or three fast liquid patches from `hits` and `bands` (`28i-3b` / `28f-2`),
+    with area cords (`25h`, `lib/areaCords.ts`) on `lumia`, `cell-bloom`, `poster-1969`,
+    `milk-marble` and `red-cabbage` (`25 cords on 8 looks`, `npm run areacords`). 28i-2
+    stays open as briefed.
   - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
     magenta cells, no rainbow); then four or more hues on the film.
 
@@ -7483,8 +7478,9 @@ Turing Print" work (#331), which also made the reaction grow at all.
     check's 200 steps a window, 191 on one run and 215 on another, so the check measured
     the governor and not the press; it now runs on Bass Drop at its own 0.8, the one look
     left that ships the squeeze, the bar unchanged);
-    (d) `soundpatch`'s three pattern looks are Cyberpunk, Aurora Borealis and Lava Lamp
-    until 28i-3 gives Poster, 1969 patches (the Fillmore had two), and `lampjudge`'s
+    (d) ~~`soundpatch`'s three pattern looks are Cyberpunk, Aurora Borealis and Lava Lamp
+    until 28i-3 gives Poster, 1969 patches (the Fillmore had two)~~ (**fixed** in 28i-3:
+    `poster-1969` carries three area cords and is in `soundpatch` `PATTERN`), and `lampjudge`'s
     owner override for the Sensual Laboratory is gone with it; (e) `evolve`/`replay`
     start from Poster, 1969 and Clock Glass where they started from the Fillmore and the
     Oil Wheel, so their seeded rolls are different rolls; (f) the README's gallery

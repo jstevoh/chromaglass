@@ -88,6 +88,17 @@ export const PRESETS: Preset[] = [
       */
       dyeBudget: 0.45,
       bubbles: 0.05,
+      /*
+        The overhead projector's dish answers in the liquid (PLAN 28i-3b): a
+        kick breaks the oil-and-water film with a soap pull (surfactantFlow),
+        the snare curls the oil rims, and a held mid chord rounds the blobs'
+        surface tension.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'surfactantFlow', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.2 },
+      ],
       audioMappings: {
         velocity: 'bass',        // low frequencies push the fluid gently
         density: 'volume',       // louder = more color, but mapped gently
@@ -124,14 +135,14 @@ export const PRESETS: Preset[] = [
       boundaryContrast: 0.6,
       saturationBoost: 1.5,
       sceneMappings: [
-        { source: 'sound', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
         /*
-          45 was meant as degrees, and a depth is a share of the dial's travel
-          (0..360 for the angle): at 45 the comet's heading was thrown to its
-          clamp by any timbre above 0.003. An eighth of the travel is the 45°
-          that was meant (28f).
+          Fast bands and hits (PLAN 28i-3b): the bass band drives the stream's
+          speed, the tonal mids bend its heading by an eighth of the dial
+          (45°, 28f), and the snare sheds eddies into the tail.
         */
-        { source: 'sound', feature: 'timbre', setting: 'cometAngle', depth: 0.125 }
+        { source: 'bands', feature: 'bass', setting: 'cometSpeed', depth: 0.4 },
+        { source: 'bands', feature: 'tonalMid', setting: 'cometAngle', depth: 0.125 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
       ],
       audioMappings: {
         velocity: 'bass',
@@ -185,11 +196,22 @@ export const PRESETS: Preset[] = [
       ledColor: '#03041a',
       ledSpeed: 0.0,
       secondLamp: 0.25,
+      /*
+        Sound on the liquid, not the frame (PLAN 28i-3): the energy reading
+        that swayed the dish's rotation now raises star-mote beads across the
+        spiral arms, a kick lifts the warm core plume, and high overtones
+        tighten the arms' curl.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'level', setting: 'beads', depth: 0.25 },
+        { source: 'hits', feature: 'kickHit', setting: 'buoyancy', depth: 0.1 },
+        { source: 'bands', feature: 'tonalHigh', setting: 'vorticityConfinement', depth: 0.25 },
+      ],
       audioMappings: {
         velocity: 'bass',        // bass drives galactic tides
         density: 'energy',       // overall energy triggers star formation
         color: 'treble',         // treble shifts nebula hue
-        rotation: 'energy',      // energy modulates orbital speed
+        rotation: 'none',        // dish motor turns steadily; energy is on beads above (PLAN 28i-3)
       },
     }
   },
@@ -240,9 +262,9 @@ export const PRESETS: Preset[] = [
       ],
       audioMappings: {
         velocity: 'energy',
-        density: 'treble',
+        density: 'complexity',   // moved off rotation to dye density (PLAN 28i-3)
         color: 'timbre',
-        rotation: 'complexity',
+        rotation: 'none',
       },
     }
   },
@@ -293,14 +315,22 @@ export const PRESETS: Preset[] = [
       gelWheel: 0.55,
       gelSpeed: 0.6,
       ledColor: '#12002c',
+      /*
+        Sound on the liquid, not the frame (PLAN 28i-3): the energy reading
+        that swayed the dish's rotation now pulls the soap-and-silicone film
+        apart (surfactantFlow), a kick churns the concentric rings, and the
+        lead note turns the hue walk sooner.
+      */
       sceneMappings: [
-        { source: 'sound', feature: 'complexity', setting: 'turbulenceScale', depth: 0.25 }
+        { source: 'bands', feature: 'level', setting: 'surfactantFlow', depth: 0.3 },
+        { source: 'hits', feature: 'kickHit', setting: 'turbulenceScale', depth: 0.25 },
+        { source: 'bands', feature: 'note', setting: 'hueJourney', depth: -0.15 },
       ],
       audioMappings: {
         velocity: 'treble',
         density: 'timbre',
         color: 'complexity',
-        rotation: 'energy',
+        rotation: 'none',
       },
     }
   },
@@ -408,7 +438,10 @@ export const PRESETS: Preset[] = [
       dyeBudget: 0.55,
       sceneMappings: [
         // The hats by name are the `bands` source's; on `sound` this read 0 (28f).
-        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.5 }
+        // Kick and snare agitate the slide and nucleate micro-bubbles in the shear (28i-3b).
+        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.5 },
+        { source: 'hits', feature: 'kickHit', setting: 'turbulenceScale', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'bubbles', depth: 0.25 },
       ],
       audioMappings: {
         velocity: 'complexity',
@@ -463,16 +496,18 @@ export const PRESETS: Preset[] = [
           chord turning the hue sooner (a step a minute and a half quicker
           at full). The journey steps when its minutes are up, so a chord
           coming and going moves when the next step lands, never the colour
-          on the frame.
+          on the frame. And the energy reading that swayed rotation now
+          billows the curtains' curl (PLAN 28i-3).
         */
         { source: 'bands', feature: 'note', setting: 'cometSpeed', depth: 0.15 },
-        { source: 'bands', feature: 'tonalMid', setting: 'hueJourney', depth: -0.15 }
+        { source: 'bands', feature: 'tonalMid', setting: 'hueJourney', depth: -0.15 },
+        { source: 'bands', feature: 'level', setting: 'vorticityConfinement', depth: 0.2 },
       ],
       audioMappings: {
         velocity: 'bass',
         density: 'volume',
         color: 'complexity',
-        rotation: 'energy',
+        rotation: 'none',
       },
     }
   },
@@ -509,11 +544,22 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.6,
       iridescence: 0.25,
       ledColor: '#2a0700',
+      /*
+        Sound on the liquid, not the frame (PLAN 28i-3): the bass reading that
+        swayed the dish's rotation now drives thermal plume rise (buoyancy) in
+        the alcohol-and-soap corona, kicks erupt the prominences, and hats
+        pull Marangoni filaments off the flare tips.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'bass', setting: 'buoyancy', depth: 0.12 },
+        { source: 'hits', feature: 'kickHit', setting: 'turbulenceScale', depth: 0.3 },
+        { source: 'bands', feature: 'hats', setting: 'surfactantFlow', depth: 0.25 },
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'energy',
         color: 'treble',
-        rotation: 'bass',
+        rotation: 'none',
       },
     }
   },
@@ -611,11 +657,22 @@ export const PRESETS: Preset[] = [
       ledColor: '#000000',
       saturationBoost: 1.45,
       dishVignette: 0.5,
+      /*
+        Sound on the liquid, not the frame (PLAN 28i-3): the treble reading
+        that swayed the dish's rotation now scatters silicone beads across the
+        mirrored rings, the snare curls the ring edges, and high overtones
+        tighten the silicone drops.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
+        { source: 'bands', feature: 'tonalHigh', setting: 'oilTension', depth: 0.2 },
+      ],
       audioMappings: {
         velocity: 'complexity',
         density: 'mid',
         color: 'timbre',
-        rotation: 'treble',
+        rotation: 'none',
       },
     }
   },
@@ -716,11 +773,22 @@ export const PRESETS: Preset[] = [
       chemistry: 0.7,
       ledColor: '#021418',
       saturationBoost: 1.4,
+      /*
+        Sound on the liquid, not the frame (PLAN 28i-3): the timbre reading
+        that swayed the dish's rotation now pulls the soap-and-silicone
+        Marangoni coral branches (surfactantFlow), the snare opens lace polyps
+        along the branches, and the hats release bright reef motes.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'tonalMid', setting: 'surfactantFlow', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'lacing', depth: 0.25 },
+        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.25 },
+      ],
       audioMappings: {
         velocity: 'mid',
         density: 'treble',
         color: 'complexity',
-        rotation: 'timbre',
+        rotation: 'none',
       },
     }
   },
@@ -762,11 +830,22 @@ export const PRESETS: Preset[] = [
       particles: 0.8,
       particleMix: 0.75,
       ledColor: '#000000',
+      /*
+        Sound on the liquid, not the frame (PLAN 28i-3): the bass reading that
+        swayed the dish's rotation now presses the soap ring on the collapse
+        (platePressure), kicks tighten the infalling eddies, and hats brighten
+        the dust motes.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'bass', setting: 'platePressure', depth: 0.25 },
+        { source: 'hits', feature: 'kickHit', setting: 'vorticityConfinement', depth: 0.3 },
+        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.25 },
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'energy',
         color: 'treble',
-        rotation: 'bass',
+        rotation: 'none',
       },
     }
   },
@@ -818,6 +897,18 @@ export const PRESETS: Preset[] = [
       plateRock: 0.1,
       layerScaleVariety: 0,
       lumia: 0.9,
+      /*
+        No drum hits: Wilfred's three veils answer harmony and the lead note
+        only, each in its own area on a slow gate (PLAN 25h, 28i-3b). Low
+        harmony warms the left glycerine veil (area 0), mid harmony folds the
+        soap veil (area 1), and the lead note refreshes the lower glycerine
+        veil (area 2).
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'tonalLow', setting: 'areaHeat', area: 0, depth: 0.35, threshold: 0.3, attack: 0.2, release: 0.8 },
+        { source: 'bands', feature: 'tonalMid', setting: 'areaStir', area: 1, depth: 0.3, threshold: 0.35, attack: 0.15, release: 0.6 },
+        { source: 'bands', feature: 'note', setting: 'areaPour', area: 2, depth: 0.3, threshold: 0.4, attack: 0.1, release: 0.7 },
+      ],
       audioMappings: { velocity: 'energy', density: 'none', color: 'timbre', rotation: 'none' },
     }
   },
@@ -890,6 +981,17 @@ export const PRESETS: Preset[] = [
       */
       turingDrift: 0.7,
       exposure: 0.7,
+      /*
+        The CIMA dish answers in the reaction and the flow that drags it
+        (PLAN 28i-3b): bass nudges the feed drift along the saddle-node line,
+        the snare bends growing stripes into whorls, and high overtones
+        sharpen the labyrinth detail.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'bass', setting: 'turingDrift', depth: 0.2 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
+        { source: 'bands', feature: 'tonalHigh', setting: 'mazeDetail', depth: 0.2 },
+      ],
       audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
     }
   },
@@ -952,6 +1054,17 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.1,
       iridescence: 0,
       secondLamp: 0,
+      /*
+        Each poster shape answers in its own place (PLAN 25b-4, 28i-3b): the
+        kick pours into the left orange-and-coral milk shape (area 0), the
+        bass band switches its bottle between orange and coral, and the snare
+        pushes the right ultramarine-and-purple ink shape (area 1).
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
+        { source: 'bands', feature: 'band2', setting: 'areaHue', area: 0, depth: 0.6 },
+        { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 1, depth: 0.45, threshold: 0.35, attack: 0.02, release: 0.3 },
+      ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
@@ -1008,6 +1121,16 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.5,
       glossiness: 0.12,          // a hint of wet sheen at this distance
       macroSync: 0.6,
+      /*
+        Closeup bead physics (PLAN 28i-3b): kicks open cell rings inside the
+        travelling silicone bead, snares stretch lacing along its dark
+        shoulder, and mid harmony rounds the drop's surface tension.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'cells', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'lacing', depth: 0.25 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.2 },
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'volume',
@@ -1068,8 +1191,16 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.55,
       glossiness: 0.18,
       macroSync: 0.35,
+      /*
+        Its three closeup pools answer by area (PLAN 25h, 28i-3b): the kick
+        pours silicone into the top pool (area 0), the bass band turns its
+        bottle between magenta and amber, and the mid band stirs the lavender
+        oil pool beside it (area 1).
+      */
       sceneMappings: [
-        { source: 'sound', feature: 'mid', setting: 'beads', depth: 0.3 }
+        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
+        { source: 'bands', feature: 'band2', setting: 'areaHue', area: 0, depth: 0.6 },
+        { source: 'bands', feature: 'band4', setting: 'areaStir', area: 1, depth: 0.4, threshold: 0.35, attack: 0.04, release: 0.35 },
       ],
       audioMappings: {
         velocity: 'mid',
@@ -1131,6 +1262,16 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.4,
       glossiness: 0.08,
       macroSync: 0.85,
+      /*
+        The running tongue of soap and silicone (PLAN 28i-3b): kicks drive the
+        surfactant pull at the leading edge, snares split the front into
+        fingers, and hats tighten the dendritic lace in the wake.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'surfactantFlow', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'fingering', depth: 0.25 },
+        { source: 'bands', feature: 'hats', setting: 'lacing', depth: 0.2 },
+      ],
       audioMappings: {
         velocity: 'bass',
         density: 'energy',
@@ -1187,7 +1328,7 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.5,
       hueJourney: 5,
 
-      // The room, on.
+      // The room, on, plus two fast sound cords for the music half (PLAN 28i-3b).
       sceneDrive: 0.55,
       sceneHands: 0.6,
       sceneImpact: 0.6,
@@ -1199,6 +1340,10 @@ export const PRESETS: Preset[] = [
         { feature: 'dirX', setting: 'lampMotion', depth: 0.35 },
         // More people, more dye on the plate.
         { feature: 'crowd', setting: 'dyeBudget', depth: 0.25 },
+        // And the music's own hands on the soap film: kicks pull the soap
+        // rims open and hats scatter beads across the wash.
+        { source: 'hits', feature: 'kickHit', setting: 'surfactantFlow', depth: 0.25 },
+        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.25 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
@@ -1267,9 +1412,18 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.35,
       iridescence: 0,
       secondLamp: 0,
+      /*
+        Fixed dead patch + area cords (PLAN 28i-3, 28i-3b): `treble ->
+        airVelocity` at depth 0.02 read nothing because the GPU solver gates
+        `airVelocity` below 0.1 to 0 (`LiquidVisualizer.tsx:4257`). Instead,
+        the hats drive the soap's Marangoni pull (`surfactantFlow`), the kick
+        touches soap into the top-left food-colouring spot (area 0), and the
+        snare draws a marbling paddle through the top-right spot (area 1).
+      */
       sceneMappings: [
-        { source: 'sound', feature: 'bass', setting: 'beads', depth: 0.2 },
-        { source: 'sound', feature: 'treble', setting: 'airVelocity', depth: 0.02 }
+        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.3 },
+        { source: 'bands', feature: 'hats', setting: 'surfactantFlow', depth: 0.2 },
+        { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 1, depth: 0.45, threshold: 0.35, attack: 0.02, release: 0.35 },
       ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
     }
@@ -1330,8 +1484,15 @@ export const PRESETS: Preset[] = [
       iridescence: 0.6,
       thinFilm: 1.0,
       secondLamp: 0,
+      /*
+        The soap sheet's own fast patches (PLAN 28i-3b): kicks pull thin spots
+        open in the sheet, overall level raises Plateau-border beads along the
+        rims, and high harmony swirls the iridescent fringes.
+      */
       sceneMappings: [
-        { source: 'sound', feature: 'energy', setting: 'beads', depth: 0.15 }
+        { source: 'hits', feature: 'kickHit', setting: 'surfactantFlow', depth: 0.25 },
+        { source: 'bands', feature: 'level', setting: 'beads', depth: 0.2 },
+        { source: 'bands', feature: 'tonalHigh', setting: 'vorticityConfinement', depth: 0.25 },
       ],
       audioMappings: { velocity: 'mid', density: 'bass', color: 'treble', rotation: 'none' },
     }
@@ -1382,6 +1543,16 @@ export const PRESETS: Preset[] = [
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
+      /*
+        Immiscible oil and water between glass (PLAN 28i-3b): kicks push water
+        fingers into the amber oil pools, snares shear the meniscus, and the
+        bass band rounds the oil bodies back together.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'fingering', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
+        { source: 'bands', feature: 'bass', setting: 'oilTension', depth: 0.2 },
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
@@ -1426,6 +1597,17 @@ export const PRESETS: Preset[] = [
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
+      /*
+        Two pH wells that cancel where they meet (PLAN 25i-2, 28i-3b): the
+        snare drops acid into the left well (area 0, blooming pink), the kick
+        drops base into the right well (area 1, turning green), and mid
+        harmony stirs the two fronts together across the dish.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'snareHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
+        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
+        { source: 'bands', feature: 'tonalMid', setting: 'areaStir', area: 0, depth: 0.35, threshold: 0.35, attack: 0.04, release: 0.35 },
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
@@ -1469,6 +1651,16 @@ export const PRESETS: Preset[] = [
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
+      /*
+        The Belousov-Zhabotinsky gel dish (PLAN 28i-3b): kicks push the
+        oxidation wave drift outward, snares shear wave tips into spiral
+        pairs, and mid harmony deepens the ferroin reaction.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'turingDrift', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.2 },
+        { source: 'bands', feature: 'tonalMid', setting: 'chemistry', depth: 0.15 },
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
@@ -1530,6 +1722,16 @@ export const PRESETS: Preset[] = [
       beatSqueeze: 0.0,
       lampHotspot: 0.4,
       secondLamp: 0.3,
+      /*
+        Ferrofluid on the gold pool (PLAN 28i-3b): kicks sharpen the black
+        rims against the gold, bass presses the pool outward, and snares twist
+        the gold dye between the domes.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'phaseSharp', depth: 0.2 },
+        { source: 'bands', feature: 'bass', setting: 'platePressure', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
@@ -1579,6 +1781,16 @@ export const PRESETS: Preset[] = [
       lampWarmth: 0.45,
       dishVignette: 0.3,
       hueJourney: 2,
+      /*
+        The dish filmed from the back of the hall (PLAN 28i-3b): bass warms
+        the rising plumes, snares part the soap wash, and the lead note steps
+        the cartridge's warm colours sooner.
+      */
+      sceneMappings: [
+        { source: 'bands', feature: 'bass', setting: 'buoyancy', depth: 0.1 },
+        { source: 'hits', feature: 'snareHit', setting: 'surfactantFlow', depth: 0.25 },
+        { source: 'bands', feature: 'note', setting: 'hueJourney', depth: -0.15 },
+      ],
       audioMappings: { velocity: 'bass', density: 'volume', color: 'treble', rotation: 'none' },
     }
   },
@@ -1636,6 +1848,17 @@ export const PRESETS: Preset[] = [
       transmission: 0.35,
       dishVignette: 0.8,
       lampHotspot: 0.5,
+      /*
+        Two bowed clock glasses (PLAN 28i-3b): kicks press the top glass so
+        the oil bodies spread thin, snares indent their rims into fingers on
+        the release, and mid harmony pulls the red, amber and blue oil bodies
+        round again.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'fingering', depth: 0.25 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.2 },
+      ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
@@ -1703,6 +1926,16 @@ export const PRESETS: Preset[] = [
       beatSqueeze: 0.0,
       lampHotspot: 0.3,
       secondLamp: 0.2,
+      /*
+        Ferrofluid channels through amber, teal and coral (PLAN 28i-3b): kicks
+        drive the labyrinth channels finer, snares branch the fingers along
+        the seams, and high overtones crisp the black channel walls.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'mazeDetail', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'fingering', depth: 0.25 },
+        { source: 'bands', feature: 'tonalHigh', setting: 'phaseSharp', depth: 0.2 },
+      ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'treble', rotation: 'none' },
     }
   },
@@ -1793,6 +2026,16 @@ export const PRESETS: Preset[] = [
       macroDepth: 0,
       macroEdgeDetail: 0,
       macroRelief: 0,
+      /*
+        Flat comic inks in the dish, with no beads or gloss (PLAN 28i-3b):
+        kicks press the ink shapes outward into their Ben-Day tint fields,
+        snares curl the brushstroke tails, and mid harmony stirs the shapes.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
+        { source: 'bands', feature: 'tonalMid', setting: 'turbulenceScale', depth: 0.2 },
+      ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },

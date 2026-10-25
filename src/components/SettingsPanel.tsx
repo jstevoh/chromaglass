@@ -2147,7 +2147,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, source, feature: (keep ? m.feature : options[0][0]) as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-source-${i}`}
                     >
                       {PATCH_SOURCES.map(([value, label]) => (
@@ -2162,7 +2162,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, feature: e.target.value as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-feature-${i}`}
                     >
                       {featuresFor(m.source ?? 'room').map(([value, label]) => (
@@ -2183,7 +2183,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, setting: e.target.value as SceneMapping['setting'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-control-${i}`}
                     >
                       {m.area !== undefined ? AREA_TARGETS.map(t => (
@@ -2198,7 +2198,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     </select>
                     <button
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
-                      className="p-1 rounded hover:bg-white/10 opacity-50 hover:opacity-100"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
                       aria-label="Remove mapping"
                     >
                       <X size={12} />
@@ -2230,7 +2230,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, layer: v === 'all' ? 'all' : Number(v) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
+                      className="min-h-6 w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
                       data-testid={`patch-layer-${i}`}
                     >
                       <option value="all">All plates</option>
@@ -2250,7 +2250,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, depth: parseFloat(e.target.value) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                      className="set-range flex-1"
+                      style={{ '--fill': `${Math.round(50 * (m.depth + 1))}%` } as React.CSSProperties}
                     />
                     <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
@@ -2299,6 +2300,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                             next[i] = e.target.checked ? { ...rest, threshold: 0.3, attack: 0.02, release: 0.4 } : rest;
                             onUpdate({ sceneMappings: next });
                           }}
+                          className="h-6 w-6 shrink-0 accent-white cursor-pointer"
                           data-testid={`patch-gate-on-${i}`}
                         />
                         Fire on a hit, not the room
@@ -2319,7 +2321,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                               next[i] = { ...m, [key]: parseFloat(e.target.value) };
                               onUpdate({ sceneMappings: next });
                             }}
-                            className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                            className="set-range flex-1"
+                            style={{ '--fill': `${Math.round(100 * ((m[key] ?? 0) - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
                             data-testid={`patch-${key}-${i}`}
                           />
                           <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
