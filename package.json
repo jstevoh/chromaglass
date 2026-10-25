@@ -52,6 +52,7 @@
     "natural": "node --experimental-strip-types scripts/natural.mjs",
     "liquidfile": "node --experimental-strip-types scripts/liquidfile.mjs",
     "seed": "esbuild scripts/seed.mjs --bundle --platform=node --format=esm --log-level=warning --external:typescript --external:playwright --external:esbuild --outfile=node_modules/.cache/seed.mjs && node node_modules/.cache/seed.mjs",
+    "record": "node --experimental-strip-types scripts/record.mjs",
     "setlist": "esbuild scripts/setlist.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/setlist.mjs && node node_modules/.cache/setlist.mjs",
     "sanitize": "esbuild scripts/sanitize.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/sanitize.mjs && node node_modules/.cache/sanitize.mjs",
     "steadycam": "node scripts/steadycam.mjs",

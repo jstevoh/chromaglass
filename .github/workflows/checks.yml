@@ -451,6 +451,11 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # The one Record button (PLAN 14ae): what a press does for each choice,
+      # and one Record on the desk, the panel and the phone.
+      - name: The one Record button
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run record
       # The score (PLAN 28h): each of a song show's cues drawn where the
       # scheduler fires it, a cue pinned to a section firing on that section
       # through a stretched live take, and the nudge putting a late map's cue
