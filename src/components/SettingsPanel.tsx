@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
+import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { SOURCE_NAMES } from '../lib/audioFeatures';
@@ -21,6 +21,7 @@ import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet, SwitchPill, Toggle } from './ui';
+import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { EngineStatus } from '../lib/platform';
@@ -104,11 +105,12 @@ interface SettingsPanelProps {
   engineStatus?: EngineStatus | null;
   /** The live reading (frame time), polled while the panel is open. */
   getLiveEngineStatus?: () => EngineStatus | null;
-  /** The room camera: whether it is watching, which one, and what it is seeing. */
+  /** The motion camera: whether it is watching, which one, and what it is seeing. */
   sceneOn?: boolean;
   onSceneToggle?: (on: boolean) => void;
-  sceneState?: { active: boolean; error: string | null; device: string | null; ms: number; energy: number; raw: number; people: number } | null;
-  sceneDevices?: MediaDeviceInfo[];
+  sceneState?: { active: boolean; error: string | null; device: string | null; fellBack?: boolean; lost?: boolean; ms: number; energy: number; raw: number; people: number } | null;
+  /** The cameras plugged in (`useCameras`), for both cameras' pickers. */
+  cameras?: readonly MediaDeviceInfo[];
   sceneDeviceId?: string;
   onSceneDevice?: (id: string) => void;
   /** Where the sensor draws what it sees, so the camera can be aimed. */
@@ -117,6 +119,11 @@ interface SettingsPanelProps {
   filmSource?: 'none' | 'file' | 'camera' | 'window';
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
+  /** The film's Webcam: which camera it shows, what opened, and whether it was unplugged. */
+  filmCameraId?: string;
+  onFilmCameraDevice?: (id: string) => void;
+  filmCamera?: { label: string | null; fellBack: boolean } | null;
+  filmCameraLost?: boolean;
   /** Another tab, window or screen, through the browser's own picker. */
   onFilmWindow?: () => void;
   onFilmClear?: () => void;
@@ -386,7 +393,7 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -1724,34 +1731,43 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       {/* The Room Section */}
       {keep('room') && (
       <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
+        {/*
+          Two cameras, two jobs, and the owner could not tell them apart
+          (2026-10-24): "what the room control is vs. showing video on the
+          plate". This one is a sensor. Its picture is never drawn; movement
+          in front of it stirs the liquid. The film's Webcam is the other
+          one, a picture on the plate. So the heading says what it does
+          rather than where it points ("The Room"), the first line says the
+          picture is never shown and where to go to show one, and the switch
+          is the shared Toggle, so on and off read the way every other
+          switch does. (PLAN 14ad.)
+        */}
         <h3 className={TITLE}>
-          <Camera size={12} /> The Room
+          <ScanEye size={12} /> Motion camera
         </h3>
+        <p className="mb-2 text-[12px] leading-relaxed text-text-2" data-testid="scene-what">
+          Movement in front of a camera stirs the liquid. Its picture is never shown. To put a camera&rsquo;s picture on the plate, use Webcam in {goTo('film', 'room')}.
+        </p>
         <Info>
-          The camera pointed at the room, read back rather than shown: movement in front of the lens becomes movement in the liquid. Aim it at the floor, not at the screen — a camera that can see the projection makes the plate drive itself.
+          Aim it at the floor or the crowd, not at the screen: a camera that can see the projection makes the plate drive itself. Hold people below is what tracks each person and puts their hands on the glass.
         </Info>
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={() => onSceneToggle?.(!sceneOn)}
-            className={`flex-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${sceneOn ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-            data-testid="scene-toggle"
-          >
-            {sceneOn ? 'Watching' : 'Watch the room'}
-          </button>
+        <div className="mb-2">
+          <Toggle
+            label="Watch for movement"
+            on={sceneOn}
+            onChange={(v) => onSceneToggle?.(v)}
+            testId="scene-toggle"
+          />
         </div>
-        {sceneOn && sceneDevices.length > 1 && (
-          <select
-            value={sceneDeviceId}
-            onChange={(e) => onSceneDevice?.(e.target.value)}
-            aria-label="Room camera"
-            className="w-full mb-3 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] outline-none"
-          >
-            <option value="">Default camera</option>
-            {sceneDevices.map((d, i) => (
-              <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>
-            ))}
-          </select>
-        )}
+        <CameraPicker
+          cameras={cameras}
+          value={sceneDeviceId}
+          onChange={(id) => onSceneDevice?.(id)}
+          label="Motion camera"
+          testId="scene-device"
+          inUse={sceneState?.device}
+          fellBack={sceneOn && !!sceneState?.fellBack}
+        />
         {sceneOn && (
           <div className="mb-4">
             <canvas
@@ -1762,7 +1778,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               data-testid="scene-preview"
             />
             {sceneState?.error ? (
-              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/80">{sceneState.error}</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/80" data-testid="scene-error">{sceneState.error}</p>
             ) : (
               <>
                 <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
@@ -1866,9 +1882,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <div className="mt-2 mb-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <span className="text-[12px] font-mono opacity-50">
+            <span className="text-[12px] font-mono opacity-50" data-testid="film-source-status">
               {filmSource === 'file' ? 'loop playing'
-                : filmSource === 'camera' ? 'camera live'
+                : filmSource === 'camera' ? (filmCamera?.label ? `camera live: ${filmCamera.label}` : 'camera live')
                 : filmSource === 'window' ? 'window live'
                 : 'off'}
             </span>
@@ -1924,7 +1940,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               Off
             </button>
           </div>
-          
+          {/*
+            Which camera the film shows, and what the film's camera is for
+            (PLAN 14ad). It had no picker: the browser's "environment" camera
+            or nothing. The line says the other camera's job too, because the
+            owner could not tell this from the motion camera, and the two are
+            two sections apart.
+          */}
+          <div className="mt-1" data-testid="film-camera-pick">
+            <p className="mb-2 text-[12px] leading-relaxed text-text-2" data-testid="film-camera-what">
+              Webcam shows a camera&rsquo;s picture on the plate, through the dye. To stir the liquid with movement instead, use the {goTo('room', 'film')}.
+            </p>
+            <CameraPicker
+              cameras={cameras}
+              value={filmCameraId}
+              onChange={(id) => onFilmCameraDevice?.(id)}
+              label="Webcam"
+              testId="film-device"
+              inUse={filmCamera?.label}
+              fellBack={!!filmCamera?.fellBack}
+            />
+            {filmCameraLost && (
+              <p className="-mt-1 mb-2 text-[12px] leading-relaxed text-amber-300/80" data-testid="film-camera-lost">
+                The camera was unplugged. The film comes back on when it is plugged in again.
+              </p>
+            )}
+          </div>
+
           {/* Demo Videos */}
           <div className="mt-3 flex flex-col gap-1">
             <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo Loops</span>

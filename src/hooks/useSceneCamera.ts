@@ -1,7 +1,8 @@
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type SceneReading, type SceneSenseOptions } from '../lib/sceneSense';
 import { VideoSampler, SENSE_FRAME } from '../lib/videoSense';
+import { cameraError, cameraPresent, openCamera } from '../lib/cameras';
 
 /**
  * The camera that watches the room.
@@ -46,6 +47,14 @@ export interface SceneCameraOptions extends SceneSenseOptions {
   userAsked?: boolean;
   /** `deviceId` from `enumerateDevices`, or '' for whatever the browser picks. */
   deviceId?: string;
+  /**
+   * The cameras plugged in now (`useCameras`). Read only to notice the chosen
+   * camera coming back after it was pulled out, or turning up after the
+   * browser's pick stood in for it; never to restart on every change.
+   */
+  cameras?: readonly MediaDeviceInfo[];
+  /** Called once a camera opens, the moment the browser starts naming the cameras. */
+  onOpened?: () => void;
   /** Flip left for right — a camera facing the audience sees the room mirrored. */
   mirror: boolean;
   hz?: number;
@@ -59,6 +68,10 @@ export interface SceneCameraState {
   error: string | null;
   /** The device it actually opened. */
   device: string | null;
+  /** The chosen camera was not plugged in, so the browser's pick is the one open. */
+  fellBack: boolean;
+  /** The camera was pulled out while it ran; it opens again when it is back. */
+  lost: boolean;
   /** Milliseconds the last analysis took. */
   ms: number;
   /** Motion as the room's own range makes it, 0..1 — the meter. */
@@ -72,31 +85,40 @@ export interface SceneCameraHandle {
   /** The latest reading. Null until the camera is running and has two frames. */
   reading: React.MutableRefObject<SceneReading | null>;
   state: SceneCameraState;
-  devices: MediaDeviceInfo[];
-  refreshDevices: () => Promise<void>;
   /** The open stream, so the film projector can show what the sensor sees. */
   stream: React.MutableRefObject<MediaStream | null>;
 }
 
-const IDLE: SceneCameraState = { active: false, error: null, device: null, ms: 0, energy: 0, raw: 0, people: 0 };
+const IDLE: SceneCameraState = { active: false, error: null, device: null, fellBack: false, lost: false, ms: 0, energy: 0, raw: 0, people: 0 };
 
 export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
   const reading = useRef<SceneReading | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const [state, setState] = useState<SceneCameraState>(IDLE);
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  /** Bumped to open the camera again: it came back, or the chosen one turned up. */
+  const [retry, setRetry] = useState(0);
 
   const optsRef = useRef(opts);
   optsRef.current = opts;
 
-  const refreshDevices = useCallback(async () => {
-    try {
-      const all = await navigator.mediaDevices.enumerateDevices();
-      setDevices(all.filter(d => d.kind === 'videoinput'));
-    } catch { /* no permission yet: the list fills in once the camera is open */ }
-  }, []);
+  const { enabled, deviceId = '', hz = DEFAULT_HZ, userAsked = false, cameras } = opts;
 
-  const { enabled, deviceId = '', hz = DEFAULT_HZ, userAsked = false } = opts;
+  /*
+    A knocked cable at a gig (PLAN 14g, 14ad). A camera pulled out ends its
+    track; the sensor said "opening…" for ever after, because nothing listened
+    for the end. Now the end is heard (below) and, when the same camera is
+    plugged back in, it opens again by itself. That is not a camera opened
+    behind anyone's back: it was switched on by hand in this session and never
+    switched off, and the light coming back on is the camera they chose
+    coming back. The same goes for a chosen camera that was not plugged in
+    when it was switched on: the browser's pick stood in, and the chosen one
+    takes over when it arrives.
+  */
+  useEffect(() => {
+    if (!enabled || !cameras) return;
+    const wanted = state.lost || (state.fellBack && deviceId !== '');
+    if (wanted && cameraPresent(cameras, deviceId)) setRetry(r => r + 1);
+  }, [cameras, enabled, deviceId, state.lost, state.fellBack]);
 
   useEffect(() => {
     if (!enabled) {
@@ -136,30 +158,27 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
         the resume notice in App.
       */
       if (!userAsked) {
-        setState({ ...IDLE, error: 'Switch the room camera on to use it.' });
+        setState({ ...IDLE, error: 'Switch the motion camera on to use it.' });
         return;
       }
+      let opened;
       try {
-        local = await navigator.mediaDevices.getUserMedia({
-          video: deviceId
-            ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
-            : { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
-        });
+        opened = await openCamera(deviceId, 'user', { width: 640, height: 480 });
       } catch (err) {
         if (cancelled) return;
         // The common ones are worth naming: a laptop will often not hand the
         // browser a camera another app already holds.
-        const name = (err as DOMException)?.name ?? '';
-        const message =
-          name === 'NotAllowedError' ? 'Camera permission was refused.'
-          : name === 'NotFoundError' || name === 'OverconstrainedError' ? 'That camera is not there any more.'
-          : name === 'NotReadableError' ? 'Another app is holding this camera.'
-          : 'The camera would not open.';
-        setState({ ...IDLE, error: message });
+        setState({ ...IDLE, error: cameraError(err) });
         return;
       }
+      local = opened.stream;
       if (cancelled) { local.getTracks().forEach(t => t.stop()); return; }
+      const track = local.getVideoTracks()[0];
+      track?.addEventListener('ended', () => {
+        if (cancelled) return;
+        reading.current = null;
+        setState({ ...IDLE, lost: true, error: 'The camera was unplugged. It comes back on when it is plugged in again.' });
+      });
 
       stream.current = local;
       video = document.createElement('video');
@@ -177,9 +196,8 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
       // matters.
       void video.play().catch(() => { /* a gesture will start it */ });
 
-      const label = local.getVideoTracks()[0]?.label ?? null;
-      setState(s => ({ ...s, active: true, error: null, device: label }));
-      void refreshDevices();
+      setState(s => ({ ...s, active: true, error: null, lost: false, device: opened.label, fellBack: opened.fellBack }));
+      optsRef.current.onOpened?.();
 
       let last = performance.now();
       let uiAt = 0;
@@ -228,9 +246,9 @@ export function useSceneCamera(opts: SceneCameraOptions): SceneCameraHandle {
       stream.current = null;
       reading.current = null;
     };
-  }, [enabled, deviceId, hz, userAsked, refreshDevices]);
+  }, [enabled, deviceId, hz, userAsked, retry]);
 
-  return { reading, state, devices, refreshDevices, stream };
+  return { reading, state, stream };
 }
 
 /**
