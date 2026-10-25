@@ -52,9 +52,17 @@ on:
       - 'package-lock.json'
       - '.github/workflows/desktop.yml'
 
+# Read-only unless a job says otherwise: the build runs npm ci and
+# electron-builder, and needs nothing more; only the release job writes.
+permissions:
+  contents: read
+
+# A newer push to a pull request replaces its older run; a run on main or a
+# tag is never cancelled by another, so a plain Run workflow started while a
+# release is going does not end the release.
 concurrency:
-  group: desktop-${{ github.ref }}
-  cancel-in-progress: true
+  group: desktop-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -138,6 +146,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      # A release is only ever a commit on main: a desktop-v tag pushed on a
+      # branch, or on an unmerged pull request's head, would otherwise be
+      # published as the newest release and every installed app told to take it.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Only from main
+        run: |
+          git fetch --quiet origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$GITHUB_SHA is not on main; a release is only made from main"; exit 1; }
       - uses: actions/download-artifact@v4
         with:
           name: ChromaGlass-mac

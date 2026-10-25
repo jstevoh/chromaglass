@@ -94,6 +94,11 @@ check('CHROMAGLASS_NO_UPDATES switches it off', !!updatesOff({ packaged: true, e
 check('the GitHub feed gives the newest release\'s .dmg', downloadUrl(RELEASE, null) === `${RELEASES}ChromaGlass-mac-arm64.dmg`, downloadUrl(RELEASE, null));
 check('a feed of its own gives that feed\'s .dmg', downloadUrl(RELEASE, 'http://127.0.0.1:9/feed') === 'http://127.0.0.1:9/feed/ChromaGlass-mac-arm64.dmg');
 check('a release that lists no .dmg still gives the fixed name', downloadUrl({ version: '2.0.0', files: [{ url: 'a.zip' }] }, null) === `${RELEASES}${DMG}`);
+for (const bad of ['https://example.com/ChromaGlass.dmg', 'http://github.com/jstevoh/chromaglass/releases/x.dmg', 'file:///Applications/x.dmg', 'https://github.com/someone/else/releases/x.dmg']) {
+  check(`a release that names another address opens the fixed link instead (${bad.split(':')[0]}, ${new URL(bad).host || 'no host'})`, downloadUrl({ version: '2.0.0', files: [{ url: bad }] }, null) === `${RELEASES}${DMG}`, downloadUrl({ version: '2.0.0', files: [{ url: bad }] }, null));
+}
+check('a whole address under this repo\'s releases is kept', downloadUrl({ version: '2.0.0', files: [{ url: 'https://github.com/jstevoh/chromaglass/releases/download/desktop-v2.0.0/ChromaGlass-mac-arm64.dmg' }] }, null).endsWith('desktop-v2.0.0/ChromaGlass-mac-arm64.dmg'));
+check('with the check\'s feed, an address off the feed gives the feed\'s fixed link', downloadUrl({ files: [{ url: 'https://example.com/x.dmg' }] }, 'http://127.0.0.1:9/') === `http://127.0.0.1:9/${DMG}`);
 
 // --- Ad hoc (today): it says so, and the performer downloads -----------------
 {
@@ -272,7 +277,19 @@ const create = /gh release create[^\n]*\\\n[^\n]*/.exec(releaseJob)?.[0] ?? '';
 check('the build job runs the check on the packed app', jobAt('build') > 0 && /\n\s+run: node scripts\/desktop\.mjs --packaged\n/.test(buildJob));
 check('the release job waits for the build job, check and all', jobAt('release') > jobAt('build') && /\n    needs: build\n/.test(releaseJob));
 check('it publishes only when asked, from main or a desktop-v tag', /\n    if: \$\{\{ \(inputs\.release && github\.ref == 'refs\/heads\/main'\) \|\| startsWith\(github\.ref, 'refs\/tags\/desktop-v'\) \}\}\n/.test(releaseJob));
-check('only the release job may write', /permissions:\s*\n\s+contents: write/.test(releaseJob) && !/contents: write/.test(buildJob));
+// What each job's token may do: its own permissions block, or else the
+// workflow's, or else (neither) the repository's default, which can be write.
+const top = wf.slice(0, wf.indexOf('\njobs:\n'));
+const topPerms = /\npermissions:\n((?:  \S.*\n)+)/.exec(top)?.[1] ?? null;
+const jobPerms = (job) => /\n    permissions:\n((?:      \S.*\n)+)/.exec(job)?.[1] ?? null;
+const contents = (block) => (block === null ? null : /contents: (\w+)/.exec(block)?.[1] ?? 'none');
+const effective = (job) => contents(jobPerms(job) ?? topPerms);
+check('the workflow\'s token is read-only unless a job says otherwise', contents(topPerms) === 'read' && !/write/.test(topPerms ?? ''), topPerms === null ? 'no top-level permissions: the repository default applies' : topPerms.trim());
+check('only the release job may write', effective(releaseJob) === 'write' && effective(buildJob) === 'read', `release ${effective(releaseJob)}, build ${effective(buildJob) ?? 'the repository default'}`);
+const onlyMain = releaseJob.indexOf('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+check('a release (a tag too) is published only from a commit on main, before anything is uploaded', onlyMain > 0 && /fetch-depth: 0/.test(releaseJob.slice(0, onlyMain)) && onlyMain < releaseJob.indexOf('gh release create'));
+check('a run on main or a tag is never cancelled by another; a pull request\'s newer push replaces its older run',
+  /\nconcurrency:\n  group: desktop-\$\{\{ github\.event_name == 'pull_request' && github\.ref \|\| github\.run_id \}\}\n  cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}\n/.test(top));
 check('gh release create uploads the feed, the zip, the blockmaps and the fixed-name dmg', ['latest-mac.yml', '*.zip', '*.blockmap', DMG].every((f) => create.includes(f)) && create.includes('--latest'), create.replace(/\s+/g, ' '));
 
 console.log(`\n${failed ? `FAIL  ${failed} line(s)` : 'ok    every line'}`);

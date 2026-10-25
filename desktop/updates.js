@@ -56,15 +56,30 @@ export function updatesOff({ packaged, env }) {
   return null;
 }
 
-/** The .dmg of the version found, as a link to open in the browser. */
+/** Where a link from a release may point: this repo's releases, over https. */
+const RELEASES_HOME = 'https://github.com/jstevoh/chromaglass/releases/';
+
+/**
+ * The .dmg of the version found, as a link to open in the browser.
+ *
+ * The name comes from the release's latest-mac.yml, and `new URL(name, base)`
+ * keeps a name that is already a whole address, of any scheme and any host,
+ * which would then go to shell.openExternal. The file is our own release's, so
+ * this is defence in depth: a link that is not https under this repo's
+ * releases (or under the feed the check serves) gives the fixed link instead.
+ */
 export function downloadUrl(info, feed) {
   const base = feed ? (feed.endsWith('/') ? feed : `${feed}/`) : RELEASES;
+  const fixed = new URL(DMG, base).href;
   const dmg = (info?.files ?? []).map((f) => f?.url).find((u) => typeof u === 'string' && u.endsWith('.dmg'));
+  let url;
   try {
-    return new URL(dmg ?? DMG, base).href;
+    url = new URL(dmg ?? DMG, base).href;
   } catch {
-    return new URL(DMG, RELEASES).href;
+    return fixed;
   }
+  const home = feed ? base : RELEASES_HOME;
+  return url.startsWith(home) && (feed || url.startsWith('https:')) ? url : fixed;
 }
 
 /**
