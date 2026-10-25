@@ -8558,8 +8558,7 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   `docs/plan-shipped.md` §35.
 - **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
   section (35c's work) or a different surface:
-  - Plates & LED holds the platform's spin, which is Motion's, but Stage is also the gate that
-    keeps a panel out of Build and Gig (`isStagePanel`); its spin controls move with 35c.
+  - ~~Plates & LED holds the platform's spin, which is Motion's.~~ Moved to Plate Spin in 35c-2.
   - The pin picker (`PickList`) and the command palette still list by section, not by the seven
     groups; the same headings would find a setting faster there.
 - ~~**35c-1** Squish Plate in five.~~ Shipped: Squish Plate (the glass: pressure, shape, depth drag,
@@ -8569,13 +8568,30 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   Reactions. The registry files each pin under the section that draws it (the desk's Fluid Physics
   panel had been the glass's, the oil's and the magnet's forty knobs), held by `panel`. Story in
   `docs/plan-shipped.md` §35.
-- **35c-2** One home per setting, what is left of phase 3: Flash Limit (Settings' Master and the
-  Wall), Blackout, MIDI on (Settings and Controller) and the audio source (Settings and Sound)
-  each appear in two places, with record and replay, and the unused `desk/PerformanceButton.tsx`;
-  Drive/Impact pairs sit in different sections (one Strength per input); the platform's spin in
-  Plates & LED is Motion's but Stage-gated; the sequencer is behind a 10 px, 40%-opacity link in
-  Songs; the Build layout's deck lists Fluid Physics, which used to be the glass's knobs, so it
-  could take Squish Plate beside it. After 35c-1.
+- **35c-2** One home per setting, second half. Shipped: **Flash Limit** has one switch, in Master
+  (Wall → Output draws a state line and no switch); each **Impact** master sits under the Drive of
+  its source (Room, Film, Sound), Shapes Impact alone staying at the bay; the platform's spin is a
+  **Plate Spin** section of its own in Motion (it was the first half of Plates & LED, which Stage's
+  gate keeps out of Build and Gig); Build's deck takes Squish Plate beside Fluid Physics; the
+  sequencer in Songs is a button; the track panel's Takes is a pointer to the Record panel (its
+  own Start a take and replay list were a second copy). Blackout was checked and is already one
+  per surface (the desk header on a desk, Settings' Master only where there is no desk; the
+  remote's two share a test id because there is one per layout). The unused
+  `desk/PerformanceButton.tsx` was already gone (`record` asserts it). Story in
+  `docs/plan-shipped.md` §35.
+- **35c-3** What 35c-2 left, each a change inside surfaces whose checks read the control, so it
+  needs the Mac shards to judge:
+  - **MIDI on** is drawn in Settings' Controller section (`settings-midi-enable`) and again at the
+    top of the MIDI sheet (`midi-enable`, the port, factory maps and Auto-map). The sheet is the
+    teaching surface (Learn, banks, bindings); make it show the state and send the setup to the
+    section, retargeting `qa` (1716), `panel` (742) and `renders`.
+  - **Audio source** is drawn in Settings' Sound (`audio-source`, five options) and in the Sound
+    sheet (`sound-source-*`, six, with the plate as an instrument). The sheet is the superset;
+    Settings' row should become a state line with a link, and `opensource`, `kickbubbles`, `qa`
+    and about twenty harnesses that set `chromaglass-audio-source` by storage stay as they are.
+  - The remote's two Blackouts share the test id `remote-blackout`; the phone has no Blackout
+    outside Settings → Master (35a-2).
+  - 35b-2's pin picker and command palette still list by section, not by the seven groups.
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.

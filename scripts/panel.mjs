@@ -405,9 +405,21 @@ check('and the film is an input of its own',
   flat list of eighty.
 */
 const MASTERS = ['sceneImpact', 'filmImpact', 'soundImpact', 'shapeImpact'];
-check('every master sits with the patch bay',
-  MASTERS.every(k => PIN_RANGE.get(k)?.section === 'patches'),
-  MASTERS.filter(k => PIN_RANGE.get(k)?.section !== 'patches').map(k => `${k} → ${PIN_RANGE.get(k)?.section ?? 'nowhere'}`).join(', '));
+/*
+  The masters were gathered under the bay on purpose (above), and the owner
+  then found two strengths for one input in two sections: Room Drive in The
+  Room and Room Impact in Patches, likewise for the film and the sound (PLAN
+  35c-2, one Strength per input). Each master sits with the Drive of its own
+  source now; the shapes have no input section, so theirs stays at the bay.
+*/
+const MASTER_HOME = { sceneImpact: 'room', filmImpact: 'film', soundImpact: 'audio-input', shapeImpact: 'patches' };
+const DRIVE_OF = { sceneImpact: 'sceneDrive', filmImpact: 'filmDrive', soundImpact: 'audioImpact' };
+check('every master sits with its source: the three that have a Drive beside it, the shapes at the bay',
+  MASTERS.every(k => PIN_RANGE.get(k)?.section === MASTER_HOME[k]),
+  MASTERS.filter(k => PIN_RANGE.get(k)?.section !== MASTER_HOME[k]).map(k => `${k} → ${PIN_RANGE.get(k)?.section ?? 'nowhere'}`).join(', '));
+check('and a Drive and the master of the same source are filed in one section',
+  Object.entries(DRIVE_OF).every(([m, d]) => PIN_RANGE.get(m)?.section === PIN_RANGE.get(d)?.section),
+  Object.entries(DRIVE_OF).filter(([m, d]) => PIN_RANGE.get(m)?.section !== PIN_RANGE.get(d)?.section).map(([m, d]) => `${m} ≠ ${d}`).join(', '));
 /** The markup of one section, from its opening tag to the next `</section>`. */
 const sectionSource = (id) => {
   const at = panel.indexOf(`data-section="${id}"`);
@@ -423,7 +435,7 @@ const sectionSource = (id) => {
   lamp (which took two) and of Fluid Physics (which gave up three and kept the
   rest).
 */
-for (const id of ['squish', 'oil', 'ferro', 'reactions', 'tilt', 'lamp', 'physics']) {
+for (const id of ['squish', 'oil', 'ferro', 'reactions', 'tilt', 'spin', 'lamp', 'physics', 'room', 'film', 'audio-input']) {
   const drawn = [...sectionSource(id).matchAll(/settingKey="(\w+)"/g)].map(m => m[1]).sort();
   const filed = PINNABLE.filter(s => s.section === id).map(s => String(s.key)).sort();
   const strays = [...drawn.filter(k => !filed.includes(k)).map(k => `${k} drawn, filed elsewhere`),
@@ -433,7 +445,7 @@ for (const id of ['squish', 'oil', 'ferro', 'reactions', 'tilt', 'lamp', 'physic
 const bay = sectionSource('patches');
 check('and the bay is drawn there, not in The Room',
   bay.includes('data-testid="scene-map-add"') && !sectionSource('room').includes('scene-map-add')
-  && MASTERS.every(k => bay.includes(`settingKey="${k}"`)));
+  && bay.includes('settingKey="shapeImpact"') && !MASTERS.filter(k => k !== 'shapeImpact').some(k => bay.includes(`settingKey="${k}"`)));
 check('no source can ride a master',
   !PATCH_TARGETS.some(t => MASTERS.includes(String(t.key))),
   PATCH_TARGETS.filter(t => MASTERS.includes(String(t.key))).map(t => t.label).join(', '));
