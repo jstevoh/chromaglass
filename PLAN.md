@@ -5497,9 +5497,23 @@ Not a gate and no bar: a rate depends on what was pushed.
 - **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** `renders` waits
   for the plate to draw fifteen frames in a second before measuring (the band's 8 reds of
   191 were all first windows at 0 to 14.5 frames a second), and the fader's line asks the
-  Dimmer to change on four frames in five drawn and a quarter more than the desk's, where
-  "twice the desk's" asked for more changes than frames below 20 a second. Story in
+  Dimmer to change on nine frames in ten that were offered a new value and a quarter more
+  than the desk's, where "twice the desk's" asked for more changes than frames below 20 a
+  second (the first per-frame bar, 0.8 of the frames drawn, sat on the edge of a healthy
+  plate: 0.79 to 0.99 in 48 windows). Story in
   `docs/plan-shipped.md` §19aa-6.
+- **19aa-8. The Blow's push follows the solver steps, and the stroke gave it too few
+  (shipped 2026-10-25).** `tools`' "and pushes the colour along, whichever way it blows"
+  was red on 13 of 187 Mac runs in the week to 10-24. Over 28 Mac strokes the push
+  correlates 0.73 with the wind steps the stroke laid and the CI Macs step 12 to 23 times
+  a second, so a stroke of 1500 ms of waiting got 38 to 71 and the weak ones read
+  -0.07% to +0.05% against +0.15%. The stroke now takes 3000 ms of waiting; nine strokes
+  of one Mac run at three paces read +0.46% to +2.97% with no straw step. The paused hunt
+  for why the app pushes less per step than the lab (the breath's share, the `still`
+  threshold, the Dropper's bottle) is not answered: the toolAmount is 1, so
+  `k = kRaw²` is 1, and the 0.75-cell `still` threshold is under the moves' one cell on a
+  192 grid. Open: why the push has an offset of about 50 steps before it rises, and
+  whether a Mac with fewer than 12 steps a second still reads under the bar.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 193.** Every red
   read the show's own wait 1.8 to 3.0 s against the control's 0.7 to 1.1 s, with 1 s
   spare, and moving for good 2.4 to 7.6 s earlier than the control. Not read further;

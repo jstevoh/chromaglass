@@ -584,7 +584,24 @@ try {
         const rb0 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
         const w0p = await snap('wind0');
         const t0 = Date.now();
-        await stroke('blow', from, to, 1500);
+        /*
+          The stroke takes 3000 ms of waiting (4.1 to 4.6 s with its 30 pointer
+          round trips), not 1500 (2.6 to 3.3 s). What the Blow's push follows is the
+          solver steps the wind is laid on, not the pool or the clock: over the
+          28 strokes of 14 Mac runs it correlates 0.73 with the wind steps (-0.22
+          with the pool's size, -0.32 with the moves' time), and the CI Macs step
+          only 12 to 23 times a second, so a stroke of fixed wall time got 38 to
+          71 wind steps and the push read -0.07% to +1.64% against +0.15% to beat.
+          The four reds in those runs each had a stroke of 41 to 53 wind steps
+          and read -0.07% to +0.05%. One Mac run (#465) drew nine strokes at
+          three paces: 45 to 53 wind steps read +0.46% to +0.79% (750 ms of
+          waiting), 67 to 70 read +0.92% to +1.64%, and the slowest paces, 92 and
+          112 wind steps, +1.55% and +2.97% (those at 3000), at 14 to 29
+          solver steps a second, with no straw step in any (the moves 140 to 155 ms apart at 3000, where
+          the straw is a hand held still for three frames). Twice the time gave
+          about twice the wind steps and a push six to twenty times the bar's.
+        */
+        await stroke('blow', from, to, 3000);
         const strokeMs = Date.now() - t0;
         await settle(700);
         await snap('wind1');
