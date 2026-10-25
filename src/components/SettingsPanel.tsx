@@ -24,9 +24,9 @@ import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
 import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
-import type { EngineStatus } from '../lib/platform';
+import { isProLicenseUnlocked, type EngineStatus } from '../lib/platform';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
-import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
+import { APP_FEATURE_TILES, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
 import { helpFor } from '../lib/controlHelp';
 import { useControlTip } from './ui/ControlTip';
 
@@ -1093,6 +1093,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ edgeRelief: v })}
           settingKey="edgeRelief"
+        />
+        <Slider
+          label="Projector Focus"
+          value={settings.projectorFocus ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ projectorFocus: v })}
+          settingKey="projectorFocus"
         />
         <Slider
           label="Lacing"
@@ -2778,6 +2787,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             value={String(settings.simResolution ?? 'auto')}
             onChange={(e) => {
               const v = e.target.value;
+              if (v === '1024' && isTierGatingEnforced() && !isProLicenseUnlocked()) return;
               onUpdate({ simResolution: (v === 'auto' ? v : Number(v)) as SimResolution });
             }}
             className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm focus:outline-none focus:border-white/50"
@@ -2788,6 +2798,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <option value="384">GPU · 384²</option>
             <option value="512">GPU · 512²</option>
             <option value="768">GPU · 768² (heavy)</option>
+            <option value="1024" disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}>GPU · 1024² (Pro · ultra)</option>
           </select>
           <Info>
             Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them.
@@ -2795,6 +2806,36 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             {engineStatus?.governed && engineStatus.steppedDown ? ' — it has stepped down on this machine.' : '.'}
             {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
           </Info>
+          {((engineStatus?.governed && engineStatus.steppedDown) || engineStatus?.gpuUnavailable) && !isProLicenseUnlocked() && (
+            <div
+              data-cg-grid-upgrade-pro=""
+              className="mt-1 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] p-3 text-[12px] leading-snug text-amber-100/90"
+            >
+              <div className="font-semibold text-amber-200">
+                Upgrade to ChromaGlass Pro for full GPU &amp; CPU headroom
+              </div>
+              <p className="mt-1 text-[11px] text-white/75">
+                Pro lets the automatic quality ladder climb to <span className="font-mono text-white/90">768²</span> at <span className="font-mono text-white/90">2x</span> and <span className="font-mono text-white/90">1024²</span> at <span className="font-mono text-white/90">1x</span>, and unlocks the <span className="font-mono text-white/90">1024²</span> grid pin on your machine.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <a
+                  href={getEffectiveTier() === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-amber-300"
+                >
+                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $164' : 'Get Pro — $199'}
+                </a>
+                <button
+                  type="button"
+                  onClick={openAccountSheet}
+                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/85 hover:bg-white/[0.12]"
+                >
+                  Enter licence key
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
       )}

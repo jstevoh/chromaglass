@@ -58,6 +58,13 @@ const NOT_A_STATE = [
   ['ToolAmount.tsx', 'value === 1', 'the amount at its stop, a reading not a choice'],
   ['OutputPanel.tsx', 'identity', 'Reset greyed while there is nothing to reset, which its `disabled` says'],
   ['ui/index.tsx', 'hit', 'the ring a controller puts on a control while it touches it, a flash'],
+  // The account button while signed out (#460, the owner 2026-10-24: "the way
+  // back in"): it becomes Sign in, the one primary on its surface, and its
+  // label and aria-label say so. Not an on or off, so not lit; white is the
+  // primary's look, which is what it is while signed out.
+  ['App.tsx', 'signedOut', 'the account pill turned into Sign in, a call to action whose label says it'],
+  ['desk/Desk.tsx', 'signedOut', 'the account button turned into Sign in, a call to action whose label says it'],
+  ['phone/PhoneStage.tsx', 'signedOut', 'the Account pill turned into Sign in, a call to action whose label says it'],
 ];
 
 const STATED = /\baria-(pressed|selected|checked|current|expanded)\b|\brole=["'{](switch|tab|radio|option|menuitemradio|menuitemcheckbox)\b/;

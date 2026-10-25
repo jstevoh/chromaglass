@@ -36,7 +36,7 @@ import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide, rideSlot } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User } from 'lucide-react';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
@@ -100,7 +100,7 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
-import { isFreeTierGated } from './lib/tierGates';
+import { getEffectiveTier, isFreeTierGated } from './lib/tierGates';
 import { syncServerLicense } from './lib/licenseKey';
 import { usePublishAccountShow } from './lib/accountShows';
 import { LOCKUP_URL } from './brand';
@@ -288,6 +288,9 @@ interface ArmedLook {
 
 import AccountSheet from './components/AccountSheet';
 import { LIT, LIVE } from './components/ui';
+import { ACCOUNTS_ON, useSignedIn } from './lib/useSignedIn';
+import { isSignedInCached, onAuthFlagChange } from './lib/authFlag';
+import { syncAccountLicense } from './lib/accountLicense';
 
 const hasAccountOrLicenseUI =
   Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
@@ -310,6 +313,10 @@ const isProfileRoute = () =>
 export default function App() {
   const [isActive, setIsActive] = useState(true);
   const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
+  // Signed out with the show up: every account button turns into a lit
+  // "Sign in" that opens the sheet's sign-in (the owner, 2026-10-24).
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
 
   const openProfileSheet = useCallback(() => {
     if (!hasAccountOrLicenseUI) return;
@@ -3506,6 +3513,16 @@ export default function App() {
     return () => window.removeEventListener('cg-license-changed', onLicense);
   }, []);
 
+  // The account's licence key, brought here once the app is up signed in and
+  // again on any later sign-in (lib/accountLicense.ts): a Pro account read Free
+  // while this lived only in the profile sheet (the owner, 2026-10-24).
+  useEffect(() => {
+    if (!ACCOUNTS_ON) return;
+    const ask = () => { if (isSignedInCached()) void syncAccountLicense(); };
+    ask();
+    return onAuthFlagChange(ask);
+  }, []);
+
   const loadMark = useCallback((file: File) => {
     const effectiveFile = isFreeTierGated()
       ? new File(
@@ -5662,7 +5679,8 @@ export default function App() {
                   }}
                   data-testid="lucky-button"
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    luckyArmed ? LIVE : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    // Armed to confirm is pressed, not live: red is only blackout and recording (PLAN 35a).
+                    luckyArmed ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title={luckyArmed
                     ? 'Click again to replace every setting with a random one. Revert brings this look back.'
@@ -5945,6 +5963,8 @@ export default function App() {
             onLampGround={(v) => updateSettings({ lampGround: v })}
             twoProjectors={settings.twoProjectors ?? 0}
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
+            projectorFocus={settings.projectorFocus ?? 0.5}
+            onProjectorFocus={(v) => updateSettings({ projectorFocus: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
             slosh={settings.slosh ?? 0}
@@ -6297,6 +6317,7 @@ export default function App() {
                 isCasting ? 'bg-ok text-bg' : castMenu ? LIT : 'hover:bg-white/10 text-white/60'
               }`}
               title={isCasting ? "Stop casting" : "Cast to display"}
+              aria-pressed={isCasting}
               aria-haspopup="menu"
               aria-expanded={castMenu}
               data-testid="cast-button"
@@ -6583,13 +6604,7 @@ export default function App() {
       )}
 
       {showAccount && hasAccountOrLicenseUI && (
-        <AccountSheet
-          onClose={closeProfileSheet}
-          onOpenSettings={() => {
-            closeProfileSheet();
-            openAllSettings();
-          }}
-        />
+        <AccountSheet onClose={closeProfileSheet} />
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives
@@ -6678,12 +6693,18 @@ export default function App() {
           type="button"
           data-cg-account-open=""
           onClick={openAccount}
-          title="Profile, Settings & Store"
-          aria-label="Account"
-          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-amber-400/40 bg-black/75 px-3.5 py-1.5 text-[12px] font-semibold text-amber-100 shadow-xl backdrop-blur-xl transition-all hover:border-amber-400/70 hover:bg-black/90"
+          data-cg-account-signin={signedOut ? '' : undefined}
+          data-cg-tier={getEffectiveTier()}
+          title={signedOut ? 'Sign in' : 'Account, licence and store'}
+          aria-label={signedOut ? 'Sign in' : 'Account'}
+          className={`fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-medium shadow-xl backdrop-blur-xl transition-all ${
+            signedOut
+              ? 'bg-primary text-on-primary hover:opacity-90'
+              : 'border border-border-strong bg-black/75 text-text-2 hover:bg-black/90 hover:text-text'
+          }`}
         >
-          <User size={14} className="shrink-0 text-amber-300" />
-          <span>Profile &amp; Store</span>
+          {signedOut ? <LogIn size={14} className="shrink-0" /> : <User size={14} className="shrink-0 text-muted" />}
+          <span>{signedOut ? 'Sign in' : 'Account'}</span>
         </button>
       )}
 
