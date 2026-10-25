@@ -22,6 +22,7 @@ import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
 import { PaceTrack } from './ui/Pace';
+import { ViscosityDrip } from './ui/Playful';
 import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -3114,10 +3115,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 aria-pressed={settings.viscosity === v}
                 key={v}
                 onClick={() => onUpdate({ viscosity: v })}
-                className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
+                title={v === 'thick' ? 'A light oil, 20 times water\'s viscosity. Hover to watch a drop fall through it.' : 'Water. Hover to watch a drop fall through it.'}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-1 text-[12px] rounded-md transition-all ${
                   settings.viscosity === v ? `${LIT} font-bold` : 'text-muted hover:bg-hover'
                 }`}
               >
+                {/* A drop that lets go at the pace of this viscosity (PLAN 35e, lib/dripPace.ts). */}
+                <ViscosityDrip mode={v} />
                 {v}
               </button>
             ))}

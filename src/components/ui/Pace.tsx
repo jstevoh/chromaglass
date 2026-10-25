@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { paceOf } from '../../lib/settingsMap';
+import { Bulb } from './Playful';
 
 /*
   The snail and the hare (PLAN 35d): the two ends of a pace control, drawn as
@@ -48,6 +49,19 @@ export function Hare({ size = 12, flip = false }: { size?: number; flip?: boolea
  * is what lights the animal the thumb is at the end of.
  */
 export function PaceTrack({ settingKey, at, children, size = 12 }: { settingKey: string | null | undefined; at: number; children: ReactNode; size?: number }) {
+  /*
+    Lamp Warmth is the other control that wears a drawing on its track (PLAN
+    35e): a bulb at the left whose glow is the grade's colour temperature. Its
+    travel is the setting (0 to 1, no curve), so `at` is the warmth itself.
+  */
+  if (settingKey === 'lampWarmth') {
+    return (
+      <div className="flex items-center gap-2" data-lamp="">
+        <Bulb warmth={at} />
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
+    );
+  }
   const pace = paceOf(settingKey);
   if (!pace) return <>{children}</>;
   const lit = 'text-text-2', dim = 'text-faint';

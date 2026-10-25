@@ -1767,7 +1767,31 @@ group's colour.
 Bad: a cap you read as "on" or "live", a colour you cannot tell from its neighbour at arm's length, a
 picture that does not say what its tool does, or a snail and hare you do not see until you look for them.
 
-## 78. The Splodascope, and Film Hold (PLAN 28k)
+
+## 78. Bottles that tip, drops that fall, a bulb in kelvin (PLAN 35e)
+
+On the desk (Build, with Bottles open) and in Settings:
+
+1. Pick a bottle. It leans forward once, with a little overshoot, and stands still; its outline and name
+   stay lit violet. Pour with it for a minute: its level sinks as the plate fills toward the Dye Budget,
+   and rises as the plate empties. Lower Dye Budget and the level drops sooner; raise it and it holds. The
+   other bottles stand full.
+2. In Settings, Viscosity (Squish Plate): hover **thin** and a small drop forms and falls in under a
+   second; hover **thick** and the drop hangs and strings out for about five. Choosing one runs it once.
+   At rest each is a drop hanging at the lip.
+3. In Settings, Lamp & Light, Lamp Warmth has a bulb at the left. At 0 it reads 6500 K and glows white;
+   turn it up and it falls to 5100 K at full, the filament going from white to cream. The figure is the
+   temperature of the grade the slider applies to the picture, not a label.
+
+On the phone: the Dye sheet's picked bottle leans and shows its level, and the dock's dye button holds the
+bottle in hand, leaning while the sheet is open. Settings has the same drops and bulb.
+
+Bad: a level that sits still while the plate fills, a lean that keeps moving, a drop that falls in the same
+time on both buttons, a bulb whose number does not follow the slider, anything that moves with reduced
+motion on, or a violet or red that is not "on" or "live". Decide too: the 5100 K top is what the grade does
+today; if you would rather it reached a 3200 K halogen, that is PLAN 35e-2.
+
+## 79. The Splodascope, and Film Hold (PLAN 28k)
 
 Open the Splodascope look on the lamp, with the owner's photograph beside it (in the project's
 shared files, `references/splodascope-2026-10-25.png`).

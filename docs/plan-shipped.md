@@ -5372,3 +5372,21 @@ tools' pictograms are single lines on a 24 grid, one for what each tool does to 
 keycaps with the letter in the corner, the held one pressed 2 px and lit, the phone's the same pictures in
 the dock. Snail and hare sit at the ends of the five pace controls and come up from faint when the control
 is at that end; they do not move. Judging §77.
+
+### 35e. Liquid in the controls (shipped 2026-10-25)
+
+Batch B of the owner's playful-controls choice: three controls that behave like the material they set, each
+drawn inside its own few pixels and holding still under reduced motion. The bottle in hand leans forward on
+the desk's Bottles panel and the phone's Dye sheet and dock, and stands filled to what is left of the Dye
+Budget: the plate's mean dye density against the target the regulator holds it to, eased toward the
+closeup's own, read a few times a second by the one bottle that is picked (a polled getter, not App state,
+so nothing above it re-renders). The surface stays level as the bottle leans, as a real one's does, the
+liquid being drawn in the room's frame and clipped by the bottle's. The Viscosity buttons each let a drop go
+when hovered, focused or chosen; a drop released in a viscous carrier falls at Stokes's terminal speed,
+which is the inverse of the viscosity, so the fall takes twenty times as long for thick as for thin (the
+solver's own 20 mm²/s and 1), slowed at one factor for both. Lamp Warmth's bulb names the colour temperature
+the grade matches: the blackbody, from Planck's law and a fit of the CIE matching functions, whose red over
+blue is the grade's at that position, and glows that blackbody's own colour. The reading is of what the
+shader does, and says what the slider never did: it tops out at 5100 K. `npm run panel` holds the kelvin to
+the shader's tint, the drop's pace to the solver's viscosities, the bottle's level to its formula and the
+wiring, and the reduced-motion rule. Judging §78.

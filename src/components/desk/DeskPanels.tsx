@@ -21,6 +21,7 @@ import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import { ToolGlyph } from '../ui/ToolGlyph';
+import { Bottle, LiveBottle } from '../ui/Playful';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
 
@@ -607,7 +608,15 @@ function BottlesBody({ p }: { p: DeskProps }) {
           }`}
           data-testid={`bottle-${l.id}`}
         >
-          <span className="h-2.5 w-2.5 shrink-0 rounded-[3px] border border-border-strong" style={bottleSwatch(l)} />
+          {/*
+            A bottle on a shelf (PLAN 35e). The Dye Budget is one tank for the
+            whole plate, so the bottle in hand is the one wired to it: it leans
+            forward, ready to pour, and stands filled to what is left of the
+            budget; the others stand full.
+          */}
+          {p.bottleId === l.id
+            ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} testId="bottle-in-hand" />
+            : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} />}
           <span className="truncate text-[13px] font-medium">{l.name}</span>
         </button>
       ))}

@@ -1978,6 +1978,8 @@ export default function App() {
    * layer is does not need sixty looks a second at the cost of a re-render
    * each.
    */
+  /** What is left of the Dye Budget, for the picked bottle on the desk and the phone (PLAN 35e); a stable function, so asking re-renders nothing here. */
+  const readDyeRoom = useCallback(() => visualizerRef.current?.dyeRoom?.() ?? 1, []);
   const [layerReport, setLayerReport] = useState<{ index: number; fill: number; colour: string }[]>([]);
   const layerReportKey = useRef('');
   /** Which desk is up, for the poll below, which is armed once and never re-armed. */
@@ -5927,6 +5929,7 @@ export default function App() {
             onAmount={(v) => setToolAmount(activeTool, v)}
             liquids={liquidTypes}
             selectedLiquidId={selectedLiquidId}
+            dyeRoom={readDyeRoom}
             onLiquid={setSelectedLiquidId}
             dyeColors={DROPPER_COLORS}
             onDyeColor={(hex) => updateLiquidColor(selectedLiquidId, hex)}
@@ -6619,6 +6622,7 @@ export default function App() {
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}
+          dyeRoom={readDyeRoom}
           onBottle={(id) => { setSelectedLiquidId(id); }}
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
