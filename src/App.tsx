@@ -1086,28 +1086,15 @@ export default function App() {
         if (nativeTap) {
           // Mac app (PLAN.md 23.8): ScreenCaptureKit loopback via setDisplayMediaRequestHandler
           // (no tab picker) combined with the main-process loopback audio tap.
-          let displayStream: MediaStream | null = null;
-          try {
-            displayStream = await navigator.mediaDevices.getDisplayMedia({
-              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
-              video: true,
-            });
-          } catch {
-            displayStream = null;
-          }
-          if (ask !== sourceAskRef.current) {
-            displayStream?.getTracks().forEach(t => t.stop());
-            return;
-          }
+          // Subscribe the PCM tap and hand `dest.stream` to `useAudioAnalyzer` immediately,
+          // before `getDisplayMedia` resolves (~0.8 s on macOS), so no early PCM packets
+          // are dropped while ScreenCaptureKit initializes.
           const ctx = new AudioContext();
           if (ctx.state === 'suspended') void ctx.resume();
           const dest = ctx.createMediaStreamDestination();
-          if (displayStream && displayStream.getAudioTracks().length > 0) {
-            try {
-              ctx.createMediaStreamSource(displayStream).connect(dest);
-            } catch { /* fallback to PCM tap */ }
-          }
+          let displayStream: MediaStream | null = null;
           let nextTime = 0;
+          let pcmChunks = 0;
           const unsubPcm = nativeTap((samples: Float32Array, sampleRate: number) => {
             if (!samples || samples.length === 0 || ctx.state === 'closed') return;
             if (ctx.state === 'suspended') void ctx.resume();
@@ -1118,9 +1105,12 @@ export default function App() {
             src.buffer = buf;
             src.connect(dest);
             const now = ctx.currentTime;
-            if (nextTime < now) nextTime = now + 0.005;
+            // Give the first scheduled chunk 60 ms so React has committed `dest.stream`
+            // and `useAudioAnalyzer` has connected its `AnalyserNode`.
+            if (nextTime < now) nextTime = now + (pcmChunks === 0 ? 0.06 : 0.005);
             src.start(nextTime);
             nextTime += buf.duration;
+            pcmChunks += 1;
           });
           systemTapRef.current = {
             stop: () => {
@@ -1130,6 +1120,22 @@ export default function App() {
             },
           };
           stream = dest.stream;
+          setAudioStream(stream);
+          void navigator.mediaDevices.getDisplayMedia({
+            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
+            video: true,
+          }).then((ds) => {
+            if (ask !== sourceAskRef.current || ctx.state === 'closed') {
+              ds.getTracks().forEach(t => t.stop());
+              return;
+            }
+            displayStream = ds;
+            if (ds.getAudioTracks().length > 0) {
+              try {
+                ctx.createMediaStreamSource(ds).connect(dest);
+              } catch { /* fallback to PCM tap */ }
+            }
+          }, () => { /* loopback tap continues */ });
         } else {
           // Raw, as the microphone below, and in stereo: a shared tab is the
           // music itself. With plain `audio: true` Chrome shared a music tab as

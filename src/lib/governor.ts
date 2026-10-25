@@ -134,6 +134,7 @@ export class QualityGovernor {
   heavyPost = false;
   /** Explicit per-governor ambient override (14j / 23.8). */
   private ambient = false;
+  private wasAmbient = false;
 
   /**
    * Held on one rung, for measuring it (`?rung=`).
@@ -157,18 +158,31 @@ export class QualityGovernor {
     this.start = this.index;
     this.pinned = pin;
     this.ambient = ambient;
+    this.wasAmbient = ambient || globalAmbientMode;
     this.settleUntil = now + SETTLE_S;
   }
 
+  private syncAmbient(): boolean {
+    const on = this.ambient || globalAmbientMode;
+    if (on !== this.wasAmbient) {
+      this.wasAmbient = on;
+      if (on) {
+        if (this.index < this.start) this.index = this.start;
+      } else {
+        this.steps = 0;
+        this.stepsFailed.clear();
+      }
+    }
+    return on;
+  }
+
   get ambientMode(): boolean {
-    return this.ambient || globalAmbientMode;
+    return this.syncAmbient();
   }
 
   setAmbient(on: boolean): void {
     this.ambient = Boolean(on);
-    if (this.ambientMode && this.index < this.start) {
-      this.index = this.start;
-    }
+    this.syncAmbient();
   }
 
   get rung(): QualityRung {

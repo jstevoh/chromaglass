@@ -253,12 +253,12 @@ function grantPermissions() {
             return;
           }
         } catch { /* fall through */ }
+        try {
+          callback({ video: request.frame, audio: 'loopback' });
+          return;
+        } catch { /* fall through */ }
       }
-      try {
-        callback({ video: request.frame, audio: 'loopback' });
-      } catch {
-        callback({ video: request.frame });
-      }
+      callback({ video: request.frame });
       return;
     }
     try {
@@ -290,15 +290,24 @@ function startLoopbackAudioTap() {
       if (rinfo.address !== '127.0.0.1') return;
       const win = showWindow;
       if (!win || win.isDestroyed() || msg.byteLength < 4) return;
-      const count = Math.min(4096, Math.floor(msg.byteLength / 4));
+      let offset = 0;
+      let sampleRate = 48000;
+      if (msg.byteLength >= 16 && msg.subarray(0, 6).toString('ascii') === 'CGPCM1') {
+        const sr = msg.readUInt32LE(8);
+        if (sr >= 8000 && sr <= 192000) sampleRate = sr;
+        offset = 12;
+      }
+      const count = Math.min(4096, Math.floor((msg.byteLength - offset) / 4));
+      if (count <= 0) return;
       const samples = new Array(count);
       for (let i = 0; i < count; i++) {
-        const v = msg.readFloatLE(i * 4);
+        const v = msg.readFloatLE(offset + i * 4);
         samples[i] = Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0;
       }
-      win.webContents.send('chromaglass:system-audio-pcm', samples);
+      win.webContents.send('chromaglass:system-audio-pcm', samples, sampleRate);
     });
     sock.bind(0, '127.0.0.1', () => {
+      sock.unref();
       const { port } = sock.address();
       loopbackAudioSocket = sock;
       show.audioPort = port;
@@ -508,7 +517,13 @@ async function start() {
   wireWindow(showWindow);
   showWindow.once('ready-to-show', () => showWindow?.show());
   // Closing the show closes the projector with it, and the app: the server has nothing to serve.
-  showWindow.on('closed', () => { showWindow = null; app.quit(); });
+  showWindow.on('closed', () => {
+    showWindow = null;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.destroy();
+    }
+    app.quit();
+  });
   const query = process.env.CHROMAGLASS_QUERY ?? '';
   await showWindow.loadURL(`http://localhost:${show.port}/${query}`);
 }
@@ -526,5 +541,6 @@ app.on('will-quit', () => {
     try { loopbackAudioSocket.close(); } catch { /* ignore */ }
     loopbackAudioSocket = null;
   }
+  setImmediate(() => app.exit(0));
 });
 app.on('window-all-closed', () => app.quit());

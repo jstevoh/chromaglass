@@ -35,8 +35,8 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   license,
   onSystemAudioPcm(fn) {
     if (typeof fn !== 'function') return () => {};
-    const listener = (_event, samples) => {
-      try { fn(samples); } catch { /* ignore */ }
+    const listener = (_event, samples, sampleRate) => {
+      try { fn(samples, sampleRate); } catch { /* ignore */ }
     };
     ipcRenderer.on('chromaglass:system-audio-pcm', listener);
     return () => ipcRenderer.removeListener('chromaglass:system-audio-pcm', listener);
