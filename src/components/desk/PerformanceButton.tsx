@@ -24,15 +24,23 @@ export function PerformanceButton({ performance, onToggle }: {
       midiKey="action:performance-toggle"
       testId="performance-button"
       title={performance
-        ? 'Stop, and keep what was painted with the song that was playing'
+        ? `Stop${short ? ` (${short})` : ''}, and keep what was painted with the song that was playing`
         : 'Record what you paint from now until you stop, with the song that is playing'}
     >
       {/* Short below 1280, where the row beside the look is tight: at 1024 the
           full label wrapped and squeezed the layer switch into two lines. */}
-      <span className="whitespace-nowrap">
-        {performance
-          ? <>■ Stop · {performance.clock}{short && <span className="hidden xl:inline"> · {short}</span>}</>
-          : <>● Record<span className="hidden xl:inline"> performance</span></>}
+      <span className="relative inline-flex items-center justify-center whitespace-nowrap">
+        <span aria-hidden={!!performance || undefined} className={performance ? 'invisible' : undefined}>
+          ● Record<span className="hidden xl:inline"> performance</span>
+        </span>
+        {performance && (
+          <span
+            data-testid="performance-timer"
+            className="absolute inset-0 flex items-center justify-center tabular-nums"
+          >
+            ■ <span className="hidden xl:inline">Stop · </span>{performance.clock}
+          </span>
+        )}
       </span>
     </Button>
   );

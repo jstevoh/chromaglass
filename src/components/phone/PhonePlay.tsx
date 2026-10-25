@@ -339,8 +339,20 @@ export function PhonePlay(p: PhonePlayProps) {
               <Pill onPress={p.onShuffle} label="Shuffle the look" testId="play-shuffle"><Shuffle size={18} /></Pill>
               {p.recording.supported && (
                 <Pill onPress={p.recording.onToggle} label={p.recording.on ? 'Stop recording' : 'Record a clip'} testId="play-record" pressed={p.recording.on}>
-                  <span className={`h-4 w-4 rounded-full border-2 border-[#F87171] ${p.recording.on ? 'bg-[#F87171]' : ''}`} />
-                  {p.recording.on && <span className="font-mono text-[12px] text-text">{clock(p.recording.seconds)}</span>}
+                  <span className="relative flex h-4 w-4 items-center justify-center">
+                    <span
+                      aria-hidden={p.recording.on || undefined}
+                      className={`h-4 w-4 rounded-full border-2 border-[#F87171] ${p.recording.on ? 'bg-[#F87171] invisible' : ''}`}
+                    />
+                    {p.recording.on && (
+                      <span
+                        data-testid="play-record-timer"
+                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-mono text-[11px] tabular-nums text-text"
+                      >
+                        {clock(p.recording.seconds)}
+                      </span>
+                    )}
+                  </span>
                 </Pill>
               )}
             </>
@@ -491,7 +503,7 @@ export function PhonePlay(p: PhonePlayProps) {
                   className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Clear plate</button>
                 {p.recording.supported && (
                   <button onClick={() => { void shareClip(); }} data-testid="play-share"
-                    className="h-[52px] min-w-0 flex-1 truncate rounded-[14px] bg-primary px-2 text-[15px] font-medium text-on-primary">{clipLabel}</button>
+                    className="h-[52px] min-w-0 flex-1 truncate rounded-[14px] bg-primary px-2 text-[15px] font-medium tabular-nums text-on-primary">{clipLabel}</button>
                 )}
                 {p.onOpenAccount && (
                   <button onClick={() => { setSheet(false); p.onOpenAccount?.(); }} data-testid="play-sheet-account"

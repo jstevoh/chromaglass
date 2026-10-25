@@ -623,6 +623,70 @@ try {
       `clean ${before.marked ? 'no (already marked)' : 'yes'}, marked after ${after?.marked ? 'yes' : 'no'}; plate ${fmt(before.preview)} → ${fmt(after?.preview)} (${dp.toFixed(1)} px); Save ${fmt(before.save)} → ${fmt(after?.save)} (${ds.toFixed(1)} px)`);
   }
 
+  // ── The plate bar does not move when recording starts or stops (PLAN.md 19v-4) ──
+  {
+    /*
+      Found with 19v-3: at 1280 × 800 in Build, Record's running labels
+      ("■ Stop video · 0:00" and "■ Stop · 0:00") were 70 px and 25 px wider
+      than their idle labels ("● Video" and "● Record"), which wrapped the
+      plate bar to two rows and dropped the plate's hole by 42 px as soon as a
+      take began. Both record buttons now keep their idle labels in flow and
+      overlay the running clock inside the same box, so starting and stopping a
+      video recording or a performance take moves neither the buttons nor the
+      plate.
+    */
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pg = await ctx.newPage();
+    await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* */ } });
+    await pg.goto(URL, { waitUntil: 'networkidle' });
+    for (let i = 0; i < 20 && !(await pg.getByTestId('desk-preview').count()); i++) await pg.waitForTimeout(300);
+    await pg.waitForTimeout(1500);
+    const measure = () => pg.evaluate(() => {
+      const box = (id) => { const r = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; };
+      const timerVis = (btnId, timerId) => {
+        const t = document.querySelector(`[data-testid="${timerId}"]`);
+        if (t) return getComputedStyle(t).visibility === 'visible';
+        const b = document.querySelector(`[data-testid="${btnId}"]`);
+        return !!b && /\d+:\d\d/.test(b.textContent || '');
+      };
+      return {
+        preview: box('desk-preview'),
+        save: box('save-look'),
+        video: box('record-video-button'),
+        perf: box('performance-button'),
+        videoOn: timerVis('record-video-button', 'record-video-timer'),
+        perfOn: timerVis('performance-button', 'performance-timer'),
+      };
+    });
+    const before = await measure();
+    await clickAt(pg, 'record-video-button');
+    let duringVideo = null;
+    for (let i = 0; i < 10; i++) { await pg.waitForTimeout(200); duringVideo = await measure(); if (duringVideo.videoOn) break; }
+    await clickAt(pg, 'record-video-button');
+    await pg.waitForTimeout(300);
+    await clickAt(pg, 'performance-button');
+    let duringPerf = null;
+    for (let i = 0; i < 10; i++) { await pg.waitForTimeout(200); duringPerf = await measure(); if (duringPerf.perfOn) break; }
+    await clickAt(pg, 'performance-button');
+    let after = null;
+    for (let i = 0; i < 10; i++) { await pg.waitForTimeout(200); after = await measure(); if (!after.videoOn && !after.perfOn) break; }
+    await ctx.close();
+    const moved = (a, b) => (a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h)) : Infinity);
+    const dp = Math.max(moved(before.preview, duringVideo?.preview), moved(before.preview, duringPerf?.preview), moved(before.preview, after?.preview));
+    const dv = Math.max(moved(before.video, duringVideo?.video), moved(before.video, after?.video));
+    const dt = Math.max(moved(before.perf, duringPerf?.perf), moved(before.perf, after?.perf));
+    const ds = Math.max(moved(before.save, duringVideo?.save), moved(before.save, duringPerf?.save), moved(before.save, after?.save));
+    const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
+    check('at 1280 in Build, starting and stopping a recording does not move the plate: its hole, Record and Save keep their boxes',
+      !before.videoOn && !before.perfOn && !!duringVideo?.videoOn && !!duringPerf?.perfOn && !after?.videoOn && !after?.perfOn
+        && dp <= 0.5 && dv <= 0.5 && dt <= 0.5 && ds <= 0.5,
+      `video timer ${before.videoOn ? 'on' : 'off'} → ${duringVideo?.videoOn ? 'on' : 'off'} → ${after?.videoOn ? 'on' : 'off'}, `
+      + `take timer ${before.perfOn ? 'on' : 'off'} → ${duringPerf?.perfOn ? 'on' : 'off'} → ${after?.perfOn ? 'on' : 'off'}; `
+      + `plate ${fmt(before.preview)} → ${fmt(duringVideo?.preview)} / ${fmt(duringPerf?.preview)} (${dp.toFixed(1)} px); `
+      + `video ${fmt(before.video)} → ${fmt(duringVideo?.video)} (${dv.toFixed(1)} px); `
+      + `take ${fmt(before.perf)} → ${fmt(duringPerf?.perf)} (${dt.toFixed(1)} px); Save (${ds.toFixed(1)} px)`);
+  }
+
   // ── The rest of Desk v2 (PLAN.md 8c, 8e, 8f, 8h) ───────────────
   await page.setViewportSize({ width: 1440, height: 900 });
   await clickOn('mode-segmented-design');

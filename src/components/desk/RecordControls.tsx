@@ -29,6 +29,12 @@ export function RecordControls({
   return (
     <div className="flex shrink-0 items-center gap-1 xl:gap-1.5" data-testid="record-controls-cluster">
       {/* ── Video Recording Button (Canvas Only) ─────────────── */}
+      {/*
+        The running timer takes no extra width (PLAN.md 19v-4, as Save's dot in
+        19v-3): the idle label stays in flow to size the button, and the stop
+        mark + clock sit over that same box while recording so starting a take
+        at 1280 never widens the bar or drops the plate.
+      */}
       <Button
         height={32}
         variant={videoRecording ? 'danger' : 'secondary'}
@@ -38,11 +44,17 @@ export function RecordControls({
           ? `Stop canvas video recording (${videoClock}) and save video file`
           : 'Record canvas directly to a video file (R) — click sliders for quality and audio options'}
       >
-        <span className="whitespace-nowrap">
-          {videoRecording ? (
-            <>■ Stop video · {videoClock}</>
-          ) : (
-            <>● <span className="hidden 2xl:inline">Record </span>Video</>
+        <span className="relative inline-flex items-center justify-center whitespace-nowrap">
+          <span aria-hidden={videoRecording || undefined} className={videoRecording ? 'invisible' : undefined}>
+            ● <span className="hidden 2xl:inline">Record </span>Video
+          </span>
+          {videoRecording && (
+            <span
+              data-testid="record-video-timer"
+              className="absolute inset-0 flex items-center justify-center tabular-nums"
+            >
+              ■ <span className="hidden 2xl:inline">Stop · </span>{videoClock}
+            </span>
           )}
         </span>
       </Button>
@@ -57,14 +69,20 @@ export function RecordControls({
         midiKey="action:performance-toggle"
         testId="performance-button"
         title={performance
-          ? 'Stop, and keep what was painted with the song that was playing'
+          ? `Stop${short ? ` (${short})` : ''}, and keep what was painted with the song that was playing`
           : 'Record what you paint from now until you stop, with the song that is playing (T)'}
       >
-        <span className="whitespace-nowrap">
-          {performance ? (
-            <>■ Stop · {performance.clock}{short && <span className="hidden 2xl:inline"> · {short}</span>}</>
-          ) : (
-            <>● Record<span className="hidden 2xl:inline"> performance</span></>
+        <span className="relative inline-flex items-center justify-center whitespace-nowrap">
+          <span aria-hidden={!!performance || undefined} className={performance ? 'invisible' : undefined}>
+            ● Record<span className="hidden 2xl:inline"> performance</span>
+          </span>
+          {performance && (
+            <span
+              data-testid="performance-timer"
+              className="absolute inset-0 flex items-center justify-center tabular-nums"
+            >
+              ■ <span className="hidden 2xl:inline">Stop · </span>{performance.clock}
+            </span>
           )}
         </span>
       </Button>

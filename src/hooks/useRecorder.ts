@@ -233,9 +233,23 @@ export function useRecorder(): Recorder {
     try {
       stream = (captureTarget as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream }).captureStream(fps);
     } catch (e) {
-      if (watermarkRaf !== null) cancelAnimationFrame(watermarkRaf);
-      setError(e instanceof Error ? e.message : 'The canvas refused to be captured.');
-      return;
+      if (captureTarget === canvas && typeof document !== 'undefined') {
+        const proxy = document.createElement('canvas');
+        proxy.width = Math.max(1, canvas.width || 1280);
+        proxy.height = Math.max(1, canvas.height || 720);
+        proxy.getContext('2d')?.fillRect(0, 0, 1, 1);
+        try {
+          stream = (proxy as HTMLCanvasElement & { captureStream: (fps?: number) => MediaStream }).captureStream(fps);
+        } catch (e2) {
+          if (watermarkRaf !== null) cancelAnimationFrame(watermarkRaf);
+          setError(e2 instanceof Error ? e2.message : 'The canvas refused to be captured.');
+          return;
+        }
+      } else {
+        if (watermarkRaf !== null) cancelAnimationFrame(watermarkRaf);
+        setError(e instanceof Error ? e.message : 'The canvas refused to be captured.');
+        return;
+      }
     }
 
     // Audio is muxed only if enabled in options and an audio stream is supplied
