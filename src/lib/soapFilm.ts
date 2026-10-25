@@ -1,6 +1,6 @@
 /*
   The CPU reference for a draining vertical soap film seen in reflected light
-  (PLAN.md §32, step 32a; judged by `npm run soapfilm` in scripts/soapfilm.mjs).
+  (PLAN.md §32, steps 32a–32b; judged by `npm run soapfilm` in scripts/soapfilm.mjs).
 
   What the owner asked for is the look of a vertical soap film hanging in a
   frame under reflected light: horizontal interference bands (silver, straw,
@@ -48,11 +48,25 @@
      is marked ruptured, relaxes exponentially toward 8 nm over a 0.5 s time
      constant, and cannot refill above 30 nm from neighbouring thicker film.
 
-  4. Reflected colour at viewing angle:
+  4. Reflected colour at viewing angle on a dark ground (32b):
      `soapFilmRgb` maps each cell's thickness h to sRGB 0..1 through Airy's
-     multi-beam reflectance (`filmColour` in `filmTable.ts`) at incidence
-     cosine `cosI` in air, where Snell's law gives the internal path factor
-     cos(theta_t) = sqrt(1 - (n0 / n1)^2 (1 - cosI^2)).
+     multi-beam reflectance (`filmReflectance` / `filmColour` in `filmTable.ts`)
+     at incidence cosine `cosI` in air, where Snell's law gives the internal
+     path factor cos(theta_t) = sqrt(1 - (n0 / n1)^2 (1 - cosI^2)) and effective
+     path thickness d_eff = h cos(theta_t). For a 2D film in a frame (`ny > 1`,
+     or when `softBox: true`), Airy reflectance is summed over a 4-point path
+     spread (`spread = 0.025`) around `d_eff` on a dark ground (`ground = 0.0004`
+     through transmittance 1 - R), and negative linear sRGB channels are clamped
+     to 0. That 4-point path spread and dark ground alone move C7's t = 120 s
+     saturation from 79% to 77% (dark 22.7%, 9/12 hues). The rest of the drop to
+     the reference photograph's 15% saturated (13% at t = 120 s, 14.8% at
+     t = 110 s, dark 19.4%, 8/12 hues) is a colour grade (`notchFloor = 0.0725`
+     lifting each pixel's lowest linear channel and `chromaRetention = 0.67`
+     pulling each channel a third of the way toward grey while rescaling to
+     preserve luminous reflectance Y(d_eff)) standing in for the soft box's
+     angular spread and the camera's gamut, not the physics itself (named
+     shortcut (f); PLAN.md 32b-1 replaces the grade with the real solid-angle
+     integral and camera gamut mapping).
 
   Named shortcuts (PLAN.md §32):
   - (a) Gravity acts along +y in the plane of the film (`yhat`), representing a
@@ -65,9 +79,18 @@
     black equilibrium rather than stochastic hole nucleation.
   - (e) Explicit Marangoni surfactant concentration transport is omitted; its
     inextensibility constraint is carried directly by `div u = 0`.
+  - (f) Angled reflectance (`cosI < 1`) keeps normal-incidence Fresnel
+    amplitudes r01, r12 = (n_a - n_b) / (n_a + n_b) (no s/p polarisation split);
+    and on 2D films (`ny > 1`), `notchFloor = 0.0725` and `chromaRetention = 0.67`
+    are a colour grade standing in for the soft box's angular spread and the
+    camera's gamut, not the physics itself: with the grade off (`notchFloor = 0`,
+    `chromaRetention = 1`, keeping `spread = 0.025` and `ground = 0.0004`) the
+    film's saturation at t = 120 s is 77% (dark 22.7%, 9/12 hues), and with the
+    grade on it is 13% at t = 120 s (14.8% at t = 110 s, dark 19.4%, 8/12 hues)
+    against the photograph's 15% (PLAN.md 32b-1).
 */
 
-import { filmColour, SOAP } from './filmTable';
+import { filmColour, filmReflectance, SOAP } from './filmTable';
 
 export interface SoapFilmOptions {
   nx?: number;
@@ -87,6 +110,11 @@ export interface SoapFilmStepOptions {
 export interface SoapFilmRgbOptions {
   cosI?: number;
   gain?: number;
+  softBox?: boolean;
+  spread?: number;
+  ground?: number;
+  notchFloor?: number;
+  chromaRetention?: number;
 }
 
 export interface SoapFilm {
@@ -409,24 +437,194 @@ export function stepSoapFilm(f: SoapFilm, dt: number, opts: SoapFilmStepOptions 
   }
 }
 
+const SOFTBOX_LAMBDAS: number[] = [];
+for (let l = 380; l <= 780; l += 5) SOFTBOX_LAMBDAS.push(l);
+
+const softBoxGauss = (l: number, mu: number, s1: number, s2: number) => {
+  const s = l < mu ? s1 : s2;
+  return Math.exp(-0.5 * ((l - mu) / s) ** 2);
+};
+
+const SOFTBOX_S: number[] = SOFTBOX_LAMBDAS.map((l) => {
+  const m = l * 1e-9;
+  return 1 / (m ** 5 * (Math.exp(1.4388e-2 / (m * 5500)) - 1));
+});
+
+const SOFTBOX_XYZ: [number, number, number][] = SOFTBOX_LAMBDAS.map((l) => [
+  1.056 * softBoxGauss(l, 599.8, 37.9, 31.0) +
+    0.362 * softBoxGauss(l, 442.0, 16.0, 26.7) -
+    0.065 * softBoxGauss(l, 501.1, 20.4, 26.2),
+  0.821 * softBoxGauss(l, 568.8, 46.9, 40.5) + 0.286 * softBoxGauss(l, 530.9, 16.3, 31.1),
+  1.217 * softBoxGauss(l, 437.0, 11.8, 36.0) + 0.681 * softBoxGauss(l, 459.0, 26.0, 13.8),
+]);
+
+let SOFTBOX_XW = 0;
+let SOFTBOX_YW = 0;
+let SOFTBOX_ZW = 0;
+for (let j = 0; j < SOFTBOX_LAMBDAS.length; j++) {
+  SOFTBOX_XW += SOFTBOX_S[j] * SOFTBOX_XYZ[j][0];
+  SOFTBOX_YW += SOFTBOX_S[j] * SOFTBOX_XYZ[j][1];
+  SOFTBOX_ZW += SOFTBOX_S[j] * SOFTBOX_XYZ[j][2];
+}
+
+const SOFTBOX_Q_OFF = [-1.5, -0.5, 0.5, 1.5] as const;
+const SOFTBOX_Q_W = [0.15, 0.35, 0.35, 0.15] as const;
+const SOFTBOX_LUT_MAX_NM = 800;
+const SOFTBOX_LUT_STEP_NM = 0.5;
+const SOFTBOX_LUT_COUNT = Math.round(SOFTBOX_LUT_MAX_NM / SOFTBOX_LUT_STEP_NM) + 1;
+
+const srgbEncode = (c: number) => {
+  const v = Math.max(0, c);
+  return Math.min(1, v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+};
+
+function evalSoftBoxRgb(
+  dEff: number,
+  gain: number,
+  spread: number,
+  ground: number,
+  notchFloor: number,
+  chromaRetention: number,
+): [number, number, number] {
+  const { n0, n1, n2 } = SOAP;
+  let X = 0;
+  let Y = 0;
+  let Z = 0;
+  for (let q = 0; q < 4; q++) {
+    const d = Math.max(0, dEff * (1 + spread * SOFTBOX_Q_OFF[q]));
+    const wq = SOFTBOX_Q_W[q];
+    for (let j = 0; j < SOFTBOX_LAMBDAS.length; j++) {
+      const R = filmReflectance(n0, n1, n2, d, SOFTBOX_LAMBDAS[j], 1);
+      const Rtot = R + (1 - R) * ground;
+      const s = wq * SOFTBOX_S[j] * Rtot;
+      X += s * SOFTBOX_XYZ[j][0];
+      Y += s * SOFTBOX_XYZ[j][1];
+      Z += s * SOFTBOX_XYZ[j][2];
+    }
+  }
+  X = (X / SOFTBOX_YW) * ((0.9505 * SOFTBOX_YW) / SOFTBOX_XW);
+  Y = Y / SOFTBOX_YW;
+  Z = (Z / SOFTBOX_YW) * ((1.089 * SOFTBOX_YW) / SOFTBOX_ZW);
+
+  let rL = Math.max(0, 3.2406 * X - 1.5372 * Y - 0.4986 * Z);
+  let gL = Math.max(0, -0.9689 * X + 1.8758 * Y + 0.0415 * Z);
+  let bL = Math.max(0, 0.0557 * X - 0.204 * Y + 1.057 * Z);
+
+  const mxL = Math.max(rL, gL, bL, 1e-9);
+  const mnL = Math.min(rL, gL, bL);
+  const targetMn = Math.max(mnL, notchFloor * mxL);
+  if (mxL > mnL) {
+    const s = (mxL - targetMn) / (mxL - mnL);
+    rL = mxL - (mxL - rL) * s;
+    gL = mxL - (mxL - gL) * s;
+    bL = mxL - (mxL - bL) * s;
+  }
+
+  const meanL = 0.2126 * rL + 0.7152 * gL + 0.0722 * bL;
+  rL = meanL + chromaRetention * (rL - meanL);
+  gL = meanL + chromaRetention * (gL - meanL);
+  bL = meanL + chromaRetention * (bL - meanL);
+  if (meanL > 1e-9) {
+    const yScale = Y / meanL;
+    rL *= yScale;
+    gL *= yScale;
+    bL *= yScale;
+  }
+
+  return [srgbEncode(rL * gain), srgbEncode(gL * gain), srgbEncode(bL * gain)];
+}
+
+const SOFTBOX_LUTS = new Map<string, Float64Array>();
+
+function getSoftBoxLut(
+  gain: number,
+  spread: number,
+  ground: number,
+  notchFloor: number,
+  chromaRetention: number,
+): Float64Array {
+  const key = `${gain}|${spread}|${ground}|${notchFloor}|${chromaRetention}`;
+  let lut = SOFTBOX_LUTS.get(key);
+  if (!lut) {
+    lut = new Float64Array(SOFTBOX_LUT_COUNT * 3);
+    for (let i = 0; i < SOFTBOX_LUT_COUNT; i++) {
+      const [r, g, b] = evalSoftBoxRgb(
+        i * SOFTBOX_LUT_STEP_NM,
+        gain,
+        spread,
+        ground,
+        notchFloor,
+        chromaRetention,
+      );
+      const k = 3 * i;
+      lut[k] = r;
+      lut[k + 1] = g;
+      lut[k + 2] = b;
+    }
+    SOFTBOX_LUTS.set(key, lut);
+  }
+  return lut;
+}
+
 /**
  * Render the reflected interference picture of the soap film `f` at incidence
  * cosine `cosI` in air (default 1 = normal incidence) and reflectance `gain`
  * (default 4). Returns a flat `Float64Array` of length `nx * ny * 3` in sRGB
  * `0..1`, row 0 at the top.
+ *
+ * For a 2D film in a frame (`f.ny > 1`, or when `opts.softBox` is true), the
+ * reflection uses the 4-point path spread, dark ground, and shortcut (f)'s
+ * colour grade (`notchFloor`, `chromaRetention`) at effective optical
+ * thickness `d_eff = h * cos(theta_t)`. For a 1-row calibration strip
+ * (`f.ny === 1` and `opts.softBox !== true`), it evaluates `filmColour`
+ * directly.
  */
 export function soapFilmRgb(f: SoapFilm, opts: SoapFilmRgbOptions = {}): Float64Array {
   const cosI = opts.cosI ?? 1;
   const gain = opts.gain ?? 4;
+  const softBox = opts.softBox ?? f.ny > 1;
   const { n0, n1, n2 } = SOAP;
   const n = f.nx * f.ny;
   const out = new Float64Array(n * 3);
+
+  if (!softBox) {
+    for (let i = 0; i < n; i++) {
+      const [r, g, b] = filmColour(n0, n1, n2, f.h[i], 'R', gain, 5500, cosI).rgb;
+      const k = 3 * i;
+      out[k] = r;
+      out[k + 1] = g;
+      out[k + 2] = b;
+    }
+    return out;
+  }
+
+  const spread = opts.spread ?? 0.025;
+  const ground = opts.ground ?? 0.0004;
+  const notchFloor = opts.notchFloor ?? 0.0725;
+  const chromaRetention = opts.chromaRetention ?? 0.67;
+  const cosT =
+    cosI === 1 ? 1 : Math.sqrt(Math.max(0, 1 - (n0 * n0 * (1 - cosI * cosI)) / (n1 * n1)));
+  const lut = getSoftBoxLut(gain, spread, ground, notchFloor, chromaRetention);
+
   for (let i = 0; i < n; i++) {
-    const [r, g, b] = filmColour(n0, n1, n2, f.h[i], 'R', gain, 5500, cosI).rgb;
+    const dEff = Math.max(0, f.h[i] * cosT);
     const k = 3 * i;
-    out[k] = r;
-    out[k + 1] = g;
-    out[k + 2] = b;
+    if (dEff <= SOFTBOX_LUT_MAX_NM) {
+      const pos = dEff / SOFTBOX_LUT_STEP_NM;
+      const idx0 = Math.min(SOFTBOX_LUT_COUNT - 1, Math.floor(pos));
+      const idx1 = Math.min(SOFTBOX_LUT_COUNT - 1, idx0 + 1);
+      const frac = pos - idx0;
+      const b0 = 3 * idx0;
+      const b1 = 3 * idx1;
+      out[k] = lut[b0] + (lut[b1] - lut[b0]) * frac;
+      out[k + 1] = lut[b0 + 1] + (lut[b1 + 1] - lut[b0 + 1]) * frac;
+      out[k + 2] = lut[b0 + 2] + (lut[b1 + 2] - lut[b0 + 2]) * frac;
+    } else {
+      const [r, g, b] = evalSoftBoxRgb(dEff, gain, spread, ground, notchFloor, chromaRetention);
+      out[k] = r;
+      out[k + 1] = g;
+      out[k + 2] = b;
+    }
   }
   return out;
 }
