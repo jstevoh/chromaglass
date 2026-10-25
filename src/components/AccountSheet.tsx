@@ -42,6 +42,11 @@ const LazySignInForm = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./SignInScreen').then((m) => ({ default: m.SignInForm })))
   : null;
 
+// How the account signs in, and confirming its email: fetched like the form above.
+const LazySignInMethods = import.meta.env.VITE_FIREBASE_API_KEY
+  ? lazy(() => import('./AccountSignInMethods'))
+  : null;
+
 interface AccountSheetProps {
   onClose: () => void;
 }
@@ -324,6 +329,17 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                 {TIER_NAME[currentTier]}
               </span>
             </div>
+          )}
+
+          {signedIn && LazySignInMethods && (
+            <Suspense fallback={null}>
+              <LazySignInMethods
+                onConfirmed={async () => {
+                  await syncAccountLicense(true);
+                  refreshLicenseState();
+                }}
+              />
+            </Suspense>
           )}
 
           {signedIn && !licenseInfo.valid && accountKey.state === 'declined' && (

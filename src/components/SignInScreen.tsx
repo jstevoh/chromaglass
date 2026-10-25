@@ -5,6 +5,12 @@ import {
   sendMagicLink,
   completeEmailLinkSignIn,
   checkPendingRedirect,
+  signUpWithPassword,
+  signInWithPassword,
+  sendPasswordReset,
+  signInWithGoogleAddPassword,
+  authErrorMessage,
+  MIN_PASSWORD_LENGTH,
 } from '../lib/firebaseAuth';
 import { hasEmailSignInLink } from '../lib/authFlag';
 import { getMarketingOptIn, setMarketingOptIn } from '../lib/tierGates';
@@ -44,6 +50,15 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [marketingOptIn, setMarketingOptInState] = useState(() => getMarketingOptIn());
+  // The email panel has two ways in: the emailed link (what it was, and still
+  // the one a returning link lands on) and a password (PLAN 23.10e).
+  const [method, setMethod] = useState<'link' | 'password'>('link');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  // Sign-up hit an address that already has an account: the Google way to add the password.
+  const [exists, setExists] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +91,58 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
         return;
       }
       setError((err as { message?: string })?.message || 'Could not sign in with provider.');
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed || !password) return;
+    setError(null);
+    setExists(false);
+    setResetSent(false);
+    if (mode === 'signup' && password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Use at least ${MIN_PASSWORD_LENGTH} characters for the password.`);
+      return;
+    }
+    setSending(true);
+    try {
+      if (mode === 'signup') await signUpWithPassword(trimmed, password);
+      else await signInWithPassword(trimmed, password);
+      onSignedIn();
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code === 'auth/email-already-in-use') setExists(true);
+      else setError(authErrorMessage(err));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleGoogleAddPassword = async () => {
+    setError(null);
+    try {
+      await signInWithGoogleAddPassword(email, password);
+      onSignedIn();
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
+      setError(authErrorMessage(err));
+    }
+  };
+
+  const handleReset = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError('Type your email above, then ask for the reset link.');
+      return;
+    }
+    setError(null);
+    setExists(false);
+    try {
+      await sendPasswordReset(trimmed);
+      setResetSent(true);
+    } catch (err: unknown) {
+      setError(authErrorMessage(err));
     }
   };
 
@@ -148,47 +215,179 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
             }}
             className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-medium text-neutral-200 transition hover:bg-white/10 active:bg-white/15"
           >
-            <span>Continue with Email Link</span>
+            <span>Continue with email</span>
           </button>
         </div>
 
         {emailOpen && (
-          <form onSubmit={handleEmailSubmit} className="mt-2.5 flex flex-col gap-2">
-            <input
-              type="email"
-              required
-               data-cg-signin-email=""
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              aria-label="Email address"
-              className="min-h-[40px] w-full rounded-xl border border-white/20 bg-black/50 px-3.5 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-accent focus:outline-none"
-            />
-            <button
-              type="submit"
-              data-cg-signin-send=""
-              disabled={sending}
-              className="min-h-[40px] w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary transition hover:opacity-90 disabled:opacity-50"
-            >
-              {isCompletingLink
-                ? 'Complete sign-in'
-                : sending
-                  ? 'Sending link…'
-                  : 'Send sign-in link'}
-            </button>
-            {sent && (
-              <p
-                data-cg-signin-sent=""
-                className="rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-3 py-1.5 text-center text-xs text-emerald-200"
-              >
-                Sign-in link sent to {email}. Open the link in your email to continue.
-              </p>
+          <div className="mt-2.5 flex flex-col gap-2">
+            {/* Not shown while a link is being completed: that page is the link's. */}
+            {!isCompletingLink && (
+              <div role="tablist" aria-label="Email sign-in" className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+                {(['link', 'password'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={method === m}
+                    data-cg-signin-method={m}
+                    onClick={() => {
+                      setMethod(m);
+                      setError(null);
+                      setExists(false);
+                    }}
+                    className={`min-h-[44px] rounded-lg px-3 text-sm font-medium transition ${
+                      method === m ? 'bg-white/15 text-neutral-50' : 'text-neutral-400 hover:text-neutral-200'
+                    }`}
+                  >
+                    {m === 'link' ? 'Emailed link' : 'Password'}
+                  </button>
+                ))}
+              </div>
             )}
-          </form>
+            <form
+              onSubmit={method === 'password' && !isCompletingLink ? handlePasswordSubmit : handleEmailSubmit}
+              className="flex flex-col gap-2"
+            >
+              <input
+                type="email"
+                required
+                data-cg-signin-email=""
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                aria-label="Email address"
+                autoComplete="email"
+                className="min-h-[40px] w-full rounded-xl border border-white/20 bg-black/50 px-3.5 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-accent focus:outline-none"
+              />
+              {method === 'password' && !isCompletingLink ? (
+                <>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      data-cg-signin-password=""
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={mode === 'signup' ? `New password, ${MIN_PASSWORD_LENGTH}+ characters` : 'Password'}
+                      aria-label="Password"
+                      autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                      className="min-h-[44px] w-full rounded-xl border border-white/20 bg-black/50 py-2 pl-3.5 pr-16 text-sm text-neutral-100 placeholder-neutral-500 focus:border-accent focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      data-cg-signin-show-password=""
+                      aria-pressed={showPassword}
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute inset-y-0 right-1 flex min-w-[52px] items-center justify-center rounded-lg px-2 text-xs text-neutral-400 hover:text-neutral-100"
+                    >
+                      {showPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <button
+                    type="submit"
+                    data-cg-signin-password-submit=""
+                    disabled={sending}
+                    className="min-h-[44px] w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    {sending ? 'One moment…' : mode === 'signup' ? 'Create account' : 'Sign in'}
+                  </button>
+                  <div className="flex items-center justify-between text-xs text-neutral-400">
+                    <button
+                      type="button"
+                      data-cg-signin-mode={mode === 'signup' ? 'signin' : 'signup'}
+                      onClick={() => {
+                        setMode(mode === 'signup' ? 'signin' : 'signup');
+                        setError(null);
+                        setExists(false);
+                        setResetSent(false);
+                      }}
+                      className="min-h-[44px] underline decoration-neutral-600 underline-offset-2 hover:text-neutral-100"
+                    >
+                      {mode === 'signup' ? 'Have an account? Sign in' : 'New here? Create an account'}
+                    </button>
+                    {mode === 'signin' && (
+                      <button
+                        type="button"
+                        data-cg-signin-reset=""
+                        onClick={handleReset}
+                        className="min-h-[44px] underline decoration-neutral-600 underline-offset-2 hover:text-neutral-100"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  {resetSent && (
+                    <p
+                      data-cg-signin-reset-sent=""
+                      className="rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-3 py-1.5 text-center text-xs text-emerald-200"
+                    >
+                      If {email.trim()} has an account, a link to choose a new password is on its way.
+                    </p>
+                  )}
+                  {exists && (
+                    <div
+                      data-cg-signin-exists=""
+                      className="flex flex-col gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-center text-xs text-neutral-200"
+                    >
+                      <p>
+                        {email.trim()} already has an account. Sign in below. Made it with Google? Continue with Google
+                        and this password is added to the same account.
+                      </p>
+                      <button
+                        type="button"
+                        data-cg-signin-google-add=""
+                        onClick={handleGoogleAddPassword}
+                        className="min-h-[44px] rounded-lg border border-white/15 bg-white/10 px-3 text-sm font-medium text-neutral-100 hover:bg-white/15"
+                      >
+                        Continue with Google and add this password
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode('signin');
+                          setExists(false);
+                        }}
+                        className="min-h-[44px] underline decoration-neutral-600 underline-offset-2 hover:text-neutral-50"
+                      >
+                        Sign in with a password instead
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="submit"
+                    data-cg-signin-send=""
+                    disabled={sending}
+                    className="min-h-[40px] w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    {isCompletingLink
+                      ? 'Complete sign-in'
+                      : sending
+                        ? 'Sending link…'
+                        : 'Send sign-in link'}
+                  </button>
+                  {sent && (
+                    <p
+                      data-cg-signin-sent=""
+                      className="rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-3 py-1.5 text-center text-xs text-emerald-200"
+                    >
+                      Sign-in link sent to {email}. Open the link in your email to continue.
+                    </p>
+                  )}
+                </>
+              )}
+            </form>
+          </div>
         )}
 
         {error && (
-          <p className="mt-2 rounded-lg border border-red-500/30 bg-red-950/50 px-3 py-1.5 text-center text-xs text-red-200">
+          <p
+            data-cg-signin-error=""
+            className="mt-2 rounded-lg border border-red-500/30 bg-red-950/50 px-3 py-1.5 text-center text-xs text-red-200"
+          >
             {error}
           </p>
         )}
