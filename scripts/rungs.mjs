@@ -36,6 +36,7 @@
  */
 
 import { qualityLadder, canvasPixelsFor, effectiveLadderTier } from '../src/lib/platform';
+import { canUseProFeature } from '../src/lib/tierGates';
 import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf, handValueAt } from '../src/lib/midi';
 import { readSetting } from '../src/lib/readout';
 import { QualityGovernor, STEP_RATES } from '../src/lib/governor';
@@ -616,6 +617,23 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       proRetina[0].dpr === 2 &&
       pro1x[0].grid === 1024,
     `hosted 2x top=${hostedRetina[0].grid}²@${hostedRetina[0].dpr}x, Pro 2x top=${proRetina[0].grid}²@${proRetina[0].dpr}x, Pro 1x top=${pro1x[0].grid}²@${pro1x[0].dpr}x`,
+  );
+}
+
+// ── The ladder follows the tier the Account pill reads (the owner, 2026-10-25) ──
+// The Mac app's pill said PRO while the ladder and the upsell took "no licence
+// key, so Free". Asked with no argument, a hosted page climbs exactly when
+// `getEffectiveTier()` says Pro. Run here, with no window, nothing is gated
+// and no key is held, so the tier is Pro and the ladder must be the Pro one;
+// the first line is what keeps the second from passing for want of a Pro.
+{
+  const pro = canUseProFeature();
+  const asked = effectiveLadderTier('hosted');
+  const top = ladderAt(asked, 'strong', 2).rungs[0];
+  check(
+    'with nothing gated and no key the tier reads Pro, and the hosted ladder asked for it is the Pro ladder (768² at 2x)',
+    pro === true && asked === 'local' && top.grid === 768 && top.dpr === 2,
+    `pro=${pro} ladder=${asked} top=${top.grid}²@${top.dpr}x`,
   );
 }
 
