@@ -125,7 +125,7 @@ const sample = (page) => page.evaluate(() => {
   const h = window.chromaglassDebug?.()?.hearing ?? { frames: 0, fresh: 0, ownFrame: 0 };
   const rd = window.chromaglassDebug?.()?.riding ?? { frames: 0, laid: 0 };
   return {
-    rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0, drawnMoves: window.__drawnMoves ?? 0,
+    rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0, drawnMoves: window.__drawnMoves ?? 0, offered: window.__offered ?? 0,
     t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN,
     reads: r.frame + r.ask + r.tick, published: c.ear?.published ?? 0,
     frames: h.frames, fresh: h.fresh, ownFrame: h.ownFrame ?? 0,
@@ -235,6 +235,7 @@ async function measure(page) {
       laid: b.laid - a.laid,
       deskMoves: (b.deskMoves - a.deskMoves) / s,
       drawnMoves: (b.drawnMoves - a.drawnMoves) / s,
+      offered: (b.offered - a.offered) / s,
     });
   }
   return out;
@@ -295,9 +296,10 @@ try {
       const wired = await page.evaluate(() => typeof window.__fader?.onmidimessage === 'function');
       check(`${screen.name}, a fader: the app is listening to the stubbed controller`, wired);
       await page.evaluate(() => {
-        let v = 0, dir = 2, last, lastDrawn;
+        let v = 0, dir = 2, last, lastDrawn, lastAt;
         window.__deskMoves = 0;
         window.__drawnMoves = 0;
+        window.__offered = 0;
         const watch = () => {
           const d = window.chromaglassCastState().settings.dimmer;
           if (last !== undefined && d !== last) window.__deskMoves++;
@@ -307,6 +309,12 @@ try {
           const drawn = window.__cgRiding?.drawn?.dimmer;
           if (lastDrawn !== undefined && drawn !== lastDrawn) window.__drawnMoves++;
           lastDrawn = drawn;
+          // And the frames the plate was offered a new value on: the stub's
+          // 60 Hz timer beats against the frames, so some have no message to
+          // draw, and the plate cannot move its Dimmer on those.
+          const at = window.__faderAt;
+          if (lastAt !== undefined && at !== lastAt) window.__offered++;
+          lastAt = at;
           window.__deskWatch = requestAnimationFrame(watch);
         };
         watch();
@@ -326,11 +334,11 @@ try {
         w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits <= x.deskMoves + ALLOWED_EXTRA),
         w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s for ${f(x.deskMoves)}`).join(', '));
       /*
-        On four frames in five the plate draws, and a quarter more often than
-        React is told, at least: at sixty messages a second the plate's Dimmer
-        changes on nearly every frame it draws, and a plate fed only React's
-        would change on React's 7 to 10.5 a second, once each, whatever its
-        frame rate.
+        On nine frames in ten that were offered a new value the plate draws
+        it, and a quarter more often than React is told, at least: at sixty
+        messages a second the plate's Dimmer changes on nearly every frame it
+        is offered one, and a plate fed only React's would change on React's
+        7 to 10.5 a second, once each, whatever its frame rate.
 
         It asked "twice as often as the desk's" until 2026-10-24, which says
         the same at the 24 to 60 frames a second it was written against and
@@ -338,17 +346,33 @@ try {
         in the week to 10-24 (all 8 green on the same commit), every one with
         the phone's page drawing 14.6 to 22.5 frames a second and the Dimmer
         changing on 93 to 100% of them ("18.5/s drawn for 10.2 on the desk"
-        with 18.7 frames a second, where 20.4 was asked). So the bar is now
-        the claim itself, per frame drawn, which is stricter than twice the
-        desk's at any rate above 25 frames a second, and the quarter over
-        the desk's still fails a plate fed by React at any rate the line
-        allows (45 frames in 3 s and up: React's at most 10.5 against a
-        floor of 12).
+        with 18.7 frames a second, where 20.4 was asked).
+
+        The first replacement asked four frames in five of all it draws, and
+        that was no safer than the bar it replaced: over the 48 windows of 12
+        green open shards of 10-24, the Dimmer changed on 0.79 to 0.99 of the
+        frames drawn (median 0.88), falling as the rate rises (about 0.95 at
+        26 to 30 frames a second, about 0.83 at 40 to 45), and one window,
+        laptop, 30.9 frames a second, 24.5 changes (0.79), failed 0.8. The
+        stub's 60 Hz timer beats against the frames, so some frames have no
+        new message to draw, more of them the faster the frames come. That
+        ratio reads the stub's timer, not the ride. So the claim is asked of
+        the frames that were offered a new value (the watch below counts a
+        frame whose newest message differs from the last frame's): a working
+        ride reads close to 1.0 there. A plate fed by React's 7 to 10.5 a
+        second changes at most that often, against a floor of 0.9 of the
+        frames offered, which is 12.6 and up at the 45 frames in 3 s this
+        asks (the stub offers a new value on nearly every frame below 30 a
+        second). The quarter over the desk's stays whatever the rate: it
+        fails a plate fed by React by itself, at any rate the line allows.
+        The ratio is printed, and the 0.9 is to be read on a Mac run before
+        it is trusted: 0.79 was the lowest of the 48 windows above, against
+        this bar's offered frames, which the earlier runs did not print.
       */
-      const laidLine = `${screen.name}, a fader: the plate's Dimmer moves on four frames in five it draws, and more often than the desk's`;
+      const laidLine = `${screen.name}, a fader: the plate's Dimmer moves on nine frames in ten that were offered a new value, and more often than the desk's`;
       if (PLATE) {
-        check(laidLine, w.every(x => x.rideFrames >= 45 && x.drawnMoves >= 0.8 * x.rideRate && x.drawnMoves >= 1.25 * x.deskMoves && x.laid > 0),
-          w.map(x => `${f(x.drawnMoves)}/s drawn on ${f(x.rideRate)} frames/s, for ${f(x.deskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', '));
+        check(laidLine, w.every(x => x.rideFrames >= 45 && x.offered > 0 && x.drawnMoves >= 0.9 * x.offered && x.drawnMoves >= 1.25 * x.deskMoves && x.laid > 0),
+          w.map(x => `${f(x.drawnMoves)}/s drawn on ${f(x.offered)} offered a new value (${(x.drawnMoves / Math.max(1e-9, x.offered)).toFixed(2)}) of ${f(x.rideRate)} frames/s, for ${f(x.deskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', '));
       } else skip(laidLine, `no plate draws here (${w.map(x => x.rideFrames).join(', ')} frames); held on the Mac`);
       // Let go, and give the last tenth of a second time to reach React.
       const at = await page.evaluate(() => { clearInterval(window.__sweep); return window.__faderAt; });
