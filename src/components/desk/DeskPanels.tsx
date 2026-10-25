@@ -5,6 +5,7 @@ import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle } from '../ui';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { CartoonShelf } from '../CartoonShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
@@ -730,6 +731,12 @@ function DyesBody({ p }: { p: DeskProps }) {
           <Video size={13} className="mr-1.5 inline" /> Video…
         </button>
       </div>
+      {p.cartoons && (
+        <div className="mt-1 flex flex-col gap-1">
+          <span className="text-[11px] uppercase tracking-wider text-dim">Cartoons</span>
+          <CartoonShelf {...p.cartoons} />
+        </div>
+      )}
     </div>
   );
 }
@@ -895,6 +902,17 @@ function PhoneBody({ p }: { p: DeskProps }) {
   }, [p.status.phone]);
 
   const hasRelay = Boolean(info && info.hosts && info.hosts.length > 0 && info.hosts[0]);
+  /*
+    PLAN 14m-lan: a relay answered but handed this page no display key, which
+    it gives only to the laptop at its own name (localhost). So this is the
+    laptop's page opened at its Wi-Fi address (or another computer's), and it
+    stays off the relay by design: phones would see no laptop. It used to draw
+    a code anyway, of the remote with no key in it, which a phone could scan
+    and never join with. Now it says where to open the page instead, and draws
+    no code.
+  */
+  const notLaptop = hasRelay && !!info && !info.displayKey;
+  const localUrl = info ? `http://localhost:${info.port}/` : '';
   const url = hasRelay && info
     ? `http://${info.hosts[0]}:${info.port}/?remote=1${info.key ? `&key=${info.key}` : ''}`
     : `${window.location.origin}/`;
@@ -933,6 +951,10 @@ function PhoneBody({ p }: { p: DeskProps }) {
       )}
       {info === undefined ? (
         <p className="text-dim">Looking for the show server…</p>
+      ) : notLaptop ? (
+        <p className="leading-relaxed text-dim" data-testid="phone-link-local">
+          The show server is running, but this page was opened at its Wi-Fi address, so it cannot link phones. On the laptop running the show, open <span className="font-mono text-[12px] text-text-2">{localUrl}</span> instead.
+        </p>
       ) : (
         <>
           {p.status.phone > 0 && (

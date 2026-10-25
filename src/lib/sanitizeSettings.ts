@@ -13,6 +13,7 @@ import {
 } from '../types.ts';
 import { PIN_RANGE, onStep } from './deskPins.ts';
 import { SETTING_TRAVEL } from './sceneMap.ts';
+import { isAreaTarget } from './areaCords.ts';
 
 const VALID_VISCOSITY = new Set<string>(VISCOSITY_MODES);
 const VALID_BLEND_MODE = new Set<string>(BLEND_MODES);
@@ -134,13 +135,26 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
         (m.source === undefined || typeof m.source === 'string') &&
         typeof m.feature === 'string' &&
         typeof m.setting === 'string' &&
-        Object.prototype.hasOwnProperty.call(SETTING_TRAVEL, m.setting) &&
+        /*
+          A cord on a setting, or a cord aimed at an area with one of the
+          hand's four acts there (lib/areaCords.ts, PLAN 25h). An area with
+          a setting, or an act with no area, is neither, and is dropped
+          rather than read as the other.
+        */
+        (m.area === undefined
+          ? Object.prototype.hasOwnProperty.call(SETTING_TRAVEL, m.setting)
+          : Number.isInteger(m.area) && m.area >= 0 && m.area < 8 && isAreaTarget(m.setting)) &&
         typeof m.depth === 'number' && Number.isFinite(m.depth) &&
-        (m.layer === undefined || m.layer === 'all' || (typeof m.layer === 'number' && Number.isFinite(m.layer)))
-      ).map(m => ({
-        ...m,
-        depth: Math.max(-100, Math.min(100, m.depth)),
-      })).slice(0, 32);
+        (m.layer === undefined || m.layer === 'all' || (typeof m.layer === 'number' && Number.isFinite(m.layer))) &&
+        [m.threshold, m.attack, m.release].every(v => v === undefined || (typeof v === 'number' && Number.isFinite(v)))
+      ).map(m => {
+        const out = { ...m, depth: Math.max(-100, Math.min(100, m.depth)) };
+        // The gate's three, each in its range: a threshold is a share of the reading, the times are seconds.
+        if (m.threshold !== undefined) out.threshold = Math.max(0, Math.min(1, m.threshold));
+        if (m.attack !== undefined) out.attack = Math.max(0, Math.min(10, m.attack));
+        if (m.release !== undefined) out.release = Math.max(0, Math.min(10, m.release));
+        return out;
+      }).slice(0, 32);
       out.sceneMappings = validMappings;
       continue;
     }

@@ -96,6 +96,27 @@ async function startOver(): Promise<boolean> {
 }
 
 /**
+ * The page opened at an address on the Wi-Fi rather than at localhost (PLAN
+ * 14m-lan). Browsers give WebGPU only to a secure page, which is https or the
+ * machine's own name, so the laptop's own page opened at its Wi-Fi address
+ * (`http://192.168.1.5:3000/`) cannot start at all: what it said was the
+ * bare "GPUTextureUsage is not defined" of the first shader module. The show
+ * server also hands the display key only to localhost, so even in a browser
+ * told to treat the address as secure that page could not link phones. The
+ * way out is the same page at localhost on the same port, said in plain words.
+ * A network display at a Wi-Fi address meets the same wall and has no such way
+ * out yet (PLAN 14m-https). Null on a secure page, where the failure is something else.
+ */
+function insecureAddress(): { local: string; cast: boolean } | null {
+  if (typeof window === 'undefined' || window.isSecureContext) return null;
+  const { hostname, port, search } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') return null;
+  // A network display (`?cast=true`) is another machine: its localhost is not
+  // the laptop, so it is told only why, not sent somewhere that is not the show.
+  return { local: `http://localhost${port ? `:${port}` : ''}/`, cast: new URLSearchParams(search).has('cast') };
+}
+
+/**
  * Anything that stops the app rendering shows up here.
  *
  * The app is one lazy import behind a `<Suspense>` whose fallback is a black
@@ -130,6 +151,16 @@ class Boot extends Component<{ children: any }, { failed: any; recovering: boole
         {!recovering && (
           <>
             <p className="max-w-md text-[13px] leading-relaxed text-white/50">{String(failed?.message ?? failed)}</p>
+            {insecureAddress() && (
+              <p className="max-w-md text-[13px] leading-relaxed text-white/80" data-testid="boot-insecure">
+                This page was opened at a Wi-Fi address, and browsers run the GPU only on a secure page (https, or the computer's own localhost).{' '}
+                {insecureAddress()!.cast ? (
+                  'A network display cannot start from this address.'
+                ) : (
+                  <>On the laptop running the show, open <a className="font-mono underline" href={insecureAddress()!.local}>{insecureAddress()!.local}</a> instead.</>
+                )}
+              </p>
+            )}
             <button
               onClick={() => { sessionStorage.removeItem(RESET_ONCE); void startOver(); }}
               className="rounded-md border border-white/20 px-4 py-2 text-[13px] text-white/90 transition-colors hover:bg-white/10"

@@ -63,6 +63,16 @@ export interface PlateArea {
    * of a look has a different one.
    */
   dye: number;
+  /**
+   * Its colour family (PLAN 25h): indices into the look's dyes, the area's own
+   * bottles, which its pours, its laid pool and the music's colour there are
+   * drawn from. The first is `dye`. Absent, the family is `dye` and the dye
+   * after it, which is what an area poured before families existed (its pool's
+   * second colour and the Color route's cycle both took `dye + 1`), so a look
+   * that gives none lays and plays exactly as before. One look's families do
+   * not share a dye (`npm run plate`), so one look holds two or three palettes.
+   */
+  dyes?: readonly number[];
   /** The part of the music that works here. */
   band: AreaBand;
   /** How much dye the look lays there, against a full pool at 1 (default). */
@@ -84,10 +94,45 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     the dye off its surface into a ring. Low in the middle, syrup and
     ultramarine settled under the others, glittering with the treble.
   */
+  /*
+    Each pool has a family of its own now (PLAN 25h): the glycerine magenta
+    and lavender, the soap raspberry and coral, the syrup ultramarine and
+    purple. Before, each pool's second colour was the next pool's first, so
+    all three pools drew on one palette of three.
+  */
   'velvet-underground': [
-    { x: 0.26, y: 0.34, r: 0.15, liquid: 'glycerine', dye: 1, band: 'mid' },
-    { x: 0.73, y: 0.42, r: 0.14, liquid: 'soap', dye: 2, band: 'bass' },
-    { x: 0.47, y: 0.73, r: 0.14, liquid: 'syrup', dye: 0, band: 'treble' },
+    { x: 0.26, y: 0.34, r: 0.15, liquid: 'glycerine', dye: 1, dyes: [1, 3], band: 'mid' },
+    { x: 0.73, y: 0.42, r: 0.14, liquid: 'soap', dye: 2, dyes: [2, 4], band: 'bass' },
+    { x: 0.47, y: 0.73, r: 0.14, liquid: 'syrup', dye: 0, dyes: [0, 5], band: 'treble' },
+  ],
+  /*
+    Jellyfish Bloom (25b-6): its four bells, which its seed lays (OWN_SEED_AREAS)
+    and used to scatter at random across the top half, now sit here, each with
+    a part of the music. The two side bells take the mids; the lowest, in the
+    middle, takes the bass, so Beat Squeeze's press and the kick's ring land on
+    it and it contracts and sends out a pulse; the top one takes the hats, which
+    ruffle its fringe. Each bell keeps the colour it was laid in (the look's
+    dyes in order); the pulsing bell's family adds the teal its pulse carries
+    out, and the top bell's the icy blue of its fringe. Milk, the look's bottle that carries something (water
+    carries no property): a bell is a translucent body in the teal water.
+  */
+  'jellyfish-bloom': [
+    { x: 0.2, y: 0.31, r: 0.085, liquid: 'milk', dye: 0, dyes: [0], band: 'mid' },
+    { x: 0.4, y: 0.42, r: 0.085, liquid: 'milk', dye: 1, dyes: [1, 4], band: 'bass' },
+    { x: 0.6, y: 0.22, r: 0.085, liquid: 'milk', dye: 2, dyes: [2, 5], band: 'treble' },
+    { x: 0.8, y: 0.31, r: 0.085, liquid: 'milk', dye: 3, dyes: [3], band: 'mid' },
+  ],
+  /*
+    Bass Drop (25b-3): every kick fell in the middle (Beat Squeeze 0.8 and
+    Center Gravity 0.4 on one point). Three soap wells now, all on the bass,
+    so successive kicks take them in turn (areaForBand) and a four-on-the-
+    floor leaves three bruises that bleed into each other: crimson, the blues,
+    magenta on ice.
+  */
+  'bass-drop': [
+    { x: 0.3, y: 0.36, r: 0.13, liquid: 'soap', dye: 0, dyes: [0, 1], band: 'bass' },
+    { x: 0.7, y: 0.36, r: 0.13, liquid: 'soap', dye: 3, dyes: [3, 4], band: 'bass' },
+    { x: 0.5, y: 0.7, r: 0.13, liquid: 'soap', dye: 2, dyes: [2, 5], band: 'bass' },
   ],
   /*
     Lumia: Wilfred's light forms came and went in a few places on a dark field,
@@ -121,6 +166,13 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     { x: 0.435, y: 0.5375, r: 0.05, liquid: 'silicone', dye: 2, band: 'treble' },
   ],
 };
+
+/**
+ * Looks whose areas take the music and the area cords but whose plate is laid
+ * by the look's own seed, which puts its shapes in those places (Jellyfish
+ * Bloom's bells), rather than as pools (layAreas).
+ */
+export const OWN_SEED_AREAS: ReadonlySet<string> = new Set(['jellyfish-bloom']);
 
 /** The areas of a look, or null for a look built the old way. */
 export const plateAreas = (presetId: string | null | undefined): PlateArea[] | null =>
@@ -161,11 +213,17 @@ export function areaForBand(areas: readonly PlateArea[], band: Exclude<AreaBand,
  * and syrup pool came out the same colour on every step (the check-skeptic,
  * working the window through by hand).
  */
-export function areaDye(a: PlateArea, dyes: readonly number[], lead = 0): number {
+export function areaDye(a: PlateArea, dyes: readonly number[], lead = 0, k = 0): number {
   const n = dyes.length;
   if (n === 0) return 0;
-  const i = Math.floor(a.dye + lead);
+  const fam = areaFamily(a);
+  const i = Math.floor(fam[((Math.floor(k) % fam.length) + fam.length) % fam.length] + lead);
   return dyes[((i % n) + n) % n];
+}
+
+/** An area's colour family, as indices into the look's dyes (`dyes`, else `dye` and the next). */
+export function areaFamily(a: PlateArea): readonly number[] {
+  return a.dyes && a.dyes.length > 0 ? a.dyes : [a.dye, a.dye + 1];
 }
 
 /** An area's middle in grid cells. */
