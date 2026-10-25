@@ -23,14 +23,14 @@ export const TOOL_AMOUNT_MEANS: Record<string, string> = {
   spin: 'turn',
 };
 
-const STORE_KEY = 'chromaglass-tool-amounts';
+export const TOOL_AMOUNTS_KEY = 'chromaglass-tool-amounts';
 
 export const clampAmount = (v: number): number =>
   Number.isFinite(v) ? Math.max(TOOL_AMOUNT.min, Math.min(TOOL_AMOUNT.max, v)) : 1;
 
 export function loadToolAmounts(): Record<string, number> {
   try {
-    const raw = JSON.parse(localStorage.getItem(STORE_KEY) ?? '{}') as Record<string, unknown>;
+    const raw = JSON.parse(localStorage.getItem(TOOL_AMOUNTS_KEY) ?? '{}') as Record<string, unknown>;
     const out: Record<string, number> = {};
     for (const [k, v] of Object.entries(raw ?? {})) if (k in TOOL_AMOUNT_MEANS && typeof v === 'number') out[k] = clampAmount(v);
     return out;
@@ -40,5 +40,5 @@ export function loadToolAmounts(): Record<string, number> {
 }
 
 export function saveToolAmounts(amounts: Record<string, number>): void {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(amounts)); } catch { /* storage unavailable: kept for this session */ }
+  try { localStorage.setItem(TOOL_AMOUNTS_KEY, JSON.stringify(amounts)); } catch { /* storage unavailable: kept for this session */ }
 }

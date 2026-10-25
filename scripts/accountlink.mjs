@@ -67,6 +67,7 @@ function makeFakeJwt(payload) {
     aud: PROJECT,
     sub: 'user-a',
     email: SHOW_EMAIL,
+    iat: nowSec - 60,
     exp: nowSec + 3600,
   });
   const tokB = makeFakeJwt({
@@ -74,6 +75,7 @@ function makeFakeJwt(payload) {
     aud: PROJECT,
     sub: 'user-b',
     email: OTHER_EMAIL,
+    iat: nowSec - 60,
     exp: nowSec + 3600,
   });
   const tokExpired = makeFakeJwt({
@@ -81,17 +83,44 @@ function makeFakeJwt(payload) {
     aud: PROJECT,
     sub: 'user-a',
     email: SHOW_EMAIL,
+    iat: nowSec - 60,
     exp: nowSec - 120,
   });
 
-  const verifiedA = verifyAccountToken(`Bearer ${tokA}`, now);
-  const verifiedB = verifyAccountToken(`Bearer ${tokB}`, now);
-  const rejectedExpired = verifyAccountToken(`Bearer ${tokExpired}`, now);
-  const rejectedBlank = verifyAccountToken('', now);
+  // The emulator's tokens are unsigned, so they count only on a server told the
+  // emulator is in use (as the one this check starts below is).
+  const EMU_ENV = { FIREBASE_AUTH_EMULATOR: `127.0.0.1:${EMU_PORT}`, FIREBASE_PROJECT_ID: PROJECT };
+  const verifiedA = await verifyAccountToken(`Bearer ${tokA}`, EMU_ENV, now);
+  const verifiedB = await verifyAccountToken(`Bearer ${tokB}`, EMU_ENV, now);
+  const rejectedExpired = await verifyAccountToken(`Bearer ${tokExpired}`, EMU_ENV, now);
+  const rejectedBlank = await verifyAccountToken('', EMU_ENV, now);
   check(
     '1. token verification accepts valid account tokens and refuses missing or expired ones',
     !!verifiedA && !!verifiedB && verifiedA.accountKey !== verifiedB.accountKey && !rejectedExpired && !rejectedBlank,
     `A=${verifiedA?.accountKey}, B=${verifiedB?.accountKey}, expired=${rejectedExpired}`,
+  );
+
+  // PLAN 23.14-verify: the server used to trust a token's payload unread. The
+  // same unsigned token is refused by a server not running the emulator; a
+  // token Google's key signed is taken; one signed by any other key, or signed
+  // for another project, is not.
+  const google = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const forger = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const LIVE_ENV = { FIREBASE_PROJECT_ID: 'chromaglass', GOOGLE_JWKS: { keys: [{ ...(await crypto.subtle.exportKey('jwk', google.publicKey)), kid: 'k1' }] } };
+  const signed = async (key, aud) => {
+    const b64 = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+    const head = `${b64({ alg: 'RS256', typ: 'JWT', kid: 'k1' })}.${b64({ iss: `https://securetoken.google.com/${aud}`, aud, sub: 'user-a', email: SHOW_EMAIL, iat: nowSec - 60, exp: nowSec + 3600 })}`;
+    const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(head));
+    return `Bearer ${head}.${Buffer.from(sig).toString('base64url')}`;
+  };
+  const unsignedOnLive = await verifyAccountToken(`Bearer ${tokA}`, LIVE_ENV, now);
+  const real = await verifyAccountToken(await signed(google.privateKey, 'chromaglass'), LIVE_ENV, now);
+  const forged = await verifyAccountToken(await signed(forger.privateKey, 'chromaglass'), LIVE_ENV, now);
+  const otherProject = await verifyAccountToken(await signed(google.privateKey, 'some-other-app'), LIVE_ENV, now);
+  check(
+    '1b. a signed token is taken; an unsigned, forged or other-project token is refused without the emulator',
+    !!real && real.uid === 'user-a' && !unsignedOnLive && !forged && !otherProject,
+    `signed=${real?.accountKey ?? null}, unsigned=${!!unsignedOnLive}, forged=${!!forged}, other project=${!!otherProject}`,
   );
 
   const store = createAccountShowsStore();
@@ -153,7 +182,10 @@ async function emuReady() {
 
 function startRelay() {
   const proc = spawn(process.execPath, ['server/remote-server.js'], {
-    env: { ...process.env, PORT: String(PORT), SHOW_KEY: KEY, OSC_PORT: '0', REMOTE_DIST: DIST },
+    env: {
+      ...process.env, PORT: String(PORT), SHOW_KEY: KEY, OSC_PORT: '0', REMOTE_DIST: DIST,
+      FIREBASE_AUTH_EMULATOR: `127.0.0.1:${EMU_PORT}`, FIREBASE_PROJECT_ID: PROJECT,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });

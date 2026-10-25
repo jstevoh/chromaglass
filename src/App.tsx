@@ -40,9 +40,9 @@ import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
-import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
+import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid, CUSTOM_LIQUIDS_KEY } from './lib/liquidFile';
 import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
-import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
+import { loadToolAmounts, saveToolAmounts, clampAmount, TOOL_AMOUNTS_KEY } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
 import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
@@ -64,7 +64,7 @@ import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
 import { useSongShows } from './hooks/useSongShows';
-import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, newId, type ActionSet, type ActionWhat, type ActionWhen, type SongAction, type SongShow } from './lib/songShows';
+import { BUILT_IN_SETS, SETS_KEY, SHOWS_KEY, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, newId, type ActionSet, type ActionWhat, type ActionWhen, type SongAction, type SongShow } from './lib/songShows';
 import type { SongScoreProps } from './components/SongScore';
 import { songDuration } from './lib/songScore';
 import { MidiPanel } from './components/MidiPanel';
@@ -89,7 +89,7 @@ import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, ser
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
 import { exportShowKit, importShowKit, SHOW_KIT_FORMAT } from './lib/showKit';
-import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
+import { SAVED_SETS_KEY, SETLIST_KEY, loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
@@ -101,6 +101,7 @@ import { LyricsOverlay } from './components/LyricsOverlay';
 import { isFreeTierGated } from './lib/tierGates';
 import { syncServerLicense } from './lib/licenseKey';
 import { usePublishAccountShow } from './lib/accountShows';
+import { startCloudSync, useCloudSyncReload } from './lib/cloudSyncApp';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
@@ -3021,6 +3022,26 @@ export default function App() {
     setFollowSongsState(on);
     try { localStorage.setItem('chromaglass-follow-songs', on ? '1' : '0'); } catch { /* private */ }
   }, []);
+  /*
+    Cloud sync (PLAN 23.18, lib/cloudSync.ts): a Pro account's saved work kept in
+    step across its browsers and Mac apps. What the cloud writes into a store held
+    here in state is read again at once: a stale list saved over it would read as
+    the player deleting what had just arrived, on every device. The saved looks,
+    sequences and MIDI map reload in their own hooks.
+  */
+  useCloudSyncReload({
+    [CUSTOM_LIQUIDS_KEY]: () => setLiquidTypes([...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]),
+    [TOOL_AMOUNTS_KEY]: () => setToolAmounts(loadToolAmounts()),
+    [MUSIC_SETTINGS_KEY]: () => setMusicSettings(loadMusicSettings()),
+    [SETLIST_KEY]: () => setSetList(loadSetList(() => starterSet(PRESETS.map(p => p.id)))),
+    [SAVED_SETS_KEY]: () => setSavedSets(loadSavedSets()),
+    [SHOWS_KEY]: () => setSongShowsState(loadShows()),
+    [SETS_KEY]: () => setUserActionSets(loadSets()),
+    'chromaglass-follow-songs': () => {
+      try { setFollowSongsState(localStorage.getItem('chromaglass-follow-songs') !== '0'); } catch { /* private */ }
+    },
+  });
+  useEffect(() => startCloudSync(), []);
   const [showSongs, setShowSongs] = useState(false);
 
   const sequencer = useShowSequencer({

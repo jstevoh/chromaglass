@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import CloudSyncCard from './CloudSyncCard';
+import { cloudSync } from '../lib/cloudSyncApp';
 import { getCachedEmail } from '../lib/authFlag';
 import {
   useAccountShows,
@@ -193,6 +195,9 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
     setError(null);
     try {
       await unpublishAccountShows();
+      // The cloud copy goes with the account (privacy.html says so). Asked while
+      // the account still exists, since the Worker needs its token to know whose.
+      await cloudSync()?.erase().catch(() => false);
       const authMod = await loadFirebaseAuth();
       if (authMod) await authMod.deleteCurrentAccount();
       setEmail(null);
@@ -418,6 +423,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
             </p>
           )}
         </div>
+
+        {email && <CloudSyncCard tier={currentTier} email={email} />}
 
         <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3" data-cg-account-marketing="">
           {unsubscribedBanner && !marketingOptIn && (
