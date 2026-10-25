@@ -3641,6 +3641,17 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   14j's timer line).
 - **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
   sixty steps (`speciesShare`); a ring like the readback's.
+- **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
+  tools shard, two attempts on one head were each red on one line of 224, a different line
+  each time. Attempt 1 failed "both windows animating, 0.25 of a refresh behind", which read
+  1.1x, against a bar of 1.05: 21.9 drawn against 20.4 served, with displays at 19.4 and
+  30.1 Hz. Attempt 2 failed "both windows were handed the same refreshes", which read 1.154x
+  (17.2 served against 14.9), over its bar of 1.15. The PR changes neither `drawGate.ts` nor the place frames are offered
+  to it. The runner was handing each window 11 to 30 of its 60 refreshes. Green runs that
+  night handed 13 to 40, and #461's green run read 1.13x on the same line. The lines' own
+  comments say a starved runner's late timers part the two windows' frames by themselves. Find
+  a measure of the gate's fault that holds at a quarter of the display's refreshes, or a
+  starvation reading that sets the line aside and says so. The bar itself stays where it is.
 
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 
