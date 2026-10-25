@@ -3677,6 +3677,28 @@ sync wrapper rethrowing Node's own error fails two. `deploygate.sh` still puts t
 on curl's command line, readable through `ps` while it runs on the owner's machine:
 19aa-4.
 
+### 19aa-6. The renders lines on a starved runner
+
+Shipped 2026-10-24. Three `npm run renders` lines went red on 8 of 191 Mac runs each in
+the week to 10-24 (`npm run flakes`). The laptop's band lines ("the ear is reading", "the
+plate hears a new reading on four frames in five") failed in the first of their two
+3 s windows every time, with the plate drawing 0.0, 1.7, 1.9, 9.9, 10.8, 12.2, 13.6 and
+14.5 frames a second there and 16.5 to 28.4 in the second: five seconds after load the
+page was still opening on a cold runner (the open shard runs startup first, which empties
+the Mac's shader cache). Each page now waits, a second at a time and at most thirty,
+until one second holds fifteen of the plate's frames (the 45 in 3 s the lines ask), as
+squeeze.mjs does for its steps; a plate that never gets there is still measured and
+fails, and the wait is printed when it is more than a second and a half.
+
+The phone's fader line, "the plate's Dimmer moves at least twice as often as the desk's",
+failed with the page drawing 14.6 to 22.5 frames a second and the Dimmer changing on 93
+to 100% of them: twice the desk's 9 to 10 a second is more changes than frames below 20
+a second. It now asks the claim itself: a change on four frames in five drawn, and a
+quarter more than the desk's (a plate fed by React changes at React's 7 to 10.5 a second,
+which fails both at any frame rate the line allows). Stricter than the old bar above 25
+frames a second. Of the 8 reds, 7 pass the new bar on their printed numbers; the eighth
+drew 44 frames in a window, under the 45 the line still asks.
+
 ### 19ac-1. The double tap's two taps carry a finger's times
 
 Shipped 2026-10-24. `npm run phone`'s "Play: a double tap on Speed puts it back to the
