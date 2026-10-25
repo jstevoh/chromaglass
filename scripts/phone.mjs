@@ -830,6 +830,36 @@ try {
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       /*
+        Projector Focus (PLAN 18e), the projector's focus ring, on the Looks
+        sheet beside the lamp's controls: there on every look, at 50 % (no
+        look saves one, so each is in focus, as it was before the setting),
+        and it reaches 0 % and 100 %. Put back to 50 % after, by the
+        keyboard's own steps (ten of 5 %), so the checks below draw the
+        plate in focus as they did before this check was here.
+      */
+      await tap(page, 'phone-open-looks');
+      const focusShown = await visible(page, 'phone-projector-focus');
+      const focusRead = async () => (await page.getByTestId('phone-projector-focus').innerText()).match(/(\d+)%/)?.[1] ?? null;
+      const focusAt = focusShown ? await focusRead() : null;
+      let focusBottom = null, focusTop = null, focusBack = null;
+      if (focusShown) {
+        await page.getByTestId('phone-projector-focus').locator('input').focus();
+        await page.keyboard.press('Home');
+        await page.waitForTimeout(200);
+        focusBottom = await focusRead();
+        await page.keyboard.press('End');
+        await page.waitForTimeout(200);
+        focusTop = await focusRead();
+        for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowLeft');
+        await page.waitForTimeout(200);
+        focusBack = await focusRead();
+      }
+      check('Projector Focus is on the Looks sheet at 50 %, goes to 0 % and 100 %, and back to 50 %',
+        focusShown && focusAt === '50' && focusBottom === '0' && focusTop === '100' && focusBack === '50',
+        focusShown ? `at ${focusAt} %, then ${focusBottom} %, ${focusTop} % and back to ${focusBack} %` : 'missing from the Looks sheet');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
+      /*
         A projector's source (PLAN.md §16b), from the phone: More, Settings,
         Mapping, a shape added, and its source picked. The phone has no
         second screen of its own, but it is the remote at a gig, and the
@@ -1257,6 +1287,25 @@ try {
           !none && !!tipped && tipped.name === 'Soap' && tipped.help.length > 20 && tipped.value === soapBefore?.trim() && tipped.inside,
           tipped ? `"${tipped.help.slice(0, 40)}…", ${tipped.value}, ${tipped.inside ? 'on screen' : 'off screen'}` : 'no card');
         await shot(page, 'Play-portrait-name-card');
+        /*
+          8j: one card at a time. The owner found two desk cards up at once,
+          stacked; on the phone a tap on another slider's name must swap the
+          card, not lay a second over the first, and that second card must
+          shut on its own second tap like the first.
+        */
+        const swirlName = page.getByTestId('play-slider-swirl').locator('[data-info="name"]');
+        const sb = await swirlName.boundingBox();
+        await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.waitForTimeout(250);
+        const cards = await page.evaluate(() => [...document.querySelectorAll('[data-control-tip] [data-tip=name]')].map(n => n.textContent));
+        check('Play: a tap on another slider\'s name swaps the card for its own, one card at a time',
+          cards.length === 1 && cards[0] === 'Swirl', cards.join(' + ') || 'no card');
+        await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.waitForTimeout(250);
+        check('Play: and a second tap on it shuts it', cards[0] === 'Swirl' && !(await readTip()));
+        // Soap's again, for the second-tap check below.
+        await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+        await page.waitForTimeout(250);
         await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
         await page.waitForTimeout(250);
         check('Play: a second tap shuts it, and two taps on a name leave the value alone', !(await readTip()) && (await soapText()) === soapBefore,

@@ -5,7 +5,7 @@ import { MusicIntelState, PerformanceState } from '../hooks/useMusicIntelligence
 import { clockText } from '../lib/performanceTake';
 import { MusicSettings } from '../lib/musicTypes';
 import { followLine } from '../lib/followedPlace';
-import { Toggle } from './ui';
+import { Toggle, LIT, LIVE } from './ui';
 
 interface TrackPanelProps {
   state: MusicIntelState;
@@ -137,7 +137,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
         {/* Status row */}
         <div className="flex gap-2 mt-3 text-[9px] uppercase tracking-wider">
           {state.identifying && <span className="flex items-center gap-1 text-blue-300"><Fingerprint size={10} /> identifying…</span>}
-          {state.recording && <span className="flex items-center gap-1 text-red-300"><Mic2 size={10} /> mapping this listen</span>}
+          {state.recording && <span className="flex items-center gap-1 text-blue-300"><Mic2 size={10} /> learning this song</span>}
           {state.analyzing && <span className="flex items-center gap-1 text-yellow-300"><FileAudio size={10} /> analyzing structure…</span>}
         </div>
       </section>
@@ -196,20 +196,21 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
       {/* ── Performances ─────────────────────────────────────────── */}
       <section className="mb-8" data-testid="performances">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
-          <Circle size={12} /> Performances
+          <Circle size={12} /> Takes
         </h3>
         <button
+          aria-pressed={!!performance.live}
           onClick={onTogglePerformance}
           data-testid="performance-toggle"
           className={`flex items-center justify-center gap-2 w-full mb-2 px-3 py-2.5 rounded-lg border text-[12px] font-bold uppercase tracking-widest transition-colors ${
             performance.live
-              ? 'bg-red-500/25 border-red-400/50 text-red-100 hover:bg-red-500/35'
+              ? LIVE
               : 'bg-white/5 border-white/15 hover:bg-white/10'
           }`}
         >
           {performance.live
             ? <><Square size={11} /> Stop and keep · {performanceClock ?? '0:00'}</>
-            : <><Circle size={11} className="text-red-400" fill="currentColor" /> Start a performance</>}
+            : <><Circle size={11} className="text-red-400" fill="currentColor" /> Start a take</>}
         </button>
         <p className="text-[9px] opacity-40 mb-3 leading-relaxed">
           {performance.live
@@ -276,11 +277,12 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
           <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
             {[...trackState.listens].reverse().map(listen => (
               <button
+                aria-pressed={state.replayListenNumber === listen.listenNumber}
                 key={listen.listenNumber}
                 onClick={() => onReplayListen(listen.listenNumber)}
                 className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-all text-left ${
                   state.replayListenNumber === listen.listenNumber
-                    ? 'bg-purple-500/20 border-purple-400/40'
+                    ? LIT
                     : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
               >

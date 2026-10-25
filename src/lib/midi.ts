@@ -422,7 +422,7 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
-  'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record Performance',
+  'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record a Take',
   'scene-toggle': 'Watch the Room',
   'cue-next': 'Cue Next Look', 'cue-prev': 'Cue Previous Look', 'go': 'Go', 'revert': 'Back',
   'go-back-plate': 'Go to Back Plate', 'back-follows-front': 'Back Plate Follows Front',
@@ -485,6 +485,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0.5, max: 2 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
+  { key: 'projectorFocus',  label: 'Projector Focus',  min: 0, max: 1 },
   { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
   // The Roy look's own: the plate printed as a comic, a knob to print it by.
   { key: 'benDay',          label: 'Ben-Day Dots',     min: 0, max: 1 },

@@ -69,8 +69,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'audio-input', name: 'Sound', category: 'inputs',
     terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation' },
-  { id: 'room', name: 'The Room', category: 'inputs',
-    terms: 'camera video webcam people crowd dancers track tracking hands motion sensor floor deadzone smoothing mirror flip presence drive' },
+  /*
+    Called by what it does (PLAN 14ad, the owner 2026-10-24: "what the room
+    control is vs. showing video on the plate"). "The Room" said where the
+    camera points, which is also where a webcam showing a picture points; this
+    one stirs and is never shown. Search still finds it by "room".
+  */
+  { id: 'room', name: 'Motion camera', category: 'inputs',
+    terms: 'room camera video webcam people crowd dancers track tracking hands motion movement sensor floor deadzone smoothing mirror flip presence drive' },
   /*
     The film projector, out of Projectors.
 
@@ -81,7 +87,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     here too, because nobody loads a reel and then goes to a different
     section to see it.
   */
-  { id: 'film', name: 'Video', category: 'inputs',
+  { id: 'film', name: 'Film', category: 'inputs',
     terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive' },
   /*
     The patch bay, with every master over it.
@@ -127,8 +133,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade transmission light through dye thickness depth pale deep' },
   { id: 'stock', name: 'Film Stock', category: 'look',
     terms: 'film stock 16mm super 8 slide reversal negative faded grain gate weave projector curve toe shoulder period sixties' },
-  { id: 'camera', name: 'Camera', category: 'look',
-    terms: 'photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
+  { id: 'camera', name: 'Lens', category: 'look',
+    terms: 'camera photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
   { id: 'macro', name: 'Macro Closeup', category: 'look',
     terms: 'zoom bead chase magnify closeup detail cells lacing depth relief' },
   { id: 'automation', name: 'Automation', category: 'look',

@@ -320,7 +320,7 @@ try {
     `centre of mass moved ${(along * 100).toFixed(1)}% of the plate toward where the stroke went`);
   // Bracketed by what the plate did alone before and after: a stroke that
   // neither creates nor destroys dye must fall within the plate's natural
-  // idle drift bracket (spanning fIdle, fIdleAfter and 0) plus the 15% allowance.
+  // idle drift bracket (spanning fIdle, fIdleAfter and 0) plus `fSlack` below.
   /*
     Gains only, and in proportion to the pool.
 
@@ -332,25 +332,45 @@ try {
     window reads −1, so the negative side is live and would be charged for
     nothing.
 
-    5% of the pool, floored at 5. The Mac reads +1 on pools of 357 and 611, so
-    this is twenty to thirty times the drift measured with the seeder off — and
-    deliberately not the 2% that measurement alone would justify, because CI's
-    pool is 49 to 279 and *no run anywhere has measured this quantity on a
-    shard with the seeder off*. A bar whose value rests on unmeasured variance
-    is the flake this repo keeps relearning. Tighten it when 40 shards have
-    reported, not before.
+    2% of the pool, and 1 more. This was 5% floored at 5, held loose until
+    the shards had measured the quantity with the seeder off, because no run
+    had and a bar resting on unmeasured variance is the flake this repo keeps
+    relearning. They have now (PR #449, 2026-10-24): 48 trials of
+    TOOLS_FINGER_TRIALS on four Mac runners, pools of 39 to 357, and the
+    plate left alone gained at most +0.74 (on 357) — at most 0.26% of its
+    pool, and +0.02 on every pool under 80. The six shard runs before them
+    and the five beside them read +0.72 at most; the owner's Mac reads +1 on
+    611. The tightest of all 48 sits at a tenth of this bar (+0.54 on 209,
+    against 5.2), so it is ten times the noise, and on a 357 pool it is 8.1
+    where it was 17.9. The 1 keeps a thin pool's bar off zero, where a
+    reading of +0.02 is rounding.
   */
-  const fQuietBar = Math.max(5, 0.05 * fa.total);
+  const fQuietBar = 0.02 * fa.total + 1;
   const fQuiet = Math.max(fIdle, fIdleAfter) <= fQuietBar;
   // A pool, or there is nothing to judge: an empty plate reads 0 → 0 and every
   // bound below is 0, so `adds none` would pass on nothing (check-skeptic).
   const fPooled = fa.total > 5;
   const fMinIdle = Math.min(0, fIdle, fIdleAfter);
   const fMaxIdle = Math.max(0, fIdle, fIdleAfter);
-  const fSlack = 0.15 * fa.total + 5;
+  /*
+    How far past the plate's own bracket the stroke may land: 2% of the pool,
+    and 1 more. It was 15% and 5 more, set when the windows were the seeder's
+    +35 and had to be that wide; with the seeder off it granted ±59 on a pool
+    of 357 against a hand that measured under a unit, so it passed a Finger
+    that created a sixth of the pool. Measured on the shards (PR #449): 48
+    trials, pools 39 to 357, the stroke's Δ landed at most 0.48 outside the
+    bracket, 0.17% of its pool, and 0.05 at most on pools under 80. The
+    nearest of them to this bar is a sixteenth of it. On a 357 pool it is
+    ±8.1, seven times sharper. What fails is a Δ beyond the plate's own
+    bracket by more than 2% of the pool and 1: on a quiet plate a Finger
+    that makes 3% of a pool over 100 fails, and on a pool under 50 two units
+    do. The bracket itself may widen by as much as `quiet` lets the plate
+    gain alone, so the worst case it can pass is 4% and 2.
+  */
+  const fSlack = 0.02 * fa.total + 1;
   const fDelta = fb.total - fa.total;
   check('and adds none', fPooled && fQuiet && fDelta >= fMinIdle - fSlack && fDelta <= fMaxIdle + fSlack,
-    `${!fPooled ? `no pool to judge (${fa.total.toFixed(1)}); ` : !fQuiet ? 'the plate was not quiet, so nothing below is the hand; ' : ''}${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(0)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(0)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(0)}] ± ${fSlack.toFixed(0)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after`);
+    `${!fPooled ? `no pool to judge (${fa.total.toFixed(1)}); ` : !fQuiet ? 'the plate was not quiet, so nothing below is the hand; ' : ''}${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(2)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(2)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(2)}] ± ${fSlack.toFixed(1)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(2)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(2)} after`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
   /*
@@ -453,6 +473,45 @@ try {
       `${matched ? ' — within a tenth, so the same stage of the pool' : ' — not the same stage of the pool, so this run says nothing'}`);
     if (cVoid) console.log(`    the control measured nothing${!(ca.total > 5) ? ` (no pool: ${ca.total.toFixed(1)})` : ''}\n`);
     else console.log(`    with no stroke the second window is ${gap <= fQuietBar ? 'not' : ''} biased by where it sits in the run\n`);
+  }
+  /*
+    The noise `fSlack` is set from, measured where it lives.
+
+    The bar above is only as sharp as the plate's noise allows, and that noise
+    is a property of the runner: the pool a 1.5 s Drop lays follows the
+    machine's speed (49 to 356 across CI's shards, 611 on the owner's Mac), and
+    a thin pool is where advection's rounding is largest against what is
+    there. One run reads one pool, so a slack set from the shards' own `adds
+    none` lines needs forty pushes. This repeats the same stroke on the same
+    helpers, cycling the Drop's hold so one runner reads thin pools and thick
+    ones, and prints each with the hand's excess over the plate's own bracket,
+    as a share of the pool. Reporting, not gating. Set TOOLS_FINGER_TRIALS=<n>.
+  */
+  const fTrials = Number(process.env.TOOLS_FINGER_TRIALS ?? 0);
+  if (fTrials > 0) {
+    const holds = [300, 600, 1000, 1500];
+    let worst = 0, worstShare = 0;
+    for (let i = 0; i < fTrials; i++) {
+      await clear();
+      await hold('dropper', A, holds[i % holds.length]);
+      await settle(1500);
+      await settle(3000);
+      const tIdle = await idleChange(A, 3800);
+      const t0p = await snap('trial0');
+      await stroke('finger', A, B, 1500, 1500);
+      await settle(700);
+      await snap('trial1');
+      const ta = await measure('trial0', t0p), tb = await measure('trial1', t0p);
+      const tIdleAfter = await idleChange(A, 3800);
+      const tDelta = tb.total - ta.total;
+      const excess = Math.max(tDelta - Math.max(0, tIdle, tIdleAfter), Math.min(0, tIdle, tIdleAfter) - tDelta, 0);
+      const share = ta.total > 5 ? excess / ta.total : NaN;
+      if (Number.isFinite(share)) { worst = Math.max(worst, excess); worstShare = Math.max(worstShare, share); }
+      console.log(`  finger trial ${i + 1}/${fTrials}: hold ${holds[i % holds.length]} ms, pool ${ta.total.toFixed(2)}, Δ ${tDelta >= 0 ? '+' : ''}${tDelta.toFixed(2)}, ` +
+        `alone ${tIdle >= 0 ? '+' : ''}${tIdle.toFixed(2)} before and ${tIdleAfter >= 0 ? '+' : ''}${tIdleAfter.toFixed(2)} after, ` +
+        `outside the bracket by ${excess.toFixed(2)} (${Number.isFinite(share) ? `${(share * 100).toFixed(2)}% of the pool` : 'no pool'})`);
+    }
+    console.log(`  finger trials: worst ${worst.toFixed(2)} outside the bracket, ${(worstShare * 100).toFixed(2)}% of its pool\n`);
   }
   /*
     The seeder back on for everything after the Finger, as the Blow and the

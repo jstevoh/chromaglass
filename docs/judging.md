@@ -1606,3 +1606,60 @@ about a quarter of a second a swing) before it settled, which the solve leaves o
 Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
 building.
 
+## 71. One Record button (PLAN 14ae)
+
+On the desk, press the Record button in the header (or R): a plate video starts, the button
+turns red with one clock, and a single Rec dot appears. Press it again: it stops and the file
+is in the Record panel (the sliders button) under Plate video. In the panel, turn on Take as
+well and press Record again: both run from the one press, and the dot says "Plate video + Take".
+Paint a little, stop, and the take is under Takes with Replay. Say whether "Record · Plate
+video" on a wide desk reads at a glance, whether "Plate video" and "Take" are the words you
+want, and whether the Song film row belongs in the Record panel. On the phone: More, then Record
+makes, pick Take and press Record.
+
+## 69. Any camera, and which camera does what (PLAN 14ad)
+
+With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual Camera):
+
+- **Settings, Film.** Pick the second camera under Webcam, then press Webcam: its picture
+  should be on the plate, and the Source line should name it. Pick the laptop's camera while
+  it shows: it should switch without pressing anything else.
+- **Pull the cable** while it shows: the film should go off with a line saying it was
+  unplugged. Plug it back in: it should come back by itself. Say how long that takes on a
+  real camera (the code waits for the browser to list it, not a timer).
+- **Settings, Motion camera.** Does the first line make it obvious that this one stirs and
+  is never shown, and that Webcam is the one that shows a picture? Pick a camera for it and
+  switch it on; the film's camera should stay what it was.
+- On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
+
+## 70. On reads on (PLAN 35a)
+
+On the laptop in a dark room, and on the phone, with no reading of labels:
+
+- **Film.** Load a demo loop with Film: its Film button and Video file in Source should be lit
+  violet, the row should say "playing as film", and Off should not be. Pour another: its Pour
+  lights too. Say whether you can tell which loop is doing what from across the room.
+- **The desk.** The layout switch, the tools, the layers, the bottles and the palette list: the
+  chosen one is a solid violet now, not a lighter grey. Blackout is grey until pressed, then
+  solid red. Say whether the violet is too loud anywhere, or
+  whether anything that is on still looks off.
+- **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
+  tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
+
+## 71. A look saved in Chrome is in the Mac app (PLAN 23.18)
+
+Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
+
+1. In Chrome at chromaglass.art, open Profile & Store. *Cloud sync* says On and, within a few
+   seconds, "Up to date".
+2. Save a look, learn one control on the MIDI map, and change a tool's amount.
+3. Open the Mac app, signed in to the same account. Within a minute (or at once with
+   *Sync now*) the look is in the preset menu and the MIDI map is the one from Chrome. The
+   projector layout on the Mac is still the Mac's.
+4. Delete the look on the Mac. Back in Chrome, focus the window: the look goes, and does not
+   come back after a reload.
+5. On the phone, open the Account pill: the same card, readable and tappable at phone width.
+6. Turn the Wi-Fi off on the Mac, save a look, turn it back on: the look reaches Chrome.
+
+Bad: a look that comes back after being deleted, a set list replaced by an empty one, or the
+plate stuttering when a sync lands mid-show.

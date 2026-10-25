@@ -1,5 +1,6 @@
 import { Clapperboard, Droplets, Square } from 'lucide-react';
 import { CARTOONS, runningTime } from '../lib/cartoons';
+import { LIT } from './ui';
 
 /**
  * The cartoons that ship with the app (lib/cartoons.ts), each with its two
@@ -27,7 +28,9 @@ export function CartoonShelf({ pouring, filming, onPour, onFilm, onStopPour, siz
   const phone = size === 'phone';
   const btn = `${phone ? 'h-11 px-3 text-[13px]' : 'h-7 px-2 text-[12px]'} flex shrink-0 items-center gap-1 rounded-md border`;
   const off = 'border-border bg-elevated text-text-2 hover:bg-hover';
-  const on = 'border-accent-border bg-accent-bg text-accent-text';
+  // Lit while in use (PLAN 35a): the violet wash this was read 1.16:1 against
+  // the grey button beside it, a difference found by comparing, not seen.
+  const on = LIT;
   return (
     <div className="flex flex-col gap-1" data-testid={`cartoons-${size}`}>
       {CARTOONS.map(c => (
@@ -37,11 +40,11 @@ export function CartoonShelf({ pouring, filming, onPour, onFilm, onStopPour, siz
             <div className="truncate text-[11px] text-dim">{c.year} · {runningTime(c.seconds)}</div>
           </div>
           {pouring === c.id ? (
-            <button onClick={onStopPour} className={`${btn} ${on}`} title="Stop pouring this cartoon" data-testid={`cartoon-stop-${c.id}`}>
+            <button onClick={onStopPour} aria-pressed className={`${btn} ${on}`} title="Pouring into the dish. Click to stop." data-testid={`cartoon-stop-${c.id}`}>
               <Square size={phone ? 14 : 11} /> Stop
             </button>
           ) : (
-            <button onClick={() => onPour(c.id)} className={`${btn} ${off}`} title="Pour it into the dish as dye, looping" data-testid={`cartoon-pour-${c.id}`}>
+            <button onClick={() => onPour(c.id)} aria-pressed={false} className={`${btn} ${off}`} title="Pour it into the dish as dye, looping" data-testid={`cartoon-pour-${c.id}`}>
               <Droplets size={phone ? 14 : 11} /> Pour
             </button>
           )}

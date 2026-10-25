@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, CirclePlus, Shuffle, User } from 'lucide-react';
+import { ChevronDown, CirclePlus, LogIn, Shuffle, User } from 'lucide-react';
+import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { TouchSlider } from '../ui/TouchSlider';
 import type { VisualizerSettings } from '../../types';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
 import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playGesture';
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
+import { LIT, LIVE } from '../ui';
 
 /**
  * Play: ChromaGlass on a phone for someone listening, not performing.
@@ -22,7 +24,7 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
  *                the full phone layout, for anyone who wants every tool
  *   the sheet    pulled up from the tray's handle: six sliders (Speed,
  *                Turbulence, Swirl, Soap, Zoom, Evolve), the looks as tiles
- *                to swipe through, Follow the music and Wander on its own,
+ *                to swipe through, Follow the music and Evolve,
  *                and Shuffle, Clear plate and Share clip; Save at the top
  *
  * With Drop on the tray a touch picks its own hand, the way a hand reads a
@@ -109,13 +111,13 @@ const zoomOf = (s: PhonePlayProps['settings']) => {
   return s.macroMode === true ? (z > 1.05 ? z : 4) : Math.max(1, z);
 };
 
-/** A 36-tall glass pill in a 48 px target. */
-function Pill({ onPress, label, testId, children, pressed }: { onPress: () => void; label: string; testId: string; children: ReactNode; pressed?: boolean }) {
+/** A 36-tall glass pill in a 48 px target: lit while pressed, or solid red when what it holds is live (recording). */
+function Pill({ onPress, label, testId, children, pressed, live = false }: { onPress: () => void; label: string; testId: string; children: ReactNode; pressed?: boolean; live?: boolean }) {
   return (
     <button onClick={onPress} aria-label={label} aria-pressed={pressed} data-testid={testId}
       className="pointer-events-auto flex h-12 min-w-12 items-center justify-center">
       <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[14px] font-medium ${
-        pressed ? 'border border-accent-border bg-accent-bg text-accent-text backdrop-blur-[16px]' : `text-text ${GLASS_PILL}`
+        pressed ? `border ${live ? LIVE : LIT} backdrop-blur-[16px]` : `text-text ${GLASS_PILL}`
       }`}>
         {children}
       </span>
@@ -125,6 +127,8 @@ function Pill({ onPress, label, testId, children, pressed }: { onPress: () => vo
 
 export function PhonePlay(p: PhonePlayProps) {
   const [sheet, setSheet] = useState(false);
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
   const [picked, setPicked] = useState<PlayTool>('dropper');
   const [touched, setTouched] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -318,13 +322,15 @@ export function PhonePlay(p: PhonePlayProps) {
             <button
               type="button"
               onClick={p.onOpenAccount}
-              aria-label="Account"
+              aria-label={signedOut ? 'Sign in' : 'Account'}
               data-cg-account-open=""
+              data-cg-account-signin={signedOut ? '' : undefined}
               className="pointer-events-auto flex h-12 min-w-12 items-center justify-center"
             >
-              <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[13px] font-medium text-text ${GLASS_PILL}`}>
-                <User size={15} className="shrink-0 text-amber-300" />
-                <span>Account</span>
+              {/* Signed out, lit: the way back in (the owner, 2026-10-24). */}
+              <span className={`flex h-9 min-w-11 items-center justify-center gap-1.5 rounded-[18px] px-3 text-[13px] font-medium ${signedOut ? 'bg-primary text-on-primary' : `text-text ${GLASS_PILL}`}`}>
+                {signedOut ? <LogIn size={15} className="shrink-0" /> : <User size={15} className="shrink-0 text-muted" />}
+                <span>{signedOut ? 'Sign in' : 'Account'}</span>
               </span>
             </button>
           )}
@@ -338,9 +344,9 @@ export function PhonePlay(p: PhonePlayProps) {
             <>
               <Pill onPress={p.onShuffle} label="Shuffle the look" testId="play-shuffle"><Shuffle size={18} /></Pill>
               {p.recording.supported && (
-                <Pill onPress={p.recording.onToggle} label={p.recording.on ? 'Stop recording' : 'Record a clip'} testId="play-record" pressed={p.recording.on}>
-                  <span className={`h-4 w-4 rounded-full border-2 border-[#F87171] ${p.recording.on ? 'bg-[#F87171]' : ''}`} />
-                  {p.recording.on && <span className="font-mono text-[12px] text-text">{clock(p.recording.seconds)}</span>}
+                <Pill onPress={p.recording.onToggle} label={p.recording.on ? 'Stop recording' : 'Record a clip'} testId="play-record" pressed={p.recording.on} live>
+                  <span className={`h-4 w-4 rounded-full border-2 ${p.recording.on ? 'border-bg bg-bg' : 'border-[#F87171]'}`} />
+                  {p.recording.on && <span className="font-mono text-[12px]">{clock(p.recording.seconds)}</span>}
                 </Pill>
               )}
             </>
@@ -396,7 +402,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 return (
                   <button key={t.id} onClick={() => setPicked(t.id)} aria-pressed={on} data-testid={`play-tool-${t.id}`}
                     className={`${tablet ? 'h-[72px] rounded-[16px] text-[16px]' : 'h-[52px] rounded-[14px] text-[15px]'} min-w-0 flex-1 font-medium transition-colors ${
-                      on ? 'bg-primary text-on-primary' : 'border border-white/10 bg-white/[0.04] text-text active:bg-white/10'
+                      on ? `border ${LIT}` : 'border border-white/10 bg-white/[0.04] text-text active:bg-white/10'
                     }`}>
                     {t.label}
                   </button>
@@ -461,8 +467,9 @@ export function PhonePlay(p: PhonePlayProps) {
                   return (
                     <button key={l.id} onClick={() => p.onLook(l.id)} aria-pressed={on} data-testid="play-look-tile"
                       className="flex w-[92px] shrink-0 snap-start flex-col gap-1.5 text-left">
-                      <span className={`h-14 w-[92px] rounded-[12px] ${on ? 'border-2 border-white' : 'border border-white/10'}`} style={{ background: l.swatch }} />
-                      <span className={`w-full truncate text-[12px] ${on ? 'font-medium text-text' : 'text-text-2'}`}>{l.name}</span>
+                      {/* Lit like every other chosen thing (PLAN 35a): the look's own swatch cannot change colour, so its name takes the lit chip and the swatch a lit ring. */}
+                      <span className={`h-14 w-[92px] rounded-[12px] ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : 'border border-white/10'}`} style={{ background: l.swatch }} />
+                      <span className={`w-full truncate rounded-[6px] px-1.5 text-[12px] ${on ? `${LIT} font-medium` : 'text-text-2'}`}>{l.name}</span>
                     </button>
                   );
                 })}
@@ -471,17 +478,17 @@ export function PhonePlay(p: PhonePlayProps) {
               <div className="mt-4 flex gap-2">
                 <button onClick={() => p.onListen(!p.listening)} aria-pressed={p.listening} data-testid="play-follow"
                   className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
-                    p.listening ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-white/10 text-text-2'
+                    p.listening ? LIT : 'border-white/10 text-text-2'
                   }`}>
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.listening ? (p.deaf ? 'bg-[#FBBF24]' : 'bg-accent') : 'bg-muted'}`} />
                   <span className="truncate">{p.listening && p.deaf ? 'Hearing nothing' : 'Follow the music'}</span>
                 </button>
                 <button onClick={() => p.onWander(!p.wandering)} aria-pressed={p.wandering} data-testid="play-wander"
                   className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[14px] border text-[14px] font-medium ${
-                    p.wandering ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-white/10 text-text-2'
+                    p.wandering ? LIT : 'border-white/10 text-text-2'
                   }`}>
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${p.wandering ? 'bg-accent' : 'bg-muted'}`} />
-                  <span className="truncate">Wander on its own</span>
+                  <span className="truncate">Evolve</span>
                 </button>
               </div>
               <div className="mt-3 flex gap-2 pb-1">
@@ -495,7 +502,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 )}
                 {p.onOpenAccount && (
                   <button onClick={() => { setSheet(false); p.onOpenAccount?.(); }} data-testid="play-sheet-account"
-                    className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Account</button>
+                    className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">{signedOut ? 'Sign in' : 'Account'}</button>
                 )}
               </div>
               </div>
