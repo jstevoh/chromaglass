@@ -39,20 +39,30 @@
  *     least 60 half-full cells at step 60, so neither bar is passed by a
  *     drop that was never there), and its centroid, read from the solver's
  *     phase field and not from the magnet's path, had moved over 0.40 from
- *     the 0.36 it settled at (0.42 measured), so the lag is of a dragged drop.
+ *     the 0.36 it settled at (0.42 measured on software WebGPU; 84 half-full
+ *     cells and 0.422 on Metal), so the lag is of a dragged drop.
  *
- * Controls, measured on the same scene (software WebGPU; Metal is not
- * measured until the first Mac run, and the bars are re-placed between its
- * on and off runs if they land near them), mean over the seven readings:
+ * Controls, measured on the same scene (software WebGPU, and Metal on the Mac
+ * CI runner in `WebGPU (macOS) · fifth`, `main` runs 40154167142, 40140795675
+ * and 40123398910 and #373's run 39280236231, identical across all four), mean
+ * over the seven readings:
  *
- *                       lead of the magnet    half-full cells
- *   both passes on      2.01R                 60.3
- *   phaseMomentum off   2.28R  (bar 2.15)     63.7
- *   phaseCompress off   2.05R                 34.4  (bar 47)
+ *                       lead of the magnet          half-full cells
+ *                       software  Metal             software  Metal
+ *   both passes on      2.01R     2.02R             60.3      61.4
+ *   phaseMomentum off   2.28R     2.29R  (bar 2.15) 63.7      62.9
+ *   phaseCompress off   2.05R     2.06R             34.4      35.7  (bar 47)
+ *
+ * (On Metal, steps 60..120 every 10 read: as given, lag 1.71 1.81 1.91 2.01
+ * 2.12 2.23 2.35R, half-full 84 74 68 64 52 48 40, peak 0.96..0.65;
+ * phaseMomentum off, lag 1.85 2.00 2.14 2.29 2.43 2.58 2.74R, half-full 82 80
+ * 76 66 56 46 34, peak 0.90..0.56; phaseCompress off, lag 1.71 1.82 1.93 2.05
+ * 2.17 2.31 2.45R, half-full 76 64 54 40 16 0 0, peak 0.84..0.43.)
  *
  * so each absolute bar sits between the run it is for and the run it must
- * pass, and the two off-runs are the script's own, read by lines 4 and 5 as
- * differentials of half the gap measured (0.13R, 13 cells). The margins are a
+ * pass, and the two off-runs are the script's own, read by lines 4 and 5 of
+ * the five checks as differentials of half the gap measured (0.13R of 0.27R on
+ * both; 13 of 25.9 cells on software, 25.7 on Metal). The margins are a
  * tenth of a radius and a dozen cells; the lag is the thin one, since the
  * momentum pass is a small share of what keeps the drop up. `phaseCompress`
  * is a lab-only switch in the solver's step options (1 on, the default, so no
@@ -74,9 +84,10 @@ const N = 384;
 const R = 0.022;
 const FROM = 60, TO = 120, EVERY = 10;
 // Midway between the on run and the off run that each bar is for (software
-// WebGPU, see the header): lag 2.01R on, 2.28R with phaseMomentum off; half-full
-// 60.3 on, 34.4 with phaseCompress off. The differentials are half the gap each
-// control measured (0.27R and 25.9 cells).
+// WebGPU / Metal, see the header): lag 2.01R / 2.02R on, 2.28R / 2.29R with
+// phaseMomentum off; half-full 60.3 / 61.4 on, 34.4 / 35.7 with phaseCompress
+// off. The differentials are half the gap each control measured (0.27R on both;
+// 25.9 cells on software, 25.7 on Metal).
 const LAG_BAR = 2.15;
 const HALF_BAR = 47;
 const DLAG_BAR = 0.13;

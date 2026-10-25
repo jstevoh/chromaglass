@@ -7818,7 +7818,13 @@ the code's entry points, the checks to add and the scenes to match, in
     pass to be worth half its measured gap (`0.13R` of `0.27R` of lead; `13` of `25.9` half-full
     cells), so a stand-in that speeds the drop up cannot pass for the momentum pass; it also reads
     from the solver that the drop was whole (60 cells) and carried (centroid over `0.40` from `0.36`,
-    `0.42` measured) when the window opened. Metal is unmeasured until the first Mac run. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
+    `0.42` measured) when the window opened. On Metal (`WebGPU (macOS) · fifth`, `main` runs
+    `40154167142`, `40140795675` and `40123398910`, identical across all three and matching #373's
+    run `39280236231`), the window opens at step 60 with `84` half-full cells and centroid `0.422`;
+    the seven readings at steps 60..120 average a lead of `2.02R` (`1.71..2.35R`) and `61.4`
+    half-full cells (`84 → 40`, peak `0.96 → 0.65`) as given, `2.29R` (`1.85..2.74R`, `+0.27R` over
+    `on`) and `62.9` cells (`82 → 34`) with `phaseMomentum` off, and `2.06R` (`1.71..2.45R`) and
+    `35.7` cells (`76 → 0`, `-25.7` from `on`) with `phaseCompress` off. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
     re-read against the whole drag.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
