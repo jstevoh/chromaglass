@@ -115,7 +115,7 @@ check('a release that lists no .dmg still gives the fixed name', downloadUrl({ v
   check('ad hoc: and never tries to install in place, which macOS refuses for it', h.updater.calls.install === 0);
   const last = h.pushed.at(-1);
   check('ad hoc: the page is told what was found', last?.status === 'available' && last?.version === '1.3.99' && last?.url === `${RELEASES}${DMG}` && last?.current === '1.3.0', JSON.stringify(last));
-  check('nothing older or a prerelease is offered', h.updater.allowDowngrade === false && h.updater.allowPrerelease === false);
+  check('only a newer, stable version is offered', h.updater.allowDowngrade === false && h.updater.allowPrerelease === false);
 
   // The 6 h re-check, at a venue with no network: what was found stays found.
   await h.fire();
