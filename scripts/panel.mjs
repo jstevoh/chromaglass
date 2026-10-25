@@ -388,7 +388,7 @@ check('the look effects live with the lamp',
   LAMP.every(k => PIN_RANGE.get(k)?.section === 'lamp'),
   LAMP.filter(k => PIN_RANGE.get(k)?.section !== 'lamp').map(k => `${k} → ${PIN_RANGE.get(k)?.section}`).join(', '));
 check('and the film is an input of its own',
-  SECTION_BY_ID.get('film')?.category === 'inputs'
+  SECTION_BY_ID.get('film')?.category === 'feed'
   && ['filmMix', 'filmKey', 'filmDrive'].every(k => PIN_RANGE.get(k)?.section === 'film'));
 // ── The patch bay ───────────────────────────────────────────────────
 /*
