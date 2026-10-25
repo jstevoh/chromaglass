@@ -3599,7 +3599,13 @@ Open, found doing it:
   larger grid's textures leave the cache), and part of the drawing does not scale with the
   pixels at all, so a pixel climb is predicted dearer than it is and a grid climb cheaper.
   Learn each rung's ratio from the frames it has drawn this session (a step's cost on every
-  grid visited, the drawing's on every pixel share) and predict from that.
+  grid visited, the drawing's on every pixel share) and predict from that. Two trades this
+  shortcut makes today, both visible next to the old governor (the review of #474): a light
+  look tops out a rung lower (512² at two pixels, where the old governor climbed on to 768²
+  at two pixels and sixty steps, predicted 11.6 ms against the 9 ms budget), and after one
+  busy tab a light look climbs to 768² at thirty steps and sixty never comes back (the old
+  governor had it back in about ninety seconds). The second could also be priced: give up
+  the rung again when that wins back sixty under budget.
 - **14aa-5** (open): the governor's lines are 60 Hz milliseconds (`SLOW_MS`, `FAST_MS`,
   `MISSED_MS`): on a 120 Hz display a missed refresh is 8.3 ms late and is not seen as one. Take
   the refresh from the draw gate (`drawGate.refreshMs`) and draw the lines in refreshes.

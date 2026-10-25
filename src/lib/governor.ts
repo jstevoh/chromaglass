@@ -511,9 +511,11 @@ export class QualityGovernor {
    */
   private workAt(rung: QualityRung, rate: number): number {
     if (!(this.emaStep > 0)) return this.emaWork;
-    const cur = this.rung;
-    const step = this.emaStep * (rung.grid / cur.grid) ** 2;
-    const draw = this.emaDraw * (rung.dpr / cur.dpr) ** 2;
+    // From the rung the two were measured on, which is this one once a frame
+    // with timings has landed since the last move, and the last one until then.
+    const from = this.costRung;
+    const step = this.emaStep * (rung.grid / from.grid) ** 2;
+    const draw = this.emaDraw * (rung.dpr / from.dpr) ** 2;
     return Math.max(this.emaWork, draw + step * rate * this.emaFrame * 0.001);
   }
 

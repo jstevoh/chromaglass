@@ -694,16 +694,30 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       (the drawing four times over, with the pixels), and no further, since
       768² at two pixels is predicted 11.6 (the step 2.25 times over, with
       the cells). The old governor climbed there too, on a frame's cost alone.
+      Stopping at two pixels is a trade, and a named one (PLAN.md 14aa-4): the
+      old governor climbed on to 768² at two pixels and sixty steps, which
+      in this model never misses; at Poster's measured 3.1 times a step for
+      the larger grid it would cost about 13.75 ms, over the miss line, so a
+      light look tops out a rung lower than it used to rather than risk that.
+
       Then a tab takes the machine for five seconds (every frame two
       refreshes, the plate's own cost unchanged): it gives the rate up, and
       once the retry's wait is over it has back what it gave or better.
       Better, here: at thirty steps 768² at two pixels is predicted 8.8 ms,
       and a finer grid for steps nobody sees is the trade the ladder's order
       makes on purpose (the rate comes back only when the picture is whole).
+      Also a trade, named in 14aa-4: sixty steps never comes back after that,
+      since 768² at two pixels and sixty is predicted at 11.6 ms; the old
+      governor had it back at 154 s.
+
+      The replay tests the policy given the governor's cost model, not the
+      model: its machine scales the pixels and the smaller grids as the
+      governor does, and only 768² and the step at sixty differ. The model
+      itself is 14aa-4's to measure.
     */
     const light = (rung) => ({ draw: 1.5 * rung.dpr ** 2, step: 2.5 * (rung.grid / 512) ** 2, miss: 0 });
     const calm = replay(light, { seconds: 60 });
-    check('a light plate keeps sixty and climbs to the sharpest rung its costs fit, no further',
+    check('a light plate keeps sixty and climbs to the best rung predicted under budget, no further',
       calm.g.stepRate === 60 && seen(calm.g.rung) === '512²@2.00' && calm.moves.length === 1,
       calm.moves.map((m) => `${m.at.toFixed(0)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ') || 'no moves');
     const tab = replay(light, { seconds: 240, slowFrom: 60, slowFor: 5 });
@@ -716,10 +730,13 @@ for (const devicePx of [1, 1.5, 2, 3]) {
         && tab.g.rungIndex <= back.index,
       tab.moves.map((m) => `${m.at.toFixed(0)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ') || 'no moves');
     /*
-      A plate over the budget with its frames on time: Classic's costs on the
-      owner's Mac (5.8 ms of drawing, a 7.1 ms step), so sixty steps cost
-      12.9 ms a frame, over the 9 that a climb needs and under a refresh.
-      Nothing is being dropped, so nothing is given up.
+      A plate over the budget with its frames on time: Classic's frame costs
+      on the owner's Mac (5.8 ms of drawing, a 7.1 ms step, read at 256² and
+      one pixel, set here on 512² for the replay's opening rung), so sixty
+      steps cost 12.9 ms a frame, over the 9 that a climb needs and under a
+      refresh. Nothing is being dropped, so nothing is given up. Whether
+      Classic itself keeps or regains sixty is the Mac's to say
+      (`npm run stutter`).
     */
     const busy = (rung) => ({ draw: 5.8 * rung.dpr ** 2, step: 7.1 * (rung.grid / 512) ** 2, miss: 0 });
     const held = replay(busy, { seconds: 120 });
