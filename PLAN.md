@@ -8440,10 +8440,18 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The hand-built pick-one grids in Settings (On a New Song, Render Style, Film Stock,
     folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
     draw them once, once it takes a title per option and a number id.
-- **35b** Regroup the panels into seven: Play, Pour, Feed, Motion, Chemistry, Look, Stage
-  (phase 2). The owner chose all three phases, in order (2026-10-24). The four group vocabularies
-  to reconcile: `data-group` in SettingsPanel, `lib/settingsMap.ts`, the panel browser,
-  and the phone rail, whose headings are hidden.
+- ~~**35b** Regroup the panels into seven.~~ Shipped: Play, Pour, Feed, Motion, Chemistry, Look,
+  Stage, one vocabulary for the rail, the panel browser, the sections' `data-group`, the desk's own
+  panels and the phone's Settings strip (now with its headings drawn). Story in
+  `docs/plan-shipped.md` §35.
+- **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
+  section (35c's work) or a different surface:
+  - Chemistry has one member, Squish Plate, until 35c splits it (Plate Rock to Motion, the
+    chemistry and ferrofluid stay): Lamp & Light's chemistry and Turing Print belong beside it.
+  - Plates & LED holds the platform's spin, which is Motion's, but Stage is also the gate that
+    keeps a panel out of Build and Gig (`isStagePanel`); its spin controls move with 35c.
+  - The pin picker (`PickList`) and the command palette still list by section, not by the seven
+    groups; the same headings would find a setting faster there.
 - **35c** One home per setting (phase 3): Flash Limit, Blackout, MIDI on, the audio
   source and record/replay each appear in two places; Drive/Impact pairs sit in different
   sections; Squish Plate splits up; the sequencer is behind Songs. After 35b.
