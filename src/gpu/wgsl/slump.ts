@@ -66,22 +66,24 @@
  * arithmetic mean, not the harmonic one a flux in series wants: a front cell
  * has K = 0, and the harmonic mean would hold the front still forever).
  *
- * The one shortcut (PLAN 18m-1). An explicit step is stable only while a
- * face moves at most a quarter of the difference across it, K Δt/Δx² ≤ ¼,
- * and K grows as the cube of the depth: a pool poured to the dye's cap of six
- * units, two millimetres deep, has K near 2e-4 m²/s in water, which at 768²
- * would want about 170 substeps for one frame. So each face is held to
- * SLUMP_FACE of its difference a substep, and the substeps to SLUMP_SUBSTEPS
- * a step: anything below the cap runs at its real rate, a pool thicker than
- * the cap spreads at the cap's rate until it has thinned to it. In water at
- * 768² that is everything under about 1.4 units (0.5 mm), at 256² (the lab)
- * under about 3.1. Both are a pool's first second or so: `npm run slump`'s
- * drop starts at 5.6 units, capped, and is on Huppert's law by its first
- * second, at 256² and (a numpy copy of these kernels) at 768² alike, 10.96 mm
- * at 60 s against the law's 10.91. A real current that deep is also past where
- * this viscous law holds (its Reynolds number is near 30, and it runs at about
- * its Froude speed √(g′η) instead), so what is cut is the part the law
- * overstates anyway; the plan has an implicit solve to replace the cap.
+ * The shortcuts (PLAN 18m-1, 18m-1a). A pool poured to the dye's cap of six
+ * units (2.13 mm deep in a 6 mm gap) is past where the viscous Poiseuille law
+ * holds (its Reynolds number in water is near 30): in that slumping regime a
+ * gravity current's front runs at its Froude speed Fr √(g′η(1 − η/b)) with
+ * Fr = 1.19 (Huppert and Simpson 1980, J. Fluid Mech. 99). Each cell in
+ * slumpRate takes the slower of its viscous rate and its inertial Froude rate
+ * (written as K_inert Δt/Δx² = Fr (Δt/Δx) √(g′η(1 − η/b)), which assumes the
+ * front drops across one cell Δx). The step is still explicit forward Euler on
+ * a 5-point stencil, stable only while each face moves at most a quarter of
+ * the difference across it (K Δt/Δx² ≤ ¼). slumpPlan plans up to
+ * SLUMP_SUBSTEPS = 20 substeps against SLUMP_FACE = 0.24 at DYE_CAP (enough
+ * for 1024² at Dye Weight 1 and 60 Hz, where the inertial bound reaches 4.57
+ * a frame; 15 substeps at 768²; 6 at 768² with Dye Weight 0; 2 on the default
+ * light-oil Thickness), and each face in slump keeps min(mean K, SLUMP_FACE)
+ * as a stability guard that binds only if a longer frame dt or a locally
+ * deeper gap pushes ceil(most / SLUMP_FACE) past SLUMP_SUBSTEPS. The lagged-K
+ * backward-Euler multigrid step and Δx-independent inertial front flux are in
+ * PLAN 18m-1a.
  */
 import { OPEN_RIM } from '../../lib/turntable';
 
@@ -123,9 +125,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
     /*
       One substep: each face moves the amount's difference across it at the
-      mean of its two cells' rates (lagged K), carrying the colour of the
-      cell it leaves. At the plate's edge the neighbour is the cell itself, so
-      nothing crosses.
+      mean of its two cells' rates (lagged K), held to A.a.x (SLUMP_FACE) as a
+      stability guard if the substep ceiling is ever reached, carrying the
+      colour of the cell it leaves. At the plate's edge the neighbour is the
+      cell itself, so nothing crosses.
     */
     slump: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
@@ -146,7 +149,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let q = clampP(p + o, S.n);
     if (length((vec2f(q) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { continue; }
     let cq = textureLoad(dye, q, 0);
-    let a = 0.5 * (k + textureLoad(rate, q, 0).r);
+    let a = min(0.5 * (k + textureLoad(rate, q, 0).r), A.a.x);
     let flux = a * (cq.a - c.a);
     let up = select(c, cq, flux > 0.0);
     if (up.a > 1e-6) { out += flux * up / up.a; }

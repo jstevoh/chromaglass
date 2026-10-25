@@ -546,13 +546,16 @@ export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * (REST_GAP * PLATE_METRES) ** 2 /
 */
 export const DYE_LAYER = 3.55e-4;
 /*
-  The explicit slump's limits (wgsl/slump.ts, "The one shortcut"): a face
-  moves at most SLUMP_FACE of the difference across it in a substep (¼ is
-  the edge of stability on a square grid), in at most SLUMP_SUBSTEPS
-  substeps a step. Six passes of five reads each at 768² is the price.
+  The explicit slump's limits (wgsl/slump.ts, "The shortcuts (PLAN 18m-1,
+  18m-1a)"): a face moves at most SLUMP_FACE of the difference across it in
+  a substep (¼ is the edge of stability on a square grid), in at most
+  SLUMP_SUBSTEPS substeps a step. At 1024² with Heavy dye at 1 (g′ = 1.47 m/s²)
+  a cell at DYE_CAP (2.13 mm in a 6 mm gap) has an inertial bound of 4.57 a
+  frame at 60 Hz, which asks for ceil(4.57 / 0.24) = 20 substeps (15 at 768²;
+  6 in water at Dye Weight 0 on 768²; 2 on the default light-oil Thickness).
 */
 const SLUMP_FACE = 0.24;
-const SLUMP_SUBSTEPS = 6;
+const SLUMP_SUBSTEPS = 20;
 /** The Froude number for a gravity current front in the slumping regime (Huppert and Simpson 1980). */
 const FROUDE_FRONT = 1.19;
 /** The dye's cap per cell (decayDye), the deepest layer the slump has to be ready for. */
@@ -3373,7 +3376,7 @@ export class WebGPUFluid {
       const oilMix = mix && this.mixLive ? mix.read : this.blank('rgba');
       this.run(pass, 'slumpRate', rate, [this.dye.read, this.squeeze.read, oilMix],
         this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), slump!.inertRate, 0, 0, 0]));
-      const args = this.arg('slump', [0, 0, 0, 0]);
+      const args = this.arg('slump', [SLUMP_FACE, 0, 0, 0]);
       for (let k = 0; k < slump!.substeps; k++) {
         this.run(pass, 'slump', this.dye.write, [this.dye.read, rate], args);
         this.dye.swap();

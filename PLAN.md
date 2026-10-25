@@ -4927,21 +4927,28 @@ viscous gravity current (`wgsl/slump.ts`, its own stage in the dye's step, apart
 measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
 
 - ~~**18m-1. The slump's cap (a speed shortcut).**~~ **Partly shipped** (#371): replaced
-  the per-face `0.24` clamp in `slump` with a per-cell regime switch `min(viscous rate,
-  inertial rate)` using the Huppert–Simpson front Froude number `Fr = 1.19`
-  (`Fr √(g′η(1 − η/b))`, Huppert and Simpson 1980) in `slumpRate` and substep planning
-  in `fluid.ts`.
+  the viscous-only cap with a per-cell regime switch `min(viscous rate, inertial rate)`
+  using the Huppert–Simpson front Froude number `Fr = 1.19` (`Fr √(g′η(1 − η/b))`,
+  Huppert and Simpson 1980) in `slumpRate`, planned `substeps = Math.ceil(most /
+  SLUMP_FACE)` up to `SLUMP_SUBSTEPS = 20` in `fluid.ts` (covering 1024² at Heavy dye 1),
+  and kept `min(a, SLUMP_FACE)` (`0.24`) in `slump` as a stability guard (`npm run slump`
+  13/13, including deep heavy pools on 768² and 1024²).
 - **18m-1a. Implicit backward-Euler slump step and grid-independent inertial flux.**
   #371's `min(viscous, inertial)` is a regime switch inside the explicit pass, not an
   implicit step, and keeps two shortcuts: (1) the pass is still explicit forward Euler in
-  at most `SLUMP_SUBSTEPS = 6` substeps planned against `SLUMP_FACE = 0.24` at `DYE_CAP`,
-  not a backward-Euler solve `(I − Δt ∇·K∇)A = A^n` with lagged K on the thin gap's
-  multigrid with an identity term, so a deep heavy pool at 768² (`solutalBuoyancy = 1`)
-  still outruns six explicit substeps; and (2) writing the inertial front speed
-  `u_f = Fr √(g′η(1 − η/b))` into the diffusive rate as `K_inert Δt/Δx² = u_f Δt/Δx`
+  at most `SLUMP_SUBSTEPS = 20` substeps planned against `SLUMP_FACE = 0.24` at `DYE_CAP`,
+  with the per-face `min(a, SLUMP_FACE)` (`0.24`) stability guard in `slump`, rather than
+  an unconditional backward-Euler solve `(I − Δt ∇·K∇)A = A^n` with lagged K on the thin
+  gap's multigrid with an identity term — `SLUMP_SUBSTEPS = 20` covers up to 1024² at
+  `solutalBuoyancy = 1` at 60 Hz (`mostInert ≈ 4.57`, 20 substeps of `≤ 0.23`), so the
+  `min(a, SLUMP_FACE)` guard binds only when `ceil(most / SLUMP_FACE) > 20` (a slow frame
+  with `dt > 1/60 s` on a 1024² heavy-dye water plate, or a locally deeper squeezed gap
+  where `η(1 − η/gap)` exceeds its rest-gap value); and (2) writing the inertial front
+  speed `u_f = Fr √(g′η(1 − η/b))` into the diffusive rate as `K_inert Δt/Δx² = u_f Δt/Δx`
   assumes the front drops across one cell Δx (`K_inert = u_f Δx`), rather than
-  propagating the front at `u_f` independent of Δx. Replace the explicit substeps with
-  the lagged-K backward-Euler multigrid solve and a Δx-independent inertial front flux.
+  propagating the front at `u_f` independent of Δx. Replace the explicit substeps and the
+  `min(a, SLUMP_FACE)` guard with the lagged-K backward-Euler multigrid solve and a
+  Δx-independent inertial front flux.
 - **18m-2. Coloured water in oil is a puddle, not a current.** Dye Weight at 1 says the
   dye is water in an oil (15% heavier), and two immiscible liquids do not mix into a
   gravity current: surface tension holds the pool at its puddle height and it stops
