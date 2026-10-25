@@ -5113,3 +5113,29 @@ inside only at 15% of the control or more, and a group as disabled only when eve
 Checks: `npm run states` (new, in Measure) and `npm run switches`' lift bar. Numbers before and
 after are in the PR.
 
+### 35b. Seven groups, one vocabulary (2026-10-25)
+
+Reported: the owner, 2026-10-24, "the grouping is bad": the same sections were sorted four ways
+that did not agree, so the panel browser, the search and the phone's Settings disagreed about
+where a thing is.
+
+Measured on main (a7dd8e7): `data-group` in `SettingsPanel` said perform, setup, look, inputs or
+stage (24 sections, read by nothing), `SETTINGS_CATEGORIES` said Live, Inputs, Look, Plate or
+Stage, the panel browser borrowed those five and filed the desk's own panels under `live` and
+`plate`, and the phone's Settings strip drew the same five with the headings hidden
+(`hidden ... sm:block`), one flat run of 26 tabs.
+
+What changed: `SETTINGS_CATEGORIES` is the one list, Play, Pour, Feed, Motion, Chemistry, Look,
+Stage. Play: Master, Mixer and the desk's Cues, Rides, Recipe, Score. Pour: Bottles, Dyes, Tools,
+Liquids, Manual Interaction. Feed: Sound, Motion camera, Film, Patches, Controller. Motion:
+Kaleidoscope, Automation, Fluid Physics. Chemistry: Squish Plate. Look: Light Show Look, Show,
+Lamp & Light, Film Stock, Lens, Macro Closeup. Stage: unchanged (Wall, Mapping, Logo & Titles,
+Plates & LED, Simulation, Phone · iPad), so Build and Gig still keep it in the Stage sheet. The
+rail, the panel browser and the desk's own panels read the list; each section's `data-group`
+comes from it (`groupOf`); the phone's strip draws the seven headings. No section's id, controls
+or place on the desk changed, so saved layouts, pins and deep links open as before. The Settings
+guide names the seven. `desklayout` holds the list, every panel's group, the markup's
+`data-group` and the Stage panels to their names; `phone` reads the seven headings drawn at phone
+width.
+
+Squish Plate keeps its name and its 45 controls in Chemistry: splitting it is 35c.

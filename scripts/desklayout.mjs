@@ -29,7 +29,7 @@ import {
   panelAllowed, placeFloating, raiseFloating, sameLayout, sanitizeLayout, saveLayout, shippedLayout,
   toggleCollapsed, whereIs, DESK_MODE_OF, LAYOUT_OF_MODE,
 } from '../src/lib/deskLayout.ts';
-import { SETTINGS_SECTIONS } from '../src/lib/settingsMap.ts';
+import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, groupOf } from '../src/lib/settingsMap.ts';
 import { PINNABLE } from '../src/lib/deskPins.ts';
 const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
@@ -98,6 +98,26 @@ const panelSrc = readFileSync('src/components/SettingsPanel.tsx', 'utf8');
 const unkept = SETTINGS_SECTIONS.filter(s => !new RegExp(`\\{keep\\('${s.id}'\\) && \\(\\s*<section[^>]*data-section="${s.id}"`).test(panelSrc));
 check('every settings section is a panel the browser can open, with its markup kept for it', unkept.length === 0 && SETTINGS_SECTIONS.every(s => PANEL_BY_ID.has(s.id)),
   unkept.length ? `not kept: ${unkept.map(s => s.id).join(', ')}` : `${SETTINGS_SECTIONS.length} sections`);
+/*
+  The seven groups (PLAN 35b), one vocabulary for the rail, the panel browser,
+  the sections' own `data-group` and the desk's own panels. What could drift is
+  each of those four being edited alone: a panel left on a retired group name
+  would sort to the top of the browser under a heading nobody drew, and a
+  section's `data-group` is a string in the markup the map knows nothing about.
+  And the Stage group is also a gate (`isStagePanel`: Build and Gig keep it in
+  the Stage sheet), so the regroup must not move a panel in or out of it.
+*/
+const GROUPS = ['play', 'pour', 'feed', 'motion', 'chemistry', 'look', 'stage'];
+check('the groups are the seven, in order', SETTINGS_CATEGORIES.map(c => c.id).join() === GROUPS.join(), SETTINGS_CATEGORIES.map(c => c.name).join(' · '));
+const offGroup = PANELS.filter(p => !GROUPS.includes(p.category));
+check('every panel, the desk\'s own included, is in one of them', offGroup.length === 0, offGroup.map(p => `${p.id} → ${p.category}`).join(', ') || `${PANELS.length} panels`);
+const wrongMarkup = SETTINGS_SECTIONS.filter(s => !new RegExp(`data-group=\\{groupOf\\('${s.id}'\\)\\} data-section="${s.id}"`).test(panelSrc));
+check('and a section\'s markup takes its data-group from the map, not a word of its own', wrongMarkup.length === 0 && groupOf('film') === 'feed',
+  wrongMarkup.map(s => s.id).join(', ') || `${SETTINGS_SECTIONS.length} sections`);
+const STAGE_NOW = ['layers', 'mapping', 'mark', 'phone', 'projectors', 'simulation'];
+check('and Stage is the same panels as before, so Build and Gig still keep them in the Stage sheet',
+  PANELS.filter(p => isStagePanel(p.id)).map(p => p.id).sort().join() === STAGE_NOW.join(),
+  PANELS.filter(p => isStagePanel(p.id)).map(p => p.id).sort().join());
 const idsOnce = new Set(PANELS.map(p => p.id)).size === PANELS.length;
 check('and no panel id is used twice (a desk panel cannot shadow a section)', idsOnce, `${PANELS.length} panels`);
 // A knob panel draws the section's pinnable controls; a section whose point is
