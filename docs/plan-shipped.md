@@ -5267,3 +5267,32 @@ asks of seven sections that the sliders the markup draws are exactly the ones th
 under it, and that the lamp keeps the optics and Reactions the Turing pattern. A saved layout's
 Fluid Physics panel now shows only the flow (about a third of the knobs it did).
 
+
+### 35c-2. One home per setting, second half (shipped 2026-10-25)
+
+The owner's audit named controls that appear twice, and strengths that come twice for one input.
+Checked one by one: the ones that really were two places are now one.
+
+- Flash Limit was a switch in Master and another at the foot of Wall → Output. The switch is in
+  Master, where a hand riding a set is; Wall → Output draws a line that says on or off and where the
+  switch is, because the wall is where someone checks the safety. The test id `output-flash-guard`
+  is gone (no check read it); `flash-limit-master` stays.
+- Room, Film and Sound each had a Drive (the sensor stirring the liquid) in its section and an
+  Impact (the master over the patches that read it) in Patches. Each Impact sits under its Drive now;
+  Shapes Impact has no input section and stays at the bay, which links to the other three. The keys
+  are unchanged; only the section a pin is filed under moved (`deskPins` SECTION_OF). This undid the
+  earlier gathering of the masters under the bay, on purpose: the owner's later finding was two
+  strengths for one input.
+- The platform's spin (Rotation Speed, the Flick buttons, Auto Spin, Spin Rate, Beats a Turn,
+  Reverse Spin, Spin Direction, Wander, Spin From Music, Flick Strength, Plate Drag) left Plates & LED,
+  a Stage section Build and Gig cannot dock, for **Plate Spin** in Motion. No key changed.
+- Build's deck takes Squish Plate after Fluid Physics, since the glass's knobs the deck once held
+  under Fluid Physics are in Squish Plate now. A layout already saved is untouched.
+- Songs' "Stage sequences (the old sequencer)…" 10 px link at 40% opacity is a button of the same
+  weight as its neighbours.
+- The track panel had its own Start a take and replay/delete list beside the Record panel's. It is
+  one button into the Record panel; the take itself, its clock and `T` are unchanged.
+
+Checks. `panel` files each master with its source and each Drive with its master, and asks the
+sliders-drawn-equal-sliders-filed rule of Plate Spin, the room, the film and the sound as well.
+`qa` reads Film Impact from the film's section.

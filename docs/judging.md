@@ -1709,3 +1709,24 @@ On the desk, open Settings (⌘K, All settings…) and look under Chemistry and 
 
 Bad: a control you went looking for in the old place and could not find by the search box, or a
 section with so few controls that it should have been joined to another.
+
+## 75. One home per setting, second half (PLAN 35c-2)
+
+On the desk and on the phone's Settings strip:
+
+1. Motion lists **Plate Spin**: Rotation Speed, the Flick buttons, Auto Spin, Spin Rate, Beats a
+   Turn, Reverse Spin, Spin Direction, Spin Wander, Spin From Music, Flick Strength and Plate Drag.
+   Plates & LED (Stage) keeps only Layers, the blend, and the LED platform. In Build you can dock
+   Plate Spin beside the set.
+2. **Flash Limit** has one switch, in Master. Wall shows a line saying whether it is on, and no
+   switch. Turn it off in Master and the Wall line turns amber.
+3. Each Drive has its Impact under it: Room Drive / Room Impact in the Motion camera, Film Drive /
+   Film Impact in Film, Sound Drive / Sound Impact in Sound. Shapes Impact is the only master left
+   in Patches, which links to the other three.
+4. Build's deck now holds Squish Plate after Fluid Physics (a layout you had saved is unchanged).
+5. Songs: "Stage sequences…" is a button like the ones above it, with a list-music icon.
+6. The track panel's Takes is one button that opens the Record panel, where takes are started,
+   replayed and deleted.
+
+Bad: a control you used all the time that is now in a place you do not expect, or a Build deck that
+runs out of room with Squish Plate in it.

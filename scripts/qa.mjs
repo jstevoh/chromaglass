@@ -1611,7 +1611,7 @@ try {
       await settle(1200);
       /*
         Film Drive is the film's own section; Film Impact is a master over the
-        film's patches, so it sits with the other three under Patches. Each is
+        film's patches, so it sits beside Film Drive in the film's section (PLAN 35c-2). Each is
         read from the section it is in, and only while that section is the
         one on screen: every section is in the page at once, so a control
         found without looking there proves nothing about where it lives.
@@ -1627,9 +1627,7 @@ try {
       await clickOn('settings-nav-film');
       await settle(500);
       const drive = await sliderIn('film', 'filmDrive');
-      await clickOn('settings-nav-patches');
-      await settle(500);
-      const force = { drive, impact: await sliderIn('patches', 'filmImpact') };
+      const force = { drive, impact: await sliderIn('film', 'filmImpact') };
       check('the film can drive the plate as well as light it',
         !!force.drive && !!force.impact,
         `drive ${!!force.drive}, impact ${!!force.impact}`);
