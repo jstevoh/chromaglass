@@ -133,7 +133,7 @@
  * the app with the projector window open.
  */
 
-import { isGlobalAmbientMode } from './ambient';
+import { isGlobalAmbientMode } from './ambient.ts';
 
 export type DrawSource = 'frame' | 'ask';
 

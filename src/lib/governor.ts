@@ -1,4 +1,4 @@
-import { isGlobalAmbientMode } from './ambient';
+import { isGlobalAmbientMode } from './ambient.ts';
 import type { QualityRung } from './platform';
 
 /**
