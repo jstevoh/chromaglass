@@ -3174,6 +3174,24 @@ and the canvas's top at the plan, the second touch and the drag's end, and fails
 canvas moved or the second touch starts off it. The phone has no plate bar. Record's
 labels still change width in the same bar (19v-4).
 
+**19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
+Shipped 2026-10-25. Found with 19v-3: at 1280 × 800 in Build, `RecordControls`' button
+(`record-button` after 14ae/#463 unified the desk's Video and Take buttons into one, and
+`pressed={running} live` after 35a/#461) grew from `● Record` (93.5 px, or 120.1 px before
+35a removed inline shortcut chips) to `■ Stop · 0:00` (118.2 px, +24.7 px) when recording
+Plate video, a Take, or both, shifting its neighbours in the plate bar (and before 14ae,
+when two buttons sat side by side, wrapping the bar to two rows and dropping the plate
+42.0 px). On the phone's Play screen (`PhonePlay`), `play-record` grew by 28.0 px when a
+clip started, pushing `play-shuffle` and `Account` across the top bar. Both the desk's
+`RecordControls` button and Play's `play-record` pill now keep their idle content in flow
+(`invisible` while recording) and overlay the running `tabular-nums` clock inside the same
+box (at `2xl` on the desk the running overlay reads `■ Stop · 0:00` while the hover title
+and `dot-rec` name what is recording), so starting, running and stopping a recording changes
+their boxes by 0.0 px. `layout`
+at 1280 in Build across `off → Plate video → Take → Plate video + Take → off` (before:
+Record 24.7 px; after: 0.0 px on plate, Record and Save) and `phone` on Play in portrait
+(before: Record 28.0 px, Shuffle 28.0 px; after: 0.0 px on both) ask it on every PR.
+
 ### 19w. A fifth Mac shard: every shard well inside its timeout
 
 **Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
