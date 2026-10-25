@@ -5319,3 +5319,17 @@ Checks. `panel` reads the section for the switch, both ports and the factory map
 the absence of its old copies; `qa`'s Mic-dot block reads the state line and follows the link to the
 sheet's Mic tile; `opensource` and `kickbubbles` choose the band in the sheet and read the state
 line. Harnesses that set `chromaglass-audio-source` in storage are unchanged.
+
+### 35d. Colour and keys (shipped 2026-10-25)
+
+The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
+is the first batch, the three that need no new behaviour. Colour says where a control lives, never whether
+it is on: violet is on and red is live exactly as 35a set them (`npm run states` holds), so the seven group
+colours are muted mid-tones kept off both, each holding its knob's pointer at 3.9:1 or better. A setting's
+group is the group of the section that draws it, so Speed is the same colour in the Rides panel as in
+Settings. The colour reaches the cap through one custom property, `--cap`, set by `data-group` and read by
+whatever is inside, which is how the panel header's tick and the phone's thumb take it without a prop. The
+tools' pictograms are single lines on a 24 grid, one for what each tool does to the liquid; the desk's are
+keycaps with the letter in the corner, the held one pressed 2 px and lit, the phone's the same pictures in
+the dock. Snail and hare sit at the ends of the five pace controls and come up from faint when the control
+is at that end; they do not move. Judging §77.

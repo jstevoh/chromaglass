@@ -20,6 +20,7 @@ import type { VisualizerSettings } from '../../types';
 import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
+import { ToolGlyph } from '../ui/ToolGlyph';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
 
@@ -770,22 +771,30 @@ function ToolsBody({ p }: { p: DeskProps }) {
           setToolMenu({ tool: t, at: { x: e.clientX, y: e.clientY } });
         }}
       >
-        {TOOLS.map(([id, label, k]) => (
-          <button
-            key={id}
-            role="tab"
-            aria-selected={p.tool === id}
-            onClick={() => p.onTool(id)}
-            title={`${label} (${k}). Right-click for its options.`}
-            data-testid={`tool-segmented-${id}`}
-            aria-keyshortcuts={k}
-            className={`inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border px-2 text-[13px] font-medium transition-colors duration-[120ms] ${
-              p.tool === id ? LIT : 'border-border text-muted hover:bg-hover hover:text-text-2'
-            }`}
-          >
-            <span className="truncate">{label}</span>
-          </button>
-        ))}
+        {TOOLS.map(([id, label, k]) => {
+          const held = p.tool === id;
+          return (
+            // A keycap: the tool's pictogram, its name, and the letter that picks it in the corner. The held one sits 2 px lower with its key's edge gone, and stays lit.
+            <button
+              key={id}
+              role="tab"
+              aria-selected={held}
+              onClick={() => p.onTool(id)}
+              title={`${label} (${k}). Right-click for its options.`}
+              data-testid={`tool-segmented-${id}`}
+              aria-keyshortcuts={k}
+              className={`relative flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border pt-0.5 text-[11px] font-medium transition-[transform,box-shadow,background-color] duration-[120ms] ${
+                held
+                  ? `${LIT} translate-y-[2px] shadow-none`
+                  : 'border-border bg-elevated text-muted shadow-[0_2px_0_0_rgba(0,0,0,.6)] hover:bg-hover hover:text-text-2'
+              }`}
+            >
+              <ToolGlyph id={id} size={18} />
+              <span className="max-w-full truncate px-0.5 leading-none">{label}</span>
+              <kbd className={`pointer-events-none absolute right-1 top-0.5 font-mono text-[9px] leading-none ${held ? 'text-on-lit/80' : 'text-faint'}`}>{k}</kbd>
+            </button>
+          );
+        })}
       </div>
       {p.onToolAmount && (
         <div className="flex items-center gap-2">

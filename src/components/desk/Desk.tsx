@@ -252,6 +252,7 @@ export function Desk(p: DeskProps) {
           key={id}
           id={id}
           title={spec.name}
+          group={spec.category}
           floating={opts.floating}
           collapsed={false}
           className={opts.className}
@@ -276,6 +277,7 @@ export function Desk(p: DeskProps) {
         key={id}
         id={id}
         title={spec.name}
+        group={spec.category}
         meta={panelMeta(id, p)}
         floating={opts.floating}
         collapsed={collapsed}

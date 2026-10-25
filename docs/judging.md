@@ -1745,3 +1745,24 @@ On the desk (the phone already had one of each):
    **Set up…** (opens Settings → Controller), and still teaches: Learn, banks, bindings, the picture,
    Save and Load file. It no longer has a switch, a port picker, factory chips or Auto-map.
 
+
+## 77. Coloured knob caps, tool keycaps, a snail and a hare (PLAN 35d)
+
+On the desk (Build, with Recipe, Fluid Physics, Lens and Tools open):
+
+1. Every knob's cap wears the colour of its group: Play off-white, Pour blue, Feed orange, Motion
+   green, Chemistry teal, Look yellow, Stage grey. The same colour is the small tick before a panel's
+   title and the dot on a Settings rail heading. Violet still means on and red still means live; no cap
+   should read as either.
+2. Speed and Evolve Speed (and Gel Speed, Chase Speed, Kaleido Spin where you pin them) have a snail
+   at the slow end of the ring and a hare at the fast end, faint until the knob is at that end. Kaleido
+   Spin has a hare at each end, since it turns either way.
+3. The Tools panel is ten keycaps: a drawn picture, the name, the letter in the corner. The held tool
+   is lit violet and sits 2 px lower. Press a letter on the keyboard and the held key moves.
+
+On the phone: the dock's ten tools carry the same pictures (the held one lit and 2 px lower); Motion's
+Evolve speed and Play's Speed have the snail and hare at the ends of the track, and the thumb takes its
+group's colour.
+
+Bad: a cap you read as "on" or "live", a colour you cannot tell from its neighbour at arm's length, a
+picture that does not say what its tool does, or a snail and hare you do not see until you look for them.

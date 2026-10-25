@@ -8722,6 +8722,26 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
     (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.
   - 35b-2's pin picker and command palette still list by section, not by the seven groups.
+
+- **35c-2** One home per setting, what is left of phase 3: Flash Limit (Settings' Master and the
+  Wall), Blackout, MIDI on (Settings and Controller) and the audio source (Settings and Sound)
+  each appear in two places, with record and replay, and the unused `desk/PerformanceButton.tsx`;
+  Drive/Impact pairs sit in different sections (one Strength per input); the platform's spin in
+  Plates & LED is Motion's but Stage-gated; the sequencer is behind a 10 px, 40%-opacity link in
+  Songs; the Build layout's deck lists Fluid Physics, which used to be the glass's knobs, so it
+  could take Squish Plate beside it. After 35c-1.
+- ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~ Shipped: a knob's
+  cap, the tick in a panel's header, the dot on a rail heading and the phone's touch thumb wear their group's
+  colour (the seven in `index.css`; a setting's group is its section's, `groupOfSetting`); the tools are
+  keycaps on the desk and pictograms on the phone's dock (`ToolGlyph`); a snail and a hare mark the ends of
+  Master Speed, Evolve Speed, Gel Speed, Chase Speed and Kaleido Spin wherever they are drawn as a knob or a
+  slider (`PACE_KEYS`, `PaceTrack`). Judging §77. Story in `docs/plan-shipped.md` §35.
+- **35d-2** What batch A left: the remote's own sliders (Speed and Evolve Speed in `RemoteControl.tsx`) have
+  no snail and hare, and the remote has no group colours; the phone's Settings sheet takes the cap colours
+  only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
+  its hare at both ends but no snail at the stop in the middle (the slider has one under the track). Batches B
+  (liquid in the controls: bottles, viscosity drip, lamp filament) and C (show hardware: reels, tap light, VU
+  needle, lens cap, strobe dots) are in `/handoff/playful-controls.md`.
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.

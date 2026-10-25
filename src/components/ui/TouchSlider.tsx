@@ -3,6 +3,8 @@ import { curveOf, handValueAt, travelOf } from '../../lib/midi';
 import { helpFor } from '../../lib/controlHelp';
 import type { VisualizerSettings } from '../../types';
 import { useControlTip } from './ControlTip';
+import { groupOfSetting } from '../../lib/settingsMap';
+import { PaceTrack } from './Pace';
 
 /*
   The touch slider (Desk v2's design system, "Touch slider"): one row 44
@@ -67,6 +69,7 @@ export function TouchSlider({ label, value, min, max, setting, onChange, display
       ref={el => { tip.anchor.current = el; }}
       className="flex h-11 items-center gap-3"
       data-testid={testId}
+      data-group={groupOfSetting(setting)}
       onPointerUp={resetTo === undefined ? undefined : e => {
         const last = lastTap.current;
         if (last && e.timeStamp - last.t < DOUBLE_TAP_MS && Math.abs(e.clientX - last.x) < DOUBLE_TAP_PX) {
@@ -93,15 +96,19 @@ export function TouchSlider({ label, value, min, max, setting, onChange, display
       ) : (
         <span className="w-[84px] shrink-0 truncate text-[14px] font-medium text-text-2">{label}</span>
       )}
-      <input
-        type="range"
-        min={0} max={1} step={0.001}
-        value={at}
-        onChange={e => onChange(handValueAt(Number(e.target.value), min, max, curve))}
-        aria-label={label}
-        className="ride-slider is-touch min-w-0 flex-1"
-        style={style}
-      />
+      <div className="min-w-0 flex-1">
+        <PaceTrack settingKey={setting} at={at} size={16}>
+          <input
+            type="range"
+            min={0} max={1} step={0.001}
+            value={at}
+            onChange={e => onChange(handValueAt(Number(e.target.value), min, max, curve))}
+            aria-label={label}
+            className="ride-slider is-touch w-full"
+            style={style}
+          />
+        </PaceTrack>
+      </div>
       <span className="w-11 shrink-0 text-right font-mono text-[12px] text-muted">{display}</span>
     </div>
   );
