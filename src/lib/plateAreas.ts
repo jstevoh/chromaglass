@@ -144,9 +144,9 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     music reaches it takes the areas in turn.
   */
   'lumia': [
-    { x: 0.30, y: 0.38, r: 0.16, liquid: 'glycerine', dye: 0, band: 'any', fill: 0.45 },
-    { x: 0.71, y: 0.30, r: 0.13, liquid: 'soap', dye: 1, band: 'any', fill: 0.4 },
-    { x: 0.62, y: 0.70, r: 0.12, liquid: 'glycerine', dye: 2, band: 'any', fill: 0.35 },
+    { x: 0.30, y: 0.38, r: 0.16, liquid: 'glycerine', dye: 0, dyes: [0], band: 'any', fill: 0.45 },
+    { x: 0.71, y: 0.30, r: 0.13, liquid: 'soap', dye: 1, dyes: [1], band: 'any', fill: 0.4 },
+    { x: 0.62, y: 0.70, r: 0.12, liquid: 'glycerine', dye: 2, dyes: [2], band: 'any', fill: 0.35 },
   ],
   /*
     Cell Bloom: a closeup look, so its areas are where its camera is. It
@@ -157,22 +157,57 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     whole at 7.8x), measured in the lab as a plain magenta frame. Now three
     small pools sit round the middle of the plate inside one closeup frame,
     the camera holds on the middle, and the dish's turn carries the pools
-    round under it: silicone and magenta (where the bass lands), oil and
-    lavender (the mids), silicone and ultramarine (the treble).
+    round under it: silicone and magenta-to-amber (where the bass lands),
+    oil and lavender (the mids), silicone and ultramarine (the treble).
   */
   'cell-bloom': [
-    { x: 0.5, y: 0.425, r: 0.05, liquid: 'silicone', dye: 0, band: 'bass' },
-    { x: 0.565, y: 0.5375, r: 0.05, liquid: 'oil', dye: 1, band: 'mid' },
-    { x: 0.435, y: 0.5375, r: 0.05, liquid: 'silicone', dye: 2, band: 'treble' },
+    { x: 0.5, y: 0.425, r: 0.05, liquid: 'silicone', dye: 0, dyes: [0, 3], band: 'bass' },
+    { x: 0.565, y: 0.5375, r: 0.05, liquid: 'oil', dye: 1, dyes: [1], band: 'mid' },
+    { x: 0.435, y: 0.5375, r: 0.05, liquid: 'silicone', dye: 2, dyes: [2], band: 'treble' },
+  ],
+  /*
+    Poster, 1969 (PLAN 25b-4, 28i-3b): three hard-edged poster shapes apart on
+    the glass, so the bass and snare work separate shapes rather than one
+    middle stain. Left, an orange-and-coral milk shape on the bass; right, an
+    ultramarine-and-purple ink shape on the mids; low in the middle, an amber
+    milk shape on the treble.
+  */
+  'poster-1969': [
+    { x: 0.28, y: 0.36, r: 0.14, liquid: 'milk', dye: 0, dyes: [0, 1], band: 'bass' },
+    { x: 0.72, y: 0.38, r: 0.14, liquid: 'ink', dye: 3, dyes: [3, 4], band: 'mid' },
+    { x: 0.48, y: 0.72, r: 0.13, liquid: 'milk', dye: 2, dyes: [2], band: 'treble' },
+  ],
+  /*
+    Milk Marbling (PLAN 25b-5, 28i-3b): its own seed lays the pale milk ground
+    and four food-colouring spots (OWN_SEED_AREAS). Three of those spots take
+    the music's hands here: top left, a soap spot (yellow and amber) that the
+    kick touches to send colour running; top right, a milk spot (blue and
+    magenta) that the snare's paddle combs; low middle, ultramarine and teal.
+  */
+  'milk-marble': [
+    { x: 0.37, y: 0.37, r: 0.09, liquid: 'soap', dye: 0, dyes: [0, 1], band: 'bass' },
+    { x: 0.63, y: 0.37, r: 0.09, liquid: 'milk', dye: 2, dyes: [2, 3], band: 'mid' },
+    { x: 0.50, y: 0.63, r: 0.09, liquid: 'milk', dye: 4, dyes: [4, 5], band: 'treble' },
+  ],
+  /*
+    Red Cabbage (PLAN 25i-2, 28i-3b): an acid well on the left where the snare
+    drops acid (blooming pink in the indicator) and a base well on the right
+    where the kick drops base (turning green); where the two fronts meet across
+    the middle they cancel back to violet.
+  */
+  'red-cabbage': [
+    { x: 0.31, y: 0.44, r: 0.14, liquid: 'acid', dye: 0, dyes: [0], band: 'mid' },
+    { x: 0.69, y: 0.56, r: 0.14, liquid: 'base', dye: 1, dyes: [1], band: 'bass' },
   ],
 };
 
 /**
  * Looks whose areas take the music and the area cords but whose plate is laid
  * by the look's own seed, which puts its shapes in those places (Jellyfish
- * Bloom's bells), rather than as pools (layAreas).
+ * Bloom's bells, Milk Marbling's pale milk dish and food-colouring spots),
+ * rather than as pools (layAreas).
  */
-export const OWN_SEED_AREAS: ReadonlySet<string> = new Set(['jellyfish-bloom']);
+export const OWN_SEED_AREAS: ReadonlySet<string> = new Set(['jellyfish-bloom', 'milk-marble']);
 
 /** The areas of a look, or null for a look built the old way. */
 export const plateAreas = (presetId: string | null | undefined): PlateArea[] | null =>
