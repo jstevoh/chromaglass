@@ -34,7 +34,7 @@ const { startUpdates, updateMenuItem, updatesOff, downloadUrl, RELEASES, DMG, FI
 const tmp = mkdtempSync(join(tmpdir(), 'cg-updates-'));
 const out = join(tmp, 'macApp.mjs');
 await build({ entryPoints: [join(REPO, 'src', 'lib', 'macApp.ts')], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { macAppRow, onMacComputer, MAC_DOWNLOAD_URL } = await import(pathToFileURL(out).href);
+const { macAppRow, onMacComputer, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN } = await import(pathToFileURL(out).href);
 rmSync(tmp, { recursive: true, force: true });
 
 let failed = 0;
@@ -248,6 +248,9 @@ check('in the app: an update is a Download button', inApp('available').button ==
 check('in the app: a ready one is Restart to Update', inApp('ready').button === 'Restart to Update');
 check('in the app: downloading has no button', inApp('downloading').button === null && /40%/.test(inApp('downloading').line));
 check('in the app: the version is shown', inApp('none').current === '1.3.0');
+// macOS 15 took right-click → Open away for an app it cannot check (the owner's
+// Mac refused 1.3.622, 2026-10-25): the words point at the one way left.
+check('the first-open words name Settings\' Open Anyway, not right-click', /Privacy & Security/.test(MAC_FIRST_OPEN) && /Open Anyway/.test(MAC_FIRST_OPEN) && !/right-click|control-click/i.test(MAC_FIRST_OPEN), MAC_FIRST_OPEN);
 
 // --- The three files agree on where a release is ------------------------------
 const require = createRequire(import.meta.url);
@@ -290,6 +293,15 @@ const onlyMain = releaseJob.indexOf('git merge-base --is-ancestor "$GITHUB_SHA" 
 check('a release (a tag too) is published only from a commit on main, before anything is uploaded', onlyMain > 0 && /fetch-depth: 0/.test(releaseJob.slice(0, onlyMain)) && onlyMain < releaseJob.indexOf('gh release create'));
 check('a run on main or a tag is never cancelled by another; a pull request\'s newer push replaces its older run',
   /\nconcurrency:\n  group: desktop-\$\{\{ github\.event_name == 'pull_request' && github\.ref \|\| github\.run_id \}\}\n  cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}\n/.test(top));
+// The notes tell the first open whenever Gatekeeper refuses the built app, and
+// that is asked of the app (spctl), not read off which secrets were set: a
+// Developer ID that signed but failed to notarise is refused all the same.
+const notesIf = releaseJob.indexOf('if [ "$GATEKEEPER" != accepted ]');
+check('the release notes say how to open a build Gatekeeper refuses, before it is published',
+  /\n        id: build\n/.test(buildJob) && /spctl --assess --type execute -vv desktop\/release\/mac-arm64\/ChromaGlass\.app/.test(buildJob) && /grep -q 'source=Notarized Developer ID'/.test(buildJob)
+    && /\n      gatekeeper: \$\{\{ steps\.build\.outputs\.gatekeeper \}\}\n/.test(buildJob)
+    && /GATEKEEPER: \$\{\{ needs\.build\.outputs\.gatekeeper \}\}/.test(releaseJob)
+    && notesIf > 0 && /Open Anyway[^\n]*>> notes\.md/.test(releaseJob.slice(notesIf)) && notesIf < releaseJob.indexOf('gh release create'));
 check('gh release create uploads the feed, the zip, the blockmaps and the fixed-name dmg', ['latest-mac.yml', '*.zip', '*.blockmap', DMG].every((f) => create.includes(f)) && create.includes('--latest'), create.replace(/\s+/g, ' '));
 
 console.log(`\n${failed ? `FAIL  ${failed} line(s)` : 'ok    every line'}`);

@@ -1691,7 +1691,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           label="Lamp Warmth"
           value={settings.lampWarmth ?? 0}
           min={0}
-          max={1.0}
+          max={3.75}
           step={0.05}
           onChange={(v: number) => onUpdate({ lampWarmth: v })}
           settingKey="lampWarmth"

@@ -155,7 +155,7 @@ Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet
 with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-smoke**, the site on two Windows PCs, by hand (§13).
 The owner's account steps sit here too: **S8-on** (switch the crash reports on),
 **19g** (more Mac runners), **12.2** (the store accounts), **13.1-sign** (the Mac app's
-Developer ID).
+Developer ID and notarisation, which takes away the "may harm your Mac" refusal on first open).
 
 ### Wave 3. Seams in the two big files (one session, in a quiet week)
 
@@ -2785,13 +2785,24 @@ network):
   Mac (Profile & Store for Pro, the landing page) links to its fixed-name .dmg; the app
   finds new releases itself (electron-updater, `desktop/updates.js`) and, ad hoc,
   offers the download in its menu and the profile sheet. *Measure:* `npm run updates`
-  (69/69, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
+  (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §75.
   - **13-update-signed** *(after 13.1-sign)*: with the Developer ID secrets in, the
     same code downloads in the background and installs on quit. Nothing to build;
     the first signed release is judged by installing the one before it and seeing it
-    replace itself (§75's last step).
+    replace itself (§75's last step). Signing is also what takes away the first-open
+    warning: set `MAC_APP_NOTARISED` true in `src/lib/macApp.ts` then, and the profile
+    sheet and landing page stop telling the way round (the release notes stop by
+    themselves, from what `spctl` says of the built app).
+  - **13-first-open** *(shipped)*: the first release, 1.3.622 (2026-10-25), was refused on
+    the owner's Mac ("may harm your Mac"), and the reply sent then said right-click →
+    Open, which macOS 15 no longer offers for an app it cannot check. The release notes
+    (when `spctl` refuses the build), the profile sheet's Mac app card and the landing
+    page's download line now say System Settings → Privacy & Security → Open Anyway;
+    `desktop/README.md` adds the `xattr` way. Only a Developer ID **and** notarisation
+    (13.1-sign) removes the warning. *Measure:* `npm run updates`, two lines (the words,
+    and the notes' gate before publishing).
   - *Trap:* the updater reads the repository's **newest** release. Any other kind of
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
     with `--latest=false`, or every installed app looks for `latest-mac.yml` in it
@@ -8770,14 +8781,31 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   the pace of the carrier's viscosity (`dripFallSeconds`, 20 to 1); Lamp Warmth has a bulb whose filament
   is the blackbody colour at the temperature its grade matches, written in kelvin (`lampKelvin.ts`,
   6500 K at 0 down to 5100 K at 1). Held by `npm run panel`. Judging §78. Story in `docs/plan-shipped.md` §35.
-- **35e-2** What the readings showed, none changed here because each moves a look:
-  - **The lamp's grade tops out at 5100 K.** Read in kelvin, Lamp Warmth at full is a warm morning, not
-    the 3200 K of a quartz-halogen overhead projector, so the sealed-wheel look it was named for is only
-    about a third of the way there. A grade that reached 3200 K (a wider tint, red over blue 5.1, with
-    the vignette unchanged) would move every look that sets `lampWarmth` (Lamp Warmth 0.25 and 0.45 in
-    `presets.ts` and `lucky.ts`'s draws); the owner's call, with the bulb and its figure already in
-    place to show the new range. The tint is also applied to the picture, not to the lamp's own light
-    on the dye, so a real colour temperature would warm the dye's transmission too (`transmission`).
+- ~~**35e-2** The lamp's grade tops out at 5100 K.~~ Shipped (2026-10-25): Lamp Warmth reaches a quartz-halogen
+  projector's 3200 K. The slider is a temperature, even in mireds, and the plate multiplies by the blackbody's
+  own colour at it (`lampTint`, Planck and the CIE fit, worked out once on the CPU and handed in as
+  `lampTintR/G/B`), not a tint mixed in by the slider. It runs 0 to 3.75, and 0 to 1 is still 6500 K to 5100 K
+  (the new tint is the old grade to 1.5% a channel there), so saved looks, the presets and Lucky keep their
+  colour with no migration. The vignette is unchanged (full from 1 on). Held by `npm run panel`. Story in
+  `docs/plan-shipped.md` §35; judging §80.
+- **35e-3** What the readings left, none changed because each moves a look or waits on another step:
+  - **The lamp's colour is a multiply on the finished picture,** which is the lamp's spectrum times a white
+    surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
+    Planck spectrum entering `spectralThrough`'s six bands before the eye sums them, so a deep blue dye under
+    3200 K goes darker and more violet than a multiplied blue does (it already goes to a near black in the
+    lab picture). Named shortcut; replace it. The warm end is also about a third dimmer, which is a choice and not
+    physics (holding red still keeps 0 to 1 the old grade; a lamp's brightness is not set by its colour
+    temperature), and Exposure puts it back; if the owner wants the end held at the same brightness, that is one
+    normalisation in `lampTint`. Two more shortcuts: the neutral is the 6500 K blackbody, not D65 (sRGB's white,
+    which sits a little off the blackbody curve), so the figure is approximate; and the full blackbody ratio is
+    what a camera or film balanced for daylight records, where an eye in the room would partly adapt to the warm
+    light and see less orange.
+  - **Velvet Underground (0.25) and Home Movie (0.45) keep their colour** to under 2% in blue, because their
+    numbers kept their meaning. Home Movie is the look an old projector's lamp is for: the owner's eye on
+    whether it should now go to 2 or 3 (judging §80 item 4); Lucky still draws 0 to 0.8, so it never reaches
+    the halogen.
+  - **Evolve wanders Lamp Warmth by a fifth of its travel,** which is now a fifth of 3.75: from a look at 0.25 up
+    to 1, from a look at 3 over the whole warm end. Pull it in (a per-dial span) if that reads as too much.
   - **The viscosity drip is slow motion at one factor.** The ratio between thin and thick is the
     physics (Stokes's terminal speed, the solver's 1 and 20 mm²/s); the thread behind a thick drop is
     drawn stretching at the drop's speed, not solved, and a real thread at this viscosity pinches off in
@@ -8799,7 +8827,7 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   through a ref on its own frame); Blackout is a lens with a red cap on it, one drawing on the desk header,
   Settings, the remote and Draw, and the remote's two Blackouts are one (the bar under the thumb); Auto Spin has
   a strobe ring that drifts at the dish's speed in Rate and stands still in Tempo once a tempo is heard
-  (`strobeRing.ts`). Held by `npm run panel`. Judging §80. Story in `docs/plan-shipped.md` §35.
+  (`strobeRing.ts`). Held by `npm run panel`. Judging §81. Story in `docs/plan-shipped.md` §35.
 - **35f-2** What batch C left:
   - **Item 12, Looks as slide-carousel mounts**, is its own piece (it touches the set list, so `desk`,
     `setlist` and `panel` all have to hold).

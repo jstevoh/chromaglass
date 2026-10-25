@@ -76,7 +76,11 @@ switches it off.
 Until it is signed with a Developer ID (below), macOS says it cannot check the app
 for malicious software. Open it once, let macOS refuse, then System Settings →
 Privacy & Security → *Open Anyway* (macOS 15 no longer offers this from the
-right-click menu). After that it opens like any app.
+right-click menu, and a double-click only says it may harm your Mac). After that
+it opens like any app. In Terminal, `xattr -dr com.apple.quarantine
+/Applications/ChromaGlass.app` does the same. The release notes and the profile
+sheet say this for every build Gatekeeper refuses (`spctl` asks the built app in
+`desktop.yml`); notarising (13.1-sign) is what takes the warning away.
 
 macOS then asks, each once:
 

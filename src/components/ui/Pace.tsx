@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { paceOf } from '../../lib/settingsMap';
 import { Bulb } from './Playful';
+import { LAMP_WARMTH_MAX } from '../../lib/lampKelvin';
 
 /*
   The snail and the hare (PLAN 35d): the two ends of a pace control, drawn as
@@ -52,12 +53,12 @@ export function PaceTrack({ settingKey, at, children, size = 12 }: { settingKey:
   /*
     Lamp Warmth is the other control that wears a drawing on its track (PLAN
     35e): a bulb at the left whose glow is the grade's colour temperature. Its
-    travel is the setting (0 to 1, no curve), so `at` is the warmth itself.
+    travel is the setting with no curve, so `at` is the warmth over its top.
   */
   if (settingKey === 'lampWarmth') {
     return (
       <div className="flex items-center gap-2" data-lamp="">
-        <Bulb warmth={at} />
+        <Bulb warmth={at * LAMP_WARMTH_MAX} />
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     );
