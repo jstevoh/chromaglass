@@ -1862,7 +1862,7 @@ check('and neither starts over the limit',
   // the slider names, so the shader has to take that tint from the uniforms the packer fills from the library.
   const uniformsSrc = readFileSync(join(root, 'src/gpu/plateUniforms.ts'), 'utf8');
   check("the plate's shader multiplies by the lamp's tint from the uniforms, and the packer fills them from lampTint",
-    /outColor \* vec3f\(U\.lampTintR, U\.lampTintG, U\.lampTintB\)/.test(plateWgsl) &&
+    /vec3f\(U\.lampTintR, U\.lampTintG, U\.lampTintB\)/.test(plateWgsl) &&
     /const tint = lampTint\(warmth\);[\s\S]{0,200}'lampTintR', tint\[0\][\s\S]{0,60}'lampTintG', tint\[1\][\s\S]{0,60}'lampTintB', tint\[2\]/.test(uniformsSrc),
     'plate.ts lamp line and plateUniforms.ts');
 
@@ -1891,6 +1891,18 @@ check('and neither starts over the limit',
   }
   check('from 0 to 1 the tint is the old grade to 1.5% a channel, so every saved look keeps its colour',
     worstLegacy < 0.015, `worst ${(worstLegacy * 100).toFixed(2)}% over 21 notches`);
+  // The vignette blends as it always did (1 - w + w*g*vig), not tint times a second blend: the review found 6% in the corners.
+  const shaderForm = /tint - \(tint - vec3f\(1\.0 - min\(U\.lampWarmth, 1\.0\)\)\) \* \(1\.0 - vig\)/.test(plateWgsl);
+  let worstCorner = 0;
+  for (let i = 0; i <= 20; i++) for (const vig of [0.55, 0.8, 1]) {
+    const w = i / 20, t = lampTint(w);
+    for (let c = 0; c < 3; c++) {
+      const now = t[c] - (t[c] - (1 - Math.min(w, 1))) * (1 - vig), was = 1 - w + w * LEGACY_GRADE[c] * vig;
+      worstCorner = Math.max(worstCorner, Math.abs(now / was - 1));
+    }
+  }
+  check('the vignette blends as the old grade did, to 1.5% in the corners of the dish, from 0 to 1',
+    shaderForm && worstCorner < 0.015, `shader form ${shaderForm}, worst ${(worstCorner * 100).toFixed(2)}% over 21 notches and three corner depths`);
   const pinLamp = readFileSync(join(root, 'src/lib/deskPins.ts'), 'utf8'), settingsSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
   check('the pin range, the Settings slider (typed as the number the sheet reads) and the bulb all end at the library\'s top',
     /key: 'lampWarmth'[^}]*max: LAMP_WARMTH_MAX/.test(pinLamp) && /settingKey="lampWarmth"/.test(settingsSrc) && Number(/label="Lamp Warmth"[\s\S]{0,160}max=\{([\d.]+)\}/.exec(settingsSrc)?.[1]) === LAMP_WARMTH_MAX &&

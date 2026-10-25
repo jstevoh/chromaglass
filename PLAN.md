@@ -8754,9 +8754,13 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
     Planck spectrum entering `spectralThrough`'s six bands before the eye sums them, so a deep blue dye under
     3200 K goes darker and more violet than a multiplied blue does (it already goes to a near black in the
-    lab picture). Named shortcut; replace it. The warm end is also about a third dimmer by design (a real lamp
-    gives a daylight-balanced eye that much less), and Exposure puts it back; if the owner wants the end held at
-    the same brightness, that is one normalisation in `lampTint`.
+    lab picture). Named shortcut; replace it. The warm end is also about a third dimmer, which is a choice and not
+    physics (holding red still keeps 0 to 1 the old grade; a lamp's brightness is not set by its colour
+    temperature), and Exposure puts it back; if the owner wants the end held at the same brightness, that is one
+    normalisation in `lampTint`. Two more shortcuts: the neutral is the 6500 K blackbody, not D65 (sRGB's white,
+    which sits a little off the blackbody curve), so the figure is approximate; and the full blackbody ratio is
+    what a camera or film balanced for daylight records, where an eye in the room would partly adapt to the warm
+    light and see less orange.
   - **Velvet Underground (0.25) and Home Movie (0.45) keep their colour** to under 2% in blue, because their
     numbers kept their meaning. Home Movie is the look an old projector's lamp is for: the owner's eye on
     whether it should now go to 2 or 3 (judging §79 item 4); Lucky still draws 0 to 0.8, so it never reaches

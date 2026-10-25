@@ -94,9 +94,10 @@ let tintMemo: { w: number; tint: [number, number, number] } | null = null;
  * blackbody's red, green and blue against the neutral's, held to the red
  * channel so that warmth takes its light from blue and green and leaves red
  * where it was, plus the small red lift the old grade had.
- * (A real lamp at 3200 K gives a camera balanced for daylight about a third of
- * the light the 6500 K one does; that is the figure the warm end shows, and
- * Exposure is the control that puts it back.)
+ * Holding red still is a choice, made so that 0 to 1 stays the old grade: it
+ * is what makes the warm end about a third dimmer (luminance 0.66 at 3200 K).
+ * A lamp's brightness is not fixed by its colour temperature, so this is not
+ * physics; Exposure puts it back.
  */
 export function lampTint(warmth: number): [number, number, number] {
   const w = Math.max(0, Math.min(LAMP_WARMTH_MAX, Number.isFinite(warmth) ? warmth : 0));
