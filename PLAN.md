@@ -6439,7 +6439,9 @@ once the login works (23.14).*
   emailed-link account each set a password from the sheet and sign in with it; the password form
   fits 1024×768 and a phone upright and on its side. *Owner's chore, once:* Firebase console →
   Authentication → Sign-in method → enable Email/Password (the emailed-link toggle is already
-  on) and leave Settings → User account linking on "Link accounts that use the same email".
+  on; email link cannot be on without the Email/Password provider, so this may already be done,
+  look before calling it owed) and leave Settings → User account linking on "Link accounts that
+  use the same email".
   Open follow-ups:
   **23.10e-1** (open): an emailed-link account cannot be told from a password one from the
   browser (Firebase lists the `password` provider for both), so the sheet says "Email (link or
@@ -6450,6 +6452,25 @@ once the login works (23.14).*
   password-strength setting) is not turned on; the form asks for 8 characters, Firebase's own
   floor is 6. **23.10e-4** (open): the iPhone app's sign-in (23.15) needs the same form and the
   keychain's autofill hints.
+  **23.10e-5** (open, from #475's review): `pendingProviderCredential` (Google's credential kept
+  when Firebase refuses a Google sign-in because the email has a password) is attached on the
+  next password sign-in for *any* email. Firebase refuses to link it to another account today
+  (`email-already-in-use`, swallowed), so it is safe by the platform and not by this code; store
+  the error's `customData.email` with the credential and link only when it matches the password
+  sign-in's email.
+  **23.10e-6** (open, from #475's review): `signInWithGoogleAddPassword` sets the signed-in flag
+  before checking the Google email is the typed one, so choosing the wrong Google account leaves
+  the person signed in as it with no plate; check first, or sign out on a mismatch. The same
+  path hits `auth/account-exists-with-different-credential` (a non-Gmail Google address whose
+  email already has a verified password) and says "Google is added when you do", but stashes no
+  credential, so it is not: stash it, or reword.
+  **23.10e-7** (open, from #475's review; pre-registration takeover, a known platform weakness):
+  someone can create a password account for another person's *non-Gmail* address with the public
+  key and link their own Google to it; if the real owner later resets the password and keeps
+  using the account, the attacker's Google still signs in to that uid, now with a verified email.
+  The emailed-link sign-in already runs on the Email/Password provider, so this is not new with
+  passwords. Fix: the sheet lists every linked provider with its own email and lets the owner
+  remove one, and a password reset signs the other providers out.
 - **23.15** (*later*, the owner 2026-10-24: no Apple sign-in for now; with §12's iPhone
   app, which needs it beside Google's under App Store guideline 4.8, and the paid Apple
   Developer account): Sign in with Apple on the site (`APPLE_SIGN_IN`, the Services ID
