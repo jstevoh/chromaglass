@@ -182,7 +182,10 @@ try {
       // Where the hand was when each pour was made, for `follows` below.
       g.addPhase = (x, y, r, a) => {
         const p = window.chromaglassDebug().pointer();
-        window.__bottleLog.phase.push({ x, y, a, hx: p.x / p.grid, hy: p.y / p.grid });
+        // And whether the mouse was down and how many times the look's own ring had been laid
+        // (phaseLays), so a pour that is not the hand's can be told from one that is (see strays).
+        const ring = window.chromaglassDebug().phaseLays;
+        window.__bottleLog.phase.push({ x, y, r, a, hx: p.x / p.grid, hy: p.y / p.grid, down: !!p.down, lays: typeof ring === 'function' ? ring() : null });
         return addPhase(x, y, r, a);
       };
       const addMix = g.addMix.bind(g);
@@ -253,6 +256,13 @@ try {
         list.reduce((a, c) => a + c.y - c.hy, 0) / list.length) : Infinity;
       return {
         n: on.length, a: on.reduce((a, c) => a + c.a, 0), mirror: list.filter((c) => near(c, mirror)).length, off,
+        // Every call that landed away from the stroke (the fling's reach is 0.14 of the plate, so a
+        // splatter has some at its edge), for the line below when the mirror or the hand's offset fails.
+        strays: list.filter((c) => !near(c, pts)).slice(0, 6).map((c) => ({
+          at: [+c.x.toFixed(3), +c.y.toFixed(3)], r: c.r === undefined ? null : +c.r.toFixed(3), a: +c.a.toFixed(3), down: c.down, lays: c.lays,
+          fromHand: c.hx === undefined ? null : +Math.hypot(c.x - c.hx, c.y - c.hy).toFixed(3),
+        })),
+        lays: list.length ? [list[0].lays, list[list.length - 1].lays] : null,
         follows: withHand && on.length >= 4 && off < 0.04
           && mean(on.slice(-q).map(hand)) - mean(on.slice(0, q).map(hand)) > 0.25,
       };
@@ -449,7 +459,9 @@ try {
     const r = ferro[t];
     check(`${t} with the Ferrofluid bottle lays ferrofluid along the stroke, and not at its mirror`,
       r.same && r.phase.n >= 8 && r.phase.a > 0.5 && r.phase.follows && r.phase.mirror === 0,
-      `${r.phase.n} pours, amount ${r.phase.a.toFixed(2)}, ${r.phase.follows ? 'following' : 'not following'} the hand (off it by ${r.phase.off.toFixed(3)} on average), ${r.phase.mirror} at the mirror${same(r)}`);
+      `${r.phase.n} pours, amount ${r.phase.a.toFixed(2)}, ${r.phase.follows ? 'following' : 'not following'} the hand (off it by ${r.phase.off.toFixed(3)} on average), ${r.phase.mirror} at the mirror${same(r)}`
+      // PLAN 19ac-3: 3 reds of 183 on the Splat alone, one at the mirror, two off the hand by 0.041 and 0.056 where its own scatter says 0.014; say what else poured.
+      + (r.phase.mirror > 0 || !r.phase.follows ? `; away from the stroke ${JSON.stringify(r.phase.strays)}, look rings laid (phaseLays) ${JSON.stringify(r.phase.lays)}` : ''));
   }
   check('the hand\'s first pour turns Ferrofluid up, and lays none of the look\'s',
     amountPicked <= 0.002 && amountPoured > 0.002 && ferroLays === 0,

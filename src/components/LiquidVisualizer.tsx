@@ -6756,6 +6756,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let throwFrames = 0;
     /** `stepDownFrames(n)`: a rung lost on each of the next n frames — swaps faster than a readback lands (S3, S6). */
     let stepDownFrames = 0;
+    /*
+      What `forceStepDown` asked for, kept across frames. It used to set the
+      engine status once and let the next frame's own status overwrite it, and
+      on a one-rung ladder (software WebGPU in a cloud session: classifyAdapter
+      says 'software', so qualityLadder has one rung) `failRung` has nowhere to
+      go, `governor.steppedDown` stays false, and `npm run tiers` lost the
+      step-down nudge before it could read it (Measure · lab, "locator.textContent:
+      Timeout 30000ms", PLAN 19aa-10). On a real ladder the governor does move
+      and agrees with this anyway.
+    */
+    let forcedStepDown = false;
     /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
     let stormFrames = 0;
     /*
@@ -7535,8 +7546,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             grid: lead?.gpu ? lead.gpu.N : 0,
             dpr: dprRef.current,
             tier, gpu: renderer?.info.gpuClass ?? 'weak', renderer: renderer?.info.renderer ?? '',
-            governed,
-            steppedDown: governed && governor.steppedDown,
+            governed: governed || forcedStepDown,
+            steppedDown: forcedStepDown || (governed && governor.steppedDown),
             gpuUnavailable,
             frameMs: governor.frameMs,
             simMs: simMsRef.current,
@@ -10650,6 +10661,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
         forceStepDown: (steppedDown = true) => {
+          forcedStepDown = steppedDown;
           if (steppedDown) governorRef.current?.failRung(performance.now() * 0.001);
           const prev = engineStatusRef.current;
           const next: EngineStatus = {

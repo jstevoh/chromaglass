@@ -3491,11 +3491,14 @@ for, and the GPU was asked for only after they had arrived and drawn.
   cap hold their length). Story in
   `docs/plan-shipped.md` §14v-7; judged by `npm run flakes -- --check 'no stop in the
   opening'` over the week after.
-- **14v-8. Two edges of 14v-7's rule, from its review (#456).** (a) One gap can reach
-  6.5 s before check 4 goes red: 4.5 s of it taken out as the page seen free, plus the 2 s
-  bar. Read the week's `stillIdle` on the line before deciding whether the cap should be
-  per gap. (b) The `seenOk` gate (long tasks observable, the timer ticking as asked) has no
-  self-case: add one to `stillCases` where the timer runs slow and nothing is taken out.
+- **14v-8. Two edges of 14v-7's rule, from its review (#456).** (b) is shipped (2026-10-25):
+  three more synthetic openings for the `seenOk` gate (long tasks not observable, the
+  timer's median over its bar, no timer reading), each of which must count the gap whole;
+  with `seenOk` forced true all three go wrong. (a) waits. One gap can reach 6.5 s before
+  check 4 goes red: 4.5 s of it taken out as the page seen free, plus the 2 s bar. Read the
+  week's `stillIdle` on the line before deciding whether the cap should be per gap; in the 37
+  Mac runs since 14v-7 merged the longest wait for a frame was 0.8 to 1.6 s and the still
+  intro took nothing out on any of them, so there is nothing to read yet.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
@@ -5226,6 +5229,18 @@ like day (`npm run macqueue -- --hours 24` for the time).
   readback taken off a plate that was rebuilt). The next red should print the plate's
   turn and the solver's step and clear counts across the window. Too big for the
   2026-10-05 bundle of small fixes; left open here.
+  **Cause found 2026-10-25 (4 reds of 169 Mac runs, 10-18 to 10-24): the check read the
+  plate in the frames after a rebuild, the dye was not lost.** All four print the same
+  states: 384² solvers #1 and #2 through the hold, 256² solvers #3 and #4 after it (the
+  governor stepped the grid down in the 700 ms after the lift), "the plate gained −6 to −8
+  of 411 to 570 handed it" from the snap, and in the same line each plate's own sums, read
+  a moment later, at 435 to 595. A rebuilt solver opens on the plate its predecessor handed
+  over on the GPU (`handOver`), but the CPU copy every reader sees (`readDensity`) is fresh
+  until the new solver's first readback lands, and the snap read that. The check now waits
+  for the same solvers on two looks and three readbacks since the first (up to 3 s) before
+  it snaps; no bar, cell or hold moved. Named, not done: for those few frames after a
+  resolution change every reader of `readDensity` sees an empty plate (bubbles, the
+  regulator's reading); the app could keep the old reading until the new one lands.
   **Instrumented 2026-10-10.** The two reds' logs (jobs 111540991031 and
   111236251946) were read again: both fingers at (45, 110) and (345, 110) px, 0.0 cells
   from where they were picked, 69 and 89 readbacks, every other line of the phone check
@@ -5540,11 +5555,71 @@ Not a gate and no bar: a rate depends on what was pushed.
   `k = kRaw²` is 1, and the 0.75-cell `still` threshold is under the moves' one cell on a
   192 grid. Open: why the push has an offset of about 50 steps before it rises, and
   whether a Mac with fewer than 12 steps a second still reads under the bar.
-- **19aa-7. Startup's "moving for good no later than the old way" 7 of 193.** Every red
-  read the show's own wait 1.8 to 3.0 s against the control's 0.7 to 1.1 s, with 1 s
-  spare, and moving for good 2.4 to 7.6 s earlier than the control. Not read further;
-  the next thing is whether the show's "own" here includes the still intro's idle
-  stretch that 14v-7 now sets apart in check 4 (the same Chromium wait, priced twice).
+- **19aa-9. Bottles' Splat with the Ferrofluid bottle, "not at its mirror" (read 2026-10-25).**
+  3 reds of 183 Mac runs in the week, all on the Splat and on no other tool or the replays
+  (0 of 183 for Dropper, Pour, Spray and Streak): two "not following the hand" (off it by
+  0.041 and 0.056 over 24 and 32 pours, against the 0.04 bar) and one with 1 pour at the
+  mirror (33 on the stroke, off it by 0.010; green on re-run). A Splat's first droplet is
+  flung 4.5 to 27 cells from the hand, so the mean offset of 33 pours has a spread of about
+  0.011 of the plate and 0.04 is out of reach of the scatter alone (0.14% a run for the one
+  that read 0.041, nothing for 0.056), and a fling cannot reach the mirror (0.45 of the
+  plate from the stroke, the fling 0.14). So something other than the hand poured ferrofluid
+  on those three: the look's own ring (`layPhase`, from a look being laid or the plate
+  coming up bare) is the lead, with the automation's Ferrofluid hand the other. The check's
+  pour log did not say; it now prints, when the mirror or the hand's offset fails, every
+  call that landed away from the stroke (where, its radius and amount, whether the
+  mouse was down, how far from the hand) and the ring counter (`phaseLays`) on the first
+  and last call. No bar moved. When a red names the pour, either mark it as the show's own
+  in the log (the way the dye log marks `auto`) or hold the show off the plate for the
+  window, as `__bottleTest` already holds `doseLiquid` off.
+- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** Its step-down
+  nudge ("12. slower framerates suggest upgrading to Pro") is read after `forceStepDown(true)`.
+  The hook set the engine status once and the next frame's own status replaced it: on software
+  WebGPU `classifyAdapter` says 'software', `qualityLadder` has one rung, `failRung` has
+  nowhere to go and `governor.steppedDown` stays false, so the card unmounted before the
+  check read it ("locator.textContent: Timeout 30000ms"). Not reproducible by running the
+  check (0 of 10 red on main in a cloud session, 0 of 6 after), so the nudge's presence was
+  sampled every frame for three seconds after the hook: the card is there for all of them
+  both ways, and the check, once it reads three seconds later, goes red 2 of 2 on main and
+  passes 2 of 2 with the fix. The hook now keeps what it was asked (`forcedStepDown` in the
+  loop's status), and the status in the loop reads it. A test hook only; the governor, the
+  ladder and the real step-down are as they were. It touches no bar. `governor.ts` was not
+  touched (#441, #474 and the #402 finish thread are in it).
+- **19aa-11. The Mac `webgpu` check "the stage starts, with nothing asked for" (3 of 192,
+  read 2026-10-25; two of them within twenty minutes that day).** `no stage` with no
+  `gpuFailure`, 30 s after load, on the first page of the run only: every later page of
+  the same run started at once. The same cold start as `startup`'s, but 30 s and not 3, and
+  the line says nothing about which part stopped. It now says: the frames and engine the
+  page reports, how long a fresh adapter request takes at that moment, and the page's
+  errors. Not fixed, not retried (the owner turned a retry down for `startup`, 2026-10-24).
+  The next red names it.
+- **19aa-12. Phone: "a finger holding the Press lifts nothing until it comes off" read
+  `held` once (2 of 177, 10-24 and 10-25).** `held` is the plate having pressed within 150 ms
+  of the read, and a held finger presses once a plate step, so a stall of that length on a
+  Mac stepping 12 to 23 times a second reads false while the press is held; both reds
+  printed "held false over 10 steps" with the lift laid at the finger afterwards. It now
+  reads six times across the same 600 ms and wants four held (a press laid once and not
+  renewed reads one or two); the lift half is as it was. Judge with `npm run flakes --
+  --check 'holding the Press lifts nothing'` a week after merge.
+- **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
+  the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
+  to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
+  *earlier* than the control. Over the 192 Mac runs of the week the show's own ran 0.40 to
+  3.25 s (median 0.78, 2.0 s or more on 8%), and the control's has the same tail (0.5 to
+  3.4 s): the line holds one noisy residual to another's plus a second, so it goes red when
+  only the show's tail lands. Ruled out from the logs: the opening's one wait for the GPU's
+  first uses (`useWait`) is 0.00 s on all 192, so it is not the unpriced part; and the boot's
+  warm compile (`first compile` row, 0.7 to 2.6 s on the reds) is mostly inside a priced
+  build, so taking it off the show would count it twice (it correlates 0.25 with own).
+  Not ruled out: the stretches that are neither Chromium's nor a build's are the page idle
+  and waiting on a process that is not the page (which 14v-7 already sets apart for the frame
+  gaps), or the page's own thread held (the three reds that printed it show 0.50 to 1.71 s
+  held). The logs do not say which, so every run's 1b line now ends its own wait with the
+  stretches that are neither Chromium's nor priced, how long they are and how much of
+  that the page's timer ticked on time in (printed, not judged; no bar moved). The next
+  step is to read that line on the week's reds and, if it is the page seen free, price it
+  the way 14v-7 does the frame gaps, with the same synthetic cases. The reds are 4% of runs,
+  so the week after this merges is the evidence.
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Red on #390's PR and its deploy
   and about 1 run in 6 in parallel (2 of 12 on main's code), on a line it should not
   have failed: the track panel's section against the band's. Three readings were taken

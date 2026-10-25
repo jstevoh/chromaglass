@@ -1572,8 +1572,23 @@ try {
       const errorsFrom = pageErrors.length;
       const liftFrom = await lift();
       await touch('touchStart', [{ ...A, id: 5 }]);
-      await settle(600);
-      const whileHeld = await lift();
+      /*
+        "Held" is the plate having pressed within RELEASE_MS (150 ms) of the
+        read, and the plate presses again on each of its steps while the
+        finger is down, so one read at 600 ms is a read of whether a step
+        happened in the last 150 ms: on a Mac stepping 12 to 23 times a
+        second a stall of that length is not rare. Two reds of 177 (10-24 and
+        10-25, both "held false over 10 steps" with the lift laid where the
+        finger was afterwards, so the press had reached the plate) were
+        that. Read six times across the same 600 ms, and held on four of the
+        six: a press laid once and never renewed is held for the first 150
+        ms and reads one or two of six; a stall costs the reads it covers.
+        The rest of the line reads the last sample as it read the one.
+      */
+      const holdReads = [];
+      for (let k = 0; k < 6; k++) { await settle(100); holdReads.push(await lift()); }
+      const whileHeld = holdReads[holdReads.length - 1];
+      const heldReads = holdReads.filter((r) => r.held).length;
       await touch('touchEnd', [{ ...A, id: 5 }]);
       await settle(900);
       const afterLift = await lift();
@@ -1615,9 +1630,9 @@ try {
         const last = afterLift.last;
         const near = !!last && !!ref.A && Math.hypot(last.x - ref.A.x, last.y - ref.A.y) <= 2;
         check('a finger holding the Press lifts nothing until it comes off, then the glass lifts into fingers where it was',
-          whileHeld.held && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
+          heldReads >= 4 && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
             && afterLift.steps > 0 && near && last.cells > 0,
-          `held ${whileHeld.held} over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
+          `held on ${heldReads} of ${holdReads.length} reads over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
       }
       await settings({ fingering: 0 });
       await page.getByTestId('phone-tool-dropper').click();
@@ -1704,6 +1719,32 @@ try {
       const stateHeld = await plateState();
       await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(700);
+      /*
+        Not the plate's reader until it has spoken. All four reds of the 172
+        Mac runs from 2026-10-18 to 10-24 (19h-2) show the same thing in the
+        line below: 384² solvers #1 and #2 through the hold, 256² solvers #3
+        and #4 after it, so the governor stepped the grid down in the 700 ms
+        after the lift. A rebuilt solver opens on the plate its predecessor
+        handed it (`handOver`, on the GPU), but the CPU's copy that every
+        reader sees (`readDensity`) is a fresh array until its first
+        readback lands, and the snap below read that: "the plate gained −8
+        of 538" in the same line whose each-plate sums, read a moment later,
+        say 579. The dye was never lost, the check read the plate in the
+        frames before it could be read. So the snap waits for the same
+        solvers on two looks and three readbacks since the first of them (the
+        count is the plate's, and a new solver's first readback is among
+        them), up to three seconds; the bars and the cells are as they were.
+      */
+      {
+        let seen = null;
+        for (let k = 0; k < 30; k++) {
+          const st = await plateState();
+          const key = st.plates.map((p) => p.solver).join('/');
+          if (seen?.key !== key) seen = { key, rb: st.plates[0]?.readbacks ?? -1 };
+          else if ((st.plates[0]?.readbacks ?? -1) - seen.rb >= 3) break;
+          await settle(100);
+        }
+      }
       const after = await snap();
       const rb1 = await readbacks();
       const stateAfter = await plateState();
