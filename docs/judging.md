@@ -1646,6 +1646,19 @@ On the laptop in a dark room, and on the phone, with no reading of labels:
 - **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
   tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
 
+## 75. The Mac app downloads, and finds its own updates (PLAN 13-update)
+
+On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
+Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
+copy that is there, and open it (the first open still needs System Settings → Privacy &
+Security → Open Anyway until the app is signed). On a phone the same card should say to open
+the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
+release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
+minute: one notification should say the new version is out, the ChromaGlass menu should offer
+Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
+while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
+another, and check that the first downloads it and becomes the new version after a quit.
+
 ## 72. A look saved in Chrome is in the Mac app (PLAN 23.18)
 
 Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
@@ -1696,3 +1709,24 @@ On the desk, open Settings (⌘K, All settings…) and look under Chemistry and 
 
 Bad: a control you went looking for in the old place and could not find by the search box, or a
 section with so few controls that it should have been joined to another.
+
+## 75. One home per setting, second half (PLAN 35c-2)
+
+On the desk and on the phone's Settings strip:
+
+1. Motion lists **Plate Spin**: Rotation Speed, the Flick buttons, Auto Spin, Spin Rate, Beats a
+   Turn, Reverse Spin, Spin Direction, Spin Wander, Spin From Music, Flick Strength and Plate Drag.
+   Plates & LED (Stage) keeps only Layers, the blend, and the LED platform. In Build you can dock
+   Plate Spin beside the set.
+2. **Flash Limit** has one switch, in Master. Wall shows a line saying whether it is on, and no
+   switch. Turn it off in Master and the Wall line turns amber.
+3. Each Drive has its Impact under it: Room Drive / Room Impact in the Motion camera, Film Drive /
+   Film Impact in Film, Sound Drive / Sound Impact in Sound. Shapes Impact is the only master left
+   in Patches, which links to the other three.
+4. Build's deck now holds Squish Plate after Fluid Physics (a layout you had saved is unchanged).
+5. Songs: "Stage sequences…" is a button like the ones above it, with a list-music icon.
+6. The track panel's Takes is one button that opens the Record panel, where takes are started,
+   replayed and deleted.
+
+Bad: a control you used all the time that is now in a place you do not expect, or a Build deck that
+runs out of room with Squish Plate in it.

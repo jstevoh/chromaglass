@@ -18,11 +18,17 @@ and:
   the display does not sleep.
 
 The site inside is the one from the day it was built. Every change still lands on
-the website first; a new download picks it up.
+the website first; a release (below) brings it to the app, and an installed app
+finds the release by itself.
 
 ## Getting the app
 
-**From CI (no Mac tools needed).** On GitHub: Actions → *Mac app* → *Run workflow*
+**The download.** The newest release is always at
+<https://github.com/jstevoh/chromaglass/releases/latest/download/ChromaGlass-mac-arm64.dmg>,
+which is what the site's Download for Mac (Profile & Store, for Pro, and the
+landing page) links to. Open it and drag ChromaGlass into Applications.
+
+**A build of any commit, from CI (no Mac tools needed).** On GitHub: Actions → *Mac app* → *Run workflow*
 on `main`. When it finishes, the run's *Artifacts* has `ChromaGlass-mac`: a zip
 holding `ChromaGlass-<version>-arm64.dmg` (and a `.zip` of the app). It is built for
 Apple silicon.
@@ -36,6 +42,34 @@ npm run app        # run it from the repo, to try a change
 npm run mac-app    # build the .dmg into desktop/release/
 npm run desktop    # the check: the app, offline, on a lit plate (add -- --packaged for the built one)
 ```
+
+## Releases and updates
+
+**Making a release.** On GitHub: Actions → *Mac app* → *Run workflow* on `main`,
+with *release* ticked. The run builds the app, runs the check on the built app,
+and then publishes it as the repository's newest release, `desktop-v<version>`.
+The version is the site's major and minor (`package.json`) and the run's number,
+so each release is newer than the last with nothing to bump first. Pushing a tag
+`desktop-v<version>` does the same with that version. A release is never made by a
+merge or a pull request: the site changes several times a day, and each release
+tells every installed app to update.
+
+**How an installed app updates** (`updates.js`). Twenty seconds after it opens, and every
+six hours after, it reads `latest-mac.yml` from the newest release. When there is a
+newer version:
+
+- **Signed with a Developer ID** (below): it downloads in the background and
+  installs the next time ChromaGlass quits. *ChromaGlass → Restart to Update* does
+  it now.
+- **Ad hoc, as today:** macOS will not let an app replace itself unless it is
+  signed, so the app says the new version is out instead. *ChromaGlass → Download
+  ChromaGlass <version>…* (or the button in Profile & Store) opens the new download;
+  drag it over the old one in Applications.
+
+Either way it never restarts, opens a window or asks anything by itself during a
+show: one notification on the laptop at most, and none while a projector window is
+open. *ChromaGlass → Check for Updates…* looks now. `CHROMAGLASS_NO_UPDATES=1`
+switches it off.
 
 ## First launch
 
@@ -75,7 +109,9 @@ as repository secrets (Settings → Secrets and variables → Actions):
 
 With them the workflow signs with the hardened runtime and notarizes; without them
 (and on every pull request from a fork) it signs ad hoc, which is what lets an Apple
-silicon Mac open it at all.
+silicon Mac open it at all. The first signed release is also the first that can
+update itself in place; apps installed from ad hoc releases keep offering the
+download, once more, and update in place from then on.
 
 ## How it is put together
 
@@ -84,6 +120,9 @@ silicon Mac open it at all.
   cameras, MIDI, screens) to its own pages only, opens the show window, and puts the
   projector window on the projector's screen in full screen. Why each of these, at
   length, is in its comments.
+- `updates.js`: finds new releases and offers or installs them (above), with
+  electron-updater; `npm run updates` checks it in plain Node, and `npm run
+  desktop -- --packaged` checks the packed app against a feed of its own.
 - `preload.cjs`: tells the page it is in the app (`isDesktopApp()` in
   `src/lib/platform.ts`), which is what lets `useProjector` send the show to a
   projector without waiting for a click.

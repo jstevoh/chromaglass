@@ -526,6 +526,47 @@ receiver once rather than in every cast state (the lesson of S0's logo, in
 *Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
 row; the cast state's size is unchanged.
 
+### 13-update. The Mac app's download, its releases and its updates (2026-10-25)
+
+Asked by the owner on 2026-10-25, after the app was built and put in Applications by hand:
+"don't we also need to create a download link on the webpage/profile? and whenever we have a
+new release update that app? and also allow updating of the app from inside the app itself?"
+The same day they chose a public download ("public download is fine"): Pro is checked inside
+the app against the key (23.11), so a GitHub Release on this public repo is the file.
+
+- **A release** is the owner's call: Actions → *Mac app* → *Run workflow* with *release*
+  ticked, or a `desktop-v<version>` tag. `desktop.yml` builds and checks the app as every run
+  does, then a `release` job on Ubuntu (no Mac minutes; the only job that may write) publishes
+  `desktop-v<version>` as the newest release with the .dmg under a fixed name
+  (`ChromaGlass-mac-arm64.dmg`), the zip, the blockmaps and `latest-mac.yml`. Not every merge:
+  main takes several a day and each would tell every installed app to update. The version is the
+  site's major and minor and the run's number, so nothing has to be bumped first (13-version is
+  what that leaves).
+- **The download**: Profile & Store has a Mac app card (`MacAppCard.tsx`, `src/lib/macApp.ts`):
+  Pro on a Mac gets Download for Mac; Pro on a phone, an iPad or a PC is told to open the page on
+  the Mac (the phone version); Free and Home are told it comes with Pro. The landing page's Pro
+  tier lists it, with a download line for a Mac. The link is GitHub's `releases/latest/download/`
+  of the fixed name, so a release never needs a deploy to be found.
+- **Updates in the app** (`desktop/updates.js`, electron-updater 6.8.10): twenty seconds after
+  opening and every six hours it reads the newest release's `latest-mac.yml`. macOS replaces an
+  app in place only when it is signed with a Developer ID (Squirrel.Mac checks the new copy's
+  signature against the old), and the owner has deferred the Apple account, so the build records
+  whether it was signed (`chromaglass.signed` in its package.json) and: ad hoc, the menu's
+  *Download ChromaGlass <version>…* and the profile card's button open the new .dmg; signed, it
+  downloads and installs on quit, with *Restart to Update*. It never restarts, opens a window or a
+  box by itself; one notification at most, none while a projector window is open; Check for
+  Updates… is the only box. What it found stays found through a later check that fails offline or
+finds the same release again, and on a signed Mac Restart to Update waits until Squirrel.Mac
+itself has the update (electron-updater says it is downloaded before Squirrel has taken it, and
+a click then would queue a quit for whenever Squirrel finished). A release runs only from main or
+a tag.
+
+Measured: `npm run updates` 69/69 (every updater event in order with stand-ins, what it must not
+do unasked, and that the builder config, the app and the site agree on the .dmg's name and the
+feed); `npm run desktop -- --packaged` 11/11 on the Linux pack, its new "updates" line the shipped
+electron-updater reading a feed the check serves (`1.3.0 → 999.0.0 (idle → checking →
+available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile card seeing the same and told it as it happened: `checking → available 999.0.0`).
+
 ### 14a. The show goes deaf when its window is hidden
 
 **Read in the code.** The sound analysis runs only on the show window's animation
@@ -4884,7 +4925,7 @@ signed (a second window that gains over 3 cells is red too) and line 3 also hold
 
 ## 32. The soap film: a draining film seen in reflection
 
-### 32a. The CPU reference (this PR, #403)
+### 32a. The CPU reference (#403)
 
 Built `src/lib/soapFilm.ts` (`createSoapFilm`, `stepSoapFilm`, `soapFilmRgb`), added the
 sixth argument `cosI = 1` to `filmReflectance` (and optional `cosI = 1` to `filmColour`)
@@ -4908,6 +4949,44 @@ agreement 8.3e-17, table and angle match 0.00/255; C6 quarter means ordered from
 top reaches 10% black first at 115 s, no ruptured cell refills; C7 4 consecutive 5 s
 samples in the photograph window, at t=120 s 5.1% under 30 nm, 23.3% dark, 79% saturated,
 9/12 hue sectors); `npm run filmtable` 8/8; 600 steps of the 32×64 film in 0.69 s.
+
+### 32b. The reflected view (this PR, #469)
+
+Extended `soapFilmRgb` in `src/lib/soapFilm.ts` so a 2D draining vertical film (`ny > 1`, or
+`softBox: true`) is read in reflected light at viewing angle `cosI` on a dark ground
+(`ground = 0.0004` through transmittance `1 − R`), where Snell's law sets the internal path
+thickness `d_eff = h cos θ_t` and Airy reflectance is summed over a 4-point path spread
+(`spread = 0.025`) around `d_eff` before clamping negative linear sRGB channels to 0. That
+4-point path spread and dark ground alone move C7's `t = 120` s saturation by two points from
+32a's 79% down to 77% (dark 22.7%, 9/12 hues). The rest of the drop to the photograph's 15%
+saturated is a colour grade (`notchFloor = 0.0725` lifting each pixel's lowest linear channel
+and `chromaRetention = 0.67` pulling each channel a third of the way toward grey while
+rescaling to preserve luminous reflectance `Y(d_eff)`) standing in for the soft box's angular
+spread and the camera's gamut, not the physics itself: with the grade off (`notchFloor = 0`,
+`chromaRetention = 1`) saturation at `t = 120` s is 77% (dark 22.7%, 9/12 hues), and with the
+grade on it is 13% at `t = 120` s (14.8% at `t = 110` s, dark 19.4%, 8/12 hues) against the
+photograph's 15% saturated and 9/12 hues. A 1-row calibration strip (`ny === 1` with `softBox`
+unset) continues to read the raw point-source `filmColour` table directly. Named shortcut (f)
+(normal-incidence Fresnel amplitudes kept at all angles, no s/p split; plus `notchFloor` and
+`chromaRetention` as a colour grade standing in for the soft box's solid-angle spread and
+camera gamut) in `PLAN.md` §32 and `src/lib/soapFilm.ts`, and queued `PLAN.md` 32b-1 to replace
+the grade with the solid-angle integral over `cosI` (with s/p Fresnel terms) and camera gamut
+mapping.
+
+Measured: `npm run soapfilm` 23/23 with C7's saturation bar unchanged (`4 samples in a row
+(5 s apart)` across `t = 105..120` s: at `t = 105` s saturated 17.2%, silver 10.7%, dark 9.5%,
+black 0.8%; at `t = 110` s saturated 14.8%, silver 8.1%, dark 12.3%, black 1.5%; at `t = 115` s
+saturated 12.5%, silver 7.4%, dark 16.6%, black 2.5%; at `t = 120` s film under 30 nm 5.1%,
+dark 19.4%, saturated 13%, silver 10.2%, 8/12 hues — against the photograph's 15% saturated,
+10.9% silver, 14.3% dark, 1.1% black, 9/12 hues; control with `notchFloor = 0` and
+`chromaRetention = 1` gives 77% saturated, 22.7% dark, 9/12 hues at `t = 120` s);
+`npm run filmtable` 8/8. Three-angle render of the `t = 115` s film at `0°`, `30°` and `50°`
+(`cos θ_t = 1.000, 0.927, 0.817`): the Newton-black lace (`< 30` nm, `luma < 0.12`) stays
+pinned at the top (`centroid row = 1.00, 1.01, 1.09`), while the first-order purple dark
+fringe (`d_eff ≈ 200` nm) shifts down from row 27 (`h = 206.7` nm) at `0°` to row 28
+(`h = 208.6` nm) at `30°` to row 45 (`h = 246.0` nm) at `50°`, and the second-order green-gold
+peak (`d_eff ≈ 320` nm) shifts down from row 71 (`h = 319.9` nm) at `0°` to row 78
+(`h = 353.1` nm) at `30°` to row 84 (`h = 393.2` nm) at `50°`.
 
 
 ## 33. Bubbles and the closeup, per liquid
@@ -5188,3 +5267,32 @@ asks of seven sections that the sliders the markup draws are exactly the ones th
 under it, and that the lamp keeps the optics and Reactions the Turing pattern. A saved layout's
 Fluid Physics panel now shows only the flow (about a third of the knobs it did).
 
+
+### 35c-2. One home per setting, second half (shipped 2026-10-25)
+
+The owner's audit named controls that appear twice, and strengths that come twice for one input.
+Checked one by one: the ones that really were two places are now one.
+
+- Flash Limit was a switch in Master and another at the foot of Wall → Output. The switch is in
+  Master, where a hand riding a set is; Wall → Output draws a line that says on or off and where the
+  switch is, because the wall is where someone checks the safety. The test id `output-flash-guard`
+  is gone (no check read it); `flash-limit-master` stays.
+- Room, Film and Sound each had a Drive (the sensor stirring the liquid) in its section and an
+  Impact (the master over the patches that read it) in Patches. Each Impact sits under its Drive now;
+  Shapes Impact has no input section and stays at the bay, which links to the other three. The keys
+  are unchanged; only the section a pin is filed under moved (`deskPins` SECTION_OF). This undid the
+  earlier gathering of the masters under the bay, on purpose: the owner's later finding was two
+  strengths for one input.
+- The platform's spin (Rotation Speed, the Flick buttons, Auto Spin, Spin Rate, Beats a Turn,
+  Reverse Spin, Spin Direction, Wander, Spin From Music, Flick Strength, Plate Drag) left Plates & LED,
+  a Stage section Build and Gig cannot dock, for **Plate Spin** in Motion. No key changed.
+- Build's deck takes Squish Plate after Fluid Physics, since the glass's knobs the deck once held
+  under Fluid Physics are in Squish Plate now. A layout already saved is untouched.
+- Songs' "Stage sequences (the old sequencer)…" 10 px link at 40% opacity is a button of the same
+  weight as its neighbours.
+- The track panel had its own Start a take and replay/delete list beside the Record panel's. It is
+  one button into the Record panel; the take itself, its clock and `T` are unchanged.
+
+Checks. `panel` files each master with its source and each Drive with its master, and asks the
+sliders-drawn-equal-sliders-filed rule of Plate Spin, the room, the film and the sound as well.
+`qa` reads Film Impact from the film's section.

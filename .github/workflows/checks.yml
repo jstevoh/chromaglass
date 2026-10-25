@@ -573,6 +573,15 @@ jobs:
       - name: The licence-key Worker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run license-worker
+      # The Mac app's updates (scripts/updates.mjs, PLAN.md 13-update): what
+      # desktop/updates.js does with each thing electron-updater says, above
+      # all what it must not do by itself in the middle of a set, and that the
+      # build, the app and the site agree on where a release's .dmg is. Plain
+      # Node with stand-ins for Electron, so `logic`; the real updater against
+      # a feed is `npm run desktop -- --packaged`, in desktop.yml.
+      - name: The Mac app's updates
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run updates
       # Cloud sync for Pro (PLAN.md 23.18, scripts/cloudsync.mjs): two devices,
       # each with its own storage like a browser and the Mac app, syncing through
       # the licence Worker's /sync against in-memory KV with real RS256 tokens.
