@@ -137,7 +137,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
         {/* Status row */}
         <div className="flex gap-2 mt-3 text-[9px] uppercase tracking-wider">
           {state.identifying && <span className="flex items-center gap-1 text-blue-300"><Fingerprint size={10} /> identifying…</span>}
-          {state.recording && <span className="flex items-center gap-1 text-red-300"><Mic2 size={10} /> mapping this listen</span>}
+          {state.recording && <span className="flex items-center gap-1 text-blue-300"><Mic2 size={10} /> learning this song</span>}
           {state.analyzing && <span className="flex items-center gap-1 text-yellow-300"><FileAudio size={10} /> analyzing structure…</span>}
         </div>
       </section>
@@ -196,7 +196,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
       {/* ── Performances ─────────────────────────────────────────── */}
       <section className="mb-8" data-testid="performances">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
-          <Circle size={12} /> Performances
+          <Circle size={12} /> Takes
         </h3>
         <button
           onClick={onTogglePerformance}
@@ -209,7 +209,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
         >
           {performance.live
             ? <><Square size={11} /> Stop and keep · {performanceClock ?? '0:00'}</>
-            : <><Circle size={11} className="text-red-400" fill="currentColor" /> Start a performance</>}
+            : <><Circle size={11} className="text-red-400" fill="currentColor" /> Start a take</>}
         </button>
         <p className="text-[9px] opacity-40 mb-3 leading-relaxed">
           {performance.live

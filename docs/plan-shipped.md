@@ -3175,19 +3175,19 @@ canvas moved or the second touch starts off it. The phone has no plate bar. Reco
 labels still change width in the same bar (19v-4).
 
 **19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
-Shipped 2026-10-25. Found with 19v-3: at 1280 × 800 in Build, `RecordControls` grew from
-`● Video` (85.0 px) to `■ Stop video · 0:00` (155.4 px, +70.4 px) when recording video,
-and `performance-button` grew from `● Record` (120.1 px) to `■ Stop · 0:00` (144.8 px,
-+24.7 px) during a performance take; starting video recording wrapped the plate bar to two
-rows, dropped the plate's hole by 42.0 px (106.0 → 148.0) and moved Save by 536.6 px. On
+Shipped 2026-10-25. Found with 19v-3: at 1280 × 800 in Build, `RecordControls`' button
+(`record-button` after 14ae/#463 unified the desk's Video and Take buttons into one) grew
+from `● Record` (120.1 px) to `■ Stop · 0:00` (144.8 px, +24.7 px) when recording Plate
+video, a Take, or both, shifting its neighbours in the plate bar (and before 14ae, when two
+buttons sat side by side, wrapping the bar to two rows and dropping the plate 42.0 px). On
 the phone's Play screen (`PhonePlay`), `play-record` grew by 28.0 px when a clip started,
-pushing `play-shuffle` and `Account` across the top bar. Both desk buttons (`RecordControls`,
-`PerformanceButton`) and Play's `play-record` pill now keep their idle content in flow
-(`invisible` while recording) and overlay the running `tabular-nums` clock inside the same
-box, so starting, running and stopping a recording changes their boxes by 0.0 px. `layout`
-at 1280 in Build (before: plate 42.0 px, video 341.1 px, take 24.7 px, Save 536.6 px;
-after: 0.0 px on all four) and `phone` on Play in portrait (before: Record 28.0 px,
-Shuffle 28.0 px; after: 0.0 px on both) ask it on every PR.
+pushing `play-shuffle` and `Account` across the top bar. Both the desk's `RecordControls`
+button and Play's `play-record` pill now keep their idle content in flow (`invisible` while
+recording) and overlay the running `tabular-nums` clock inside the same box, so starting,
+running and stopping a recording changes their boxes by 0.0 px. `layout` at 1280 in Build
+across `off → Plate video → Take → Plate video + Take → off` (before: Record 24.7 px;
+after: 0.0 px on plate, Record and Save) and `phone` on Play in portrait (before: Record
+28.0 px, Shuffle 28.0 px; after: 0.0 px on both) ask it on every PR.
 
 ### 19w. A fifth Mac shard: every shard well inside its timeout
 
@@ -3691,6 +3691,28 @@ The check-skeptic's mutants: `failure` without its redaction fails the URL check
 sync wrapper rethrowing Node's own error fails two. `deploygate.sh` still puts the header
 on curl's command line, readable through `ps` while it runs on the owner's machine:
 19aa-4.
+
+### 19aa-6. The renders lines on a starved runner
+
+Shipped 2026-10-24. Three `npm run renders` lines went red on 8 of 191 Mac runs each in
+the week to 10-24 (`npm run flakes`). The laptop's band lines ("the ear is reading", "the
+plate hears a new reading on four frames in five") failed in the first of their two
+3 s windows every time, with the plate drawing 0.0, 1.7, 1.9, 9.9, 10.8, 12.2, 13.6 and
+14.5 frames a second there and 16.5 to 28.4 in the second: five seconds after load the
+page was still opening on a cold runner (the open shard runs startup first, which empties
+the Mac's shader cache). Each page now waits, a second at a time and at most thirty,
+until one second holds fifteen of the plate's frames (the 45 in 3 s the lines ask), as
+squeeze.mjs does for its steps; a plate that never gets there is still measured and
+fails, and the wait is printed when it is more than a second and a half.
+
+The phone's fader line, "the plate's Dimmer moves at least twice as often as the desk's",
+failed with the page drawing 14.6 to 22.5 frames a second and the Dimmer changing on 93
+to 100% of them: twice the desk's 9 to 10 a second is more changes than frames below 20
+a second. It now asks the claim itself: a change on four frames in five drawn, and a
+quarter more than the desk's (a plate fed by React changes at React's 7 to 10.5 a second,
+which fails both at any frame rate the line allows). Stricter than the old bar above 25
+frames a second. Of the 8 reds, 7 pass the new bar on their printed numbers; the eighth
+drew 44 frames in a window, under the 45 the line still asks.
 
 ### 19ac-1. The double tap's two taps carry a finger's times
 

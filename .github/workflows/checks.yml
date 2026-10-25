@@ -443,6 +443,11 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # The one Record button (PLAN 14ae): what a press does for each choice,
+      # and one Record on the desk, the panel and the phone.
+      - name: The one Record button
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run record
       # The score (PLAN 28h): each of a song show's cues drawn where the
       # scheduler fires it, a cue pinned to a section firing on that section
       # through a stretched live take, and the nudge putting a late map's cue
@@ -560,6 +565,13 @@ jobs:
       - name: The licence-key Worker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run license-worker
+      # Cloud sync for Pro (PLAN.md 23.18, scripts/cloudsync.mjs): two devices,
+      # each with its own storage like a browser and the Mac app, syncing through
+      # the licence Worker's /sync against in-memory KV with real RS256 tokens.
+      # Node only, so `logic`.
+      - name: Cloud sync between two devices
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run cloudsync
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
@@ -663,6 +675,15 @@ jobs:
       - name: Sign-in
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run signin
+      # One address (PLAN.md 23.16, scripts/onehost.mjs): chromaglass.web.app and
+      # chromaglass.firebaseapp.com forward to chromaglass.art with what they had
+      # saved, written before the app's module runs; Firebase's /__/ pages, an
+      # offline or internet-less cached show and a cast window with an opener
+      # stay; a carried fragment from anywhere else writes nothing. index.html
+      # served at the real names through request routing, under a minute.
+      - name: One address
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run onehost
       # Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):
       # two signed-in pages on the same account (a show and a phone) list and
       # join the show in one tap while keeping the QR code, a third page on

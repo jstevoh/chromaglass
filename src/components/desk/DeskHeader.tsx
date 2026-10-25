@@ -27,12 +27,13 @@ export interface DeskDots {
   wall?: boolean;
   midi: boolean;
   phone?: boolean;
+  /** The clock ("1:23") of whatever Record is making, or null. */
   rec?: string | null;
-  /** The performance being recorded, as its clock ("1:23"), or null. */
-  perf?: string | null;
+  /** What it is making, in the words the Record button uses ("Plate video + Take"). */
+  recWhat?: string;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onPerformance, onSearch, leading, trailing }: {
+export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onSearch, leading, trailing }: {
   breadcrumb: ReactNode;
   mode: DeskMode;
   onMode: (m: DeskMode) => void;
@@ -53,10 +54,8 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
   /** The controller panel. The dot is the only thing on either desk that names MIDI. */
   onMidi?: () => void;
   onPhone?: () => void;
-  /** Start, stop or manage canvas video recording. */
+  /** Open the Record panel (what Record makes, and what it made). */
   onRecord?: () => void;
-  /** Start or stop a performance (T). */
-  onPerformance?: () => void;
   onSearch: () => void;
   /** Before the dots: the desk's + Panel. */
   leading?: ReactNode;
@@ -208,6 +207,12 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
           testId="dot-phone"
         />
       )}
+      {/*
+        One dot for everything Record is making, with the clock. It used to be
+        two: Rec for the video, and a Perf dot that was always there, off or on.
+        It appears only while recording, so the header folds for it (npm run
+        layout) as it did for the video's.
+      */}
       {dots.rec && (
         <StatusDot
           on
@@ -216,31 +221,13 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
           short="Rec"
           tight={t}
           onClick={onRecord}
-          title={`Recording canvas video (${dots.rec}). Click to manage recording options or press R to stop.`}
+          title={`Recording ${dots.recWhat ?? 'Plate video'} (${dots.rec}). Click for the Record panel, or press R to stop.`}
           testId="dot-rec"
         />
       )}
-      {/*
-        Performances start and stop here, by hand (T). They used to follow
-        the song detection, which started late and ran on into the next
-        song; the song that is playing is still attached, on its own.
-        A short word, with the clock in its tooltip: "Performance 0:42"
-        beside it pushed Mic and Wall under the centred mode switch at 1440
-        (npm run qa), and with no word at all nobody could tell what it was.
-      */}
-      <StatusDot
-        on={!!dots.perf}
-        tone="live"
-        label="Perf" tight={t}
-        onClick={onPerformance}
-        title={dots.perf
-          ? `Recording a performance (${dots.perf}). Click or press T to stop and keep it, with the song that is playing.`
-          : 'Start recording a performance: what you paint, replayable later at the same moments in the song. Click or press T.'}
-        testId="dot-performance"
-      />
     </>
   );
-  const recording = !!dots.rec || !!dots.perf;
+  const recording = !!dots.rec;
   const connected = [dots.sound ?? dots.mic, dots.video, dots.wall, dots.midi, dots.phone].filter(Boolean).length;
 
   return (

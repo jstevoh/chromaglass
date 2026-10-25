@@ -28,6 +28,7 @@
  * a page from https cannot open a plain ws:// socket to a laptop on the LAN
  * (mixed content), which is why the show server serves its own copy.
  */
+import { SHOW_PATH } from './showPath';
 
 /** Where the remembered laptop lives, per device. */
 const STORE_KEY = 'chromaglass-laptop';
@@ -141,5 +142,7 @@ export function goRemote(): void {
 
 /** Switch the app back to playing the show itself. */
 export function goPlay(): void {
-  window.location.href = '/';
+  // The site's show is at /show, past the webpage at / (lib/showPath.ts); the
+  // iPhone app has no webpage, and its own files answer / for certain.
+  window.location.href = isPhoneApp() ? '/' : SHOW_PATH;
 }

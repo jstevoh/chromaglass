@@ -1606,6 +1606,17 @@ about a quarter of a second a swing) before it settled, which the solve leaves o
 Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
 building.
 
+## 71. One Record button (PLAN 14ae)
+
+On the desk, press the Record button in the header (or R): a plate video starts, the button
+turns red with one clock, and a single Rec dot appears. Press it again: it stops and the file
+is in the Record panel (the sliders button) under Plate video. In the panel, turn on Take as
+well and press Record again: both run from the one press, and the dot says "Plate video + Take".
+Paint a little, stop, and the take is under Takes with Replay. Say whether "Record · Plate
+video" on a wide desk reads at a glance, whether "Plate video" and "Take" are the words you
+want, and whether the Song film row belongs in the Record panel. On the phone: More, then Record
+makes, pick Take and press Record.
+
 ## 69. Any camera, and which camera does what (PLAN 14ad)
 
 With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual Camera):
@@ -1621,3 +1632,20 @@ With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual C
   switch it on; the film's camera should stay what it was.
 - On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
 
+## 71. A look saved in Chrome is in the Mac app (PLAN 23.18)
+
+Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
+
+1. In Chrome at chromaglass.art, open Profile & Store. *Cloud sync* says On and, within a few
+   seconds, "Up to date".
+2. Save a look, learn one control on the MIDI map, and change a tool's amount.
+3. Open the Mac app, signed in to the same account. Within a minute (or at once with
+   *Sync now*) the look is in the preset menu and the MIDI map is the one from Chrome. The
+   projector layout on the Mac is still the Mac's.
+4. Delete the look on the Mac. Back in Chrome, focus the window: the look goes, and does not
+   come back after a reload.
+5. On the phone, open the Account pill: the same card, readable and tappable at phone width.
+6. Turn the Wi-Fi off on the Mac, save a look, turn it back on: the look reaches Chrome.
+
+Bad: a look that comes back after being deleted, a set list replaced by an empty one, or the
+plate stuttering when a sync lands mid-show.
