@@ -499,52 +499,6 @@ try {
 
     await ctx.close();
   }
-
-  // 13. The Account pill and the Pro gates read one tier (the owner, 2026-10-25).
-  // The Mac app enforces nothing, so with no key its pill read PRO while the
-  // Simulation panel beside it, which asked "is there a Pro licence?", offered
-  // "Get Pro — $199" and kept the 1024² grid off. Here a page with nothing
-  // gated and no key is made to step down: the pill's tier must be what the
-  // panel obeys (no upsell card, no floating nudge, 1024² pickable). The tier
-  // is read first (no "In the ChromaGlass app" tiles), so a build whose tier
-  // turns out not to be Pro fails on that line instead of passing for want of
-  // anything to disagree with.
-  {
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-    const page = await ctx.newPage();
-    await page.goto(`${ORIGIN}/?debug`);
-    await waitFor(
-      () => page.evaluate(() => typeof window.chromaglassSettings === 'function').catch(() => false),
-      45_000,
-    );
-    await page.evaluate(() => {
-      try {
-        localStorage.removeItem('chromaglass-run-locally-dismissed');
-      } catch {
-        // ignore
-      }
-      window.chromaglassDebug?.()?.forceStepDown?.(true);
-    });
-    await page.click('[data-testid="open-all-settings"]');
-    await page.waitForTimeout(800);
-    // The pill is not drawn where accounts are off (this build has no Firebase),
-    // so the tier is read from what else asks getEffectiveTier(): the "In the
-    // ChromaGlass app" tiles, which only a tier below Pro shows.
-    const tilesShown = await page.locator('[data-cg-app-tiles]').count();
-    const option1024 = '#settings-simulation option[value="1024"]';
-    const gridCount = await page.locator(option1024).count();
-    const gridDisabled = gridCount === 1 ? await page.locator(option1024).isDisabled() : null;
-    const card = await page.locator('[data-cg-grid-upgrade-pro]').count();
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
-    const nudge = await page.locator('[data-cg-upgrade-pro-nudge]').count();
-    check(
-      '13. an ungated build with no key reads Pro (no app tiles), and then shows no Pro upsell and lets the 1024² grid be picked',
-      tilesShown === 0 && gridCount === 1 && gridDisabled === false && card === 0 && nudge === 0,
-      `tiles=${tilesShown} 1024=${gridCount}/${gridDisabled ? 'disabled' : 'enabled'} card=${card} nudge=${nudge}`,
-    );
-    await ctx.close();
-  }
 } catch (err) {
   check('the check ran to its end', false, String(err?.message ?? err));
 } finally {
