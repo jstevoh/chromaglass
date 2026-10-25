@@ -830,6 +830,36 @@ try {
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       /*
+        Projector Focus (PLAN 18e), the projector's focus ring, on the Looks
+        sheet beside the lamp's controls: there on every look, at 50 % (no
+        look saves one, so each is in focus, as it was before the setting),
+        and it reaches 0 % and 100 %. Put back to 50 % after, by the
+        keyboard's own steps (ten of 5 %), so the checks below draw the
+        plate in focus as they did before this check was here.
+      */
+      await tap(page, 'phone-open-looks');
+      const focusShown = await visible(page, 'phone-projector-focus');
+      const focusRead = async () => (await page.getByTestId('phone-projector-focus').innerText()).match(/(\d+)%/)?.[1] ?? null;
+      const focusAt = focusShown ? await focusRead() : null;
+      let focusBottom = null, focusTop = null, focusBack = null;
+      if (focusShown) {
+        await page.getByTestId('phone-projector-focus').locator('input').focus();
+        await page.keyboard.press('Home');
+        await page.waitForTimeout(200);
+        focusBottom = await focusRead();
+        await page.keyboard.press('End');
+        await page.waitForTimeout(200);
+        focusTop = await focusRead();
+        for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowLeft');
+        await page.waitForTimeout(200);
+        focusBack = await focusRead();
+      }
+      check('Projector Focus is on the Looks sheet at 50 %, goes to 0 % and 100 %, and back to 50 %',
+        focusShown && focusAt === '50' && focusBottom === '0' && focusTop === '100' && focusBack === '50',
+        focusShown ? `at ${focusAt} %, then ${focusBottom} %, ${focusTop} % and back to ${focusBack} %` : 'missing from the Looks sheet');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
+      /*
         A projector's source (PLAN.md §16b), from the phone: More, Settings,
         Mapping, a shape added, and its source picked. The phone has no
         second screen of its own, but it is the remote at a gig, and the
@@ -1151,12 +1181,86 @@ try {
       // double-click, on a phone where every knob is a slider). Tapped at a
       // third of the way, so the first tap moves it and the second must undo
       // that as well as the move above.
-      await page.touchscreen.tap(track.x + track.width * 0.3, track.y + track.height / 2);
-      await page.waitForTimeout(60);
-      await page.touchscreen.tap(track.x + track.width * 0.3, track.y + track.height / 2);
-      await page.waitForTimeout(400);
-      const reset = await speedText();
-      check('Play: a double tap on Speed puts it back to the look\'s own speed', reset === before && after !== before, `${before} → ${after} → ${reset}`);
+      /*
+        The two taps carry a finger's times, stamped on the events, not the
+        moment the harness got round to sending each. What was seen: red on 10
+        of 173 Mac runs over the week to 2026-10-24 (5 of them green on the
+        same commit), every one reading "0.009 → 0.28 → 0.005": 0.005 is
+        Speed at a third of the track, so both taps landed and the second was
+        not taken as the other half of a double tap. TouchSlider reads a
+        double tap from the two lifts' `timeStamp`s, 320 ms apart at most
+        (DOUBLE_TAP_MS), which on a phone are the times the finger touched.
+        Playwright's `touchscreen.tap` stamps no time, so Chromium stamps
+        each event when the command reaches it, and Playwright sends the
+        second tap only once the page has handled the first. So the gap the
+        app reads is the 60 ms asked for plus however long the page was busy
+        with the first tap (here, the whole app re-rendering for a new speed
+        while the plate draws on a slow runner). Measured in a plain page
+        whose pointerup kept the thread busy: two such taps read 95 ms apart
+        with the thread free, 217 ms busy 150 ms, 466 ms busy 400 ms; the
+        same taps sent with their own times read 80 ms apart busy 400 ms.
+        So the old check failed on how slowly the page answered, which a
+        finger never does to the double tap, and passed or failed the
+        slider's logic by chance. Stamped, it asks exactly what a thumb does:
+        two taps 90 ms apart, wherever the page is. The page's own lag is
+        printed beside it, measured on the same two lifts, since that is a
+        real cost (a tap that takes a third of a second to answer) and
+        belongs to the renders and frame checks, not to this one.
+      */
+      const tapAt = { x: track.x + track.width * 0.3, y: track.y + track.height / 2 };
+      await page.evaluate(() => {
+        window.__cgLifts = [];
+        document.querySelector('[data-testid="play-slider-speed"]').addEventListener('pointerup', (e) => window.__cgLifts.push([e.timeStamp, performance.now()]), { capture: true });
+      });
+      // Two taps whose second lands `apart` seconds after the first, by the finger's clock.
+      const twoTaps = async (apart) => {
+        await page.evaluate(() => { window.__cgLifts = []; });
+        const pre = await speedText();
+        const cdp = await ctx.newCDPSession(page);
+        const t0 = Date.now() / 1000;
+        const finger = (type, at) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ ...tapAt, id: 1 }], timestamp: t0 + at });
+        await finger('touchStart', 0);
+        await finger('touchEnd', 0.03);
+        // Where one tap at a third of the track puts Speed, what the control
+        // must read: waited for, up to a second of the harness's time, which
+        // the stamps make no part of the gesture.
+        let one = await speedText();
+        for (let i = 0; i < 20 && one === pre; i++) { await page.waitForTimeout(50); one = await speedText(); }
+        /*
+          The second tap is sent no sooner than 0.4 s after the first, past
+          DOUBLE_TAP_MS, whatever its stamp says: so the double tap passes
+          only if the stamps are what the app reads (as the slow CI page
+          made it, but every run), and no stamp is ever in the future, which
+          a Chromium might clamp.
+        */
+        const early = t0 + Math.max(apart, 0.4) - Date.now() / 1000;
+        if (early > 0) await page.waitForTimeout(early * 1000);
+        await finger('touchStart', apart);
+        await finger('touchEnd', apart + 0.03);
+        await cdp.detach();
+        await page.waitForTimeout(400);
+        const lifts = await page.evaluate(() => window.__cgLifts);
+        const seen = lifts.length === 2 ? lifts[1][0] - lifts[0][0] : null;
+        return {
+          value: await speedText(), one,
+          // The stamps reached the app as sent, within 15 ms: otherwise a red
+          // says the instrument failed, not the slider.
+          stamped: seen != null && Math.abs(seen - apart * 1000) <= 15,
+          gap: seen != null ? `the lifts ${Math.round(seen)} ms apart as the finger made them (sent ${Math.round(apart * 1000)}), handled ${Math.round(lifts[1][1] - lifts[0][1])} ms apart` : `${lifts.length} lifts seen, not 2`,
+        };
+      };
+      const dbl = await twoTaps(0.09);
+      check('Play: a double tap on Speed puts it back to the look\'s own speed', dbl.value === before && after !== before && dbl.stamped, `${before} → ${after} → ${dbl.value}; ${dbl.gap}`);
+      /*
+        The control: the same two taps stamped 0.6 s apart are two single
+        taps and leave Speed where one tap there puts it, so the window has
+        an end and the slider does not reset on any second tap. That the
+        stamps are what the app reads is the line above's: its second tap
+        is sent 0.4 s after the first, so ignored stamps would read 0.4 s
+        apart and fail it, and `stamped` names that cause.
+      */
+      const slow = await twoTaps(0.6);
+      check('Play: and the control, two taps 0.6 s apart by the finger\'s clock are two taps, not a double tap', slow.value === slow.one && slow.value !== before && slow.stamped, `${before} → ${slow.value}, one tap there ${slow.one}; ${slow.gap}`);
       /*
         8j: a phone has no hover, so the name is the button. A tap on Soap's
         name opens the card with what it does and the value as printed on
@@ -1183,6 +1287,25 @@ try {
           !none && !!tipped && tipped.name === 'Soap' && tipped.help.length > 20 && tipped.value === soapBefore?.trim() && tipped.inside,
           tipped ? `"${tipped.help.slice(0, 40)}…", ${tipped.value}, ${tipped.inside ? 'on screen' : 'off screen'}` : 'no card');
         await shot(page, 'Play-portrait-name-card');
+        /*
+          8j: one card at a time. The owner found two desk cards up at once,
+          stacked; on the phone a tap on another slider's name must swap the
+          card, not lay a second over the first, and that second card must
+          shut on its own second tap like the first.
+        */
+        const swirlName = page.getByTestId('play-slider-swirl').locator('[data-info="name"]');
+        const sb = await swirlName.boundingBox();
+        await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.waitForTimeout(250);
+        const cards = await page.evaluate(() => [...document.querySelectorAll('[data-control-tip] [data-tip=name]')].map(n => n.textContent));
+        check('Play: a tap on another slider\'s name swaps the card for its own, one card at a time',
+          cards.length === 1 && cards[0] === 'Swirl', cards.join(' + ') || 'no card');
+        await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.waitForTimeout(250);
+        check('Play: and a second tap on it shuts it', cards[0] === 'Swirl' && !(await readTip()));
+        // Soap's again, for the second-tap check below.
+        await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+        await page.waitForTimeout(250);
         await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
         await page.waitForTimeout(250);
         check('Play: a second tap shuts it, and two taps on a name leave the value alone', !(await readTip()) && (await soapText()) === soapBefore,

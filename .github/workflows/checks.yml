@@ -702,6 +702,15 @@ jobs:
       - name: Preview's copy
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/draftwall.mjs
+      # Any camera, anywhere (scripts/cameras.mjs, PLAN.md 14ad): two stand-in
+      # cameras behind navigator.mediaDevices, nameless until one is allowed.
+      # Both pickers (the motion camera and the film's Webcam) on the desk and
+      # the phone, a camera opened by the id picked, each choice remembered
+      # apart, an unplugged camera taken off and opened again when it is back.
+      # No GPU; the site the steps above built.
+      - name: Any camera
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/cameras.mjs
 
       # The phone (scripts/phone.mjs): on an emulated phone, in portrait and
       # landscape, every tool and sheet in reach at 48 px, the plate keeping

@@ -60,6 +60,7 @@
     "qa": "npm run build && node scripts/qa.mjs",
     "layout": "npm run build && node --experimental-strip-types scripts/layout.mjs",
     "draftwall": "npm run build && node scripts/draftwall.mjs",
+    "cameras": "npm run build && node scripts/cameras.mjs",
     "showcursor": "npm run build && node scripts/showcursor.mjs",
     "rewall": "npm run build && node scripts/rewall.mjs",
     "inputpick": "node scripts/inputpick.mjs",

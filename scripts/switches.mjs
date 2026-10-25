@@ -105,7 +105,7 @@ const BARS = {
 };
 
 /** The settings sections, as the palette lists them (`lib/settingsMap.ts`): id and the name typed to find it. */
-const SETTINGS_SECTIONS = [['master', 'Master'], ['mixer', 'Mixer'], ['audio-input', 'Sound'], ['room', 'The Room'],
+const SETTINGS_SECTIONS = [['master', 'Master'], ['mixer', 'Mixer'], ['audio-input', 'Sound'], ['room', 'Motion camera'],
   ['film', 'Video'], ['patches', 'Patches'], ['midi', 'Controller'], ['look', 'Light Show Look'], ['show', 'Show'],
   ['kaleidoscope', 'Kaleidoscope'], ['lamp', 'Lamp & Light'], ['stock', 'Film Stock'], ['camera', 'Camera'],
   ['macro', 'Macro Closeup'], ['automation', 'Automation'], ['squish', 'Squish Plate'], ['physics', 'Fluid Physics'],

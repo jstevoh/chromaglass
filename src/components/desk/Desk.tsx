@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { User } from 'lucide-react';
+import { LogIn, User } from 'lucide-react';
 import { Button, PanelFrame, Segmented, Tag } from '../ui';
 import { PanelGuard } from '../PanelGuard';
 import { RecordControls } from './RecordControls';
@@ -14,6 +14,7 @@ import {
   type DeskLayout, type Slot,
 } from '../../lib/deskLayout';
 import { getEffectiveTier } from '../../lib/tierGates';
+import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import type { DeskProps } from './deskProps';
 
 /**
@@ -49,6 +50,8 @@ interface Drag { id: string; x: number; y: number; x0: number; y0: number; moved
 
 export function Desk(p: DeskProps) {
   const l = p.layout;
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
   const set = p.onLayout;
   const [browser, setBrowser] = useState<{ top: number; right: number } | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -525,19 +528,29 @@ export function Desk(p: DeskProps) {
       <footer className="col-[1/-1] flex items-center justify-between gap-3 border-t border-border px-3 font-mono text-[11px] text-dim">
         <span className="flex min-w-0 items-center gap-3 truncate">
           {p.onOpenAccount && (
+            // Signed out, the one place on the desk that lets you back in says so,
+            // lit, rather than "Profile" over nothing (the owner, 2026-10-24).
             <button
               type="button"
               data-cg-account-open=""
+              data-cg-account-signin={signedOut ? '' : undefined}
+              data-cg-tier={getEffectiveTier()}
               onClick={p.onOpenAccount}
-              className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-2.5 font-sans text-[11px] font-semibold text-amber-100 transition-colors hover:border-amber-400/70 hover:bg-amber-500/25"
-              title="Profile, Settings & Store"
-              aria-label="Account"
+              className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 font-sans text-[11px] font-medium transition-colors ${
+                signedOut
+                  ? 'bg-primary text-on-primary hover:opacity-90'
+                  : 'border border-border-strong bg-elevated text-text-2 hover:bg-hover hover:text-text'
+              }`}
+              title={signedOut ? 'Sign in' : 'Account, licence and store'}
+              aria-label={signedOut ? 'Sign in' : 'Account'}
             >
-              <User size={12} className="shrink-0 text-amber-300" />
-              <span>Profile &amp; Store</span>
-              <span className="rounded bg-amber-500/25 px-1 py-px font-mono text-[9px] uppercase tracking-wider text-amber-200">
-                {getEffectiveTier()}
-              </span>
+              {signedOut ? <LogIn size={12} className="shrink-0" /> : <User size={12} className="shrink-0 text-muted" />}
+              <span>{signedOut ? 'Sign in' : 'Account'}</span>
+              {!signedOut && (
+                <span className="rounded-sm bg-accent-bg px-1 py-px font-mono text-[9px] uppercase tracking-wider text-accent-text">
+                  {getEffectiveTier()}
+                </span>
+              )}
             </button>
           )}
           <span className="truncate" data-testid="status-hearing">

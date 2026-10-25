@@ -56,6 +56,7 @@ const page = visible(text(PRIVACY));
  * cannot hide a request to it added later.
  */
 const LINK_ONLY = {
+  'securetoken.google.com': "the issuer a Firebase ID token must name (server/license-worker.js compares the token's `iss` to it); a string, never fetched",
   'archive.org': 'the music library credits each track with a link to its page',
   'creativecommons.org': "each track's licence, as a link",
   'github.com': 'links to the source, and the name LRCLIB asks clients to send',
