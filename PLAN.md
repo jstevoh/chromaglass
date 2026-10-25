@@ -234,8 +234,8 @@ style (§31).
   and the slide plan's S2) and ~~**18j** milk~~ #353 (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   ~~**18g-1**~~ colour leaves by flushing #362 (18g-2..5 open) and **18k-spray**.
-- **6.4** **18e** edges from refraction (which is #219's 20d), then **31a** the projector's
-  focus across the two dishes and **31d** colour at a defocused edge (§31).
+- **6.4** **18e** edges from refraction, partly shipped #355 (the front plate's edges from projector pupil aperture loss and shadowgraph Becke lines; #219's 20d), then **18e-2** a clear pour's edge, **31a** the projector's
+  focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** ~~**18m**~~ a drop slumps under its own weight (then **18m-1** to **18m-5**), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
@@ -1282,6 +1282,15 @@ Open from Desk v2, each its own thread (the UI lane):
   control does.
   - **8j-1** (S) The remote page (`RemoteControl.tsx`) has its own sliders and no card;
     its names are whole, but the line would help there too.
+  - ~~**8j-2** Cards that stuck and stacked~~ (the owner, 2026-10-24: Macro Zoom's card
+    stayed up under Evolve Speed's). **Shipped.** A knob whose mouse-up never reached the
+    page thought a hand was still on it: Chromium then sends no pointerup, only a
+    lostpointercapture on the next buttonless move, which the knob did not hear. The
+    drag now ends on a lost capture, a release or cancel anywhere in the window, a move
+    with no button down, or the window losing focus; and one card is up at a time,
+    whatever asked for it. Checks: `npm run layout` (two knobs with swallowed releases;
+    a focused card replaced by a hovered one), `npm run phone` (a tap on another name
+    swaps the card). Which gesture on the owner's Mac swallowed the release is not known.
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
@@ -3606,6 +3615,28 @@ Open, found building it:
   greys and Film shows a grey picture. Whether the look's palette should tint them (Film's
   grade already can, in the Mixer) is the owner's call in §66.
 
+### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped, asked 2026-10-24)
+
+**Shipped** (2026-10-24): one camera list (`useCameras`, kept current on `devicechange`)
+and one picker (`CameraPicker.tsx`) in both places a camera opens, desk and phone alike: the
+motion camera (was "The Room") and the film's Webcam, which could only ever open the
+browser's "environment" camera. Each choice is remembered apart; a camera pulled out takes
+its source off and says so, and opens again by itself when it is plugged back in; a chosen
+camera that is missing opens the browser's pick, says so, and hands over when it arrives
+(`src/lib/cameras.ts`, `npm run cameras`). The room section is now **Motion camera**,
+its first line says its picture is never shown and points at Webcam, and the film's camera
+line says it shows a picture and points back. Story in `docs/plan-shipped.md`.
+
+- **14ad-1** (S) *The audio input does not come back either* (14g's first half): the same
+  `devicechange` reopen, for the sound's input.
+- **14ad-2** (S) *Room Drive and Room Impact keep the old word.* The section is Motion
+  camera; its two masters (and the patch source "Room") still say Room. Rename with
+  phase 3's one-home-per-setting pass, where the Drive/Impact pairs are settled, rather than
+  churn the patch bay's names twice.
+- **14ad-3** (S) *The browser keeps camera names back until one has been allowed.* Before
+  that the pickers list "Default camera" only, with a line saying why. A "find my cameras"
+  button that asks once and closes the camera at once would list them sooner.
+
 ### 14z. A new song: where songs start and end, and the change on the music (asked 2026-10-24)
 
 The owner: song detection does not work well enough to ship. It does not catch where
@@ -4180,7 +4211,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18b | The lamp shines through the dye | Large: gels colour the dye, overlaps darken, thin washes are pale | Free | A per-look choice of ground. **Shipped** (#256), behind Lamp Ground; eleven looks on it (#262, 18b-1) |
 | 18c | A pour adds liquid | Large: a drop shoves the colour outward into rings | Free | Better with 18a's open rim |
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
-| 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None |
+| 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None. **Partly shipped** (#355); 18e-1 to 18e-3 open |
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | **Shipped** (#352) |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362), **18g-6 shipped** (the rim holds the oil); 18g-2..5, 18g-7, 18g-8 open |
 | 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
@@ -4601,7 +4632,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 - **18d-7** Milk's `repel`. Milk is a miscible emulsion, so this goes to 18j (scattering).
 - **18d-8** Retire the CPU fields (soap, body, repel at 192²) and their pass once 18d-2 to
   18d-7 have moved each to the GPU.
-- **18d-9** The index into 18e's refraction. The species carries Σ share·n.
+- ~~**18d-9**~~ #355 The index into 18e's refraction: the derive pass's optical path reads the species' Σ share·n (`pouredDn`), measured against the shelf's own indices by `npm run derive`. The display's deflection does not read it yet: 18e-2.
 - **18d-10** The species is not in FieldCarry, so a rebuilt solver loses it, and now that
   nothing fades it the loss shows: a governor's move drops every poured liquid. Carry it.
   On the old plate (Thin Gap off), the CPU body drag is still the thickness.
@@ -4677,48 +4708,11 @@ its frame rate live. "Free" means no new passes or texture reads.
   Extends 15e, which found these forces measured only on a stand-in plate.
 
 ### 18e. Edges come from refraction (replaces the painted rims and highlights)
+**Partly shipped** (#355). What shipped: on projected looks, the front plate's edges come from projector pupil aperture loss and shadowgraph Becke line doublets, from the optical path OPL = n·h and its Laplacian in the derive pass. n is water's 1.333 plus the oil (1.47), the film, the poured liquids' own indices from the species field (18d-9) and a named stand-in for the dye (d·0.015·dyeGain: a dilute dye barely moves the index, and the shelf gives dyes none); h is the gap. A separate Projector Focus control (Settings, desks, MIDI, remote, the phone's Looks sheet; 0.5, in focus, by default, so every look is as before until it moves). Painted specular highlights are gone from projected looks and stay on camera and closeup looks. Named shortcuts (each in `refractionOptics`' notes and the archive): the deflection from the dye's slope, not ∇OPL (18e-2); dyeGain, a contrast gain on the step; the pupil overlap a smoothstep against `DROP_NA` 0.25; the shadowgraph's gain max(1, boundaryContrast·2) and edge mask; the back plate's painted line (18e-1); the dye's stand-in index d·0.015·dyeGain; no heat in n (18e-3). What did not ship is below (18e-1 to 18e-3). Follow-ons (§31, 2026-10-11): **31a** gives the defocus Δz a control that also blurs whichever dish is out of focus; **31d** evaluates the shadowgraph per band with each liquid's dispersion. Shipped story and measurements in [`docs/plan-shipped.md`](docs/plan-shipped.md) §18e. Open:
 
-- **Where:** in `plate.ts`, `sobelGrad` and `gradNormal` turn the gradient of dye
-  density into a "surface normal". That normal drives Lambert and Blinn–Phong shading
-  (`applyLighting`), the dark rim and highlight of `meniscus()`, the bright line of
-  `boundaryContrast` (set in 34 presets), `lacing`'s threads, and the camera pass's
-  refraction offset. The oil phase is drawn with its own `|∇oil|·2.2` darkening.
-- **The shortcut:** dye concentration is not a height, and there is no free surface
-  between two glasses to shade. Only the drops and bubbles (the beads and the air
-  field) get the real optics today: Snell refraction at the meniscus and the
-  projector's aperture (`dropLens`, the `u*` law).
-- **The real phenomenon:** light between two glasses bends where the optical path
-  OPL = ∫n dz changes. n depends on the dye's concentration (Δn about 10⁻³–10⁻²), oil
-  against water (1.47 against 1.333), temperature (about −10⁻⁴ per K) and the gap. A
-  projector then shows two effects:
-  - **Aperture loss:** darkness wherever the deflection is steeper than the lens can
-    take in. This is the drops' `u*` law, applied everywhere.
-  - **Shadowgraph:** at a defocus Δz, I ≈ I₀(1 − Δz·∇²OPL/n). This gives the bright
-    and dark doublets at fronts (Becke lines), and caustics once the rays cross.
-- **What it takes:** build n from the fields already bound (dye, oil, gap, heat), and
-  compute OPL = n·h with its gradient and Laplacian in the derive pass. That pass runs
-  once a frame and has a spare channel. The display pass applies the aperture and the
-  defocus term. The projector's focus becomes a real control a performer can ride.
-  - The aperture's hard threshold becomes the overlap of the condenser's illumination
-    disc with the lens pupil. The comment on `DROP_NA` (raised from the physical 0.05–
-    0.1 because it "drew black doughnuts") and the 0.85 and 0.9 floors are that
-    overlap, guessed.
-  - The solver's oil and the beads then look like the same material.
-  - The painted highlights (the Blinn–Phong spec, `meniscus`'s spec, the macro's "wet
-    highlight", `microDrops`' dots) go from projected looks: a plate lit from below
-    sends no reflection to the wall. They stay in the camera and closeup looks.
-  - True folded caustics would need a scatter pass. The 16-binding limit is reached,
-    so that is later.
-- **Cost:** under 0.1 ms for the gather version.
-- **Gain:** one mechanism replaces five painted ones, and edges answer to focus, press
-  and oil.
-- **Follow-ons (§31, 2026-10-11):** **31a** gives the defocus Δz a control that also
-  blurs whichever dish is out of focus; **31d** evaluates the shadowgraph per band with
-  each liquid's dispersion.
-- **Risk:** real dye-into-water fronts are faint (Δn is small), so the plate may lose
-  the bright boundary line its looks are tuned on. Keep a gain on it, named as a gain.
-  Research item 4 (`/mnt/project-files/drops/research/bubbles-and-drops.md`) is this;
-  it was not in the plan.
+- **18e-1. Layer 1's painted boundary line (a painted shortcut until 31a separates the two dishes' heights).** On projected looks with `derivedOn > 0.5`, Layer 1 keeps a painted boundary line (`edge1 * boundaryContrast * 1.6` from `smoothstep(0.1, 0.6, length(near1.xy))`, gated on `fluid1.a > 0.03`) alongside `refractionOptics(near1, 0.0, 0.0, 0.0)`. At default `projectorFocus = 0.5`, both dishes currently sit at Δz = 0 so the shadowgraph Becke term is 1 and `refractionOptics` only darkens by pupil loss; without the painted line on Layer 1, the back plate's Screen vs Multiply separation in `npm run mixer` falls to 9.9 (bar > 10, 11.0 on main, 10.3 with the line), while applying that brightening to Layer 0 clips the 90th-percentile thin-dye rim in `mixer`'s single-dish mid-grey contrast check (`129.5 → 136.4` without it, `130.9 → 134.7` with it). Replace the painted line when **31a** gives the upper dish its inter-dish focal offset Δz₁ in the projector cone.
+- **18e-2. A clear pour's edge, and the deflection from the optical path.** The aperture's deflection is worked out from the dye's air-masked slope (`θ ≈ |∇density| · 0.35`, weighted by Edge Relief × plateAmt, plus `bEdge · boundaryContrast · 1.1` shaped by `smoothstep(0.25, 1.0, uB) * 0.78` at a hue-gated two-dye boundary, refractionOptics note 1), and `refractionOptics` returns early where both are flat. So an edge with no dye across it, glycerine poured clear into water (Δn 0.14) or the oil's rim, reaches ∇²OPL in the derive pass but draws no line on the wall. #355 took the oil's painted rim (`|∇oil|·2.2`) off projected looks, so a clear oil drop with no dye across its rim has no rim line there until this ships (its 8% lens brightening stays). Deflect by ∇OPL instead (the derive pass would write ∇OPL in place of the dye's slope, and the camera looks keep theirs), then retune the dye's stand-in index against it. A look change: every look's edges move.
+- **18e-3. The heat's index.** Water's index falls about 10⁻⁴ per kelvin, which is what makes a lamp's convection shimmer on the wall. The derive pass does not read the heat; with 18f.
 
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 
@@ -6210,6 +6204,34 @@ once the login works (23.14).*
   iPhones kept on `chromaglass.web.app` by `index.html`). *Measure:* `npm run signin` (14/14, wired into `checks.yml`
   `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
   than today's bar.
+- **23.10c** (**shipped**, this PR): a way back in, and a profile sheet that reads (the owner,
+  2026-10-24: signed out while using the app, "there is no way to re-sign in"; "the profile page is
+  garbage"). Signed out with the show up, every account button (the desk's status bar, the corner
+  pill, the phone's header and its Play menu) becomes a lit **Sign in** that opens the same sign-in
+  the first visit meets, inside the sheet, over a plate that keeps playing; a sign-in or sign-out
+  here, in another tab, or by the background check redraws them (`authFlag.ts` says so on
+  `cg-auth-changed`, and other tabs are heard through `storage`). The sheet (23.10b's frame) is now
+  one column that answers who you are (email and plan, or the sign-in), what you have (Pro says so;
+  Home is offered the upgrade; Free sees the two plans side by side; a key typed by hand is one
+  row), then the rest: running shows (one quiet line when there are none), the newsletter as one switch, sign
+  out and a small delete at the bottom. The settings shortcut is gone (the desk and the phone each
+  have their own). *Measure:* `npm run signin` 15 (a lit Sign in on the desk and the phone, 44 px on
+  the phone, opening the sign-in over a running plate) and 16 (signing in from the sheet brings the
+  account back); 1–13 unchanged.
+- **23.10b** (**shipped**, #430's work, folded into 23.10c's PR): the Profile & Store sheet fits the screen (the owner,
+  2026-10-22: "a little janky"). The sheet was one 955px column centred in a scrolling
+  overlay, so on a 900px laptop and an 844px phone its title and close button sat above the
+  screen with no way to scroll to them. Now the frame stays inside the viewport (`92dvh` on a
+  phone, `100dvh - 2rem` on a laptop), the title and the footer links stay put and only the
+  middle scrolls; two columns from 768px (who you are, the key and the running shows on the
+  left; the store and the newsletter on the right), so a 1280×720 laptop sees the whole sheet
+  at 600px tall with no scroll; on a phone a bottom sheet with the store second and 48px
+  touch rows. Colours are the desk's tokens (violet for what you own and for Pro, red for
+  sign-out's neighbour, white for the primary button) in place of amber, which meant nothing
+  elsewhere; the three "Profile & Store" / "Account" pills lost their amber too. Checkout
+  links, prices and every `data-cg-*` hook are unchanged. *Measure:* sheet height 955 → 600px
+  at 1440×900 and 1280×720, 776px at 390×844 inside the screen (was cut off by 28, 118 and 56px at the top);
+  `panel` 192/192, `layout` 74/74, `phone` 355/355.
 - **23.11** (**shipped**, this PR): the Mac app with no key asks for the
   same sign-in once (`LicenseGate.tsx`, `src/main.tsx`), online, then runs as the site does;
   with a verified Ed25519 key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
@@ -6230,6 +6252,34 @@ once the login works (23.14).*
   1 with. Typing a key by hand never needed it (checked offline). *Open:* `VITE_FIREBASE_SHOWS_URL`
   is read by `accountShows.ts` and is also not in the build; it falls back to `/account-shows` on the
   same origin, which the hosted site does not serve, so decide with 23.14 where that endpoint lives.
+  **23.12-jwks** (**shipped**, this PR): the owner's Pro account read Free (2026-10-24). The Worker
+  verified Firebase ID tokens only against a `GOOGLE_JWKS` variable that the check sets and the live
+  Worker never had, so it answered 401 to every real sign-in and no account key ever reached a
+  browser; and the app asked for the key only while the profile sheet was open. Now the Worker fetches
+  Google's published keys for Firebase tokens and keeps them for the endpoint's max-age (about five
+  hours, measured), asking at most once a minute for an unknown key id or while Google is down, one
+  fetch shared by concurrent requests; an RS256 token must name this project as both audience and
+  issuer, and carry an expiry, an issue time not in the future and a subject; the app asks once it starts signed in
+  (`src/lib/accountLicense.ts`, from `main.tsx`) and again the moment a sign-in completes in the
+  sheet, keeping the best of Home and Pro; a key taken off the computer by hand stays off until
+  asked back from the sheet (it would otherwise retake a Mac's seat at the next start). *Measure:*
+  `npm run license-worker` 15/15, 12/15 on the old Worker (8: no `GOOGLE_JWKS`, a good token gets
+  its Pro key and Google is asked once, old: 0 keys, 401; 8b: Google down, ten tokens ask it once;
+  3b: tokens for another project, another issuer, the demo project, or with no audience or issuer
+  refused, old: four of five let through); `npm run signin` 14 (Free before the key is
+  filed, Pro after a restart with the sheet never opened). *Owed:* `wrangler deploy` of the licence
+  Worker from the owner's Mac (its config is not in the repo), then confirm `owner-pro-1` is filed
+  under the owner's sign-in email and was signed after the key rotation (the sheet now says so in
+  words when the account holds a key the app cannot verify).
+  **23.12-reissue** (open): a key the account holds that was signed by the retired key pair is
+  refused by every browser; the Worker could re-sign such records on `GET /keys` with the current
+  key (it is the source of truth for what was sold), with a check that a forged token never enters
+  KV that way.
+  **23.14-verify** (open, found 2026-10-24): `server/account-shows.js` `verifyAccountToken` reads
+  the token's uid, audience and issuer but never checks its signature, so anyone who can reach a
+  show server can name any uid and read or publish that account's running shows. It should verify
+  RS256 against Google's keys as the licence Worker now does (23.12-jwks), with an `accountlink` line
+  that a token signed by anyone else is refused.
 - **23.14** (**shipped**, this PR): linking devices by
   account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
   with `server/remote-server.js` publishes its LAN relay address and show key to
@@ -6245,7 +6295,15 @@ once the login works (23.14).*
   and joined with a tap and no address typed while the QR code stays on `Phone · iPad`, a
   third page on another account sees nothing, and cutting off the internet and account
   service leaves the local remote socket driving the show.
-- **23.15** (with §12's iPhone app): Sign in with Apple native in the iPhone app, and
+- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (the owner,
+  2026-10-24: "I don't want to do the apple developer account or accept logins from
+  them. maybe later - but not now."). The button is held behind `APPLE_SIGN_IN` in
+  `SignInScreen.tsx`, the landing page and the privacy page say Google or an emailed
+  link. *Measure:* `npm run signin` line 4 fails if an Apple button is drawn.
+- **23.15** (*later*, the owner 2026-10-24: no Apple sign-in for now; with §12's iPhone
+  app, which needs it beside Google's under App Store guideline 4.8, and the paid Apple
+  Developer account): Sign in with Apple on the site (`APPLE_SIGN_IN`, the Services ID
+  and key in the Firebase console) and native in the iPhone app, and
   deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
   laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
   `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).
@@ -6255,6 +6313,7 @@ once the login works (23.14).*
   saved ChromaGlass state in `localStorage` (licence, signed-in flag, settings, set list),
   and there is no `?remote` or `?cast`, so returning users and offline shows do not lose
   their origin-scoped state before a handoff moves it across.
+- **23.17** (**shipped**, this PR): when slower frame rates cause the governor to step down (`status.steppedDown`) or the GPU solver is unavailable (`status.gpuUnavailable`), replace the old "Run it locally" `git clone` card (`src/components/RunLocallyCard.tsx`) and add a matching phone/desk `Fluid Grid` callout (`src/components/SettingsPanel.tsx`) suggesting an upgrade to **ChromaGlass Pro** (`CHECKOUT_PRO_URL` / `CHECKOUT_UPGRADE_URL` and `AccountSheet`), hidden once a Pro key is active; gate the `1024²` `Fluid Grid` option to Pro (`disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}`); and let the automatic quality ladder climb to `768²` at `2x`/`3x` Retina and `1024²` at `1x` with projector `stageLadder` and full WebGPU adapter limits in `src/gpu/device.ts` (falling back first to `maxStorageBufferBindingSize` + `maxBufferSize` and then to defaults) whenever a verified Pro licence is active (`effectiveLadderTier` in `src/lib/platform.ts`, `LiquidVisualizer.tsx`). *Measure:* `npm run tiers` (12/12) and `npm run rungs` (74/74).
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free

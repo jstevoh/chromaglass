@@ -47,7 +47,7 @@ import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../li
 import { stirOf } from '../lib/stir';
 import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
-import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
+import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
@@ -68,6 +68,7 @@ import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
+import { openCamera } from '../lib/cameras';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
 import { Modulators } from '../lib/modulators';
@@ -939,7 +940,13 @@ export interface LiquidVisualizerHandle {
   loadFilmFile: (file: File) => Promise<void>;
   /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
   loadFilmUrl: (url: string) => Promise<void>;
-  startFilmCamera: () => Promise<void>;
+  /**
+   * A camera's picture as the film (lib/cameras.ts): `deviceId` from the
+   * film's camera picker, '' for the browser's pick (a phone's back camera,
+   * pointed at a dish). `onEnded` fires when the camera is unplugged, and the
+   * answer says which camera opened and whether the chosen one was missing.
+   */
+  startFilmCamera: (deviceId?: string, onEnded?: () => void) => Promise<{ label: string | null; fellBack: boolean }>;
   /**
    * A window, a tab or a screen, picked from the browser's own chooser.
    *
@@ -6462,15 +6469,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }, 300);
       }
     },
-    startFilmCamera: async () => {
+    startFilmCamera: async (deviceId = '', onEnded) => {
       stopFilm();
       const f = filmRef.current;
       const v = filmVideo();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
+      const opened = await openCamera(deviceId, 'environment', { width: 1280 });
+      const stream = opened.stream;
       f.stream = stream;
       v.srcObject = stream;
       f.kind = 'camera';
+      // Unplugged, the same way a captured window is taken away: the film
+      // comes off and the panel is told, rather than the plate holding the
+      // camera's last frame with the source still reading "live".
+      filmEndedRef.current = onEnded ?? null;
+      for (const t of stream.getVideoTracks()) {
+        t.addEventListener('ended', () => {
+          const cb = filmEndedRef.current;
+          stopFilm();
+          cb?.();
+        });
+      }
       try { await v.play(); } catch { /* as above */ }
+      return { label: opened.label, fellBack: opened.fellBack };
     },
     clearFilm: () => stopFilm(),
     loadMark: (source, width, height) => {
@@ -6624,6 +6644,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     if (af === fluidsRef.current[0]) phaseByHandRef.current = true;
   };
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
+
+  useEffect(() => {
+    const onLicenseChanged = () => {
+      reladderRef.current();
+      resizeRef.current();
+    };
+    window.addEventListener('chromaglass:license-changed', onLicenseChanged);
+    window.addEventListener('cg-license-changed', onLicenseChanged);
+    return () => {
+      window.removeEventListener('chromaglass:license-changed', onLicenseChanged);
+      window.removeEventListener('cg-license-changed', onLicenseChanged);
+    };
+  }, []);
 
   useEffect(() => {
     const currentCount = fluidsRef.current.length;
@@ -10616,9 +10649,35 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         */
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
+        forceStepDown: (steppedDown = true) => {
+          if (steppedDown) governorRef.current?.failRung(performance.now() * 0.001);
+          const prev = engineStatusRef.current;
+          const next: EngineStatus = {
+            label: prev?.label ?? 'WebGPU · 384² · 1.0x',
+            engine: prev?.engine ?? 'webgpu',
+            grid: prev?.grid ?? 384,
+            dpr: prev?.dpr ?? 1,
+            tier,
+            gpu: prev?.gpu ?? 'mid',
+            renderer: prev?.renderer ?? 'WebGPU',
+            governed: true,
+            steppedDown,
+            gpuUnavailable: false,
+            frameMs: prev?.frameMs ?? 24,
+            simMs: prev?.simMs ?? 12,
+            layers: prev?.layers ?? 1,
+            stepsPerSec: prev?.stepsPerSec ?? 30,
+            stepRate: prev?.stepRate ?? 30,
+            otherMs: prev?.otherMs ?? 4,
+          };
+          engineStatusRef.current = next;
+          engineStatusAtRef.current = performance.now() * 0.001;
+          onEngineStatusRef.current?.(next);
+        },
         errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
         ambientSeed: (on: boolean) => { ambientSeedRef.current = !!on; },
         gridCap: () => gridCapRef.current,
+        ladderRungs: () => governorRef.current?.rungs ?? [],
         ...(renderer?.debug?.() ?? {}),
       });
     if (!isDraftRef.current && new URLSearchParams(window.location.search).has('debug')) {
@@ -10775,7 +10834,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     let ladderKey = '';
     const govern = (r: PlateRenderer, fresh: boolean) => {
-      const ladder = qualityLadder(tier, r.info.gpuClass, stageRef.current, gridCapRef.current);
+      const ladderTier = effectiveLadderTier(tier);
+      const ladder = qualityLadder(ladderTier, r.info.gpuClass, stageRef.current, gridCapRef.current);
       const key = ladder.rungs.map((x) => `${x.grid}@${x.dpr}`).join(' ');
       if (!fresh && key === ladderKey && governorRef.current) return;
       ladderKey = key;

@@ -67,6 +67,9 @@ const LIGHT_STACK = new Set([
   // And how far its chemistry wanders: a look's choice, and Evolve's own slow
   // changes would be a second clock on a clock already slow (PLAN 26d-6).
   'turingDrift',
+  // The projector lens's focal plane (PLAN 18e): 0.5 is sharp focus on the
+  // plate, so drifting it around 0.5 would defocus looks that ship sharp.
+  'projectorFocus',
 ]);
 const CALIBRATION = new Set([
   'audioImpact', 'automateRate', 'sensitivity', 'bassBoost', 'beatPrediction',

@@ -441,7 +441,10 @@ async function verifyFirebaseIdToken(idToken, env) {
   if (!header || !payload) return null;
 
   const nowSec = Math.floor(Date.now() / 1000);
-  if (typeof payload.exp === 'number' && payload.exp <= nowSec) return null;
+  // A token with no expiry, or issued in the future, is not a Firebase token.
+  if (typeof payload.exp !== 'number' || payload.exp <= nowSec) return null;
+  if (typeof payload.iat !== 'number' || payload.iat > nowSec + 300) return null;
+  if (typeof payload.sub !== 'string' || !payload.sub) return null;
   if (typeof payload.email !== 'string' || !payload.email.includes('@')) return null;
   if (payload.email_verified === false) return null;
 
@@ -460,12 +463,16 @@ async function verifyFirebaseIdToken(idToken, env) {
   }
 
   if (header.alg !== 'RS256') return null;
+  // A real token names this project twice: as its audience and in its issuer.
+  // The audience alone let through any token Google signed for 'demo-chromaglass'
+  // too, and checked neither when `aud` was missing.
+  if (payload.aud !== expectedAud || payload.iss !== `https://securetoken.google.com/${expectedAud}`) return null;
+  if (typeof header.kid !== 'string' || !header.kid) return null;
   const sigBytes = fromBase64Url(parts[2]);
   if (!sigBytes) return null;
 
-  const jwks = await getGoogleJwks(env);
-  if (!Array.isArray(jwks) || jwks.length === 0) return null;
-  const jwk = header.kid ? jwks.find((k) => k.kid === header.kid) : jwks[0];
+  const jwks = await getGoogleJwks(env, header.kid);
+  const jwk = Array.isArray(jwks) ? jwks.find((k) => k.kid === header.kid) : null;
   if (!jwk) return null;
 
   try {
@@ -485,12 +492,60 @@ async function verifyFirebaseIdToken(idToken, env) {
   }
 }
 
-async function getGoogleJwks(env) {
+/**
+ * Google's public keys for Firebase ID tokens, as JWKs.
+ *
+ * Reported by the owner, 2026-10-24: signed in with an account that holds a Pro
+ * key, the app still said Free. This function was why. It read the keys only
+ * from a `GOOGLE_JWKS` variable, which `npm run license-worker` sets and the
+ * live Worker never had, so it returned no keys and every real sign-in was
+ * refused: `GET /keys` answered 401 to everyone, and no account's key ever
+ * reached a browser. A variable could not have worked for long anyway: Google
+ * rotates these keys every few days (the endpoint's own max-age, measured
+ * 2026-10-24, was 18637 s, about five hours), and a token signed by a key the
+ * variable did not hold would be refused the same way.
+ *
+ * So the keys are fetched from Google's endpoint for exactly these tokens and
+ * kept for as long as Google says they may be. A token naming a key the cache
+ * does not hold fetches again (Google has rotated). Every attempt counts toward
+ * the once-a-minute limit, a failed one too, and concurrent requests share the
+ * one fetch in flight: a stream of tokens with made-up key ids, or Google being
+ * down, cannot turn into a stream of fetches (the review of #460 found both).
+ * `GOOGLE_JWKS` stays as an override for the check, which signs its own tokens.
+ */
+const GOOGLE_JWKS_URL =
+  'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
+const JWKS_MIN_REFETCH_MS = 60_000;
+const jwksCache = { keys: [], until: 0, triedAt: 0 };
+let jwksInFlight = null;
+
+async function getGoogleJwks(env, kid) {
   if (env.GOOGLE_JWKS) {
     const parsed = typeof env.GOOGLE_JWKS === 'string' ? JSON.parse(env.GOOGLE_JWKS) : env.GOOGLE_JWKS;
     return Array.isArray(parsed) ? parsed : parsed?.keys ?? [];
   }
-  return [];
+  const now = Date.now();
+  const holds = jwksCache.keys.some((k) => k.kid === kid);
+  if (holds && now < jwksCache.until) return jwksCache.keys;
+  if (jwksInFlight) return jwksInFlight;
+  if (now - jwksCache.triedAt < JWKS_MIN_REFETCH_MS) return jwksCache.keys;
+  jwksCache.triedAt = now;
+  jwksInFlight = (async () => {
+    try {
+      const res = await fetch(GOOGLE_JWKS_URL);
+      if (!res.ok) return jwksCache.keys;
+      const body = await res.json();
+      const keys = Array.isArray(body?.keys) ? body.keys : [];
+      if (!keys.length) return jwksCache.keys;
+      const maxAge = Number(/max-age=(\d+)/.exec(res.headers.get('cache-control') || '')?.[1]) || 3600;
+      jwksCache.keys = keys;
+      jwksCache.until = now + Math.min(maxAge, 6 * 3600) * 1000;
+    } catch {
+      // Google out of reach: the keys already held, if any, still verify.
+    }
+    return jwksCache.keys;
+  })().finally(() => { jwksInFlight = null; });
+  return jwksInFlight;
 }
 
 async function readEmailKeys(env, email) {
