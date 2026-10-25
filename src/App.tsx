@@ -12,6 +12,8 @@ import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
+import type { CartoonShelfProps } from './components/CartoonShelf';
+import { CARTOON_BY_ID } from './lib/cartoons';
 import { SETTINGS_SECTIONS, sectionSearchText, resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
@@ -49,6 +51,7 @@ import { relayInfo, parseRemoteGesture, type RemoteState, type RelayInfo } from 
 import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
 import type { CastState, CastMessage } from './lib/castProtocol';
 import type { RemoteMessage } from './lib/remoteProtocol';
+import { fitMarkForCast } from './lib/markFit';
 import { runBench, formatBench, readRenderer } from './lib/bench';
 import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
@@ -923,36 +926,47 @@ export default function App() {
 
   const videoInputRef = useRef<HTMLInputElement>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
-  const videoFrameRaf = useRef<number | null>(null);
-
+  /** A poured file's object URL, revoked when the pour moves on. */
+  const pourUrlRef = useRef<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  /** The shelf's cartoon pouring as dye (lib/cartoons.ts), or null for a file or nothing. */
+  const [pouringCartoon, setPouringCartoon] = useState<string | null>(null);
+  /*
+    The video pour: one hidden, muted, looping <video>, handed to the plate
+    once when it starts playing. It used to be handed over again on every
+    animation frame, which made the plate pause and play it every frame
+    (PLAN 14ab-1, fixed in `pourVideo`); the plate's own frame loop reads the
+    picture, so once is enough. A cartoon is given by address, so it pours
+    while it is still arriving; a file by an object URL.
+  */
+  const pourVideoFrom = useCallback((src: string, objectUrl: boolean) => {
+    const v = videoPlayerRef.current;
+    if (!v) return;
+    if (pourUrlRef.current) URL.revokeObjectURL(pourUrlRef.current);
+    pourUrlRef.current = objectUrl ? src : null;
+    v.onplay = () => { setIsVideoPlaying(true); visualizerRef.current?.pourVideo(v); };
+    v.onpause = () => setIsVideoPlaying(false);
+    v.onended = () => setIsVideoPlaying(false);
+    v.src = src;
+    v.play().catch(() => { /* autoplay policy: plays on the next gesture */ });
+  }, []);
+  const stopPour = useCallback(() => {
+    visualizerRef.current?.stopPourVideo();
+    const v = videoPlayerRef.current;
+    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+    if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
+    setIsVideoPlaying(false);
+    setPouringCartoon(null);
+  }, []);
+  const pourFile = useCallback((file: File) => {
+    pourVideoFrom(URL.createObjectURL(file), true);
+    setPouringCartoon(null);
+  }, [pourVideoFrom]);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !videoPlayerRef.current) return;
-    videoPlayerRef.current.src = URL.createObjectURL(file);
-    videoPlayerRef.current.play();
-    setIsVideoPlaying(true);
-    
-    const loop = (time: number) => {
-      if (videoPlayerRef.current && !videoPlayerRef.current.paused && !videoPlayerRef.current.ended) {
-        visualizerRef.current?.pourVideo(videoPlayerRef.current);
-        videoFrameRaf.current = requestAnimationFrame(loop);
-      } else {
-        setIsVideoPlaying(false);
-      }
-    };
-    
-    videoPlayerRef.current.onplay = () => {
-      setIsVideoPlaying(true);
-      if (videoFrameRaf.current) cancelAnimationFrame(videoFrameRaf.current);
-      loop(performance.now());
-    };
-
-    videoPlayerRef.current.onpause = () => setIsVideoPlaying(false);
-    videoPlayerRef.current.onended = () => setIsVideoPlaying(false);
-
+    if (file) pourFile(file);
     e.target.value = '';
-  }, []);
+  }, [pourFile]);
 
   const userPresetsRef = useRef<UserPreset[]>([]);
 
@@ -1355,9 +1369,12 @@ export default function App() {
   }, []);
   startBenchRef.current = startBench;
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
+  /** The shelf's cartoon playing as the film; read only while the film is a file (a camera or window replaces it). */
+  const [filmCartoon, setFilmCartoon] = useState<string | null>(null);
   const loadFilm = async (file: File) => {
     await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
+    setFilmCartoon(null);
   };
   const startFilmCamera = async () => {
     try {
@@ -1396,6 +1413,28 @@ export default function App() {
   const clearFilm = () => {
     wallRef.current?.clearFilm();
     setFilmSource('none');
+    setFilmCartoon(null);
+  };
+  const filmCartoonNow = async (id: string) => {
+    const c = CARTOON_BY_ID.get(id);
+    if (!c) return;
+    await wallRef.current?.loadFilmUrl(c.src);
+    setFilmSource('file');
+    setFilmCartoon(id);
+  };
+  /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
+  const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
+  const cartoons: CartoonShelfProps = {
+    pouring: pouringCartoon,
+    filming: filmingCartoon,
+    onPour: (id) => {
+      const c = CARTOON_BY_ID.get(id);
+      if (!c) return;
+      pourVideoFrom(c.src, false);
+      setPouringCartoon(id);
+    },
+    onFilm: (id) => { if (filmingCartoon === id) clearFilm(); else void filmCartoonNow(id); },
+    onStopPour: stopPour,
   };
   // ── The room ────────────────────────────────────────────────────
   // The camera as a sensor: it stirs the plate, puts hands on it and rides
@@ -3198,9 +3237,23 @@ export default function App() {
   };
 
   // ── A new song, a new look ──────────────────────────────────────
-  // Heard as a gap between tracks, or named by track identification. The
-  // sequencer owns the evolution while it runs, so it is left alone then.
-  const songChange = useSongChange(audioData, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
+  // Heard as a gap between tracks, or named by track identification, on the
+  // ear's own clock and landed on a beat (PLAN 14z). The sequencer owns the
+  // evolution while it runs, so it is left alone then.
+  const songChange = useSongChange(ear.onReading, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
+  /*
+    How long the new song's look takes to come in, by how the song came.
+
+    After a gap the new song starts clean and the change lands on one of its
+    first beats, so it comes in quickly: a second, short enough to read as the
+    show answering the song and long enough not to read as a cut. Named by
+    identification, the new song has been playing for several seconds already
+    (a crossfade, or a gapless join; `npm run songends` measures 6 to 17 s at the
+    median), so the look blends in under it instead: twice the desk's fade,
+    and never under four seconds. Both were a fixed desk fade at whatever
+    moment the gap rule happened to fire.
+  */
+  const songFadeSeconds = (reason: 'gap' | 'track') => reason === 'gap' ? 1 : Math.max(4, fadeSeconds * 2);
   const lastSongChangeSeq = useRef(0);
   useEffect(() => {
     if (!songChange || songChange.seq === lastSongChangeSeq.current) return;
@@ -3241,7 +3294,7 @@ export default function App() {
       setPinnedPresetId(null);
       // The song boundary's own stream, not Lucky's default: a Lucky press
       // between songs must not decide which look the next song brings.
-      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), fadeSeconds);
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), songFadeSeconds(songChange.reason));
       return;
     }
     const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
@@ -3252,7 +3305,7 @@ export default function App() {
     if (!next) return;
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);
-    fadeSettingsTo(evolvedLook(from, next.settings), fadeSeconds);
+    fadeSettingsTo(evolvedLook(from, next.settings), songFadeSeconds(songChange.reason));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songChange?.seq]);
 
@@ -3290,6 +3343,14 @@ export default function App() {
    * rather than only in the visualizer for that reason.
    */
   const markUrlRef = useRef<string | null>(null);
+  /*
+    The same mark as it crosses the show server to a network display: the
+    original when it fits a relay frame, else a smaller copy (PLAN 14m-mark,
+    `lib/markFit.ts`). The relay closes a socket on a frame over 512 KB, and a
+    print-sized logo is several megabytes, so before this a big logo never
+    reached the network display at all.
+  */
+  const markRelayUrlRef = useRef<string | null>(null);
   const [markLoaded, setMarkLoaded] = useState(false);
   /*
     The state, at most fifteen times a second.
@@ -3368,7 +3429,7 @@ export default function App() {
     if (withMark) send({ type: 'mark', dataUrl: markUrlRef.current });
     if (mirrorCountRef.current > 0) {
       relaySendRef.current?.({ type: 'cast', message: { type: 'state', state } });
-      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markUrlRef.current } });
+      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
     }
   }, []);
   useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
@@ -3396,9 +3457,10 @@ export default function App() {
       img.onload = () => {
         for (const v of bothEngines()) v.loadMark?.(img, img.naturalWidth, img.naturalHeight);
         markUrlRef.current = url;
+        markRelayUrlRef.current = fitMarkForCast(img, url);
         setMarkLoaded(true);
         castSend({ type: 'mark', dataUrl: url });
-        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: url } });
+        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
         setToastRef.current?.('Mark on the wall');
       };
       img.onerror = () => setToastRef.current?.('That file would not open as a picture');
@@ -3410,6 +3472,7 @@ export default function App() {
   const clearMark = useCallback(() => {
     for (const v of bothEngines()) v.clearMark?.();
     markUrlRef.current = null;
+    markRelayUrlRef.current = null;
     setMarkLoaded(false);
     castSend({ type: 'mark', dataUrl: null });
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
@@ -4736,6 +4799,7 @@ export default function App() {
     <SettingsPanel
       mixTakes={mixTakes}
       backLook={backLookName}
+      lookId={activePresetId}
       songDetection={musicSettings.enabled}
       onSongDetection={(on) => updateMusicSettings({ enabled: on })}
       settings={settings}
@@ -4789,6 +4853,7 @@ export default function App() {
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       onFilmFile={loadFilm}
+      onPourVideo={pourFile}
       onFilmCamera={startFilmCamera}
       onFilmWindow={startFilmWindow}
       onFilmClear={clearFilm}
@@ -5708,6 +5773,7 @@ export default function App() {
             onPalette={selectPalette}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
+            cartoons={cartoons}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -6400,6 +6466,7 @@ export default function App() {
           onPalette={selectPalette}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
+          cartoons={cartoons}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}

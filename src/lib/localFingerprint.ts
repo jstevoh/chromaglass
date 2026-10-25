@@ -293,6 +293,9 @@ const NEIGHBOR_FRAMES = 6;   // deltas this close to the winner count as the sam
  * genuine matches stand 3.9–5.0x over their track's own 90th-percentile
  * alignment, strangers 1.5–2.1x. Three is the gap between them, with close to
  * a factor of two of margin on each side.
+ *
+ * Since a repeated pair votes once (below), the genuine ones stand 3.7–8.9x
+ * and no stranger is named at all.
  */
 const MIN_BACKGROUND_RATIO = 3.0;
 
@@ -305,13 +308,38 @@ export function matchSnippet(pcm: Float32Array, sampleRate: number, index: Finge
   // Vote on (track, referenceFrame - queryFrame) at raw frame granularity
   const DELTA_BIAS = 1 << 21;
   const KEY_STRIDE = 1 << 22;
+  //
+  // One hash value votes once per track and neighbourhood of alignments, however
+  // many times it occurs in the snippet or the track. A held note or chord makes
+  // the same pair at every frame it lasts: n of them in the snippet against m in
+  // a track used to put n×m votes across a band of alignments, and the window
+  // below summed thirteen of those deltas into a "match" thousands strong. With
+  // eight songs in the library and each left out in turn (`npm run songends`'
+  // fixtures, through the room at -66 and -48 dB), songs the library had never
+  // heard were named 38 times, at scores of 550 to 3400, and always at the
+  // same place in the named song (132 s into one, whatever moment of the
+  // stranger was playing): a held chord, not shared music. Counted once, 0
+  // strangers are named, and the songs it knows are named in 978 captures of
+  // 4 s, not 929. Genuine alignment is many different pairs agreeing on one
+  // delta, which this keeps; a repeated pair agreeing with itself it no longer
+  // counts more than once. (Once per bucket of thirteen deltas, so a run that
+  // straddles a bucket's edge can vote twice: bounded, and well under the
+  // twelve a match needs.)
+  const VOTE_BUCKET = 2 * NEIGHBOR_FRAMES + 1;
+  const order = Array.from(q.hashes.keys()).sort((a, b) => q.hashes[a] - q.hashes[b]);
+  const voted = new Set<number>();
   const votes = new Map<number, number>();
   let totalVotes = 0;
-  for (let i = 0; i < q.hashes.length; i++) {
+  for (let o = 0; o < order.length; o++) {
+    const i = order[o];
+    if (o === 0 || q.hashes[i] !== q.hashes[order[o - 1]]) voted.clear();
     const qFrame = q.frames[i];
     forEachEntry(index, q.hashes[i], (trackIdx, refFrame) => {
       const delta = refFrame - qFrame;
       if (delta < -2) return; // snippet can't start before the track
+      const bucket = trackIdx * KEY_STRIDE + Math.floor((delta + DELTA_BIAS) / VOTE_BUCKET);
+      if (voted.has(bucket)) return;
+      voted.add(bucket);
       const key = trackIdx * KEY_STRIDE + delta + DELTA_BIAS;
       votes.set(key, (votes.get(key) ?? 0) + 1);
       totalVotes++;
@@ -373,7 +401,16 @@ export function matchSnippet(pcm: Float32Array, sampleRate: number, index: Finge
   const track = index.tracks[best.trackIdx];
   if (!track) return null;
 
-  const offsetSec = Math.max(0, best.delta * FP_HOP_SEC + q.durationSec);
+  // Where in the track: the single delta with the most votes inside the
+  // winning window, not the window's own place. With a repeated pair voting
+  // once per neighbourhood, window sums plateau across several deltas and the
+  // first of the plateau won, a few frames off: the worst offset in
+  // `npm run music` was 0.28 s that way, 0.02 s this way (0.03 s before).
+  let peak = best;
+  for (const e of entries) {
+    if (e.trackIdx === best.trackIdx && Math.abs(e.delta - best.delta) <= NEIGHBOR_FRAMES && e.v > peak.v) peak = e;
+  }
+  const offsetSec = Math.max(0, peak.delta * FP_HOP_SEC + q.durationSec);
   return { isrc: track.isrc, title: track.title, artist: track.artist, offsetSec, score,
            concentration: totalVotes > 0 ? score / totalVotes : 0, queryHashes: q.hashes.length,
            background, perHash: score / Math.max(1, q.hashes.length) };

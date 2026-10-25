@@ -96,6 +96,8 @@ struct Sim {
   magRadius: f32,
   // 1 where decayDye clears thin mist first (sparse dark looks only; lib/dyeTarget.ts).
   surfaceClear: f32,
+  // Lamp intensity scaled by heating rate (PLAN 18f).
+  lampHeat: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -382,6 +384,74 @@ const STAND_ASIDE = /* wgsl */ `
 fn aside(p: vec2i, q: vec2i, n: f32) -> f32 {
   return 1.0 - max(textureLoad(stand, clampP(p, n), 0).r, textureLoad(stand, clampP(q, n), 0).r);
 }`;
+/*
+  How far inside the rim the rim's pressure is laid in (CAPILLARY, below), in
+  cells. A gradient moves nothing wherever it is laid, so the width is only
+  how gently Φ comes up: over a band this wide its radial part is about the
+  capillary force's own size at an edge four cells wide, and the band is
+  still a twentieth of a 192 plate's radius.
+*/
+const RIM_BAND = 8;
+/** The most samples rimLaplace takes round the ring (its workgroup arrays' length; fluid.ts sizes the ring). */
+export const RIM_SAMPLES = 1024;
+/*
+  The oil's capillary force, σ κ ∇c̃, at one cell (mixForce has the physics),
+  shared by mixForce and rimLaplace so the rim reads the very force the flow
+  is given. Both bind the oil's blur as \`soft\`; A.a.x is σ and A.a.y the most
+  it may add, both mixForce's.
+
+  And the rim's share of it (PLAN 18g-6). The thin gap's rim is open: past
+  it the liquid is the reservoir round the cover glass, held at the air's
+  pressure, p = 0 (wgsl/thinGap.ts). That is the water's pressure there, and
+  a cell of water at the rim is right to have it. A cell of oil is not: the
+  oil's interface makes the oil σκ above the water round it (Young–Laplace),
+  and a body cut by the rim still has its interface past it, in the water
+  of the reservoir, so the oil at the rim is at σκ, not at zero. Held at
+  zero, the oil just inside the rim was at its body's Laplace pressure and
+  the rim's own cells at none, and the difference drained the body out
+  through the rim by its own surface tension, with the plate level and
+  nothing stirring: in the lab a lens of radius 0.06 laid against the rim at
+  Clock Glass's Oil Tension kept 9.6% of its oil after six seconds (\`npm
+  run rimhold\`), and the same lens at a hundredth of the tension, or in the
+  middle of the dish, kept all of it.
+
+  So the rim holds each cell at the oil's own pressure there, φ: the line
+  integral of the capillary force along the rim, ∮ f·dl from a cell of water
+  (rimLaplace), which across an interface is the jump σκ the force makes and
+  across water or the inside of a body is nothing. Not laid into the
+  pressure solve's held cells (which every carry's faces read too,
+  THIN_FACE), but as the same thing said in the force: the gradient of
+  Φ = w(r)·φ(θ), a ramp w from nothing to one over the last RIM_BAND cells
+  inside the rim, taken off the capillary force. A gradient moves nothing
+  between two glasses (the pressure takes it, whatever the drag in each
+  cell: u = c(f − ∇p)), so inside the band the flow is the flow it was; and
+  the solve's p' = p − Φ held at zero on the rim is p held at φ there.
+  Everywhere short of the band the force is untouched, to the bit.
+*/
+const CAPILLARY = /* wgsl */ `
+fn cs(p: vec2i, n: f32) -> f32 { return textureLoad(soft, clampP(p, n), 0).r; }
+fn grad(p: vec2i, n: f32) -> vec2f {
+  return 0.5 * vec2f(cs(p + vec2i(1, 0), n) - cs(p - vec2i(1, 0), n), cs(p + vec2i(0, 1), n) - cs(p - vec2i(0, 1), n));
+}
+// The edge's unit normal, fading to nothing where there is no edge to have one.
+fn nrm(p: vec2i, n: f32) -> vec2f { let g = grad(p, n); return g / sqrt(dot(g, g) + 0.0004); }
+// σ κ ∇c̃. The normal's divergence by central differences of the normals
+// themselves, not a second derivative of c: that is the step that keeps the
+// grid out of it.
+fn capillaryAt(p: vec2i, n: f32) -> vec2f {
+  let g = grad(p, n);
+  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
+  var f = A.a.x * kappa * g;
+  let l = length(f);
+  if (l > A.a.y) { f *= A.a.y / l; }
+  return f;
+}
+// The ring rimLaplace integrates along: two cells inside the rim, inside
+// every cell the solve holds (the rim's and the grid's edge, hsPrep).
+fn rimRing(n: f32) -> f32 { return ${OPEN_RIM.toFixed(2)} - 2.0 / n; }
+// w(r): nothing short of the band, one from a cell and a half inside the rim outward.
+fn rimRamp(r: f32, n: f32) -> f32 { return smoothstep(${OPEN_RIM.toFixed(2)} - (1.5 + ${RIM_BAND.toFixed(1)}) / n, ${OPEN_RIM.toFixed(2)} - 1.5 / n, r); }
+`;
 const MAGNET_WGSL = /* wgsl */ `
 // The magnetic energy density a magnet under the glass sets up in the plate,
 // up to its constant. m = (x, y, height, strength); its field B is the
@@ -644,7 +714,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   gapReshape: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
@@ -653,11 +723,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let was = clamp(0.03 * (1.0 - A.a.x * k), 0.004, 0.06);
   let now = clamp(0.03 * (1.0 - A.a.y * k), 0.004, 0.06);
   let s = textureLoad(src, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, 0.0, 0.0));
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, s.b, s.a));
 }`,
 
   gapRest: `${HEAD}
-@group(0) @binding(2) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(2) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let d = uvOf(id) - vec2f(0.5);
@@ -1447,7 +1517,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   squeezeUpdate: `${HEAD}
 @group(0) @binding(2) var sq: texture_2d<f32>;
 @group(0) @binding(3) var addT: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rg32float, write>;
+@group(0) @binding(4) var sheetT: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let s = textureLoad(sq, vec2i(id.xy), 0);
@@ -1497,6 +1568,52 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     }
   }
   /*
+    The rhythm sheet's change this step (A.a.z; lib/sheet.ts, PLAN 27f-4),
+    laid as solved. Not as a press: the sheet's solve is already the film
+    draining under it (lubrication, the film's own resistance), so a
+    Stefan closing on top would count that resistance twice, and the ring
+    it lifts round its dent is the sheet past rest, which a press's ceiling
+    would cut off. Cut, it would ratchet: the ring's rise dropped, its
+    fall laid in full, every kick leaving the gap a little closer where the
+    ring went. Only the floor holds.
+
+    And the floor keeps what it took (\`owed\`, the texel's fourth number).
+    On a dome (Plate Shape below zero) the middle rests near the floor, and
+    a dent there closes more than the gap has: the floor refuses the rest
+    of it. Given back in full as the sheet lets go, the opening then landed
+    past rest by all that was refused, and every kick near the middle left
+    the gap a little more open: at Plate Shape −1, a dozen default kicks
+    left the middle a whole dent past rest and the dish's mean 10% of a
+    dent open (the review of #452). So what the floor refuses is owed, and
+    the sheet's openings pay it before they open the gap: the gap is the
+    floor or rest minus the dent, whichever is higher, as the sheet's own
+    state says, however many kicks. It takes the spring as the gap does
+    (the dent it stands for is pulled back by it too). The kick is also
+    pressed no deeper than the dome's rest under it (pressKick), so what
+    is owed is the dent's inner flank, not its middle.
+
+    And not \`pressed\`. Setting it everywhere the sheet moved (which is every
+    cell: the solve is a sum of sines) stopped the memory below for every
+    other press while any kick's sheet was live: a hand press's push after
+    it went from −4.5e2 a step to under 3. The memory must not repeat the
+    sheet's own rate (the solve already carries it on), so the rate it
+    remembers (the texel's third number) is this step's without the
+    sheet's, and every other press keeps its tail.
+  */
+  var sheetRate = 0.0;
+  var owed = s.a;
+  if (A.a.z > 0.5) {
+    let dw = textureLoad(sheetT, vec2i(id.xy), 0).r;
+    if (dw != 0.0) {
+      let want = gap + dw - owed;
+      let g2 = max(0.004, want);
+      owed = g2 - want;
+      sheetRate = (g2 - gap) / max(S.dt, 0.0001);
+      dhdt += sheetRate;
+      gap = g2;
+    }
+  }
+  /*
     The squeeze a press leaves behind (gapMemory): after the press, and
     never more than the gap has room to give.
 
@@ -1528,13 +1645,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   if (!pressed) {
     let room = (gap - 0.004) / max(S.dt, 0.0001);
-    dhdt += max(s.g * S.gapMemory, -room);
+    dhdt += max(s.b * S.gapMemory, -room);
   }
   // The spring back toward the dome, and its motion counts.
   let g3 = gap + (rest - gap) * S.gapSpring;
   dhdt += (g3 - gap) / max(S.dt, 0.0001);
-  let out = vec4f(g3, dhdt, 0.0, 0.0);
-  textureStore(dst, vec2i(id.xy), select(vec4f(rest, 0.0, 0.0, 0.0), out, finite2(out.xy)));
+  let out = vec4f(g3, dhdt, dhdt - sheetRate, owed * (1.0 - S.gapSpring));
+  textureStore(dst, vec2i(id.xy), select(vec4f(rest, 0.0, 0.0, 0.0), out, finite2(out.xy) && finite2(out.zw)));
 }`,
 
   /*
@@ -2577,14 +2694,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var c = textureLoad(cur, q, 0).xy;
   let temp = bilerpN(vel, uv, S.n).z;
   /*
-    tanh with its argument held in range: some GPUs take tanh as a ratio of
-    exponentials, and past about 88 the exponential is infinite and the
-    ratio is NaN. A plate anywhere hotter than 4.4 (the lamp under a standing
-    plate reaches that) turned the whole current NaN, and the flow was
-    wiped every step after it. tanh is ±1 to float precision well before 10.
+    Buoyancy is linear with temperature (Boussinesq, PLAN §18f), with the tanh
+    removed so plumes have a strength proportional to their heat rather than
+    saturating at once. S.up is gated on upright, so a level plate has no in-plane
+    buoyancy.
   */
   let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
-  var f = S.up * (S.curBuoy * tanh(min(max(temp, 0.0) * 20.0, 10.0)));
+  var f = S.up * (S.curBuoy * clamp(temp, 0.0, 50.0));
   f += S.rock * dd;
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
@@ -3594,6 +3710,99 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    The oil's pressure along the rim, φ(θ), for mixForce to hold the open rim
+    at (CAPILLARY has the physics). One workgroup: the ring two cells inside
+    the rim sampled K times (the texture's width, a cell or so apart), at
+    each sample the capillary force mixForce lays, bilinear between its
+    cells, and its component along the ring times the arc, which summed
+    round the ring is ∮ f·dl.
+
+    From a cell of water: the sample with the least oil on it is zero, as
+    the reservoir's water is. Across an interface the sum rises by the jump
+    σκ and inside a body it is flat, so a body cut by the rim reads its own
+    Laplace pressure from end to end. The sum round the whole ring is zero
+    only for a force that is a gradient; a body that is not round has a
+    different curvature where it enters the ring and where it leaves, and
+    the two jumps do not cancel. What is left over is laid along the ring by
+    the oil it crosses (the share of the ring's oil passed so far), so the
+    water's samples stay at the water's zero and a body's pressure runs
+    from one end's jump to the other's across it, as the pressure inside a
+    body that is still rounding does.
+
+    A.a = mixForce's (σ, the most a cell may add).
+  */
+  rimLaplace: `${HEAD}${CAPILLARY}
+@group(0) @binding(2) var soft: texture_2d<f32>;
+@group(0) @binding(3) var dst: texture_storage_2d<r32float, write>;
+var<workgroup> ring: array<f32, ${RIM_SAMPLES}>;
+var<workgroup> oilOn: array<f32, ${RIM_SAMPLES}>;
+var<workgroup> part: array<vec2f, 64>;
+var<workgroup> least: array<vec2f, 64>;
+var<workgroup> total: vec3f;
+// A cell's (capillary force, oil) between the four cells round g.
+fn sampleAt(g: vec2f, n: f32) -> vec3f {
+  let c0 = vec2i(floor(g));
+  let f = g - floor(g);
+  let a = vec3f(capillaryAt(c0, n), cs(c0, n));
+  let b = vec3f(capillaryAt(c0 + vec2i(1, 0), n), cs(c0 + vec2i(1, 0), n));
+  let c = vec3f(capillaryAt(c0 + vec2i(0, 1), n), cs(c0 + vec2i(0, 1), n));
+  let d = vec3f(capillaryAt(c0 + vec2i(1, 1), n), cs(c0 + vec2i(1, 1), n));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+@compute @workgroup_size(64) fn main(@builtin(local_invocation_index) t: u32) {
+  let n = S.n;
+  let k = i32(textureDimensions(dst).x);
+  let per = k / 64;
+  let first = i32(t) * per;
+  let rs = rimRing(n);
+  let step = 6.2831853 / f32(k);
+  let arc = step * rs * n;
+  var mine = vec2f(0.0);
+  for (var j = 0; j < per; j++) {
+    let i = first + j;
+    let th = (f32(i) + 0.5) * step;
+    let dir = vec2f(cos(th), sin(th));
+    let s = sampleAt((vec2f(0.5) + rs * dir) * n - 0.5, n);
+    ring[i] = dot(s.xy, vec2f(-dir.y, dir.x)) * arc;
+    oilOn[i] = clamp(s.z, 0.0, 1.0);
+    mine += vec2f(ring[i], oilOn[i]);
+  }
+  part[t] = mine;
+  workgroupBarrier();
+  if (t == 0u) {
+    var run = vec2f(0.0);
+    for (var i = 0; i < 64; i++) { let here = part[i]; part[i] = run; run += here; }
+    total = vec3f(run, 0.0);
+  }
+  workgroupBarrier();
+  let sums = total.xy;
+  var run = part[t];
+  var low = vec2f(2.0, 0.0);
+  for (var j = 0; j < per; j++) {
+    let i = first + j;
+    let here = vec2f(ring[i], oilOn[i]);
+    let mid = run + 0.5 * here;
+    let share = select(mid.y / sums.y, (f32(i) + 0.5) / f32(k), sums.y < 1e-6);
+    run += here;
+    ring[i] = mid.x - sums.x * share;
+    if (here.y < low.x) { low = vec2f(here.y, f32(i)); }
+  }
+  least[t] = low;
+  workgroupBarrier();
+  if (t == 0u) {
+    var best = least[0];
+    for (var i = 1; i < 64; i++) { if (least[i].x < best.x) { best = least[i]; } }
+    total.z = best.y;
+  }
+  workgroupBarrier();
+  let zero = ring[i32(total.z)];
+  for (var j = 0; j < per; j++) {
+    let i = first + j;
+    textureStore(dst, vec2i(i, 0), vec4f(ring[i] - zero, 0.0, 0.0, 0.0));
+  }
+}`,
+
+  /*
     What the mix does to the flow, and what gravity does to the dye.
 
     **Capillary force**, σ κ ∇c̃ (continuum surface force, Brackbill 1992):
@@ -3634,33 +3843,40 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     **The lamp**: heat A.a.z a step into the dye below A.a.w plate widths
     from the centre, downhill, where a standing plate goes out of view.
   */
-  mixForce: `${HEAD}
+  mixForce: `${HEAD}${CAPILLARY}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var dye: texture_2d<f32>;
 @group(0) @binding(5) var soft: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
-fn cs(p: vec2i, n: f32) -> f32 { return textureLoad(soft, clampP(p, n), 0).r; }
-fn grad(p: vec2i, n: f32) -> vec2f {
-  return 0.5 * vec2f(cs(p + vec2i(1, 0), n) - cs(p - vec2i(1, 0), n), cs(p + vec2i(0, 1), n) - cs(p - vec2i(0, 1), n));
+@group(0) @binding(6) var rimPhi: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
+// Φ = w(r)·φ(θ) at a cell (CAPILLARY): φ read round the ring, between its samples.
+fn rimHeld(q: vec2i, n: f32) -> f32 {
+  let d = (vec2f(q) + 0.5) / n - vec2f(0.5);
+  let w = rimRamp(length(d), n);
+  if (w <= 0.0) { return 0.0; }
+  let k = i32(textureDimensions(rimPhi).x);
+  let s = fract(atan2(d.y, d.x) / 6.2831853 + 1.0) * f32(k) - 0.5;
+  let i0 = i32(floor(s));
+  let a = textureLoad(rimPhi, vec2i((i0 + k) % k, 0), 0).r;
+  let b = textureLoad(rimPhi, vec2i((i0 + 1 + k) % k, 0), 0).r;
+  // (Not mix(): the oil's texture has that name in this kernel.)
+  return w * (a + (b - a) * (s - floor(s)));
 }
-// The edge's unit normal, fading to nothing where there is no edge to have one.
-fn nrm(p: vec2i, n: f32) -> vec2f { let g = grad(p, n); return g / sqrt(dot(g, g) + 0.0004); }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
   var v = textureLoad(vel, p, 0);
-  // σ κ ∇c̃ (see above). The normal's divergence by central differences of
-  // the normals themselves, not a second derivative of c: that is the step
-  // that keeps the grid out of it.
-  let g = grad(p, n);
-  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
-  var capillary = A.a.x * kappa * g;
-  let cl = length(capillary);
-  if (cl > A.a.y) { capillary *= A.a.y / cl; }
+  var capillary = capillaryAt(p, n);
+  // On a thin gap, the rim held at the oil's own pressure (CAPILLARY says why).
+  if (S.thinGap > 0.5) {
+    capillary -= 0.5 * vec2f(rimHeld(p + vec2i(1, 0), n) - rimHeld(p - vec2i(1, 0), n), rimHeld(p + vec2i(0, 1), n) - rimHeld(p - vec2i(0, 1), n));
+  }
   let wax = textureLoad(dye, p, 0).a;
-  let rho = wax - S.meanD;
+  let oil = textureLoad(mix, p, 0).r;
+  // Oil has density below water (PLAN §18f): floats upward when plate is upright/tilted.
+  let rho = wax - S.meanD - 0.15 * oil;
   let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
   var heat = v.z;
   if (A.a.z > 0.0) {
@@ -4161,7 +4377,14 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   decayVel: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(3) var dye: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+
+// Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
+fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
+  return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
+}
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   var v = textureLoad(vel, vec2i(id.xy), 0);
@@ -4170,7 +4393,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  v.z *= S.heatDecay;
+  // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
+  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
+  var temp = v.z * cool;
+  // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
+  let d = textureLoad(dye, vec2i(id.xy), 0);
+  var absorbed = 0.0;
+  if (d.a > 1e-4) {
+    let norm = 1.0 / d.a;
+    let unit = exp(-max(d.rgb, vec3f(0.0)) * norm);
+    let through = lampThrough(unit, d.a);
+    absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
+  }
+  // Central hotspot of the lamp (shortcut: 1 / (1 + 2.5 r²)):
+  let toCenter = uvOf(id) - vec2f(0.5);
+  let r2 = dot(toCenter, toCenter);
+  let hotspot = 1.0 / (1.0 + r2 * 2.5);
+  temp += S.lampHeat * hotspot * absorbed * S.dt;
+  v.z = temp;
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,
 
@@ -4199,8 +4439,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     The slosh (PLAN 18a-13) laid over the flow the dye rides.
 
     `scaleDye`'s copy of the thin gap's velocity, plus the dish's own: a
-    64 by 64 grid of velocities in plate widths a second (lib/slosh.ts,
-    its `field`) read by uv, bilinear, and turned into this solver's own
+    64 by 64 grid of velocities in plate widths a second (the GPU dish's
+    flow, gpu/slosh.ts) read by uv, bilinear, and turned into this solver's own
     unit by the scale in A.a.w (the step's seconds over the step's
     displacement, as the swirl's is). It is added here, after the solve and
     before the dye rides it, and not as a force in front of it, because the
@@ -4213,11 +4453,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 ${BILERP_N}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var slosh: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(4) var mixT: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let v = textureLoad(src, vec2i(id.xy), 0);
-  let s = bilerpN(slosh, uvOf(id), A.a.z).xy * A.a.w;
+  // The dish's two layers (lib/slosh.ts): the water's flow in xy, the oil's in zw. Where the plate holds oil (the mix's
+  // red, A.a.y on), that share of the cell rides the oil's: an oil body slides over the water as the raft it is.
+  let f = bilerpN(slosh, uvOf(id), A.a.z);
+  let c = select(0.0, clamp(textureLoad(mixT, vec2i(id.xy), 0).r, 0.0, 1.0), A.a.y > 0.5);
+  let s = mix(f.xy, f.zw, c) * A.a.w;
   textureStore(dst, vec2i(id.xy), vec4f(v.xy + s, v.zw));
 }`,
 

@@ -1,3 +1,4 @@
+import { sheetReach } from './sheet.ts';
 /**
  * A hand on the top glass, and the glass coming back up (PLAN.md §10 step 4,
  * roadmap G in docs/bubbles-plan.md).
@@ -427,31 +428,38 @@ export const KICK_HOLD = RELEASE_MS / 1000;
   28 cells of a 128 plate across its radius, a fifth of the dish; in water 47,
   most of the middle; in glycerine 15, a fingertip's dimple. A thin liquid
   runs out from under the sheet fast enough for the bend to spread before the
-  kick lets go, a thick one holds the sheet up round the finger.
+  kick lets go, a thick one holds the sheet up round the finger. (As the
+  lubrication equation has it, which is the liquid's own pace only in
+  glycerine: in 6 mm of the default oil the layer's viscous time h²/ν is
+  1.6 s, a hundred times the dent's, and the liquid's inertia rings the
+  sheet; PLAN 27f-8(f).)
 
-  Named shortcuts: (a) the ring the dent lifts round itself (the sheet rising
-  13% of the dent's depth at 3.4ℓ, the liquid pushed out from under the
-  finger) is not laid, because the gap is never opened past rest (the
-  shader's squeezeUpdate): that volume leaves toward the rim instead; (b) the
-  reach is read at the plate's 6 mm middle, not the bowl's own depth under
-  the press; (c) the dent is laid at its held shape and given back by
-  KickRelease over a third of a second, where the sheet's own relaxation
-  (the same equation with F gone) is slower and spreads as it goes. PLAN
-  27f-4 is the sheet solved as that equation, by FFT on its own grid.
+  That was 27f-3, and its reach left out the liquid's weight. A sheet
+  floating on a layer is held up where it is pushed down by Archimedes as
+  well as by its stiffness, and at a dent's size the weight is the larger
+  (they balance at (D/ρg)^(1/4), 14 mm). The sheet is now solved
+  (lib/sheet.ts, PLAN 27f-4) with its weight and the dish's rim, and the
+  dent's reach is the solved one's (sheetReach, the same equation by
+  quadrature): 35 cells of 128 in water, 27 on the default oil, 15 in
+  glycerine. The weight makes the thin liquids' dents narrower than the
+  bending length alone did (water's 47 was most of the dish) and leaves
+  the thick ones' as they were, where the kick's hold is too short for the
+  weight to matter. The bending-length stamp, DENT_REACH and SHEET_D are
+  kept for the record and for the frame-moving looks' glass, which is not
+  a sheet.
 */
 /** The rhythm sheet's bending stiffness, N·m: 0.1 mm of polyester (E 4 GPa, ν 0.4). */
 export const SHEET_D = (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4));
-/** Where the dent of a held point force on an elastic sheet over a thin film crosses zero, in bending lengths. */
+/** Where the dent of a held point force on an elastic sheet over a thin film crosses zero, in bending lengths, its weight left out (27f-3). */
 export const DENT_REACH = 2.28;
 /**
  * The sheet's dent radius, in plate widths, for a liquid of kinematic
  * viscosity `nu` (m²/s; lib/turntable.ts thicknessViscosity) under a press
- * held `hold` seconds, at a gap `gapMetres` deep, on a plate `plateMetres` across.
+ * held `hold` seconds, at a gap `gapMetres` deep, on a plate `plateMetres`
+ * across: where the solved sheet's held dent crosses zero (lib/sheet.ts sheetReach).
  */
 export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = 0.006, plateMetres = 0.2, density = 1000): number {
-  const mu = density * Math.max(1e-7, Number.isFinite(nu) ? nu : 1e-6);
-  const l = Math.pow((SHEET_D * gapMetres ** 3 * hold) / (12 * mu), 1 / 6);
-  return (DENT_REACH * l) / plateMetres;
+  return sheetReach(nu, hold, gapMetres, density, SHEET_D) / plateMetres;
 }
 /**
  * The discs a kick presses, in cells of a 128-cell plate, and each one's

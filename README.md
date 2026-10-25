@@ -316,7 +316,7 @@ A **game controller** needs no setup: plug it in (or pair it) and press a button
 
 ### The show key
 
-Every start prints a four-digit **show key**, and phones and network displays must carry it in their address (`&key=1234`) to join; the printed addresses include it. Set `SHOW_KEY=1234 npm run remote` for one that stays the same. The key is what makes it safe to expose the server beyond the room.
+Every start prints an eight-digit **show key**, and phones and network displays must carry it in their address (`&key=…`) to join; the printed addresses include it. It is kept in `server/.show-key`, so a restart keeps it; `SHOW_KEY=… npm run remote` sets your own. The laptop's own page takes a separate display key that the server hands only to `localhost`, so open the show on the laptop at `http://localhost:3000/`, not at its Wi-Fi address. Browsers run WebGPU only on a secure page (https, or localhost), so a network display opened at an `http://` Wi-Fi address cannot start yet (PLAN 14m-https). The key is what makes it safe to expose the server beyond the room.
 
 ### Across buildings, other access points, or the internet
 
