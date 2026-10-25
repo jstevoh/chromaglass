@@ -154,17 +154,26 @@ check('every sound patch on the shelf reads what is heard at once, and the patte
 
 const REBUILT_25H = new Set(['velvet-underground', 'jellyfish-bloom', 'bass-drop']);
 const FAST_28I = new Set(['hits', 'bands']);
+const isFastReading = (m) =>
+  (m.source === 'hits' && HIT_FEATURES.includes(m.feature)) ||
+  (m.source === 'bands' && SOURCE_NAMES.includes(m.feature));
 const missing28i = [];
 for (const p of PRESETS) {
   if (REBUILT_25H.has(p.id)) continue;
-  const sm = (p.settings.sceneMappings ?? []).filter((m) => FAST.has(m.source ?? 'room'));
-  if (sm.length < 2 || sm.length > 3) missing28i.push(`${p.id}: ${sm.length} sound patches`);
+  const areas = plateAreas(p.id);
+  const sm = (p.settings.sceneMappings ?? []).filter((m) => !NOT_SOUND.has(m.source ?? 'room'));
+  const platePatches = sm.filter((m) => !isAreaCord(m) && isFastReading(m) && !FRAME_MOTION.has(m.setting));
+  const areaCords = sm.filter((m) => isAreaCord(m) && Boolean(areas?.[m.area]) && isFastReading(m));
+  const total = platePatches.length + areaCords.length;
+  if (total < 2 || total > 3) missing28i.push(`${p.id}: ${platePatches.length} plate patches + ${areaCords.length} area cords`);
+  if (areas && areaCords.length >= 2 && platePatches.length > 0)
+    missing28i.push(`${p.id}: area look carries ${platePatches.length} redundant plate-wide patch(es)`);
   for (const m of sm) {
-    if (!FAST_28I.has(m.source ?? '')) missing28i.push(`${p.id}: ${m.source}:${m.feature} is not hits or bands`);
+    if (!FAST_28I.has(m.source ?? '') || !isFastReading(m)) missing28i.push(`${p.id}: ${m.source}:${m.feature} is not hits or bands`);
     if (FRAME_MOTION.has(m.setting)) missing28i.push(`${p.id}: ${m.setting} moves the frame`);
   }
 }
-check('every look on the shelf carries 2–3 fast liquid patches from hits and bands only (PLAN 28i-3b)',
+check('every look on the shelf carries 2–3 fast liquid patches or area cords from hits and bands only (PLAN 28i-3b)',
   missing28i.length === 0, missing28i.join('; ') || `${PRESETS.length - REBUILT_25H.size} looks checked (+ 3 from 25h)`);
 
 // ── 3. The hits ─────────────────────────────────────────────────────────────

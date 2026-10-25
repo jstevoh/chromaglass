@@ -1416,13 +1416,12 @@ export const PRESETS: Preset[] = [
         Fixed dead patch + area cords (PLAN 28i-3, 28i-3b): `treble ->
         airVelocity` at depth 0.02 read nothing because the GPU solver gates
         `airVelocity` below 0.1 to 0 (`LiquidVisualizer.tsx:4257`). Instead,
-        the hats drive the soap's Marangoni pull (`surfactantFlow`), the kick
-        touches soap into the top-left food-colouring spot (area 0), and the
-        snare draws a marbling paddle through the top-right spot (area 1).
+        the kick touches soap into the top-left food-colouring spot (area 0)
+        and the snare draws a marbling paddle through the top-right spot
+        (area 1).
       */
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.3 },
-        { source: 'bands', feature: 'hats', setting: 'surfactantFlow', depth: 0.2 },
         { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 1, depth: 0.45, threshold: 0.35, attack: 0.02, release: 0.35 },
       ],
       audioMappings: { velocity: 'none', density: 'bass', color: 'none', rotation: 'none' },
