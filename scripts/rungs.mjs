@@ -597,6 +597,135 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       seen(g.rung) === before.at && g.stepRate === before.rate,
       `${before.at} at ${before.rate}/s → ${seen(g.rung)} at ${g.stepRate}/s`);
   }
+
+  {
+    /*
+      The climb that cost a stutter (PLAN.md 14aa-3). Poster, 1969 on the
+      owner's Mac (Metal, main at fd20c71, 3 × 180 s): at thirty steps a
+      second on 512² the GPU spent 7.6–8.7 ms a frame, under the 9 ms budget,
+      so the governor went back to sixty; there it spent 15.6–16, about one
+      frame in five missed a refresh, and every miss was followed by a frame
+      of two steps to catch up, the liquid stopping and then jumping. The
+      average frame sat at 22 ms, either side of the line, so it held there
+      8.5 to 16.8 s before stepping back: 82 to 192 two-step frames a climb.
+
+      What was measured, replayed: a frame's cost is the drawing (4.0 ms at
+      512² and one device pixel, with the pixels) and a step (8.2 ms at 512²
+      at thirty, 9.8 at sixty, which is what makes sixty's frames cost
+      15.6–16 with their catch-up steps, and 25.1 at 768²); a state whose
+      frames cost more than 13 ms misses refreshes, one frame in eight, five
+      or three across the runs here (the owner's was about one in five), and
+      one past a whole refresh misses half or more. The loop's own step
+      accumulator turns the intervals into steps, catch-up rule and all, and
+      the frames of two steps are counted. Seeded, three seeds a share.
+
+      What a governor that cannot see a climb's cost does here, and the old
+      one did before PLAN.md 14aa-3 (run this against that commit's governor): the opening
+      at sixty is held 8 to 17 s or never left, the climb to sixty comes back
+      every ninety seconds and to 512² at two pixels in between, 57 to 1105
+      two-step frames after the opening across the nine runs.
+    */
+    const R = 1000 / 60;
+    const posterAt = (missAt60) => (rung, rate) => {
+      const draw = 4.0 * rung.dpr ** 2;
+      const step = rung.grid === 768 ? 25.1 : rung.grid === 512 ? (rate === 60 ? 9.8 : 8.2) : 8.2 * (rung.grid / 512) ** 2;
+      const perFrame = draw + step * rate / 60;
+      const miss = perFrame <= 13 ? 0 : perFrame < R ? missAt60 : Math.min(1, 0.5 + (perFrame - R) / R);
+      return { draw, step, miss };
+    };
+    /** A seeded stream in [0, 1). */
+    const stream = (seed) => { let x = seed >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 2 ** 32; }; };
+    const { rungs: ladder, start } = ladderAt('local', 'strong', 2);
+    /** Replay `seconds` of a look; `slowFrom`/`slowFor` hold every frame at two refreshes for a while (another tab). */
+    const replay = (machine, { seconds = 180, seed = 1, slowFrom = Infinity, slowFor = 0 } = {}) => {
+      const g = new QualityGovernor(ladder, start, 0);
+      const next = stream(seed);
+      let t = 0, last = 0, owed = 0, frames = 0, twoAfterOpening = 0;
+      const moves = [];
+      while (t < seconds * 1000) {
+        const state = machine(g.rung, g.stepRate);
+        const forced = t >= slowFrom * 1000 && t < (slowFrom + slowFor) * 1000;
+        t += forced || next() < state.miss ? 2 * R : R;
+        const dt = (t - last) / 1000;
+        last = t;
+        // LiquidVisualizer's accumulator and its catch-up rule.
+        const stepS = 1 / g.stepRate;
+        const catchUp = g.frameMs > 40 ? 1 : g.frameMs > 24 ? 2 : 4;
+        owed = Math.min(owed + dt, stepS * catchUp + 1e-9);
+        const steps = Math.floor(owed / stepS + 1e-9);
+        owed -= steps * stepS;
+        frames++;
+        if (steps >= 2 && t > 10_000) twoAfterOpening++;
+        if (g.sample(dt, 1, t / 1000, false, state.draw + state.step * steps, state.step, steps)) {
+          moves.push({ at: t / 1000, index: g.rungIndex, stepRate: g.stepRate });
+        }
+      }
+      return { g, frames, twoAfterOpening, moves };
+    };
+    const runs = [];
+    for (const share of [1 / 8, 1 / 5, 1 / 3]) {
+      for (const seed of [1, 2, 3]) runs.push({ share, seed, ...replay(posterAt(share), { seed }) });
+    }
+    const name = (r) => `1 in ${Math.round(1 / r.share)}, seed ${r.seed}`;
+    check('Poster replayed: no frame of two steps after the opening, at any share of missed refreshes',
+      runs.every((r) => r.twoAfterOpening === 0),
+      runs.map((r) => `${name(r)}: ${r.twoAfterOpening}`).join('; '));
+    check('it gives sixty up within 6 s of opening (settling, then a second and a half of misses)',
+      runs.every((r) => r.moves.length > 0 && r.moves[0].at <= 6 && r.moves[0].stepRate === 30),
+      runs.map((r) => (r.moves.length ? `${r.moves[0].at.toFixed(1)} s → ${r.moves[0].stepRate}/s` : 'never')).join(', '));
+    /*
+      A climb into a state it leaves again within ten seconds is a climb it
+      could have known better than to take: what the old governor did every
+      ninety seconds, to sixty steps and to 512² at two pixels.
+    */
+    const undone = (moves) => moves.filter((m, i) => i > 0 && i < moves.length - 1
+      && (m.index < moves[i - 1].index || m.stepRate > moves[i - 1].stepRate) && moves[i + 1].at - m.at < 10).length;
+    check('and makes no climb it undoes within 10 s, across three minutes',
+      runs.every((r) => undone(r.moves) === 0),
+      runs.map((r) => `${name(r)}: ${r.moves.map((m) => `${m.at.toFixed(0)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ')}`).join('; '));
+
+    /*
+      The controls: the prediction must not hold a plate down that has room,
+      and the missed-refresh rule must not take sixty from one whose frames
+      are on time.
+
+      A light plate, 1.5 ms of drawing at one device pixel and a 2.5 ms step
+      at 512²: it opens at sixty and climbs to two pixels, predicted 8.5 ms
+      (the drawing four times over, with the pixels), and no further, since
+      768² at two pixels is predicted 11.6 (the step 2.25 times over, with
+      the cells). The old governor climbed there too, on a frame's cost alone.
+      Then a tab takes the machine for five seconds (every frame two
+      refreshes, the plate's own cost unchanged): it gives the rate up, and
+      once the retry's wait is over it has back what it gave or better.
+      Better, here: at thirty steps 768² at two pixels is predicted 8.8 ms,
+      and a finer grid for steps nobody sees is the trade the ladder's order
+      makes on purpose (the rate comes back only when the picture is whole).
+    */
+    const light = (rung) => ({ draw: 1.5 * rung.dpr ** 2, step: 2.5 * (rung.grid / 512) ** 2, miss: 0 });
+    const calm = replay(light, { seconds: 60 });
+    check('a light plate keeps sixty and climbs to the sharpest rung its costs fit, no further',
+      calm.g.stepRate === 60 && seen(calm.g.rung) === '512²@2.00' && calm.moves.length === 1,
+      calm.moves.map((m) => `${m.at.toFixed(0)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ') || 'no moves');
+    const tab = replay(light, { seconds: 240, slowFrom: 60, slowFor: 5 });
+    const gaveUp = tab.moves.find((m) => m.stepRate === 30);
+    const before = tab.moves.filter((m) => m.at < 60).at(-1);
+    const back = tab.moves.find((m) => gaveUp && before && m.at > gaveUp.at
+      && (m.stepRate === 60 ? m.index <= before.index : m.index < before.index));
+    check('a busy tab takes sixty away, and within 100 s the plate has back what it gave or better, for good',
+      gaveUp !== undefined && back !== undefined && back.at - gaveUp.at <= 100 && undone(tab.moves) === 0
+        && tab.g.rungIndex <= back.index,
+      tab.moves.map((m) => `${m.at.toFixed(0)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ') || 'no moves');
+    /*
+      A plate over the budget with its frames on time: Classic's costs on the
+      owner's Mac (5.8 ms of drawing, a 7.1 ms step), so sixty steps cost
+      12.9 ms a frame, over the 9 that a climb needs and under a refresh.
+      Nothing is being dropped, so nothing is given up.
+    */
+    const busy = (rung) => ({ draw: 5.8 * rung.dpr ** 2, step: 7.1 * (rung.grid / 512) ** 2, miss: 0 });
+    const held = replay(busy, { seconds: 120 });
+    check('a plate over the climb budget with every frame on time keeps sixty, and moves nowhere',
+      held.moves.length === 0 && held.g.stepRate === 60, `${held.moves.length} moves, at ${held.g.stepRate}/s`);
+  }
 }
 
 // ── Pro unlocks the full local ladder on hosted builds (PLAN.md §23.17) ──

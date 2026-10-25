@@ -4866,6 +4866,12 @@ interface PlateRenderer {
    */
   gpuFrameMs?(steps: number): number;
   /**
+   * What one solver step costs the GPU, every layer together (ms), from the
+   * same timestamps: the governor predicts a climb's cost from it (PLAN.md
+   * 14aa-3). Absent where `gpuFrameMs` is, 0 until the first timings land.
+   */
+  gpuStepMs?(): number;
+  /**
    * What `?debug` should show about this engine in particular. It is spread
    * into `chromaglassDebug()` at the top level, so a harness reaching for
    * `chromaglassDebug().gl` finds it exactly where it always was.
@@ -5633,6 +5639,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const framesDrawnRef = useRef(0);
   /** What the catch-up rule allowed last frame, for the debug readout. */
   const catchUpRef = useRef(4);
+  /**
+   * Live frames by the steps they took: none, one, two, three or more. A
+   * frame of two at sixty steps a second is the liquid stopping and then
+   * jumping, the stutter `npm run stutter` counts (PLAN.md 14aa-3).
+   */
+  const stepFramesRef = useRef([0, 0, 0, 0]);
   const onEngineStatusRef = useRef(onEngineStatus);
   const onBackLookClearedRef = useRef(onBackLookCleared);
   onBackLookClearedRef.current = onBackLookCleared;
@@ -7293,6 +7305,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           simAccumRef.current = 0;
         }
         stepsThisFrame = simSteps;
+        if (!rendering) stepFramesRef.current[Math.min(simSteps, 3)]++;
         /*
           The same elapsed time, counted in sixtieths of a second (H2b).
 
@@ -10061,8 +10074,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // What this frame cost the GPU, where the engine can say. Without it
         // the budget is JavaScript time, which on the WebGPU path is half a
         // millisecond of encoding and says nothing about the machine's load.
+        //
+        // And what one step costs, apart: at thirty steps a second half the
+        // frames take none, so a frame's cost alone cannot say what sixty
+        // would cost, and the governor climbed into it (PLAN.md 14aa-3).
         const gpuMs = renderer?.gpuFrameMs?.(stepsThisFrame) ?? 0;
-        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current, gpuMs);
+        const gpuStepMs = renderer?.gpuStepMs?.() ?? 0;
+        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current, gpuMs, gpuStepMs, stepsThisFrame);
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -10499,6 +10517,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           stepRate: PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60,
           catchUp: catchUpRef.current,
           layers: fluidsRef.current.length,
+          stepFrames: [...stepFramesRef.current],
         }),
         externalTilt: externalTiltRef.current,
         /** The pointer's Blow since the page loaded: steps as the straw, steps as the wind, and the colour the wind carried. */
@@ -11090,6 +11109,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
        */
       const plate = new WebGPUPlate(s.device, s.format);
       platePass = plate;
+      /** One solver step, every layer: the solver keeps its own profiler, per pass and per step. */
+      const stepMs = (): number => {
+        let ms = 0;
+        for (const f of fluidsRef.current) {
+          if (!(f.gpu instanceof WebGPUFluid)) continue;
+          for (const v of f.gpu.profiler.ms.values()) ms += v;
+        }
+        return ms;
+      };
       const gpuRenderer: PlateRenderer = {
         info: { renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
         maxTexture: s.device.limits.maxTextureDimension2D,
@@ -11501,14 +11529,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (!stage) return 0;
           let ms = 0;
           for (const v of stage.profiler.ms.values()) ms += v;
-          if (steps > 0) {
-            for (const f of fluidsRef.current) {
-              if (!(f.gpu instanceof WebGPUFluid)) continue;
-              for (const v of f.gpu.profiler.ms.values()) ms += v * steps;
-            }
-          }
-          return ms;
+          return steps > 0 ? ms + stepMs() * steps : ms;
         },
+        gpuStepMs: () => (stage ? stepMs() : 0),
         debug: () => ({
           webgpu: stage && {
             label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,

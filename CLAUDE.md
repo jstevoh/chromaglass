@@ -89,6 +89,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | the projector's pass (`src/gpu/output.ts`, `src/gpu/wgsl/output.ts`, `src/lib/outputConfig.ts`, `src/lib/plateSources.ts`, `OutputPanel.tsx`) | `map`, `beams`, `wallpattern` and `mixer` (the lab, `PW_WEBGPU=1`), `phone`; `wall` on the Mac |
 | the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`, `server/remote-server.js`), the Phone · iPad panel | `applink`, `remotemix`, `phonelink` (the panel's code, and the relay's count of phones); the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
 | the Mac app (`desktop/`, `scripts/desktop.mjs`), and what it leans on: `useProjector`, `useCastSession`, `CastDisplay`, `server/remote-server.js` | `desktop` (`npm --prefix desktop install` once; `-- --packaged` after `npm --prefix desktop run pack`); `desktop.yml` checks the packed app on a Mac |
+| the governor (`src/lib/governor.ts`) or what the loop feeds it | `rungs` (the ladder, the policy, and Poster's measured costs replayed); `stutter` on the Mac (two-step frames per look) |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
 | `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |

@@ -27,6 +27,21 @@ const SLOW_MS = 22;
 const FAST_MS = 18.5;
 const HOLD_MS = 20;
 const WORK_BUDGET_MS = 9;
+/**
+ * A frame interval past one and a half 60 Hz refreshes is a refresh the plate
+ * missed, and with sixty steps a second the next frame takes two steps to
+ * catch up: the liquid stops and then jumps (PLAN.md 14aa-3).
+ */
+const MISSED_MS = 25;
+/**
+ * How much of the last second's frames may miss a refresh before a GPU over
+ * budget gives up the step rate, and how fast that share follows: about forty
+ * frames, so one collection pause or one busy tab moves it by a few hundredths
+ * and fades, and one frame in five, which is what Poster, 1969 at sixty steps
+ * on the owner's Mac drew, sits at 0.2.
+ */
+const MISS_SHARE = 0.06;
+const MISS_K = 0.025;
 /** How long a verdict must hold before acting on it. */
 const DOWN_AFTER_S = 1.5;
 const UP_AFTER_S = 8;
@@ -84,6 +99,20 @@ export type PostLevel = 0 | 1 | 2;
 
 /** How many fed intervals the governor keeps for a harness: two seconds at 240 Hz and some. */
 const FED_LOG = 600;
+const MOVE_LOG = 64;
+
+/** One move, as `moveLog` keeps it. */
+export interface GovernorMove {
+  /** Seconds, on the clock the governor is fed. */
+  at: number;
+  why: 'slow' | 'dropping' | 'fast' | 'memory';
+  rung: number;
+  stepRate: number;
+  post: PostLevel;
+  /** The GPU's frame cost when it moved (ms), and, for a climb, what it predicted the new state would cost. */
+  workMs: number;
+  predictedMs: number | null;
+}
 
 export class QualityGovernor {
   private index: number;
@@ -92,7 +121,21 @@ export class QualityGovernor {
   private readonly failed = new Map<number, number>();
   private emaFrame = 16.7;
   private emaWork = 4;
+  /**
+   * What one solver step costs the GPU, every layer together, and what a
+   * frame's drawing costs without any (ms); 0 until the engine says. Measured
+   * per step, not per frame, because at thirty steps on a 60 Hz display half
+   * the frames take none, and a frame's cost then says nothing about what
+   * sixty steps would cost (`workAt`).
+   */
+  private emaStep = 0;
+  private emaDraw = 0;
+  /** The rung those two were measured on: a move scales them to the new one before it measures again. */
+  private costRung: QualityRung;
+  /** The share of recent frames that missed a refresh (`MISSED_MS`). */
+  private missShare = 0;
   private slowSince: number | null = null;
+  private droppingSince: number | null = null;
   private fastSince: number | null = null;
   private settleUntil: number;
   private everSteppedDown = false;
@@ -129,6 +172,7 @@ export class QualityGovernor {
     this.start = this.index;
     this.pinned = pin;
     this.settleUntil = now + SETTLE_S;
+    this.costRung = this.rung;
   }
 
   get rung(): QualityRung {
@@ -184,6 +228,26 @@ export class QualityGovernor {
     return this.emaFrame;
   }
 
+  /** The GPU's frame cost, a step's and the drawing's (ms), for the readout and `npm run stutter`. */
+  get workMs(): number {
+    return this.emaWork;
+  }
+
+  get stepMs(): number {
+    return this.emaStep;
+  }
+
+  get drawMs(): number {
+    return this.emaDraw;
+  }
+
+  /**
+   * Every move it made, with why and what the GPU was spending when it did,
+   * the last `MOVE_LOG` of them: `npm run stutter` lays the plate's two-step
+   * frames against these to say which move cost them.
+   */
+  readonly moveLog: GovernorMove[] = [];
+
   /**
    * Every interval it has been fed, counted, and the last `FED_LOG` of them,
    * for `npm run wall`. The average above cannot say what it was fed: it
@@ -228,8 +292,13 @@ export class QualityGovernor {
    * every rung, and the governor would climb into a grid the GPU could not
    * hold, discover it a second and a half later, and come back down. With
    * the real number it does not set off.
+   *
+   * `stepMs` is what one solver step costs the GPU, every layer together, and
+   * `steps` how many this frame took (`gpuMs` includes them). Where the engine
+   * gives them, a climb is judged on what the state it climbs to would cost
+   * (`workAt`), and not on what this one does (PLAN.md 14aa-3).
    */
-  sample(frameS: number, workMs: number, now: number, held = false, gpuMs = 0): boolean {
+  sample(frameS: number, workMs: number, now: number, held = false, gpuMs = 0, stepMs = 0, steps = 0): boolean {
     let frameMs = frameS * 1000;
     if (frameMs <= 0) return false;
     this.fedCount++;
@@ -241,6 +310,7 @@ export class QualityGovernor {
       const kp = frameMs > this.emaFrame ? 0.25 : 0.08;
       this.emaFrame += (Math.min(frameMs, HUGE_MS) - this.emaFrame) * kp;
       this.emaWork += (Math.max(workMs, gpuMs) - this.emaWork) * 0.1;
+      this.costs(gpuMs, stepMs, steps);
       return false;
     }
     if (frameMs > HUGE_MS) {
@@ -254,8 +324,50 @@ export class QualityGovernor {
     const k = frameMs > this.emaFrame ? 0.25 : 0.08;
     this.emaFrame += (frameMs - this.emaFrame) * k;
     this.emaWork += (Math.max(workMs, gpuMs) - this.emaWork) * 0.1;
+    this.costs(gpuMs, stepMs, steps);
+    this.missShare += ((frameMs > MISSED_MS ? 1 : 0) - this.missShare) * MISS_K;
 
     if (now < this.settleUntil) return false;
+
+    /*
+      Frames that keep missing a refresh with the GPU over its budget: give
+      up the step rate, though the average frame is under `SLOW_MS`.
+
+      The average cannot see this. Poster, 1969 at sixty steps on the owner's
+      Mac (Metal, 3 × 180 s) drew about one frame in five at 33 ms and the
+      rest at 17: the average sat at 22 ms, either side of the line, and each
+      dip under it started the second and a half over, so it held there for
+      8.5 to 16.8 s, every long frame followed by one that took two steps to
+      catch up, 82 to 192 of them a climb. The share of frames missing a
+      refresh is steadier than the average, and the GPU's cost says what the
+      misses are from: the step rate's own work, which halving it takes away
+      and nothing visible goes with. A miss with the GPU under its budget is
+      something else (a collection pause, another tab), and giving up the
+      rate would not buy it back.
+
+      Only the rate: at thirty steps a missed refresh holds the plate a frame
+      and takes no second step, and the rungs, which cost a picture, keep the
+      average's line. Once begun, the verdict holds until the share falls to
+      half the line, so a run of on-time frames does not start the second and
+      a half over (at one miss in eight the share wanders either side of the
+      line as the average did of its own). And it is judged ahead of the
+      average's verdict, which would take the rate first too: at one miss in
+      three the average goes over its line and back, and two clocks each
+      started over by the other never reach a second and a half.
+    */
+    const missing = this.droppingSince === null ? this.missShare > MISS_SHARE : this.missShare > MISS_SHARE / 2;
+    if (missing && this.emaWork > WORK_BUDGET_MS && this.steps < STEP_RATES.length - 1) {
+      this.fastSince = null;
+      this.slowSince ??= now;
+      this.droppingSince ??= now;
+      if (now - this.droppingSince >= DOWN_AFTER_S) {
+        this.stepsFailed.set(this.steps, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
+        this.steps += 1;
+        return this.moved(now, 'dropping');
+      }
+      return false;
+    }
+    this.droppingSince = null;
 
     if (this.emaFrame > SLOW_MS) {
       this.fastSince = null;
@@ -279,42 +391,50 @@ export class QualityGovernor {
       if (now - this.slowSince >= DOWN_AFTER_S && this.steps < STEP_RATES.length - 1) {
         this.stepsFailed.set(this.steps, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
         this.steps += 1;
-        return this.moved(now);
+        return this.moved(now, 'slow');
       }
       // Then the post chain's level, while a heavy pass is on: the rungs
       // shrink the solver, and those passes are fill-bound.
       if (now - this.slowSince >= DOWN_AFTER_S && this.heavyPost && this.post < 2) {
         this.postFailed.set(this.post, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
         this.post = (this.post + 1) as PostLevel;
-        return this.moved(now);
+        return this.moved(now, 'slow');
       }
       if (now - this.slowSince >= DOWN_AFTER_S && this.index < this.rungs.length - 1) {
         this.failed.set(this.index, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
         this.index += 1;
         this.everSteppedDown = true;
-        return this.moved(now);
+        return this.moved(now, 'slow');
       }
       return false;
     }
     this.slowSince = null;
+
 
     if (this.emaFrame < FAST_MS && this.emaWork < WORK_BUDGET_MS) {
       this.fastSince ??= now;
       if (now - this.fastSince >= UP_AFTER_S) {
         // Up in the reverse order of down: the rungs the solver lost below
         // where it started, then the effects, then any rung above the start.
+        //
+        // Each climb is judged on what it would cost, where the engine says
+        // what a step and the drawing cost (`workAt`): a state that would be
+        // over the budget is not tried at all, where it used to be tried and
+        // found slow a second and a half later, with every slow frame of that
+        // a stutter (PLAN.md 14aa-3).
         const above = this.index - 1;
         const failedAt = this.failed.get(above);
-        const rungFree = above >= 0 && (failedAt === undefined || now - failedAt >= RETRY_AFTER_S);
+        const rungFree = above >= 0 && (failedAt === undefined || now - failedAt >= RETRY_AFTER_S)
+          && this.workAt(this.rungs[above], this.stepRate) < WORK_BUDGET_MS;
         if (rungFree && this.index > this.start) {
           this.index = above;
-          return this.moved(now);
+          return this.moved(now, 'fast', this.workAt(this.rungs[above], this.stepRate));
         }
         const better = this.post - 1;
         const postFailedAt = this.postFailed.get(better);
         if (this.heavyPost && better >= 0 && (postFailedAt === undefined || now - postFailedAt >= RETRY_AFTER_S)) {
           this.post = better as PostLevel;
-          return this.moved(now);
+          return this.moved(now, 'fast');
         }
         /*
           And the step rate last, for the same reason it went first: going
@@ -335,13 +455,15 @@ export class QualityGovernor {
         const faster = this.steps - 1;
         const stepsFailedAt = this.stepsFailed.get(faster);
         const pictureWhole = this.index <= this.start && this.post === 0;
-        if (faster >= 0 && pictureWhole && (stepsFailedAt === undefined || now - stepsFailedAt >= RETRY_AFTER_S)) {
+        const fasterWork = faster >= 0 ? this.workAt(this.rung, STEP_RATES[faster]) : 0;
+        if (faster >= 0 && pictureWhole && (stepsFailedAt === undefined || now - stepsFailedAt >= RETRY_AFTER_S)
+          && fasterWork < WORK_BUDGET_MS) {
           this.steps = faster;
-          return this.moved(now);
+          return this.moved(now, 'fast', fasterWork);
         }
         if (rungFree) {
           this.index = above;
-          return this.moved(now);
+          return this.moved(now, 'fast', this.workAt(this.rungs[above], this.stepRate));
         }
         this.fastSince = now;   // nothing to climb to; keep the clock fresh
       }
@@ -363,12 +485,64 @@ export class QualityGovernor {
     this.failed.set(this.index, Number.POSITIVE_INFINITY);
     this.index += 1;
     this.everSteppedDown = true;
-    return this.moved(now);
+    return this.moved(now, 'memory');
   }
 
-  private moved(now: number): boolean {
+  /**
+   * What a frame would cost the GPU on `rung` at `rate` steps a second, from
+   * what a step and the drawing cost on this one (ms).
+   *
+   * The steps a frame takes on average are the rate times the frame
+   * interval: half a step at thirty a second on a 60 Hz display, one at
+   * sixty, so going to sixty adds half a step to every frame. A step's cost
+   * grows with the grid's cells and the drawing's with the pixels.
+   *
+   * The cells are a floor, not an estimate. The solver's passes are each one
+   * thread a cell, multigrid included, so its arithmetic is the cells; but
+   * Poster's step went 8.2 → 25.1 ms from 512² to 768² on the owner's Mac,
+   * 3.1 times for 2.25 times the cells, the larger grid's textures no longer
+   * fitting where the smaller one's did. So a climb this predicts as over
+   * budget is surely over, and one it passes can still be slow: that is what
+   * the missed-refresh rule above catches, a second and a half later, as
+   * before. Learning the ratio the machine shows is PLAN.md 14aa-4.
+   *
+   * Never less than the frame costs now, which also covers an engine that
+   * gives no split (WebGL: there it is the JavaScript time, as it was).
+   */
+  private workAt(rung: QualityRung, rate: number): number {
+    if (!(this.emaStep > 0)) return this.emaWork;
+    const cur = this.rung;
+    const step = this.emaStep * (rung.grid / cur.grid) ** 2;
+    const draw = this.emaDraw * (rung.dpr / cur.dpr) ** 2;
+    return Math.max(this.emaWork, draw + step * rate * this.emaFrame * 0.001);
+  }
+
+  /** Fold one frame's step and drawing costs in, first carried over to the rung it is now on. */
+  private costs(gpuMs: number, stepMs: number, steps: number): void {
+    if (!(stepMs > 0)) return;
+    const cur = this.rung;
+    if (cur !== this.costRung) {
+      this.emaStep *= (cur.grid / this.costRung.grid) ** 2;
+      this.emaDraw *= (cur.dpr / this.costRung.dpr) ** 2;
+      this.costRung = cur;
+    }
+    const draw = Math.max(0, gpuMs - stepMs * steps);
+    if (this.emaStep === 0) {
+      this.emaStep = stepMs;
+      this.emaDraw = draw;
+      return;
+    }
+    this.emaStep += (stepMs - this.emaStep) * 0.1;
+    this.emaDraw += (draw - this.emaDraw) * 0.1;
+  }
+
+  private moved(now: number, why: GovernorMove['why'], predictedMs: number | null = null): boolean {
+    this.moveLog.push({ at: now, why, rung: this.index, stepRate: STEP_RATES[this.steps], post: this.post, workMs: this.emaWork, predictedMs });
+    if (this.moveLog.length > MOVE_LOG) this.moveLog.splice(0, this.moveLog.length - MOVE_LOG);
     this.settleUntil = now + SETTLE_S;
     this.slowSince = null;
+    this.droppingSince = null;
+    this.missShare = 0;
     this.fastSince = null;
     // The averages carry the old rung's numbers; restart them at "fine" so a
     // downward move isn't judged again on stale slowness.

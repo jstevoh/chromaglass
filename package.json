@@ -113,6 +113,7 @@
     "onehost": "node scripts/onehost.mjs",
     "qa:gpu": "QA_GPU=mid npm run qa",
     "bench": "npm run build && node scripts/bench.mjs",
+    "stutter": "npm run build && node scripts/stutter.mjs",
     "map": "node --experimental-strip-types scripts/map.mjs",
     "qr": "node --experimental-strip-types scripts/qr.mjs",
     "score": "esbuild scripts/score.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/score.mjs && node node_modules/.cache/score.mjs",

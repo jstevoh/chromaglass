@@ -2238,6 +2238,46 @@ Measured (`npm run cameras`, two stand-in cameras behind `navigator.mediaDevices
 `environment`), switches live, comes off on unplug and back on replug, and each camera's
 choice survives a reload apart.
 
+### 14aa-3. The governor climbs back to sixty steps into a stutter (shipped 2026-10-25)
+
+Found by Antigravity on the owner's Mac (Metal, main at fd20c71, Poster, 1969 run 3 × 180 s;
+`?steps=30` and Classic clean as controls), after 14aa-2 put Poster's 136 two-step frames in
+the 14 s the governor tried sixty steps. Three causes, each in the governor:
+
+1. **The budget was read off a frame, not a step.** At thirty steps on a 60 Hz display half the
+   frames take no step, and `gpuFrameMs(0)` leaves the solver out, so the work the governor
+   averaged was 7.6–8.7 ms, under the 9 ms it climbs on. That was a fair average of what was
+   spent, and no guide at all to what sixty would spend.
+2. **A climb was not priced.** Sixty steps adds half a step to every frame, and 768² roughly
+   triples a step (8.2 → 25.1 ms). After the climb the GPU spent 15.6–16 ms a frame, or about
+   27.6 at 768².
+3. **Stepping down read only the average frame.** It needed the average over 22 ms for a second
+   and a half, and the average of one 33 ms frame in five sat either side of 22, each dip
+   starting the second and a half over.
+
+**Changed** (`src/lib/governor.ts`): the loop hands the governor what one step costs (every
+layer, from the solver's own timestamps, `gpuStepMs`) and how many steps the frame took, so it
+keeps a step's cost and the drawing's apart; `workAt` predicts a state's cost from them (the
+step scaled by the cells, the drawing by the pixels, never less than now), and every climb,
+rung or rate, must be predicted under the budget. And a share of frames missing a refresh (over
+25 ms, followed over about forty frames), with the GPU over its budget, gives the step rate up
+after a second and a half; once begun the verdict holds to half its line, and it is judged
+ahead of the average's own, which could otherwise start it over. Only the rate: at thirty a
+missed refresh takes no second step, and the rungs, which cost a picture, keep the average's
+line. The governor logs its moves (`moveLog`: why, and the predicted cost of a climb), and the
+loop counts live frames by their steps (`solver().stepFrames`).
+
+**Measured**: `npm run rungs` replays Poster's measured costs (drawing 4.0 ms, a step 8.2 at
+thirty and 9.8 at sixty, 25.1 at 768²; frames over 13 ms miss one refresh in eight, five or
+three) through the loop's own accumulator, three seeds a share. Old governor: 57 to 1136
+two-step frames after the opening, sixty held 6.5 to 26.9 s or never given up, a climb to
+sixty and to two pixels undone every ninety seconds. New: none, sixty given up at 4.0 s every
+time, no climb undone. Controls: a light plate keeps sixty and climbs to the sharpest rung its
+costs fit; a busy tab takes sixty and the plate has back as much or better within 100 s; a
+plate over the climb budget with every frame on time (Classic's costs) keeps sixty and does not
+move. On the GPU, `npm run stutter` counts two-step frames per look and climbs undone within
+10 s, from the governor's own log.
+
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped 2026-10-24)
 
 Asked by the owner 2026-10-24: early cartoons in the app to run in the background and feed

@@ -3581,6 +3581,31 @@ Mic or Band pick came back on every launch from `localStorage`.
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
 
+### 14aa-3. The governor climbs back to sixty steps into a stutter (shipped 2026-10-25)
+
+**Shipped**: the governor measures what a solver step costs apart from the frame's drawing,
+judges each climb on what the state it climbs to would cost, and gives sixty steps up when
+frames keep missing a refresh with the GPU over its budget, where it used to wait for an
+average that sat either side of its line. Poster, 1969 on the owner's Mac held 8.5 to 16.8 s at
+sixty steps after each climb, 82 to 192 frames of two steps; replayed in node, 57 to 1136 such
+frames after the opening on the old governor and none on the new (`npm run rungs`); on the
+GPU, `npm run stutter`. The story is in `docs/plan-shipped.md` under the same number.
+
+Open, found doing it:
+
+- **14aa-4** (open, a named shortcut): a climb's cost is predicted from the cells for a
+  step and the pixels for the drawing. Neither is the machine's own: Poster's step went
+  8.2 → 25.1 ms from 512² to 768² on the owner's Mac, 3.1 times for 2.25 times the cells (the
+  larger grid's textures leave the cache), and part of the drawing does not scale with the
+  pixels at all, so a pixel climb is predicted dearer than it is and a grid climb cheaper.
+  Learn each rung's ratio from the frames it has drawn this session (a step's cost on every
+  grid visited, the drawing's on every pixel share) and predict from that.
+- **14aa-5** (open): the governor's lines are 60 Hz milliseconds (`SLOW_MS`, `FAST_MS`,
+  `MISSED_MS`): on a 120 Hz display a missed refresh is 8.3 ms late and is not seen as one. Take
+  the refresh from the draw gate (`drawGate.refreshMs`) and draw the lines in refreshes.
+- **14aa-6** (open): `npm run stutter` runs by hand on the Mac (the watcher). Whether it joins
+  a Mac shard depends on what the CI runner's GPU makes of Poster, which no run has asked yet.
+
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 
 **Shipped** (2026-10-24): four public domain cartoons, each the whole film looping, poured as
