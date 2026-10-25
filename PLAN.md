@@ -5500,9 +5500,23 @@ Not a gate and no bar: a rate depends on what was pushed.
 - **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** `renders` waits
   for the plate to draw fifteen frames in a second before measuring (the band's 8 reds of
   191 were all first windows at 0 to 14.5 frames a second), and the fader's line asks the
-  Dimmer to change on four frames in five drawn and a quarter more than the desk's, where
-  "twice the desk's" asked for more changes than frames below 20 a second. Story in
+  Dimmer to change on nine frames in ten that were offered a new value and a quarter more
+  than the desk's, where "twice the desk's" asked for more changes than frames below 20 a
+  second (the first per-frame bar, 0.8 of the frames drawn, sat on the edge of a healthy
+  plate: 0.79 to 0.99 in 48 windows). Story in
   `docs/plan-shipped.md` §19aa-6.
+- **19aa-8. The Blow's push follows the solver steps, and the stroke gave it too few
+  (shipped 2026-10-25).** `tools`' "and pushes the colour along, whichever way it blows"
+  was red on 13 of 187 Mac runs in the week to 10-24. Over 28 Mac strokes the push
+  correlates 0.73 with the wind steps the stroke laid and the CI Macs step 12 to 23 times
+  a second, so a stroke of 1500 ms of waiting got 38 to 71 and the weak ones read
+  -0.07% to +0.05% against +0.15%. The stroke now takes 3000 ms of waiting; nine strokes
+  of one Mac run at three paces read +0.46% to +2.97% with no straw step. The paused hunt
+  for why the app pushes less per step than the lab (the breath's share, the `still`
+  threshold, the Dropper's bottle) is not answered: the toolAmount is 1, so
+  `k = kRaw²` is 1, and the 0.75-cell `still` threshold is under the moves' one cell on a
+  192 grid. Open: why the push has an offset of about 50 steps before it rises, and
+  whether a Mac with fewer than 12 steps a second still reads under the bar.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 193.** Every red
   read the show's own wait 1.8 to 3.0 s against the control's 0.7 to 1.1 s, with 1 s
   spare, and moving for good 2.4 to 7.6 s earlier than the control. Not read further;
@@ -6230,7 +6244,7 @@ once the login works (23.14).*
   mark only (`SettingsPanel.tsx` and `DeskPanels.tsx`); your own
   logo is the app's. *Measure:* `npm run tiers` (11/11).
 - **23.8** (**shipped**, this PR, `desktop/`): Home's listening features. The app hears
-  whatever the Mac plays with no tab to share (`desktop/main.js` `setDisplayMediaRequestHandler` with macOS ScreenCaptureKit loopback, `desktop/preload.cjs`, `desktop/electron-builder.config.cjs` `NSAudioCaptureUsageDescription`, `SoundPanel.tsx` `"System audio"` source), and an ambient TV mode (`Show → Ambient TV Mode (Cool & Quiet)`, `SoundPanel.tsx` toggle, `PhoneStage.tsx` Play sheet tile, `ambient.ts` the switch, `governor.ts` the 30 Hz step rate and rung ceiling, `drawGate.ts` the draw cap) runs the plate full screen on the TV for hours with the 60 Hz draw cap, 30 Hz solver step rate cap, and opening rung floor of 14j. *Measure:* in `npm run desktop` (13/13), the System audio source's pipeline reaches the ear and the picker was intercepted, and Ambient TV mode caps the solver at 30 steps/s, caps draws at 60 Hz in the app (`DrawGate`), and holds the opening rung; `npm run rungs` (76/76) and `npm run phone`. On the owner's Mac, an album through a streaming app drives the plate (`docs/judging.md` §72).
+  whatever the Mac plays with no tab to share (`desktop/main.js` `setDisplayMediaRequestHandler` with macOS ScreenCaptureKit loopback, `desktop/preload.cjs`, `desktop/electron-builder.config.cjs` `NSAudioCaptureUsageDescription`, `SoundPanel.tsx` `"System audio"` source), and an ambient TV mode (`Show → Ambient TV Mode (Cool & Quiet)`, `SoundPanel.tsx` toggle, `PhoneStage.tsx` Play sheet tile, `ambient.ts` the switch, `governor.ts` the 30 Hz step rate and rung ceiling, `drawGate.ts` the draw cap) runs the plate full screen on the TV for hours with the 60 Hz draw cap, 30 Hz solver step rate cap, and opening rung floor of 14j. *Measure:* in `npm run desktop` (13/13), the System audio source's pipeline reaches the ear and the picker was intercepted, and Ambient TV mode caps the solver at 30 steps/s, caps draws at 60 Hz in the app (`DrawGate`), and holds the opening rung; `npm run rungs` (76/76) and `npm run phone`. On the owner's Mac, an album through a streaming app drives the plate (`docs/judging.md` §74).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
 - **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
@@ -7800,7 +7814,13 @@ the code's entry points, the checks to add and the scenes to match, in
     pass to be worth half its measured gap (`0.13R` of `0.27R` of lead; `13` of `25.9` half-full
     cells), so a stand-in that speeds the drop up cannot pass for the momentum pass; it also reads
     from the solver that the drop was whole (60 cells) and carried (centroid over `0.40` from `0.36`,
-    `0.42` measured) when the window opened. Metal is unmeasured until the first Mac run. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
+    `0.42` measured) when the window opened. On Metal (`WebGPU (macOS) · fifth`, `main` runs
+    `40154167142`, `40140795675` and `40123398910`, identical across all three and matching #373's
+    run `39280236231`), the window opens at step 60 with `84` half-full cells and centroid `0.422`;
+    the seven readings at steps 60..120 average a lead of `2.02R` (`1.71..2.35R`) and `61.4`
+    half-full cells (`84 → 40`, peak `0.96 → 0.65`) as given, `2.29R` (`1.85..2.74R`, `+0.27R` over
+    `on`) and `62.9` cells (`82 → 34`) with `phaseMomentum` off, and `2.06R` (`1.71..2.45R`) and
+    `35.7` cells (`76 → 0`, `-25.7` from `on`) with `phaseCompress` off. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
     re-read against the whole drag.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
@@ -8425,10 +8445,18 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The hand-built pick-one grids in Settings (On a New Song, Render Style, Film Stock,
     folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
     draw them once, once it takes a title per option and a number id.
-- **35b** Regroup the panels into seven: Play, Pour, Feed, Motion, Chemistry, Look, Stage
-  (phase 2). The owner chose all three phases, in order (2026-10-24). The four group vocabularies
-  to reconcile: `data-group` in SettingsPanel, `lib/settingsMap.ts`, the panel browser,
-  and the phone rail, whose headings are hidden.
+- ~~**35b** Regroup the panels into seven.~~ Shipped: Play, Pour, Feed, Motion, Chemistry, Look,
+  Stage, one vocabulary for the rail, the panel browser, the sections' `data-group`, the desk's own
+  panels and the phone's Settings strip (now with its headings drawn). Story in
+  `docs/plan-shipped.md` §35.
+- **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
+  section (35c's work) or a different surface:
+  - Chemistry has one member, Squish Plate, until 35c splits it (Plate Rock to Motion, the
+    chemistry and ferrofluid stay): Lamp & Light's chemistry and Turing Print belong beside it.
+  - Plates & LED holds the platform's spin, which is Motion's, but Stage is also the gate that
+    keeps a panel out of Build and Gig (`isStagePanel`); its spin controls move with 35c.
+  - The pin picker (`PickList`) and the command palette still list by section, not by the seven
+    groups; the same headings would find a setting faster there.
 - **35c** One home per setting (phase 3): Flash Limit, Blackout, MIDI on, the audio
   source and record/replay each appear in two places; Drive/Impact pairs sit in different
   sections; Squish Plate splits up; the sequencer is behind Songs. After 35b.

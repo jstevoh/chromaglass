@@ -3693,11 +3693,21 @@ fails, and the wait is printed when it is more than a second and a half.
 The phone's fader line, "the plate's Dimmer moves at least twice as often as the desk's",
 failed with the page drawing 14.6 to 22.5 frames a second and the Dimmer changing on 93
 to 100% of them: twice the desk's 9 to 10 a second is more changes than frames below 20
-a second. It now asks the claim itself: a change on four frames in five drawn, and a
-quarter more than the desk's (a plate fed by React changes at React's 7 to 10.5 a second,
-which fails both at any frame rate the line allows). Stricter than the old bar above 25
-frames a second. Of the 8 reds, 7 pass the new bar on their printed numbers; the eighth
-drew 44 frames in a window, under the 45 the line still asks.
+a second. It now asks the claim itself: a change on nine frames in ten that were offered
+a new value (the watch counts the frames whose newest message differs from the last
+frame's), and a quarter more than the desk's (a plate fed by React changes at React's 7 to
+10.5 a second, which fails both at any frame rate the line allows). The first version
+asked four frames in five of all drawn; its review read 48 green windows and the Dimmer
+changed on 0.79 to 0.99 of the frames drawn, lower the faster the frames come, because
+the stub's 60 Hz timer beats against the frames and some have no message to draw. On the
+Mac the new ratio read 1.00 in all four windows (28.5 to 34.9 offered a second).
+
+### 19aa-8. The Blow's push follows the solver steps
+
+Shipped 2026-10-25. The numbers and the stroke's new pace are in `scripts/tools.mjs`
+(`windRun`) and PLAN.md §19aa-8: the push correlates 0.73 with the wind steps over 28
+Mac strokes, and nine strokes of one Mac run at 750, 1500 and 3000 ms of waiting read
++0.46% to +2.97%, 45 to 112 wind steps, no straw step.
 
 ### 19ac-1. The double tap's two taps carry a finger's times
 
@@ -5103,3 +5113,29 @@ inside only at 15% of the control or more, and a group as disabled only when eve
 Checks: `npm run states` (new, in Measure) and `npm run switches`' lift bar. Numbers before and
 after are in the PR.
 
+### 35b. Seven groups, one vocabulary (2026-10-25)
+
+Reported: the owner, 2026-10-24, "the grouping is bad": the same sections were sorted four ways
+that did not agree, so the panel browser, the search and the phone's Settings disagreed about
+where a thing is.
+
+Measured on main (a7dd8e7): `data-group` in `SettingsPanel` said perform, setup, look, inputs or
+stage (24 sections, read by nothing), `SETTINGS_CATEGORIES` said Live, Inputs, Look, Plate or
+Stage, the panel browser borrowed those five and filed the desk's own panels under `live` and
+`plate`, and the phone's Settings strip drew the same five with the headings hidden
+(`hidden ... sm:block`), one flat run of 26 tabs.
+
+What changed: `SETTINGS_CATEGORIES` is the one list, Play, Pour, Feed, Motion, Chemistry, Look,
+Stage. Play: Master, Mixer and the desk's Cues, Rides, Recipe, Score. Pour: Bottles, Dyes, Tools,
+Liquids, Manual Interaction. Feed: Sound, Motion camera, Film, Patches, Controller. Motion:
+Kaleidoscope, Automation, Fluid Physics. Chemistry: Squish Plate. Look: Light Show Look, Show,
+Lamp & Light, Film Stock, Lens, Macro Closeup. Stage: unchanged (Wall, Mapping, Logo & Titles,
+Plates & LED, Simulation, Phone · iPad), so Build and Gig still keep it in the Stage sheet. The
+rail, the panel browser and the desk's own panels read the list; each section's `data-group`
+comes from it (`groupOf`); the phone's strip draws the seven headings. No section's id, controls
+or place on the desk changed, so saved layouts, pins and deep links open as before. The Settings
+guide names the seven. `desklayout` holds the list, every panel's group, the markup's
+`data-group` and the Stage panels to their names; `phone` reads the seven headings drawn at phone
+width.
+
+Squish Plate keeps its name and its 45 controls in Chemistry: splitting it is 35c.

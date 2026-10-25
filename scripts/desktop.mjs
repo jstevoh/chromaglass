@@ -498,7 +498,7 @@ try {
   // getDisplayMedia with no tab picker, and routes the System audio source's
   // pipeline to the ear (fed here through CHROMAGLASS_AUDIO_TAP=1, since
   // CHROMAGLASS_OFFLINE skips macOS TCC screen capture; the real
-  // ScreenCaptureKit path is docs/judging.md §72). Ambient TV mode caps the
+  // ScreenCaptureKit path is docs/judging.md §74). Ambient TV mode caps the
   // solver at 30 steps/s, caps frames drawn in the app at 60 Hz through
   // DrawGate, and holds the machine's opening rung.
   await page.locator('[data-testid=mode-segmented-sound]').click();
