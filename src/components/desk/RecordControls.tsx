@@ -31,26 +31,42 @@ export function RecordControls({
   const running = videoRecording || !!performance;
   const videoClock = `${Math.floor(videoSeconds / 60)}:${String(videoSeconds % 60).padStart(2, '0')}`;
   const clock = videoRecording ? videoClock : performance?.clock ?? '0:00';
-  const what = running ? runningText({ videoOn: videoRecording, takeOn: !!performance }) : makesText(choice);
+  const idleWhat = makesText(choice);
+  const what = running ? runningText({ videoOn: videoRecording, takeOn: !!performance }) : idleWhat;
 
   return (
     <div className="flex shrink-0 items-center gap-1 xl:gap-1.5" data-testid="record-controls-cluster">
+      {/*
+        The running timer takes no extra width (PLAN.md 19v-4, as Save's dot in
+        19v-3): the idle label stays in flow to size the button, and the stop
+        mark + clock ("■ 0:00", or "■ Stop · 0:00" at 2xl; what is recording is
+        in the hover title and dot-rec) sit over that same box while recording
+        so starting a recording never widens the button or shifts its
+        neighbours in the bar.
+      */}
       <Button
         height={32}
-        variant={running ? 'danger' : 'secondary'}
+        pressed={running}
+        live
         kbd="R"
         onClick={onToggleRecord}
         midiKey="action:record-toggle"
         testId="record-button"
         title={running
           ? `Stop recording (${what}, ${clock}) and keep it`
-          : `Record: ${what} (R). Change what it makes with the sliders button.`}
+          : `Record: ${what}. Change what it makes with the sliders button.`}
       >
-        <span className="whitespace-nowrap">
-          {running ? (
-            <>■ Stop · {clock}<span className="hidden 2xl:inline"> · {what}</span></>
-          ) : (
-            <>● Record<span className="hidden 2xl:inline"> · {what}</span></>
+        <span className="relative inline-flex items-center justify-center whitespace-nowrap">
+          <span aria-hidden={running || undefined} className={running ? 'invisible' : undefined}>
+            ● Record<span className="hidden 2xl:inline"> · {idleWhat}</span>
+          </span>
+          {running && (
+            <span
+              data-testid="record-timer"
+              className="absolute inset-0 flex items-center justify-center tabular-nums"
+            >
+              ■ <span className="hidden 2xl:inline">Stop · </span>{clock}
+            </span>
           )}
         </span>
       </Button>

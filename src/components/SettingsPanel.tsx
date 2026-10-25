@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Droplets, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye } from 'lucide-react';
+import { X, FlaskConical, Magnet, Waves, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Droplets, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { SOURCE_NAMES } from '../lib/audioFeatures';
@@ -1122,15 +1122,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="bubbles"
         />
         <Slider
-          label="Plate Rock"
-          value={settings.plateRock ?? 0.45}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ plateRock: v })}
-          settingKey="plateRock"
-        />
-        <Slider
           label="Frame Sway"
           value={settings.frameSway ?? 0}
           min={0}
@@ -1649,60 +1640,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="lumia"
         />
         <Slider
-          label="Chemistry"
-          value={settings.chemistry ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ chemistry: v })}
-          settingKey="chemistry"
-        />
-        <Slider
-          label="↳ Pattern (Spots to Labyrinth)"
-          value={settings.chemistryPattern ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ chemistryPattern: v })}
-          settingKey="chemistryPattern"
-        />
-        <Slider
-          label="↳ Pattern Width"
-          value={settings.chemistryWidth ?? 0.5}
-          min={0.1}
-          max={1.0}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ chemistryWidth: v })}
-          settingKey="chemistryWidth"
-        />
-        <Slider
-          label="↳ Turing Print"
-          value={settings.turingPrint ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ turingPrint: v })}
-          settingKey="turingPrint"
-        />
-        <Slider
-          label="↳ Print Ink (0 is Starch)"
-          value={settings.turingInk ?? 0}
-          min={0}
-          max={1.0}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ turingInk: v })}
-          settingKey="turingInk"
-        />
-        <Slider
-          label="↳ Print Drift (0 is Still)"
-          value={settings.turingDrift ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ turingDrift: v })}
-          settingKey="turingDrift"
-        />
-        <Slider
           label="Gel Wheel"
           value={settings.gelWheel ?? 0}
           min={0}
@@ -1741,6 +1678,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ transmission: v })}
           settingKey="transmission"
+        />
+        <Slider
+          label="Layer Depth"
+          value={settings.thicknessOptics ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ thicknessOptics: v })}
+          settingKey="thicknessOptics"
+        />
+        <Slider
+          label="Spectral Mix"
+          value={settings.spectralOptics ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spectralOptics: v })}
+          settingKey="spectralOptics"
         />
         <Slider
           label="Exposure"
@@ -2177,7 +2132,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, source, feature: (keep ? m.feature : options[0][0]) as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-source-${i}`}
                     >
                       {PATCH_SOURCES.map(([value, label]) => (
@@ -2192,7 +2147,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, feature: e.target.value as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-feature-${i}`}
                     >
                       {featuresFor(m.source ?? 'room').map(([value, label]) => (
@@ -2213,7 +2168,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, setting: e.target.value as SceneMapping['setting'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-control-${i}`}
                     >
                       {m.area !== undefined ? AREA_TARGETS.map(t => (
@@ -2228,7 +2183,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     </select>
                     <button
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
-                      className="p-1 rounded hover:bg-white/10 opacity-50 hover:opacity-100"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
                       aria-label="Remove mapping"
                     >
                       <X size={12} />
@@ -2260,7 +2215,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, layer: v === 'all' ? 'all' : Number(v) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
+                      className="min-h-6 w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
                       data-testid={`patch-layer-${i}`}
                     >
                       <option value="all">All plates</option>
@@ -2280,7 +2235,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, depth: parseFloat(e.target.value) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                      className="set-range flex-1"
+                      style={{ '--fill': `${Math.round(50 * (m.depth + 1))}%` } as React.CSSProperties}
                     />
                     <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
@@ -2329,6 +2285,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                             next[i] = e.target.checked ? { ...rest, threshold: 0.3, attack: 0.02, release: 0.4 } : rest;
                             onUpdate({ sceneMappings: next });
                           }}
+                          className="h-6 w-6 shrink-0 accent-white cursor-pointer"
                           data-testid={`patch-gate-on-${i}`}
                         />
                         Fire on a hit, not the room
@@ -2349,7 +2306,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                               next[i] = { ...m, [key]: parseFloat(e.target.value) };
                               onUpdate({ sceneMappings: next });
                             }}
-                            className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                            className="set-range flex-1"
+                            style={{ '--fill': `${Math.round(100 * ((m[key] ?? 0) - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
                             data-testid={`patch-${key}-${i}`}
                           />
                           <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
@@ -3004,12 +2962,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
       )}
 
-      {/* Squish Plate Section */}
       {keep('squish') && (
       <section id="settings-squish" className={`${CARD} ${shown('squish') ? GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('squish')} data-section="squish">
         <h3 className={TITLE}>
           <Sliders size={12} /> Squish Plate
         </h3>
+        {/*
+          The two glasses and the film between them (PLAN 35c). What used to be
+          one section of forty controls is five: this is the cell itself, how
+          hard it is pressed, how it is shaped and how thin the gap is, and the
+          liquid's own behaviour in it; the oil, the ferrofluid and the
+          reactions each have a section beside it, and the tilt is Motion's.
+        */}
         <Slider
           label="Plate Pressure"
           value={settings.platePressure}
@@ -3033,6 +2997,164 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           at a twelfth of a second, faster than a hand can move, which is
           most of why pressing did not feel like it did anything.
         */}
+        <Slider
+          label="Plate Shape"
+          value={settings.plateCurve ?? 0}
+          min={-1}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateCurve: v })}
+          settingKey="plateCurve"
+        />
+        <Slider
+          label="Depth Drag"
+          value={settings.depthDrag ?? 0}
+          min={0}
+          max={3}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ depthDrag: v })}
+          settingKey="depthDrag"
+        />
+        {/*
+          The plate as a Hele-Shaw cell (PLAN §18a): a switch on a slider's
+          two stops, as Layers is, so a MIDI button and a desk can hold it
+          too. Thickness is how long a push lasts in it, so it only shows
+          while it is on.
+        */}
+        <Slider
+          label="Thin Gap"
+          value={settings.thinGap ?? 1}
+          min={0}
+          max={1}
+          step={1}
+          onChange={(v: number) => onUpdate({ thinGap: v })}
+          settingKey="thinGap"
+        />
+        {(settings.thinGap ?? 1) > 0.5 && (
+          <Slider
+            label="Thickness"
+            value={settings.gapThickness ?? 0.45}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(v: number) => onUpdate({ gapThickness: v })}
+            settingKey="gapThickness"
+          />
+        )}
+        <Slider
+          label="Press Lift"
+          value={settings.plateSpring ?? 0.35}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateSpring: v })}
+          settingKey="plateSpring"
+        />
+        <Slider
+          label="Glass Smear"
+          value={settings.glassSmear}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ glassSmear: v })}
+          settingKey="glassSmear"
+        />
+        <Slider
+          label="Rain Drip"
+          value={settings.rainDrip}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ rainDrip: v })}
+          settingKey="rainDrip"
+        />
+        <div className="flex flex-col gap-2 mb-4">
+          <span className="text-[13px] font-medium text-text">Viscosity</span>
+          <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
+            {(['thick', 'thin'] as const).map((v) => (
+              <button
+                aria-pressed={settings.viscosity === v}
+                key={v}
+                onClick={() => onUpdate({ viscosity: v })}
+                className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
+                  settings.viscosity === v ? `${LIT} font-bold` : 'text-muted hover:bg-hover'
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+      )}
+
+      {/* Oil & Soap Section */}
+      {keep('oil') && (
+      <section id="settings-oil" className={`${CARD} ${shown('oil') ? GRID : 'hidden'} ${focusSection === 'oil' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('oil')} data-section="oil">
+        <h3 className={TITLE}>
+          <Droplets size={12} /> Oil & Soap
+        </h3>
+        {/* What keeps one liquid out of another: surface tension, soap, and how polar each liquid is (PLAN 35c). */}
+        <Slider
+          label="Oil Tension"
+          value={settings.oilTension ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilTension: v })}
+          settingKey="oilTension"
+        />
+        {/* Each liquid keeps its own colour: needs Oil Tension, which is what puts oil on the plate. */}
+        <Slider
+          label="Oil Bodies"
+          value={settings.oilBodies ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilBodies: v })}
+          settingKey="oilBodies"
+        />
+        <Slider
+          label="Soap Bursts"
+          value={settings.surfactantFlow ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ surfactantFlow: v })}
+          settingKey="surfactantFlow"
+        />
+        {/*
+          A clear oil film against the glass that tears into lace (PLAN §20b):
+          how thick it is laid. Thin tears at once over the dish's dust, thick
+          holds until alcohol or soap lands on it. White only on Lamp Ground.
+        */}
+        <Slider
+          label="Clear Film"
+          value={settings.clearFilm ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ clearFilm: v })}
+          settingKey="clearFilm"
+        />
+        <Slider
+          label="Polarity (Repulsion)"
+          value={settings.polarity}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ polarity: v })}
+          settingKey="polarity"
+        />
+      </section>
+      )}
+
+      {/* Ferrofluid Section */}
+      {keep('ferro') && (
+      <section id="settings-ferro" className={`${CARD} ${shown('ferro') ? GRID : 'hidden'} ${focusSection === 'ferro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('ferro')} data-section="ferro">
+        <h3 className={TITLE}>
+          <Magnet size={12} /> Ferrofluid
+        </h3>
         {/*
           The second phase and the magnet under the glass (H7).
 
@@ -3145,106 +3267,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ magnetWalk: v })}
           settingKey="magnetWalk"
         />
-
-        {/* The liquids' own physics and chemistry (docs/physics-plan.md): each
-            one off until it is turned up. */}
-        <div className="mt-2 mb-2 text-[11px] uppercase tracking-wider text-muted">Physics &amp; chemistry</div>
-        <Slider
-          label="Swirl"
-          value={settings.vorticityConfinement ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ vorticityConfinement: v })}
-          settingKey="vorticityConfinement"
-        />
-        <Slider
-          label="Oil Tension"
-          value={settings.oilTension ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ oilTension: v })}
-          settingKey="oilTension"
-        />
-        {/* Each liquid keeps its own colour: needs Oil Tension, which is what puts oil on the plate. */}
-        <Slider
-          label="Oil Bodies"
-          value={settings.oilBodies ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ oilBodies: v })}
-          settingKey="oilBodies"
-        />
-        <Slider
-          label="Soap Bursts"
-          value={settings.surfactantFlow ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ surfactantFlow: v })}
-          settingKey="surfactantFlow"
-        />
-        {/*
-          A clear oil film against the glass that tears into lace (PLAN §20b):
-          how thick it is laid. Thin tears at once over the dish's dust, thick
-          holds until alcohol or soap lands on it. White only on Lamp Ground.
-        */}
-        <Slider
-          label="Clear Film"
-          value={settings.clearFilm ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ clearFilm: v })}
-          settingKey="clearFilm"
-        />
-        <Slider
-          label="Dye Weight"
-          value={settings.solutalBuoyancy ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ solutalBuoyancy: v })}
-          settingKey="solutalBuoyancy"
-        />
-        <Slider
-          label="Gravity"
-          value={settings.plateUpright ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ plateUpright: v })}
-          settingKey="plateUpright"
-        />
-        <Slider
-          label="Tilt Direction"
-          value={settings.tiltDirection ?? 180}
-          min={0}
-          max={360}
-          step={5}
-          onChange={(v: number) => onUpdate({ tiltDirection: v })}
-          settingKey="tiltDirection"
-        />
-        <Slider
-          label="Slosh"
-          value={settings.slosh ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ slosh: v })}
-          settingKey="slosh"
-        />
-        <Slider
-          label="Heat Spread"
-          value={settings.doubleDiffusion ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ doubleDiffusion: v })}
-          settingKey="doubleDiffusion"
-        />
         <Slider
           label="Labyrinth"
           value={settings.ferroLabyrinth ?? 0}
@@ -3264,6 +3286,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ mazeDetail: v })}
           settingKey="mazeDetail"
         />
+      </section>
+      )}
+
+      {/* Reactions Section */}
+      {keep('reactions') && (
+      <section id="settings-reactions" className={`${CARD} ${shown('reactions') ? GRID : 'hidden'} ${focusSection === 'reactions' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('reactions')} data-section="reactions">
+        <h3 className={TITLE}>
+          <FlaskConical size={12} /> Reactions
+        </h3>
+        {/*
+          The chemistry that draws by itself on the plate: the indicator that
+          changes colour with the acid, the oscillating reaction, the rings a
+          reagent leaves in a gel, and the Turing pattern (spots to labyrinth)
+          and its print. The last six were in Lamp & Light, under the lamp
+          they were thought to colour, and are in the group they belong to now
+          (PLAN 35c).
+        */}
         <Slider
           label="pH Indicator"
           value={settings.phIndicator ?? 0}
@@ -3292,119 +3331,58 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="liesegang"
         />
         <Slider
-          label="Layer Depth"
-          value={settings.thicknessOptics ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ thicknessOptics: v })}
-          settingKey="thicknessOptics"
-        />
-        <Slider
-          label="Spectral Mix"
-          value={settings.spectralOptics ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ spectralOptics: v })}
-          settingKey="spectralOptics"
-        />
-        <Slider
-          label="Plate Shape"
-          value={settings.plateCurve ?? 0}
-          min={-1}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ plateCurve: v })}
-          settingKey="plateCurve"
-        />
-        <Slider
-          label="Depth Drag"
-          value={settings.depthDrag ?? 0}
-          min={0}
-          max={3}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ depthDrag: v })}
-          settingKey="depthDrag"
-        />
-        {/*
-          The plate as a Hele-Shaw cell (PLAN §18a): a switch on a slider's
-          two stops, as Layers is, so a MIDI button and a desk can hold it
-          too. Thickness is how long a push lasts in it, so it only shows
-          while it is on.
-        */}
-        <Slider
-          label="Thin Gap"
-          value={settings.thinGap ?? 1}
-          min={0}
-          max={1}
-          step={1}
-          onChange={(v: number) => onUpdate({ thinGap: v })}
-          settingKey="thinGap"
-        />
-        {(settings.thinGap ?? 1) > 0.5 && (
-          <Slider
-            label="Thickness"
-            value={settings.gapThickness ?? 0.45}
-            min={0}
-            max={1}
-            step={0.05}
-            onChange={(v: number) => onUpdate({ gapThickness: v })}
-            settingKey="gapThickness"
-          />
-        )}
-        <Slider
-          label="Press Lift"
-          value={settings.plateSpring ?? 0.35}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ plateSpring: v })}
-          settingKey="plateSpring"
-        />
-        <Slider
-          label="Glass Smear"
-          value={settings.glassSmear}
+          label="Chemistry"
+          value={settings.chemistry ?? 0}
           min={0}
           max={1.0}
           step={0.05}
-          onChange={(v: number) => onUpdate({ glassSmear: v })}
-          settingKey="glassSmear"
+          onChange={(v: number) => onUpdate({ chemistry: v })}
+          settingKey="chemistry"
         />
         <Slider
-          label="Rain Drip"
-          value={settings.rainDrip}
+          label="↳ Pattern (Spots to Labyrinth)"
+          value={settings.chemistryPattern ?? 0}
           min={0}
           max={1.0}
           step={0.05}
-          onChange={(v: number) => onUpdate({ rainDrip: v })}
-          settingKey="rainDrip"
+          onChange={(v: number) => onUpdate({ chemistryPattern: v })}
+          settingKey="chemistryPattern"
         />
-        <div className="flex flex-col gap-2 mb-4">
-          <span className="text-[13px] font-medium text-text">Viscosity</span>
-          <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
-            {(['thick', 'thin'] as const).map((v) => (
-              <button
-                aria-pressed={settings.viscosity === v}
-                key={v}
-                onClick={() => onUpdate({ viscosity: v })}
-                className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
-                  settings.viscosity === v ? `${LIT} font-bold` : 'text-muted hover:bg-hover'
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
         <Slider
-          label="Polarity (Repulsion)"
-          value={settings.polarity}
+          label="↳ Pattern Width"
+          value={settings.chemistryWidth ?? 0.5}
+          min={0.1}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ chemistryWidth: v })}
+          settingKey="chemistryWidth"
+        />
+        <Slider
+          label="↳ Turing Print"
+          value={settings.turingPrint ?? 0}
           min={0}
           max={1.0}
           step={0.05}
-          onChange={(v: number) => onUpdate({ polarity: v })}
-          settingKey="polarity"
+          onChange={(v: number) => onUpdate({ turingPrint: v })}
+          settingKey="turingPrint"
+        />
+        <Slider
+          label="↳ Print Ink (0 is Starch)"
+          value={settings.turingInk ?? 0}
+          min={0}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ turingInk: v })}
+          settingKey="turingInk"
+        />
+        <Slider
+          label="↳ Print Drift (0 is Still)"
+          value={settings.turingDrift ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ turingDrift: v })}
+          settingKey="turingDrift"
         />
       </section>
       )}
@@ -3459,6 +3437,52 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <FlaskConical size={12} /> Liquids
         </h3>
         {liquids ? <LiquidDesigner {...liquids} /> : <div className="text-[12px] opacity-35">The shelf is not available here.</div>}
+      </section>
+      )}
+
+      {/* Tilt & Rock Section */}
+      {keep('tilt') && (
+      <section id="settings-tilt" className={`${CARD} ${shown('tilt') ? GRID : 'hidden'} ${focusSection === 'tilt' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('tilt')} data-section="tilt">
+        <h3 className={TITLE}>
+          <Waves size={12} /> Tilt & Rock
+        </h3>
+        {/* The dish tipped: held by a hand (Gravity, Tilt Direction), sloshed by the music (Slosh) and rocked on the beat (Plate Rock). PLAN 35c. */}
+        <Slider
+          label="Gravity"
+          value={settings.plateUpright ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateUpright: v })}
+          settingKey="plateUpright"
+        />
+        <Slider
+          label="Tilt Direction"
+          value={settings.tiltDirection ?? 180}
+          min={0}
+          max={360}
+          step={5}
+          onChange={(v: number) => onUpdate({ tiltDirection: v })}
+          settingKey="tiltDirection"
+        />
+        <Slider
+          label="Slosh"
+          value={settings.slosh ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ slosh: v })}
+          settingKey="slosh"
+        />
+        <Slider
+          label="Plate Rock"
+          value={settings.plateRock ?? 0.45}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateRock: v })}
+          settingKey="plateRock"
+        />
       </section>
       )}
 
@@ -3543,6 +3567,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.01}
           onChange={(v: number) => onUpdate({ heatDecay: v })}
           settingKey="heatDecay"
+        />
+        <Slider
+          label="Swirl"
+          value={settings.vorticityConfinement ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ vorticityConfinement: v })}
+          settingKey="vorticityConfinement"
+        />
+        <Slider
+          label="Dye Weight"
+          value={settings.solutalBuoyancy ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ solutalBuoyancy: v })}
+          settingKey="solutalBuoyancy"
+        />
+        <Slider
+          label="Heat Spread"
+          value={settings.doubleDiffusion ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ doubleDiffusion: v })}
+          settingKey="doubleDiffusion"
         />
       </section>
       )}

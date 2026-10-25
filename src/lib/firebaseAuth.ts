@@ -10,9 +10,17 @@ import {
   sendSignInLinkToEmail,
   isSignInWithEmailLink,
   signInWithEmailLink,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  linkWithCredential,
+  updatePassword,
+  EmailAuthProvider,
   signOut,
   deleteUser,
   type Auth,
+  type AuthCredential,
   type User,
 } from 'firebase/auth';
 import {
@@ -102,6 +110,15 @@ export async function signInWithProvider(
     return cred.user;
   } catch (err: unknown) {
     const code = (err as { code?: string })?.code;
+    if (code === 'auth/account-exists-with-different-credential') {
+      // The email already has a password account that Firebase will not merge on
+      // its own. Keep Google's credential, so the password sign-in that follows
+      // can attach it (`signInWithPassword`): one account, either way in.
+      pendingProviderCredential =
+        providerId === 'google.com'
+          ? GoogleAuthProvider.credentialFromError(err as never)
+          : OAuthProvider.credentialFromError(err as never);
+    }
     if (
       code === 'auth/popup-blocked' ||
       code === 'auth/operation-not-supported-in-this-environment'
@@ -115,6 +132,50 @@ export async function signInWithProvider(
       return null;
     }
     throw err;
+  }
+}
+
+/**
+ * Google's credential from a sign-in Firebase refused because the email already
+ * has a password account; the next password sign-in attaches it.
+ */
+let pendingProviderCredential: AuthCredential | null = null;
+
+/** The shortest password this app accepts (Firebase's own floor is 6). */
+export const MIN_PASSWORD_LENGTH = 8;
+
+/**
+ * Firebase's codes, in words someone signing in can act on. Firebase answers a
+ * wrong password and an email with no password the same way (`auth/invalid-credential`,
+ * since email enumeration protection came on by default), so this says both.
+ */
+export function authErrorMessage(err: unknown): string {
+  const code = (err as { code?: string })?.code ?? '';
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'That email address does not look right.';
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return "That email and password don't match. If you signed up with Google or an emailed link, use that and add a password from Account, or reset the password.";
+    case 'auth/email-already-in-use':
+      return 'That email already has an account.';
+    case 'auth/weak-password':
+      return `Use at least ${MIN_PASSWORD_LENGTH} characters for the password.`;
+    case 'auth/too-many-requests':
+      return 'Too many tries. Wait a few minutes, or reset the password.';
+    case 'auth/network-request-failed':
+      return 'Could not reach the sign-in server. Check the connection and try again.';
+    case 'auth/requires-recent-login':
+      return 'For safety, sign out and sign back in, then try again.';
+    case 'auth/provider-already-linked':
+      return 'This account already has a password.';
+    case 'auth/credential-already-in-use':
+      return 'That email belongs to a different account.';
+    case 'auth/account-exists-with-different-credential':
+      return 'That email already has a password. Sign in with it under Email, then Password; Google is added when you do.';
+    default:
+      return (err as { message?: string })?.message || 'Could not sign in.';
   }
 }
 
@@ -171,6 +232,126 @@ export async function completeEmailLinkSignIn(
   clearPendingEmail();
   stripEmailSignInParams();
   return { needsEmail: false, user: cred.user };
+}
+
+/**
+ * Email and password (PLAN 23.10e). Firebase's one account per email does the
+ * joining: Google and an emailed link already give the same uid for the same
+ * address, and a password is one more way into that uid, not a second account.
+ * Sign-up mails a confirmation link at once: the licence Worker refuses a token
+ * whose email is not verified, so a stranger who signs up with someone else's
+ * address cannot read that person's licence, and Firebase drops an unconfirmed
+ * password when the real owner signs in with Google.
+ */
+export async function signUpWithPassword(email: string, password: string): Promise<User> {
+  const auth = getFirebaseAuth();
+  const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  setSignedInCached(cred.user.email || email.trim());
+  await sendEmailVerification(cred.user).catch(() => {
+    // The account exists; the sheet offers the mail again.
+  });
+  return cred.user;
+}
+
+export async function signInWithPassword(email: string, password: string): Promise<User> {
+  const auth = getFirebaseAuth();
+  const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+  setSignedInCached(cred.user.email || email.trim());
+  if (pendingProviderCredential) {
+    const waiting = pendingProviderCredential;
+    pendingProviderCredential = null;
+    await linkWithCredential(cred.user, waiting).catch(() => {
+      // Already linked, or Google's credential went stale: the password worked.
+    });
+  }
+  return cred.user;
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  const auth = getFirebaseAuth();
+  await sendPasswordResetEmail(auth, email.trim(), { url: `${window.location.origin}/` });
+}
+
+/**
+ * Someone who typed an email and a new password for an address that already has
+ * a Google account: sign in with Google, and if it is the same address, give
+ * that account the password.
+ */
+export async function signInWithGoogleAddPassword(email: string, password: string): Promise<User> {
+  const auth = getFirebaseAuth();
+  const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+  setSignedInCached(cred.user.email);
+  if ((cred.user.email ?? '').toLowerCase() !== email.trim().toLowerCase()) {
+    throw Object.assign(new Error(`You signed in to Google as ${cred.user.email}, not ${email.trim()}. The password was not added.`), { code: 'cg/other-email' });
+  }
+  await addPasswordToCurrentUser(password);
+  return cred.user;
+}
+
+export interface AccountMethods {
+  email: string | null;
+  emailVerified: boolean;
+  /** Google is one of the ways in. */
+  google: boolean;
+  /**
+   * Firebase lists "password" for an emailed-link account too, with no password
+   * set; it cannot be told apart from here, so the sheet says "set a new password"
+   * for any account that lists it.
+   */
+  passwordProvider: boolean;
+}
+
+export function getAccountMethods(): AccountMethods | null {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return null;
+  const ids = user.providerData.map((p) => p.providerId);
+  return {
+    email: user.email,
+    emailVerified: user.emailVerified,
+    google: ids.includes('google.com'),
+    passwordProvider: ids.includes('password'),
+  };
+}
+
+/** Give the signed-in account a password (a Google one), or a new one (any with the password provider). */
+export async function addPasswordToCurrentUser(password: string): Promise<void> {
+  const auth = getFirebaseAuth();
+  const user = auth.currentUser;
+  if (!user?.email) throw new Error('Sign in first.');
+  if (user.providerData.some((p) => p.providerId === 'password')) {
+    await updatePassword(user, password);
+  } else {
+    try {
+      await linkWithCredential(user, EmailAuthProvider.credential(user.email, password));
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code !== 'auth/email-already-in-use') throw err;
+      // Linking a password to the email the account already has is the documented
+      // way, and Google's servers take it. Firebase's Auth emulator (which
+      // `npm run signin` runs against) refuses it as a second use of the email,
+      // even when it is this account's own. Setting the password on the signed-in
+      // account is the same result, so it is the fallback rather than a dead end.
+      await updatePassword(user, password);
+    }
+  }
+}
+
+export async function resendVerificationEmail(): Promise<void> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error('Sign in first.');
+  await sendEmailVerification(user);
+}
+
+/**
+ * After the confirmation link is opened (in any tab or on another device): the
+ * account is read again, and its token renewed so the licence Worker sees the
+ * verified email. True once the email is confirmed.
+ */
+export async function refreshAccountVerification(): Promise<boolean> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return false;
+  await user.reload();
+  if (user.emailVerified) await user.getIdToken(true);
+  return user.emailVerified;
 }
 
 export async function verifyReturningUserInBackground(): Promise<void> {

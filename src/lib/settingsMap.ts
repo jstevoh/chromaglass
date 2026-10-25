@@ -38,9 +38,9 @@ export interface SettingsCategory { id: string; name: string; hint: string }
  *
  * Only which group a section sits in changes here. A section's controls, its
  * id and its place on the desk are what they were (PLAN 35c, one home for
- * each setting, is the step that splits a section up: Squish Plate holds the
- * plate's rock and the chemistry and the ferrofluid, and is the only member
- * of Chemistry until then).
+ * each setting, is the step that split Squish Plate up: it held the plate's
+ * tilt, the oil, the ferrofluid and the reactions, and was the only member of
+ * Chemistry until then).
  */
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   { id: 'play',      name: 'Play',      hint: 'riding the show you have' },
@@ -160,8 +160,28 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'automation', name: 'Automation', category: 'motion',
     terms: 'evolve random drops air bursts rate dye budget' },
 
+  /*
+    Squish Plate was forty controls under one name: the glass, the oil, the
+    ferrofluid, the reactions and the tilt. It is five sections now (PLAN 35c,
+    the owner 2026-10-24: one home for each setting), and this one is the
+    glass itself. Its id stays: a saved desk layout and a deep link name it,
+    and the controls that stayed are the ones the name was always about.
+  */
   { id: 'squish', name: 'Squish Plate', category: 'chemistry',
-    terms: 'plate pressure squeeze film hele-shaw gap thickness viscosity thick thin smear drip rain' },
+    terms: 'plate pressure press squeeze film hele-shaw gap thin gap thickness plate shape dome depth drag press lift viscosity thick thin smear glass drip rain' },
+  { id: 'oil', name: 'Oil & Soap', category: 'chemistry',
+    terms: 'oil tension bodies soap bursts surfactant clear film lace polarity repulsion repel immiscible water alcohol surface tension' },
+  { id: 'ferro', name: 'Ferrofluid', category: 'chemistry',
+    terms: 'ferrofluid magnet magnetic domain size phase edge pushes dye labyrinth maze detail spikes walk strength height lattice' },
+  { id: 'reactions', name: 'Reactions', category: 'chemistry',
+    terms: 'reaction reactions chemistry ph indicator acid bz belousov zhabotinsky liesegang rings turing pattern spots labyrinth print ink starch drift' },
+  /*
+    The plate tipped. Gravity and Tilt Direction were in Squish Plate, Slosh
+    beside them, and Plate Rock in Light Show Look between Bubbles and Frame
+    Sway: four controls that all say which way the heavy colour runs.
+  */
+  { id: 'tilt', name: 'Tilt & Rock', category: 'motion',
+    terms: 'tilt rock rocking gravity slosh tip tipping dish upright direction downhill beat plate rock' },
   // The old names of Momentum, Updraft and Vibration stay findable, as Grain
   // Fineness's does under Light Show Look: someone who learned them as
   // Damping, Blow Velocity, Vibration Freq and Grain Size will type those.
