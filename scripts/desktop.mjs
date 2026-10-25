@@ -616,11 +616,17 @@ try {
   });
   await page.locator('[data-testid=sound-source-none]').click();
   await page.keyboard.press('Escape');
+  // The ceiling is the feature (60 a second on a 120 Hz offer); the floor only
+  // says the plate is still drawing, not stalled. It was 20, which measured the
+  // runner: the packed run on 3c24c37 drew 15 a second and stepped the governor
+  // down a rung while a neighbouring job loaded the machine, and the packed run
+  // on 96975ef drew 59 with the same code. The 120 Hz cap itself is counted
+  // on a clock the machine's speed cannot touch in `npm run rungs`.
   const drawCapped =
     ambOn.frames <= 65 &&
     ambOn.drawn <= 65 &&
     ambOn.skipped >= 45 &&
-    (!isMac || (ambOn.frames >= 20 && ambOn.drawn >= 20));
+    (!isMac || (ambOn.frames >= 5 && ambOn.drawn >= 5));
   const ambientWorks =
     ambOn.ambient === true &&
     ambOn.stepRate === 30 &&
