@@ -1659,6 +1659,32 @@ try {
       const stateHeld = await plateState();
       await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(700);
+      /*
+        Not the plate's reader until it has spoken. All four reds of the 172
+        Mac runs from 2026-10-18 to 10-24 (19h-2) show the same thing in the
+        line below: 384² solvers #1 and #2 through the hold, 256² solvers #3
+        and #4 after it, so the governor stepped the grid down in the 700 ms
+        after the lift. A rebuilt solver opens on the plate its predecessor
+        handed it (`handOver`, on the GPU), but the CPU's copy that every
+        reader sees (`readDensity`) is a fresh array until its first
+        readback lands, and the snap below read that: "the plate gained −8
+        of 538" in the same line whose each-plate sums, read a moment later,
+        say 579. The dye was never lost, the check read the plate in the
+        frames before it could be read. So the snap waits for the same
+        solvers on two looks and three readbacks since the first of them (the
+        count is the plate's, and a new solver's first readback is among
+        them), up to three seconds; the bars and the cells are as they were.
+      */
+      {
+        let seen = null;
+        for (let k = 0; k < 30; k++) {
+          const st = await plateState();
+          const key = st.plates.map((p) => p.solver).join('/');
+          if (seen?.key !== key) seen = { key, rb: st.plates[0]?.readbacks ?? -1 };
+          else if ((st.plates[0]?.readbacks ?? -1) - seen.rb >= 3) break;
+          await settle(100);
+        }
+      }
       const after = await snap();
       const rb1 = await readbacks();
       const stateAfter = await plateState();
