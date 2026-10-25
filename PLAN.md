@@ -257,7 +257,7 @@ style (§31).
   **12.7**, **12.8**; **12.4a**; later **12.9**.
 - **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13-win-app** then
   **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out and Link,
-  **13-port**, **13-intel**, **13-icon**, **13-update** (after signing), then **13.2**
+  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, **13-update-signed** (after signing; 13-update shipped ad hoc), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
@@ -2779,9 +2779,35 @@ network):
   `desktop/electron-builder.config.cjs`, about doubling the build.
 - The icon is the website's (`public/icon-512.png`), a flat square in the Dock. A
   Mac icon has its own shape and shadow (a 1024 px `.icns`).
-- No updates in the app: a new version is a new download from Actions. Once it is
-  signed, `electron-updater` from GitHub Releases on a `desktop-v*` tag (which
-  `desktop.yml` already builds on) would let the app offer the new show itself.
+- **13-update** (**shipped** ad hoc, asked 2026-10-25; the story is in
+  `docs/plan-shipped.md` §13): a release is Run workflow → *Mac app* with *release*
+  ticked, which builds, checks and publishes a GitHub Release; the site's Download for
+  Mac (Profile & Store for Pro, the landing page) links to its fixed-name .dmg; the app
+  finds new releases itself (electron-updater, `desktop/updates.js`) and, ad hoc,
+  offers the download in its menu and the profile sheet. *Measure:* `npm run updates`
+  (69/69, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
+  (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
+  Judged on the owner's Mac: `docs/judging.md` §75.
+  - **13-update-signed** *(after 13.1-sign)*: with the Developer ID secrets in, the
+    same code downloads in the background and installs on quit. Nothing to build;
+    the first signed release is judged by installing the one before it and seeing it
+    replace itself (§75's last step).
+  - *Trap:* the updater reads the repository's **newest** release. Any other kind of
+    release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
+    with `--latest=false`, or every installed app looks for `latest-mac.yml` in it
+    and reports an error.
+  - **13-version**: a release is `<major>.<minor>.<run number>` (1.3.N) while the site
+    packed inside keeps `package.json`'s 1.3.0, so the About box and anything the page
+    reports (the cast hello's version, 14k) disagree with the release by name. Pass the
+    release's version to the site's build, or bump `package.json` in the release.
+  - **13-exit** (found 2026-10-25): the first launch from /Applications on the owner's
+    Mac exited by itself after a few seconds, with no crash report; the second has
+    stayed up. The app writes nothing about why it quits. Write the main process's
+    errors and `render-process-gone` / `child-process-gone` to
+    `userData/logs/main.log`, so the next one says why; then find it.
+  - **13-sync** (asked 2026-10-25): the app's storage is its own, so Pro looks saved
+    on the site were not in it. Shipped as **23.18** (cloud sync for Pro, its own PR);
+    the one-file-at-a-time move below is what Free and Home still have.
 - The hidden-window lines are judged only where a window in a bare Electron is seen
   to slow down when minimised or covered: never under xvfb (no window manager), and
   on CI's Mac runner only if its window server really hides a minimised window.

@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 
 import { User } from 'lucide-react';
 import { getCachedEmail } from '../lib/authFlag';
 import CloudSyncCard from './CloudSyncCard';
+import { MacAppCard } from './MacAppCard';
 import { cloudSync } from '../lib/cloudSyncApp';
 import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
 import { allowAccountKeys, declineAccountKey, lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
@@ -482,6 +483,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
           )}
 
           {signedIn && email && <CloudSyncCard tier={currentTier} email={email} />}
+
+          <MacAppCard tier={currentTier} />
 
           {/* Signed out, the sign-in form above carries its own opt-in. */}
           {(!ACCOUNTS_ON || signedIn || unsubscribedBanner) && (
