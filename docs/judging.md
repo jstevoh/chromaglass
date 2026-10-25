@@ -1634,3 +1634,21 @@ On the laptop in a dark room, and on the phone, with no reading of labels:
   whether anything that is on still looks off.
 - **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
   tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
+
+## 71. A look saved in Chrome is in the Mac app (PLAN 23.18)
+
+Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
+
+1. In Chrome at chromaglass.art, open Profile & Store. *Cloud sync* says On and, within a few
+   seconds, "Up to date".
+2. Save a look, learn one control on the MIDI map, and change a tool's amount.
+3. Open the Mac app, signed in to the same account. Within a minute (or at once with
+   *Sync now*) the look is in the preset menu and the MIDI map is the one from Chrome. The
+   projector layout on the Mac is still the Mac's.
+4. Delete the look on the Mac. Back in Chrome, focus the window: the look goes, and does not
+   come back after a reload.
+5. On the phone, open the Account pill: the same card, readable and tappable at phone width.
+6. Turn the Wi-Fi off on the Mac, save a look, turn it back on: the look reaches Chrome.
+
+Bad: a look that comes back after being deleted, a set list replaced by an empty one, or the
+plate stuttering when a sync lands mid-show.

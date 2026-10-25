@@ -1,6 +1,8 @@
 import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { User } from 'lucide-react';
 import { getCachedEmail } from '../lib/authFlag';
+import CloudSyncCard from './CloudSyncCard';
+import { cloudSync } from '../lib/cloudSyncApp';
 import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
 import { allowAccountKeys, declineAccountKey, lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
 import {
@@ -221,6 +223,15 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
     setError(null);
     try {
       await unpublishAccountShows();
+      // The cloud copy goes with the account (privacy.html says so). Asked while
+      // the account still exists, since the Worker needs its token to know whose,
+      // and the delete stops if it fails: once the account is gone no token could
+      // ever erase it (the review of #467).
+      const sync = cloudSync();
+      if (sync && !(await sync.erase().catch(() => false))) {
+        setError("Couldn't erase your cloud copy, so the account is not deleted yet. Try again when you're online.");
+        return;
+      }
       const authMod = await loadFirebaseAuth();
       if (authMod) await authMod.deleteCurrentAccount();
       setEmail(null);
@@ -453,6 +464,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
               )}
             </div>
           )}
+
+          {signedIn && email && <CloudSyncCard tier={currentTier} email={email} />}
 
           {/* Signed out, the sign-in form above carries its own opt-in. */}
           {(!ACCOUNTS_ON || signedIn || unsubscribedBanner) && (

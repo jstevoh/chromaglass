@@ -568,6 +568,13 @@ jobs:
       - name: The licence-key Worker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run license-worker
+      # Cloud sync for Pro (PLAN.md 23.18, scripts/cloudsync.mjs): two devices,
+      # each with its own storage like a browser and the Mac app, syncing through
+      # the licence Worker's /sync against in-memory KV with real RS256 tokens.
+      # Node only, so `logic`.
+      - name: Cloud sync between two devices
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run cloudsync
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the

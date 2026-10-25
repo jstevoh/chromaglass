@@ -535,7 +535,7 @@ Where each batch stands, as of 2026-09-27:
 
 | | Batch | State |
 |---|---|---|
-| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; the Finger's own "adds none" reds traced to the ambient seeder being left on in that one section (2026-10-22: off, the plate's idle drift falls from +35 to 1 and the hand adds nothing on pools of 357 and 611; thin pools still unmeasured); it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
+| 0 | The dye a tool makes | **Shipped** (#152); the fingering push that grew a grating of stripes, dots and labyrinths in every pool, and drained the plate, **taken out** (`npm run grating` §5), not yet seen on the Mac; the Finger's own "adds none" reds traced to the ambient seeder being left on in that one section (2026-10-22: off, the plate's idle drift falls from +35 to 1 and the hand adds nothing on pools of 357 and 611); its slack and quiet bars **set from the shards' noise** (#449: 48 trials on pools of 39 to 357, at most 0.17% outside the bracket; both bars now 2% of the pool and 1, the slack was 15% and 5), thin pools included; it was also the phone's two-finger Drop reds, one finger's pool at a third of the other's (#240, `npm run grating` §6 replays them); real viscous fingering to replace it, open |
 | 1 | Sharp liquid, and pigment in it | **Shipped**; sharpening retired, granulation stands |
 | 2 | Lacing | **Shipped**; its 4–8 px gate moved to batch 3 |
 | 3 | Drops, not rings | **Shipped** (#163): drops and bubbles as air pockets, shaded as a projector throws them |
@@ -630,19 +630,21 @@ the broader one it cannot, that the window is unbiased *when a stroke happened*.
 that, the `fIdle`/`fIdleAfter` pair in the check's own detail is the evidence, and the
 control calibrates that pair rather than replacing it.
 
-*A decision for the check's owner:* `fSlack` is still `0.15 * total + 5`, chosen when
-the idle windows were the seeder's +35. They are now about 1, and the hand's own
-contribution is under a unit, so on a pool of 357 the check grants ±59 — it would still
-pass a Finger that created a sixth of the pool. Something nearer 2–3% would be five to
-seven times sharper and still twenty times the measured noise. The same holds for the
-new `quiet` bar, deliberately set at 5% rather than the 2% the Mac alone would justify.
-What stops either being tightened here is that CI's pool is 49 to 279 and the idle
-variance across 40 shards *with the seeder off* has never been measured; only the shards
-can measure it, and a bar resting on an unmeasured quantity is the flake this repo keeps
-relearning.
+*Done (PR #449): both bars set from the shards' own noise.* `TOOLS_FINGER_TRIALS=<n>`
+repeats the stroke on the same helpers, cycling the Drop's hold from 300 to 1500 ms so
+one runner reads thin pools and thick ones, and prints each trial's excess over the
+bracket as a share of the pool (reporting, not gating). Run twelve times on four Mac
+runners, 48 trials on pools of 39 to 357: the stroke landed at most **0.48 outside the
+bracket, 0.17% of its pool**, and the plate left alone gained at most **+0.74, 0.26%**.
+The six seeder-off shard runs before them and the five `adds none` lines beside them
+read the same. So `fSlack` is now `0.02 * pool + 1`, was `0.15 * pool + 5` (±8.1 on a pool
+of 357, was ±59; the nearest trial is a sixteenth of it), and the `quiet` bar is
+`0.02 * pool + 1`, was `max(5, 0.05 * pool)` (the nearest trial is a tenth of it). The
+check's detail now prints its Δ and windows to two places, so `npm run flakes -- --check
+'and adds none'` reads the margin from ordinary pushes.
 
-*Open:* whether the Finger adds dye on a genuinely thin pool, which is now measurable
-for the first time and has not been measured. `TOOLS_POOL_MS` shortens the Drop hold to
+*Measured (PR #449):* the Finger adds no dye on a genuinely thin pool: twelve trials on
+pools of 39 to 80 landed at most 0.05 outside the bracket. `TOOLS_POOL_MS` shortens the Drop hold to
 put a CI-sized pool on a fast machine; it is floored at 100 ms because under that the
 Blow's pool comes out at single figures and its checks measure nothing. Laying the pool
 by solver steps rather than milliseconds would make it one size every run. Also open,
@@ -3463,6 +3465,11 @@ for, and the GPU was asked for only after they had arrived and drawn.
   cap hold their length). Story in
   `docs/plan-shipped.md` §14v-7; judged by `npm run flakes -- --check 'no stop in the
   opening'` over the week after.
+- **14v-8. Two edges of 14v-7's rule, from its review (#456).** (a) One gap can reach
+  6.5 s before check 4 goes red: 4.5 s of it taken out as the page seen free, plus the 2 s
+  bar. Read the week's `stillIdle` on the line before deciding whether the cap should be
+  per gap. (b) The `seenOk` gate (long tasks observable, the timer ticking as asked) has no
+  self-case: add one to `stillCases` where the timer runs slow and nothing is taken out.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
@@ -4211,7 +4218,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18b | The lamp shines through the dye | Large: gels colour the dye, overlaps darken, thin washes are pale | Free | A per-look choice of ground. **Shipped** (#256), behind Lamp Ground; eleven looks on it (#262, 18b-1) |
 | 18c | A pour adds liquid | Large: a drop shoves the colour outward into rings | Free | Better with 18a's open rim |
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
-| 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None. **Partly shipped** (#355); 18e-1 to 18e-3 open |
+| 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None. **Partly shipped** (#355); 18e-1 to 18e-4 open |
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | **Shipped** (#352) |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362), **18g-6 shipped** (the rim holds the oil); 18g-2..5, 18g-7, 18g-8 open |
 | 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
@@ -4708,11 +4715,12 @@ its frame rate live. "Free" means no new passes or texture reads.
   Extends 15e, which found these forces measured only on a stand-in plate.
 
 ### 18e. Edges come from refraction (replaces the painted rims and highlights)
-**Partly shipped** (#355). What shipped: on projected looks, the front plate's edges come from projector pupil aperture loss and shadowgraph Becke line doublets, from the optical path OPL = n·h and its Laplacian in the derive pass. n is water's 1.333 plus the oil (1.47), the film, the poured liquids' own indices from the species field (18d-9) and a named stand-in for the dye (d·0.015·dyeGain: a dilute dye barely moves the index, and the shelf gives dyes none); h is the gap. A separate Projector Focus control (Settings, desks, MIDI, remote, the phone's Looks sheet; 0.5, in focus, by default, so every look is as before until it moves). Painted specular highlights are gone from projected looks and stay on camera and closeup looks. Named shortcuts (each in `refractionOptics`' notes and the archive): the deflection from the dye's slope, not ∇OPL (18e-2); dyeGain, a contrast gain on the step; the pupil overlap a smoothstep against `DROP_NA` 0.25; the shadowgraph's gain max(1, boundaryContrast·2) and edge mask; the back plate's painted line (18e-1); the dye's stand-in index d·0.015·dyeGain; no heat in n (18e-3). What did not ship is below (18e-1 to 18e-3). Follow-ons (§31, 2026-10-11): **31a** gives the defocus Δz a control that also blurs whichever dish is out of focus; **31d** evaluates the shadowgraph per band with each liquid's dispersion. Shipped story and measurements in [`docs/plan-shipped.md`](docs/plan-shipped.md) §18e. Open:
+**Partly shipped** (#355). What shipped: on projected looks, the front plate's edges come from projector pupil aperture loss and shadowgraph Becke line doublets, from the optical path OPL = n·h and its Laplacian in the derive pass. n is water's 1.333 plus the oil (1.47), the film, the poured liquids' own indices from the species field (18d-9) and a named stand-in for the dye (d·0.015·dyeGain: a dilute dye barely moves the index, and the shelf gives dyes none); h is the gap. A separate Projector Focus control (Settings, desks, MIDI, remote, the phone's Looks sheet; 0.5, in focus, by default, so every look is as before until it moves). Painted specular highlights are gone from projected looks and stay on camera and closeup looks. Named shortcuts (each in `refractionOptics`' notes and the archive): the deflection from the dye's slope, not ∇OPL (18e-2); dyeGain, a contrast gain on the step; the pupil overlap a smoothstep against `DROP_NA` 0.25; the shadowgraph's gain max(1, boundaryContrast·2) and edge mask; the back plate's painted line (18e-1); the dye's stand-in index d·0.015·dyeGain; no heat in n (18e-3). What did not ship is below (18e-1 to 18e-4). Follow-ons (§31, 2026-10-11): **31a** gives the defocus Δz a control that also blurs whichever dish is out of focus; **31d** evaluates the shadowgraph per band with each liquid's dispersion. Shipped story and measurements in [`docs/plan-shipped.md`](docs/plan-shipped.md) §18e. Open:
 
 - **18e-1. Layer 1's painted boundary line (a painted shortcut until 31a separates the two dishes' heights).** On projected looks with `derivedOn > 0.5`, Layer 1 keeps a painted boundary line (`edge1 * boundaryContrast * 1.6` from `smoothstep(0.1, 0.6, length(near1.xy))`, gated on `fluid1.a > 0.03`) alongside `refractionOptics(near1, 0.0, 0.0, 0.0)`. At default `projectorFocus = 0.5`, both dishes currently sit at Δz = 0 so the shadowgraph Becke term is 1 and `refractionOptics` only darkens by pupil loss; without the painted line on Layer 1, the back plate's Screen vs Multiply separation in `npm run mixer` falls to 9.9 (bar > 10, 11.0 on main, 10.3 with the line), while applying that brightening to Layer 0 clips the 90th-percentile thin-dye rim in `mixer`'s single-dish mid-grey contrast check (`129.5 → 136.4` without it, `130.9 → 134.7` with it). Replace the painted line when **31a** gives the upper dish its inter-dish focal offset Δz₁ in the projector cone.
 - **18e-2. A clear pour's edge, and the deflection from the optical path.** The aperture's deflection is worked out from the dye's air-masked slope (`θ ≈ |∇density| · 0.35`, weighted by Edge Relief × plateAmt, plus `bEdge · boundaryContrast · 1.1` shaped by `smoothstep(0.25, 1.0, uB) * 0.78` at a hue-gated two-dye boundary, refractionOptics note 1), and `refractionOptics` returns early where both are flat. So an edge with no dye across it, glycerine poured clear into water (Δn 0.14) or the oil's rim, reaches ∇²OPL in the derive pass but draws no line on the wall. #355 took the oil's painted rim (`|∇oil|·2.2`) off projected looks, so a clear oil drop with no dye across its rim has no rim line there until this ships (its 8% lens brightening stays). Deflect by ∇OPL instead (the derive pass would write ∇OPL in place of the dye's slope, and the camera looks keep theirs), then retune the dye's stand-in index against it. A look change: every look's edges move.
 - **18e-3. The heat's index.** Water's index falls about 10⁻⁴ per kelvin, which is what makes a lamp's convection shimmer on the wall. The derive pass does not read the heat; with 18f.
+- **18e-4. Edge Relief does not decide whether light bends.** On a projected look with the derive pass on, the meniscus slope's pupil loss is scaled by `reliefK = edgeRelief × plateAmt`, and is zero when Edge Relief is under 0.005 (`plate.ts`: `reliefK0` before the front plate's `refractionOptics` call, which scales the aperture's `smoothstep(0, 1, u) · reliefK`). So Edge Relief 0 draws no refraction at a slope, though a slope in the gap bends the lamp's light whatever a dial says. Edge Relief was the painted meniscus's strength; on projected looks the slope's loss should come from the optics alone (`plateAmt` and the pupil's NA), and Edge Relief either leave projected looks or become a named contrast on top of that. A look change at Edge Relief 0 only; with 18e-2, which moves the same term onto ∇OPL. *Measure:* the lab's `derive` or `holeline` at Edge Relief 0 and 1 draws the same slope's loss within a stated share.
 
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 
@@ -5458,14 +5466,12 @@ Not a gate and no bar: a rate depends on what was pushed.
   startup's "moving for good no later than the old way" 7 of 193 (19aa-7); the phone's
   two fingers holding Drop 4 of 172 (19h-2, a solver rebuilt by the governor in the
   window is the lead). Two deploys went red on one-off Mac flakes on 10-24.
-- **19aa-6. The renders lines on a starved runner.** `renders`' "the ear is reading" and
-  "the plate hears a new reading on four frames in five" (laptop, the band) and "the
-  plate's Dimmer moves at least twice as often as the desk's" (phone, a fader): 8 of 191
-  each, every red with the page drawing 1.7 to 22 frames a second (the band) or 14.6 to
-  22.5 (the fader) in the first of its two windows and the second window fine. So the
-  first window meets a page not yet up to speed. Find what the page is doing then (a
-  look still compiling behind, the governor's first move) and wait for that, by name, not
-  for longer: the line is right to ask for the readings at the page's own rate.
+- **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** `renders` waits
+  for the plate to draw fifteen frames in a second before measuring (the band's 8 reds of
+  191 were all first windows at 0 to 14.5 frames a second), and the fader's line asks the
+  Dimmer to change on four frames in five drawn and a quarter more than the desk's, where
+  "twice the desk's" asked for more changes than frames below 20 a second. Story in
+  `docs/plan-shipped.md` §19aa-6.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 193.** Every red
   read the show's own wait 1.8 to 3.0 s against the control's 0.7 to 1.1 s, with 1 s
   spare, and moving for good 2.4 to 7.6 s earlier than the control. Not read further;
@@ -5613,6 +5619,21 @@ Not a gate and no bar: a rate depends on what was pushed.
   **2.72 s longest wait against its 2.48 s bar** on the 38f3c07 deploy (2026-10-24) and
   passed on one re-run. One more presentation for 19ad-2's question of whether the shard
   is at the edge of its runner; the bar stays where it is.
+
+- **19ad-4. Measured: `open` is not at the edge of its runner, and is not split (PR #449,
+  2026-10-24).** Every `WebGPU (macOS)` job from 2026-10-17 to 24, 210 per shard, read
+  from the API. Green medians: plate 14.7 min (p90 16.6), fifth 14.2, show 14.1, open
+  14.0 (p90 15.4, longest 17.3), tools 14.0, against `timeout-minutes: 20`. The five
+  are within 0.7 min of each other, so `open` is neither the longest nor near its wall,
+  and the runner-stopped red in 19ad-2 was not a timeout, nor is 19ad-3's startup stall. It does go red most: 54 jobs,
+  against plate 9, fifth 14, show 22 and tools 27. But 38 of the 54 are one step, `The
+  show opens without stopping` (`startup`, 14v-6/14v-7), then `The sound's renders, with
+  a plate` 11, `The ear behind the wall` 3, and five others once or twice. A split does
+  not change the rate of any of them, because none of them depends on what ran before
+  it. It would cost a sixth Mac runner on every run, against the account's five at a
+  time, so one shard of every run would wait for another to finish. What a split would
+  buy is a cheaper re-run of a startup red (half a shard), and that is better bought by
+  fixing startup. Revisit if a shard's median passes about 15 minutes (the 19w rule).
 
 ### 19ae. A phone check reads its dye across a plate rebuild and calls it a fault
 
@@ -6258,11 +6279,14 @@ once the login works (23.14).*
   refused by every browser; the Worker could re-sign such records on `GET /keys` with the current
   key (it is the source of truth for what was sold), with a check that a forged token never enters
   KV that way.
-  **23.14-verify** (open, found 2026-10-24): `server/account-shows.js` `verifyAccountToken` reads
-  the token's uid, audience and issuer but never checks its signature, so anyone who can reach a
-  show server can name any uid and read or publish that account's running shows. It should verify
-  RS256 against Google's keys as the licence Worker now does (23.12-jwks), with an `accountlink` line
-  that a token signed by anyone else is refused.
+  **23.14-verify** (**shipped**, #467; found 2026-10-24): `server/account-shows.js`
+  `verifyAccountToken` read the token's uid, audience and issuer but never checked its
+  signature, so anyone who could reach a show server could name any uid and read or publish
+  that account's running shows. It now verifies RS256 against Google's keys in
+  `server/firebase-token.js` (cached and rate-limited as 23.12-jwks does), the project, the
+  issuer and the times; the emulator's unsigned tokens count only with `FIREBASE_AUTH_EMULATOR`
+  set. *Measure:* `npm run accountlink` 1b (a signed token taken; unsigned, forged and
+  other-project tokens refused), 7/7.
 - **23.14** (**shipped**, this PR): linking devices by
   account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
   with `server/remote-server.js` publishes its LAN relay address and show key to
@@ -6278,6 +6302,64 @@ once the login works (23.14).*
   and joined with a tap and no address typed while the QR code stays on `Phone · iPad`, a
   third page on another account sees nothing, and cutting off the internet and account
   service leaves the local remote socket driving the show.
+- **23.18** (**shipped**, this PR): cloud sync for Pro (`server/cloud-sync.js`,
+  `src/lib/cloudSync.ts`, `src/lib/cloudSyncApp.ts`, `CloudSyncCard` in the profile sheet,
+  desk and phone). Asked by the owner, 2026-10-25: the Mac app has its own storage, so looks
+  saved in Chrome were not in it. A Pro account now carries the saved looks, sequences, saved
+  sets and the working set list, song shows and action sets, custom liquids, the MIDI map,
+  tool amounts, music settings and Follow songs; every browser and Mac app signed in to it
+  keeps them in step through the licence Worker's `/sync` (one KV value per account, the tier
+  read from the keys filed under the account's email). Each device stays the source of truth
+  offline and saves exactly as before; the engine looks at the same localStorage keys every
+  5 s and stamps what changed. The rule is newest-wins per item with deletions as tombstones,
+  the cloud's copy on a tie, and what a device held before it first synced stamped oldest (so
+  a second machine's untouched starter set never replaces the first's). Clocks are corrected
+  by the skew each answer measures; a record far in the future is pulled back to a minute past
+  the server's clock. KV has no transactions, so a manifest every ten minutes finds a push lost
+  to another device's write and sends it again. Not synced, on purpose: the projector layout,
+  audio input and source, MIDI ports, desk mode, licence and sign-in, which belong to the
+  machine. The MIDI map syncs whole, one value: two computers with different controllers
+  replace each other's map (a map per controller is 23.18-midi). Erase the cloud copy from the
+  sheet (any signed-in account, Pro or not); the erase leaves a marker, and a push on a sign-in
+  token issued before it is refused, so a Mac app left open cannot put back an erased or
+  deleted account's copy. Deleting the account stops if the erase fails. A look the cloud
+  refuses (over 256 KB) is reported on the card and not sent again until edited.
+  *Measure:* `npm run cloudsync` (13/13, `checks.yml` `Measure · logic`): saved on one device
+  and read back by the stores' own load functions on the other, for arrival, the starter set
+  list, concurrent edits of different looks, the later edit of one look from a clock ten
+  minutes slow, deletion, offline edits, a lost write healed, Home/keyless/forged/other
+  accounts refused or isolated, unreadable storage never read as empty, erase, a future
+  stamp, a refused look and an id of `toString`, and the wiring (every synced key is its
+  module's, and every key held in React state reloads when the cloud writes it). Each guard
+  was broken in turn and its line went red.
+  **23.18-deploy** (*owner*): `/sync` exists once the licence Worker is deployed by hand from
+  the Mac (`npx wrangler deploy`, as for #460); until then a Pro sheet says sync stopped on an
+  error and retries, and nothing else changes.
+  **23.18-cost** (open): every push is one Workers KV write, and the free plan allows 1000 a
+  day for the whole Cloudflare account (licence webhooks and activations included). Pushes
+  wait for 4 s of quiet and come at most every 5 s, so a player editing all evening is a few
+  dozen; past about thirty busy Pro players a day the free plan runs out and writes fail
+  (sync then backs off and keeps everything local). Workers Paid ($5 a month) lifts it to
+  a million a month. If two devices of one account racing ever matters, a Durable Object per
+  account gives real transactions in place of the manifest's repair.
+  **23.18-music** (open): the song memory in IndexedDB (fingerprints, song maps, recorded
+  performances, `musicDb.ts`) does not sync: it is large and per room. A show kit
+  (`showKit.ts`) still carries it by file.
+  **23.18-prune** (open): tombstones are kept for ever (they no longer count toward a store's
+  2000-item cap, but they grow the account's value); drop those older than 90 days once every
+  device's rev is past them.
+  **23.18-verify-share** (open): the licence Worker keeps its own `verifyFirebaseIdToken` beside
+  `server/firebase-token.js`, which was written to run in both; one copy of security code
+  drifts less. Neither checks `auth_time`, which Firebase's documented steps include.
+  **23.18-midi** (open): a MIDI map per controller (keyed by the device's name), so two rigs
+  keep their own maps instead of the newest replacing the other.
+  **23.18-pack** (open): the Mac app packs `server/` from a hand list
+  (`desktop/electron-builder.config.cjs`), and this PR's new `firebase-token.js` was missing
+  from it until the packed app failed to start on CI's Mac. A line in `npm run desktop` that walks
+  `remote-server.js`'s relative imports and fails on any file the list leaves out would catch
+  the next one in the cloud, before the Mac job.
+  **23.18-exit** (open): a Mac app quit straight after an edit sends it the next time it opens
+  (no send on `pagehide`); a `keepalive` push of the waiting records under 64 KB would close it.
 - **23.10d** (**shipped**, #460): Sign in with Apple is not offered (the owner,
   2026-10-24: "I don't want to do the apple developer account or accept logins from
   them. maybe later - but not now."). The button is held behind `APPLE_SIGN_IN` in
@@ -6297,6 +6379,8 @@ once the login works (23.14).*
   and there is no `?remote` or `?cast`, so returning users and offline shows do not lose
   their origin-scoped state before a handoff moves it across.
 - **23.17** (**shipped**, this PR): when slower frame rates cause the governor to step down (`status.steppedDown`) or the GPU solver is unavailable (`status.gpuUnavailable`), replace the old "Run it locally" `git clone` card (`src/components/RunLocallyCard.tsx`) and add a matching phone/desk `Fluid Grid` callout (`src/components/SettingsPanel.tsx`) suggesting an upgrade to **ChromaGlass Pro** (`CHECKOUT_PRO_URL` / `CHECKOUT_UPGRADE_URL` and `AccountSheet`), hidden once a Pro key is active; gate the `1024²` `Fluid Grid` option to Pro (`disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}`); and let the automatic quality ladder climb to `768²` at `2x`/`3x` Retina and `1024²` at `1x` with projector `stageLadder` and full WebGPU adapter limits in `src/gpu/device.ts` (falling back first to `maxStorageBufferBindingSize` + `maxBufferSize` and then to defaults) whenever a verified Pro licence is active (`effectiveLadderTier` in `src/lib/platform.ts`, `LiquidVisualizer.tsx`). *Measure:* `npm run tiers` (12/12) and `npm run rungs` (74/74).
+- **23.17a. A pinned 1024² grid runs free.** `resolveSimResolution` (`LiquidVisualizer.tsx`) holds any pinned grid up to `MAX_PINNED_GRID` 1024 whatever the licence, so a saved look or set-list entry that carries 1024, a `?sim=1024` link, or a Pro key that lapsed runs 1024² on the free tier; #406 gated only the Fluid Grid menu's option. While gating is enforced (`isTierGatingEnforced()`), hold a pin above 768 to Pro and say so where the grid is shown (desk and phone). *Measure:* `npm run tiers` gains a line: a free tier given `?sim=1024` and a look pinned to 1024 runs at most 768², a Pro tier runs 1024², and a red control that lifts the hold fails it.
+- **23.17b. The Pro card tells Home it adds the Mac app.** On the web the step-down card (`RunLocallyCard.tsx`) says Pro adds "the Mac app with a window of its own and the projector outputs", but Home already has the Mac app (§23's tiers). Show that clause on the free tier only, and to Home name what Pro really adds there. *Measure:* `npm run tiers` reads the card's text for free, Home and Pro.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free
