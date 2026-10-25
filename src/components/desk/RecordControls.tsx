@@ -39,8 +39,10 @@ export function RecordControls({
       {/*
         The running timer takes no extra width (PLAN.md 19v-4, as Save's dot in
         19v-3): the idle label stays in flow to size the button, and the stop
-        mark + clock sit over that same box while recording so starting a
-        recording never widens the button or shifts its neighbours in the bar.
+        mark + clock ("■ 0:00", or "■ Stop · 0:00" at 2xl; what is recording is
+        in the hover title and dot-rec) sit over that same box while recording
+        so starting a recording never widens the button or shifts its
+        neighbours in the bar.
       */}
       <Button
         height={32}

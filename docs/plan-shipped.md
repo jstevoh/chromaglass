@@ -3185,7 +3185,9 @@ when two buttons sat side by side, wrapping the bar to two rows and dropping the
 clip started, pushing `play-shuffle` and `Account` across the top bar. Both the desk's
 `RecordControls` button and Play's `play-record` pill now keep their idle content in flow
 (`invisible` while recording) and overlay the running `tabular-nums` clock inside the same
-box, so starting, running and stopping a recording changes their boxes by 0.0 px. `layout`
+box (at `2xl` on the desk the running overlay reads `■ Stop · 0:00` while the hover title
+and `dot-rec` name what is recording), so starting, running and stopping a recording changes
+their boxes by 0.0 px. `layout`
 at 1280 in Build across `off → Plate video → Take → Plate video + Take → off` (before:
 Record 24.7 px; after: 0.0 px on plate, Record and Save) and `phone` on Play in portrait
 (before: Record 28.0 px, Shuffle 28.0 px; after: 0.0 px on both) ask it on every PR.
