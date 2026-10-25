@@ -1730,3 +1730,18 @@ On the desk and on the phone's Settings strip:
 
 Bad: a control you used all the time that is now in a place you do not expect, or a Build deck that
 runs out of room with Squish Plate in it.
+
+## 76. One home for MIDI on and the audio source (PLAN 35c-3)
+
+On the desk (the phone already had one of each):
+
+1. Settings → Sound: Source shows one line (Off, Mic, System, File, Band or Instrument) and a
+   **Change in Sound…** button. The button closes Settings and opens the Sound sheet, where the six
+   tiles choose. Pick Band there, reopen Settings → Sound, and the line says Band.
+2. The Mic dot still lands on Settings → Sound, with the device picker under the Source line.
+3. Settings → Controller turns MIDI on, picks the port in and the LEDs out, loads a factory map and
+   auto-maps. Plug a controller in and check all four there.
+4. The MIDI dot opens the MIDI sheet. It says "MIDI is on · <controller>" or "MIDI is off", has
+   **Set up…** (opens Settings → Controller), and still teaches: Learn, banks, bindings, the picture,
+   Save and Load file. It no longer has a switch, a port picker, factory chips or Auto-map.
+

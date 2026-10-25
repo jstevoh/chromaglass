@@ -1673,14 +1673,28 @@ try {
         const at = pane.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
         return {
           at: at?.textContent?.trim() ?? null,
-          source: !!pane.querySelector('[data-testid="audio-source"]'),
+          source: !!pane.querySelector('[data-testid="audio-source-state"]'),
           device: !!pane.querySelector('[data-testid="audio-input"]'),
-          mic: !!pane.querySelector('[data-testid="audio-source-microphone"]'),
+          open: !!pane.querySelector('[data-testid="audio-source-open"]'),
         };
       });
       check('the Mic dot opens the sound settings', !!micDot && /sound/i.test(micDot.at ?? ''), micDot?.at ?? 'no panel');
-      check('and they can choose what is listening', !!micDot?.source && !!micDot?.mic);
+      check('and they say what is listening', !!micDot?.source);
       check('and which device it listens on', !!micDot?.device);
+      /*
+        The source is chosen in the Sound sheet, one home (PLAN 35c-3), so the
+        section's link has to get there and the sheet has to be able to choose
+        it: its Mic tile is the control the section used to draw a second copy
+        of. The link closes Settings, so it is the sheet that is closed after.
+      */
+      if (micDot?.open) {
+        await clickOn('audio-source-open');
+        check('and a way to the sheet that chooses it',
+          await appears('sound-source-microphone'));
+        await escapeCloses('sound-panel');
+      } else {
+        check('and a way to the sheet that chooses it', false, 'no audio-source-open');
+      }
       /*
         `escapeCloses`, not Escape and a fixed wait.
 
@@ -1691,6 +1705,7 @@ try {
         runner rasterises in software. The helper right above the suite exists
         for this and I should have reached for it the first time.
       */
+      // The link above closed Settings; this only matters if the link was missing.
       await escapeCloses('settings-panel');
 
       /*

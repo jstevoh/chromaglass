@@ -749,14 +749,16 @@ check('and nothing the solver reads is left off the list', missed.length === 0,
 // pass because neither branch existed. So the source is read instead, which is
 // a check that can actually fail.
 const midiPanel = readFileSync(join(root, 'src/components/MidiPanel.tsx'), 'utf8');
-for (const [where, src, id] of [
-  ['the MIDI panel', midiPanel, 'midi-auto-start'],
-  ['the settings section', panel, 'settings-midi-auto'],
-]) {
-  check(`${where} offers auto-map`, src.includes(id), src.includes(id) ? '' : `no ${id}`);
-}
-check('and both can be stopped once started',
-  midiPanel.includes('midi-auto-cancel') && panel.includes('settings-midi-auto-cancel'));
+// One home (PLAN 35c-3): the section turns MIDI on, picks the ports and auto-maps; the sheet teaches
+// and says the state. So auto-map and its cancel are the section's, and the sheet must not draw
+// a second copy of the switch or the map chips.
+check('the settings section offers auto-map', panel.includes('settings-midi-auto'));
+check('and it can be stopped once started', panel.includes('settings-midi-auto-cancel'));
+check('and the settings section has the switch, the ports in and out, and the factory maps',
+  ['settings-midi-enable', 'settings-midi-input', 'settings-midi-output', 'settings-midi-factory-'].every(id => panel.includes(id)));
+check('the MIDI panel sends the setup there instead of drawing it again',
+  midiPanel.includes('midi-setup-open') && midiPanel.includes('midi-state')
+  && !['midi-enable', 'midi-auto-start', 'midi-factory-', 'midi-input', 'midi-output'].some(id => midiPanel.includes(`"${id}`) || midiPanel.includes(`\`${id}`)));
 // A watcher that swallows every message and is never turned off is a
 // controller that has stopped working, with nothing on screen to say why.
 const hook = readFileSync(join(root, 'src/hooks/useMidi.ts'), 'utf8');
@@ -1017,8 +1019,12 @@ for (const [dot, handler] of [['sound', 'onSound'], ['video', 'onVideo'], ['midi
     || new RegExp(`onClick=\\{${handler}\\}[\\s\\S]{0,240}dot-${dot}`).test(header));
 }
 // And the place the mic dot opens has to be able to change the mic.
-check('and the Sound section can choose the source, not just the device',
-  panel.includes('testId="audio-source"') && panel.includes('data-testid="audio-input"'));
+check('and the Sound section names the source and leads to the sheet that chooses it, with the device beside',
+  panel.includes('data-testid="audio-source-state"') && panel.includes('data-testid="audio-source-open"')
+  && panel.includes('data-testid="audio-input"'));
+// One home each (PLAN 35c-3): the switch is drawn once, not in the section and the sheet both.
+check('and the source is chosen in the Sound sheet alone',
+  !panel.includes('testId="audio-source"') && readFileSync(join(root, 'src/components/SoundPanel.tsx'), 'utf8').includes('sound-source-${s.id}'));
 check('and the sections the dots aim at exist',
   ['audio-input', 'projectors'].every(id => SECTION_BY_ID.has(id)));
 
