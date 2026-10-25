@@ -28,7 +28,12 @@
  *
  * Bars, for every look, after the opening (the first 10 s, where the
  * governor opens at sixty steps before it has measured anything):
- *   - no missed refresh caught up with two steps;
+ *   - missed refreshes caught up with two steps come singly: never more than
+ *     two in any ten seconds. A lone miss (a collection pause, another
+ *     program's GPU work) is caught up at sixty steps whatever a governor
+ *     does, and the second Mac run on #474 (d94c1b1) had one in 170 s; what
+ *     the governor answers for is a state that keeps missing, which on main
+ *     was 8 to 13 a second for 16 s after a climb;
  *   - no on-time frame of two steps (needs the even step clock of 14aa);
  *   - no climb undone within 10 s: a climb to a state it then leaves is one
  *     whose cost it could have known.
@@ -155,8 +160,14 @@ try {
       if (n > 0) bursts.push(`${rel(ticks[i].at)} s: ${n} (${late} late)`);
     }
     if (bursts.length) console.log(`  two-step frames by second: ${bursts.join(', ')}`);
-    verdict(lateAfter === 0, `${look}: no missed refresh caught up with two steps after the opening (the governor's)`,
-      `${lateAfter} in ${(last.at - opening.at).toFixed(0)} s`);
+    // The most caught-up misses in any ten seconds after the opening, from the once-a-second counts.
+    let worst = 0;
+    for (let i = ticks.indexOf(opening); i < ticks.length; i++) {
+      const j = ticks.findIndex((t) => t.at >= ticks[i].at + 10);
+      worst = Math.max(worst, (j < 0 ? last : ticks[j]).late - ticks[i].late);
+    }
+    verdict(worst <= 2, `${look}: missed refreshes caught up with two steps come singly, at most two in any 10 s (the governor's)`,
+      `${lateAfter} in ${(last.at - opening.at).toFixed(0)} s, at most ${worst} in 10 s`);
     verdict(onTimeAfter === 0, `${look}: no on-time frame of two steps after the opening (the step clock's, PLAN.md 14aa)`,
       `${onTimeAfter} in ${(last.at - opening.at).toFixed(0)} s`);
     verdict(undone.length === 0, `${look}: no climb undone within 10 s`,
