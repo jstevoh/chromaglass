@@ -8706,19 +8706,37 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   remote's two share a test id because there is one per layout). The unused
   `desk/PerformanceButton.tsx` was already gone (`record` asserts it). Story in
   `docs/plan-shipped.md` §35.
-- **35c-3** What 35c-2 left, each a change inside surfaces whose checks read the control, so it
-  needs the Mac shards to judge:
-  - **MIDI on** is drawn in Settings' Controller section (`settings-midi-enable`) and again at the
-    top of the MIDI sheet (`midi-enable`, the port, factory maps and Auto-map). The sheet is the
-    teaching surface (Learn, banks, bindings); make it show the state and send the setup to the
-    section, retargeting `qa` (1716), `panel` (742) and `renders`.
-  - **Audio source** is drawn in Settings' Sound (`audio-source`, five options) and in the Sound
-    sheet (`sound-source-*`, six, with the plate as an instrument). The sheet is the superset;
-    Settings' row should become a state line with a link, and `opensource`, `kickbubbles`, `qa`
-    and about twenty harnesses that set `chromaglass-audio-source` by storage stay as they are.
-  - The remote's two Blackouts share the test id `remote-blackout`; the phone has no Blackout
-    outside Settings → Master (35a-2).
+- **35c-3** One home for **MIDI on** and the **audio source**. Shipped: the Controller section of
+  Settings is the one place MIDI is turned on, its ports (in, and now the LEDs out) chosen, a
+  factory map loaded and a controller auto-mapped; the MIDI sheet is the teaching surface and says
+  the state (`midi-state`) with a **Set up…** button into the section. The Sound sheet is the one
+  place the source is chosen (six tiles, with the plate as an instrument); Settings' Sound row is a
+  state line (`audio-source-state`) and **Change in Sound…**, the device picker staying beside it.
+  The phone already had one home for each (its Sound sheet; Web MIDI is not on iOS). Story in
+  `docs/plan-shipped.md` §35. Left from it:
+  - The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
+    (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.
   - 35b-2's pin picker and command palette still list by section, not by the seven groups.
+
+- **35c-2** One home per setting, what is left of phase 3: Flash Limit (Settings' Master and the
+  Wall), Blackout, MIDI on (Settings and Controller) and the audio source (Settings and Sound)
+  each appear in two places, with record and replay, and the unused `desk/PerformanceButton.tsx`;
+  Drive/Impact pairs sit in different sections (one Strength per input); the platform's spin in
+  Plates & LED is Motion's but Stage-gated; the sequencer is behind a 10 px, 40%-opacity link in
+  Songs; the Build layout's deck lists Fluid Physics, which used to be the glass's knobs, so it
+  could take Squish Plate beside it. After 35c-1.
+- ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~ Shipped: a knob's
+  cap, the tick in a panel's header, the dot on a rail heading and the phone's touch thumb wear their group's
+  colour (the seven in `index.css`; a setting's group is its section's, `groupOfSetting`); the tools are
+  keycaps on the desk and pictograms on the phone's dock (`ToolGlyph`); a snail and a hare mark the ends of
+  Master Speed, Evolve Speed, Gel Speed, Chase Speed and Kaleido Spin wherever they are drawn as a knob or a
+  slider (`PACE_KEYS`, `PaceTrack`). Judging §77. Story in `docs/plan-shipped.md` §35.
+- **35d-2** What batch A left: the remote's own sliders (Speed and Evolve Speed in `RemoteControl.tsx`) have
+  no snail and hare, and the remote has no group colours; the phone's Settings sheet takes the cap colours
+  only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
+  its hare at both ends but no snail at the stop in the middle (the slider has one under the track). Batches B
+  (liquid in the controls: bottles, viscosity drip, lamp filament) and C (show hardware: reels, tap light, VU
+  needle, lens cap, strobe dots) are in `/handoff/playful-controls.md`.
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.

@@ -100,6 +100,39 @@
   --color-float-border: rgba(255,255,255,.12); /* a floating panel's edge */
 }
 
+/*
+  Group colour (PLAN 35d). The seven groups of Settings each have a colour,
+  worn by the cap of a knob, the tick in a panel's header, the dot on a rail
+  heading and the thumb of the phone's touch sliders. It says where a control
+  lives and never what it is doing: violet is on (`--color-lit`) and red is
+  live (`--color-live`), both as phase 1 set them (`npm run states`), so
+  neither is one of the seven, and a cap is never drawn as a state. Muted
+  mid-tones, each holding its pointer at 3.9:1 or better against the cap.
+  An element with `data-group` sets `--cap` for what is inside it; the
+  innermost wins, so a knob in the Rides panel (Play) takes its own setting's
+  group (Motion, for Speed) from `groupOfSetting` rather than the panel's.
+*/
+:root {
+  --cap-play: #E4E0D6;       --cap-play-mark: #18181B;
+  --cap-pour: #5A82C0;       --cap-pour-mark: #FFFFFF;
+  --cap-feed: #D08A44;       --cap-feed-mark: #1B1209;
+  --cap-motion: #5C9C6C;     --cap-motion-mark: #08140B;
+  --cap-chemistry: #3F9E9A;  --cap-chemistry-mark: #041413;
+  --cap-look: #CDB44C;       --cap-look-mark: #1A1604;
+  --cap-stage: #8E8E98;      --cap-stage-mark: #0A0A0B;
+}
+[data-group="play"]      { --cap: var(--cap-play);      --cap-mark: var(--cap-play-mark); }
+[data-group="pour"]      { --cap: var(--cap-pour);      --cap-mark: var(--cap-pour-mark); }
+[data-group="feed"]      { --cap: var(--cap-feed);      --cap-mark: var(--cap-feed-mark); }
+[data-group="motion"]    { --cap: var(--cap-motion);    --cap-mark: var(--cap-motion-mark); }
+[data-group="chemistry"] { --cap: var(--cap-chemistry); --cap-mark: var(--cap-chemistry-mark); }
+[data-group="look"]      { --cap: var(--cap-look);      --cap-mark: var(--cap-look-mark); }
+[data-group="stage"]     { --cap: var(--cap-stage);     --cap-mark: var(--cap-stage-mark); }
+[data-group] { --cap-hover: color-mix(in srgb, var(--cap) 82%, white); }
+/* The phone's touch thumb takes the group's colour when it has one; white as ever when not. */
+[data-group] .ride-slider.is-touch::-webkit-slider-thumb { background: var(--cap); }
+[data-group] .ride-slider.is-touch::-moz-range-thumb { background: var(--cap); }
+
 /* Sizing rules (not tokens, but contractual):
    desktop control height   32px (toolbar) · 36px (segmented, tools) · 40px (buttons) · 48px (primary Go, list rows)
    touch control height     48px min; Go/Blackout 56–64px; slider handle 32px

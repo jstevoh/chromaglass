@@ -21,6 +21,7 @@ import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
+import { PaceTrack } from './ui/Pace';
 import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -184,6 +185,8 @@ interface SettingsPanelProps {
   midi?: MidiController;
   /** The full MIDI panel, for the things this panel's section does not hold. */
   onOpenMidi?: () => void;
+  /** Open the Sound sheet, where the source is chosen. */
+  onOpenSound?: () => void;
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: { source: string | null; bpm: number; taps: number };
   onTap?: () => void;
@@ -354,23 +357,25 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
           </span>
         </div>
       </div>
-      <input
-        type="range"
-        min={curve === 1 ? min : 0}
-        max={curve === 1 ? max : 1}
-        step={curve === 1 ? step : 0.001}
-        value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
-        disabled={!!disabled}
-        aria-label={label}
-        onChange={(e) => {
-          const raw = parseFloat(e.target.value);
-          if (curve === 1) { onChange(raw); return; }
-          // Three figures, not the setting's step: see handValueAt.
-          onChange(handValueAt(raw, min, max, curve));
-        }}
-        className="set-range"
-        style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
-      />
+      <PaceTrack settingKey={settingKey} at={Math.max(0, Math.min(1, (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve))))}>
+        <input
+          type="range"
+          min={curve === 1 ? min : 0}
+          max={curve === 1 ? max : 1}
+          step={curve === 1 ? step : 0.001}
+          value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
+          disabled={!!disabled}
+          aria-label={label}
+          onChange={(e) => {
+            const raw = parseFloat(e.target.value);
+            if (curve === 1) { onChange(raw); return; }
+            // Three figures, not the setting's step: see handValueAt.
+            onChange(handValueAt(raw, min, max, curve));
+          }}
+          className="set-range"
+          style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
+        />
+      </PaceTrack>
     </div>
   );
 };
@@ -404,7 +409,7 @@ const DEMO_LOOPS = [
   { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
 ] as const;
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -737,24 +742,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="bassBoost"
         />
 
-        {/* What is listening at all */}
+        {/*
+          What is listening, said here and chosen in the Sound sheet.
+
+          The five-way switch that stood here was the second drawing of the
+          sheet's six, which also has the plate as an instrument; two homes
+          meant one could be changed while the other was read. The sheet is
+          the superset, so it is the home, and this row is the state and the
+          way there. The device below stays: it is where the Mic dot lands.
+        */}
         {onAudioSource && (
           <div className="mb-3.5 flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <Segmented
-              value={audioSource === 'file' ? 'file' : audioSource}
-              options={[
-                ['none', 'Off'],
-                ['microphone', 'Mic'],
-                ['system', 'System'],
-                ['file', 'File'],
-                ['simulated', 'Band'],
-              ] as const}
-              onChange={(v) => { if (v === 'file') onAudioFile?.(); else onAudioSource(v); }}
-              height={32}
-              fill
-              testId="audio-source"
-            />
+            <div className="flex items-center gap-2">
+              <div
+                className={`flex h-8 flex-1 items-center rounded-lg border px-3 text-[13px] font-medium ${audioSource === 'none' ? 'border-white/10 bg-white/5 text-white/60' : LIT}`}
+                role="status"
+                data-testid="audio-source-state"
+                data-source={audioSource}
+              >
+                {({ none: 'Off', microphone: 'Mic', system: 'System', file: 'File', simulated: 'Band', drone: 'Instrument' } as const)[audioSource]}
+              </div>
+              {onOpenSound && (
+                <button
+                  onClick={onOpenSound}
+                  className="h-8 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-medium transition-colors hover:bg-white/10"
+                  title="Choose what the plate listens to: the mic, a tab, a file, the band or the plate as an instrument"
+                  data-testid="audio-source-open"
+                >
+                  Change in Sound…
+                </button>
+              )}
+            </div>
             <Info>
               <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
             </Info>
@@ -2442,6 +2461,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     </p>
                   )}
                 </div>
+                {/* The port out, for the pads' LEDs: the MIDI sheet used to draw this next to the port in. */}
+                <div className="mb-3 flex flex-col gap-1.5">
+                  <span className="text-[13px] font-medium text-text">LEDs</span>
+                  <select
+                    value={midi.ports.output}
+                    onChange={e => midi.choosePorts({ output: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
+                    data-testid="settings-midi-output"
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="off">Off</option>
+                    {midi.outputs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                </div>
 
                 {/*
                   The one-click setup. `factoryFor` reads the port's own name,
@@ -4058,9 +4091,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
           )}
           {railGroups.map(group => (
-            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
+            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`} data-group={group.id}>
               {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
               <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:pb-1.5 sm:pt-4" title={group.hint} data-testid={`rail-heading-${group.id}`}>
+                <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
                 {group.name}
               </div>
               <div className="flex gap-0.5 sm:flex-col">

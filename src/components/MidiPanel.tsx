@@ -1,9 +1,9 @@
 import { HIT_FEATURES } from '../lib/hitSource';
 import { useEffect, useRef, useState } from 'react';
 import { Sheet, LIT } from './ui';
-import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Ear, Music } from 'lucide-react';
+import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Music } from 'lucide-react';
 import {
-  ACTION_LABELS, FACTORY_MAPS, factoryFor, LEARNABLE_SETTINGS, sourceLabel, targetLabel,
+  ACTION_LABELS, LEARNABLE_SETTINGS, sourceLabel, targetLabel,
   MAPPABLE_SOURCES, MUSIC_SOURCES, MUSIC_SOURCE_LABELS, isMapping, triggerable, soundMappable,
   type MidiAction, type MidiTarget, type MusicSource, type SoundBinding,
 } from '../lib/midi';
@@ -24,6 +24,8 @@ interface MidiPanelProps {
   /** Whether the controller's own readout is up on the desk, and how to change it. */
   activity: boolean;
   onActivity: (on: boolean) => void;
+  /** Open Settings at its Controller section, which is where the setup lives. */
+  onSetup: () => void;
   onClose: () => void;
 }
 
@@ -135,7 +137,7 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
   );
 }
 
-export function MidiPanel({ midi, presets, activity, onActivity, onClose }: MidiPanelProps) {
+export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClose }: MidiPanelProps) {
   const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'dyes'>('settings');
   const lastEvent = useMidiLastEvent(midi);
   /*
@@ -159,11 +161,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
   const [fileError, setFileError] = useState<string | null>(null);
   /** Which row's music editor is open, by its key; one at a time. */
   const [musicOpen, setMusicOpen] = useState<string | null>(null);
-  /** What auto-map decided last time, so the panel can say what it just did. */
-  const [autoSaid, setAutoSaid] = useState<string | null>(null);
   const presetName = (id: string) => presets.find(p => p.id === livePresetId(id))?.name;
-  /** Which map the plugged-in hardware wants, so its chip can say so. */
-  const detected = midi.inputs.map(i => factoryFor(i.name)).find(Boolean) ?? null;
 
   const learnButton = (target: MidiTarget, label: string, key: string) => {
     const isLearning = midi.learning && JSON.stringify(midi.learning.target) === JSON.stringify(target);
@@ -226,7 +224,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       )}
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6 text-white">
       <p className="text-[12px] leading-relaxed opacity-40 mb-4">
-        Faders ride the show, pads cue presets and dyes, buttons fire the one-shots. Pick a factory map or teach your controller: choose what a control should do, then touch it.
+        Faders ride the show, pads cue presets and dyes, buttons fire the one-shots. Teach your controller here: choose what a control should do, then touch it.
         Or teach it to the music with the note beside Learn: a slider follows a drum or a band, a button fires on its hits.
         Both are kept in the same map and the same file.
       </p>
@@ -237,121 +235,49 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
         </p>
       )}
 
-      {/* Enable + devices */}
+      {/*
+        The state, and the way to the setup.
+
+        Turning MIDI on, the port and the factory maps used to be drawn here
+        and again in Settings' Controller section, so the same switch had two
+        homes and a check that read one could pass while the other was off.
+        The section is the home (it is where a controller gets plugged in and
+        set up); this sheet is for teaching, so it says what is happening and
+        sends the setup there.
+      */}
       <div className="flex items-center gap-2 mb-3">
-        <button
-          aria-pressed={midi.enabled}
-          onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
-          disabled={!midi.supported}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[13px] font-medium disabled:opacity-30 ${midi.enabled ? `border ${LIT}` : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}
-          data-testid="midi-enable"
+        <div
+          className={`flex-1 flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium ${midi.enabled ? LIT : 'border-white/10 bg-white/5 text-white/60'}`}
+          role="status"
+          data-testid="midi-state"
+          data-on={midi.enabled ? 'true' : 'false'}
         >
-          <Radio size={14} /> {midi.enabled ? 'MIDI on' : 'Turn MIDI on'}
+          <Radio size={14} />
+          <span className="truncate">
+            {!midi.supported ? 'No Web MIDI here' : midi.enabled ? `MIDI is on · ${midi.activeInputName ?? 'no device'}` : 'MIDI is off'}
+          </span>
+        </div>
+        <button
+          onClick={onSetup}
+          className={chip(false)}
+          title="Turn MIDI on, pick the port and its LEDs, load a factory map or auto-map a controller"
+          data-testid="midi-setup-open"
+        >
+          Set up…
         </button>
         <span className={`h-2.5 w-2.5 rounded-full ${lastEvent && performance.now() - lastEvent.at < 400 ? 'bg-emerald-400' : midi.enabled ? 'bg-white/20' : 'bg-white/5'}`} title="Activity" data-testid="midi-activity" />
       </div>
       {midi.error && <p className="text-[12px] text-red-300 mb-3" data-testid="midi-error">{midi.error}</p>}
-      {midi.enabled && (
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <label className="text-[12px] text-white/50">In
-            <select value={midi.ports.input} onChange={e => midi.choosePorts({ input: e.target.value })} className={inputCls} data-testid="midi-input">
-              <option value="all">All devices</option>
-              {midi.inputs.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
-          </label>
-          <label className="text-[12px] text-white/50">LEDs
-            <select value={midi.ports.output} onChange={e => midi.choosePorts({ output: e.target.value })} className={inputCls} data-testid="midi-output">
-              <option value="auto">Auto</option>
-              <option value="off">Off</option>
-              {midi.outputs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
-          </label>
-          {midi.inputs.length === 0 && <p className="col-span-2 text-[12px] text-white/40">No controller found. Plug one in; it appears here by itself.</p>}
-          {lastEvent && <p className="col-span-2 text-[11px] font-mono text-white/40" data-testid="midi-last">Last: {sourceLabel(lastEvent.source)} = {lastEvent.value}</p>}
-        </div>
+      {midi.enabled && lastEvent && (
+        <p className="mb-3 text-[11px] font-mono text-white/40" data-testid="midi-last">Last: {sourceLabel(lastEvent.source)} = {lastEvent.value}</p>
       )}
 
-      {/* Map: name, factory, file */}
+      {/* Map: name, clear, file. The factory maps and Auto-map are Settings' Controller section. */}
       <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
         <input value={midi.map.name} onChange={e => midi.rename(e.target.value)} className={`${inputCls} mb-2`} placeholder="Map name" data-testid="midi-map-name" />
         <div className="flex flex-wrap gap-1.5 mb-2">
-          {/* One list, in `midi.ts`, so the settings panel's chips and these
-              cannot come to hold different sets of controllers. */}
-          {FACTORY_MAPS.map(f => (
-            <button
-              key={f.id}
-              type="button"
-              aria-pressed={detected?.id === f.id}
-              onClick={() => midi.loadFactory(f.id)}
-              className={chip(detected?.id === f.id)}
-              title={detected?.id === f.id ? `${f.name} is what is plugged in` : undefined}
-              data-testid={`midi-factory-${f.id}`}
-            >
-              {f.name}
-            </button>
-          ))}
           <button onClick={midi.clearMap} className={chip(false)} title="Remove every binding"><Trash2 size={11} className="inline -mt-0.5" /> Clear</button>
         </div>
-
-        {/*
-          Auto-map: for the controller nobody wrote a factory map for.
-
-          Which is most of them. The five above are the ones somebody read the
-          manual for; everything else meant MIDI learn, one control at a time,
-          forty times, in a venue, before doors. This watches what the hardware
-          sends and works the surface out from the shape of the messages, so it
-          needs no device list and nothing to be kept up to date.
-
-          It says so when a factory map exists, because a factory map is better
-          than anything that can be worked out by listening: it knows which pads
-          are a grid and where the master fader is, and this can only guess.
-        */}
-        {midi.enabled && (
-          midi.watched ? (
-            <div className="mb-2 rounded-lg border border-amber-400/40 bg-amber-400/10 p-2.5" data-testid="midi-auto-listening">
-              <p className="text-[13px] font-medium text-amber-100">Listening</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-amber-100/80">
-                Sweep every fader and knob end to end, then press each pad and button you want to use.
-                Nothing reaches the show while this is listening.
-              </p>
-              <p className="mt-1.5 font-mono text-[11px] text-amber-100" data-testid="midi-auto-tally">
-                {midi.watched.continuous} faders · {midi.watched.encoder} encoders · {midi.watched.button} buttons
-              </p>
-              <div className="mt-2 flex gap-1.5">
-                <button
-                  onClick={() => {
-                    const said = midi.finishAutoMap(midi.activeInputName);
-                    setAutoSaid(said
-                      ? `${said.rides} rides${said.banks ? ` over ${said.banks + 1} layers` : ''} · ${said.presets} presets · ${said.dyes} dyes · ${said.actions} buttons`
-                      : 'Nothing was touched, so nothing was changed.');
-                  }}
-                  className={`${primaryChip} flex-1`}
-                  data-testid="midi-auto-finish"
-                >
-                  Map them
-                </button>
-                <button onClick={() => { midi.cancelAutoMap(); setAutoSaid(null); }} className={chip(false)} data-testid="midi-auto-cancel">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => { setAutoSaid(null); midi.startAutoMap(); }}
-              className={`${chip(false)} mb-2 w-full`}
-              title={detected
-                ? `${detected.name} has a factory map, which knows the hardware better than listening can — but this works too`
-                : 'Watch what this controller sends and build a map from it'}
-              data-testid="midi-auto-start"
-            >
-              <Ear size={11} className="inline -mt-0.5 mr-1" />
-              Auto-map this controller
-            </button>
-          )
-        )}
-        {autoSaid && (
-          <p className="mb-2 text-[12px] text-emerald-200/90" data-testid="midi-auto-said">{autoSaid}</p>
-        )}
         <div className="flex gap-1.5">
           <button onClick={midi.exportMap} className={`${chip(false)} flex-1`} data-testid="midi-export"><Download size={11} className="inline -mt-0.5 mr-1" />Save file</button>
           <button onClick={() => fileRef.current?.click()} className={`${chip(false)} flex-1`} data-testid="midi-import"><FolderOpen size={11} className="inline -mt-0.5 mr-1" />Load file</button>
