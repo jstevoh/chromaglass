@@ -101,7 +101,7 @@ export async function viaPalette(page, query) {
  * from, so a page's own `Date.now()` samples can be placed on the take.
  */
 export async function recordTake(page, seconds, file, cues = []) {
-  await viaPalette(page, 'Record the plate');
+  await viaPalette(page, 'Record: Plate video');
   const t0 = Date.now();
   const at = s => page.waitForTimeout(Math.max(0, t0 + s * 1000 - Date.now()));
   const ran = [];

@@ -96,6 +96,7 @@ import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { clockText } from './lib/performanceTake';
+import { loadRecordChoice, saveRecordChoice, normalizeChoice, recordMove, makesText, runningText, type RecordChoice } from './lib/recordChoice';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
@@ -3747,9 +3748,34 @@ export default function App() {
   // ── Recording ──
   const recorder = useRecorder();
   const [showRecordPanel, setShowRecordPanel] = useState(false);
-  const toggleRecording = useCallback(() => {
+  /*
+    The one Record button (lib/recordChoice.ts). R, the desk's button, the
+    phone's, MIDI and the remote all land here: nothing running, it starts
+    what the Record panel says it makes (the Plate video, a Take, or both);
+    anything running, it stops all of it. `toggleVideo` is the video alone.
+  */
+  const toggleVideo = useCallback(() => {
     recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
   }, [recorder, audioStream]);
+  const [recordChoice, setRecordChoiceState] = useState<RecordChoice>(loadRecordChoice);
+  const setRecordChoice = useCallback((c: RecordChoice) => {
+    const next = normalizeChoice(c);
+    setRecordChoiceState(next);
+    saveRecordChoice(next);
+  }, []);
+  const toggleRecording = useCallback(() => {
+    const m = recordMove(recordChoice, { videoOn: recorder.recording, takeOn: perfLive, videoSupported: recorder.supported });
+    if (m.stopVideo || m.startVideo) toggleVideo();
+    if (m.stopTake) stopPerformance();
+    if (m.startTake) startPerformance();
+  }, [recordChoice, recorder.recording, recorder.supported, perfLive, toggleVideo, stopPerformance, startPerformance]);
+  // Whatever Record is making, one clock for the phone and the overlay bar: the video's when it runs, else the take's.
+  const recordingAny = recorder.recording || perfLive;
+  const recordSeconds = recorder.recording
+    ? recorder.seconds
+    : musicIntel.performance.live
+      ? Math.max(0, Math.floor((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000))
+      : 0;
 
   // ── The phone's own hands: a pinch on the closeup, and Tilt ──
   /*
@@ -4669,9 +4695,9 @@ export default function App() {
       { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
-      { id: 'record-video',       name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', kbd: 'R', run: toggleRecording },
-      { id: 'record-performance', name: perfLive ? 'Stop performance' : 'Record performance (strokes & gestures)', kind: 'Actions', kbd: 'T', run: togglePerformance },
-      { id: 'record-studio',      name: 'Recording studio options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
+      { id: 'record-video',       name: recordingAny ? 'Stop recording' : `Record: ${makesText(recordChoice)}`, kind: 'Actions', kbd: 'R', run: toggleRecording },
+      { id: 'record-performance', name: perfLive ? 'Stop the take' : 'Record a take (your strokes and drops, replayable)', kind: 'Actions', kbd: 'T', run: togglePerformance },
+      { id: 'record-studio',      name: 'Record options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
       { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
       { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
@@ -4809,9 +4835,9 @@ export default function App() {
     wall: isCasting,
     midi: midi.enabled,
     phone: livePhoneCount > 0,
-    rec: recorder.recording ? String(recorder.seconds) : null,
-    perf: perfClock,
-  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, livePhoneCount, recorder.recording, recorder.seconds, perfClock]);
+    rec: recordingAny ? clockText(recordSeconds) : null,
+    recWhat: runningText({ videoOn: recorder.recording, takeOn: perfLive }),
+  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, livePhoneCount, recordingAny, recordSeconds, recorder.recording, perfLive]);
 
   /*
     Where each status dot goes.
@@ -5124,7 +5150,7 @@ export default function App() {
             onClick={() => { setRenderOpen(v => !v); setLibraryOpen(false); }}
             // 24 px and 70% white: the floor for a control a person has to find in a dark room.
             className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${renderOpen || songRender.running ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/70'}`}
-            aria-label="Render this song to a video file" title="Render this song to a video file, every frame, none dropped"
+            aria-label="Song film: render this song to a video file" title="Song film: render this song to a video file, every frame, none dropped"
             data-testid="render-song"
           >
             <Film size={13} />
@@ -5824,7 +5850,7 @@ export default function App() {
           wandering={isAutomated}
           onWander={setIsAutomated}
           onClear={() => setClearTrigger(n => n + 1)}
-          recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording, take: recorder.lastTake }}
+          recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, take: recorder.lastTake }}
           onAllControls={() => choosePhoneScreen('stage')}
           onOpenAccount={openAccount}
         />
@@ -5959,7 +5985,7 @@ export default function App() {
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
-            recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording }}
+            recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, choice: recordChoice, onChoice: setRecordChoice }}
             onHide={hideOverlays}
             onFullLayout={() => {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
@@ -6168,16 +6194,18 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* ── Recording Studio Panel (Canvas Video & Performance) ─ */}
+      {/* ── The Record panel: what Record makes (Plate video, Take), and Song film ─ */}
       {showRecordPanel && (
         <PanelGuard name="Record" onClose={() => setShowRecordPanel(false)}>
         <RecordPanel
           onClose={() => setShowRecordPanel(false)}
           recorder={recorder}
-          onToggleVideo={toggleRecording}
+          onToggleRecord={toggleRecording}
+          choice={recordChoice}
+          onChoice={setRecordChoice}
           performanceLive={musicIntel.performance.live}
           perfClock={perfClock}
-          onTogglePerformance={togglePerformance}
+          songFilm={musicFile ? { name: musicFile.name, running: songRender.running, onOpen: () => { setShowRecordPanel(false); setLibraryOpen(false); setRenderOpen(true); } } : null}
           savedPerformances={musicIntel.performance.saved}
           replayingPerformanceId={musicIntel.performance.replayingId}
           onReplayPerformance={musicIntel.replayPerformance}
@@ -6282,17 +6310,15 @@ export default function App() {
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400" />
             )}
           </button>
-          {recorder.supported && (
-            <button
-              onClick={toggleRecording}
-              className={`p-2 rounded-full transition-all flex items-center gap-1 ${recorder.recording ? 'bg-red-600 text-white' : 'hover:bg-white/10 text-white/60'}`}
-              title={recorder.recording ? 'Stop recording and save the video' : 'Record the show to a video file'}
-              data-testid="record-button"
-            >
-              {recorder.recording ? <Square size={12} fill="currentColor" /> : <Circle size={14} />}
-              {recorder.recording && <span className="text-[11px] font-mono" data-testid="record-time">{Math.floor(recorder.seconds / 60)}:{String(recorder.seconds % 60).padStart(2, '0')}</span>}
-            </button>
-          )}
+          <button
+            onClick={toggleRecording}
+            className={`p-2 rounded-full transition-all flex items-center gap-1 ${recordingAny ? 'bg-red-600 text-white' : 'hover:bg-white/10 text-white/60'}`}
+            title={recordingAny ? 'Stop recording and keep it' : `Record: ${makesText(recordChoice)} (R)`}
+            data-testid="record-button"
+          >
+            {recordingAny ? <Square size={12} fill="currentColor" /> : <Circle size={14} />}
+            {recordingAny && <span className="text-[11px] font-mono" data-testid="record-time">{clockText(recordSeconds)}</span>}
+          </button>
           <div className="relative">
             <button
               onClick={() => { if (isCasting) { stopCast(); setCastMenu(false); } else setCastMenu(!castMenu); }}
@@ -6469,7 +6495,7 @@ export default function App() {
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
               : null,
             phone: livePhoneCount,
-            rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+            rec: recordingAny ? clockText(recordSeconds) : null,
             song: audioSource === 'none' ? null : followLine(musicIntel.state.follow, musicIntel.state.track?.title),
           }}
           onBlackout={toggleBlackout}
@@ -6491,9 +6517,9 @@ export default function App() {
           onDeleteSaved={deleteSavedLook}
           videoRecording={recorder.recording}
           videoSeconds={recorder.seconds}
-          onToggleVideo={toggleRecording}
+          onToggleRecord={toggleRecording}
+          recordChoice={recordChoice}
           onRecordOptions={() => setShowRecordPanel(true)}
-          onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           layer={activeLayer}
           layers={stageLayers}

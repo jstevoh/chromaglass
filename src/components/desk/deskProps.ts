@@ -102,9 +102,10 @@ export interface DeskProps {
   onDeleteSaved: (id: string) => void;
   videoRecording?: boolean;
   videoSeconds?: number;
-  onToggleVideo?: () => void;
+  /** The one Record button: starts what is chosen, or stops whatever is running. */
+  onToggleRecord?: () => void;
+  recordChoice?: { video: boolean; take: boolean };
   onRecordOptions?: () => void;
-  onPerformance: () => void;
   performance: { clock: string; title?: string } | null;
   layer: number;
   layers: number;
