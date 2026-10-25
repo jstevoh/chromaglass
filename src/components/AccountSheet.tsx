@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getCachedEmail } from '../lib/authFlag';
+import { MacAppCard } from './MacAppCard';
 import {
   useAccountShows,
   joinAccountShow,
@@ -339,6 +340,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
             )}
           </div>
         )}
+
+        <MacAppCard tier={currentTier} />
 
         <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
           <div className="flex items-center justify-between">

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { MAC_DOWNLOAD_URL, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
 
 /**
@@ -97,6 +98,7 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     price: '$199',
     lines: [
       'Everything in Home',
+      'The Mac app: the show offline, the projector and phone remote built in',
       'Several projectors with edge blending',
       'OSC, Art-Net / DMX and MIDI out',
     ],
@@ -114,6 +116,7 @@ const btnGhost =
 
 export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
   const [still] = useState(wantsStill);
+  const [mac] = useState(() => onMacComputer());
   const root = useRef<HTMLDivElement>(null);
 
   // The intro `index.html` painted has done its job: this page is what a
@@ -265,6 +268,16 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </div>
           ))}
         </div>
+        {/* The Mac app's download is a public file (the owner's choice,
+            2026-10-25); what Pro unlocks is checked inside the app. On a phone
+            or a PC there is nothing here to run, so it says where to get it. */}
+        <p data-cg-landing-mac="" className="mt-4 text-[13px] leading-relaxed text-muted">
+          {mac ? (
+            <>Already on Pro? <a href={MAC_DOWNLOAD_URL} className="underline underline-offset-2 hover:text-text-2">Download the Mac app</a> (Apple silicon).</>
+          ) : (
+            <>The Mac app comes with Pro. Download it on your Mac from this page or from Profile &amp; Store.</>
+          )}
+        </p>
       </section>
 
       {/* From the maker */}

@@ -22,13 +22,15 @@
  * with no Web MIDI and a WebGPU that CI never tests).
  */
 
-import { app, BrowserWindow, dialog, Menu, powerSaveBlocker, screen, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell } from 'electron';
+import electronUpdater from 'electron-updater';
 import { randomInt } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -300,6 +302,43 @@ function showDetails() {
   void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'The show server', detail: lines.join('\n'), buttons: ['OK'] });
 }
 
+/*
+  Updates (updates.js says what and why). Whether this build was signed with a
+  Developer ID is written into its package.json by electron-builder.config.cjs,
+  because only a signed app can be updated in place, and the app cannot tell
+  that from its own signature without asking macOS.
+*/
+let updates = null;
+function packedFlags() {
+  try { return JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')).chromaglass ?? {}; } catch { return {}; }
+}
+function startUpdater() {
+  const feed = process.env.CHROMAGLASS_UPDATE_FEED || null;
+  const off = updatesOff({ packaged: app.isPackaged, env: process.env });
+  updates = startUpdates({
+    autoUpdater: off ? null : electronUpdater.autoUpdater,
+    off,
+    version: app.getVersion(),
+    signed: !!packedFlags().signed,
+    feed,
+    // The check's own feed is read a second after opening, not twenty.
+    firstCheckMs: feed ? 1000 : undefined,
+    notify: (title, body) => { if (Notification.isSupported()) new Notification({ title, body, silent: true }).show(); },
+    openExternal: (url) => shell.openExternal(url),
+    quiet: () => BrowserWindow.getAllWindows().length > 1,
+    dialog: ({ message, detail }) => dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message, detail, buttons: ['OK'] }),
+    onChange: (state) => {
+      globalThis.__chromaglassUpdate = { ...updates?.state ?? state };
+      buildMenu();
+      for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('chromaglass:update', state);
+    },
+  });
+  globalThis.__chromaglassUpdate = { ...updates.state };
+  // The profile sheet asks what was found, and its button does what the menu item does.
+  ipcMain.handle('chromaglass:update-state', () => ({ ...updates.state, history: undefined }));
+  ipcMain.handle('chromaglass:update-act', () => { updates.act(); return { ...updates.state, history: undefined }; });
+}
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
   const template = [
@@ -310,12 +349,21 @@ function buildMenu() {
     { role: 'windowMenu' },
     { label: 'Show', submenu: [{ label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails }] },
   ];
+  // What the updater found goes under the app's name, where a Mac app keeps
+  // Check for Updates…, and is rebuilt each time that changes (updates.js).
+  const item = updates ? updateMenuItem(updates.state) : null;
+  if (item) {
+    const entry = { ...item, click: () => updates?.act() };
+    if (isMac) template[0] = { label: app.name, submenu: [{ role: 'about' }, entry, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] };
+    else template.push({ label: 'Help', submenu: [entry] });
+  }
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 async function start() {
   offlineGuard();
   grantPermissions();
+  startUpdater();
   buildMenu();
 
   show.port = await choosePort();

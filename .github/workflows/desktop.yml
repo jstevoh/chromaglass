@@ -16,9 +16,26 @@ name: Mac app
 # Signing: with the secrets desktop/README.md lists, the download is signed
 # with the owner's Developer ID and notarized; without them it is signed ad hoc,
 # and macOS asks once before opening it.
+#
+# Releases (PLAN.md 13-update, asked 2026-10-25: "whenever we have a new release
+# update that app"). Run workflow with "release" ticked, or a pushed
+# `desktop-v<version>` tag, builds and checks the app as every run does, and
+# then the `release` job publishes it as this repo's newest GitHub Release:
+# the .dmg under one fixed name (the site's Download for Mac links to it), the
+# zip an in-place update downloads, and latest-mac.yml, which every installed
+# app reads to learn that it is out (desktop/updates.js). A release is the
+# owner's call, not every merge: main takes several merges a day, and each
+# would tell every installed app to update. The version of a release run is
+# the site's major and minor and this run's number, so each is newer than the
+# last without a pull request to bump it first; a tag gives its own.
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish this build as a release that the installed apps update to'
+        type: boolean
+        default: false
   push:
     tags: ['desktop-v*']
   pull_request:
@@ -55,6 +72,23 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix desktop
       - run: npm run build
+      # Only a release gets a version of its own; every other build keeps the
+      # site's, so a pull request's app never looks newer than a release.
+      - name: Which version
+        id: version
+        env:
+          RELEASE: ${{ inputs.release && 'yes' || '' }}
+        run: |
+          base=$(node -p "require('./package.json').version")
+          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then
+            v="${GITHUB_REF#refs/tags/desktop-v}"
+          elif [ -n "$RELEASE" ]; then
+            v="$(echo "$base" | cut -d. -f1-2).${GITHUB_RUN_NUMBER}"
+          else
+            v="$base"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "The app is version $v (the site is $base)."
       # The download is built first and the check opens the .app it was built
       # from, signed as it ships, so a missing entitlement cannot ship unseen.
       #
@@ -72,6 +106,7 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_FOR_PULL_REQUEST: 'true'
+          DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ -z "$CSC_LINK" ]; then unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; fi
           npm --prefix desktop run dist
@@ -84,5 +119,45 @@ jobs:
           path: |
             desktop/release/*.dmg
             desktop/release/*.zip
+            desktop/release/*.blockmap
+            desktop/release/latest-mac.yml
           if-no-files-found: error
           retention-days: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+  # On Ubuntu, from the Mac job's artifact: publishing needs no Mac minutes,
+  # and only this job may write to the repository.
+  release:
+    name: Mac app (release)
+    needs: build
+    if: ${{ inputs.release || startsWith(github.ref, 'refs/tags/desktop-v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ChromaGlass-mac
+          path: release
+      - name: Publish the release
+        if: ${{ inputs.release || startsWith(github.ref, 'refs/tags/desktop-v') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          tag="desktop-v$VERSION"
+          ls -l release
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::$tag is already released; a release run makes a new version, so run it again"; exit 1
+          fi
+          grep -q "version: $VERSION" release/latest-mac.yml || { echo "::error::latest-mac.yml is not for $VERSION"; cat release/latest-mac.yml; exit 1; }
+          test -f release/ChromaGlass-mac-arm64.dmg || { echo "::error::no ChromaGlass-mac-arm64.dmg, which the site links to"; exit 1; }
+          printf '%s\n\n%s\n' \
+            "ChromaGlass $VERSION for the Mac (Apple silicon), built from ${GITHUB_SHA::7}." \
+            "Download **ChromaGlass-mac-arm64.dmg**, open it and drag ChromaGlass into Applications, over the old one if you have it. An app already installed finds this version by itself and says so in the ChromaGlass menu." > notes.md
+          gh release create "$tag" --target "$GITHUB_SHA" --title "ChromaGlass $VERSION for Mac" --notes-file notes.md --latest \
+            release/ChromaGlass-mac-arm64.dmg release/*.zip release/*.blockmap release/latest-mac.yml
+          echo "Released $tag: https://github.com/$GH_REPO/releases/tag/$tag"

@@ -1514,3 +1514,17 @@ running back as the bass falls, and each kick's dye should throw further. It sho
 bass, not as a busier or shakier plate, and nothing should move the whole frame. Say whether 3
 is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
 bass you wanted.
+
+
+## 69. The Mac app downloads, and finds its own updates (PLAN 13-update)
+
+On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
+Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
+copy that is there, and open it (the first open still needs System Settings → Privacy &
+Security → Open Anyway until the app is signed). On a phone the same card should say to open
+the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
+release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
+minute: one notification should say the new version is out, the ChromaGlass menu should offer
+Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
+while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
+another, and check that the first downloads it and becomes the new version after a quit.

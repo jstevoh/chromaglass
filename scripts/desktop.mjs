@@ -42,6 +42,13 @@
  *                 is in the page's own full screen, so neither the wall nor
  *                 the laptop asks for a click to drop the title bar
  *                 and shows no pointer on any of its elements
+ *   updates       (packed only) the app's updater, electron-updater as
+ *                 shipped, reads a release feed (here a stand-in the check
+ *                 serves, at version 999.0.0, in place of GitHub's) a moment
+ *                 after the show opens, finds the new version, and offers it in
+ *                 the app's menu and to the page's profile sheet, unasked for
+ *                 nothing else (PLAN 13-update; `npm run updates` asks the
+ *                 rest of what desktop/updates.js promises, in plain Node)
  *   quits         closing the show window, with the projector open, quits
  *                 the app and frees the port
  *
@@ -58,6 +65,7 @@ import { spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -147,8 +155,30 @@ const OSC_PORT = await freePort('udp');
 const QUERY = '?debug&look=classic';
 console.log(`The app ${app.label}; port ${PORT}, OSC ${OSC_PORT}, a new profile, the network off.\n`);
 
+/*
+  The release feed, for the packed app only (run from the repo there is no
+  app-update.yml, and updates.js says it is off). What GitHub would serve from
+  the newest release: latest-mac.yml naming a version above any real one. On
+  Linux electron-updater is the AppImage updater, which stays off unless it is
+  told the AppImage it would replace (APPIMAGE); it is given the packed binary
+  so the same check runs in a cloud session. Nothing downloads either way on
+  an ad hoc build; a signed one would try for the zip, which is not served.
+*/
+const feedAsked = [];
+let feed = null;
+if (PACKAGED) {
+  const yml = ['version: 999.0.0', 'files:', '  - url: ChromaGlass-999.0.0-arm64-mac.zip', '    sha512: AAAA', '    size: 1', '  - url: ChromaGlass-mac-arm64.dmg', '    sha512: AAAA', '    size: 1', 'path: ChromaGlass-999.0.0-arm64-mac.zip', 'sha512: AAAA', "releaseDate: '2026-10-25T00:00:00.000Z'", ''].join('\n');
+  feed = createHttpServer((req, res) => {
+    feedAsked.push(req.url);
+    if (/latest(-mac|-linux)?\.yml/.test(req.url ?? '')) { res.writeHead(200, { 'content-type': 'text/yaml' }); res.end(yml); return; }
+    res.writeHead(404); res.end();
+  });
+  await new Promise((r) => feed.listen(0, '127.0.0.1', r));
+}
+
 const env = {
   ...process.env,
+  ...(feed ? { CHROMAGLASS_UPDATE_FEED: `http://127.0.0.1:${feed.address().port}/`, ...(isMac ? {} : { APPIMAGE: app.executablePath }) } : {}),
   PORT: String(PORT),
   OSC_PORT: String(OSC_PORT),
   CHROMAGLASS_USER_DATA: profile,
@@ -492,6 +522,27 @@ try {
     !!castState && castState.root > 0 && castState.mirror && castState.pointer.length === 0,
     castState ? (castState.pointer.length ? `a pointer on ${castState.pointer.join(', ')}` : `none on ${castState.elements} elements`) : 'no projector window opened');
 
+  // ── updates ────────────────────────────────────────────────────────
+  if (!feed) {
+    skip('updates: the app finds a new release and offers it', 'run from the repo, where the app does not look (add --packaged)');
+  } else {
+    const deadline = Date.now() + 30_000;
+    let up = null;
+    while (Date.now() < deadline) {
+      up = await electronApp.evaluate(() => globalThis.__chromaglassUpdate ?? null).catch(() => null);
+      if (up && ['available', 'downloading', 'ready', 'none', 'error'].some((s) => up.history?.includes(s))) break;
+      await sleep(250);
+    }
+    const labels = await electronApp.evaluate(({ Menu }) => (Menu.getApplicationMenu()?.items ?? []).flatMap((i) => i.submenu?.items ?? []).map((i) => i.label)).catch(() => []);
+    const pageSees = await page.evaluate(() => window.__CHROMAGLASS_NATIVE__?.updates?.state?.().catch(() => null) ?? null).catch(() => null);
+    const found = !!up && up.version === '999.0.0' && (up.history.includes('available') || up.history.includes('downloading'));
+    const offered = up?.signed ? labels.some((l) => /ChromaGlass 999\.0\.0|Update to 999\.0\.0/.test(l)) : labels.includes('Download ChromaGlass 999.0.0…');
+    const asked = feedAsked.find((u) => /latest/.test(u));
+    check('updates: the app finds a new release and offers it, in the menu and to the page',
+      found && offered && !!asked && pageSees?.version === '999.0.0' && pageSees?.current === up?.current,
+      `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}`);
+  }
+
   // ── network off, the whole run ────────────────────────────────────
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
@@ -517,6 +568,7 @@ try {
   if (output) console.log(`\n  The app said:\n${output.split('\n').slice(-30).map((l) => `    ${l}`).join('\n')}`);
 } finally {
   await electronApp.close().catch(() => {});
+  feed?.close();
   rmSync(profile, { recursive: true, force: true });
 }
 

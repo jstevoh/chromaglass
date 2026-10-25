@@ -532,6 +532,15 @@ jobs:
       - name: The licence-key Worker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run license-worker
+      # The Mac app's updates (scripts/updates.mjs, PLAN.md 13-update): what
+      # desktop/updates.js does with each thing electron-updater says, above
+      # all what it must not do by itself in the middle of a set, and that the
+      # build, the app and the site agree on where a release's .dmg is. Plain
+      # Node with stand-ins for Electron, so `logic`; the real updater against
+      # a feed is `npm run desktop -- --packaged`, in desktop.yml.
+      - name: The Mac app's updates
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run updates
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
