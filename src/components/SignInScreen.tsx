@@ -237,7 +237,7 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
                       setExists(false);
                     }}
                     className={`min-h-[44px] rounded-lg px-3 text-sm font-medium transition ${
-                      method === m ? 'bg-white/15 text-neutral-50' : 'text-neutral-400 hover:text-neutral-200'
+                      method === m ? 'border border-lit bg-lit text-on-lit' : 'border border-transparent text-neutral-400 hover:text-neutral-200'
                     }`}
                   >
                     {m === 'link' ? 'Emailed link' : 'Password'}
