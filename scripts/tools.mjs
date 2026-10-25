@@ -575,7 +575,7 @@ try {
       };
       // `sign` 1 toward B, -1 toward A: the way this stroke goes.
       const toward = (sign, dx, dy) => sign * (dx * dirB.x + dy * dirB.y) / Math.max(1e-6, Math.hypot(dirB.x, dirB.y));
-      const windRun = async (from, to, sign, strokeWallMs = 1500) => {
+      const windRun = async (from, to, sign) => {
         await clear();
         await pool(from);
         await settle(3000);
@@ -584,7 +584,24 @@ try {
         const rb0 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
         const w0p = await snap('wind0');
         const t0 = Date.now();
-        await stroke('blow', from, to, strokeWallMs);
+        /*
+          The stroke takes 3000 ms of waiting (4.1 to 4.6 s with its 30 pointer
+          round trips), not 1500 (2.6 to 3.3 s). What the Blow's push follows is the
+          solver steps the wind is laid on, not the pool or the clock: over the
+          28 strokes of 14 Mac runs it correlates 0.73 with the wind steps (-0.22
+          with the pool's size, -0.32 with the moves' time), and the CI Macs step
+          only 12 to 23 times a second, so a stroke of fixed wall time got 38 to
+          71 wind steps and the push read -0.07% to +1.64% against +0.15% to beat.
+          The four reds in those runs each had a stroke of 41 to 53 wind steps
+          and read -0.07% to +0.05%. One Mac run (#465) drew nine strokes at
+          three paces: 45 to 53 wind steps read +0.46% to +0.79% (750 ms of
+          waiting), 67 to 70 read +0.92% to +1.64%, and the slowest paces, 92 and
+          112 wind steps, +1.55% and +2.97% (those at 3000), at 14 to 29
+          solver steps a second, with no straw step in any (the moves 140 to 155 ms apart at 3000, where
+          the straw is a hand held still for three frames). Twice the time gave
+          about twice the wind steps and a push six to twenty times the bar's.
+        */
+        await stroke('blow', from, to, 3000);
         const strokeMs = Date.now() - t0;
         await settle(700);
         await snap('wind1');
@@ -623,15 +640,6 @@ try {
         how long the 30 moves took and where the pool's middle sat.
       */
       const again = await windRun(C, [C[0] + half, C[1]], 1);
-      /* PROBE (draft only, never merged): the same stroke at three speeds, twice each, alternating ways. */
-      if (process.env.TOOLS_BLOW_PROBE !== '0') {
-        for (const ms of [750, 1500, 3000, 3000, 1500, 750]) {
-          const sign = ((ms / 750) | 0) % 2 ? 1 : -1;
-          const rate0 = await page.evaluate(async () => { const f = () => window.chromaglassDebug().fluids?.[0]?.stepIndex ?? 0; const a = f(); await new Promise((r) => setTimeout(r, 1000)); return f() - a; });
-          const r = await windRun(C, [C[0] + sign * half, C[1]], sign, ms);
-          console.log(`     PROBE move_wall_ms=${ms} dir=${sign} steps_per_s_before=${rate0} along=${(r.along * 100).toFixed(2)} wind=${r.wind} directed=${r.directed} straw=${r.straw} strokeSteps=${r.strokeSteps} strokeMs=${r.strokeMs} readings=${r.readings} pool=${r.wa.total.toFixed(0)}->${r.wb.total.toFixed(0)} idle=${(r.idle * 100).toFixed(2)}`);
-        }
-      }
       for (const [name, r] of [['right', fwd], ['left', back], ['right again', again]]) {
         console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
       }
