@@ -883,7 +883,7 @@ try {
     if (parts[0]) {
       await page.getByTestId('output-test-pattern').first().click();
       await settle(400);
-      const pressed = await page.getByTestId('output-test-pattern').first().evaluate((el) => el.className.includes('bg-white text-black'));
+      const pressed = (await page.getByTestId('output-test-pattern').first().getAttribute('aria-pressed')) === 'true';
       // A gain change, so the config is written while the pattern is up.
       await page.evaluate(() => window.chromaglassOutput?.({ gain: 1.05 }));
       await settle(300);
@@ -934,8 +934,8 @@ try {
       right of the centred switch, so the Sound dot sat under it. Now the dots
       fold into one Status button when they do not fit. Asked of every
       layout: at 1024 the cluster is clear of the switch, and still clear
-      with a seventh dot in it (a span as wide as the Video dot with its word
-      under it); at a width where the dots fit with their words under them,
+      with a seventh dot in it (a span as wide as the Film dot with its word
+      under it, or wider than the room left, whichever is wider); at a width where the dots fit with their words under them,
       something wider than the room left folds them, the button opens every
       dot, and with it gone they unfold.
 
@@ -978,7 +978,12 @@ try {
       await page.setViewportSize({ width: 1024, height: 860 });
       await settle(900);
       const at1024 = await cluster();
-      await extra(true, dotW); await settle(600);
+      // A dot more, or the room left plus 8 px if that is wider, so that it
+      // must fold. A seventh dot used to be enough at 1024; since the Perf
+      // dot went into the one Rec dot (#463) and Video is called Film (35a,
+      // 24 px against Video's wider word), six dots and a seventh fit at
+      // 1024 with 26 px to spare, and the fold this asks for was not asked.
+      await extra(true, Math.max(dotW, Math.max(0, at1024.gap ?? 0) + 8)); await settle(600);
       const more1024 = await cluster();
       await extra(false);
       await page.setViewportSize({ width: roomy.w, height: 860 });

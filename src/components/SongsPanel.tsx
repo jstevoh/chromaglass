@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ListMusic, Play, Square, Plus, Trash2, Download, FolderOpen, Save, ChevronUp, ChevronDown } from 'lucide-react';
-import { Sheet, Toggle } from './ui';
+import { Sheet, Toggle, LIT } from './ui';
 import type { SongRef } from '../lib/songRef';
 import {
   type ActionSet, type ActionWhat, type ActionWhen, type SectionKind, type SongAction, type SongLook, type SongShow,
@@ -160,10 +160,11 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
               const live = status.showId === s.id;
               return (
                 <button
+                  aria-pressed={selectedId === s.id}
                   key={s.id}
                   onClick={() => setSelectedId(s.id)}
                   className={`mb-1.5 w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                    selectedId === s.id ? 'border-white/40 bg-white/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                    selectedId === s.id ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
                   data-testid={`songs-item-${s.id}`}
                 >
                   <span className="block truncate text-xs font-semibold">{live ? '▶ ' : ''}{s.song.title}</span>

@@ -24,7 +24,40 @@ import type { VisualizerSettings } from '../../types';
  *   2. Hairlines, not fills. Panels separate with a 1px border at 8% white;
  *      background steps are reserved for interactive state.
  *   3. Nothing clickable under 32px on a desk or 48px under a thumb.
+ *
+ * And one look for on (PLAN 35a, 2026-10-24). The owner, with the Video
+ * panel open and a loop playing: "I really can't tell what buttons are
+ * turned on/off." Load loop, Camera, Window and Off were four identical
+ * grey buttons, and across the app a chosen or switched-on control was
+ * drawn nine ways: a white fill, a white tint at 5 to 15%, a brighter
+ * border, an amber, a raw purple, the accent, the active grey (1.19:1
+ * against the panel, the shared Segmented's own), a text colour alone, or
+ * nothing. Each panel's way was legible to whoever drew it and to nobody
+ * reading the next panel. So on is `lit`, a solid violet with white text,
+ * everywhere: the chosen segment, the pressed button (`pressed` below and
+ * `LIT` for a button that cannot be a Button). The switch's track keeps the
+ * accent, the same violet a step brighter: no text sits on a track, and
+ * against the off track the accent is 3.5:1 where lit would be 2.9. White
+ * stays the one primary action on a surface, red is only live-now
+ * (recording, blacked out), green only connected. `npm run switches` holds
+ * every control that says a state to 3:1 between on and off, and `npm run
+ * states` fails a button drawn by a state it does not say.
  */
+
+/**
+ * A hand-built button that is on: for a row whose shape a Button cannot take
+ * (a tile with a swatch, a loop row, a chip in a grid). Put it in the on
+ * branch with `aria-pressed` (or `aria-selected` in a tablist) beside it,
+ * and leave the off branch quiet. 3.47:1 against elevated.
+ */
+export const LIT = 'border-lit bg-lit text-on-lit';
+
+/**
+ * On, where on means live now: blacked out, recording. A solid red with dark
+ * text, never a red tint (a 20% red over the panel is 1.0:1 against the grey
+ * beside it in light, the same button to a glance).
+ */
+export const LIVE = 'border-live bg-live text-bg';
 
 // ── Keyboard chip ────────────────────────────────────────────────────
 
@@ -39,6 +72,10 @@ export function Kbd({ children }: { children: ReactNode }) {
 // ── Button ───────────────────────────────────────────────────────────
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+/** Lit, for a button that is on: what `pressed` draws in place of the variant. */
+const BUTTON_PRESSED = 'border border-lit bg-lit text-on-lit hover:opacity-90';
+/** And for one whose on is live now (Blackout, recording): solid red. */
+const BUTTON_LIVE = 'border border-live bg-live text-bg hover:opacity-90';
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary:   'bg-primary text-on-primary hover:opacity-90',
@@ -48,12 +85,18 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
 };
 
 export function Button({
-  children, onClick, variant = 'secondary', kbd, height = 40, full, title, disabled, testId, icon, midiKey,
+  children, onClick, variant = 'secondary', kbd, height = 40, full, title, disabled, testId, icon, midiKey, pressed, live = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: ButtonVariant;
-  /** The shortcut, shown as a chip. Every key action shows its key. */
+  /**
+   * The shortcut. Every key action says its key, in the hover title and to a
+   * screen reader (aria-keyshortcuts), not on the button: as a chip inside it
+   * the key crowded the label, and on Save sat on the dirty dot (the owner,
+   * 2026-10-24: "hover over is probably better for descriptions and shortcut
+   * hints").
+   */
   kbd?: string;
   height?: number;
   full?: boolean;
@@ -63,23 +106,32 @@ export function Button({
   icon?: ReactNode;
   /** What a controller hits to press this, so the button lights when it does. */
   midiKey?: string | null;
+  /**
+   * A button that stays on (a mode, a hold): lit while true, the variant
+   * while false, and it says so to a screen reader and to `npm run switches`.
+   * Leave it undefined for a button that only does something once.
+   */
+  pressed?: boolean;
+  /** Pressed means live now (blacked out, recording): red rather than lit. */
+  live?: boolean;
 }) {
   const hit = useMidiTouch(midiKey ?? null);
   return (
     <button
       onClick={onClick}
-      title={title}
+      title={kbd ? `${title ?? (typeof children === 'string' ? children : 'Shortcut')} (${kbd})` : title}
+      aria-keyshortcuts={kbd}
       disabled={disabled}
+      aria-pressed={pressed}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       style={{ height }}
       className={`inline-flex items-center justify-center gap-2 rounded-md px-4 transition-colors duration-[120ms] disabled:opacity-40 ${
         full ? 'w-full' : ''
-      } ${BUTTON_VARIANT[variant]} ${hit ? MIDI_HIT : ''}`}
+      } ${pressed ? (live ? BUTTON_LIVE : BUTTON_PRESSED) : BUTTON_VARIANT[variant]} ${hit ? MIDI_HIT : ''}`}
     >
       {icon}
       <span className={`${variant === 'primary' ? 'text-[14px]' : 'text-[13px]'} font-medium`}>{children}</span>
-      {kbd && <Kbd>{kbd}</Kbd>}
     </button>
   );
 }
@@ -137,13 +189,14 @@ export function Segmented<T extends string>({
           onClick={() => onChange(id)}
           style={{ height: height - 4 }}
           data-testid={testId ? `${testId}-${id}` : undefined}
-          title={compact && kbd ? `${label} (${kbd})` : undefined}
+          // The key in the hover title, never on the segment (see Button's kbd).
+          title={kbd ? `${label} (${kbd})` : undefined}
+          aria-keyshortcuts={kbd}
           className={`inline-flex items-center gap-1.5 rounded-sm ${fill ? 'min-w-0 flex-1 justify-center px-1 text-[12px]' : compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : tight ? 'px-2.5 text-[13px] xl:px-3.5' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] ${
-            value === id ? 'bg-active text-text' : 'text-muted hover:text-text-2'
+            value === id ? 'bg-lit text-on-lit' : 'text-muted hover:bg-hover hover:text-text-2'
           }`}
         >
           {label}
-          {kbd && <span className={`font-mono text-[11px] text-faint ${compact ? 'hidden 2xl:inline' : ''}`}>{kbd}</span>}
         </button>
         </span>
       ))}

@@ -3176,18 +3176,19 @@ labels still change width in the same bar (19v-4).
 
 **19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
 Shipped 2026-10-25. Found with 19v-3: at 1280 × 800 in Build, `RecordControls`' button
-(`record-button` after 14ae/#463 unified the desk's Video and Take buttons into one) grew
-from `● Record` (120.1 px) to `■ Stop · 0:00` (144.8 px, +24.7 px) when recording Plate
-video, a Take, or both, shifting its neighbours in the plate bar (and before 14ae, when two
-buttons sat side by side, wrapping the bar to two rows and dropping the plate 42.0 px). On
-the phone's Play screen (`PhonePlay`), `play-record` grew by 28.0 px when a clip started,
-pushing `play-shuffle` and `Account` across the top bar. Both the desk's `RecordControls`
-button and Play's `play-record` pill now keep their idle content in flow (`invisible` while
-recording) and overlay the running `tabular-nums` clock inside the same box, so starting,
-running and stopping a recording changes their boxes by 0.0 px. `layout` at 1280 in Build
-across `off → Plate video → Take → Plate video + Take → off` (before: Record 24.7 px;
-after: 0.0 px on plate, Record and Save) and `phone` on Play in portrait (before: Record
-28.0 px, Shuffle 28.0 px; after: 0.0 px on both) ask it on every PR.
+(`record-button` after 14ae/#463 unified the desk's Video and Take buttons into one, and
+`pressed={running} live` after 35a/#461) grew from `● Record` (93.5 px, or 120.1 px before
+35a removed inline shortcut chips) to `■ Stop · 0:00` (118.2 px, +24.7 px) when recording
+Plate video, a Take, or both, shifting its neighbours in the plate bar (and before 14ae,
+when two buttons sat side by side, wrapping the bar to two rows and dropping the plate
+42.0 px). On the phone's Play screen (`PhonePlay`), `play-record` grew by 28.0 px when a
+clip started, pushing `play-shuffle` and `Account` across the top bar. Both the desk's
+`RecordControls` button and Play's `play-record` pill now keep their idle content in flow
+(`invisible` while recording) and overlay the running `tabular-nums` clock inside the same
+box, so starting, running and stopping a recording changes their boxes by 0.0 px. `layout`
+at 1280 in Build across `off → Plate video → Take → Plate video + Take → off` (before:
+Record 24.7 px; after: 0.0 px on plate, Record and Save) and `phone` on Play in portrait
+(before: Record 28.0 px, Shuffle 28.0 px; after: 0.0 px on both) ask it on every PR.
 
 ### 19w. A fifth Mac shard: every shard well inside its timeout
 
@@ -5067,3 +5068,54 @@ Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is
 1024 × 768, 390 × 844 and 844 × 390, with nothing wider than the screen; a returning visit's plate
 comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
 returning visit nor for `?remote` and `?cast`.
+
+## 35. Clear controls: on reads on, one name for one thing
+
+### 35a. One look for on, every name unique (2026-10-24)
+
+Reported: the owner, with the Video panel open and a loop playing, could not tell which of
+Load loop, Camera, Window and Off was on (all four were the same grey button; only Off changed,
+by greying out), nor which demo loop was playing, and found several buttons called Video.
+
+Measured on main (4397c83): an on or chosen control was drawn nine ways (white fill ×18, white
+tint ×19, a brighter border ×8, the accent ×10, the active grey ×4, `bg-text` ×3, amber ×24, raw
+purple ×4, and text alone). The shared `Segmented` drew its chosen item in the active grey,
+1.19:1 against the panel it sits on. `npm run switches` passed every one: its bar, ΔE 20, is a
+difference found by comparing two buttons, not one read off a single button. With a new bar of
+3:1 in light (the fill's luminance ratio, or a ring only one state has), 58 of the 516 controls
+it reads were under it. And a source read found 88 buttons that change their look with a state
+and say no state at all, so neither the browser check nor a screen reader could see them.
+
+What changed: one look for on, `lit` (`#7C4DEB`, 3.47:1 against elevated, white text on it
+5.1:1), used by `Segmented`, a new `pressed` on `Button`, and `LIT` for a button a Button cannot
+be; `LIVE`, solid red, for on that is live now (Blackout, recording); white stays the one primary
+on a surface. The switch's track keeps the accent (3.5:1 against the off track where lit would be
+2.9). Every stateful button says `aria-pressed`, `-selected`, `-checked` or `-current`. Backwards
+ones turned round: the desk's Blackout (red while off, white while on), the drone (green while
+stopped), the phone's and the remote's play button (pressed now means paused, lit), the remote's
+second Blackout (red while off). The Film section's Source is one pick-one (Off, Video file,
+Webcam, Window), each demo loop row has its own Film and Pour, lit while that loop is doing it,
+with a "playing as film" tag (the row was a button with Pour as Dye a span inside it, and Load
+Film a span with no handler). Names: Video section → Film, the header dot → Film (it was lit by
+the poured video and opened the film), Camera section → Lens, the film's Camera source → Webcam,
+the Dye panel's Video… → Pour a
+video…, Macro/Wide → Close-up (pressed), the phone dock's Presets → Looks and Play → Motion, Play
+screen → Simple screen, Wander on its own → Evolve. Test ids kept.
+
+Shortcut hints off the buttons (the owner, the same afternoon, with Save's ⌘S chip sitting on its
+dirty dot: "hover over is probably better for descriptions and shortcut hints"). `Button`'s `kbd`
+and `Segmented`'s keys are now in the hover title and `aria-keyshortcuts`, not drawn as a chip;
+the tool grid's letters, + Panel's ⌘P, Show deck's ⌥D and the header's ⌘K (now a magnifier) the
+same. Menus and the command palette keep theirs at the row's right edge, where they overlap
+nothing. The phone has no keys.
+
+The source reader was reviewed by the check-skeptic before it shipped, which found it skipping
+`sizeId` (a filter on the word size matched the name; now whole words), a condition with text
+before it (`cn('x hover:y', on ? …)`), the second branch, named branches, `&&`, colours not on
+its list (it now allows only the tokens) and a constant `aria-pressed={false}`. The browser bar
+was made to count a fill only the right way round and in lit, live, ok or the accent, a part
+inside only at 15% of the control or more, and a group as disabled only when every member is.
+
+Checks: `npm run states` (new, in Measure) and `npm run switches`' lift bar. Numbers before and
+after are in the PR.
+

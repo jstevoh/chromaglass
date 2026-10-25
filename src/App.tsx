@@ -290,6 +290,7 @@ interface ArmedLook {
 }
 
 import AccountSheet from './components/AccountSheet';
+import { LIT, LIVE } from './components/ui';
 import { ACCOUNTS_ON, useSignedIn } from './lib/useSignedIn';
 import { isSignedInCached, onAuthFlagChange } from './lib/authFlag';
 import { syncAccountLicense } from './lib/accountLicense';
@@ -946,6 +947,8 @@ export default function App() {
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   /** The shelf's cartoon pouring as dye (lib/cartoons.ts), or null for a file or nothing. */
   const [pouringCartoon, setPouringCartoon] = useState<string | null>(null);
+  /** The file pouring as dye, by its name, so a row that poured it can say it is (Settings' demo loops). */
+  const [pourName, setPourName] = useState<string | null>(null);
   /*
     The video pour: one hidden, muted, looping <video>, handed to the plate
     once when it starts playing. It used to be handed over again on every
@@ -972,10 +975,12 @@ export default function App() {
     if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
     setIsVideoPlaying(false);
     setPouringCartoon(null);
+    setPourName(null);
   }, []);
   const pourFile = useCallback((file: File) => {
     pourVideoFrom(URL.createObjectURL(file), true);
     setPouringCartoon(null);
+    setPourName(file.name);
   }, [pourVideoFrom]);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1386,10 +1391,13 @@ export default function App() {
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
   /** The shelf's cartoon playing as the film; read only while the film is a file (a camera or window replaces it). */
   const [filmCartoon, setFilmCartoon] = useState<string | null>(null);
+  /** The file playing as the film, by its name; read only while the film is a file. */
+  const [filmName, setFilmName] = useState<string | null>(null);
   const loadFilm = async (file: File) => {
     await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
     setFilmCartoon(null);
+    setFilmName(file.name);
     setFilmCameraLost(false);
   };
   /*
@@ -1483,6 +1491,7 @@ export default function App() {
     await wallRef.current?.loadFilmUrl(c.src);
     setFilmSource('file');
     setFilmCartoon(id);
+    setFilmName(c.title);
     setFilmCameraLost(false);
   };
   /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
@@ -1495,6 +1504,7 @@ export default function App() {
       if (!c) return;
       pourVideoFrom(c.src, false);
       setPouringCartoon(id);
+      setPourName(c.title);
     },
     onFilm: (id) => { if (filmingCartoon === id) clearFilm(); else void filmCartoonNow(id); },
     onStopPour: stopPour,
@@ -4832,7 +4842,9 @@ export default function App() {
 
   const deskDots = useMemo(() => ({
     sound: audioSource !== 'none',
-    video: isVideoPlaying,
+    // The film under the dye, which is what the dot opens (Film, in Settings).
+    // It was lit by the poured video, a different thing, and opened the film.
+    video: filmSource !== 'none',
     mic: audioSource !== 'none',
     wall: isCasting,
     midi: midi.enabled,
@@ -4972,8 +4984,11 @@ export default function App() {
       onSceneDevice={chooseSceneDevice}
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
+      filmName={filmSource === 'file' ? filmName : null}
+      pourName={isVideoPlaying ? pourName : null}
       onFilmFile={loadFilm}
       onPourVideo={pourFile}
+      onStopPourVideo={stopPour}
       onFilmCamera={() => void startFilmCamera()}
       filmCameraId={filmCameraId}
       onFilmCameraDevice={chooseFilmCamera}
@@ -5094,10 +5109,11 @@ export default function App() {
           </div>
           {LIBRARY.map(t => (
             <button
+              aria-pressed={musicFile?.track?.src === t.src}
               key={t.src}
               onClick={() => playTrack(t)}
               className={`flex w-full items-baseline gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${
-                musicFile?.track?.src === t.src ? 'bg-amber-400/10 text-amber-200' : 'text-white/70 hover:bg-white/5'
+                musicFile?.track?.src === t.src ? LIT : 'text-white/70 hover:bg-white/5'
               }`}
               data-testid={`music-track-${t.src.split('/').pop()?.replace('.mp3', '')}`}
             >
@@ -5137,9 +5153,10 @@ export default function App() {
             className="w-40 h-6 accent-white cursor-pointer" aria-label="Seek" data-testid="music-seek" />
           <span className="font-mono text-[9px] text-white/40">{Math.floor(musicTime.d / 60)}:{String(Math.floor(musicTime.d % 60)).padStart(2, '0')}</span>
           <button
+            aria-pressed={musicLoop}
             onClick={() => setMusicLoop(v => !v)}
             className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
-              musicLoop ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100' : 'border-white/15 text-white/40 hover:text-white/70'
+              musicLoop ? LIT : 'border-white/15 text-white/40 hover:text-white/70'
             }`}
             title={musicFile?.track
               ? 'Hand over to the next track on the shelf when this one ends, and round again'
@@ -5149,9 +5166,10 @@ export default function App() {
             {musicFile?.track ? 'rolls on' : 'repeats'}
           </button>
           <button
+            aria-pressed={renderOpen || songRender.running}
             onClick={() => { setRenderOpen(v => !v); setLibraryOpen(false); }}
             // 24 px and 70% white: the floor for a control a person has to find in a dark room.
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${renderOpen || songRender.running ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/70'}`}
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${renderOpen || songRender.running ? LIT : 'hover:bg-white/10 text-white/70'}`}
             aria-label="Song film: render this song to a video file" title="Song film: render this song to a video file, every frame, none dropped"
             data-testid="render-song"
           >
@@ -5183,8 +5201,9 @@ export default function App() {
             <Projector size={13} /> {projector.projector.label} connected · {projector.armed ? 'sending on your next click' : 'send the show there'}
           </button>
           <button
+            aria-pressed={projector.mode === 'auto'}
             onClick={() => projector.setMode(projector.mode === 'auto' ? 'ask' : 'auto')}
-            className={`ml-2 rounded-full border px-2 py-0.5 text-[9px] ${projector.mode === 'auto' ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-100' : 'border-white/15 text-white/50 hover:text-white'}`}
+            className={`ml-2 rounded-full border px-2 py-0.5 text-[9px] ${projector.mode === 'auto' ? LIT : 'border-white/15 text-white/50 hover:text-white'}`}
             title="Always send the show to a projector the moment it is connected"
             data-testid="projector-auto"
           >
@@ -5232,7 +5251,7 @@ export default function App() {
           ] as const).map(([mode, label, title]) => (
             <button key={mode} onClick={() => updateSettings({ macroCamera: mode })} title={title}
               aria-pressed={(settings.macroCamera ?? 'hold') === mode} data-testid={`macro-camera-${mode}`}
-              className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? 'bg-white/20 text-white' : 'hover:bg-white/15 text-white/60'}`}>
+              className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? LIT : 'hover:bg-white/15 text-white/60'}`}>
               {mode === 'follow' && <Crosshair size={11} aria-hidden />}
               {label}
               {mode === 'auto' && <span className="font-normal normal-case tracking-normal opacity-70">cuts {shotLabel(settings.macroHold)}</span>}
@@ -5361,17 +5380,15 @@ export default function App() {
                       const isSelected = liq.id === selectedLiquidId;
                       return (
                         <button
+                          aria-pressed={isSelected}
                           key={liq.id}
                           onClick={() => { setSelectedLiquidId(liq.id); }}
                           title={liq.description}
                           data-testid={`liquid-${liq.id}`}
                           className={`flex items-center gap-2 w-full px-2 py-2.5 rounded-xl border-2 transition-all text-left ${
-                            isSelected ? 'text-white' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'
+                            isSelected ? LIT : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'
                           }`}
-                          style={isSelected ? {
-                            borderColor: liq.color,
-                            backgroundColor: `${liq.color}28`,
-                          } : {}}
+
                         >
                           <span
                             className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/30"
@@ -5426,10 +5443,11 @@ export default function App() {
                       const isCurrent = !isNatural(selectedLiquid) && selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
                       return (
                         <button
+                          aria-pressed={isCurrent}
                           key={hex}
                           onClick={() => updateLiquidColor(selectedLiquidId, hex)}
                           className={`w-[26px] h-[26px] rounded-full border transition-transform hover:scale-110 ${
-                            isCurrent ? 'border-white scale-110 shadow-[0_0_6px_rgba(255,255,255,0.6)]' : 'border-white/20'
+                            isCurrent ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'
                           }`}
                           style={{ backgroundColor: hex }}
                           title={PALETTE.find(p => p.hex === hex)?.name ?? hex}
@@ -5446,9 +5464,10 @@ export default function App() {
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Palette</span>
                   <div className="flex flex-col gap-1 max-h-40 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
                     <button
+                      aria-pressed={paletteLock == null}
                       onClick={() => selectPalette(null)}
                       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all ${
-                        paletteLock == null ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
+                        paletteLock == null ? LIT : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
                       }`}
                     >
                       <span className="text-[11px] font-bold uppercase tracking-wider flex-1">Auto</span>
@@ -5456,10 +5475,11 @@ export default function App() {
                     </button>
                     {COLOR_HARMONIES.map((harmony, idx) => (
                       <button
+                        aria-pressed={paletteLock === idx}
                         key={idx}
                         onClick={() => selectPalette(idx)}
                         className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all ${
-                          paletteLock === idx ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
+                          paletteLock === idx ? LIT : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
                         }`}
                         title={COLOR_HARMONY_NAMES[idx]}
                       >
@@ -5493,11 +5513,12 @@ export default function App() {
                       { id: 'spin' as const, icon: RotateCw, label: 'Spin' },
                     ]).map(({ id, icon: Icon, label }) => (
                       <button
+                        aria-pressed={activeTool === id}
                         key={id}
                         onClick={() => setActiveTool(id)}
                         className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg border transition-all ${
                           activeTool === id
-                            ? 'border-white/40 bg-white/15 text-white'
+                            ? LIT
                             : 'border-white/10 bg-white/5 text-white/40 hover:text-white'
                         }`}
                       >
@@ -5542,11 +5563,12 @@ export default function App() {
 
                 {/* Play/Pause */}
                 <button
+                  aria-pressed={!isActive}
                   onClick={() => setIsActive(!isActive)}
                   className={`p-3 rounded-full transition-all duration-300 ${
-                    isActive
-                      ? 'bg-white/15 hover:bg-white/25 text-white shadow-[0_0_15px_rgba(255,255,255,0.15)]'
-                      : 'bg-white hover:bg-gray-200 text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]'
+                    !isActive
+                      ? `border ${LIT}`
+                      : 'border border-transparent bg-white/15 hover:bg-white/25 text-white'
                   }`}
                   title={isActive ? "Pause" : "Play"}
                 >
@@ -5587,9 +5609,11 @@ export default function App() {
                 <div className="flex flex-col items-center gap-1.5 w-full">
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Random Evolve</span>
                   <button
+                    role="switch"
+                    aria-checked={isAutomated}
                     onClick={() => setIsAutomated(!isAutomated)}
                     data-testid="evolve-toggle"
-                    className={`relative w-[52px] h-[26px] rounded-full transition-colors duration-300 ${isAutomated ? 'bg-purple-500' : 'bg-white/20'}`}
+                    className={`relative w-[52px] h-[26px] rounded-full transition-colors duration-300 ${isAutomated ? 'bg-accent' : 'bg-track'}`}
                     title="Works the plate on its own: drops and air from the music, dye lifted off again, a finger drawn through it, and the dials wandering slowly around the look"
                   >
                     <motion.div
@@ -5624,9 +5648,10 @@ export default function App() {
 
                 {/* Macro closeup */}
                 <button
+                  aria-pressed={!!settings.macroMode}
                   onClick={() => updateSettings({ macroMode: !settings.macroMode })}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    settings.macroMode ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    settings.macroMode ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title="Macro closeup — magnify the plate and chase a single bead of liquid"
                 >
@@ -5636,9 +5661,10 @@ export default function App() {
 
                 {/* Settings */}
                 <button
+                  aria-pressed={showSettings}
                   onClick={() => { setSettingsSection(null); setShowSettings(!showSettings); setShowHelp(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showSettings ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    showSettings ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title="Open settings"
                 >
@@ -5648,9 +5674,10 @@ export default function App() {
 
                 {/* Perform or Design */}
                 <button
+                  aria-pressed={deskMode === 'perform'}
                   onClick={() => setDeskMode(m => (m === 'perform' ? 'design' : 'perform'))}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    deskMode === 'perform' ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    deskMode === 'perform' ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title={deskMode === 'perform'
                     ? (roomForDesk
@@ -5665,9 +5692,10 @@ export default function App() {
 
                 {/* Songs: a look for each song and what happens while it plays */}
                 <button
+                  aria-pressed={showSongs || songRuntime.status.showId !== null || sequencer.status.running}
                   onClick={() => { setShowSongs(!showSongs); setShowTrackPanel(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showSongs || songRuntime.status.showId !== null || sequencer.status.running ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    showSongs || songRuntime.status.showId !== null || sequencer.status.running ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title="Songs — a look for each song, and what happens while it plays"
                   data-testid="songs-button"
@@ -5678,9 +5706,10 @@ export default function App() {
 
                 {/* MIDI controller */}
                 <button
+                  aria-pressed={showMidi}
                   onClick={() => { setShowMidi(!showMidi); setShowSequencer(false); setShowTrackPanel(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showMidi ? 'bg-white text-black border-white' : midi.enabled ? 'bg-emerald-500/20 border-emerald-400/40' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    showMidi ? LIT : midi.enabled ? 'border-ok/50 text-ok' : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title={midi.enabled ? `MIDI on${midi.activeInputName ? `: ${midi.activeInputName}` : ''}${gamepad.connected ? ` · gamepad: ${gamepad.connected}` : ''}` : 'MIDI controller — faders, pads and buttons for the show'}
                   data-testid="midi-button"
@@ -5691,6 +5720,7 @@ export default function App() {
 
                 {/* Randomize */}
                 <button
+                  aria-pressed={luckyArmed}
                   onClick={() => {
                     if (performing && !luckyArmed) { setLuckyArmed(true); return; }
                     setLuckyArmed(false);
@@ -5698,7 +5728,8 @@ export default function App() {
                   }}
                   data-testid="lucky-button"
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    luckyArmed ? 'bg-amber-400 text-black border-amber-400' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    // Armed to confirm is pressed, not live: red is only blackout and recording (PLAN 35a).
+                    luckyArmed ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title={luckyArmed
                     ? 'Click again to replace every setting with a random one. Revert brings this look back.'
@@ -5719,10 +5750,11 @@ export default function App() {
                   <div className="flex flex-col gap-1.5">
                     {Array.from({ length: stageLayers }).map((_, idx) => (
                       <button
+                        aria-pressed={activeLayer === idx}
                         key={idx}
                         onClick={() => setActiveLayer(idx)}
                         className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center text-[11px] font-bold ${
-                          activeLayer === idx ? 'border-white bg-white text-black scale-110 shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'border-white/20 text-white/50 hover:border-white/50'
+                          activeLayer === idx ? `${LIT} scale-110` : 'border-white/20 text-white/50 hover:border-white/50'
                         }`}
                       >
                         {idx + 1}
@@ -5744,10 +5776,11 @@ export default function App() {
                 <div className="flex flex-col items-center gap-1.5 w-full">
                   <span className="text-[7px] uppercase tracking-widest font-bold opacity-30">Audio</span>
                   <button
+                    aria-pressed={audioSource === 'microphone'}
                     onClick={() => handleSourceChange(audioSource === 'microphone' ? 'none' : 'microphone')}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'microphone'
-                        ? 'text-green-400 bg-green-400/10 border border-green-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title={audioSource === 'microphone' ? "Mic is active — click to mute" : "Enable microphone input"}
@@ -5756,10 +5789,11 @@ export default function App() {
                     <span>Mic</span>
                   </button>
                   <button
+                    aria-pressed={audioSource === 'system'}
                     onClick={() => handleSourceChange(audioSource === 'system' ? 'none' : 'system')}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'system'
-                        ? 'text-blue-400 bg-blue-400/10 border border-blue-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title={audioSource === 'system' ? "System audio active — click to stop" : "Capture system/tab audio"}
@@ -5768,10 +5802,11 @@ export default function App() {
                     <span>System</span>
                   </button>
                   <button
+                    aria-pressed={audioSource === 'file'}
                     onClick={() => musicInputRef.current?.click()}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'file'
-                        ? 'text-amber-300 bg-amber-400/10 border border-amber-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title="Play a music file here and drive the show from it — no microphone, no loopback"
@@ -5781,10 +5816,11 @@ export default function App() {
                     <span>File</span>
                   </button>
                   <button
+                    aria-pressed={!!musicFile?.track}
                     onClick={() => setLibraryOpen(v => !v)}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       musicFile?.track
-                        ? 'text-amber-300 bg-amber-400/10 border border-amber-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title={`Ambient music that ships with the show — ${clock(librarySeconds())} of it, licensed for a room like this one, and played from this tab so a shared tab carries the sound too`}
@@ -5794,10 +5830,11 @@ export default function App() {
                     <span>Shelf</span>
                   </button>
                   <button
+                    aria-pressed={audioSource === 'simulated'}
                     onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'simulated'
-                        ? 'text-fuchsia-300 bg-fuchsia-400/10 border border-fuchsia-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title="A synthesised band, played silently into the show: kick, snare, hats, bass and a pad, in verses and choruses. No microphone, no permission, nothing to be asked for"
@@ -6313,8 +6350,9 @@ export default function App() {
             )}
           </button>
           <button
+            aria-pressed={recordingAny}
             onClick={toggleRecording}
-            className={`p-2 rounded-full transition-all flex items-center gap-1 ${recordingAny ? 'bg-red-600 text-white' : 'hover:bg-white/10 text-white/60'}`}
+            className={`p-2 rounded-full transition-all flex items-center gap-1 ${recordingAny ? LIVE : 'hover:bg-white/10 text-white/60'}`}
             title={recordingAny ? 'Stop recording and keep it' : `Record: ${makesText(recordChoice)} (R)`}
             data-testid="record-button"
           >
@@ -6325,9 +6363,10 @@ export default function App() {
             <button
               onClick={() => { if (isCasting) { stopCast(); setCastMenu(false); } else setCastMenu(!castMenu); }}
               className={`p-2 rounded-full transition-all ${
-                isCasting ? 'bg-blue-500 text-white' : castMenu ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/60'
+                isCasting ? 'bg-ok text-bg' : castMenu ? LIT : 'hover:bg-white/10 text-white/60'
               }`}
               title={isCasting ? "Stop casting" : "Cast to display"}
+              aria-pressed={isCasting}
               aria-haspopup="menu"
               aria-expanded={castMenu}
               data-testid="cast-button"
@@ -6421,9 +6460,10 @@ export default function App() {
           <CrashReportButton />
           </PanelGuard>
           <button
+            aria-pressed={showHelp}
             onClick={() => setShowHelp(!showHelp)}
             className={`min-w-[34px] min-h-[34px] rounded-full transition-all text-[12px] font-bold ${
-              showHelp ? 'bg-white text-black' : 'hover:bg-white/10 text-white/60'
+              showHelp ? LIT : 'hover:bg-white/10 text-white/60'
             }`}
             title="About ChromaGlass — getting started, every control, and how they interact (?)"
             data-testid="guide-button"

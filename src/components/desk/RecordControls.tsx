@@ -44,14 +44,15 @@ export function RecordControls({
       */}
       <Button
         height={32}
-        variant={running ? 'danger' : 'secondary'}
+        pressed={running}
+        live
         kbd="R"
         onClick={onToggleRecord}
         midiKey="action:record-toggle"
         testId="record-button"
         title={running
           ? `Stop recording (${what}, ${clock}) and keep it`
-          : `Record: ${what} (R). Change what it makes with the sliders button.`}
+          : `Record: ${what}. Change what it makes with the sliders button.`}
       >
         <span className="relative inline-flex items-center justify-center whitespace-nowrap">
           <span aria-hidden={running || undefined} className={running ? 'invisible' : undefined}>

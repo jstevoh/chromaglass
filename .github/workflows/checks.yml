@@ -203,6 +203,14 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run panel
 
+      # Every button drawn by a state says it, in the lit look (scripts/states.mjs,
+      # PLAN.md 35a): the source read for a className that changes with a state
+      # and no aria-pressed, -selected or -checked beside it, which the browser
+      # half (Switches read on and off) cannot see. A second, no browser.
+      - name: Buttons say their state
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run states
+
       # The guard on a check's bars and inputs, against #362's two real cases
       # and the things it must not fire on (comments, names, prose, printing).
       - name: The check-change guard
@@ -749,7 +757,8 @@ jobs:
       # PLAN.md QA-30): on the desk, every Settings section, the phone's sheets,
       # Play and the remote, each control that says it has a state is read in
       # both, from computed styles. A knob against its track at 3:1, on against
-      # off at ΔE 20. Colours, so no GPU; the site the steps above built.
+      # off at ΔE 20 and at 3:1 in light (PLAN.md 35a). Colours, so no GPU; the
+      # site the steps above built.
       - name: Switches read on and off
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/switches.mjs
