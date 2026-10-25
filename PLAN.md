@@ -5500,9 +5500,23 @@ Not a gate and no bar: a rate depends on what was pushed.
 - **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** `renders` waits
   for the plate to draw fifteen frames in a second before measuring (the band's 8 reds of
   191 were all first windows at 0 to 14.5 frames a second), and the fader's line asks the
-  Dimmer to change on four frames in five drawn and a quarter more than the desk's, where
-  "twice the desk's" asked for more changes than frames below 20 a second. Story in
+  Dimmer to change on nine frames in ten that were offered a new value and a quarter more
+  than the desk's, where "twice the desk's" asked for more changes than frames below 20 a
+  second (the first per-frame bar, 0.8 of the frames drawn, sat on the edge of a healthy
+  plate: 0.79 to 0.99 in 48 windows). Story in
   `docs/plan-shipped.md` §19aa-6.
+- **19aa-8. The Blow's push follows the solver steps, and the stroke gave it too few
+  (shipped 2026-10-25).** `tools`' "and pushes the colour along, whichever way it blows"
+  was red on 13 of 187 Mac runs in the week to 10-24. Over 28 Mac strokes the push
+  correlates 0.73 with the wind steps the stroke laid and the CI Macs step 12 to 23 times
+  a second, so a stroke of 1500 ms of waiting got 38 to 71 and the weak ones read
+  -0.07% to +0.05% against +0.15%. The stroke now takes 3000 ms of waiting; nine strokes
+  of one Mac run at three paces read +0.46% to +2.97% with no straw step. The paused hunt
+  for why the app pushes less per step than the lab (the breath's share, the `still`
+  threshold, the Dropper's bottle) is not answered: the toolAmount is 1, so
+  `k = kRaw²` is 1, and the 0.75-cell `still` threshold is under the moves' one cell on a
+  192 grid. Open: why the push has an offset of about 50 steps before it rises, and
+  whether a Mac with fewer than 12 steps a second still reads under the bar.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 193.** Every red
   read the show's own wait 1.8 to 3.0 s against the control's 0.7 to 1.1 s, with 1 s
   spare, and moving for good 2.4 to 7.6 s earlier than the control. Not read further;
@@ -5680,6 +5694,23 @@ Not a gate and no bar: a rate depends on what was pushed.
   plate, not report FAIL with "0 under it". It must not pass in that case, and the bar on
   the dye under each finger stays where it is. Same family as 19ad (a red that is about
   the runner's moment, not the branch). Found reviewing #352 (2026-10-24).
+
+### 19af. The repository's front page: a short README, the guide in docs/, a clean root (shipped 2026-10-25)
+
+- **19af-1. Shipped.** `README.md` was 79 KB of every feature and control, which is what a
+  visitor to the repository met first. It is now the front page (what ChromaGlass is, the
+  live link, four screenshots, how to run it, where things are, the licence); the old text
+  moved whole to `docs/guide.md` (same headings, so a section edited elsewhere moves
+  across), and `docs/README.md` maps the other docs. The root lost thirty-odd one-off
+  scratch files (`patch_*`, `test_dump*`, `scratch*`, `wait_ci*.sh`, `tmp_18.txt` and the
+  like: nothing in `package.json`, a workflow, a script or a doc named any of them, and
+  they stay in git history); `plan_comet.md` moved to `docs/plan-comet.md`. `dc.mjs` stays,
+  because `checks.yml` parses it by that name. New feature and control docs go in
+  `docs/guide.md`, not the README (`setting-auditor` and `CLAUDE.md` say so).
+- **19af-2. Open, the owner's, GitHub settings a session cannot change** (the agent proxy
+  refuses writes to repository-settings paths): the About description, the website link
+  (`https://chromaglass.art`) and the topics. Suggested text is in the PR that shipped
+  19af-1.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
@@ -8377,6 +8408,44 @@ a grid of generic stock thumbnails: ours are the plate itself.
 **Order.** 34a first (it needs no engine work and the site is the demo), then 34f and 34g
 (small), then 34b and 34c; 34d, 34e and 34h are for when the planned VJ and DAW steps
 have shipped. Not started.
+
+## 35. Clear controls: on reads on, one name for one thing (asked 2026-10-24)
+
+*Asked 2026-10-24, the Video panel open with a loop playing: "I really can't tell what
+buttons are turned on/off ... I can't tell what state things are in." Then: "there are
+multiple buttons called video!" The owner likes the modular panels (dock, float, fold)
+and wants them kept as they are: what changes is how state is drawn, what things are
+called, and later where they go. The audit behind this (heuristics from Nielsen Norman's
+visibility of system status and consistency, WCAG 1.4.11's 3:1 for a state's cue, every
+desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
+
+- ~~**35a** One look for on, every name unique (phase 1).~~ Shipped: the lit token, `Button
+  pressed`, the Film section's Source and demo loops, the renames, `npm run states` and the
+  3:1 bar in `npm run switches`. Story in `docs/plan-shipped.md` §35.
+- **35a-2** What phase 1 left, each because it moves a check's input or a layout:
+  - Sliders standing in for switches: the phone's Press · thin gap and Two Projectors
+    (`phone.mjs` drives the first as a range by keyboard), the remote's three (788, 822,
+    848 as of 4397c83), Settings' Auto Spin and Spin Direction (stepped sliders with three
+    named stops, which want a Segmented that keeps MIDI learn and the pins).
+  - Touch targets under 44 px: the Play handle, the remote's layer dots, tool chips, dye
+    swatches and cue strip, LaptopLink's button, Settings' rail on a phone, `Toggle`'s
+    36 px row and `PanelFrame`'s 24 px icons.
+  - The remote's two Blackouts share the test id `remote-blackout` (one per layout).
+  - The phone dock's Motion dot stands for two states (Evolve or Tilt) at once.
+  - Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
+    rows): legible, but a third way of saying off; make them `disabled` with the reason.
+  - "All settings…" twice on the desk (DeskPanels' rides and recipe) beside "+ Panel".
+  - "Sound" in the layout switch next to the Sound dot that opens the same panel.
+  - The hand-built pick-one grids in Settings (On a New Song, Render Style, Film Stock,
+    folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
+    draw them once, once it takes a title per option and a number id.
+- **35b** Regroup the panels into seven: Play, Pour, Feed, Motion, Chemistry, Look, Stage
+  (phase 2). The owner chose all three phases, in order (2026-10-24). The four group vocabularies
+  to reconcile: `data-group` in SettingsPanel, `lib/settingsMap.ts`, the panel browser,
+  and the phone rail, whose headings are hidden.
+- **35c** One home per setting (phase 3): Flash Limit, Blackout, MIDI on, the audio
+  source and record/replay each appear in two places; Drive/Impact pairs sit in different
+  sections; Squish Plate splits up; the sequencer is behind Songs. After 35b.
 
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.

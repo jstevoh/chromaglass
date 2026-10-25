@@ -1632,6 +1632,20 @@ With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual C
   switch it on; the film's camera should stay what it was.
 - On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
 
+## 70. On reads on (PLAN 35a)
+
+On the laptop in a dark room, and on the phone, with no reading of labels:
+
+- **Film.** Load a demo loop with Film: its Film button and Video file in Source should be lit
+  violet, the row should say "playing as film", and Off should not be. Pour another: its Pour
+  lights too. Say whether you can tell which loop is doing what from across the room.
+- **The desk.** The layout switch, the tools, the layers, the bottles and the palette list: the
+  chosen one is a solid violet now, not a lighter grey. Blackout is grey until pressed, then
+  solid red. Say whether the violet is too loud anywhere, or
+  whether anything that is on still looks off.
+- **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
+  tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
+
 ## 71. A look saved in Chrome is in the Mac app (PLAN 23.18)
 
 Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
