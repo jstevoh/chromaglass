@@ -15,7 +15,7 @@ import {
   Sliders,
   History,
 } from 'lucide-react';
-import { Sheet, Button, SwitchPill, Toggle } from './ui';
+import { Sheet, Button, SwitchPill, Toggle, LIT } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
 import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
@@ -90,7 +90,7 @@ export function RecordPanel({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${anyRunning ? 'bg-red-500 animate-pulse' : 'bg-muted'}`} />
+                      <span className={`h-2.5 w-2.5 rounded-full ${anyRunning ? 'bg-live animate-pulse' : 'bg-muted'}`} />
                       <span className="text-[14px] font-semibold text-text">
                         {anyRunning ? 'Recording' : 'Ready to record'}
                       </span>
@@ -109,7 +109,13 @@ export function RecordPanel({
                   </div>
                   <Button
                     height={38}
-                    variant={anyRunning ? 'danger' : 'primary'}
+                    // Off it is a plain button with a red dot, on it is the solid
+                    // red that means recording now (PLAN 35a). It was the white
+                    // primary while off, which is brighter than the red, so on
+                    // drew darker than off (switches' lift bar: 1.00:1).
+                    variant="secondary"
+                    pressed={anyRunning}
+                    live
                     kbd="R"
                     onClick={onToggleRecord}
                     testId="record-start-stop"
@@ -117,7 +123,7 @@ export function RecordPanel({
                     {anyRunning ? (
                       <span className="inline-flex items-center gap-1.5"><Square size={14} className="fill-current" />Stop and keep it</span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5"><Circle size={14} className="fill-current" />Record</span>
+                      <span className="inline-flex items-center gap-1.5"><Circle size={14} className="fill-current text-live" />Record</span>
                     )}
                   </Button>
                 </div>
@@ -263,13 +269,13 @@ export function RecordPanel({
                           data-testid={`record-quality-${q.id}`}
                           className={`flex flex-col text-left rounded-lg border p-3 transition-colors ${
                             selected
-                              ? 'border-accent-border bg-accent-bg text-text'
-                              : 'border-border bg-elevated/40 text-muted hover:border-border-strong hover:text-text'
+                              ? LIT
+                              : 'border-border text-muted hover:border-border-strong hover:text-text'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <div className="flex items-center justify-between w-full font-medium text-[13px]">
                             <span>{q.label}</span>
-                            {selected && <Check size={14} className="text-accent-text" />}
+                            {selected && <Check size={14} />}
                           </div>
                           <span className="mt-1 text-[11px] leading-snug opacity-80">{q.desc}</span>
                         </button>
@@ -298,8 +304,8 @@ export function RecordPanel({
                           data-testid={`record-fps-${rate}`}
                           className={`flex-1 rounded-md border py-1.5 text-center text-[12px] font-medium transition-colors ${
                             videoOpts.fps === rate
-                              ? 'border-accent-border bg-accent-bg text-text'
-                              : 'border-border bg-elevated/40 text-muted hover:border-border-strong'
+                              ? LIT
+                              : 'border-border text-muted hover:border-border-strong'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {rate} fps
@@ -332,8 +338,8 @@ export function RecordPanel({
                           data-testid={`record-format-${fmt.id}`}
                           className={`flex-1 rounded-md border py-1.5 text-center text-[12px] font-medium transition-colors ${
                             videoOpts.format === fmt.id
-                              ? 'border-accent-border bg-accent-bg text-text'
-                              : 'border-border bg-elevated/40 text-muted hover:border-border-strong'
+                              ? LIT
+                              : 'border-border text-muted hover:border-border-strong'
                           } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           {fmt.label}
@@ -443,13 +449,14 @@ export function RecordPanel({
 
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
+                              aria-pressed={isReplaying}
                               onClick={() =>
                                 isReplaying ? onStopPerformanceReplay() : onReplayPerformance(perf.id)
                               }
                               title={isReplaying ? 'Stop replay' : 'Replay this take'}
                               className={`flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
                                 isReplaying
-                                  ? 'border-accent-border bg-accent-soft text-accent-text'
+                                  ? LIT
                                   : 'border-border hover:bg-hover text-text'
                               }`}
                             >

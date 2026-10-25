@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
-import { Knob } from './ui';
+import { Knob, LIT } from './ui';
 import {
   DEFAULT_OUTPUT, IDENTIFY_MS, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
   makeCube, makeSurface, outputIsIdentity, surfaceOutline,
@@ -340,7 +340,7 @@ const Switch = ({ label, on, onChange, hint, testId }: {
     title={hint}
     data-testid={testId}
     className={`flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 text-[13px] font-medium transition-all ${
-      on ? 'border-white bg-white text-black' : 'border-white/10 bg-white/5 hover:bg-white/10'
+      on ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'
     }`}
   >
     {label}
@@ -620,7 +620,7 @@ export function MappingPanel({ output, onChange }: {
                   role="radio"
                   aria-checked={active.source === k}
                   onClick={() => patchSurface(active.id, { source: k })}
-                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.source === k ? 'border-white/60 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:bg-white/10'}`}
+                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.source === k ? LIT : 'border-white/20 text-white/70 hover:bg-white/10'}`}
                   title={SOURCE_HINTS[k]}
                   data-testid={`surface-source-${k}`}
                 >
@@ -639,7 +639,7 @@ export function MappingPanel({ output, onChange }: {
                   role="radio"
                   aria-checked={active.blend === k}
                   onClick={() => patchSurface(active.id, { blend: k })}
-                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.blend === k ? 'border-white/60 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:bg-white/10'}`}
+                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.blend === k ? LIT : 'border-white/20 text-white/70 hover:bg-white/10'}`}
                   title={BLEND_HINTS[k]}
                   data-testid={`surface-blend-${k}`}
                 >
@@ -683,10 +683,11 @@ export function MappingPanel({ output, onChange }: {
         <div className="mb-4 flex flex-col gap-1" data-testid="surface-list">
           {surfaces.map((s, i) => (
             <button
+              aria-pressed={s.id === selected}
               key={s.id}
               onClick={() => setSelected(s.id)}
               className={`flex items-center gap-2 rounded px-2 py-1 text-left text-[12px] ${
-                s.id === selected ? 'bg-white/15' : 'hover:bg-white/5'
+                s.id === selected ? LIT : 'hover:bg-white/5'
               }`}
               data-testid={`surface-row-${i}`}
             >
