@@ -13,7 +13,7 @@
  * checks the panel's own source against it.
  */
 
-import { PINNABLE } from './deskPins';
+import { PINNABLE, PIN_RANGE } from './deskPins';
 
 export interface SettingsCategory { id: string; name: string; hint: string }
 
@@ -248,6 +248,32 @@ export const SECTION_BY_ID = new Map(SETTINGS_SECTIONS.map(s => [s.id, s]));
 
 /** The group a section sits in, for the markup's `data-group`. */
 export const groupOf = (id: string): string => SECTION_BY_ID.get(id)?.category ?? '';
+
+/**
+ * The group a *setting* lives in, by the section that draws it, so a knob in
+ * the Rides panel (a Play panel) carries the colour of the group its own
+ * section is in and not the panel's: one control, one colour, wherever it is
+ * pinned (PLAN 35d). Undefined for a key no section draws; the knob then
+ * takes the colour of whatever it sits inside.
+ */
+export const groupOfSetting = (key: string | null | undefined): string | undefined => {
+  const section = key ? PIN_RANGE.get(key)?.section : undefined;
+  return section ? SECTION_BY_ID.get(section)?.category : undefined;
+};
+
+/**
+ * The five controls that set a *pace*, which wear a snail at the slow end of
+ * the travel and a hare at the fast one (PLAN 35d). A pace is how fast
+ * something runs by itself, so Master Speed, Evolve Speed, the gel wheel's
+ * and the macro camera's chase, and the kaleidoscope's spin. A control that
+ * is a rate of something else (a Flow, a Rate of rain) is not one of them.
+ * `bipolar` is the spin that runs backwards below zero: the hare is at both
+ * ends, the snail at the stop in the middle.
+ */
+export const PACE_KEYS: Record<string, { bipolar?: boolean }> = {
+  globalSpeed: {}, automateRate: {}, gelSpeed: {}, macroChase: {}, kaleidoSpin: { bipolar: true },
+};
+export const paceOf = (key: string | null | undefined): { bipolar?: boolean } | undefined => (key ? PACE_KEYS[key] : undefined);
 
 /*
   Every control's own label, by the section it lives in.

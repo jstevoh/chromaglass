@@ -1,7 +1,7 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import type { MixTakes } from '../../lib/mixFade';
 import {
-  Droplet, SprayCan, Paintbrush, FlaskConical, Slash, Wind, Hand, Fingerprint, Magnet,
+  Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
@@ -9,6 +9,7 @@ import {
   Crosshair,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
+import { ToolGlyph } from '../ui/ToolGlyph';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
@@ -52,18 +53,18 @@ import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 
 export type PhoneTool = 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet' | 'spin';
 
-const TOOLS: { id: PhoneTool; label: string; icon: ComponentType<{ size?: number }> }[] = [
-  { id: 'dropper', label: 'Drop', icon: Droplet },
-  { id: 'spray', label: 'Spray', icon: SprayCan },
-  { id: 'splatter', label: 'Splat', icon: Paintbrush },
-  { id: 'pour', label: 'Pour', icon: FlaskConical },
-  { id: 'streak', label: 'Streak', icon: Slash },
-  { id: 'blow', label: 'Blow', icon: Wind },
-  { id: 'press', label: 'Press', icon: Hand },
-  { id: 'finger', label: 'Finger', icon: Fingerprint },
-  { id: 'magnet', label: 'Magnet', icon: Magnet },
+const TOOLS: { id: PhoneTool; label: string }[] = [
+  { id: 'dropper', label: 'Drop' },
+  { id: 'spray', label: 'Spray' },
+  { id: 'splatter', label: 'Splat' },
+  { id: 'pour', label: 'Pour' },
+  { id: 'streak', label: 'Streak' },
+  { id: 'blow', label: 'Blow' },
+  { id: 'press', label: 'Press' },
+  { id: 'finger', label: 'Finger' },
+  { id: 'magnet', label: 'Magnet' },
   // The dish under the finger (PLAN §22): go round the middle and it turns.
-  { id: 'spin', label: 'Spin', icon: RotateCw },
+  { id: 'spin', label: 'Spin' },
 ];
 
 export interface PhoneLook {
@@ -612,7 +613,7 @@ export function PhoneStage(p: PhoneStageProps) {
         data-testid="phone-dock"
       >
         <div className="grid min-w-0 flex-1 grid-cols-6 gap-1 landscape:grid-cols-11" data-testid="phone-tools">
-          {TOOLS.map(({ id, label, icon: Icon }) => {
+          {TOOLS.map(({ id, label }) => {
             const on = p.tool === id;
             return (
               <button
@@ -628,10 +629,10 @@ export function PhoneStage(p: PhoneStageProps) {
                 aria-label={on ? `${label}, in hand. Tap again for its amount` : label}
                 data-testid={`phone-tool-${id}`}
                 className={`relative flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${
-                  on ? LIT : 'border-transparent text-text-2 active:bg-active'
+                  on ? `${LIT} translate-y-[2px]` : 'border-transparent text-text-2 active:bg-active'
                 }`}
               >
-                <Icon size={20} />
+                <ToolGlyph id={id} size={20} />
                 <span>{label}</span>
                 {on && Math.abs(p.amount - 1) > 0.01 && (
                   <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[11px] text-text">{p.amount.toFixed(1)}</span>

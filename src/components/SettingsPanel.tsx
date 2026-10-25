@@ -21,6 +21,7 @@ import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
+import { PaceTrack } from './ui/Pace';
 import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -354,23 +355,25 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
           </span>
         </div>
       </div>
-      <input
-        type="range"
-        min={curve === 1 ? min : 0}
-        max={curve === 1 ? max : 1}
-        step={curve === 1 ? step : 0.001}
-        value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
-        disabled={!!disabled}
-        aria-label={label}
-        onChange={(e) => {
-          const raw = parseFloat(e.target.value);
-          if (curve === 1) { onChange(raw); return; }
-          // Three figures, not the setting's step: see handValueAt.
-          onChange(handValueAt(raw, min, max, curve));
-        }}
-        className="set-range"
-        style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
-      />
+      <PaceTrack settingKey={settingKey} at={Math.max(0, Math.min(1, (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve))))}>
+        <input
+          type="range"
+          min={curve === 1 ? min : 0}
+          max={curve === 1 ? max : 1}
+          step={curve === 1 ? step : 0.001}
+          value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
+          disabled={!!disabled}
+          aria-label={label}
+          onChange={(e) => {
+            const raw = parseFloat(e.target.value);
+            if (curve === 1) { onChange(raw); return; }
+            // Three figures, not the setting's step: see handValueAt.
+            onChange(handValueAt(raw, min, max, curve));
+          }}
+          className="set-range"
+          style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
+        />
+      </PaceTrack>
     </div>
   );
 };
@@ -4037,9 +4040,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
           )}
           {railGroups.map(group => (
-            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
+            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`} data-group={group.id}>
               {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
               <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:pb-1.5 sm:pt-4" title={group.hint} data-testid={`rail-heading-${group.id}`}>
+                <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
                 {group.name}
               </div>
               <div className="flex gap-0.5 sm:flex-col">
