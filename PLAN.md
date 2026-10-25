@@ -6570,11 +6570,11 @@ once the login works (23.14).*
   a wrong one is refused in words, a reset is mailed; a Google account signed up again gets no
   second account and ends with `google.com` + `password` on one uid; a Google and an
   emailed-link account each set a password from the sheet and sign in with it; the password form
-  fits 1024×768 and a phone upright and on its side. *Owner's chore, once:* Firebase console →
-  Authentication → Sign-in method → enable Email/Password (the emailed-link toggle is already
-  on; email link cannot be on without the Email/Password provider, so this may already be done,
-  look before calling it owed) and leave Settings → User account linking on "Link accounts that
-  use the same email".
+  fits 1024×768 and a phone upright and on its side. *Console step, **done** (the owner, 2026-10-25): Email/Password is on and
+  "Link accounts that use the same email" is on.* Live since the 10:23 AM PT deploy on
+  2026-10-25. *Owed by the owner:* the one hand-try the emulator cannot do (Google account,
+  Account, Set a password, sign out, sign in with the password, same licence;
+  `linkWithCredential` against the real project).
   Open follow-ups:
   **23.10e-1** (open): an emailed-link account cannot be told from a password one from the
   browser (Firebase lists the `password` provider for both), so the sheet says "Email (link or
