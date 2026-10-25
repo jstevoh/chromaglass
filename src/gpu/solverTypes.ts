@@ -97,6 +97,8 @@ export interface GpuStepParams {
   oilTension?: number;
   /** Oil Bodies: the oil and the water each keep their own colour (see bodyPartition). */
   oilBodies?: number;
+  /** Film Hold: the water film between two drops of oil pushes back as it thins, so drops crowd without merging (FILM_WGSL). */
+  filmHold?: number;
   /** The ferrofluid's labyrinth under a strong field (Ohta–Kawasaki). */
   ferroLabyrinth?: number;
   /** How fine the maze is: 0 keeps MAZE_PERIOD, 1 is a third of it (the grid still sets a floor of twelve cells). */

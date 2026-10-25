@@ -1307,6 +1307,15 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         timeout-minutes: 4
         run: npm run rimhold
+      # Film Hold (PLAN 28k): the Splodascope's crowd of oil drops stays a
+      # crowd, where the same plate without the hold merges it into a few
+      # bodies; no oil made or lost, and a lone drop untouched. Two 192²
+      # plates of six seconds and two small ones; in the fifth shard, beside
+      # the rim's oil.
+      - name: Drops of oil crowd without merging
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        timeout-minutes: 6
+        run: npm run filmhold
       # A pour is liquid (PLAN 18c, 18d-2): water poured at the middle pushes a
       # ring of colour out by its volume, glycerine poured is all accounted
       # for, and a dish of glycerine flushed with a quarter of its volume of

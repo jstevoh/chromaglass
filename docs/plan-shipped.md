@@ -4759,6 +4759,45 @@ keep the ring's amount on a straight line, since they have no swap to hide, and 
 
 What is not fixed is PLAN 28j-2 to 28j-5.
 
+## 28k. Splodascope: a crowd of oil drops that do not merge (asked 2026-10-25)
+
+**28k-1. Film Hold and the Splodascope look** (shipped). The owner sent a photograph of a
+splodascope (round cells of yellow, green, red and pink oil packed edge to edge in blue water,
+some inside others) and asked for a look like it, or the physics fixed if the plate could not.
+
+It could not. Laid as Clock Glass lays its oil, a crowd of 90 drops was 25 bodies after two
+seconds and 11 after ten (lab, 192²), and every merge mixed its colours toward brown. Two
+things merged them. Cahn–Hilliard charges only for boundary, so two edges a few cells apart
+are cheaper as none and the part-oil between them fills in; and the capillary force is taken
+from the oil blurred five cells wide (mixSmooth), which reads two close drops as one body
+with a waist whose curvature pulls the waist shut. That second one is the numerical
+coalescence every smoothed-interface solver has: a pair of drops two cells apart, held still,
+were one body in a second even with an energy for the film many times the double well's.
+
+Real drops hold apart because the soapy water between them pushes back as it thins (the
+disjoining pressure, Derjaguin's Π(h)), so Film Hold models both halves of it. In the oil's
+chemical potential (`mixMu`), an energy for water that has oil on both sides of it along a
+line within FILM_REACH cells, falling by e every FILM_DECAY cells, so oil flows back out of a
+thinning film. On the flow (`mixFilm`), the near-contact force of Montessori, Lauricella,
+Tirelli and Succi (J. Fluid Mech. 872, 2019): each edge cell looks out along its normal
+through the water, and where another edge faces it, it is pushed back into its own drop,
+harder the thinner the film. The pair two cells apart then held a film of c ≈ 0.1 for the
+whole run. Two fixes came from `npm run filmhold`'s lone drop: part-oil cells counted as oil
+saw a lone drop's own edge on both sides along its tangent (0.081 of a cell's oil changed),
+and oil cells on the edge counted as film (0.026); with only oil past 0.55 counted and only
+water in a film, a lone drop is identical to the last bit with the hold on and off.
+
+The look (`src/lib/oilLay.ts`, seedPreset's 'splodascope') lays a log-normal crowd biggest
+first by random sequential packing, a film apart, yellow two drops in five, with a compound
+drop (a ring of water and a drop of another colour) in every other big one, at under half
+Clock Glass's dye so yellow over the cobalt reads green rather than black; the bowed glass
+(Plate Curve 0.45) gathers them and they pack into faceted cells as in the photograph. Its
+sound patch is fast readings only: a kick presses the glass, which past what a film holds
+merges a few neighbours. `npm run filmhold`: 35 → 31 bodies in six seconds with the hold,
+35 → 3 without; no oil made or lost; the films not driven below empty (−0.014 at worst); a
+lone drop unchanged. At the app's own grids, in the lab: 35 of 35 for four seconds at 384²,
+33 of 35 for ten at 256². Pictures in the project's shared files, `splodascope/`.
+
 ## 29. The closeup's ferrofluid drop
 
 ### 29a. The drop as a bead with the light on it (this PR)

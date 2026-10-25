@@ -18,7 +18,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
-import { clockGlassBodies, clockGlassCell } from '../src/lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
@@ -336,6 +336,13 @@ const api = {
   },
   /** One cell of Clock Glass's lay, as seedPreset lays it (src/lib/oilLay.ts). */
   clockGlassCell,
+  /** The splodascope's crowd as the app lays it (src/lib/oilLay.ts), from a seeded stream of the lab's own. */
+  splodascopeDiscs(seed: number, dyes: number) {
+    let s = seed;
+    return splodascopeDiscs(() => (s = s * 16807 % 2147483647) / 2147483647, dyes);
+  },
+  /** One cell of the splodascope's lay, as seedPreset lays it. */
+  splodascopeCell,
   /** Every shipped look's id, for a check that asks something of all of them. */
   lookIds() { return PRESETS.map(p => p.id); },
   /** A palette colour as the app lays it: the dye's absorbance per unit (lib/dye.ts). */

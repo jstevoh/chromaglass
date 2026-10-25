@@ -6570,11 +6570,11 @@ once the login works (23.14).*
   a wrong one is refused in words, a reset is mailed; a Google account signed up again gets no
   second account and ends with `google.com` + `password` on one uid; a Google and an
   emailed-link account each set a password from the sheet and sign in with it; the password form
-  fits 1024×768 and a phone upright and on its side. *Owner's chore, once:* Firebase console →
-  Authentication → Sign-in method → enable Email/Password (the emailed-link toggle is already
-  on; email link cannot be on without the Email/Password provider, so this may already be done,
-  look before calling it owed) and leave Settings → User account linking on "Link accounts that
-  use the same email".
+  fits 1024×768 and a phone upright and on its side. *Console step, **done** (the owner, 2026-10-25): Email/Password is on and
+  "Link accounts that use the same email" is on.* Live since the 10:23 AM PT deploy on
+  2026-10-25. *Owed by the owner:* the one hand-try the emulator cannot do (Google account,
+  Account, Set a password, sign out, sign in with the password, same licence;
+  `linkWithCredential` against the real project).
   Open follow-ups:
   **23.10e-1** (open): an emailed-link account cannot be told from a password one from the
   browser (Firebase lists the `password` provider for both), so the sheet says "Email (link or
@@ -7860,6 +7860,34 @@ Turing Print" work (#331), which also made the reaction grow at all.
     the patches, and add the same step-per-tick bar to `desk`.
 
 
+- **28k. Splodascope: a crowd of oil drops that do not merge** (the owner, 2026-10-25, from a
+  photograph of a splodascope: round cells of yellow, green, red and pink oil packed edge
+  to edge in blue water, some inside others; "if not, let's fix the physics").
+  - ~~**28k-1. Film Hold and the Splodascope look**~~ (**shipped**, this PR; the story in
+    `docs/plan-shipped.md` §28k). `npm run filmhold`: the look's crowd held 35 → 31 bodies in
+    six seconds, the same plate without the hold 35 → 3.
+  - **28k-2. Shortcuts named in 28k-1.** (a) The film is drawn as thick as the field's own
+    edge (two to five cells), where a real one is tens of nanometres. (b) A film breaks when
+    pressed past what it holds, which is the real threshold but not the real timing: real
+    films also drain and rupture by chance, sooner when dirty or warm. Replace with a
+    drainage time per contact (Reynolds' film drainage, μR²/(gap·σ)-scaled, as the research
+    on bubbles and drops item 7 gives for the beads) and a rupture drawn from it.
+  - **28k-3. The tiny specks.** The photograph's crowd runs down to specks a hundredth of the
+    frame; the field cannot hold a drop of under about three cells (Cahn–Hilliard dissolves
+    it), so the look lays nothing under a sixtieth of the plate. The beads (`beads.ts`,
+    `beadDrops`) are the drops under the grid; give the look a scatter of them in the oil's
+    colours once 28k-1 is judged.
+  - **28k-4. Judged on the Mac** (`docs/judging.md` §79): the look beside the photograph at
+    the app's own grid, and whether a kick (Plate Pressure) breaks a few films and no more.
+  - **28k-5. The colours darken at the walls over time** (found here, lab at 256²): yellow
+    drops go orange and brown from their edges inward over ten seconds, and green darkens,
+    though the oil's own share of the dye holds (19369 → 19368). The water's cobalt meets
+    each drop's colour in the edge's few cells of part-oil and the two multiply toward
+    black there; pressed into a crowd, a drop is mostly edge. Measure where the colour
+    goes (the dye per drop against its laid colour, the angle of its absorbance) and find
+    whether it is the partition's hand-over at a held film (bodyPartition) or the edge's
+    width; never by thinning the dyes further.
+
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
 The owner, 2026-10-11: "I'm still not happy with the macroview. I want to see much more
@@ -8748,7 +8776,7 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   `lampTintR/G/B`), not a tint mixed in by the slider. It runs 0 to 3.75, and 0 to 1 is still 6500 K to 5100 K
   (the new tint is the old grade to 1.5% a channel there), so saved looks, the presets and Lucky keep their
   colour with no migration. The vignette is unchanged (full from 1 on). Held by `npm run panel`. Story in
-  `docs/plan-shipped.md` §35; judging §79.
+  `docs/plan-shipped.md` §35; judging §80.
 - **35e-3** What the readings left, none changed because each moves a look or waits on another step:
   - **The lamp's colour is a multiply on the finished picture,** which is the lamp's spectrum times a white
     surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
@@ -8763,7 +8791,7 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     light and see less orange.
   - **Velvet Underground (0.25) and Home Movie (0.45) keep their colour** to under 2% in blue, because their
     numbers kept their meaning. Home Movie is the look an old projector's lamp is for: the owner's eye on
-    whether it should now go to 2 or 3 (judging §79 item 4); Lucky still draws 0 to 0.8, so it never reaches
+    whether it should now go to 2 or 3 (judging §80 item 4); Lucky still draws 0 to 0.8, so it never reaches
     the halogen.
   - **Evolve wanders Lamp Warmth by a fifth of its travel,** which is now a fifth of 3.75: from a look at 0.25 up
     to 1, from a look at 3 over the whole warm end. Pull it in (a per-dial span) if that reads as too much.

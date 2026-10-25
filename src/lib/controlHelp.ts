@@ -159,6 +159,7 @@ export const CONTROL_HELP: Record<string, string> = {
   phaseDisplace: 'How much the ferrofluid shoves the dye aside, so colour packs along its edge instead of hiding under it.',
   ferroLabyrinth: 'Under a strong field the ferrofluid\'s particles repel and it breaks into a maze of stripes (Ohta-Kawasaki).',
   oilBodies: 'Oil and water each keep their own colour, and an oil body\'s colour travels with it. Needs Oil Tension.',
+  filmHold: 'The water film between two oil drops holds them apart, so they crowd without merging until pressed. Needs Oil Tension.',
   oilTension: 'Surface tension between oil and water: oil rounds into drops, threads break into beads, drops merge.',
   clearFilm: 'Pours a clear oil film over the dish. Thin spots and dust tear it open into a lace of holes (dewetting).',
   thinGap: 'Treats the plate as a thin gap between two glasses, so a push coasts and viscosity matters.',
