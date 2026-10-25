@@ -5,15 +5,17 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save, Video, User,
+  Laptop, Save, Video, User, LogIn,
   Crosshair,
 } from 'lucide-react';
 import { Slider } from '../ui';
+import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -116,6 +118,8 @@ export interface PhoneStageProps {
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
+  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
+  cartoons?: CartoonShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -261,6 +265,16 @@ export interface PhoneStageProps {
   twoProjectors: number;
   onTwoProjectors: (v: number) => void;
   /**
+   * Projector Focus (PLAN 18e): where the projector lens's focal plane sits
+   * across the liquid layer. 0.5 is the layer in focus, today's look; either
+   * way the shadowgraph's Becke doublet appears at every front, bright on one
+   * side and dark on the other, and swaps sides through focus. A focus ring
+   * is a thing played at the projector, so it sits on the Looks sheet beside
+   * the lamp's two controls.
+   */
+  projectorFocus: number;
+  onProjectorFocus: (v: number) => void;
+  /**
    * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
    * lace. On the Dye sheet, under the bottles, because it is a liquid
    * poured: the Oil and Alcohol bottles then thicken it and punch holes in it.
@@ -341,6 +355,8 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
 
 export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
   const [amountOpen, setAmountOpen] = useState(false);
   // Whether the Looks sheet opened on a printed plate: its Ben-Day slider
   // stays for as long as the sheet is up, so taking it to 0 does not take
@@ -407,12 +423,13 @@ export function PhoneStage(p: PhoneStageProps) {
             <button
               type="button"
               onClick={p.onOpenAccount}
-              aria-label="Account"
+              aria-label={signedOut ? 'Sign in' : 'Account'}
               data-cg-account-open=""
-              className="flex h-12 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-text-2 active:bg-active"
+              data-cg-account-signin={signedOut ? '' : undefined}
+              className={`flex h-12 items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-medium ${signedOut ? 'bg-primary text-on-primary' : 'text-text-2 active:bg-active'}`}
             >
-              <User size={15} className="shrink-0 text-amber-300" />
-              <span>Account</span>
+              {signedOut ? <LogIn size={15} className="shrink-0" /> : <User size={15} className="shrink-0 text-muted" />}
+              <span>{signedOut ? 'Sign in' : 'Account'}</span>
             </button>
           )}
           <button
@@ -766,6 +783,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
+          {/* Not closed on a press, unlike the two above: Pour and Film are
+              each a toggle someone may want both of, and Stop is here too. */}
+          {p.cartoons && (
+            <div className="mt-4">
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
+              <CartoonShelf {...p.cartoons} size="phone" />
+            </div>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}
@@ -806,6 +831,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
               display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Each plate has its own lamp on the screen, so its clear parts wash the other's colour.</p>
+          </div>
+          <div className="mt-3">
+            <Slider label="Projector Focus" value={p.projectorFocus} min={0} max={1} step={0.05} onChange={p.onProjectorFocus}
+              display={`${Math.round(p.projectorFocus * 100)}%`} touch testId="phone-projector-focus" midiKey="setting:projectorFocus" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">The lens's focus across the liquid: 50% is sharp; either way a bright and a dark line part at every edge.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">

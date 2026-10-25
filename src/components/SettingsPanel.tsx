@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
+import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { SOURCE_NAMES } from '../lib/audioFeatures';
@@ -8,6 +8,11 @@ import { HIT_FEATURES, HIT_FEATURE_LABELS } from '../lib/hitSource';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
 import { PER_LAYER, PATCH_TARGETS } from '../lib/sceneMap';
+import { AREA_TARGETS, isAreaTarget } from '../lib/areaCords';
+import { plateAreas, areaFamily, areaDye } from '../lib/plateAreas';
+import { PRESET_CONTRACTS } from '../presetPlate';
+import { PALETTE } from '../constants';
+import { AreaPicker } from './phone/AreaPicker';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
@@ -16,11 +21,12 @@ import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet, SwitchPill, Toggle } from './ui';
+import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
-import type { EngineStatus } from '../lib/platform';
+import { isProLicenseUnlocked, type EngineStatus } from '../lib/platform';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
-import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
+import { APP_FEATURE_TILES, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
 import { helpFor } from '../lib/controlHelp';
 import { useControlTip } from './ui/ControlTip';
 
@@ -99,11 +105,12 @@ interface SettingsPanelProps {
   engineStatus?: EngineStatus | null;
   /** The live reading (frame time), polled while the panel is open. */
   getLiveEngineStatus?: () => EngineStatus | null;
-  /** The room camera: whether it is watching, which one, and what it is seeing. */
+  /** The motion camera: whether it is watching, which one, and what it is seeing. */
   sceneOn?: boolean;
   onSceneToggle?: (on: boolean) => void;
-  sceneState?: { active: boolean; error: string | null; device: string | null; ms: number; energy: number; raw: number; people: number } | null;
-  sceneDevices?: MediaDeviceInfo[];
+  sceneState?: { active: boolean; error: string | null; device: string | null; fellBack?: boolean; lost?: boolean; ms: number; energy: number; raw: number; people: number } | null;
+  /** The cameras plugged in (`useCameras`), for both cameras' pickers. */
+  cameras?: readonly MediaDeviceInfo[];
   sceneDeviceId?: string;
   onSceneDevice?: (id: string) => void;
   /** Where the sensor draws what it sees, so the camera can be aimed. */
@@ -112,6 +119,11 @@ interface SettingsPanelProps {
   filmSource?: 'none' | 'file' | 'camera' | 'window';
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
+  /** The film's Webcam: which camera it shows, what opened, and whether it was unplugged. */
+  filmCameraId?: string;
+  onFilmCameraDevice?: (id: string) => void;
+  filmCamera?: { label: string | null; fellBack: boolean } | null;
+  filmCameraLost?: boolean;
   /** Another tab, window or screen, through the browser's own picker. */
   onFilmWindow?: () => void;
   onFilmClear?: () => void;
@@ -121,6 +133,8 @@ interface SettingsPanelProps {
   mixTakes?: MixTakes;
   /** The look the back plate is on, for the Mixer's Back Plate row (PLAN.md §16a). */
   backLook?: string | null;
+  /** The look on the plate, by id, for its areas of the dish in the patch bay (PLAN 25h). */
+  lookId?: string | null;
   onMarkFile?: (file: File) => void;
   onMarkClear?: () => void;
   /** The microphone inputs the browser can see, and the one the show listens to ('' = default). */
@@ -379,9 +393,17 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
+  /*
+    The look's areas of the dish, for the patch bay's area picker (PLAN 25h),
+    each drawn in its family's colours from the look's own dyes. None for a
+    look built the old way, and then the picker is not drawn at all.
+  */
+  const lookAreas = useMemo(() => plateAreas(lookId), [lookId]);
+  const areaColours = useMemo(() => (lookAreas ?? []).map(a => areaFamily(a).map((_, k) =>
+    PALETTE[areaDye(a, PRESET_CONTRACTS[lookId ?? ''] ?? [0], 0, k)]?.hex ?? '#888')), [lookAreas, lookId]);
   const markInputRef = useRef<HTMLInputElement>(null);
   /** Whether this browser can capture a window at all. Every phone cannot. */
   const canCaptureWindow = typeof navigator !== 'undefined'
@@ -882,7 +904,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             ))}
           </div>
           <Info>
-            A new song is heard as a gap of a few seconds between tracks, or named by track identification. The sequencer keeps control while it is running.
+            A new song is heard as the last one falling away into the next, even a half-second gap, or named by song recognition when one song crossfades into another. The new look comes in on a beat: quickly after a gap, slowly under a crossfade. The sequencer keeps control while it is running.
           </Info>
         </div>
         {settings.autoCalibrate !== false && (
@@ -1057,6 +1079,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ edgeRelief: v })}
           settingKey="edgeRelief"
+        />
+        <Slider
+          label="Projector Focus"
+          value={settings.projectorFocus ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ projectorFocus: v })}
+          settingKey="projectorFocus"
         />
         <Slider
           label="Lacing"
@@ -1709,34 +1740,43 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       {/* The Room Section */}
       {keep('room') && (
       <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
+        {/*
+          Two cameras, two jobs, and the owner could not tell them apart
+          (2026-10-24): "what the room control is vs. showing video on the
+          plate". This one is a sensor. Its picture is never drawn; movement
+          in front of it stirs the liquid. The film's Webcam is the other
+          one, a picture on the plate. So the heading says what it does
+          rather than where it points ("The Room"), the first line says the
+          picture is never shown and where to go to show one, and the switch
+          is the shared Toggle, so on and off read the way every other
+          switch does. (PLAN 14ad.)
+        */}
         <h3 className={TITLE}>
-          <Camera size={12} /> The Room
+          <ScanEye size={12} /> Motion camera
         </h3>
+        <p className="mb-2 text-[12px] leading-relaxed text-text-2" data-testid="scene-what">
+          Movement in front of a camera stirs the liquid. Its picture is never shown. To put a camera&rsquo;s picture on the plate, use Webcam in {goTo('film', 'room')}.
+        </p>
         <Info>
-          The camera pointed at the room, read back rather than shown: movement in front of the lens becomes movement in the liquid. Aim it at the floor, not at the screen — a camera that can see the projection makes the plate drive itself.
+          Aim it at the floor or the crowd, not at the screen: a camera that can see the projection makes the plate drive itself. Hold people below is what tracks each person and puts their hands on the glass.
         </Info>
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={() => onSceneToggle?.(!sceneOn)}
-            className={`flex-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${sceneOn ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-            data-testid="scene-toggle"
-          >
-            {sceneOn ? 'Watching' : 'Watch the room'}
-          </button>
+        <div className="mb-2">
+          <Toggle
+            label="Watch for movement"
+            on={sceneOn}
+            onChange={(v) => onSceneToggle?.(v)}
+            testId="scene-toggle"
+          />
         </div>
-        {sceneOn && sceneDevices.length > 1 && (
-          <select
-            value={sceneDeviceId}
-            onChange={(e) => onSceneDevice?.(e.target.value)}
-            aria-label="Room camera"
-            className="w-full mb-3 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] outline-none"
-          >
-            <option value="">Default camera</option>
-            {sceneDevices.map((d, i) => (
-              <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>
-            ))}
-          </select>
-        )}
+        <CameraPicker
+          cameras={cameras}
+          value={sceneDeviceId}
+          onChange={(id) => onSceneDevice?.(id)}
+          label="Motion camera"
+          testId="scene-device"
+          inUse={sceneState?.device}
+          fellBack={sceneOn && !!sceneState?.fellBack}
+        />
         {sceneOn && (
           <div className="mb-4">
             <canvas
@@ -1747,7 +1787,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               data-testid="scene-preview"
             />
             {sceneState?.error ? (
-              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/80">{sceneState.error}</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/80" data-testid="scene-error">{sceneState.error}</p>
             ) : (
               <>
                 <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
@@ -1851,9 +1891,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         <div className="mt-2 mb-3 flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <span className="text-[12px] font-mono opacity-50">
+            <span className="text-[12px] font-mono opacity-50" data-testid="film-source-status">
               {filmSource === 'file' ? 'loop playing'
-                : filmSource === 'camera' ? 'camera live'
+                : filmSource === 'camera' ? (filmCamera?.label ? `camera live: ${filmCamera.label}` : 'camera live')
                 : filmSource === 'window' ? 'window live'
                 : 'off'}
             </span>
@@ -1909,7 +1949,33 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               Off
             </button>
           </div>
-          
+          {/*
+            Which camera the film shows, and what the film's camera is for
+            (PLAN 14ad). It had no picker: the browser's "environment" camera
+            or nothing. The line says the other camera's job too, because the
+            owner could not tell this from the motion camera, and the two are
+            two sections apart.
+          */}
+          <div className="mt-1" data-testid="film-camera-pick">
+            <p className="mb-2 text-[12px] leading-relaxed text-text-2" data-testid="film-camera-what">
+              Webcam shows a camera&rsquo;s picture on the plate, through the dye. To stir the liquid with movement instead, use the {goTo('room', 'film')}.
+            </p>
+            <CameraPicker
+              cameras={cameras}
+              value={filmCameraId}
+              onChange={(id) => onFilmCameraDevice?.(id)}
+              label="Webcam"
+              testId="film-device"
+              inUse={filmCamera?.label}
+              fellBack={!!filmCamera?.fellBack}
+            />
+            {filmCameraLost && (
+              <p className="-mt-1 mb-2 text-[12px] leading-relaxed text-amber-300/80" data-testid="film-camera-lost">
+                The camera was unplugged. The film comes back on when it is plugged in again.
+              </p>
+            )}
+          </div>
+
           {/* Demo Videos */}
           <div className="mt-3 flex flex-col gap-1">
             <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo Loops</span>
@@ -2103,6 +2169,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
+                    {/*
+                      What it moves. Aimed at an area, what a hand does there
+                      (lib/areaCords.ts): a setting is one number for the
+                      whole plate, so an area takes the four acts and nothing
+                      else, and the whole plate takes settings.
+                    */}
                     <select
                       value={m.setting}
                       aria-label="Control"
@@ -2114,7 +2186,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-control-${i}`}
                     >
-                      {TARGET_GROUPS.map(g => (
+                      {m.area !== undefined ? AREA_TARGETS.map(t => (
+                        <option key={t.key} value={t.key} title={t.hint}>{t.label}</option>
+                      )) : TARGET_GROUPS.map(g => (
                         <optgroup key={g.id} label={g.name}>
                           {g.targets.map(t => (
                             <option key={String(t.key)} value={String(t.key)}>{t.label}</option>
@@ -2145,8 +2219,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     <select
                       value={String(m.layer ?? 'all')}
                       aria-label="Plate"
-                      disabled={!PER_LAYER.has(String(m.setting))}
-                      title={PER_LAYER.has(String(m.setting))
+                      disabled={m.area !== undefined || !PER_LAYER.has(String(m.setting))}
+                      title={m.area !== undefined ? 'An area cord works on the plate the music plays'
+                        : PER_LAYER.has(String(m.setting))
                         ? 'Which plate this patch moves'
                         : `${sceneTargets.find(t => t.key === m.setting)?.label ?? 'This control'} is part of the finished picture, not one plate`}
                       onChange={(e) => {
@@ -2179,6 +2254,79 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     />
                     <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
+                  {/*
+                    Where on the plate (PLAN 25h): on a look with areas of the
+                    dish, the cord can work one of them alone. Aiming it at an
+                    area turns its control into what a hand does there (Stir,
+                    to start), and aiming it back at the plate gives it a
+                    setting again (Turbulence), so the cord is never left
+                    naming something its aim cannot take.
+                  */}
+                  {lookAreas && (
+                    <div className="mt-2">
+                      <AreaPicker
+                        areas={lookAreas}
+                        colours={areaColours}
+                        value={m.area !== undefined && m.area < lookAreas.length ? m.area : undefined}
+                        testId={`patch-area-${i}`}
+                        onChange={(area) => {
+                          const next = [...(settings.sceneMappings ?? [])];
+                          const { area: _drop, layer: _layer, ...rest } = m;
+                          next[i] = area === undefined
+                            ? { ...rest, layer: m.layer ?? 'all', setting: isAreaTarget(m.setting) ? 'turbulenceScale' : m.setting }
+                            : { ...rest, area, setting: isAreaTarget(m.setting) ? m.setting : 'areaStir' };
+                          onUpdate({ sceneMappings: next });
+                        }}
+                      />
+                    </div>
+                  )}
+                  {/*
+                    The cord's gate (the least of PLAN 30a), on an area cord:
+                    off, it follows its reading as every cord always has; on,
+                    it fires when the reading crosses Gate, swells in over
+                    Rise and lets go over Fall, so the kick that opens a ring
+                    is the kick and not the room.
+                  */}
+                  {m.area !== undefined && (
+                    <div className="mt-2 flex flex-col gap-1.5" data-testid={`patch-gate-${i}`}>
+                      <label className="flex items-center gap-2 text-[12px] min-h-[32px]">
+                        <input
+                          type="checkbox"
+                          checked={m.threshold !== undefined || m.attack !== undefined || m.release !== undefined}
+                          onChange={(e) => {
+                            const next = [...(settings.sceneMappings ?? [])];
+                            const { threshold: _t, attack: _a, release: _r, ...rest } = m;
+                            next[i] = e.target.checked ? { ...rest, threshold: 0.3, attack: 0.02, release: 0.4 } : rest;
+                            onUpdate({ sceneMappings: next });
+                          }}
+                          data-testid={`patch-gate-on-${i}`}
+                        />
+                        Fire on a hit, not the room
+                      </label>
+                      {m.threshold !== undefined && ([
+                        ['threshold', 'Gate', 0, 1, 0.05, (v: number) => v.toFixed(2)],
+                        ['attack', 'Rise', 0, 2, 0.01, (v: number) => `${v.toFixed(2)} s`],
+                        ['release', 'Fall', 0, 4, 0.05, (v: number) => `${v.toFixed(2)} s`],
+                      ] as const).map(([key, label, min, max, step, show]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <span className="text-[12px] text-white/60 w-9">{label}</span>
+                          <input
+                            type="range" min={min} max={max} step={step}
+                            value={m[key] ?? 0}
+                            aria-label={label}
+                            onChange={(e) => {
+                              const next = [...(settings.sceneMappings ?? [])];
+                              next[i] = { ...m, [key]: parseFloat(e.target.value) };
+                              onUpdate({ sceneMappings: next });
+                            }}
+                            className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                            data-testid={`patch-${key}-${i}`}
+                          />
+                          <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2607,6 +2755,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             value={String(settings.simResolution ?? 'auto')}
             onChange={(e) => {
               const v = e.target.value;
+              if (v === '1024' && isTierGatingEnforced() && !isProLicenseUnlocked()) return;
               onUpdate({ simResolution: (v === 'auto' ? v : Number(v)) as SimResolution });
             }}
             className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm focus:outline-none focus:border-white/50"
@@ -2617,6 +2766,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <option value="384">GPU · 384²</option>
             <option value="512">GPU · 512²</option>
             <option value="768">GPU · 768² (heavy)</option>
+            <option value="1024" disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}>GPU · 1024² (Pro · ultra)</option>
           </select>
           <Info>
             Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them.
@@ -2624,6 +2774,36 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             {engineStatus?.governed && engineStatus.steppedDown ? ' — it has stepped down on this machine.' : '.'}
             {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
           </Info>
+          {((engineStatus?.governed && engineStatus.steppedDown) || engineStatus?.gpuUnavailable) && !isProLicenseUnlocked() && (
+            <div
+              data-cg-grid-upgrade-pro=""
+              className="mt-1 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] p-3 text-[12px] leading-snug text-amber-100/90"
+            >
+              <div className="font-semibold text-amber-200">
+                Upgrade to ChromaGlass Pro for full GPU &amp; CPU headroom
+              </div>
+              <p className="mt-1 text-[11px] text-white/75">
+                Pro lets the automatic quality ladder climb to <span className="font-mono text-white/90">768²</span> at <span className="font-mono text-white/90">2x</span> and <span className="font-mono text-white/90">1024²</span> at <span className="font-mono text-white/90">1x</span>, and unlocks the <span className="font-mono text-white/90">1024²</span> grid pin on your machine.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <a
+                  href={getEffectiveTier() === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-amber-300"
+                >
+                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $164' : 'Get Pro — $199'}
+                </a>
+                <button
+                  type="button"
+                  onClick={openAccountSheet}
+                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/85 hover:bg-white/[0.12]"
+                >
+                  Enter licence key
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
       )}

@@ -1515,8 +1515,114 @@ bass, not as a busier or shakier plate, and nothing should move the whole frame.
 is too much (the press at 3 is three times the default's depth), and whether 2 feels like the
 bass you wanted.
 
+## 64. Oil sloshes on water, and bores (PLAN 18a-13a, 13d)
 
-## 64. The plate does not stutter now and then (PLAN 14aa)
+The slosh dish is two layers now, oil lenses riding on water, solved on the GPU with a
+Riemann flux, so a hard tip makes a running jump (a bore) instead of a smooth slope. The
+numbers are in `docs/plan-shipped.md` §18a-13a (`npm run slosh`, `sloshgpu`); the Metal run
+is the plate shard. On a real GPU:
+- On a look with oil on the plate, raise Slosh to about half and tip one way,
+  then the other. The water should run ahead and the oil lag behind it and shear past it:
+  two speeds, not one sheet. Say whether the oil reads as floating.
+- Lower Thickness to about 0.2 and tip hard and fast: the first wave should steepen into a
+  sharp front that runs to the rim and back. Say whether it reads as a wave or as a jolt.
+- Bass Drop with music: its Beat Squeeze should now send a ring out from each kick that runs
+  to the rim and back, and its Plate Rock should slosh the whole dish, a little (Frame Sway
+  0.35). Off Bass Drop, Beat Squeeze's ring starts from the sheet's one dent where the kick
+  lands (27f-3), narrower. Say whether the whole-dish slosh is too much (the frame-motion rule).
+- Any other look (Frame Sway 0) with Plate Rock up: the rock should tip the dye as it did,
+  and not slosh the whole dish.
+- With Slosh at 0, Plate Rock at 0 and Beat Squeeze at 0, the plate should look exactly as
+  before.
+
+## 65. A new song brings a new look, on its beat (PLAN 14z)
+
+Settings, Audio Input, On a New Song: pick New preset (it opens on Keep until you have judged
+this; on the phone, the same control in Settings). Then play your own music the ways you play it
+at a show, through the microphone in the room as well as through the laptop:
+
+- An album or playlist with gaps: the new look should come in about a second into each new
+  song, on one of its first beats, fading in over a second. Nothing should change during a quiet
+  bridge, a stop before a last chord, or a long fade-out.
+- A crossfade (a DJ set, or a player's crossfade setting): the change waits for the show to
+  recognise the song, usually 7 to 8 s into it for a song it has heard before, and then blends in
+  slowly under the music (about four seconds). A song it has never heard waits for the song
+  recognition service, up to about 35 s.
+
+Say whether a change ever lands in the middle of a song, whether one is ever missed, and whether
+the speeds feel right; if they do, On a New Song can open on New preset again (14z-4).
+
+## 66. The cartoons, poured and filmed (PLAN 14ac)
+
+On the desk, the Dye panel has a Cartoons shelf under Image… and Video…; on the phone, it is at
+the bottom of the dye sheet. Each cartoon has Pour and Film.
+
+- **Pour** The Skeleton Dance on a dark look (Classic) and then on a pale one. It pours the
+  picture's light as dye, so a cartoon with a light background lays a lot of white; say whether
+  that reads as the cartoon or as a wash, and whether pouring the *drawing* (the dark ink) would
+  be better (14ac-2).
+- **Film** Swing You Sinners! with Film Mix at its default and at full: does the cartoon read
+  through the dye, and does the grey picture want the look's colours (14ac-4)?
+- Leave one pouring for a whole loop (five to seven minutes) and say whether it ever stutters
+  or the plate slows; the pour's stutter every frame is fixed (14ab-1), but its per-pixel work
+  on the CPU is still open (14ab-2).
+- Say which of the four earn a place, and whether you want more (Ruttmann's abstract
+  Lichtspiel films are the next candidates, 14ac-3).
+
+## 67. Areas that listen for themselves (PLAN 25h)
+
+Three looks now play their music in parts of the plate rather than over all of it. With a
+record on, through the room microphone and through the laptop:
+
+- **Velvet Underground.** Each kick should warm and fold the raspberry soap well on the right
+  (the paddle turns the other way on each kick), the mids should fold the magenta glycerine
+  top left slowly, and the hats should drop ultramarine and purple into the syrup low in the
+  middle. The violet between should stay dark. Say whether each pool reads as following its
+  own instrument, and whether the soap well's fold is too busy or too slight.
+- **Jellyfish Bloom.** Its four bells now sit in fixed places, a band each: the lowest, middle
+  bell should pulse pink and teal on the kick, the top bell's fringe should ruffle on the hats
+  (and go icy blue when the top end is bright), the two side bells should fill on the mids.
+  Before, the bells were scattered at random and the music landed in the middle.
+- **Bass Drop.** Kicks should take three wells in turn (crimson, blues, magenta) instead of
+  all landing in the middle, and the wells should stay apart (its Center Gravity went 0.4 to
+  0.15 so they do not slide together). Say whether it lost the weight it had.
+
+Settings, Patches, on any of the three: each patch has a thumbnail of the plate with the
+look's areas; tap one to aim the patch there, and Fire on a hit gives it a gate. On the phone,
+the same sheet. Say whether the picker is clear and big enough under a thumb.
+
+## 68. Beat Squeeze's sheet gives back at the liquid's own pace (PLAN 27f-4)
+
+Classic with a band at 120 bpm, Beat Squeeze at 0.5, Kick Bloom at 0, Frame Sway 0. Each kick
+should still be a dent where it lands, but now its letting go is the liquid's: on the default oil
+most of it springs back at once and the last of it settles over a fifth of a second, with a faint
+ring of colour pushed out round the dent and drawn back. Turn Thickness to full: the dent should
+tighten and hold, coming back slowly over a second or two, the ring round it plainer. Toward water
+it should be wide and gone almost as it lands. Little outside the dent and its ring should move on
+the kick (under half of what the old dent moved there). Say whether the thick liquid's slow give-back reads as syrup or as lag, and whether
+the default oil's dent still reads as a press. A real sheet on a thin liquid would not just give back: on the
+default oil and toward water it would swing past rest once or twice (a slow wave under the sheet,
+about a quarter of a second a swing) before it settled, which the solve leaves out (PLAN 27f-8(f)).
+Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
+building.
+
+## 69. Any camera, and which camera does what (PLAN 14ad)
+
+With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual Camera):
+
+- **Settings, Film.** Pick the second camera under Webcam, then press Webcam: its picture
+  should be on the plate, and the Source line should name it. Pick the laptop's camera while
+  it shows: it should switch without pressing anything else.
+- **Pull the cable** while it shows: the film should go off with a line saying it was
+  unplugged. Plug it back in: it should come back by itself. Say how long that takes on a
+  real camera (the code waits for the browser to list it, not a timer).
+- **Settings, Motion camera.** Does the first line make it obvious that this one stirs and
+  is never shown, and that Webcam is the one that shows a picture? Pick a camera for it and
+  switch it on; the film's camera should stay what it was.
+- On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
+
+
+## 70. The plate does not stutter now and then (PLAN 14aa)
 
 Play any look for five minutes on the laptop, then with the wall up, the way a show runs. Watch
 the liquid's own motion, not the music's: before this, a plate on a machine with room to spare
