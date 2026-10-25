@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye } from 'lucide-react';
+import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Droplets, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { SOURCE_NAMES } from '../lib/audioFeatures';
@@ -13,14 +13,14 @@ import { plateAreas, areaFamily, areaDye } from '../lib/plateAreas';
 import { PRESET_CONTRACTS } from '../presetPlate';
 import { PALETTE } from '../constants';
 import { AreaPicker } from './phone/AreaPicker';
-import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
+import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches, groupOf } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
 import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
-import { Segmented, Sheet, SwitchPill, Toggle } from './ui';
+import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
 import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -68,7 +68,7 @@ function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings }) {
         data-testid={`pin-${desk}-${String(settingKey)}`}
         className={`h-[22px] w-[22px] shrink-0 rounded-[4px] border text-[11px] font-bold leading-none transition-colors ${
           on
-            ? 'border-white bg-white text-black'
+            ? LIT
             : 'border-white/15 text-white/25 hover:border-white/40 hover:text-white/70'
         }`}
       >
@@ -117,6 +117,10 @@ interface SettingsPanelProps {
   scenePreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   /** The film projector: what's playing, and how to change it. */
   filmSource?: 'none' | 'file' | 'camera' | 'window';
+  /** The file playing as the film (its name), while the source is a file. */
+  filmName?: string | null;
+  /** The file pouring as dye (its name), or null. */
+  pourName?: string | null;
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
   /** The film's Webcam: which camera it shows, what opened, and whether it was unplugged. */
@@ -393,7 +397,14 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+/** The loops that ship in public/video, for the Film section's demo rows. A loop is known by its title, which is the name of the File it is handed over as. */
+const DEMO_LOOPS = [
+  { id: 'ring', src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
+  { id: 'particles', src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
+  { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
+] as const;
+
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -510,12 +521,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   /*
     On a desk panel the section is the only one drawn, so a link to another
     goes where that one is: the sheet, opened at it (`onGoTo`). It is a
-    24px target there, inline in the sentence, which is the desk's rule.
+    24px target there, inline in the sentence, which is the desk's rule:
+    both ways, because "Film" in a 12px sentence is 23.6px wide and the
+    layout check found it ("room: Film 24×24") once the section was named
+    Film rather than Video (PLAN 35a).
   */
   const goTo = (id: string, from: string) => (
     <button
       onClick={() => { if (embed && onGoTo) { onGoTo(id); return; } setSection(id); setQuery(''); }}
-      className={`font-medium text-white/70 underline decoration-white/25 underline-offset-2 hover:text-white ${embed ? 'inline-flex min-h-6 items-center' : ''}`}
+      className={`font-medium text-white/70 underline decoration-white/25 underline-offset-2 hover:text-white ${embed ? 'inline-flex min-h-6 min-w-6 items-center justify-center' : ''}`}
       data-testid={`goto-${id}-from-${from}`}
     >
       {SECTION_BY_ID.get(id)?.name ?? id}
@@ -576,7 +590,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         and the sheet opened on the microphone's sensitivity. It opens here now.
       */}
       {keep('master') && (
-      <section id="settings-master" className={`${CARD} ${shown('master') ? GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="master">
+      <section id="settings-master" className={`${CARD} ${shown('master') ? GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('master')} data-section="master">
         <h3 className={TITLE}>
           <Lightbulb size={12} /> Master
         </h3>
@@ -593,8 +607,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/* Not on a desk panel: the desk's header has Blackout, in every layout. */}
         {onBlackout && !embed && (
           <button
+            aria-pressed={blackout}
             onClick={onBlackout}
-            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             title="Fade the plate to black and back (B on the keyboard)"
             data-testid="blackout-button"
           >
@@ -648,7 +663,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         slider here to read.
       */}
       {keep('mixer') && (
-      <section id="settings-mixer" className={`${CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="mixer">
+      <section id="settings-mixer" className={`${CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mixer')} data-section="mixer">
         <h3 className={TITLE}>
           <SlidersVertical size={12} /> Mixer
         </h3>
@@ -668,7 +683,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Sound Section */}
       {keep('audio-input') && (
-      <section id="settings-audio-input" className={`${CARD} ${shown('audio-input') ? GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-input">
+      <section id="settings-audio-input" className={`${CARD} ${shown('audio-input') ? GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('audio-input')} data-section="audio-input">
         <h3 className={TITLE}>
           <Activity size={12} /> Audio Input
         </h3>
@@ -813,9 +828,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className={`min-h-9 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
-                  tempo?.source ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'cursor-not-allowed border-white/5 opacity-30'
-                }`}
+                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
               >
                 Listen
               </button>
@@ -891,10 +904,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-3 gap-1">
             {([['off', 'Keep'], ['preset', 'New preset'], ['random', 'Random']] as const).map(([mode, label]) => (
               <button
+                aria-pressed={(settings.onNewSong ?? 'off') === mode}
                 key={mode}
                 onClick={() => onUpdate({ onNewSong: mode })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  (settings.onNewSong ?? 'off') === mode ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.onNewSong ?? 'off') === mode ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={mode === 'off' ? 'Keep the look across songs' : mode === 'preset' ? 'Switch to another preset when a new song starts' : 'Roll a random look when a new song starts'}
                 data-testid={`new-song-${mode}`}
@@ -975,7 +989,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Light Show Look Section */}
       {keep('look') && (
-      <section id="settings-look" className={`${CARD} ${shown('look') ? GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="look">
+      <section id="settings-look" className={`${CARD} ${shown('look') ? GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('look')} data-section="look">
         <h3 className={TITLE}>
           <Palette size={12} /> Light Show Look
         </h3>
@@ -1196,7 +1210,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Show Section */}
       {keep('show') && (
-      <section id="settings-show" className={`${CARD} ${shown('show') ? GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="show">
+      <section id="settings-show" className={`${CARD} ${shown('show') ? GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('show')} data-section="show">
         <h3 className={TITLE}>
           <Clapperboard size={12} /> Show
         </h3>
@@ -1324,9 +1338,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Camera Section */}
       {keep('camera') && (
-      <section id="settings-camera" className={`${CARD} ${shown('camera') ? GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="camera">
+      <section id="settings-camera" className={`${CARD} ${shown('camera') ? GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('camera')} data-section="camera">
         <h3 className={TITLE}>
-          <Aperture size={12} /> Camera
+          <Aperture size={12} /> Lens
         </h3>
         <Info>
           The macro photograph instead of the projected show: a lit paper backdrop, dye as transmission, every drop a dome with a softbox in it, then a real lens over the picture — refraction, a focal plane, bloom, colour fringing, the sensor's roll-off.
@@ -1336,10 +1350,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-2 gap-1">
             {(['show', 'photo'] as const).map((style) => (
               <button
+                aria-pressed={(settings.renderStyle ?? 'show') === style}
                 key={style}
                 onClick={() => onUpdate({ renderStyle: style })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  (settings.renderStyle ?? 'show') === style ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.renderStyle ?? 'show') === style ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={style === 'show' ? 'The projected light show: dye as light on black' : 'The photograph: dye over lit paper'}
                 data-testid={`render-${style}`}
@@ -1406,7 +1421,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Film stock — what the whole show is photographed on (F1). */}
       {keep('stock') && (
-      <section id="settings-stock" className={`${CARD} ${shown('stock') ? GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="look" data-section="stock">
+      <section id="settings-stock" className={`${CARD} ${shown('stock') ? GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('stock')} data-section="stock">
         <h3 className={TITLE}>
           <Film size={12} /> Film Stock
         </h3>
@@ -1427,10 +1442,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
+                aria-pressed={(settings.stockType ?? 0) === i}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
                 className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
-                  (settings.stockType ?? 0) === i ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={[
                   '16mm reversal: cool and saturated, with a hard shoulder',
@@ -1495,7 +1511,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         each wedge, together, and all three on the MIDI list.
       */}
       {keep('kaleidoscope') && (
-      <section id="settings-kaleidoscope" className={`${CARD} ${shown('kaleidoscope') ? GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="kaleidoscope">
+      <section id="settings-kaleidoscope" className={`${CARD} ${shown('kaleidoscope') ? GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('kaleidoscope')} data-section="kaleidoscope">
         <h3 className={TITLE}>
           <Aperture size={12} /> Kaleidoscope
         </h3>
@@ -1510,10 +1526,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-5 gap-1" data-testid="kaleido-folds">
             {[0, 2, 4, 6, 8].map((k) => (
               <button
+                aria-pressed={Math.round(settings.kaleidoscope ?? 0) === k}
                 key={k}
                 onClick={() => onUpdate({ kaleidoscope: k })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  Math.round(settings.kaleidoscope ?? 0) === k ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  Math.round(settings.kaleidoscope ?? 0) === k ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={k === 0 ? 'No mirror rig' : `${k} mirrored wedges`}
                 data-testid={`kaleido-folds-${k}`}
@@ -1548,7 +1565,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Lamp & Light Section */}
       {keep('lamp') && (
-      <section id="settings-lamp" className={`${CARD} ${shown('lamp') ? GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="lamp">
+      <section id="settings-lamp" className={`${CARD} ${shown('lamp') ? GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('lamp')} data-section="lamp">
         <h3 className={TITLE}>
           <Lightbulb size={12} /> Lamp &amp; Light
         </h3>
@@ -1739,7 +1756,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* The Room Section */}
       {keep('room') && (
-      <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
+      <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('room')} data-section="room">
         {/*
           Two cameras, two jobs, and the owner could not tell them apart
           (2026-10-24): "what the room control is vs. showing video on the
@@ -1846,15 +1863,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <div className="flex items-center gap-2 mb-2">
           <button
+            aria-pressed={settings.scenePeople !== false}
             onClick={() => onUpdate({ scenePeople: !(settings.scenePeople !== false) })}
-            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.scenePeople !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.scenePeople !== false ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-people"
           >
             Hold people
           </button>
           <button
+            aria-pressed={settings.sceneMirror !== false}
             onClick={() => onUpdate({ sceneMirror: !(settings.sceneMirror !== false) })}
-            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.sceneMirror !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.sceneMirror !== false ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-mirror"
             title="Flip the camera's view left for right, for a camera facing the room"
           >
@@ -1884,71 +1903,68 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         dish or another window, how it shows, and what it does to the liquid.
       */}
       {keep('film') && (
-      <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
+      <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('film')} data-section="film">
         <h3 className={TITLE}>
-          <Video size={12} /> Video
+          <Video size={12} /> Film
         </h3>
         <div className="mt-2 mb-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <span className="text-[12px] font-mono opacity-50" data-testid="film-source-status">
-              {filmSource === 'file' ? 'loop playing'
+            <span className="min-w-0 truncate text-[12px] text-muted" data-testid="film-source-status">
+              {filmSource === 'file' ? `playing ${filmName ?? 'a video file'}`
                 : filmSource === 'camera' ? (filmCamera?.label ? `camera live: ${filmCamera.label}` : 'camera live')
                 : filmSource === 'window' ? 'window live'
                 : 'off'}
             </span>
           </div>
-          {/* Wraps: as a 312px desk panel its four sources ran past the frame, and Off was cut off. */}
-          <div className="flex flex-wrap gap-2">
-            <input
-              ref={filmInputRef}
-              id="film-loop-file"
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
-            />
-            <button
-              onClick={() => filmInputRef.current?.click()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-              title="Play a video file through the dye, looping"
-            >
-              <Film size={13} /> Load loop
-            </button>
-            <button
-              onClick={() => onFilmCamera?.()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-              title="Point a camera at a real dish of oil and composite it through the solver"
-              data-testid="film-camera"
-            >
-              <Camera size={13} /> Camera
-            </button>
-            {/*
-              Disabled rather than silently doing nothing where the browser
-              has no screen capture — which is every phone. A button that
-              looks pressable and answers with a console warning is the kind
-              of control that makes someone doubt the rest of the panel.
-            */}
-            <button
-              onClick={() => onFilmWindow?.()}
-              disabled={!canCaptureWindow}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
-              title={canCaptureWindow
-                ? 'Play another tab, window or screen through the dye — a film from the Internet Archive, a media player, anything on this machine'
-                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.'}
-              data-testid="film-window"
-            >
-              <MonitorPlay size={13} /> Window
-            </button>
-            <button
-              onClick={() => onFilmClear?.()}
-              disabled={filmSource === 'none'}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
-              data-testid="film-off"
-            >
-              Off
-            </button>
+          <input
+            ref={filmInputRef}
+            id="film-loop-file"
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
+          />
+          {/*
+            One pick-one, the source lit (PLAN 35a). The owner, a loop
+            playing: "I really can't tell what buttons are turned on/off."
+            These were four grey buttons alike and Off was the only one that
+            changed, by greying out, so the row said what was not playing and
+            never what was. Video file opens the chooser even when it is the
+            one lit, which is how a second file replaces the first.
+
+            Wraps: as a 312px desk panel its four sources ran past the frame,
+            and Off was cut off. Window is disabled rather than silently doing
+            nothing where the browser has no screen capture, which is every
+            phone: a button that looks pressable and answers with a console
+            warning is the kind of control that makes someone doubt the rest
+            of the panel.
+          */}
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Film source" data-testid="film-source">
+            {([
+              ['none', 'Off', null, 'film-off', 'No film under the dye', () => onFilmClear?.()],
+              ['file', 'Video file', Film, 'film-file', 'Play a video file from this machine through the dye, looping', () => filmInputRef.current?.click()],
+              ['camera', 'Webcam', Camera, 'film-camera', 'Point a camera at a real dish of oil and composite it through the solver', () => onFilmCamera?.()],
+              ['window', 'Window', MonitorPlay, 'film-window', canCaptureWindow
+                ? 'Play another tab, window or screen through the dye: a film from the Internet Archive, a media player, anything on this machine'
+                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.', () => onFilmWindow?.()],
+            ] as const).map(([id, label, Icon, testId, title, go]) => (
+              <button
+                key={id}
+                aria-pressed={filmSource === id}
+                onClick={go}
+                disabled={id === 'window' && !canCaptureWindow}
+                className={`flex ${id === 'none' ? '' : 'flex-1'} items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+                  filmSource === id ? LIT : 'border-white/15 bg-white/5 text-text-2 hover:bg-white/10'
+                }`}
+                title={title}
+                data-testid={testId}
+              >
+                {Icon && <Icon size={13} />} {label}
+              </button>
+            ))}
           </div>
+
           {/*
             Which camera the film shows, and what the film's camera is for
             (PLAN 14ad). It had no picker: the browser's "environment" camera
@@ -1976,39 +1992,53 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             )}
           </div>
 
-          {/* Demo Videos */}
-          <div className="mt-3 flex flex-col gap-1">
-            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo Loops</span>
-            {[
-              { src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
-              { src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
-              { src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
-            ].map(v => (
-              <button
-                key={v.src}
-                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
-                onClick={async () => {
-                  try {
-                    const res = await fetch(v.src);
-                    const blob = await res.blob();
-                    if (onFilmFile) onFilmFile(new File([blob], v.title, { type: 'video/webm' }));
-                  } catch (e) { console.error('Failed to load demo video', e); }
-                }}
-              >
-                <span className="text-[12px] font-medium">{v.title}</span>
-                <div className="flex gap-3">
-                  <span className="text-[10px] text-white/40 hover:text-white px-1" onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      const res = await fetch(v.src);
-                      const blob = await res.blob();
-                      if (onPourVideo) onPourVideo(new File([blob], v.title, { type: 'video/webm' }));
-                    } catch (e) { console.error('Failed to load demo video', e); }
-                  }}>Pour as Dye</span>
-                  <span className="text-[10px] text-white/40 hover:text-white px-1">Load Film</span>
+          {/*
+            The demo loops, each with its two uses as the cartoon shelf has
+            them: Film plays it as the source above, Pour lays it into the
+            dish as dye. The whole row was a button that filmed it, with Pour
+            as Dye a span inside it and Load Film a span that did nothing of
+            its own (a click on it fell through to the row), and nothing said
+            which loop was playing. Now each use is its own button, lit while
+            that loop is doing it, and the one filming says so.
+          */}
+          <div className="mt-3 flex flex-col gap-1" data-testid="film-demos">
+            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo loops</span>
+            {DEMO_LOOPS.map(v => {
+              const filming = filmSource === 'file' && filmName === v.title;
+              const pouring = pourName === v.title;
+              const fetchAs = async (use: (f: File) => void) => {
+                try {
+                  const blob = await (await fetch(v.src)).blob();
+                  use(new File([blob], v.title, { type: 'video/webm' }));
+                } catch (e) { console.error('Failed to load demo video', e); }
+              };
+              const btn = 'flex h-8 shrink-0 items-center gap-1 rounded-md border px-2.5 text-[12px] font-medium transition-colors';
+              const off = 'border-white/15 text-text-2 hover:bg-white/10';
+              return (
+                <div key={v.src} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5" data-testid={`film-demo-${v.id}`}>
+                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{v.title}</span>
+                  {filming && <Tag tone="next">playing as film</Tag>}
+                  <button
+                    aria-pressed={filming}
+                    onClick={() => (filming ? onFilmClear?.() : fetchAs(f => onFilmFile?.(f)))}
+                    className={`${btn} ${filming ? LIT : off}`}
+                    title={filming ? 'Playing as the film. Click to take it off.' : 'Play it through the projector as the film, looping (Film Mix sets how much shows)'}
+                    data-testid={`film-demo-film-${v.id}`}
+                  >
+                    <Clapperboard size={11} /> Film
+                  </button>
+                  <button
+                    aria-pressed={pouring}
+                    onClick={() => (pouring ? onStopPourVideo?.() : fetchAs(f => onPourVideo?.(f)))}
+                    className={`${btn} ${pouring ? LIT : off}`}
+                    title={pouring ? 'Pouring into the dish. Click to stop.' : 'Pour it into the dish as dye, looping'}
+                    data-testid={`film-demo-pour-${v.id}`}
+                  >
+                    <Droplets size={11} /> Pour
+                  </button>
                 </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
 
           <Info>
@@ -2095,7 +2125,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         over it are one place now, after the sources it reads.
       */}
       {keep('patches') && (
-      <section id="settings-patches" className={`${CARD} ${shown('patches') ? GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="patches">
+      <section id="settings-patches" className={`${CARD} ${shown('patches') ? GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('patches')} data-section="patches">
         <h3 className={TITLE}>
           <Cable size={12} /> Patches
         </h3>
@@ -2406,7 +2436,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         the picture) is still the panel, one click away.
       */}
       {keep('midi') && (
-      <section id="settings-midi" className={`${CARD} ${shown('midi') ? GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="midi">
+      <section id="settings-midi" className={`${CARD} ${shown('midi') ? GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('midi')} data-section="midi">
         <h3 className={TITLE}>
           <Sliders size={12} /> Controller
         </h3>
@@ -2419,9 +2449,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         ) : (
           <>
             <button
+              aria-pressed={midi.enabled}
               onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
               className={`mb-3 w-full rounded-lg py-2.5 text-[13px] font-medium transition-colors ${
-                midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10 hover:bg-white/15'
+                midi.enabled ? `border ${LIT}` : 'border border-white/10 hover:bg-white/10'
               }`}
               data-testid="settings-midi-enable"
             >
@@ -2559,7 +2590,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         is an input of its own.
       */}
       {keep('projectors') && (
-      <section id="settings-projectors" className={`${CARD} ${shown('projectors') ? GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="projectors">
+      <section id="settings-projectors" className={`${CARD} ${shown('projectors') ? GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('projectors')} data-section="projectors">
         <h3 className={TITLE}>
           <Projector size={12} /> Wall
         </h3>
@@ -2569,9 +2600,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <div className="grid grid-cols-3 gap-1">
               {([['ask', 'Ask'], ['auto', 'Automatic'], ['off', 'Off']] as const).map(([m, label]) => (
                 <button
+                  aria-pressed={projectorMode === m}
                   key={m}
                   onClick={() => onProjectorMode(m)}
-                  className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${projectorMode === m ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                  className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${projectorMode === m ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                   data-testid={`projector-mode-${m}`}
                 >
                   {label}
@@ -2591,7 +2623,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Mapping Section */}
       {keep('mapping') && (
-      <section id="settings-mapping" className={`${CARD} ${shown('mapping') ? GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="mapping">
+      <section id="settings-mapping" className={`${CARD} ${shown('mapping') ? GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mapping')} data-section="mapping">
         <h3 className={TITLE}>
           <Shapes size={12} /> Mapping
         </h3>
@@ -2610,7 +2642,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         This one sits over the top and stays put for three hours.
       */}
       {keep('mark') && (
-      <section id="settings-mark" className={`${CARD} ${shown('mark') ? GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="stage" data-section="mark">
+      <section id="settings-mark" className={`${CARD} ${shown('mark') ? GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mark')} data-section="mark">
         <h3 className={TITLE}>
           <Image size={12} /> Logo &amp; Titles
         </h3>
@@ -2700,7 +2732,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       )}
 
       {keep('simulation') && (
-      <section id="settings-simulation" className={`${CARD} ${shown('simulation') ? GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="simulation">
+      <section id="settings-simulation" className={`${CARD} ${shown('simulation') ? GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('simulation')} data-section="simulation">
         <h3 className={TITLE}>
           <Zap size={12} /> Simulation
         </h3>
@@ -2810,7 +2842,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Macro Closeup Section */}
       {keep('macro') && (
-      <section id="settings-macro" className={`${CARD} ${shown('macro') ? GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="macro">
+      <section id="settings-macro" className={`${CARD} ${shown('macro') ? GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('macro')} data-section="macro">
         <h3 className={TITLE}>
           <Microscope size={12} /> Macro Closeup
         </h3>
@@ -2974,7 +3006,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Squish Plate Section */}
       {keep('squish') && (
-      <section id="settings-squish" className={`${CARD} ${shown('squish') ? GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="squish">
+      <section id="settings-squish" className={`${CARD} ${shown('squish') ? GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('squish')} data-section="squish">
         <h3 className={TITLE}>
           <Sliders size={12} /> Squish Plate
         </h3>
@@ -3353,10 +3385,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
             {(['thick', 'thin'] as const).map((v) => (
               <button
+                aria-pressed={settings.viscosity === v}
                 key={v}
                 onClick={() => onUpdate({ viscosity: v })}
                 className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
-                  settings.viscosity === v ? 'bg-white text-black font-bold' : 'hover:bg-white/5 opacity-50'
+                  settings.viscosity === v ? `${LIT} font-bold` : 'text-muted hover:bg-hover'
                 }`}
               >
                 {v}
@@ -3378,7 +3411,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Manual Interaction Section */}
       {keep('interaction') && (
-      <section id="settings-interaction" className={`${CARD} ${shown('interaction') ? GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="interaction">
+      <section id="settings-interaction" className={`${CARD} ${shown('interaction') ? GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('interaction')} data-section="interaction">
         <h3 className={TITLE}>
           <Wind size={12} /> Manual Interaction
         </h3>
@@ -3421,7 +3454,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Liquids anyone can make, load from a file and save to one (lib/liquidFile.ts). */}
       {keep('liquids') && (
-      <section id="settings-liquids" className={`${CARD} ${shown('liquids') ? GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="liquids">
+      <section id="settings-liquids" className={`${CARD} ${shown('liquids') ? GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('liquids')} data-section="liquids">
         <h3 className={TITLE}>
           <FlaskConical size={12} /> Liquids
         </h3>
@@ -3431,7 +3464,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Fluid Physics Section */}
       {keep('physics') && (
-      <section id="settings-physics" className={`${CARD} ${shown('physics') ? GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="physics">
+      <section id="settings-physics" className={`${CARD} ${shown('physics') ? GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('physics')} data-section="physics">
         <h3 className={TITLE}>
           <Zap size={12} /> Fluid Physics
         </h3>
@@ -3516,7 +3549,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Automation Section */}
       {keep('automation') && (
-      <section id="settings-automation" className={`${CARD} ${shown('automation') ? GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="automation">
+      <section id="settings-automation" className={`${CARD} ${shown('automation') ? GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('automation')} data-section="automation">
         <h3 className={TITLE}>
           <Hourglass size={12} /> Automation
         </h3>
@@ -3582,7 +3615,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Mixer Section */}
       {keep('layers') && (
-      <section id="settings-layers" className={`${CARD} ${shown('layers') ? GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="layers">
+      <section id="settings-layers" className={`${CARD} ${shown('layers') ? GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('layers')} data-section="layers">
         <h3 className={TITLE}>
           <Layers size={12} /> Plates &amp; LED
         </h3>
@@ -3954,7 +3987,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           )}
           {railGroups.map(group => (
             <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
-              <div className="hidden px-3 pb-1.5 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:block" title={group.hint}>
+              {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
+              <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:pb-1.5 sm:pt-4" title={group.hint} data-testid={`rail-heading-${group.id}`}>
                 {group.name}
               </div>
               <div className="flex gap-0.5 sm:flex-col">

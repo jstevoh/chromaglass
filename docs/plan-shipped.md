@@ -3677,6 +3677,38 @@ sync wrapper rethrowing Node's own error fails two. `deploygate.sh` still puts t
 on curl's command line, readable through `ps` while it runs on the owner's machine:
 19aa-4.
 
+### 19aa-6. The renders lines on a starved runner
+
+Shipped 2026-10-24. Three `npm run renders` lines went red on 8 of 191 Mac runs each in
+the week to 10-24 (`npm run flakes`). The laptop's band lines ("the ear is reading", "the
+plate hears a new reading on four frames in five") failed in the first of their two
+3 s windows every time, with the plate drawing 0.0, 1.7, 1.9, 9.9, 10.8, 12.2, 13.6 and
+14.5 frames a second there and 16.5 to 28.4 in the second: five seconds after load the
+page was still opening on a cold runner (the open shard runs startup first, which empties
+the Mac's shader cache). Each page now waits, a second at a time and at most thirty,
+until one second holds fifteen of the plate's frames (the 45 in 3 s the lines ask), as
+squeeze.mjs does for its steps; a plate that never gets there is still measured and
+fails, and the wait is printed when it is more than a second and a half.
+
+The phone's fader line, "the plate's Dimmer moves at least twice as often as the desk's",
+failed with the page drawing 14.6 to 22.5 frames a second and the Dimmer changing on 93
+to 100% of them: twice the desk's 9 to 10 a second is more changes than frames below 20
+a second. It now asks the claim itself: a change on nine frames in ten that were offered
+a new value (the watch counts the frames whose newest message differs from the last
+frame's), and a quarter more than the desk's (a plate fed by React changes at React's 7 to
+10.5 a second, which fails both at any frame rate the line allows). The first version
+asked four frames in five of all drawn; its review read 48 green windows and the Dimmer
+changed on 0.79 to 0.99 of the frames drawn, lower the faster the frames come, because
+the stub's 60 Hz timer beats against the frames and some have no message to draw. On the
+Mac the new ratio read 1.00 in all four windows (28.5 to 34.9 offered a second).
+
+### 19aa-8. The Blow's push follows the solver steps
+
+Shipped 2026-10-25. The numbers and the stroke's new pace are in `scripts/tools.mjs`
+(`windRun`) and PLAN.md §19aa-8: the push correlates 0.73 with the wind steps over 28
+Mac strokes, and nine strokes of one Mac run at 750, 1500 and 3000 ms of waiting read
++0.46% to +2.97%, 45 to 112 wind steps, no straw step.
+
 ### 19ac-1. The double tap's two taps carry a finger's times
 
 Shipped 2026-10-24. `npm run phone`'s "Play: a double tap on Speed puts it back to the
@@ -5060,3 +5092,80 @@ Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is
 1024 × 768, 390 × 844 and 844 × 390, with nothing wider than the screen; a returning visit's plate
 comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
 returning visit nor for `?remote` and `?cast`.
+
+## 35. Clear controls: on reads on, one name for one thing
+
+### 35a. One look for on, every name unique (2026-10-24)
+
+Reported: the owner, with the Video panel open and a loop playing, could not tell which of
+Load loop, Camera, Window and Off was on (all four were the same grey button; only Off changed,
+by greying out), nor which demo loop was playing, and found several buttons called Video.
+
+Measured on main (4397c83): an on or chosen control was drawn nine ways (white fill ×18, white
+tint ×19, a brighter border ×8, the accent ×10, the active grey ×4, `bg-text` ×3, amber ×24, raw
+purple ×4, and text alone). The shared `Segmented` drew its chosen item in the active grey,
+1.19:1 against the panel it sits on. `npm run switches` passed every one: its bar, ΔE 20, is a
+difference found by comparing two buttons, not one read off a single button. With a new bar of
+3:1 in light (the fill's luminance ratio, or a ring only one state has), 58 of the 516 controls
+it reads were under it. And a source read found 88 buttons that change their look with a state
+and say no state at all, so neither the browser check nor a screen reader could see them.
+
+What changed: one look for on, `lit` (`#7C4DEB`, 3.47:1 against elevated, white text on it
+5.1:1), used by `Segmented`, a new `pressed` on `Button`, and `LIT` for a button a Button cannot
+be; `LIVE`, solid red, for on that is live now (Blackout, recording); white stays the one primary
+on a surface. The switch's track keeps the accent (3.5:1 against the off track where lit would be
+2.9). Every stateful button says `aria-pressed`, `-selected`, `-checked` or `-current`. Backwards
+ones turned round: the desk's Blackout (red while off, white while on), the drone (green while
+stopped), the phone's and the remote's play button (pressed now means paused, lit), the remote's
+second Blackout (red while off). The Film section's Source is one pick-one (Off, Video file,
+Webcam, Window), each demo loop row has its own Film and Pour, lit while that loop is doing it,
+with a "playing as film" tag (the row was a button with Pour as Dye a span inside it, and Load
+Film a span with no handler). Names: Video section → Film, the header dot → Film (it was lit by
+the poured video and opened the film), Camera section → Lens, the film's Camera source → Webcam,
+the Dye panel's Video… → Pour a
+video…, Macro/Wide → Close-up (pressed), the phone dock's Presets → Looks and Play → Motion, Play
+screen → Simple screen, Wander on its own → Evolve. Test ids kept.
+
+Shortcut hints off the buttons (the owner, the same afternoon, with Save's ⌘S chip sitting on its
+dirty dot: "hover over is probably better for descriptions and shortcut hints"). `Button`'s `kbd`
+and `Segmented`'s keys are now in the hover title and `aria-keyshortcuts`, not drawn as a chip;
+the tool grid's letters, + Panel's ⌘P, Show deck's ⌥D and the header's ⌘K (now a magnifier) the
+same. Menus and the command palette keep theirs at the row's right edge, where they overlap
+nothing. The phone has no keys.
+
+The source reader was reviewed by the check-skeptic before it shipped, which found it skipping
+`sizeId` (a filter on the word size matched the name; now whole words), a condition with text
+before it (`cn('x hover:y', on ? …)`), the second branch, named branches, `&&`, colours not on
+its list (it now allows only the tokens) and a constant `aria-pressed={false}`. The browser bar
+was made to count a fill only the right way round and in lit, live, ok or the accent, a part
+inside only at 15% of the control or more, and a group as disabled only when every member is.
+
+Checks: `npm run states` (new, in Measure) and `npm run switches`' lift bar. Numbers before and
+after are in the PR.
+
+### 35b. Seven groups, one vocabulary (2026-10-25)
+
+Reported: the owner, 2026-10-24, "the grouping is bad": the same sections were sorted four ways
+that did not agree, so the panel browser, the search and the phone's Settings disagreed about
+where a thing is.
+
+Measured on main (a7dd8e7): `data-group` in `SettingsPanel` said perform, setup, look, inputs or
+stage (24 sections, read by nothing), `SETTINGS_CATEGORIES` said Live, Inputs, Look, Plate or
+Stage, the panel browser borrowed those five and filed the desk's own panels under `live` and
+`plate`, and the phone's Settings strip drew the same five with the headings hidden
+(`hidden ... sm:block`), one flat run of 26 tabs.
+
+What changed: `SETTINGS_CATEGORIES` is the one list, Play, Pour, Feed, Motion, Chemistry, Look,
+Stage. Play: Master, Mixer and the desk's Cues, Rides, Recipe, Score. Pour: Bottles, Dyes, Tools,
+Liquids, Manual Interaction. Feed: Sound, Motion camera, Film, Patches, Controller. Motion:
+Kaleidoscope, Automation, Fluid Physics. Chemistry: Squish Plate. Look: Light Show Look, Show,
+Lamp & Light, Film Stock, Lens, Macro Closeup. Stage: unchanged (Wall, Mapping, Logo & Titles,
+Plates & LED, Simulation, Phone · iPad), so Build and Gig still keep it in the Stage sheet. The
+rail, the panel browser and the desk's own panels read the list; each section's `data-group`
+comes from it (`groupOf`); the phone's strip draws the seven headings. No section's id, controls
+or place on the desk changed, so saved layouts, pins and deep links open as before. The Settings
+guide names the seven. `desklayout` holds the list, every panel's group, the markup's
+`data-group` and the Stage panels to their names; `phone` reads the seven headings drawn at phone
+width.
+
+Squish Plate keeps its name and its 45 controls in Chemistry: splitting it is 35c.

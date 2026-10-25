@@ -3,6 +3,7 @@ import { Film, X } from 'lucide-react';
 import type { SongRenderState } from '../hooks/useSongRender';
 import { estimateFilmBytes } from '../lib/render';
 import { FREE_RENDER_MAX_HEIGHT, isFreeTierGated, openAccountSheet } from '../lib/tierGates';
+import { LIT } from './ui';
 
 /**
  * Render this song: the size, the rate and the seed, then progress and a
@@ -113,10 +114,10 @@ export function RenderPanel(p: Props) {
               {RENDER_SIZES.map((s) => {
                 const locked = freeGated && (s.height > FREE_RENDER_MAX_HEIGHT || s.width > 1280);
                 return (
-                  <button key={s.id} disabled={p.running || locked} onClick={() => !locked && setSizeId(s.id)} data-testid={`render-size-${s.id}`}
+                  <button aria-pressed={sizeId === s.id} key={s.id} disabled={p.running || locked} onClick={() => !locked && setSizeId(s.id)} data-testid={`render-size-${s.id}`}
                     data-cg-render-locked={locked ? s.id : undefined}
                     title={locked ? 'In the ChromaGlass app (Home & Pro)' : undefined}
-                    className={`h-6 rounded-full border px-2.5 ${sizeId === s.id ? 'border-white/40 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-40`}>
+                    className={`h-6 rounded-full border px-2.5 ${sizeId === s.id ? LIT : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-40`}>
                     {s.label}
                   </button>
                 );
@@ -125,8 +126,8 @@ export function RenderPanel(p: Props) {
             <span>Rate</span>
             <div className="flex gap-1">
               {RENDER_RATES.map((r) => (
-                <button key={r} disabled={p.running} onClick={() => setFps(r)} data-testid={`render-fps-${r}`}
-                  className={`h-6 rounded-full border px-2.5 ${fps === r ? 'border-white/40 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-60`}>
+                <button aria-pressed={fps === r} key={r} disabled={p.running} onClick={() => setFps(r)} data-testid={`render-fps-${r}`}
+                  className={`h-6 rounded-full border px-2.5 ${fps === r ? LIT : 'border-white/20 text-white/70 hover:text-white'} disabled:opacity-60`}>
                   {r} fps
                 </button>
               ))}

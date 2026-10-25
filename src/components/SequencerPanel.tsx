@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Sheet } from './ui';
+import { Sheet, LIT } from './ui';
 import { Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
 import { PRESETS, livePresetId, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
@@ -168,7 +168,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               aria-checked={current || (editable && editIndex === i)}
               onClick={() => (isRunningThis ? onGoTo(i) : editable ? setEditIndex(editIndex === i ? null : i) : undefined)}
               className={`relative overflow-hidden text-left rounded-lg border px-3 py-2 transition-colors ${
-                current ? 'border-white/60 bg-white/10' : editIndex === i && editable ? 'border-white/40 bg-white/5' : 'border-white/10 bg-white/5 hover:bg-white/10'
+                current ? LIT : editIndex === i && editable ? 'border-lit bg-elevated' : 'border-white/10 bg-white/5 hover:bg-white/10'
               }`}
               data-testid={`seq-stage-${i}`}
             >

@@ -1,4 +1,5 @@
 import type { PlateArea } from '../../lib/plateAreas';
+import { LIT } from '../ui';
 
 /**
  * Which area of the dish a patch cord works in (PLAN 25h), picked on a
@@ -61,7 +62,7 @@ export function AreaPicker({ areas, colours, value, onChange, testId }: {
           type="button"
           onClick={() => onChange(undefined)}
           aria-pressed={value === undefined}
-          className={`min-h-[40px] px-3 rounded-full text-[12px] font-medium border ${value === undefined ? 'bg-white/15 border-white/40' : 'bg-white/5 border-white/10'}`}
+          className={`min-h-[44px] px-3 rounded-full text-[12px] font-medium border ${value === undefined ? LIT : 'bg-white/5 border-white/10'}`}
           data-testid={testId ? `${testId}-plate` : undefined}
         >
           Whole plate

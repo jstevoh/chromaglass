@@ -931,6 +931,19 @@ try {
       check('every tab of the phone\'s Settings rail takes a tap where it is drawn',
         railCovered.tabs > 20 && railCovered.covered.length === 0,
         `${railCovered.tabs} tabs; ${railCovered.covered.length ? `covered: ${railCovered.covered.join(', ')}` : 'none covered'}`);
+      /*
+        And the strip names its groups (PLAN 35b). The seven headings were
+        drawn on the desk and hidden on a phone (`hidden ... sm:block`), so the
+        phone's rail was one flat run of tabs. Each heading is asked for its box
+        and its words, since a heading that is `display: none` has neither.
+      */
+      const headings = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="rail-heading-"]')].map(h => {
+        const r = h.getBoundingClientRect();
+        return { id: h.dataset.testid.replace('rail-heading-', ''), w: Math.round(r.width), h: Math.round(r.height), text: h.textContent };
+      }));
+      check('the phone\'s Settings strip names the seven groups, each heading drawn',
+        headings.map(x => x.text).join() === 'Play,Pour,Feed,Motion,Chemistry,Look,Stage' && headings.every(x => x.w > 20 && x.h > 8),
+        headings.map(x => `${x.text} ${x.w}×${x.h}`).join(' · ') || 'no headings');
       await tap(page, 'settings-nav-patches');
       const mappings = () => page.evaluate(() => window.chromaglassDebug?.().settings?.sceneMappings ?? null);
       const patchesBefore = (await mappings())?.length ?? null;

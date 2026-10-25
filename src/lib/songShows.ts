@@ -169,8 +169,8 @@ export function showFor(shows: SongShow[], song: SongRef | null | undefined): So
   return shows.find((s) => sameSong(s.song, song)) ?? null;
 }
 
-const SHOWS_KEY = 'chromaglass-song-shows';
-const SETS_KEY = 'chromaglass-action-sets';
+export const SHOWS_KEY = 'chromaglass-song-shows';
+export const SETS_KEY = 'chromaglass-action-sets';
 
 export function loadShows(): SongShow[] {
   try { return parseShows(JSON.parse(localStorage.getItem(SHOWS_KEY) ?? '[]')); } catch { return []; }

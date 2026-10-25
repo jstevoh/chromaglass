@@ -991,7 +991,10 @@ try {
   // device.
   const band = firstVisible('simulated-audio-button');
   const beforeBand = await page.evaluate(() => window.__media.length);
-  const bandLit = async () => (await band.getAttribute('class')).includes('fuchsia');
+  // Read by what the button says, not by its colour: it was fuchsia while
+  // playing and is the shared lit look now (PLAN 35a), and the next look
+  // would break a class match again. aria-pressed is the state itself.
+  const bandLit = async () => (await band.getAttribute('aria-pressed')) === 'true';
   const wasLit = await bandLit();
   await clickOn(band);
   await settle(2000);
@@ -1496,8 +1499,8 @@ try {
           const el = document.querySelector(`[data-testid="${id}"]`);
           return el ? { ...el.getBoundingClientRect().toJSON(), title: el.getAttribute('title') ?? '' } : null;
         };
-        const w = box('film-window'), cam = box('film-camera'), off = box('film-off');
-        if (!w || !cam || !off) return null;
+        const w = box('film-window'), cam = box('film-camera'), off = box('film-off'), file = box('film-file');
+        if (!w || !cam || !off || !file) return null;
         return {
           title: w.title,
           width: Math.round(w.width),
@@ -1507,14 +1510,17 @@ try {
           // as far down it. The pinned way *into* settings has to be above
           // the fold and is checked for that; a control inside a section
           // does not.
-          inRow: Math.abs(w.top - cam.top) < 4 && Math.abs(w.top - off.top) < 4,
-          between: cam.right <= w.left + 1 && w.right <= off.left + 1,
+          inRow: [cam, off, file].every(b => Math.abs(w.top - b.top) < 4),
+          // Beside Webcam, the other live source. The row was Camera, Window,
+          // Off; it is one pick-one now (PLAN 35a), Off, Video file, Webcam,
+          // Window, with Off first as the one that means none.
+          between: off.right <= file.left + 1 && file.right <= cam.left + 1 && cam.right <= w.left + 1,
           wide: w.width > 40,
         };
       });
       check('the film projector can be fed from a window',
         !!film && film.wide, film ? `${film.width}px button` : 'no window button');
-      check('and it sits in the row with the other two sources',
+      check('and it sits in the row with the other three sources',
         !!film && film.inRow && film.between && /window|tab|screen/i.test(film.title),
         film ? `in row ${film.inRow}, between ${film.between}, “${film.title.slice(0, 40)}…”` : '');
       /*
