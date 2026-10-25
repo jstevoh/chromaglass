@@ -367,3 +367,15 @@ button:is(:hover, :focus-visible, [aria-pressed="true"]) > .cg-drip .cg-thread {
   .cg-tip { transition: none; }
   .cg-drip .cg-form, .cg-drip .cg-fall, .cg-drip .cg-thread { animation: none !important; }
 }
+
+/* Show hardware (PLAN 35f): everything here moves inside its own few pixels. */
+.cg-reel { transition: transform 1s linear; }
+.cg-needle { will-change: transform; }
+@keyframes cg-cap-snap { from { transform: scale(1.4); opacity: 0; } 60% { opacity: 1; } to { transform: scale(1); opacity: 1; } }
+.cg-cap { transform-box: fill-box; transform-origin: 50% 50%; animation: cg-cap-snap 140ms cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes cg-ring-turn { to { transform: rotate(360deg); } }
+.cg-ring { transform-box: view-box; transform-origin: 20px 20px; animation: cg-ring-turn var(--ring-s, 10s) linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .cg-reel { transform: none !important; transition: none; }
+  .cg-cap, .cg-ring { animation: none !important; }
+}

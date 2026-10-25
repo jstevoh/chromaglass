@@ -8815,12 +8815,39 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     refilled) waits for the volume model (18c-2).
   - The legacy bench's bottle list in `App.tsx` (the `liquid-…` test ids) still draws round swatches.
   - The remote has no bottles or bulb (the owner's remote has Dye Budget and Lamp Warmth as sliders).
+- ~~**35f** Show hardware (batch C of the playful-controls choice, 2026-10-25; items 7 to 11).~~ Shipped: Record
+  is two tape reels turning at the tape's speed over their radius, the full one slow and the bare one fast
+  (`tapeReels.ts`: a compact cassette's 4.76 cm/s, hub 0.9 cm, pack 2.1 cm; angle by closed form, so the
+  button holds no clock of its own) on the desk button, the phone's Play pill (a fixed box, so it does not widen,
+  and red while it runs) and the More tile; Tap Tempo is a pad with a beat light on the locked beat, four pips
+  and the tempo in segment digits (`TapPad`; the light runs on the Web Animations clock from the source's period
+  and phase, so the App never re-renders for a beat), on the desk's Tempo row and the phone's Sound sheet; the
+  Sound sheet on both has a VU needle with a moving coil's ballistics, 99% of a steady tone in 300 ms and a
+  1.3% overshoot, falling to its stop and writing "deaf" on the dial when the input stops (`vuMeter.ts`, moved
+  through a ref on its own frame); Blackout is a lens with a red cap on it, one drawing on the desk header,
+  Settings, the remote and Draw, and the remote's two Blackouts are one (the bar under the thumb); Auto Spin has
+  a strobe ring that drifts at the dish's speed in Rate and stands still in Tempo once a tempo is heard
+  (`strobeRing.ts`). Held by `npm run panel`. Judging §81. Story in `docs/plan-shipped.md` §35.
+- **35f-2** What batch C left:
+  - **Item 12, Looks as slide-carousel mounts**, is its own piece (it touches the set list, so `desk`,
+    `setlist` and `panel` all have to hold).
+  - **The VU reads the plate's volume, not decibels.** The dial is marked 0 to 100 in the plate's own volume
+    unit (the loud end of the ear's range at 85, `soundLevels.ts`), because that is what the ear gives and the
+    gain stages before it are not the app's to know. A dial in dBFS would need the analyser's raw peak.
+  - **A take is not a tape with an end.** The reels fill in ten minutes (`TAPE_SECONDS`) and a longer take
+    leaves the right reel full and still turning at v / r. Named shortcut of the picture, not of any recording.
+  - **The ring stands still only up to 32 beats a turn.** Past that it has too few dots for the dish's turn
+    between two beats and creeps at the alias (48 beats at 120 bpm: 7.5 degrees a second back).
+  - **The mic-heard tempo lights the ring but not the tap pad's beat light.** The pad polls the tempo source
+    (tap, MIDI clock, typed), which a heard beat does not set; the ring takes the beat grid's tempo when
+    nothing was tapped. Lighting the pad from the grid is a follow-up if the owner wants it.
+  - The remote's Record, Auto Spin and tempo are still plain buttons and sliders (35d-2's remote list grows
+    by these), and the Settings Source row has no meter (the needle is in the Sound sheet).
 - **35d-2** What batch A left: the remote's own sliders (Speed and Evolve Speed in `RemoteControl.tsx`) have
   no snail and hare, and the remote has no group colours; the phone's Settings sheet takes the cap colours
   only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
   its hare at both ends but no snail at the stop in the middle (the slider has one under the track). Batches B
-  (liquid in the controls: bottles, viscosity drip, lamp filament) and C (show hardware: reels, tap light, VU
-  needle, lens cap, strobe dots) are in `/handoff/playful-controls.md`.
+  (liquid in the controls) and C (show hardware) have shipped (35e, 35f); item 12 is in `/handoff/playful-controls.md`.
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.

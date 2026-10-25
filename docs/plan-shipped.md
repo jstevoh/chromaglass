@@ -5405,3 +5405,31 @@ seeded plate, mean 0 to 255 per channel, old then new: 0.25 (64.4, 44.1, 55.9) t
 (68.8, 25.4, 6.0), against 6500 K's (63.5, 45.8, 61.4), a blue dye going nearly black as it does under a real
 tungsten lamp. The vignette is unchanged, blended as it was (a first version multiplied by a second blend and was 4 to 6% dark in the corners, which the review caught), and full from 1 on. `npm run panel` holds the shader to the uniforms, the
 kelvin to even mireds ending at 3200 K, the tint to the blackbody's ratios, and 0 to 1 to the old grade.
+
+### 35f. Show hardware (shipped 2026-10-25)
+
+Batch C of the owner's playful-controls choice, items 7 to 11 (the slide carousel, 12, is its own piece): five
+controls drawn as the machines they stand in for, each moving only inside its own few pixels and holding
+still under reduced motion. Record is two tape reels. Tape runs past the heads at one speed, so a reel's
+turn rate is that speed over the radius of tape on it: the supply reel starts full and slow and speeds up as it
+empties onto the take-up, which starts a bare hub and slows as it fills (a compact cassette's 4.76 cm/s, hub
+0.9 cm, pack 2.1 cm, a constant-thickness roll so the pack's area, not its radius, is the tape wound on). The
+angle a reel has turned through is the integral of v / r, which has a closed form for a radius that is a
+square root of time, so the button is stateless: the angle is a function of the clock and a one-second linear
+transition carries it round. `npm run panel` integrates the turn rate numerically and holds the closed form
+to a tenth of a percent, across the end of the tape too. The phone's Play pill takes the reels in a fixed box
+(the pill still does not widen when a clip starts, and is red while it runs, which the audit said it was not),
+the More sheet's tile takes them at 20 px. Tap Tempo is a pad with a light that blinks on the beat the source
+has locked, four pips that fill with the taps, and the tempo in segment digits. The light is a Web Animations
+loop at the source's period and phase, resynced every quarter second if it slipped 30 ms, so a beat renders
+nothing. The VU needle is a moving coil: a second-order system with a damping ratio of 0.81 (1.3% overshoot,
+inside the standard's 1 to 1.5) and a natural frequency set so its step response first reaches 99% at
+300 ms, solved exactly over each step because an Euler step added damping of its own that took the overshoot
+to 0.8% and the rise to 208 ms. It reads the plate's volume on its own frame through a ref (nothing
+re-renders with it), falls to its stop when the sound stops, writes "deaf" on the dial when the input
+is, and under reduced motion shows the number. Blackout is a lens with a cap: the same drawing on the desk
+header, Settings, the remote and Draw, the cap snapping on once in 140 ms and in the button's own colours
+(red where the button is live, neutral otherwise: Draw's was red while the room was lit); the remote's two
+Blackouts are one, the bar under the thumb. Auto Spin has a platter's strobe ring: in Rate the dots drift at
+the dish's speed, in Tempo with a tempo heard the dish turns exactly one dot a beat, so lit by the beat the
+ring stands still, up to 32 beats a turn and as a slow alias past that. Judging §81.
