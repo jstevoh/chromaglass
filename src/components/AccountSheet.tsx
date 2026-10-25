@@ -1,6 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { User } from 'lucide-react';
 import { getCachedEmail } from '../lib/authFlag';
+import CloudSyncCard from './CloudSyncCard';
 import { MacAppCard } from './MacAppCard';
+import { cloudSync } from '../lib/cloudSyncApp';
+import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
+import { allowAccountKeys, declineAccountKey, lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
 import {
   useAccountShows,
   joinAccountShow,
@@ -19,7 +24,6 @@ import {
   getActiveLicenseInfo,
   getEffectiveTier,
   getMarketingOptIn,
-  hasExplicitMarketingChoice,
   setMarketingOptIn,
   syncMarketingPreferenceToServer,
 } from '../lib/tierGates';
@@ -29,9 +33,18 @@ async function loadFirebaseAuth() {
   return import('../lib/firebaseAuth');
 }
 
+// The same sign-in the first visit meets, fetched only when this sheet needs it
+// and only in a build that has accounts: a build without Firebase carries none
+// (`npm run signin` 1a). The variable is read here, not through ACCOUNTS_ON:
+// Vite folds `import.meta.env` away in a build without it, which drops this
+// import; through the shared constant it stayed, and in that build it pulled the
+// App's chunk apart (`preloadApp: no chunk for src/App.tsx`).
+const LazySignInForm = import.meta.env.VITE_FIREBASE_API_KEY
+  ? lazy(() => import('./SignInScreen').then((m) => ({ default: m.SignInForm })))
+  : null;
+
 interface AccountSheetProps {
   onClose: () => void;
-  onOpenSettings?: () => void;
 }
 
 const isUnsubscribeUrl = () =>
@@ -39,16 +52,48 @@ const isUnsubscribeUrl = () =>
   (/^\/unsubscribe\/?$/i.test(window.location.pathname) ||
     new URLSearchParams(window.location.search).has('unsubscribe'));
 
-export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSettings }) => {
+const TIER_NAME = { free: 'Free', home: 'Home', pro: 'Pro' } as const;
+
+/**
+ * The account: who you are, what you own, what you can buy.
+ *
+ * The owner, 2026-10-24: "the profile page is garbage", and, signed out while
+ * using the app, "there is no way to re-sign in". The sheet before this had
+ * grown a block for everything account-shaped (a settings shortcut, a licence
+ * form, an empty "Running shows" box, the store, the newsletter, two big
+ * account buttons, a paragraph of small print), all at the same weight, and
+ * once signed out it said "Signed in as Signed-in user" over a note that the
+ * *next load* would ask to sign in. So it is now one column that answers three
+ * questions in order, each at the weight it deserves:
+ *
+ *   1. Who am I? Your email and your plan, or, signed out, the sign-in itself,
+ *      right here (the same form the first visit meets), with the show still
+ *      running behind it.
+ *   2. What do I have? Pro says so and stops. Home offers the upgrade. Free
+ *      shows the two plans side by side. A key typed by hand is one row under it.
+ *   3. Everything else: running shows (one quiet line when there are none), the newsletter
+ *      as one switch, and sign out / delete at the bottom, small, where a slip
+ *      of the thumb does not reach them.
+ *
+ * #430's frame is kept (the owner's "janky" of 2026-10-22): the sheet never
+ * grows past the screen, the title and footer stay put and only the middle
+ * scrolls; on a phone it is a bottom sheet with 48px rows. Colours are the
+ * desk's tokens: violet is what you own, red only on delete.
+ */
+export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const signedInFlag = useSignedIn();
+  const signedIn = ACCOUNTS_ON && signedInFlag;
+  // A stable callback: SignInForm's redirect check re-runs whenever it changes.
+  const onSignedIn = useCallback(() => setEmail(getCachedEmail()), []);
   const [email, setEmail] = useState<string | null>(() => getCachedEmail());
-  const [signedOut, setSignedOut] = useState(false);
   const [confirmMode, setConfirmMode] = useState<'none' | 'signout' | 'delete'>('none');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [licenseInfo, setLicenseInfo] = useState(() => getActiveLicenseInfo());
   const [effectiveTier, setEffectiveTier] = useState(() => getEffectiveTier());
+  const [accountKey, setAccountKey] = useState<AccountLicenseResult>(() => lastAccountLicense());
   const [keyInput, setKeyInput] = useState('');
   const [licenseBusy, setLicenseBusy] = useState(false);
   const [licenseError, setLicenseError] = useState<string | null>(() => getActiveLicenseInfo().error);
@@ -65,6 +110,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
   const refreshLicenseState = () => {
     setLicenseInfo(getActiveLicenseInfo());
     setEffectiveTier(getEffectiveTier());
+    setAccountKey(lastAccountLicense());
+    setMarketingOptInState(getMarketingOptIn());
   };
 
   const handleToggleMarketing = async (next: boolean) => {
@@ -77,59 +124,41 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
     }
   };
 
+  // Signed in (on opening, or the moment the form below signs in): the live
+  // email, and the account's key brought here if it beats what this browser has.
+  useEffect(() => {
+    if (!signedIn) return;
+    let cancelled = false;
+    setEmail(getCachedEmail());
+    void loadFirebaseAuth().then(async (authMod) => {
+      const liveEmail = await authMod?.getCurrentUserEmail();
+      if (!cancelled && liveEmail) setEmail(liveEmail);
+    });
+    void syncAccountLicense().then(() => {
+      if (!cancelled) refreshLicenseState();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn]);
+
   useEffect(() => {
     let cancelled = false;
-    loadFirebaseAuth().then(async (authMod) => {
-      if (!authMod || cancelled) return;
-      const liveEmail = await authMod.getCurrentUserEmail();
-      if (!cancelled && liveEmail) {
-        setEmail(liveEmail);
-      }
-      const licensesUrl = import.meta.env.VITE_FIREBASE_LICENSES_URL as string | undefined;
-      if (licensesUrl) {
-        const token = await authMod.getCurrentIdToken();
-        if (cancelled || !token) return;
-        if (hasExplicitMarketingChoice()) {
-          void syncMarketingPreferenceToServer(token, getMarketingOptIn());
-        }
-        try {
-          const res = await fetch(`${licensesUrl.replace(/\/$/, '')}/keys`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: 'no-store',
-          });
-          if (!res.ok) return;
-          const data = (await res.json()) as {
-            keys?: Array<{ key?: string; token?: string; tier?: string; revoked?: boolean }>;
-            marketingOptIn?: boolean | null;
-          };
-          if (typeof data.marketingOptIn === 'boolean' && !hasExplicitMarketingChoice() && !cancelled) {
-            setMarketingOptInState(data.marketingOptIn);
-            setMarketingOptIn(data.marketingOptIn);
-          }
-          const activeRemote = (data.keys ?? []).find((k) => (k.token || k.key) && !k.revoked);
-          const remoteToken = activeRemote?.token || activeRemote?.key;
-          if (remoteToken && !getActiveLicenseInfo().valid) {
-            await activateLocalLicenseKey(remoteToken);
-            if (!cancelled) refreshLicenseState();
-          }
-        } catch {
-          // offline or unreachable
-        }
-      }
-    });
+    // The Mac app's own show server knows its key (a static site has none).
     syncServerLicense().then(() => {
       if (!cancelled) refreshLicenseState();
     });
-
     const onLicenseChange = () => refreshLicenseState();
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('cg-license-changed', onLicenseChange);
+    window.addEventListener('cg-account-license', onLicenseChange);
     window.addEventListener('keydown', onKeyDown);
     return () => {
       cancelled = true;
       window.removeEventListener('cg-license-changed', onLicenseChange);
+      window.removeEventListener('cg-account-license', onLicenseChange);
       window.removeEventListener('keydown', onKeyDown);
     };
   }, []);
@@ -148,14 +177,14 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
       } else {
         setLicenseError(
           res.error === 'expired'
-            ? 'This license key has expired.'
+            ? 'This licence key has expired.'
             : res.error === 'machine-limit'
-              ? 'This license key is already active on 2 machines.'
-              : 'Invalid license key signature.',
+              ? 'This licence key is already active on 2 machines.'
+              : 'That is not a valid licence key.',
         );
       }
     } catch {
-      setLicenseError('Could not verify license key.');
+      setLicenseError('Could not check the licence key.');
     } finally {
       setLicenseBusy(false);
     }
@@ -165,6 +194,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
     setLicenseBusy(true);
     setLicenseError(null);
     try {
+      // Kept off on later starts too, until asked back below.
+      declineAccountKey(licenseInfo.id);
       await deactivateLocalLicenseKey();
       refreshLicenseState();
     } finally {
@@ -181,7 +212,6 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
       if (authMod) await authMod.signOutCurrentAccount();
       setEmail(null);
       setConfirmMode('none');
-      setSignedOut(true);
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || 'Could not sign out.');
     } finally {
@@ -194,37 +224,46 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
     setError(null);
     try {
       await unpublishAccountShows();
+      // The cloud copy goes with the account (privacy.html says so). Asked while
+      // the account still exists, since the Worker needs its token to know whose,
+      // and the delete stops if it fails: once the account is gone no token could
+      // ever erase it (the review of #467).
+      const sync = cloudSync();
+      if (sync && !(await sync.erase().catch(() => false))) {
+        setError("Couldn't erase your cloud copy, so the account is not deleted yet. Try again when you're online.");
+        return;
+      }
       const authMod = await loadFirebaseAuth();
       if (authMod) await authMod.deleteCurrentAccount();
       setEmail(null);
       setConfirmMode('none');
-      setSignedOut(true);
     } catch (err: unknown) {
       setError(
         (err as { message?: string })?.message ||
-          'Could not delete account. You may need to sign in again first.',
+          'Could not delete the account. Sign in again, then try once more.',
       );
     } finally {
       setBusy(false);
     }
   };
 
-  const tierLabel =
-    licenseInfo.valid
-      ? licenseInfo.tier === 'pro'
-        ? 'Pro'
-        : 'Home'
-      : effectiveTier === 'free'
-        ? 'Free'
-        : 'Unlocked';
-
-  const checkoutEmail = email || licenseInfo.email;
   const currentTier = licenseInfo.valid ? licenseInfo.tier : effectiveTier;
+  const checkoutEmail = (signedIn && email) || licenseInfo.email;
+  // An account key this app could not use: said once, plainly, with who to ask.
+  const keyTrouble =
+    signedIn && !licenseInfo.valid && accountKey.state === 'unverifiable'
+      ? `Your account holds a ${TIER_NAME[accountKey.tier]} licence this app could not verify. Write to support and it will be reissued.`
+      : null;
+
+  const label = 'text-[11px] font-medium uppercase tracking-wider text-dim';
+  const section = 'border-t border-border pt-4';
+  const ghostBtn =
+    'flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover disabled:opacity-50';
+  const textBtn = 'text-[12px] text-muted underline decoration-faint underline-offset-2 hover:text-text disabled:opacity-50';
 
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4 overflow-y-auto"
-      style={{ background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)' }}
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -234,293 +273,253 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
         role="dialog"
         aria-modal="true"
         aria-label="Account"
-        className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950 p-5 text-neutral-100 shadow-2xl"
+        className="flex max-h-[92dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-xl border border-border bg-surface text-text shadow-palette sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl"
       >
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <h2 className="text-base font-medium text-neutral-100">Profile &amp; Store</h2>
+        <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-border pl-4 pr-2">
+          <h2 className="text-[16px] font-medium text-text">Account</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close account"
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-white/10 hover:text-neutral-200"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-hover hover:text-text"
           >
             ✕
           </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wider text-neutral-500">Signed in as</div>
-            <div className="mt-1 truncate text-sm font-medium text-neutral-100">
-              {email || licenseInfo.email || 'Signed-in user'}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
+          {/* ── 1. Who you are ─────────────────────────────────── */}
+          {ACCOUNTS_ON && !signedIn ? (
+            <div data-cg-signin="" data-cg-account-signedout="">
+              <p className="text-[14px] font-medium text-text">You're not signed in</p>
+              <p className="mb-3 mt-0.5 text-[12px] leading-snug text-muted">
+                Sign in to bring your licence and your saved shows to this browser. The show keeps playing while you do.
+              </p>
+              {LazySignInForm && (
+                <Suspense fallback={<div className="h-[152px]" />}>
+                  <LazySignInForm onSignedIn={onSignedIn} />
+                </Suspense>
+              )}
             </div>
-          </div>
-          <span
-            data-cg-license-tier={currentTier}
-            className="shrink-0 rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-200"
-          >
-            {tierLabel}
-          </span>
-        </div>
-
-        {onOpenSettings && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            data-cg-account-settings=""
-            className="mt-3 flex min-h-[38px] w-full items-center justify-between rounded-xl border border-white/15 bg-white/[0.05] px-3.5 py-2 text-xs font-medium text-neutral-100 transition hover:bg-white/10"
-          >
-            <span>Studio &amp; Stage Settings</span>
-            <span className="text-neutral-400">Open →</span>
-          </button>
-        )}
-
-        {currentTier !== 'pro' && (
-          <div
-            data-cg-account-store=""
-            className="mt-4 rounded-xl border border-amber-400/25 bg-amber-500/[0.06] p-3"
-          >
-            <div className="text-xs font-semibold uppercase tracking-wider text-amber-200">
-              {currentTier === 'home' ? 'Upgrade to Pro' : 'Get the ChromaGlass App'}
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-elevated text-[15px] font-medium text-text-2">
+                {checkoutEmail ? checkoutEmail.slice(0, 1).toUpperCase() : <User size={18} />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14px] font-medium text-text">
+                  {checkoutEmail || (ACCOUNTS_ON ? 'Signed in' : 'This computer')}
+                </div>
+                <div className="text-[12px] text-muted">
+                  {currentTier === 'pro' ? 'Everything is unlocked.' : currentTier === 'home' ? 'Home features are unlocked.' : 'The free plan.'}
+                </div>
+              </div>
+              <span
+                data-cg-license-tier={currentTier}
+                className={`shrink-0 rounded-md px-2 py-1 font-mono text-[11px] font-medium uppercase tracking-wider ${
+                  currentTier === 'free'
+                    ? 'border border-border-strong text-muted'
+                    : 'border border-accent-border bg-accent-bg text-accent-text'
+                }`}
+              >
+                {TIER_NAME[currentTier]}
+              </span>
             </div>
-            {currentTier === 'home' ? (
-              <div className="mt-2 flex flex-col gap-2">
-                <p className="text-xs leading-relaxed text-neutral-300">
-                  Pay only the difference ($164) to unlock multi-projector edge blend, Syphon/Spout/NDI, Art-Net DMX, OSC &amp; custom band logos on this account.
-                </p>
+          )}
+
+          {signedIn && !licenseInfo.valid && accountKey.state === 'declined' && (
+            <button
+              type="button"
+              data-cg-account-key-restore=""
+              onClick={() => {
+                allowAccountKeys();
+                void syncAccountLicense(true).then(refreshLicenseState);
+              }}
+              className="flex min-h-10 pointer-coarse:min-h-12 w-full items-center justify-between rounded-lg border border-accent-border bg-accent-bg px-3 text-[13px] font-medium text-text transition-colors hover:bg-accent/30"
+            >
+              <span>Use the {TIER_NAME[accountKey.tier]} licence on your account</span>
+              <span className="text-accent-text">→</span>
+            </button>
+          )}
+
+          {keyTrouble && (
+            <p data-cg-account-key-trouble="" className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[12px] leading-snug text-warn">
+              {keyTrouble}
+            </p>
+          )}
+
+          {/* ── 2. What you have, and what you can get ─────────── */}
+          {currentTier !== 'pro' && (
+            <div data-cg-account-store="" className={section}>
+              <div className={label}>{currentTier === 'home' ? 'Upgrade' : 'Get the full app'}</div>
+              {currentTier === 'home' ? (
                 <a
                   href={buildCheckoutUrl(CHECKOUT_UPGRADE_URL, checkoutEmail)}
                   target="_blank"
                   rel="noopener noreferrer"
                   data-cg-buy-upgrade=""
-                  className="flex min-h-[38px] items-center justify-between rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-neutral-950 transition hover:bg-amber-400"
+                  className="mt-2 flex flex-col rounded-lg border border-accent-border bg-accent-bg p-3 text-left transition-colors hover:bg-accent/30"
                 >
-                  <span>Upgrade Home → Pro</span>
-                  <span>$164</span>
-                </a>
-              </div>
-            ) : (
-              <div className="mt-2 flex flex-col gap-2">
-                <a
-                  href={buildCheckoutUrl(CHECKOUT_HOME_URL, checkoutEmail)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-cg-buy-home=""
-                  className="flex flex-col rounded-lg border border-white/15 bg-black/40 p-2.5 text-left transition hover:border-amber-400/50 hover:bg-black/60"
-                >
-                  <div className="flex items-center justify-between text-xs font-semibold text-neutral-100">
-                    <span>ChromaGlass Home</span>
-                    <span className="rounded bg-amber-500/20 px-2 py-0.5 text-amber-200">$35 · once</span>
+                  <div className="flex items-center justify-between text-[13px] font-medium text-text">
+                    <span>Home → Pro</span>
+                    <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$164</span> once</span>
                   </div>
-                  <p className="mt-1 text-[11px] leading-snug text-neutral-400">
-                    System audio capture, ambient TV mode, full-length unmarked recordings, 1080p/4K song renders &amp; phone remote (2 machines).
+                  <p className="mt-1 text-[12px] leading-snug text-text-2">
+                    Pay the difference for several projectors, video out, Art-Net, OSC and your own logo.
                   </p>
                 </a>
-                <a
-                  href={buildCheckoutUrl(CHECKOUT_PRO_URL, checkoutEmail)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-cg-buy-pro=""
-                  className="flex flex-col rounded-lg border border-amber-400/30 bg-black/50 p-2.5 text-left transition hover:border-amber-400/70 hover:bg-black/70"
-                >
-                  <div className="flex items-center justify-between text-xs font-semibold text-amber-200">
-                    <span>ChromaGlass Pro</span>
-                    <span className="rounded bg-amber-500 px-2 py-0.5 text-neutral-950">$199 · once</span>
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-neutral-300">
-                    Everything in Home + multi-projector edge blend, Syphon/Spout/NDI video out, Art-Net DMX, OSC &amp; your own band logo.
-                  </p>
-                </a>
-              </div>
-            )}
-            {checkoutEmail && (
-              <p className="mt-2 text-[11px] text-neutral-400">
-                Checkout pre-fills <span className="text-neutral-200">{checkoutEmail}</span> so your key links to this account automatically.
-              </p>
-            )}
-          </div>
-        )}
-
-        <MacAppCard tier={currentTier} />
-
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-neutral-400">License Key</span>
-            {licenseInfo.valid && (
-              <button
-                type="button"
-                data-cg-license-deactivate=""
-                disabled={licenseBusy}
-                onClick={handleDeactivateKey}
-                className="text-[11px] text-neutral-400 underline hover:text-neutral-200"
-              >
-                Deactivate machine
-              </button>
-            )}
-          </div>
-          <form onSubmit={handleActivateKey} className="mt-2 flex gap-1.5">
-            <input
-              type="text"
-              data-cg-license-input=""
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              placeholder={
-                licenseInfo.valid
-                  ? `Active (${licenseInfo.tier.toUpperCase()}) — paste key to upgrade`
-                  : 'Paste license key (cg1...)'
-              }
-              aria-label="License key"
-              className="min-h-[36px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 font-mono text-xs text-neutral-100 placeholder-neutral-500 focus:border-amber-400/60 focus:outline-none"
-            />
-            <button
-              type="submit"
-              data-cg-license-activate=""
-              disabled={licenseBusy || !keyInput.trim()}
-              className="min-h-[36px] shrink-0 rounded-lg bg-amber-500/90 px-3 py-1.5 text-xs font-medium text-neutral-950 transition hover:bg-amber-400 disabled:opacity-40"
-            >
-              {licenseInfo.valid ? 'Upgrade' : 'Activate'}
-            </button>
-          </form>
-          {licenseError && (
-            <p
-              data-cg-license-error=""
-              className="mt-1.5 text-xs text-red-300"
-            >
-              {licenseError}
-            </p>
-          )}
-        </div>
-
-        <div className="mt-4">
-          <div className="text-xs uppercase tracking-wider text-neutral-500">Running shows</div>
-          {accountShows.length > 0 ? (
-            <div className="mt-2 flex flex-col gap-1.5" data-testid="account-shows">
-              {accountShows.map((show) => (
-                <button
-                  key={show.id}
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    joinAccountShow(show);
-                  }}
-                  data-testid="account-show-join"
-                  data-cg-account-show={show.id}
-                  className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-left text-sm font-medium text-neutral-100 transition hover:bg-white/15"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-                    <span className="truncate">{show.name}</span>
-                  </span>
-                  <span className="shrink-0 text-xs font-medium text-amber-300">Join</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-1 text-xs text-neutral-500" data-testid="account-shows-empty">
-              No running shows on this account.
-            </p>
-          )}
-        </div>
-
-        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3" data-cg-account-marketing="">
-          {unsubscribedBanner && !marketingOptIn && (
-            <p className="mb-2 rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-2.5 py-1.5 text-xs text-emerald-200">
-              You have been unsubscribed from ChromaGlass marketing &amp; newsletter emails.
-            </p>
-          )}
-          <label className="flex cursor-pointer items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs font-medium text-neutral-100">Newsletter &amp; product updates</div>
-              <p className="mt-0.5 text-[11px] leading-snug text-neutral-400">
-                Occasional emails about new looks, fluid engine updates &amp; release notes. Unsubscribe anytime.
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              data-cg-marketing-toggle=""
-              checked={marketingOptIn}
-              onChange={(e) => void handleToggleMarketing(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/30 bg-black accent-amber-500"
-            />
-          </label>
-        </div>
-
-        <div className="mt-5 flex flex-col gap-2.5">
-          {signedOut ? (
-            <div
-              data-cg-signin=""
-              className="rounded-xl border border-white/15 bg-white/[0.04] p-3.5 text-center"
-            >
-              <p className="text-xs text-neutral-200">
-                Signed out on this browser. The plate and show stay running; the next load will ask to sign in.
-              </p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="mt-2.5 min-h-[40px] w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-neutral-100 hover:bg-white/15"
-              >
-                Return to show
-              </button>
-            </div>
-          ) : (
-            <>
-              {confirmMode !== 'signout' ? (
-                <button
-                  type="button"
-                  data-cg-account-signout=""
-                  disabled={busy}
-                  onClick={() => {
-                    setConfirmMode('signout');
-                    setError(null);
-                  }}
-                  className="min-h-[44px] w-full rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15"
-                >
-                  Sign out
-                </button>
               ) : (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 p-3">
-                  <p className="mb-2 text-xs text-amber-200">
-                    Sign out of ChromaGlass on this device?
-                  </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <a
+                    href={buildCheckoutUrl(CHECKOUT_HOME_URL, checkoutEmail)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-cg-buy-home=""
+                    className="flex flex-col rounded-lg border border-border-strong bg-elevated p-3 text-left transition-colors hover:bg-hover"
+                  >
+                    <span className="text-[13px] font-medium text-text">Home</span>
+                    <span className="text-[12px] text-muted"><span className="font-mono font-medium text-text-2">$35</span> once</span>
+                    <span className="mt-1.5 text-[12px] leading-snug text-muted">Full-length recording, 4K renders, system audio, phone remote.</span>
+                  </a>
+                  <a
+                    href={buildCheckoutUrl(CHECKOUT_PRO_URL, checkoutEmail)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-cg-buy-pro=""
+                    className="flex flex-col rounded-lg border border-accent-border bg-accent-bg p-3 text-left transition-colors hover:bg-accent/30"
+                  >
+                    <span className="text-[13px] font-medium text-text">Pro</span>
+                    <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$199</span> once</span>
+                    <span className="mt-1.5 text-[12px] leading-snug text-text-2">All of Home, plus several projectors, video out, Art-Net, OSC.</span>
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className={currentTier === 'pro' ? section : ''}>
+            <div className="flex items-center justify-between">
+              <span className={label}>Licence key</span>
+              {licenseInfo.valid && (
+                <button type="button" data-cg-license-deactivate="" disabled={licenseBusy} onClick={handleDeactivateKey} className={textBtn}>
+                  Remove from this computer
+                </button>
+              )}
+            </div>
+            <form onSubmit={handleActivateKey} className="mt-2 flex gap-2">
+              <input
+                type="text"
+                data-cg-license-input=""
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                placeholder={licenseInfo.valid ? `${TIER_NAME[licenseInfo.tier]} key active` : 'Paste a key (cg1…)'}
+                aria-label="Licence key"
+                className="min-h-10 pointer-coarse:min-h-12 min-w-0 flex-1 rounded-lg border border-border-strong bg-bg px-3 font-mono text-[12px] text-text placeholder-dim focus:border-accent focus:outline-none"
+              />
+              <button
+                type="submit"
+                data-cg-license-activate=""
+                disabled={licenseBusy || !keyInput.trim()}
+                className={ghostBtn}
+              >
+                Activate
+              </button>
+            </form>
+            {licenseError && (
+              <p data-cg-license-error="" className="mt-2 text-[12px] text-live">
+                {licenseError}
+              </p>
+            )}
+          </div>
+
+          {/* ── 3. Everything else ────────────────────────────── */}
+          {/* Signed in, one quiet line says there are none (`accountlink` 4 reads
+              it): a phone looking for its laptop's show learns that here. */}
+          {(signedIn || accountShows.length > 0) && (
+            <div className={section}>
+              <div className={label}>Running shows</div>
+              {accountShows.length === 0 ? (
+                <p className="mt-1 text-[12px] text-dim" data-testid="account-shows-empty">No running shows on this account.</p>
+              ) : (
+              <div className="mt-2 flex flex-col gap-1.5" data-testid="account-shows">
+                {accountShows.map((show) => (
+                  <button
+                    key={show.id}
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      joinAccountShow(show);
+                    }}
+                    data-testid="account-show-join"
+                    data-cg-account-show={show.id}
+                    className="flex min-h-10 pointer-coarse:min-h-12 w-full items-center justify-between gap-2 rounded-lg border border-border-strong bg-elevated px-3 text-left text-[13px] font-medium text-text transition-colors hover:bg-hover"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="h-2 w-2 shrink-0 rounded-full bg-ok" />
+                      <span className="truncate">{show.name}</span>
+                    </span>
+                    <span className="shrink-0 text-[12px] text-accent-text">Join</span>
+                  </button>
+                ))}
+              </div>
+              )}
+            </div>
+          )}
+
+          {signedIn && email && <CloudSyncCard tier={currentTier} email={email} />}
+
+          <MacAppCard tier={currentTier} />
+
+          {/* Signed out, the sign-in form above carries its own opt-in. */}
+          {(!ACCOUNTS_ON || signedIn || unsubscribedBanner) && (
+          <div className={section} data-cg-account-marketing="">
+            {unsubscribedBanner && !marketingOptIn && (
+              <p className="mb-2 rounded-md border border-ok/30 bg-ok/10 px-2.5 py-1.5 text-[12px] text-ok">
+                You're unsubscribed from ChromaGlass emails.
+              </p>
+            )}
+            <label className="flex min-h-10 cursor-pointer items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block text-[13px] font-medium text-text">Email me about new looks</span>
+                <span className="block text-[12px] text-muted">A few times a year. Off any time.</span>
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                aria-checked={marketingOptIn}
+                data-cg-marketing-toggle=""
+                checked={marketingOptIn}
+                onChange={(e) => void handleToggleMarketing(e.target.checked)}
+                className="h-4 w-4 shrink-0 rounded border-border-strong bg-bg accent-accent"
+              />
+            </label>
+          </div>
+          )}
+
+          {signedIn && (
+            <div className={section}>
+              {confirmMode === 'signout' ? (
+                <div className="rounded-lg border border-border-strong bg-elevated p-3">
+                  <p className="mb-2 text-[13px] text-text-2">Sign out on this browser? The show keeps playing.</p>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       data-cg-account-signout-confirm=""
                       disabled={busy}
                       onClick={handleConfirmSignOut}
-                      className="min-h-[40px] flex-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-neutral-950 hover:bg-amber-400 disabled:opacity-50"
+                      className="min-h-10 pointer-coarse:min-h-12 flex-1 rounded-lg bg-primary px-3 text-[13px] font-medium text-on-primary hover:opacity-90 disabled:opacity-50"
                     >
-                      Confirm sign out
+                      Sign out
                     </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setConfirmMode('none')}
-                      className="min-h-[40px] rounded-lg border border-white/15 px-3 py-2 text-xs text-neutral-300 hover:bg-white/10"
-                    >
+                    <button type="button" disabled={busy} onClick={() => setConfirmMode('none')} className={ghostBtn}>
                       Cancel
                     </button>
                   </div>
                 </div>
-              )}
-
-              {confirmMode !== 'delete' ? (
-                <button
-                  type="button"
-                  data-cg-account-delete=""
-                  disabled={busy}
-                  onClick={() => {
-                    setConfirmMode('delete');
-                    setError(null);
-                  }}
-                  className="min-h-[44px] w-full rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-2.5 text-sm font-medium text-red-200 transition hover:bg-red-950/50"
-                >
-                  Delete account
-                </button>
-              ) : (
-                <div className="rounded-xl border border-red-500/40 bg-red-950/40 p-3">
-                  <p className="mb-2 text-xs text-red-200">
-                    Permanently delete your ChromaGlass account? This cannot be undone.
+              ) : confirmMode === 'delete' ? (
+                <div className="rounded-lg border border-live-border bg-live-bg p-3">
+                  <p className="mb-2 text-[13px] text-live">
+                    Delete your ChromaGlass account for good? Licences you bought stay valid on the computers that have them.
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -528,70 +527,71 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
                       data-cg-account-delete-confirm=""
                       disabled={busy}
                       onClick={handleConfirmDelete}
-                      className="min-h-[40px] flex-1 rounded-lg bg-red-500 px-3 py-2 text-xs font-semibold text-neutral-950 hover:bg-red-400 disabled:opacity-50"
+                      className="min-h-10 pointer-coarse:min-h-12 flex-1 rounded-lg bg-live px-3 text-[13px] font-medium text-on-primary hover:opacity-90 disabled:opacity-50"
                     >
-                      Confirm delete account
+                      Delete account
                     </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setConfirmMode('none')}
-                      className="min-h-[40px] rounded-lg border border-white/15 px-3 py-2 text-xs text-neutral-300 hover:bg-white/10"
-                    >
+                    <button type="button" disabled={busy} onClick={() => setConfirmMode('none')} className={ghostBtn}>
                       Cancel
                     </button>
                   </div>
                 </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    data-cg-account-signout=""
+                    disabled={busy}
+                    onClick={() => {
+                      setConfirmMode('signout');
+                      setError(null);
+                    }}
+                    className={ghostBtn}
+                  >
+                    Sign out
+                  </button>
+                  <button
+                    type="button"
+                    data-cg-account-delete=""
+                    disabled={busy}
+                    onClick={() => {
+                      setConfirmMode('delete');
+                      setError(null);
+                    }}
+                    className="min-h-10 pointer-coarse:min-h-12 px-2 text-[12px] text-dim underline decoration-faint underline-offset-2 hover:text-live disabled:opacity-50"
+                  >
+                    Delete account
+                  </button>
+                </div>
               )}
-            </>
+            </div>
+          )}
+          {/* Outside the signed-in block: a sign-out or delete that fails can leave
+              the sheet signed out, and its reason must still be read. */}
+          {error && (
+            <p className="rounded-lg border border-live-border bg-live-bg px-3 py-2 text-[12px] text-live">{error}</p>
           )}
         </div>
 
-        {error && (
-          <p className="mt-3 rounded-lg border border-red-500/30 bg-red-950/50 px-3 py-2 text-xs text-red-200">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-5 border-t border-white/10 pt-3 text-center">
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-neutral-400">
-            <a
-              href="https://chromaglass.lemonsqueezy.com/billing"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-            >
-              Orders &amp; Invoices
-            </a>
-            <span>·</span>
-            <a
-              href="mailto:support@chromaglass.art"
-              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-            >
-              Support
-            </a>
-            <span>·</span>
-            <a
-              href="/privacy.html"
-              target="_blank"
-              rel="noopener"
-              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-            >
-              Privacy
-            </a>
-            <span>·</span>
-            <a
-              href="/terms.html"
-              target="_blank"
-              rel="noopener"
-              className="underline decoration-neutral-600 underline-offset-2 hover:text-neutral-200"
-            >
-              Terms
-            </a>
-          </div>
-          <p className="mt-2 text-[11px] leading-snug text-neutral-500">
-            Home &amp; Pro are one-time purchases (no recurring subscription). Marketing emails are strictly opt-in and can be turned off above or at <span className="text-neutral-400">/unsubscribe</span>.
-          </p>
+        <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-border px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-[12px] text-muted">
+          <a
+            href="https://chromaglass.lemonsqueezy.com/billing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-faint underline-offset-2 hover:text-text"
+          >
+            Orders
+          </a>
+          <a href="mailto:support@chromaglass.art" className="underline decoration-faint underline-offset-2 hover:text-text">
+            Support
+          </a>
+          <a href="/privacy.html" target="_blank" rel="noopener" className="underline decoration-faint underline-offset-2 hover:text-text">
+            Privacy
+          </a>
+          <a href="/terms.html" target="_blank" rel="noopener" className="underline decoration-faint underline-offset-2 hover:text-text">
+            Terms
+          </a>
+          <span className="text-dim">One-time purchases, no subscription.</span>
         </div>
       </div>
     </div>

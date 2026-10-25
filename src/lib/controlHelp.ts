@@ -44,6 +44,7 @@ export const CONTROL_HELP: Record<string, string> = {
   bubbles: 'Trapped air bubbles on the plate. A few go a long way.',
   saturationBoost: 'Colour strength of the finished picture, from washed out to vivid.',
   edgeRelief: 'The curved rim where a blob of liquid meets the glass: a dark edge and a bright refracted highlight.',
+  projectorFocus: 'Moves the projector lens\'s focus through the liquid, turning edges into bright and dark Becke lines.',
   lacing: 'Pale threads along the line where two colours meet, finer where the flow pulls them apart.',
   benDay: 'Prints the picture as a comic: flat inks with the tones laid down as even dots.',
   sharpness: 'How crisp the edge of a colour stays. Low lets the solver smear it soft, high holds it hard.',

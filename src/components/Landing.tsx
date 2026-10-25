@@ -28,7 +28,7 @@ import { introOut } from '../lib/intro';
  *
  * "Play free" mounts the sign-in over this page rather than replacing it, so
  * the card sits on the hero and a visitor who backs out of it is still on the
- * page. The choice is kept in sessionStorage for the tab: Google and Apple
+ * page. The choice is kept in sessionStorage for the tab: Google can
  * sign in by a redirect that reloads the page, and the sign-in screen is what
  * collects that redirect, so a reload with the flag set goes straight to it.
  *
@@ -196,7 +196,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </a>
           </div>
           <p className="mt-4 text-[13px] leading-relaxed text-muted">
-            Free in your browser, nothing to install. Sign in with Google, Apple or an emailed link.
+            Free in your browser, nothing to install. Sign in with Google or an emailed link.
           </p>
           <p className="mt-1 font-mono text-[12px] text-dim">
             Home $35 · Pro $199 · one-time payment, no subscription

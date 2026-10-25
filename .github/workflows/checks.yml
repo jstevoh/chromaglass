@@ -569,6 +569,13 @@ jobs:
       - name: The Mac app's updates
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run updates
+      # Cloud sync for Pro (PLAN.md 23.18, scripts/cloudsync.mjs): two devices,
+      # each with its own storage like a browser and the Mac app, syncing through
+      # the licence Worker's /sync against in-memory KV with real RS256 tokens.
+      # Node only, so `logic`.
+      - name: Cloud sync between two devices
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run cloudsync
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
@@ -706,6 +713,15 @@ jobs:
       - name: Preview's copy
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/draftwall.mjs
+      # Any camera, anywhere (scripts/cameras.mjs, PLAN.md 14ad): two stand-in
+      # cameras behind navigator.mediaDevices, nameless until one is allowed.
+      # Both pickers (the motion camera and the film's Webcam) on the desk and
+      # the phone, a camera opened by the id picked, each choice remembered
+      # apart, an unplugged camera taken off and opened again when it is back.
+      # No GPU; the site the steps above built.
+      - name: Any camera
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/cameras.mjs
 
       # The phone (scripts/phone.mjs): on an emulated phone, in portrait and
       # landscape, every tool and sheet in reach at 48 px, the plate keeping

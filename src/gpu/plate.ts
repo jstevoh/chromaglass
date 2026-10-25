@@ -15,7 +15,7 @@
  * into being told different things.
  */
 
-import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import { Disposer, PipelineCache, type Prep, layoutEntries, layoutFromWgsl, type RenderRecipe } from './kit';
 import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { PLATE_LAYOUT } from './wgsl/plateFields';
@@ -62,10 +62,23 @@ export function pictureSize(image: CanvasImageSource): [number, number] {
   before the show opens, cannot describe two different pipelines under one
   name (the cache would hand the frame whichever was built first).
 */
+/*
+  The derive pass's layout: layoutFromWgsl's, except binding 4, the poured
+  liquids' species (PLAN 18d-9). layoutFromWgsl takes every f32 texture a
+  fragment shader names to be sampled, and the species is rgba32float, which
+  is not filterable without a feature the plate does not ask for: the derive
+  pass reads it with textureLoad, and the layout has to say so.
+*/
+function deriveLayout(device: GPUDevice): GPUBindGroupLayout {
+  const entries = layoutEntries(DERIVE_WGSL, GPUShaderStage.FRAGMENT)
+    .map((e) => (e.binding === 4 ? { ...e, texture: { sampleType: 'unfilterable-float' as GPUTextureSampleType } } : e));
+  return device.createBindGroupLayout({ label: 'derive', entries });
+}
+
 function deriveRecipe(device: GPUDevice): RenderRecipe {
   return (module) => ({
     layout: device.createPipelineLayout({
-      bindGroupLayouts: [layoutFromWgsl(device, DERIVE_WGSL, 'derive', GPUShaderStage.FRAGMENT)],
+      bindGroupLayouts: [deriveLayout(device)],
     }),
     /*
       Flipped, as every pass into a texture another pass samples is (the
@@ -360,12 +373,15 @@ export class WebGPUPlate {
           colorAttachments: [{ view: this.layers[i].derived.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }],
         });
         pass.setPipeline(derive);
+        const viewTex = fields[i]?.view ?? this.blankU;
         pass.setBindGroup(0, this.device.createBindGroup({
           layout: derive.getBindGroupLayout(0),
           entries: [
             { binding: 0, resource: { buffer: this.uniformBuffer } },
             { binding: 1, resource: this.sampler },
             { binding: 2, resource: this.layers[i].dye.createView() },
+            { binding: 3, resource: viewTex.createView() },
+            { binding: 4, resource: (fields[i]?.species ?? this.blankSpecies).createView() },
           ],
         }));
         pass.draw(6);

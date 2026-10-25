@@ -23,49 +23,41 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
   }, [updates]);
 
   const row = macAppRow(tier, onMacComputer(), state, !!updates);
+  // The sheet's own classes (AccountSheet, CloudSyncCard), so the card reads as one of its sections.
+  const label = 'text-[11px] font-medium uppercase tracking-wider text-dim';
+  const note = 'mt-1 text-[12px] leading-snug text-muted';
+  const what = 'The show offline, with the phone remote, OSC and the projector built in.';
   return (
-    <div data-cg-mac-app={row.kind} className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+    <div data-cg-mac-app={row.kind} className="border-t border-border pt-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wider text-neutral-400">Mac app</span>
-        {row.kind === 'in-app' && row.current && <span className="font-mono text-[11px] text-neutral-400">{row.current}</span>}
+        <div className={label}>Mac app</div>
+        {row.kind === 'in-app' && row.current && <span className="font-mono text-[11px] text-dim">{row.current}</span>}
       </div>
       {row.kind === 'download' && (
         <>
-          <p className="mt-1.5 text-[11px] leading-snug text-neutral-400">
-            The show offline, with the phone remote, OSC and the projector built in. For Macs with Apple silicon.
-          </p>
+          <p className="mt-1 text-[12px] leading-snug text-text-2">{what} For Macs with Apple silicon.</p>
           <a
             href={row.href}
             data-cg-mac-download=""
-            className="mt-2 flex min-h-[38px] items-center justify-between rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-neutral-950 transition hover:bg-amber-400"
+            className="mt-2 flex min-h-10 pointer-coarse:min-h-12 w-full items-center justify-between rounded-lg border border-accent-border bg-accent-bg px-3 text-[13px] font-medium text-text transition-colors hover:bg-accent/30"
           >
             <span>Download for Mac</span>
-            <span aria-hidden="true">↓</span>
+            <span className="text-accent-text" aria-hidden="true">↓</span>
           </a>
-          <p className="mt-2 text-[11px] leading-snug text-neutral-500">
-            Drag it into Applications. It tells you when a new version is out.
-          </p>
+          <p className={note}>Drag it into Applications. It tells you when a new version is out.</p>
         </>
       )}
-      {row.kind === 'on-a-mac' && (
-        <p className="mt-1.5 text-[11px] leading-snug text-neutral-400">
-          Open chromaglass.art on your Mac and download it from Profile &amp; Store there.
-        </p>
-      )}
-      {row.kind === 'with-pro' && (
-        <p className="mt-1.5 text-[11px] leading-snug text-neutral-400">
-          The Mac app comes with Pro: the show offline, with the phone remote, OSC and the projector built in.
-        </p>
-      )}
+      {row.kind === 'on-a-mac' && <p className={note}>Open chromaglass.art on your Mac and download it from this sheet there.</p>}
+      {row.kind === 'with-pro' && <p className={note}>The Mac app comes with Pro. {what}</p>}
       {row.kind === 'in-app' && (
         <>
-          <p className="mt-1.5 text-[11px] leading-snug text-neutral-400" data-cg-mac-update={state?.status ?? 'off'}>{row.line}</p>
+          <p className="mt-1 text-[13px] text-text" data-cg-mac-update={state?.status ?? 'off'} aria-live="polite">{row.line}</p>
           {row.button && (
             <button
               type="button"
               data-cg-mac-update-act=""
               onClick={() => { updates?.act().then(setState).catch(() => {}); }}
-              className="mt-2 flex min-h-[36px] w-full items-center justify-center rounded-lg border border-white/15 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-neutral-100 transition hover:bg-white/10"
+              className="mt-2 flex min-h-10 pointer-coarse:min-h-12 items-center justify-center rounded-lg border border-border-strong px-3 text-[13px] font-medium text-text-2 transition-colors hover:bg-hover"
             >
               {row.button}
             </button>
