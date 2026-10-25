@@ -8098,14 +8098,19 @@ next step in the physics. (d) *Rupture is a relaxation to 8 nm*, not a nucleatio
 the lace and islands come from the flow's noise, not from a model of bursting. (e) *Explicit
 Marangoni plug flow* (the surfactant's own motion) is left out: it is stiff (wave speed
 about 7.7 m/s on this grid) and the Darcy flow already carries the exchange. (f) *Angled
-reflectance keeps normal-incidence Fresnel amplitudes (no s/p split), and the 2D
-soft-box diffuse fill is a 4-point path quadrature plus a luminance-preserving linear
-notch floor.* At viewing angle `θ_i` the optical path in the film scales as `2 n d cos θ_t`
-by Snell's law, while the interface reflection amplitudes `r_01` and `r_12` remain the
-normal-incidence values `(n_a − n_b)/(n_a + n_b)` rather than splitting into s and p
-polarisations; on a 2D film (`ny > 1`), the extended soft-box hemisphere is summarised by a
-4-point angular path spread (`spread = 0.025`), dark-ground transmittance (`ground = 0.0004`),
-and a luminance-preserving linear notch floor (`notchFloor = 0.0725`, `chromaRetention = 0.67`).
+reflectance keeps normal-incidence Fresnel amplitudes (no s/p split), and on 2D films
+`notchFloor` and `chromaRetention` are a colour grade standing in for the soft box's
+angular spread and the camera's gamut, not the physics itself.* At viewing angle `θ_i`
+the optical path in the film scales as `2 n d cos θ_t` by Snell's law, while the interface
+reflection amplitudes `r_01` and `r_12` remain the normal-incidence values
+`(n_a − n_b)/(n_a + n_b)` rather than splitting into s and p polarisations; on a 2D film
+(`ny > 1`), the 4-point angular path spread (`spread = 0.025`) and dark ground
+(`ground = 0.0004`) alone move saturation at `t = 120` s by two points from 79% to 77%
+(dark 22.7%, 9/12 hues), and `notchFloor = 0.0725` and `chromaRetention = 0.67` are a
+colour grade fitted to the photograph's 15% saturated (bringing saturation from 77% with
+the grade off to 13% at `t = 120` s and 14.8% at `t = 110` s with the grade on, dark 19.4%,
+8/12 hues) standing in for integrating over the soft box's solid angle and mapping into the
+camera's gamut (32b-1 below).
 Literature the model sits in: Chomaz, *J. Fluid Mech.* 2001 (the vertical film's
 convection), Gros, Bussonnière and Cantat on marginal regeneration, and Huang and
 colleagues 2020.
@@ -8145,14 +8150,18 @@ drains like a real one (quarter means grow top to bottom from 30 s on, the top r
 true rupture first and by 120 s, a ruptured cell stays black); C7 it looks like the
 photograph (a window of at least three samples in a row in which film under 30 nm is
 between 0.5% and 6%, dark between 3% and 25%, saturated over 10% and at least 7 of the 12
-hue sectors held). Black is the film's thickness, never the picture's brightness. Against
+hue sectors held; check C7 has no upper bound on saturation — `sat > 0.10` only — so it
+would pass a film far more saturated than the photograph, such as main's 79% or the
+ungraded 77%, for a check session to add that bar). Black is the film's thickness, never the picture's brightness. Against
 a scratch prototype of the model above (not committed) it reads 23 of 23; with no
 `src/lib/soapFilm.ts` it exits 1 and says so. A bar is never moved to get green: if the
 model cannot reach one, the PR says what it reached and asks.
 
 ### ~~32a. The CPU reference~~ — **Shipped, #403** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a)
 
-### ~~32b. The reflected view~~ — **Shipped, this PR (#469)** (`soapFilmRgb` soft-box + dark-ground reflected optics in `src/lib/soapFilm.ts`, shortcut (f) named in `PLAN.md` §32 and `src/lib/soapFilm.ts`; `npm run soapfilm` 23/23 with C7 saturation bar unchanged, `npm run filmtable` 8/8; at t=110 s saturated 15%, silver 8.1%, dark 12.3%, black 1.5%, 12/12 hues; at t=120 s film under 30 nm 5.1%, dark 19.4%, saturated 13%, silver 10.2%, 8/12 hues; 3-angle render at 0°/30°/50° shows bands shift down by 13–18 rows while Newton-black lace stays at row 1.00–1.09; story in `docs/plan-shipped.md` §32b; named shortcuts (a)–(f) stay open for 32c–32d)
+### ~~32b. The reflected view~~ — **Shipped, this PR (#469)** (`soapFilmRgb` reflected view in `src/lib/soapFilm.ts` with Snell path factor `d_eff = h cos θ_t`, 4-point path spread `spread = 0.025`, dark ground `ground = 0.0004`, and colour grade `notchFloor = 0.0725`, `chromaRetention = 0.67` named under shortcut (f) in `PLAN.md` §32 and `src/lib/soapFilm.ts`; `npm run soapfilm` 23/23 with C7 saturation bar unchanged, `npm run filmtable` 8/8; control with the grade off (`notchFloor = 0`, `chromaRetention = 1`) is 77% saturated, 22.7% dark, 9/12 hues at t=120 s, and with the grade on is 13% saturated, 19.4% dark, 8/12 hues at t=120 s (14.8% saturated, 12/12 hues at t=110 s) against the photograph's 15% saturated and 9/12 hues; 3-angle render at 0°/30°/50° shows bands shift down by 13–18 rows while Newton-black lace stays at row 1.00–1.09; story in `docs/plan-shipped.md` §32b; replacing the grade with the real solid-angle integral and camera gamut mapping is 32b-1 below)
+
+- **32b-1. Replace the colour grade with the soft box's solid-angle integral and camera gamut mapping.** In 32b, the 4-point path spread (`spread = 0.025`) and dark ground (`ground = 0.0004`) move C7's `t = 120` s saturation by two points (79% → 77%), while the colour grade (`notchFloor = 0.0725`, `chromaRetention = 0.67`) accounts for the rest of the drop from 77% to 13% against the photograph's 15%. Replace that grade with the real phenomenon: integrate the film's Airy reflectance over the soft box's solid angle as a quadrature in `cosI` with s and p Fresnel reflection terms at each angle and the thickness's phase `4π n d cos θ_t / λ` at each angle (which also retires the Fresnel half of shortcut (f)), then map the integrated CIE XYZ tristimulus into the camera's sRGB gamut instead of clamping negative linear channels to zero. *Measure:* the same saturation and hue numbers `npm run soapfilm` C7 prints, with the grade removed (`notchFloor = 0`, `chromaRetention = 1`), showing how much of the 77% → 15% saturation drop the solid-angle integral and camera gamut mapping recover. Also note that check C7 in `scripts/soapfilm.mjs` has no upper bound on saturation (`sat > 0.10` only, so it would pass a film far more saturated than the photograph, such as main's 79% or the ungraded 77%), for a check session to add that bar.
 
 ### 32c. The GPU solver
 

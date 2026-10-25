@@ -48,22 +48,25 @@
      is marked ruptured, relaxes exponentially toward 8 nm over a 0.5 s time
      constant, and cannot refill above 30 nm from neighbouring thicker film.
 
-  4. Reflected colour at viewing angle under a soft-box lamp on a dark ground (32b):
+  4. Reflected colour at viewing angle on a dark ground (32b):
      `soapFilmRgb` maps each cell's thickness h to sRGB 0..1 through Airy's
      multi-beam reflectance (`filmReflectance` / `filmColour` in `filmTable.ts`)
      at incidence cosine `cosI` in air, where Snell's law gives the internal
      path factor cos(theta_t) = sqrt(1 - (n0 / n1)^2 (1 - cosI^2)) and effective
      path thickness d_eff = h cos(theta_t). For a 2D film in a frame (`ny > 1`,
-     or when `softBox: true`), the lamp is modelled as an extended 5500 K soft
-     box against a dark ground (`ground = 0.0004` through transmittance 1 - R):
-     Airy reflectance is integrated over a 4-point angular path spread (`spread =
-     0.025`) around `d_eff`, out-of-gamut negative linear sRGB excursions are
-     clamped before mixing, and the extended soft-box hemisphere supplies a
-     broadband notch floor (`notchFloor = 0.0725` of peak linear channel) and
-     chromatic retention (`chromaRetention = 0.67`) while preserving the film's
-     physical luminous reflectance Y(d_eff). This matches the reference
-     photograph's ~15% saturated (`ch > 0.25`) and ~10.9% silver while keeping
-     Newton-black (< 30 nm), dark (< 0.20 luma) and all hue sectors.
+     or when `softBox: true`), Airy reflectance is summed over a 4-point path
+     spread (`spread = 0.025`) around `d_eff` on a dark ground (`ground = 0.0004`
+     through transmittance 1 - R), and negative linear sRGB channels are clamped
+     to 0. That 4-point path spread and dark ground alone move C7's t = 120 s
+     saturation from 79% to 77% (dark 22.7%, 9/12 hues). The rest of the drop to
+     the reference photograph's 15% saturated (13% at t = 120 s, 14.8% at
+     t = 110 s, dark 19.4%, 8/12 hues) is a colour grade (`notchFloor = 0.0725`
+     lifting each pixel's lowest linear channel and `chromaRetention = 0.67`
+     pulling each channel a third of the way toward grey while rescaling to
+     preserve luminous reflectance Y(d_eff)) standing in for the soft box's
+     angular spread and the camera's gamut, not the physics itself (named
+     shortcut (f); PLAN.md 32b-1 replaces the grade with the real solid-angle
+     integral and camera gamut mapping).
 
   Named shortcuts (PLAN.md §32):
   - (a) Gravity acts along +y in the plane of the film (`yhat`), representing a
@@ -78,9 +81,13 @@
     inextensibility constraint is carried directly by `div u = 0`.
   - (f) Angled reflectance (`cosI < 1`) keeps normal-incidence Fresnel
     amplitudes r01, r12 = (n_a - n_b) / (n_a + n_b) (no s/p polarisation split);
-    and for 2D films the extended soft-box diffuse fill is summarised by a 4-point
-    angular path spread (`spread = 0.025`) plus a luminance-preserving linear
-    notch floor (`notchFloor = 0.0725`, `chromaRetention = 0.67`).
+    and on 2D films (`ny > 1`), `notchFloor = 0.0725` and `chromaRetention = 0.67`
+    are a colour grade standing in for the soft box's angular spread and the
+    camera's gamut, not the physics itself: with the grade off (`notchFloor = 0`,
+    `chromaRetention = 1`, keeping `spread = 0.025` and `ground = 0.0004`) the
+    film's saturation at t = 120 s is 77% (dark 22.7%, 9/12 hues), and with the
+    grade on it is 13% at t = 120 s (14.8% at t = 110 s, dark 19.4%, 8/12 hues)
+    against the photograph's 15% (PLAN.md 32b-1).
 */
 
 import { filmColour, filmReflectance, SOAP } from './filmTable';
@@ -566,7 +573,8 @@ function getSoftBoxLut(
  * `0..1`, row 0 at the top.
  *
  * For a 2D film in a frame (`f.ny > 1`, or when `opts.softBox` is true), the
- * reflection uses the soft-box lamp and dark ground at effective optical
+ * reflection uses the 4-point path spread, dark ground, and shortcut (f)'s
+ * colour grade (`notchFloor`, `chromaRetention`) at effective optical
  * thickness `d_eff = h * cos(theta_t)`. For a 1-row calibration strip
  * (`f.ny === 1` and `opts.softBox !== true`), it evaluates `filmColour`
  * directly.
