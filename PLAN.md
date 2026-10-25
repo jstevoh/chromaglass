@@ -6424,6 +6424,64 @@ once the login works (23.14).*
   them. maybe later - but not now."). The button is held behind `APPLE_SIGN_IN` in
   `SignInScreen.tsx`, the landing page and the privacy page say Google or an emailed
   link. *Measure:* `npm run signin` line 4 fails if an Apple button is drawn.
+- **23.10e** (**shipped**, this PR): email and password accounts (the owner, 2026-10-24:
+  "an email login option that stores passwords and other account details ... and if they
+  have a google account it can link to that"). Firebase Email/Password beside Google and the
+  emailed link; Firebase keeps one account per email, so a password is one more way into the
+  same uid and the licence (keyed on the email, `keys:<email>`) follows with no Worker change.
+  *Sign-in form* (`SignInForm`, shared by the first-visit screen, the account sheet on the desk
+  and the phone): "Continue with email" opens an Emailed link / Password pair of tabs; Password
+  has sign in, create account, show/hide, and "Forgot password?". Sign-up mails the confirmation
+  link at once. An address that already has an account says so, and offers "Continue with Google
+  and add this password" (Google, then `linkWithCredential`). A Google sign-in Firebase refuses
+  because the email has a password keeps Google's credential and attaches it on the next
+  password sign-in. *Account sheet* (`AccountSignInMethods.tsx`): which ways in the account has,
+  "Set a password" (a Google account: `linkWithCredential`; an emailed-link one: `updatePassword`),
+  and, for an unconfirmed password account, a banner with "I've confirmed" (reload, renew the
+  token, ask the Worker for the licence) and "Send it again". **Why confirmation matters:** the
+  licence Worker already refuses an ID token whose email is not verified
+  (`license-worker.js`, `email_verified === false`), which is what stops a stranger signing up
+  with someone else's address from reading that person's licence; an unconfirmed account reads
+  Free until the link is opened. *Measure:* `npm run signin` 17–21 (the real SDK against the Auth
+  emulator): sign-up makes one unconfirmed account, mails the link, starts the plate, a filed Pro
+  key reads Free until confirmed and Pro after; on a phone the password signs in to the same uid,
+  a wrong one is refused in words, a reset is mailed; a Google account signed up again gets no
+  second account and ends with `google.com` + `password` on one uid; a Google and an
+  emailed-link account each set a password from the sheet and sign in with it; the password form
+  fits 1024×768 and a phone upright and on its side. *Owner's chore, once:* Firebase console →
+  Authentication → Sign-in method → enable Email/Password (the emailed-link toggle is already
+  on; email link cannot be on without the Email/Password provider, so this may already be done,
+  look before calling it owed) and leave Settings → User account linking on "Link accounts that
+  use the same email".
+  Open follow-ups:
+  **23.10e-1** (open): an emailed-link account cannot be told from a password one from the
+  browser (Firebase lists the `password` provider for both), so the sheet says "Email (link or
+  password)" and "Set a new password"; an Admin-SDK call in the Worker could say which.
+  **23.10e-2** (open): the reset and confirmation emails use Firebase's default templates and
+  sender; the console's template editor can carry the ChromaGlass name and the support address
+  once the mail service (23.13-mail) exists. **23.10e-3** (open): a password policy (the console's
+  password-strength setting) is not turned on; the form asks for 8 characters, Firebase's own
+  floor is 6. **23.10e-4** (open): the iPhone app's sign-in (23.15) needs the same form and the
+  keychain's autofill hints.
+  **23.10e-5** (open, from #475's review): `pendingProviderCredential` (Google's credential kept
+  when Firebase refuses a Google sign-in because the email has a password) is attached on the
+  next password sign-in for *any* email. Firebase refuses to link it to another account today
+  (`email-already-in-use`, swallowed), so it is safe by the platform and not by this code; store
+  the error's `customData.email` with the credential and link only when it matches the password
+  sign-in's email.
+  **23.10e-6** (open, from #475's review): `signInWithGoogleAddPassword` sets the signed-in flag
+  before checking the Google email is the typed one, so choosing the wrong Google account leaves
+  the person signed in as it with no plate; check first, or sign out on a mismatch. The same
+  path hits `auth/account-exists-with-different-credential` (a non-Gmail Google address whose
+  email already has a verified password) and says "Google is added when you do", but stashes no
+  credential, so it is not: stash it, or reword.
+  **23.10e-7** (open, from #475's review; pre-registration takeover, a known platform weakness):
+  someone can create a password account for another person's *non-Gmail* address with the public
+  key and link their own Google to it; if the real owner later resets the password and keeps
+  using the account, the attacker's Google still signs in to that uid, now with a verified email.
+  The emailed-link sign-in already runs on the Email/Password provider, so this is not new with
+  passwords. Fix: the sheet lists every linked provider with its own email and lets the owner
+  remove one, and a password reset signs the other providers out.
 - **23.15** (*later*, the owner 2026-10-24: no Apple sign-in for now; with §12's iPhone
   app, which needs it beside Google's under App Store guideline 4.8, and the paid Apple
   Developer account): Sign in with Apple on the site (`APPLE_SIGN_IN`, the Services ID
