@@ -1540,8 +1540,23 @@ try {
       const errorsFrom = pageErrors.length;
       const liftFrom = await lift();
       await touch('touchStart', [{ ...A, id: 5 }]);
-      await settle(600);
-      const whileHeld = await lift();
+      /*
+        "Held" is the plate having pressed within RELEASE_MS (150 ms) of the
+        read, and the plate presses again on each of its steps while the
+        finger is down, so one read at 600 ms is a read of whether a step
+        happened in the last 150 ms: on a Mac stepping 12 to 23 times a
+        second a stall of that length is not rare. Two reds of 177 (10-24 and
+        10-25, both "held false over 10 steps" with the lift laid where the
+        finger was afterwards, so the press had reached the plate) were
+        that. Read six times across the same 600 ms, and held on four of the
+        six: a press laid once and never renewed is held for the first 150
+        ms and reads one or two of six; a stall costs the reads it covers.
+        The rest of the line reads the last sample as it read the one.
+      */
+      const holdReads = [];
+      for (let k = 0; k < 6; k++) { await settle(100); holdReads.push(await lift()); }
+      const whileHeld = holdReads[holdReads.length - 1];
+      const heldReads = holdReads.filter((r) => r.held).length;
       await touch('touchEnd', [{ ...A, id: 5 }]);
       await settle(900);
       const afterLift = await lift();
@@ -1583,9 +1598,9 @@ try {
         const last = afterLift.last;
         const near = !!last && !!ref.A && Math.hypot(last.x - ref.A.x, last.y - ref.A.y) <= 2;
         check('a finger holding the Press lifts nothing until it comes off, then the glass lifts into fingers where it was',
-          whileHeld.held && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
+          heldReads >= 4 && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
             && afterLift.steps > 0 && near && last.cells > 0,
-          `held ${whileHeld.held} over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
+          `held on ${heldReads} of ${holdReads.length} reads over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
       }
       await settings({ fingering: 0 });
       await page.getByTestId('phone-tool-dropper').click();

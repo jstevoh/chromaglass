@@ -5562,6 +5562,22 @@ Not a gate and no bar: a rate depends on what was pushed.
   loop's status), and the status in the loop reads it. A test hook only; the governor, the
   ladder and the real step-down are as they were. It touches no bar. `governor.ts` was not
   touched (#441, #474 and the #402 finish thread are in it).
+- **19aa-11. The Mac `webgpu` check "the stage starts, with nothing asked for" (3 of 192,
+  read 2026-10-25; two of them within twenty minutes that day).** `no stage` with no
+  `gpuFailure`, 30 s after load, on the first page of the run only: every later page of
+  the same run started at once. The same cold start as `startup`'s, but 30 s and not 3, and
+  the line says nothing about which part stopped. It now says: the frames and engine the
+  page reports, how long a fresh adapter request takes at that moment, and the page's
+  errors. Not fixed, not retried (the owner turned a retry down for `startup`, 2026-10-24).
+  The next red names it.
+- **19aa-12. Phone: "a finger holding the Press lifts nothing until it comes off" read
+  `held` once (2 of 177, 10-24 and 10-25).** `held` is the plate having pressed within 150 ms
+  of the read, and a held finger presses once a plate step, so a stall of that length on a
+  Mac stepping 12 to 23 times a second reads false while the press is held; both reds
+  printed "held false over 10 steps" with the lift laid at the finger afterwards. It now
+  reads six times across the same 600 ms and wants four held (a press laid once and not
+  renewed reads one or two); the lift half is as it was. Judge with `npm run flakes --
+  --check 'holding the Press lifts nothing'` a week after merge.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
   the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
