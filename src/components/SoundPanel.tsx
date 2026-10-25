@@ -124,7 +124,7 @@ export function SoundPanel({
               data-testid="sound-ambient-toggle"
               className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors ${
                 ambientMode
-                  ? 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100'
+                  ? LIT
                   : 'border-border text-muted hover:bg-hover hover:text-text'
               }`}
             >
