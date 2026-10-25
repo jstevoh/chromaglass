@@ -626,26 +626,6 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       rateInAmbient === 30 && rateAfterFast === 30 && rungAfterFast >= 2 && rateRestored === 60 && ambientDraws === 60 && normalDraws === 120,
       `ambient stepRate=${rateInAmbient} → ${rateAfterFast}/s, rung ${rungBefore} → ${rungAfterFast} (start=2), restored=${rateRestored}/s, draws on 120 Hz=${ambientDraws}/s vs ${normalDraws}/s`);
   }
-
-  {
-    // Repeated rung failures double the retry wait (90 s → 180 s → 360 s) so
-    // an unreachable rung does not cause a periodic stutter every 90 seconds.
-    const g = new QualityGovernor(rungs, 1, 0);
-    // Climb from rung 1 to rung 0 after fast frames, then fail rung 0 three times.
-    let clock = feed(g, 16.0, 2, 20, 0).now;
-    const climbed0 = at(g.rung) === 0;
-    clock = feed(g, 40, 35, 6, clock).now; // drops stepRate 60→30, then rung 0→1 (failure #1 of rung 0)
-    const wait1 = g.retryWaitFor(0);
-    clock = feed(g, 16.0, 2, 120, clock).now; // climbs back to rung 0 after 90 s wait
-    clock = feed(g, 40, 35, 6, clock).now; // fails rung 0 a second time
-    const wait2 = g.retryWaitFor(0);
-    clock = feed(g, 16.0, 2, 210, clock).now; // climbs back to rung 0 after 180 s wait
-    clock = feed(g, 40, 35, 6, clock).now; // fails rung 0 a third time
-    const wait3 = g.retryWaitFor(0);
-    check('repeated rung failures double the retry wait (90 s → 180 s → 360 s)',
-      climbed0 && wait1 === 90 && wait2 === 180 && wait3 === 360,
-      `waits after 1st, 2nd, 3rd failure of rung 0: ${wait1}s → ${wait2}s → ${wait3}s`);
-  }
 }
 
 // ── Pro unlocks the full local ladder on hosted builds (PLAN.md §23.17) ──

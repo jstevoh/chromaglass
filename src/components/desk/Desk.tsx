@@ -358,8 +358,7 @@ export function Desk(p: DeskProps) {
         onVideo={p.onVideo}
         onWall={p.onOpenWall ?? p.onSendToWall}
         onMidi={p.onMidi}
-        onRecord={p.onRecordOptions ?? p.onToggleVideo}
-        onPerformance={p.onPerformance}
+        onRecord={p.onRecordOptions ?? p.onToggleRecord}
         onSearch={p.onSearch}
         leading={
           <button
@@ -371,15 +370,21 @@ export function Desk(p: DeskProps) {
             data-testid="panel-browser-button"
           >
             +<span className="hidden xl:inline"> Panel</span>
-            <span className="hidden font-mono text-[11px] text-faint 2xl:inline">⌘P</span>
           </button>
         }
         trailing={
-          /* Inverted while it is on: a blacked-out room is exactly when the button has to say so without being read. */
+          /*
+            Solid red while it is on: a blacked-out room is exactly when the
+            button has to say so without being read. It was a red outline
+            while off and white while on (PLAN 35a), which put red, the
+            colour of live, on the room that was lit, and white, the colour of
+            the primary, on the one that was dark.
+          */
           <Button
             height={32}
             kbd="B"
-            variant={p.blackout ? 'primary' : 'danger'}
+            pressed={!!p.blackout}
+            live
             onClick={p.onBlackout}
             midiKey="action:blackout-toggle"
             testId="blackout-button"
@@ -410,9 +415,9 @@ export function Desk(p: DeskProps) {
           <RecordControls
             videoRecording={p.videoRecording ?? false}
             videoSeconds={p.videoSeconds ?? 0}
-            onToggleVideo={p.onToggleVideo ?? (() => {})}
+            choice={p.recordChoice ?? { video: true, take: false }}
+            onToggleRecord={p.onToggleRecord ?? (() => {})}
             performance={p.performance}
-            onTogglePerformance={p.onPerformance}
             onOptions={p.onRecordOptions ?? (() => {})}
           />
           <Layers p={p} report={p.layoutName === 'build'} />
@@ -490,8 +495,10 @@ export function Desk(p: DeskProps) {
             onClick={() => set(x => ({ ...x, deckCollapsed: false }))}
             className="ml-auto inline-flex h-7 shrink-0 items-center gap-2 rounded-md px-2.5 text-[12px] text-muted hover:bg-hover hover:text-text"
             data-testid="deck-show"
+            title="Show the deck (⌥D)"
+            aria-keyshortcuts="Alt+D"
           >
-            Show deck <span className="font-mono text-[11px] text-faint">⌥D</span>
+            Show deck
           </button>
         </div>
       ) : (
@@ -698,7 +705,7 @@ function Layers({ p, report }: { p: DeskProps; report: boolean }) {
               style={{ height: 28 }}
               data-testid={`layer-segmented-${i}`}
               className={`inline-flex items-center gap-1.5 rounded-sm px-2 text-[13px] font-medium transition-colors duration-[120ms] 2xl:gap-2 2xl:px-3 ${
-                p.layer === i ? 'bg-active text-text' : 'text-muted hover:text-text-2'
+                p.layer === i ? 'bg-lit text-on-lit' : 'text-muted hover:bg-hover hover:text-text-2'
               }`}
               title={rep ? `Layer ${i + 1} — ${Math.round(rep.fill * 100)}% full` : `Layer ${i + 1}`}
             >

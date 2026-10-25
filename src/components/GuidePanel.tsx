@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
+import { LIT } from './ui';
 import {
   X, BookOpen, Play, Layers, Droplets, Palette, Activity, Aperture,
   Zap, Microscope, Projector, Video, Sliders, GitMerge, History, Gauge,
@@ -108,8 +109,8 @@ const SECTIONS: Section[] = [
           ['6. Clean Screen last', <>Hides every overlay and the cursor for the projection. Esc brings them back, or a finger held still on a touch screen.</>],
         ]} />
         <P>
-          <Em>Record</Em>, the red button beside Cast, writes the show and its music to a{' '}
-          <C>.webm</C> file. <C>B</C> is blackout — the thing to hit when something goes
+          <Em>Record</Em>, the red button beside Cast (<C>R</C>), writes the plate and its music to a{' '}
+          <C>.webm</C> file (the Plate video), keeps your strokes as a Take, or both: the sliders button beside it says which. <C>T</C> records a Take on its own. <C>B</C> is blackout — the thing to hit when something goes
           wrong, because it fades rather than cuts.
         </P>
         <H>When something is wrong</H>
@@ -857,7 +858,7 @@ export function GuidePanel({ focus = null, onClose }: GuidePanelProps) {
                 aria-current={active === s.id ? 'true' : undefined}
                 className={`w-full flex items-center gap-2.5 border-l-2 px-5 py-2 text-[11px] text-left transition-colors ${
                   active === s.id
-                    ? 'text-white bg-white/10 border-white'
+                    ? LIT
                     : 'text-white/45 border-transparent hover:text-white/80 hover:bg-white/5'
                 }`}
                 data-testid={`guide-nav-${s.id}`}
@@ -872,10 +873,11 @@ export function GuidePanel({ focus = null, onClose }: GuidePanelProps) {
             <div className="sm:hidden flex gap-1.5 overflow-x-auto scrollbar-hide px-4 py-2.5 border-b border-white/10 shrink-0">
               {SECTIONS.map(s => (
                 <button
+                  aria-current={active === s.id ? 'true' : undefined}
                   key={s.id}
                   onClick={() => go(s.id)}
                   className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] whitespace-nowrap border transition-colors ${
-                    active === s.id ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/60'
+                    active === s.id ? LIT : 'bg-white/5 border-white/10 text-white/60'
                   }`}
                 >
                   {s.title}

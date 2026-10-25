@@ -3,7 +3,7 @@
   "short_name": "ChromaGlass",
   "description": "A liquid light show that plays to your music.",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/show",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "fullscreen"],

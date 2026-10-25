@@ -8,7 +8,7 @@ import {
   Laptop, Save, Video, User, LogIn,
   Crosshair,
 } from 'lucide-react';
-import { Slider } from '../ui';
+import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
@@ -295,7 +295,7 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
-  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void };
+  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void };
   onHide: () => void;
   onFullLayout: () => void;
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
@@ -344,8 +344,8 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
       aria-pressed={on}
       data-testid={testId}
       className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-lg border text-[13px] transition-colors active:scale-[0.97] ${
-        tone === 'live' && on ? 'border-live-border bg-live-bg text-live'
-          : on ? 'border-accent-border bg-accent-bg text-accent-text'
+        tone === 'live' && on ? LIVE
+          : on ? LIT
           : 'border-border bg-elevated text-text-2 active:bg-active'
       }`}
     >
@@ -439,15 +439,16 @@ export function PhoneStage(p: PhoneStageProps) {
             aria-pressed={zoomed}
             aria-label={zoomed ? 'Leave the closeup' : 'Closeup'}
             data-testid="phone-zoom"
-            className={`flex h-12 w-12 items-center justify-center rounded-full ${zoomed ? 'bg-accent-bg text-accent-text' : 'text-text-2 active:bg-active'}`}
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${zoomed ? LIT : 'text-text-2 active:bg-active'}`}
           >
             <Microscope size={20} />
           </button>
           <button
             onClick={p.onPlay}
-            aria-label={p.playing ? 'Pause the plate' : 'Play the plate'}
+            aria-label={p.playing ? 'Pause the plate' : 'Paused. Play the plate'}
+            aria-pressed={!p.playing}
             data-testid="phone-play"
-            className={`flex h-12 w-12 items-center justify-center rounded-full ${p.playing ? 'text-text-2 active:bg-active' : 'bg-primary text-on-primary'}`}
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${p.playing ? 'text-text-2 active:bg-active' : LIT}`}
           >
             {p.playing ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
           </button>
@@ -471,7 +472,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 onClick={() => p.onCamera(c)}
                 aria-pressed={p.camera === c}
                 data-testid={`phone-camera-${c}`}
-                className={`flex h-10 min-w-[64px] items-center justify-center gap-1.5 rounded-full px-3 text-[13px] capitalize ${p.camera === c ? 'bg-accent-bg text-accent-text' : 'text-text-2'}`}
+                className={`flex h-10 min-w-[64px] items-center justify-center gap-1.5 rounded-full px-3 text-[13px] capitalize ${p.camera === c ? LIT : 'text-text-2'}`}
               >
                 {/* As on the desk's chip (QA-11): Follow is locked on one subject, Auto cuts. */}
                 {c === 'follow' && <Crosshair size={14} aria-hidden />}
@@ -629,7 +630,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 aria-label={on ? `${label}, in hand. Tap again for its amount` : label}
                 data-testid={`phone-tool-${id}`}
                 className={`relative flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${
-                  on ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-transparent text-text-2 active:bg-active'
+                  on ? LIT : 'border-transparent text-text-2 active:bg-active'
                 }`}
               >
                 <Icon size={20} />
@@ -645,7 +646,7 @@ export function PhoneStage(p: PhoneStageProps) {
             aria-pressed={sheet === 'dye'}
             aria-label={`Dye: ${liquid?.name ?? 'none'}. Choose a bottle and its colour`}
             data-testid="phone-open-dye"
-            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-transparent text-text-2 active:bg-active'}`}
+            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? LIT : 'border-transparent text-text-2 active:bg-active'}`}
           >
             <span className="h-5 w-5 rounded-full border-2 border-white/40" style={liquid ? bottleSwatch(liquid) : { backgroundColor: '#fff' }} />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
@@ -653,9 +654,9 @@ export function PhoneStage(p: PhoneStageProps) {
         </div>
         <div className="grid shrink-0 grid-cols-5 gap-1 border-t border-border pt-1.5 landscape:pt-1 wide-land:w-[264px] wide-land:border-l wide-land:border-t-0 wide-land:pl-1.5 wide-land:pt-0">
           {([
-            ['looks', 'Presets', Palette],
+            ['looks', 'Looks', Palette],
             ['sound', 'Sound', Music],
-            ['play', 'Play', Waves],
+            ['play', 'Motion', Waves],
             ['mix', 'Mix', SlidersVertical],
             ['more', 'More', MoreHorizontal],
           ] as const).map(([name, label, Icon]) => (
@@ -664,11 +665,11 @@ export function PhoneStage(p: PhoneStageProps) {
               onClick={() => open(name)}
               aria-pressed={sheet === name}
               data-testid={`phone-open-${name}`}
-              className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] ${sheet === name ? 'border border-accent-border bg-accent-bg text-accent-text' : 'border border-transparent text-text-2 active:bg-active'}`}
+              className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] ${sheet === name ? `border ${LIT}` : 'border border-transparent text-text-2 active:bg-active'}`}
             >
               <Icon size={18} />
               <span>{label}</span>
-              {name === 'play' && (p.evolving || p.tilt.on) && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+              {name === 'play' && (p.evolving || p.tilt.on) && <span className={`absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full ${sheet === name ? 'bg-on-lit' : 'bg-accent'}`} />}
               {name === 'sound' && p.audioSource !== 'none' && <span className={`absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full ${p.deaf ? 'bg-warn' : 'bg-ok'}`} data-testid="phone-sound-dot" data-deaf={p.deaf ? 'true' : undefined} />}
               {name === 'more' && p.recording.on && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-live" />}
             </button>
@@ -695,8 +696,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       onClick={() => { p.onLiquid(l.id); p.onTool('dropper'); }}
                       aria-pressed={on}
                       data-testid={`phone-liquid-${l.id}`}
-                      className={`flex h-12 items-center gap-2.5 rounded-lg border px-3 text-left text-[14px] ${on ? 'text-text' : 'border-border bg-elevated text-text-2'}`}
-                      style={on ? { borderColor: l.color, backgroundColor: `${l.color}26` } : undefined}
+                      className={`flex h-12 items-center gap-2.5 rounded-lg border px-3 text-left text-[14px] ${on ? LIT : 'border-border bg-elevated text-text-2'}`}
                     >
                       <span className="h-5 w-5 shrink-0 rounded-full border-2 border-white/30" style={bottleSwatch(l)} />
                       <span className="truncate">{l.name}</span>
@@ -754,7 +754,7 @@ export function PhoneStage(p: PhoneStageProps) {
             <button
               onClick={() => p.onPalette(null)}
               aria-pressed={p.paletteLock == null}
-              className={`h-12 shrink-0 rounded-lg border px-4 text-[13px] ${p.paletteLock == null ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}
+              className={`h-12 shrink-0 rounded-lg border px-4 text-[13px] ${p.paletteLock == null ? LIT : 'border-border bg-elevated text-text-2'}`}
             >
               Auto
             </button>
@@ -763,7 +763,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 key={pal.name}
                 onClick={() => p.onPalette(i)}
                 aria-pressed={p.paletteLock === i}
-                className={`flex h-12 shrink-0 items-center gap-2 rounded-lg border px-3 text-[13px] ${p.paletteLock === i ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}
+                className={`flex h-12 shrink-0 items-center gap-2 rounded-lg border px-3 text-[13px] ${p.paletteLock === i ? LIT : 'border-border bg-elevated text-text-2'}`}
               >
                 <span className="flex">
                   {pal.colors.slice(0, 4).map((c, j) => <span key={j} className="-ml-1 h-4 w-4 rounded-full border border-black/40 first:ml-0" style={{ backgroundColor: c }} />)}
@@ -881,7 +881,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       }}
                       aria-pressed={on}
                       data-testid={`phone-look-${l.id}`}
-                      className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? 'border-accent-border bg-accent-bg' : 'border-transparent active:bg-active'}`}
+                      className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
                     >
                       <span className="h-10 w-10 shrink-0 rounded-md border border-white/10" style={{ background: l.swatch }} />
                       <span className="min-w-0 flex-1">
@@ -923,7 +923,7 @@ export function PhoneStage(p: PhoneStageProps) {
                   key={t.src}
                   onClick={() => p.onTrack(t)}
                   aria-pressed={p.nowPlaying?.src === t.src}
-                  className={`flex min-h-[52px] flex-col justify-center rounded-lg px-3 text-left ${p.nowPlaying?.src === t.src ? 'bg-accent-bg' : 'active:bg-active'}`}
+                  className={`flex min-h-[52px] flex-col justify-center rounded-lg px-3 text-left ${p.nowPlaying?.src === t.src ? LIT : 'active:bg-active'}`}
                 >
                   <span className={`text-[14px] ${p.nowPlaying?.src === t.src ? 'text-accent-text' : 'text-text'}`}>{t.title}</span>
                   <span className="text-[12px] text-dim">{t.artist} · {t.licence}</span>
@@ -984,7 +984,7 @@ export function PhoneStage(p: PhoneStageProps) {
       )}
 
       {sheet === 'play' && (
-        <PhoneSheet title="Play" onClose={close} testId="phone-sheet-play">
+        <PhoneSheet title="Motion" onClose={close} testId="phone-sheet-play">
           <PanelGuard name="The Play sheet" inline onClose={close}>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Hourglass} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
@@ -1030,7 +1030,7 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="grid gap-1.5" style={{ gridTemplateColumns: p.layers > 1 ? `repeat(${p.layers}, minmax(0, 1fr)) auto` : '1fr' }}>
             {p.layers > 1 && Array.from({ length: p.layers }).map((_, i) => (
               <button key={i} onClick={() => p.onLayer(i)} aria-pressed={p.activeLayer === i} data-testid={`phone-layer-${i}`}
-                className={`h-12 rounded-lg border text-[14px] ${p.activeLayer === i ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
+                className={`h-12 rounded-lg border text-[14px] ${p.activeLayer === i ? LIT : 'border-border bg-elevated text-text-2'}`}>
                 {i === 0 ? 'Front' : i === 1 ? 'Back' : `Layer ${i + 1}`}
               </button>
             ))}
@@ -1051,7 +1051,7 @@ export function PhoneStage(p: PhoneStageProps) {
             {(['Off', 'Rate', 'Tempo'] as const).map((name, mode) => (
               <button key={name} onClick={() => p.spin.onChange({ spinAuto: mode })} aria-pressed={Math.round(p.spin.auto) === mode}
                 data-testid={`phone-spin-auto-${name.toLowerCase()}`}
-                className={`h-12 rounded-lg border text-[14px] ${Math.round(p.spin.auto) === mode ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
+                className={`h-12 rounded-lg border text-[14px] ${Math.round(p.spin.auto) === mode ? LIT : 'border-border bg-elevated text-text-2'}`}>
                 {name}
               </button>
             ))}
@@ -1102,26 +1102,37 @@ export function PhoneStage(p: PhoneStageProps) {
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
           <div className="grid grid-cols-3 gap-1.5">
-            {p.recording.supported && (
-              <Tile
-                icon={p.recording.on ? Square : Circle}
-                label={p.recording.on ? `${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
-                on={p.recording.on}
-                tone="live"
-                onPress={p.recording.onToggle}
-                testId="phone-record"
-              />
-            )}
+            <Tile
+              icon={p.recording.on ? Square : Circle}
+              label={p.recording.on ? `${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
+              on={p.recording.on}
+              tone="live"
+              onPress={p.recording.onToggle}
+              testId="phone-record"
+            />
             <Tile icon={Clapperboard} label="Songs" onPress={() => { close(); p.onSongs(); }} testId="phone-songs" />
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
-            {p.onPlayScreen && <Tile icon={Waves} label="Play screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
+            {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
             {p.onOpenAccount && <Tile icon={Settings} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
+          </div>
+          {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
+          <div className="mt-3 flex flex-col gap-1.5" data-testid="phone-record-makes">
+            <SectionLabel>Record makes</SectionLabel>
+            <Segmented
+              value={p.recording.choice.video && p.recording.choice.take ? 'both' : p.recording.choice.take ? 'take' : 'video'}
+              options={[['video', 'Plate video'], ['take', 'Take'], ['both', 'Both']] as const}
+              onChange={(v) => p.recording.onChoice({ video: v !== 'take', take: v !== 'video' })}
+              height={44}
+              fill
+              testId="phone-record-makes-segmented"
+            />
+            <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
           </div>
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">
@@ -1146,7 +1157,7 @@ export function PhoneStage(p: PhoneStageProps) {
           )}
           <p className="mt-3 text-[12px] leading-snug text-dim">
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
-            {p.onPlayScreen && ' Play screen is the simple one: the plate, the dyes and three hands.'}
+            {p.onPlayScreen && ' Simple screen is the plain one: the plate, the dyes and three hands.'}
             {isPhoneApp() && ' Laptop remote makes this phone the remote for a show running on the laptop; Play here brings it back.'}
           </p>
           </PanelGuard>

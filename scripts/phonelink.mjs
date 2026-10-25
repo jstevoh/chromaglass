@@ -35,7 +35,8 @@
  *      display the count when the display says hello, not only on changes.
  *   6. On a static host (vite preview, which answers `/remote-info.json` with
  *      index.html as Firebase does) the panel still draws a code, of the page's
- *      own address with nothing after the slash: no key, no `?remote=1`. That
+ *      own show address (`/show`, PLAN.md 23.16b: the site's `/` is the
+ *      webpage) with nothing after it: no key, no `?remote=1`. That
  *      page opens the show on the phone itself, which is the right page when
  *      there is no show server to drive; the panel's words say so, and how to
  *      get a show server.
@@ -66,6 +67,7 @@ import { spawn } from 'node:child_process';
 import zlib from 'node:zlib';
 import { launchChromium } from './chromium.mjs';
 import { clickAt } from './layoutProbe.mjs';
+import { SHOW_PATH } from '../src/lib/showPath.ts';
 
 const PORT = Number(process.env.PHONELINK_PORT ?? 4197);
 const PREVIEW_PORT = PORT + 1;
@@ -485,8 +487,10 @@ try {
   const origin = `http://localhost:${PREVIEW_PORT}`;
   p = await openDesk(origin);
   check('with no show server behind the page, the panel still says "No phone linked."', p.status === 'No phone linked.', `status "${p.status}"`);
-  check('and shows the page\'s own address, with no key and no remote flag after it', p.url === `${origin}/`, p.url ?? 'no address');
-  check('drawn as a QR code, module for module the encoder\'s own for that address', !!p.d && p.d === codeOf(`${origin}/`), p.d ? `${p.d.length} chars of path` : 'no code drawn');
+  // The show's own address on this host, not `/`: since 23.16b the site's `/`
+  // is the webpage, and the phone that scans this should open the show.
+  check('and shows the page\'s own show address, with no key and no remote flag after it', p.url === `${origin}${SHOW_PATH}`, p.url ?? 'no address');
+  check('drawn as a QR code, module for module the encoder\'s own for that address', !!p.d && p.d === codeOf(`${origin}${SHOW_PATH}`), p.d ? `${p.d.length} chars of path` : 'no code drawn');
   check('and its words say the code opens the show on the phone itself, and how to get a show server',
     /on the phone itself/.test(p.words) && /show server/.test(p.words) && /npm run remote/.test(p.words), p.words.replace(/\s+/g, ' ').slice(0, 120));
   check('with no relay there is no Link another button', p.more === null, p.more ?? 'none');

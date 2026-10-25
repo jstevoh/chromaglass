@@ -153,6 +153,7 @@ const env = {
   OSC_PORT: String(OSC_PORT),
   CHROMAGLASS_USER_DATA: profile,
   CHROMAGLASS_OFFLINE: '1',
+  CHROMAGLASS_AUDIO_TAP: '1',
   CHROMAGLASS_QUERY: QUERY,
   ...(isMac ? {} : { CHROMAGLASS_SOFTWARE_WEBGPU: '1' }),
 };
@@ -493,10 +494,13 @@ try {
     castState ? (castState.pointer.length ? `a pointer on ${castState.pointer.join(', ')}` : `none on ${castState.elements} elements`) : 'no projector window opened');
 
   // ── system audio & ambient TV (23.8) ───────────────────────────────
-  // On the Mac app, "System audio" replaces "Another tab", opens with no tab
-  // picker, and hears a tone played by a separate process. Ambient TV mode
-  // caps the solver at 30 steps/s, caps the display at 60 Hz, and holds the
-  // machine's opening rung.
+  // On the Mac app, "System audio" replaces "Another tab", intercepts
+  // getDisplayMedia with no tab picker, and routes the System audio source's
+  // pipeline to the ear (fed here through CHROMAGLASS_AUDIO_TAP=1, since
+  // CHROMAGLASS_OFFLINE skips macOS TCC screen capture; the real
+  // ScreenCaptureKit path is docs/judging.md §72). Ambient TV mode caps the
+  // solver at 30 steps/s, caps frames drawn in the app at 60 Hz through
+  // DrawGate, and holds the machine's opening rung.
   await page.locator('[data-testid=mode-segmented-sound]').click();
   await page.locator('[data-testid=sound-source-system]').waitFor({ timeout: 5_000 });
   const sysLabel = (await page.locator('[data-testid=sound-source-system]').textContent())?.trim() ?? '';
@@ -547,26 +551,51 @@ try {
     soundHeard.reads > 0 &&
     soundHeard.volume > 5;
   check(
-    'system audio: hears a tone played by another process, with no tab picker',
+    'system audio: the System audio source\'s pipeline reaches the ear, and the picker was intercepted',
     systemHeard,
     `label "${sysLabel}", picker intercepted ${asksAfter - asksBefore} time(s), audio port ${audioPort}, ear reads ${soundHeard.reads}, volume ${Math.round(soundHeard.volume)}`,
   );
 
   await page.locator('[data-testid=sound-ambient-toggle]').click();
-  const ambOn = await page.evaluate(() => {
+  const ambOn = await page.evaluate(async () => {
     const g = window.chromaglassGovernor?.();
-    const cs = window.chromaglassCastState?.();
+    const dbg0 = window.chromaglassDebug?.();
+    const dg0 = dbg0?.drawGate;
+    const frames0 = dbg0?.frames ?? 0;
+    const drawn0 = (dg0?.drawn?.frame ?? 0) + (dg0?.drawn?.ask ?? 0);
+    const skipped0 = (dg0?.skipped?.frame ?? 0) + (dg0?.skipped?.ask ?? 0);
+    const t0 = performance.now();
+    let tick = 1;
+    await new Promise((done) => {
+      const iv = setInterval(() => {
+        const now = performance.now();
+        while (t0 + tick * (1000 / 120) <= now && tick <= 120) {
+          window.__chromaglassFrame?.(t0 + tick * (1000 / 120));
+          tick++;
+        }
+        if (now - t0 >= 1000 || tick > 120) {
+          clearInterval(iv);
+          done();
+        }
+      }, 8);
+    });
+    const cs1 = window.chromaglassCastState?.();
+    const dbg1 = window.chromaglassDebug?.();
+    const dg1 = dbg1?.drawGate;
+    const frames = (dbg1?.frames ?? 0) - frames0;
+    const drawn = (dg1?.drawn?.frame ?? 0) + (dg1?.drawn?.ask ?? 0) - drawn0;
+    const skipped = (dg1?.skipped?.frame ?? 0) + (dg1?.skipped?.ask ?? 0) - skipped0;
     return {
-      ambient: Boolean(cs?.ambient),
+      ambient: Boolean(cs1?.ambient),
       stepRate: g?.stepRate ?? null,
       rungIndex: g?.rungIndex ?? null,
       start: g?.start ?? null,
+      frames,
+      drawn,
+      skipped,
     };
   });
-  const mainAmb = await electronApp.evaluate(() => ({
-    ambient: Boolean(globalThis.__chromaglassAmbient),
-    frameRate: globalThis.__chromaglassFrameRateCap ?? null,
-  }));
+  const mainAmb = await electronApp.evaluate(() => Boolean(globalThis.__chromaglassAmbient));
   await page.locator('[data-testid=sound-ambient-toggle]').click();
   const ambOff = await page.evaluate(() => {
     const g = window.chromaglassGovernor?.();
@@ -578,18 +607,23 @@ try {
   });
   await page.locator('[data-testid=sound-source-none]').click();
   await page.keyboard.press('Escape');
+  const drawCapped =
+    ambOn.frames <= 65 &&
+    ambOn.drawn <= 65 &&
+    ambOn.skipped >= 45 &&
+    (!isMac || (ambOn.frames >= 20 && ambOn.drawn >= 20));
   const ambientWorks =
     ambOn.ambient === true &&
     ambOn.stepRate === 30 &&
     (ambOn.rungIndex === null || ambOn.rungIndex >= (ambOn.start ?? 0)) &&
-    mainAmb.ambient === true &&
-    mainAmb.frameRate === 60 &&
+    mainAmb === true &&
+    drawCapped &&
     ambOff.ambient === false &&
     (ambOff.stepRate === null || ambOff.stepRate === 60);
   check(
     'ambient TV: caps solver at 30 steps/s, display at 60 Hz, and holds the opening rung',
     ambientWorks,
-    `on: ambient=${ambOn.ambient}, stepRate=${ambOn.stepRate}, rung=${ambOn.rungIndex}/${ambOn.start}, main=${mainAmb.ambient} (${mainAmb.frameRate} Hz); off: ambient=${ambOff.ambient}, stepRate=${ambOff.stepRate}`,
+    `on: ambient=${ambOn.ambient}, stepRate=${ambOn.stepRate}, rung=${ambOn.rungIndex}/${ambOn.start}, drawn=${ambOn.drawn}/s (frames=${ambOn.frames}/s, skipped=${ambOn.skipped} of 120 Hz offers), menu=${mainAmb}; off: ambient=${ambOff.ambient}, stepRate=${ambOff.stepRate}`,
   );
 
   // ── network off, the whole run ────────────────────────────────────

@@ -1606,6 +1606,17 @@ about a quarter of a second a swing) before it settled, which the solve leaves o
 Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
 building.
 
+## 71. One Record button (PLAN 14ae)
+
+On the desk, press the Record button in the header (or R): a plate video starts, the button
+turns red with one clock, and a single Rec dot appears. Press it again: it stops and the file
+is in the Record panel (the sliders button) under Plate video. In the panel, turn on Take as
+well and press Record again: both run from the one press, and the dot says "Plate video + Take".
+Paint a little, stop, and the take is under Takes with Replay. Say whether "Record · Plate
+video" on a wide desk reads at a glance, whether "Plate video" and "Take" are the words you
+want, and whether the Song film row belongs in the Record panel. On the phone: More, then Record
+makes, pick Take and press Record.
+
 ## 69. Any camera, and which camera does what (PLAN 14ad)
 
 With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual Camera):
@@ -1620,6 +1631,20 @@ With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual C
   is never shown, and that Webcam is the one that shows a picture? Pick a camera for it and
   switch it on; the film's camera should stay what it was.
 - On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
+
+## 70. On reads on (PLAN 35a)
+
+On the laptop in a dark room, and on the phone, with no reading of labels:
+
+- **Film.** Load a demo loop with Film: its Film button and Video file in Source should be lit
+  violet, the row should say "playing as film", and Off should not be. Pour another: its Pour
+  lights too. Say whether you can tell which loop is doing what from across the room.
+- **The desk.** The layout switch, the tools, the layers, the bottles and the palette list: the
+  chosen one is a solid violet now, not a lighter grey. Blackout is grey until pressed, then
+  solid red. Say whether the violet is too loud anywhere, or
+  whether anything that is on still looks off.
+- **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
+  tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
 
 ## 71. A look saved in Chrome is in the Mac app (PLAN 23.18)
 
@@ -1638,3 +1663,12 @@ Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to th
 
 Bad: a look that comes back after being deleted, a set list replaced by an empty one, or the
 plate stuttering when a sync lands mid-show.
+
+## 72. System audio and Ambient TV mode in the Mac app (PLAN 23.8)
+
+`npm run desktop` verifies that clicking **System audio** in the Mac app intercepts `getDisplayMedia` with no tab picker and routes the System audio pipeline to the ear (using `CHROMAGLASS_AUDIO_TAP=1`, since `CHROMAGLASS_OFFLINE` skips macOS's TCC screen-capture prompt). The real ScreenCaptureKit loopback path needs macOS permission and a streaming app playing on the Mac:
+
+1. Open the Mac app, open **Sound**, and pick **System audio** (where the browser shows **Another tab**). No browser tab picker should appear; on the first run macOS asks once for Screen & System Audio Recording permission.
+2. Play an album in a streaming app (Apple Music, Spotify, or another app on the Mac). The sound bar in the Sound panel and the plate's motion (kicks, bass, swell) should follow the album in stereo with no microphone bleed from the room.
+3. Quit and reopen the Mac app while the album is still playing: **System audio** is remembered across launches in the Mac app and resumes without asking for a tab.
+4. Turn on **Ambient TV mode (cool & quiet)** from the Sound panel, from **Show → Ambient TV Mode (Cool & Quiet)** (`Cmd+Shift+A`), or from the phone's Play sheet tile: the plate steps at 30 Hz, caps display draws at 60 Hz (`DrawGate`), and stays at or below the opening rung so the Mac stays cool and quiet over a long listening session.

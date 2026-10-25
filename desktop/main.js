@@ -274,12 +274,15 @@ function grantPermissions() {
 }
 
 /**
- * Local loopback audio tap (`127.0.0.1` only): lets another process on this
- * machine (a helper or `npm run desktop`'s tone generator on a runner with no
- * physical audio output device) feed Float32 PCM frames into the show's
- * System audio source.
+ * Local loopback audio tap (`127.0.0.1` only), opened only when the desktop
+ * check asks for it (`CHROMAGLASS_AUDIO_TAP=1` in `scripts/desktop.mjs`).
+ * Under `CHROMAGLASS_OFFLINE` on an ungranted CI runner ScreenCaptureKit
+ * cannot be queried without blocking on a macOS TCC modal, so the check uses
+ * this tap to verify that the System audio source's pipeline reaches the ear;
+ * the shipped app never listens on this socket.
  */
 function startLoopbackAudioTap() {
+  if (!process.env.CHROMAGLASS_AUDIO_TAP) return Promise.resolve(0);
   return new Promise((done) => {
     const sock = createSocket('udp4');
     sock.once('error', () => {
@@ -318,28 +321,24 @@ function startLoopbackAudioTap() {
 }
 
 /**
- * Ambient TV mode (PLAN.md §23.8 and §14j): caps the compositor frame rate at
- * 60 Hz across every show and projector window, and tells the renderer to cap
+ * Ambient TV mode (PLAN.md §23.8 and §14j): syncs the Show menu item and tells
+ * the renderer to cap draws at 60 Hz (`DrawGate`, `AMBIENT_MIN_DRAW_MS`), cap
  * the solver step rate at 30 Hz and hold at or below the machine's opening
  * rung so the Mac runs cool and quiet for hours.
  */
 function setAmbientMode(on) {
   const next = Boolean(on);
-  const hz = next ? 60 : 240;
   show.ambient = next;
   globalThis.__chromaglassAmbient = next;
-  globalThis.__chromaglassFrameRateCap = hz;
   buildMenu();
   for (const w of BrowserWindow.getAllWindows()) {
     if (w.isDestroyed()) continue;
-    try { w.webContents.setFrameRate(hz); } catch { /* ignore */ }
     try { w.webContents.send('chromaglass:ambient', next); } catch { /* ignore */ }
   }
   return next;
 }
 globalThis.__chromaglassSetAmbient = setAmbientMode;
 globalThis.__chromaglassAmbient = false;
-globalThis.__chromaglassFrameRateCap = 240;
 ipcMain.on('chromaglass:set-ambient', (_event, on) => {
   setAmbientMode(Boolean(on));
 });
@@ -397,9 +396,6 @@ const opened = [];
 globalThis.__chromaglassOpened = opened;
 
 function wireWindow(win) {
-  if (show.ambient) {
-    try { win.webContents.setFrameRate(60); } catch { /* ignore */ }
-  }
   win.webContents.setWindowOpenHandler(({ url, features }) => {
     if (isOurs(url)) {
       opened.push(String(features));
@@ -467,7 +463,7 @@ async function start() {
   offlineGuard();
   grantPermissions();
   buildMenu();
-  await startLoopbackAudioTap();
+  if (process.env.CHROMAGLASS_AUDIO_TAP) await startLoopbackAudioTap();
 
   show.port = await choosePort();
   show.key = showKey();

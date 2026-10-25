@@ -48,6 +48,15 @@
   --color-ok:            #4ADE80;
   --color-warn:          #FBBF24;
 
+  /* Lit: a control that is on, or the one chosen of several. One look for
+     every on in the app (PLAN 35a). The old chosen segment was the active grey
+     on elevated, 1.19:1, and the owner could not tell which button was on.
+     This violet is 3.47:1 against elevated and 3.7:1 against surface
+     (WCAG 1.4.11 asks 3:1 of a state), and white text on it is 5.1:1, which
+     the brighter accent (4.23:1) misses for 13px labels. */
+  --color-lit:    #7C4DEB;
+  --color-on-lit: #FFFFFF;
+
   /* Primary button: white on black */
   --color-primary:    #FAFAFA;
   --color-on-primary: #0A0A0B;

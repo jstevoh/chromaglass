@@ -468,7 +468,7 @@ try {
   }
   /*
     Zoomed in, the zoom chip leaves Record alone (QA-4). The owner found the
-    chip (− 4.7× +, Hold / Follow / Auto) on top of Record performance as
+    chip (− 4.7× +, Hold / Follow / Auto) on top of Record as
     soon as the plate was zoomed past 1.05×: it was pinned to the window's
     top, which on a desk is the top strip Record sits in. Asked on both desks
     at the three desk widths: the chip and Record do not overlap, what is on
@@ -484,14 +484,14 @@ try {
       await settle(800);
       const where = await page.evaluate(() => {
         const box = (id) => { const el = document.querySelector(`[data-testid="${id}"]`); return el ? el.getBoundingClientRect() : null; };
-        const chip = box('macro-zoom'), rec = box('performance-button'), plate = box('desk-preview');
+        const chip = box('macro-zoom'), rec = box('record-button'), plate = box('desk-preview');
         if (!chip || !rec) return { chip: !!chip, rec: !!rec };
         const hit = document.elementFromPoint(rec.left + rec.width / 2, rec.top + rec.height / 2);
         const overlap = Math.max(0, Math.min(chip.right, rec.right) - Math.max(chip.left, rec.left))
           * Math.max(0, Math.min(chip.bottom, rec.bottom) - Math.max(chip.top, rec.top));
         const inPlate = !!plate && chip.left >= plate.left - 0.5 && chip.right <= plate.right + 0.5
           && chip.top >= plate.top - 0.5 && chip.bottom <= plate.bottom + 0.5;
-        return { chip: true, rec: true, overlap, onRecord: !!hit?.closest('[data-testid="performance-button"]'), inPlate, top: Math.round(chip.top) };
+        return { chip: true, rec: true, overlap, onRecord: !!hit?.closest('[data-testid="record-button"]'), inPlate, top: Math.round(chip.top) };
       });
       check(`zoomed in on ${mode} at ${width}, the zoom chip sits on the plate and Record stays clear`,
         where.chip && where.rec && where.overlap === 0 && where.onRecord && where.inPlate,
@@ -815,7 +815,7 @@ try {
     if (parts[0]) {
       await page.getByTestId('output-test-pattern').first().click();
       await settle(400);
-      const pressed = await page.getByTestId('output-test-pattern').first().evaluate((el) => el.className.includes('bg-white text-black'));
+      const pressed = (await page.getByTestId('output-test-pattern').first().getAttribute('aria-pressed')) === 'true';
       // A gain change, so the config is written while the pattern is up.
       await page.evaluate(() => window.chromaglassOutput?.({ gain: 1.05 }));
       await settle(300);
@@ -866,8 +866,8 @@ try {
       right of the centred switch, so the Sound dot sat under it. Now the dots
       fold into one Status button when they do not fit. Asked of every
       layout: at 1024 the cluster is clear of the switch, and still clear
-      with a seventh dot in it (a span as wide as the Video dot with its word
-      under it); at a width where the dots fit with their words under them,
+      with a seventh dot in it (a span as wide as the Film dot with its word
+      under it, or wider than the room left, whichever is wider); at a width where the dots fit with their words under them,
       something wider than the room left folds them, the button opens every
       dot, and with it gone they unfold.
 
@@ -910,7 +910,12 @@ try {
       await page.setViewportSize({ width: 1024, height: 860 });
       await settle(900);
       const at1024 = await cluster();
-      await extra(true, dotW); await settle(600);
+      // A dot more, or the room left plus 8 px if that is wider, so that it
+      // must fold. A seventh dot used to be enough at 1024; since the Perf
+      // dot went into the one Rec dot (#463) and Video is called Film (35a,
+      // 24 px against Video's wider word), six dots and a seventh fit at
+      // 1024 with 26 px to spare, and the fold this asks for was not asked.
+      await extra(true, Math.max(dotW, Math.max(0, at1024.gap ?? 0) + 8)); await settle(600);
       const more1024 = await cluster();
       await extra(false);
       await page.setViewportSize({ width: roomy.w, height: 860 });
@@ -923,7 +928,7 @@ try {
         await clickOn('dot-fold');
         await settle(300);
         // Listed, and on top: each dot's middle is the dot, not the deck or a panel over the list.
-        listed = await page.evaluate(() => ['dot-sound', 'dot-video', 'dot-midi', 'dot-performance'].every((t) => {
+        listed = await page.evaluate(() => ['dot-sound', 'dot-video', 'dot-midi'].every((t) => {
           const el = document.querySelector(`[data-testid="dot-fold-list"] [data-testid="${t}"]`);
           if (!el) return false;
           const r = el.getBoundingClientRect();
