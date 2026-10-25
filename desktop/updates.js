@@ -121,35 +121,71 @@ export function startUpdates(deps) {
   autoUpdater.allowDowngrade = false;
   if (feed) autoUpdater.setFeedURL({ provider: 'generic', url: feed });
 
-  autoUpdater.on('checking-for-update', () => set({ status: 'checking' }));
+  /*
+    What was found stays found. A re-check six hours later, at a venue with no
+    network, ends in 'error', and one that finds the same release again starts
+    it over: either would take back the Download or Restart to Update the menu
+    was offering, and a performer who saw it at soundcheck would find it gone.
+    So 'checking', 'none' and 'error' only show when nothing was found, and the
+    same version found again keeps the state it has.
+  */
+  const holding = () => state.status === 'available' || state.status === 'downloading' || state.status === 'ready';
+
+  autoUpdater.on('checking-for-update', () => { if (!holding()) set({ status: 'checking' }); });
   autoUpdater.on('update-not-available', () => {
-    set({ status: 'none', version: null, url: null });
-    answer('ChromaGlass is up to date', `You have ${version}, the newest version.`);
+    if (!holding()) set({ status: 'none', version: null, url: null });
+    answer(holding() ? `ChromaGlass ${state.version} is waiting` : 'ChromaGlass is up to date', holding() ? 'It is in the ChromaGlass menu.' : `You have ${version}, the newest version.`);
   });
   autoUpdater.on('update-available', (info) => {
     const next = String(info?.version ?? '');
     const url = downloadUrl(info, feed);
+    const same = next === state.version && holding();
     if (signed) {
-      set({ status: 'downloading', version: next, url, percent: 0 });
-      answer(`ChromaGlass ${next} is downloading`, 'It installs the next time you quit ChromaGlass, or now with Restart to Update once it has arrived.');
+      if (!same) set({ status: 'downloading', version: next, url, percent: 0 });
+      answer(`ChromaGlass ${next} is ${state.status === 'ready' ? 'ready' : 'downloading'}`, 'It installs the next time you quit ChromaGlass, or now with Restart to Update once it has arrived.');
       return;
     }
-    set({ status: 'available', version: next, url });
+    if (!same) set({ status: 'available', version: next, url });
     tell(`available:${next}`, `ChromaGlass ${next} is out`, 'Download it from the ChromaGlass menu, then drag it into Applications over this one.');
     answer(`ChromaGlass ${next} is out`, `You have ${version}. Download ChromaGlass ${next}… in the ChromaGlass menu opens the new download in your browser.`);
   });
   autoUpdater.on('download-progress', (p) => {
     if (state.status === 'downloading') set({ percent: Math.round(Number(p?.percent) || 0) });
   });
+
+  /*
+    Ready means macOS has it, not only electron-updater. MacUpdater says
+    'update-downloaded' when the zip is on disk, before Squirrel.Mac has taken
+    it from MacUpdater's local proxy; a quitAndInstall() then only waits for
+    Squirrel, and would quit the app whenever Squirrel finished, minutes after
+    the click, mid-set perhaps. So with Squirrel there (`nativeUpdater`,
+    Electron's own autoUpdater, on a Mac) Restart to Update is offered only
+    once Squirrel has said it too, and a click then quits at once.
+  */
+  const nativeUpdater = deps.nativeUpdater ?? null;
+  let fetched = false;
+  let squirrel = !nativeUpdater;
+  const ready = () => {
+    if (!fetched || !squirrel) return;
+    set({ status: 'ready', percent: 100 });
+    tell(`ready:${state.version}`, `ChromaGlass ${state.version} is ready`, 'It installs when you quit ChromaGlass. Restart to Update in the ChromaGlass menu does it now.');
+  };
   autoUpdater.on('update-downloaded', (info) => {
-    const next = String(info?.version ?? state.version ?? '');
-    set({ status: 'ready', version: next, percent: 100 });
-    tell(`ready:${next}`, `ChromaGlass ${next} is ready`, 'It installs when you quit ChromaGlass. Restart to Update in the ChromaGlass menu does it now.');
+    if (info?.version) state.version = String(info.version);
+    fetched = true;
+    ready();
   });
+  nativeUpdater?.on('update-downloaded', () => { squirrel = true; ready(); });
+
   autoUpdater.on('error', (err) => {
+    const error = String(err?.message ?? err).split('\n')[0].slice(0, 200);
+    // A download that failed falls back to the download in the browser, which
+    // always works; anything else found stays as it was (above).
+    if (state.status === 'downloading' && state.url) set({ status: 'available', error });
+    else if (holding()) set({ error });
     // Offline at a venue is the usual case, and not news. Kept for the menu's
     // own check, which says it, and for the check, which reads it.
-    set({ status: 'error', error: String(err?.message ?? err).split('\n')[0].slice(0, 200) });
+    else set({ status: 'error', error });
     answer('Could not check for updates', 'ChromaGlass could not reach its releases. Check the connection and try again from the ChromaGlass menu.');
   });
 
@@ -158,8 +194,10 @@ export function startUpdates(deps) {
     try {
       await autoUpdater.checkForUpdates();
     } catch (err) {
-      // checkForUpdates rejects as well as sending 'error'; the event has said it.
-      if (state.status !== 'error') set({ status: 'error', error: String(err?.message ?? err).slice(0, 200) });
+      // checkForUpdates rejects as well as sending 'error'; when the event has
+      // not said it (a feed that cannot be parsed), say it here.
+      if (state.status !== 'error' && !holding()) set({ status: 'error', error: String(err?.message ?? err).slice(0, 200) });
+      answer('Could not check for updates', 'ChromaGlass could not reach its releases. Check the connection and try again from the ChromaGlass menu.');
     }
   };
 
@@ -167,10 +205,14 @@ export function startUpdates(deps) {
   timer = setTimer(() => { void check(false).finally(loop); }, deps.firstCheckMs ?? FIRST_CHECK_MS);
 
   /** The one thing the menu item or the profile sheet's button does, which is only ever a click. */
+  let installing = false;
   const act = () => {
     if (state.status === 'available' && state.url) void openExternal?.(state.url);
-    else if (state.status === 'ready') autoUpdater.quitAndInstall(false, true);
-    else void check(true);
+    else if (state.status === 'ready') {
+      if (installing) return;
+      installing = true;
+      autoUpdater.quitAndInstall(false, true);
+    } else void check(true);
   };
 
   return { state, check, act, stop: () => { if (timer) clearTimer(timer); timer = null; } };

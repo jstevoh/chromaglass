@@ -22,7 +22,7 @@
  * with no Web MIDI and a WebGPU that CI never tests).
  */
 
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell } from 'electron';
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 import { randomInt } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -317,6 +317,8 @@ function startUpdater() {
   const off = updatesOff({ packaged: app.isPackaged, env: process.env });
   updates = startUpdates({
     autoUpdater: off ? null : electronUpdater.autoUpdater,
+    // Squirrel.Mac itself, so Restart to Update waits until macOS has the update (updates.js).
+    nativeUpdater: off || process.platform !== 'darwin' ? null : nativeAutoUpdater,
     off,
     version: app.getVersion(),
     signed: !!packedFlags().signed,

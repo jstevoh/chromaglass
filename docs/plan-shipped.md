@@ -4612,11 +4612,15 @@ the app against the key (23.11), so a GitHub Release on this public repo is the 
   *Download ChromaGlass <version>…* and the profile card's button open the new .dmg; signed, it
   downloads and installs on quit, with *Restart to Update*. It never restarts, opens a window or a
   box by itself; one notification at most, none while a projector window is open; Check for
-  Updates… is the only box.
+  Updates… is the only box. What it found stays found through a later check that fails offline or
+finds the same release again, and on a signed Mac Restart to Update waits until Squirrel.Mac
+itself has the update (electron-updater says it is downloaded before Squirrel has taken it, and
+a click then would queue a quit for whenever Squirrel finished). A release runs only from main or
+a tag.
 
-Measured: `npm run updates` 56/56 (every updater event in order with stand-ins, what it must not
+Measured: `npm run updates` 69/69 (every updater event in order with stand-ins, what it must not
 do unasked, and that the builder config, the app and the site agree on the .dmg's name and the
 feed); `npm run desktop -- --packaged` 11/11 on the Linux pack, its new "updates" line the shipped
 electron-updater reading a feed the check serves (`1.3.0 → 999.0.0 (idle → checking →
-available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile card seeing the same).
+available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile card seeing the same and told it as it happened: `checking → available 999.0.0`).
 

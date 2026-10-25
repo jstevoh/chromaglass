@@ -54,9 +54,11 @@ function fakeUpdater() {
 }
 
 /** Everything else: timers held until fired, and every outward call written down. */
-function harness({ signed = false, feed = null, off = null, quiet = false } = {}) {
-  const h = { timers: [], notes: [], opened: [], dialogs: [], changes: 0, quiet };
+function harness({ signed = false, feed = null, off = null, quiet = false, squirrel = false } = {}) {
+  const h = { timers: [], notes: [], opened: [], dialogs: [], changes: 0, pushed: [], quiet };
   h.updater = off ? null : fakeUpdater();
+  // Squirrel.Mac (Electron's own autoUpdater), which says when macOS has the update.
+  h.native = squirrel ? new EventEmitter() : undefined;
   h.u = startUpdates({
     autoUpdater: h.updater,
     off,
@@ -67,7 +69,8 @@ function harness({ signed = false, feed = null, off = null, quiet = false } = {}
     openExternal: (url) => { h.opened.push(url); },
     quiet: () => h.quiet,
     dialog: (d) => h.dialogs.push(d),
-    onChange: () => { h.changes++; },
+    onChange: (st) => { h.changes++; h.pushed.push(st); },
+    nativeUpdater: h.native,
     setTimer: (fn, ms) => { const t = { fn, ms }; h.timers.push(t); return t; },
     clearTimer: (t) => { h.timers = h.timers.filter((x) => x !== t); },
   });
@@ -110,7 +113,17 @@ check('a release that lists no .dmg still gives the fixed name', downloadUrl({ v
   h.u.act();
   check('ad hoc: the click opens the new .dmg in the browser', h.opened.length === 1 && h.opened[0] === `${RELEASES}${DMG}`);
   check('ad hoc: and never tries to install in place, which macOS refuses for it', h.updater.calls.install === 0);
-  check('ad hoc: the page hears each change', h.changes >= 2, `${h.changes} changes`);
+  const last = h.pushed.at(-1);
+  check('ad hoc: the page is told what was found', last?.status === 'available' && last?.version === '1.3.99' && last?.url === `${RELEASES}${DMG}` && last?.current === '1.3.0', JSON.stringify(last));
+  check('nothing older or a prerelease is offered', h.updater.allowDowngrade === false && h.updater.allowPrerelease === false);
+
+  // The 6 h re-check, at a venue with no network: what was found stays found.
+  await h.fire();
+  h.updater.emit('checking-for-update');
+  h.updater.emit('error', new Error('net::ERR_INTERNET_DISCONNECTED'));
+  check('ad hoc: a later check that fails keeps the download on offer', h.u.state.status === 'available' && updateMenuItem(h.u.state)?.label === 'Download ChromaGlass 1.3.99…', `${h.u.state.status}, ${updateMenuItem(h.u.state)?.label}`);
+  h.updater.emit('update-not-available', { version: '1.3.0' });
+  check('ad hoc: and one that finds nothing new keeps it too', h.u.state.status === 'available');
 }
 
 // --- Over a projector: the room is not told ----------------------------------
@@ -133,10 +146,56 @@ check('a release that lists no .dmg still gives the fixed name', downloadUrl({ v
   check('signed: the menu shows how far, and is not a button', updateMenuItem(h.u.state)?.label === 'Downloading ChromaGlass 1.3.99 (50%)' && updateMenuItem(h.u.state)?.enabled === false, updateMenuItem(h.u.state)?.label);
   h.updater.emit('update-downloaded', RELEASE);
   check('signed: ready, said once', h.u.state.status === 'ready' && h.notes.length === 1 && /ready/.test(h.notes[0].title));
+  await h.fire();
+  h.updater.emit('checking-for-update');
+  h.updater.emit('update-available', RELEASE);
+  h.updater.emit('error', new Error('net::ERR_INTERNET_DISCONNECTED'));
+  check('signed: a later check (found again, then offline) keeps Restart to Update', h.u.state.status === 'ready' && updateMenuItem(h.u.state)?.label === 'Restart to Update to 1.3.99', `${h.u.state.status}`);
   check('signed: never restarts on its own', h.updater.calls.install === 0);
   check('signed: the menu offers the restart', updateMenuItem(h.u.state)?.label === 'Restart to Update to 1.3.99');
   h.u.act();
   check('signed: the click restarts into it', h.updater.calls.install === 1);
+  h.u.act();
+  check('signed: a second click does not ask twice', h.updater.calls.install === 1);
+}
+
+// --- Signed on a Mac: Restart only once Squirrel.Mac has it --------------------
+{
+  const h = harness({ signed: true, squirrel: true, quiet: false });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.updater.emit('update-downloaded', RELEASE);
+  check('signed, Squirrel still taking it: no Restart yet', h.u.state.status === 'downloading' && h.notes.length === 0, h.u.state.status);
+  h.u.act();
+  check('signed, Squirrel still taking it: a click does not queue a quit for later', h.updater.calls.install === 0);
+  h.native.emit('update-downloaded');
+  check('signed, Squirrel has it: Restart is offered', h.u.state.status === 'ready' && h.notes.length === 1);
+}
+
+// --- Signed, a download that fails: the browser download instead ---------------
+{
+  const h = harness({ signed: true });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.updater.emit('error', new Error('HttpError: 404'));
+  check('signed, the download fails: it offers the .dmg instead', h.u.state.status === 'available' && updateMenuItem(h.u.state)?.label === 'Download ChromaGlass 1.3.99…');
+}
+
+// --- Signed over a projector: ready is not said either ---------------------------
+{
+  const h = harness({ signed: true, quiet: true });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.updater.emit('update-downloaded', RELEASE);
+  check('signed, with a projector open: ready, not notified', h.u.state.status === 'ready' && h.notes.length === 0);
+}
+
+// --- A check that rejects without an event (a feed that cannot be read) --------
+{
+  const h = harness();
+  h.updater.checkForUpdates = async () => { throw new Error('ERR_UPDATER_INVALID_RELEASE_FEED'); };
+  await h.u.check(true);
+  check('a check that throws is an error, said when asked, and never unhandled', h.u.state.status === 'error' && /INVALID/.test(h.u.state.error) && h.dialogs.length === 1);
 }
 
 // --- Check for Updates…: the only time it answers in a box -------------------
@@ -206,10 +265,15 @@ check('a build never uploads by itself', /--publish never/.test(dpkg.scripts.dis
 
 // --- The workflow: a release only when asked, after the check, with the feed ----
 const wf = readFileSync(join(REPO, '.github', 'workflows', 'desktop.yml'), 'utf8');
-const step = wf.slice(wf.indexOf('- name: Publish the release'));
-check('the workflow has a release step after the check', wf.indexOf('- name: Publish the release') > wf.indexOf('scripts/desktop.mjs --packaged'));
-check('it publishes only when the owner asks (Run workflow with release ticked, or a desktop-v tag)', /if:.*inputs\.release.*desktop-v|if:.*desktop-v.*inputs\.release/s.test(step.split('\n').slice(0, 4).join('\n')));
-check('it uploads the feed, the zip and the fixed-name dmg', /latest-mac\.yml/.test(step) && /\.zip/.test(step) && step.includes(DMG));
+const jobAt = (name) => wf.indexOf(`\n  ${name}:\n`);
+const buildJob = wf.slice(jobAt('build'), jobAt('release'));
+const releaseJob = wf.slice(jobAt('release'));
+const create = /gh release create[^\n]*\\\n[^\n]*/.exec(releaseJob)?.[0] ?? '';
+check('the build job runs the check on the packed app', jobAt('build') > 0 && /\n\s+run: node scripts\/desktop\.mjs --packaged\n/.test(buildJob));
+check('the release job waits for the build job, check and all', jobAt('release') > jobAt('build') && /\n    needs: build\n/.test(releaseJob));
+check('it publishes only when asked, from main or a desktop-v tag', /\n    if: \$\{\{ \(inputs\.release && github\.ref == 'refs\/heads\/main'\) \|\| startsWith\(github\.ref, 'refs\/tags\/desktop-v'\) \}\}\n/.test(releaseJob));
+check('only the release job may write', /permissions:\s*\n\s+contents: write/.test(releaseJob) && !/contents: write/.test(buildJob));
+check('gh release create uploads the feed, the zip, the blockmaps and the fixed-name dmg', ['latest-mac.yml', '*.zip', '*.blockmap', DMG].every((f) => create.includes(f)) && create.includes('--latest'), create.replace(/\s+/g, ' '));
 
 console.log(`\n${failed ? `FAIL  ${failed} line(s)` : 'ok    every line'}`);
 process.exit(failed ? 1 : 0);

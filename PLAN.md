@@ -2708,7 +2708,7 @@ network):
   Mac (Profile & Store for Pro, the landing page) links to its fixed-name .dmg; the app
   finds new releases itself (electron-updater, `desktop/updates.js`) and, ad hoc,
   offers the download in its menu and the profile sheet. *Measure:* `npm run updates`
-  (56/56, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
+  (69/69, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §69.
   - **13-update-signed** *(after 13.1-sign)*: with the Developer ID secrets in, the

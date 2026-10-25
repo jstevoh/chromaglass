@@ -10,7 +10,9 @@ import { desktopUpdates, macAppRow, onMacComputer, type DesktopUpdateState } fro
  * already looks for their account, not only in the menu bar.
  */
 export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
-  const updates = desktopUpdates();
+  // Read once: the bridge is fixed for the page's life, and the effect below
+  // subscribes to it once rather than on every render.
+  const [updates] = useState(desktopUpdates);
   const [state, setState] = useState<DesktopUpdateState | null>(null);
   useEffect(() => {
     if (!updates) return;

@@ -166,10 +166,15 @@ console.log(`The app ${app.label}; port ${PORT}, OSC ${OSC_PORT}, a new profile,
 */
 const feedAsked = [];
 let feed = null;
+// The feed holds its answer until the page is listening, so the push to the
+// page (what the profile card hears) is measured, not raced.
+let openFeed = () => {};
+const feedOpen = new Promise((r) => { openFeed = r; });
 if (PACKAGED) {
   const yml = ['version: 999.0.0', 'files:', '  - url: ChromaGlass-999.0.0-arm64-mac.zip', '    sha512: AAAA', '    size: 1', '  - url: ChromaGlass-mac-arm64.dmg', '    sha512: AAAA', '    size: 1', 'path: ChromaGlass-999.0.0-arm64-mac.zip', 'sha512: AAAA', "releaseDate: '2026-10-25T00:00:00.000Z'", ''].join('\n');
-  feed = createHttpServer((req, res) => {
+  feed = createHttpServer(async (req, res) => {
     feedAsked.push(req.url);
+    await feedOpen;
     if (/latest(-mac|-linux)?\.yml/.test(req.url ?? '')) { res.writeHead(200, { 'content-type': 'text/yaml' }); res.end(yml); return; }
     res.writeHead(404); res.end();
   });
@@ -210,6 +215,26 @@ try {
   const canvas = await page.locator('#liquid-canvas').count();
   check('opens: the show, from the server inside the app', url === `http://localhost:${PORT}/${QUERY}` && canvas === 1,
     `${url}, ${canvas ? 'the plate canvas is there' : 'no plate canvas'}`);
+
+  // The profile card's way of hearing the updater (desktop/preload.cjs), set
+  // up before the feed answers; read in the updates line below.
+  if (feed) {
+    await page.evaluate(() => {
+      window.__cgUpdatePushes = [];
+      window.__CHROMAGLASS_NATIVE__?.updates?.onChange((st) => window.__cgUpdatePushes.push(`${st.status} ${st.version ?? ''}`.trim()));
+    }).catch(() => {});
+  }
+  openFeed();
+  // Read here, before anything below reloads the page and its list with it.
+  let pushes = null;
+  if (feed) {
+    const until = Date.now() + 30_000;
+    while (Date.now() < until) {
+      pushes = await page.evaluate(() => window.__cgUpdatePushes ?? null).catch(() => null);
+      if (!Array.isArray(pushes) || pushes.some((p) => !/^(idle|checking)/.test(p))) break;
+      await sleep(250);
+    }
+  }
 
   // ── network off ───────────────────────────────────────────────────
   // `no-cors`: the website sends no CORS headers, so an ordinary cross-origin
@@ -535,12 +560,13 @@ try {
     }
     const labels = await electronApp.evaluate(({ Menu }) => (Menu.getApplicationMenu()?.items ?? []).flatMap((i) => i.submenu?.items ?? []).map((i) => i.label)).catch(() => []);
     const pageSees = await page.evaluate(() => window.__CHROMAGLASS_NATIVE__?.updates?.state?.().catch(() => null) ?? null).catch(() => null);
+    const pushed = Array.isArray(pushes) && pushes.some((p) => /^(available|downloading|ready) 999\.0\.0$/.test(p));
     const found = !!up && up.version === '999.0.0' && (up.history.includes('available') || up.history.includes('downloading'));
     const offered = up?.signed ? labels.some((l) => /ChromaGlass 999\.0\.0|Update to 999\.0\.0/.test(l)) : labels.includes('Download ChromaGlass 999.0.0…');
     const asked = feedAsked.find((u) => /latest/.test(u));
     check('updates: the app finds a new release and offers it, in the menu and to the page',
-      found && offered && !!asked && pageSees?.version === '999.0.0' && pageSees?.current === up?.current,
-      `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}`);
+      found && offered && !!asked && pageSees?.version === '999.0.0' && pageSees?.current === up?.current && pushed,
+      `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}, and was told ${pushes?.length ? pushes.join(' → ') : 'nothing'}`);
   }
 
   // ── network off, the whole run ────────────────────────────────────
@@ -567,6 +593,7 @@ try {
   check('the run finished', false, err?.message ?? String(err));
   if (output) console.log(`\n  The app said:\n${output.split('\n').slice(-30).map((l) => `    ${l}`).join('\n')}`);
 } finally {
+  openFeed();
   await electronApp.close().catch(() => {});
   feed?.close();
   rmSync(profile, { recursive: true, force: true });
