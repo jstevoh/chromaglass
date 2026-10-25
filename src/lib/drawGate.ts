@@ -133,134 +133,9 @@
  * the app with the projector window open.
  */
 
-import { QualityGovernor, STEP_RATES } from './governor';
+import { isGlobalAmbientMode } from './ambient';
 
 export type DrawSource = 'frame' | 'ask';
-
-let globalAmbientDrawMode = false;
-const ambientListeners = new Set<(on: boolean) => void>();
-
-export function isGlobalAmbientDrawMode(): boolean {
-  return globalAmbientDrawMode;
-}
-export function setGlobalAmbientDrawMode(on: boolean): void {
-  const next = Boolean(on);
-  if (globalAmbientDrawMode === next) return;
-  globalAmbientDrawMode = next;
-  for (const fn of ambientListeners) {
-    try { fn(next); } catch { /* ignore listener errors */ }
-  }
-}
-
-export function isGlobalAmbientMode(): boolean {
-  return globalAmbientDrawMode;
-}
-export function setGlobalAmbientMode(on: boolean): void {
-  setGlobalAmbientDrawMode(on);
-}
-export function onAmbientModeChange(fn: (on: boolean) => void): () => void {
-  ambientListeners.add(fn);
-  return () => { ambientListeners.delete(fn); };
-}
-
-declare module './governor' {
-  interface QualityGovernor {
-    ambientMode: boolean;
-    setAmbient(on: boolean): void;
-  }
-}
-
-interface GovernorInternal {
-  index: number;
-  readonly start: number;
-  readonly rungs: QualityGovernor['rungs'];
-  readonly rungIndex: number;
-  readonly postLevel: QualityGovernor['postLevel'];
-  readonly stepRate: number;
-  steps: number;
-  readonly stepsFailed: Map<number, number>;
-  everSteppedDown: boolean;
-  __ambient?: boolean;
-  __wasAmbient?: boolean;
-}
-
-function syncGovernorAmbient(gov: GovernorInternal): boolean {
-  const on = Boolean(gov.__ambient) || globalAmbientDrawMode;
-  if (gov.__wasAmbient === undefined) gov.__wasAmbient = on;
-  if (on !== gov.__wasAmbient) {
-    gov.__wasAmbient = on;
-    if (on) {
-      if (gov.index < gov.start) gov.index = gov.start;
-    } else {
-      gov.steps = 0;
-      gov.stepsFailed.clear();
-    }
-  }
-  return on;
-}
-
-const origSample = QualityGovernor.prototype.sample;
-Object.defineProperties(QualityGovernor.prototype, {
-  ambientMode: {
-    get(this: GovernorInternal): boolean {
-      return syncGovernorAmbient(this);
-    },
-    configurable: true,
-  },
-  setAmbient: {
-    value(this: GovernorInternal, on: boolean): void {
-      this.__ambient = Boolean(on);
-      syncGovernorAmbient(this);
-    },
-    configurable: true,
-    writable: true,
-  },
-  rungIndex: {
-    get(this: GovernorInternal): number {
-      return syncGovernorAmbient(this) ? Math.max(this.start, this.index) : this.index;
-    },
-    configurable: true,
-  },
-  rung: {
-    get(this: GovernorInternal) {
-      return this.rungs[this.rungIndex];
-    },
-    configurable: true,
-  },
-  stepRate: {
-    get(this: GovernorInternal): number {
-      if (syncGovernorAmbient(this)) return STEP_RATES[STEP_RATES.length - 1];
-      return STEP_RATES[this.steps];
-    },
-    configurable: true,
-  },
-  steppedDown: {
-    get(this: GovernorInternal): boolean {
-      return this.everSteppedDown && this.rungIndex > this.start;
-    },
-    configurable: true,
-  },
-  sample: {
-    value(this: GovernorInternal, frameS: number, workMs: number, now: number, held = false, gpuMs = 0): boolean {
-      const amb = syncGovernorAmbient(this);
-      if (amb && this.index < this.start) this.index = this.start;
-      const prevIndex = this.rungIndex;
-      const prevPost = this.postLevel;
-      const prevSteps = this.stepRate;
-      const savedSteps = this.steps;
-      if (amb) this.steps = STEP_RATES.length - 1;
-      const moved = origSample.call(this as unknown as QualityGovernor, frameS, workMs, now, held, gpuMs);
-      if (amb) {
-        this.steps = savedSteps;
-        if (this.index < this.start) this.index = this.start;
-        return this.rungIndex !== prevIndex || this.postLevel !== prevPost || this.stepRate !== prevSteps;
-      }
-      return moved;
-    },
-    configurable: true,
-    writable: true,
-  },
-});
 
 /** An offer this soon after the last draw, as a fraction of a refresh, is turned down. */
 export const DRAW_SKIP_FRACTION = 0.6;
@@ -397,7 +272,7 @@ export class DrawGate {
     if (gap > CLOCK_FRESH_MS) g.length = 0;
     else if (gap > 0) { g.push(gap); if (g.length > GAPS) g.shift(); }
     this.lastOffer[source] = now;
-    if ((this.ambient || globalAmbientDrawMode) && now - this.lastDraw < AMBIENT_MIN_DRAW_MS) {
+    if ((this.ambient || isGlobalAmbientMode()) && now - this.lastDraw < AMBIENT_MIN_DRAW_MS) {
       this.skipped[source]++;
       return false;
     }

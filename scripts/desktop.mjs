@@ -615,11 +615,12 @@ try {
   const ambientWorks =
     ambOn.ambient === true &&
     ambOn.stepRate === 30 &&
-    (ambOn.rungIndex === null || ambOn.rungIndex >= (ambOn.start ?? 0)) &&
+    // A null is a show with no governor, which the Mac app never is: it fails.
+    ambOn.rungIndex !== null && ambOn.start !== null && ambOn.rungIndex >= ambOn.start &&
     mainAmb === true &&
     drawCapped &&
     ambOff.ambient === false &&
-    (ambOff.stepRate === null || ambOff.stepRate === 60);
+    ambOff.stepRate === 60;
   check(
     'ambient TV: caps solver at 30 steps/s, display at 60 Hz, and holds the opening rung',
     ambientWorks,

@@ -56,7 +56,7 @@ import { runBench, formatBench, readRenderer } from './lib/bench';
 import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
 import { isDesktopApp, type EngineStatus } from './lib/platform';
-import { isGlobalAmbientMode, setGlobalAmbientMode, onAmbientModeChange } from './lib/drawGate';
+import { isGlobalAmbientMode, setGlobalAmbientMode, onAmbientModeChange } from './lib/ambient';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
 import { PhonePlay } from './components/phone/PhonePlay';

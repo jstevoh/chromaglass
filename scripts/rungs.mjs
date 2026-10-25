@@ -622,6 +622,19 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       if (gate.offer('frame', t)) ambientDraws++;
       if (normalGate.offer('frame', t)) normalDraws++;
     }
+    // The opening rung is a ceiling for ambient mode, not only a floor on how
+    // far it climbs: a governor that has already climbed above it before the
+    // switch is thrown is brought back to it, and stays.
+    const c = new QualityGovernor(rungs, 2, 0);
+    const climbed = feed(c, 8.33, 2, 300, 0);
+    const climbedTo = c.rungIndex;
+    c.setAmbient(true);
+    const cameBackTo = c.rungIndex;
+    feed(c, 8.33, 2, 300, climbed.now);
+    const heldAt = c.rungIndex;
+    check('ambient TV mode brings a climbed governor back to the opening rung and holds it there',
+      climbedTo < 2 && cameBackTo === 2 && heldAt === 2 && c.stepRate === 30,
+      `opened on 2, climbed to ${climbedTo} with the switch off, ${cameBackTo} on throwing it, ${heldAt} after 300 s more of fast frames, ${c.stepRate}/s`);
     check('ambient TV mode caps the solver step rate at 30 Hz, holds the opening rung, and caps a 120 Hz display at 60 draws/s',
       rateInAmbient === 30 && rateAfterFast === 30 && rungAfterFast >= 2 && rateRestored === 60 && ambientDraws === 60 && normalDraws === 120,
       `ambient stepRate=${rateInAmbient} → ${rateAfterFast}/s, rung ${rungBefore} → ${rungAfterFast} (start=2), restored=${rateRestored}/s, draws on 120 Hz=${ambientDraws}/s vs ${normalDraws}/s`);
