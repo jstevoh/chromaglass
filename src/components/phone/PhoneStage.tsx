@@ -348,7 +348,7 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
       }`}
     >
       <Icon size={20} />
-      <span>{label}</span>
+      <span className="tabular-nums">{label}</span>
     </button>
   );
 }

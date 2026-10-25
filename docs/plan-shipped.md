@@ -526,6 +526,47 @@ receiver once rather than in every cast state (the lesson of S0's logo, in
 *Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
 row; the cast state's size is unchanged.
 
+### 13-update. The Mac app's download, its releases and its updates (2026-10-25)
+
+Asked by the owner on 2026-10-25, after the app was built and put in Applications by hand:
+"don't we also need to create a download link on the webpage/profile? and whenever we have a
+new release update that app? and also allow updating of the app from inside the app itself?"
+The same day they chose a public download ("public download is fine"): Pro is checked inside
+the app against the key (23.11), so a GitHub Release on this public repo is the file.
+
+- **A release** is the owner's call: Actions → *Mac app* → *Run workflow* with *release*
+  ticked, or a `desktop-v<version>` tag. `desktop.yml` builds and checks the app as every run
+  does, then a `release` job on Ubuntu (no Mac minutes; the only job that may write) publishes
+  `desktop-v<version>` as the newest release with the .dmg under a fixed name
+  (`ChromaGlass-mac-arm64.dmg`), the zip, the blockmaps and `latest-mac.yml`. Not every merge:
+  main takes several a day and each would tell every installed app to update. The version is the
+  site's major and minor and the run's number, so nothing has to be bumped first (13-version is
+  what that leaves).
+- **The download**: Profile & Store has a Mac app card (`MacAppCard.tsx`, `src/lib/macApp.ts`):
+  Pro on a Mac gets Download for Mac; Pro on a phone, an iPad or a PC is told to open the page on
+  the Mac (the phone version); Free and Home are told it comes with Pro. The landing page's Pro
+  tier lists it, with a download line for a Mac. The link is GitHub's `releases/latest/download/`
+  of the fixed name, so a release never needs a deploy to be found.
+- **Updates in the app** (`desktop/updates.js`, electron-updater 6.8.10): twenty seconds after
+  opening and every six hours it reads the newest release's `latest-mac.yml`. macOS replaces an
+  app in place only when it is signed with a Developer ID (Squirrel.Mac checks the new copy's
+  signature against the old), and the owner has deferred the Apple account, so the build records
+  whether it was signed (`chromaglass.signed` in its package.json) and: ad hoc, the menu's
+  *Download ChromaGlass <version>…* and the profile card's button open the new .dmg; signed, it
+  downloads and installs on quit, with *Restart to Update*. It never restarts, opens a window or a
+  box by itself; one notification at most, none while a projector window is open; Check for
+  Updates… is the only box. What it found stays found through a later check that fails offline or
+finds the same release again, and on a signed Mac Restart to Update waits until Squirrel.Mac
+itself has the update (electron-updater says it is downloaded before Squirrel has taken it, and
+a click then would queue a quit for whenever Squirrel finished). A release runs only from main or
+a tag.
+
+Measured: `npm run updates` 69/69 (every updater event in order with stand-ins, what it must not
+do unasked, and that the builder config, the app and the site agree on the .dmg's name and the
+feed); `npm run desktop -- --packaged` 11/11 on the Linux pack, its new "updates" line the shipped
+electron-updater reading a feed the check serves (`1.3.0 → 999.0.0 (idle → checking →
+available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile card seeing the same and told it as it happened: `checking → available 999.0.0`).
+
 ### 14a. The show goes deaf when its window is hidden
 
 **Read in the code.** The sound analysis runs only on the show window's animation
@@ -3174,6 +3215,24 @@ and the canvas's top at the plan, the second touch and the drag's end, and fails
 canvas moved or the second touch starts off it. The phone has no plate bar. Record's
 labels still change width in the same bar (19v-4).
 
+**19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
+Shipped 2026-10-25. Found with 19v-3: at 1280 × 800 in Build, `RecordControls`' button
+(`record-button` after 14ae/#463 unified the desk's Video and Take buttons into one, and
+`pressed={running} live` after 35a/#461) grew from `● Record` (93.5 px, or 120.1 px before
+35a removed inline shortcut chips) to `■ Stop · 0:00` (118.2 px, +24.7 px) when recording
+Plate video, a Take, or both, shifting its neighbours in the plate bar (and before 14ae,
+when two buttons sat side by side, wrapping the bar to two rows and dropping the plate
+42.0 px). On the phone's Play screen (`PhonePlay`), `play-record` grew by 28.0 px when a
+clip started, pushing `play-shuffle` and `Account` across the top bar. Both the desk's
+`RecordControls` button and Play's `play-record` pill now keep their idle content in flow
+(`invisible` while recording) and overlay the running `tabular-nums` clock inside the same
+box (at `2xl` on the desk the running overlay reads `■ Stop · 0:00` while the hover title
+and `dot-rec` name what is recording), so starting, running and stopping a recording changes
+their boxes by 0.0 px. `layout`
+at 1280 in Build across `off → Plate video → Take → Plate video + Take → off` (before:
+Record 24.7 px; after: 0.0 px on plate, Record and Save) and `phone` on Play in portrait
+(before: Record 28.0 px, Shuffle 28.0 px; after: 0.0 px on both) ask it on every PR.
+
 ### 19w. A fifth Mac shard: every shard well inside its timeout
 
 **Shipped** 2026-10-11. The plate shard's run had grown to 15 to 19.8 minutes against its
@@ -4642,6 +4701,17 @@ two lines, one over every retired id against the end of its own chain, written o
 check and not taken from `livePresetId`, and one that a chain is followed the whole way.
 With the resolver cut to one hop both are red (`sunny-side-up → nothing (wanted classic)`).
 
+### 28i-3. Sound on the liquid, not the frame: the eight rotation looks and Milk Marbling's dead patch (#473, with 28f-3 and 28i-6(d); 28i-3b and 28f-2 remain open in PLAN.md)
+
+Asked in PLAN 28i-3 and 28f-3: move the eight looks that still drove `audioMappings.rotation` from sound onto liquid targets (`rotation: 'none'`), fix Milk Marbling's dead `treble → airVelocity` patch (`0.02`), and give every look that hears sound two or three fast liquid patches or area cords from `hits` and `bands` only (`docs/sound-patches.md`), using 25h's area cords (`lib/areaCords.ts`) where parts of the plate answer on their own.
+
+What shipped in #473:
+- **Eight looks off `audioMappings.rotation` (28f-3 / 28i-3):** `galaxy` (`energy`), `cyberpunk` (`complexity`), `acid-trip` (`energy`), `aurora-borealis` (`energy`), `solar-flare` (`bass`), `fractal-dream` (`treble`), `neon-coral-reef` (`timbre`) and `stardust-collapse` (`bass`) now set `audioMappings.rotation: 'none'` and route their readings into liquid controls (`buoyancy`, `turbulenceScale`, `surfactantFlow`, `injectRate`, `colorShift`, `beads`, `reactionRate`, `flowSpeed`). The other two of 28f-3's ten looks had already left the slot before #473 (`timbre-shifter` moved `rotation: 'timbre'` to `'none'` in #351 and was retired with `deep-ocean` in #408). `scripts/framesway.mjs`'s `frameRoutes` now counts `audioMappings.rotation !== 'none'` alongside `plateRock`, `frameSway` and `rotationSpeed` (`npm run framesway`: 59 of 59 looks and stages still; on `origin/main` it fails naming all eight looks).
+- **Milk Marbling's dead patch fixed:** `{ source: 'sound', feature: 'treble', setting: 'airVelocity', depth: 0.02 }` moved `airVelocity` from `0` to `0.008`, which `LiquidVisualizer.tsx:4257` (`airV <= 0.1 ? 0 : ...`) gated to `0`. Replaced with two area cords on its food-colouring spots (`hits:kickHit → areaPour[0] 0.45`, `hits:snareHit → areaStir[1] 0.45`). `scripts/soundpatch.mjs` §1 now folds each patch on the look's own settings (`ownBay`) as well as on defaults and requires `|ownBay.global[m.setting] - own[m.setting]| >= 0.03 * span` and `!(m.setting === 'airVelocity' && ownBay.global.airVelocity <= 0.1)` (on `origin/main` it fails naming `reads nothing: milk-marble sound:treble on airVelocity`).
+- **Area cords and colour families (`src/lib/plateAreas.ts`, `src/presets.ts`, `scripts/soundpatch.mjs`):** Added explicit disjoint `dyes` families to `lumia` (`[0]`, `[1]`, `[2]`) and `cell-bloom` (`[0, 3]`, `[1]`, `[2]`), and added `PRESET_AREAS` entries for `poster-1969` (three poster shapes: left `milk` `[0, 1]` on `bass`, right `ink` `[3, 4]` on `mid`, lower `milk` `[2]` on `treble`), `milk-marble` (three food-colouring spots in `OWN_SEED_AREAS` so `seedPreset` still lays the white milk dish and four spots: `[0, 1]` on `bass`, `[2, 3]` on `mid`, `[4, 5]` on `treble`), and `red-cabbage` (two pH wells: left `acid` `[0]` on `mid`, right `base` `[1]` on `bass`). `poster-1969` joins `soundpatch`'s `PATTERN` list (closing 28i-6(d)), and `soundpatch` §2 counts both plate-wide liquid patches and area cords on fast readings (`hits` and `bands`, including onsets and notes) toward a look's two or three while holding area looks free of redundant plate-wide patches (`100 of 100 move`, `29 looks checked (+ 3 from 25h)`).
+- **Patch bay hit targets on the desk (`src/components/SettingsPanel.tsx`):** Now that `classic` and `jellyfish-bloom` carry `sceneMappings`, the `patches` deck panel renders their patch cards on load; `Remove mapping` (`h-6 w-6`), `Depth` (`set-range`), `patch-gate-on` (`h-6 w-6`) and the gate sliders (`set-range`) meet the desk's 24 px minimum hit-target rule (`npm run layout`, `npm run qa`).
+- **Still open in `PLAN.md` (`28i-3` film measure, `28i-3b`, `28f-2`):** A fresh showreel (28f-2) and a main-vs-head film on the same looks (seed 1, band in a box) are still owed, and 27 of the 28 changed looks still miss one or more of the 28i film bars (`2–3.5 swells a minute`, `at least 6 colour changes a minute`, `r1 in [−0.13, 0.22]`); all 28 per-look numbers are recorded under `28i-3b` in `PLAN.md`.
+
 ## 28j. Changing looks without a jump
 
 ### 28j-1. The patch list and the ferrofluid ring cross over, not cut (this PR)
@@ -5138,45 +5208,24 @@ guide names the seven. `desklayout` holds the list, every panel's group, the mar
 `data-group` and the Stage panels to their names; `phone` reads the seven headings drawn at phone
 width.
 
-Squish Plate keeps its name and its 45 controls in Chemistry: splitting it is 35c.
+Squish Plate keeps its name and its 45 controls in Chemistry: splitting it is 35c (done in 35c-1, below).
 
-### 13-update. The Mac app's download, its releases and its updates (2026-10-25)
+### 35c-1. Squish Plate in five (shipped 2026-10-25)
 
-Asked by the owner on 2026-10-25, after the app was built and put in Applications by hand:
-"don't we also need to create a download link on the webpage/profile? and whenever we have a
-new release update that app? and also allow updating of the app from inside the app itself?"
-The same day they chose a public download ("public download is fine"): Pro is checked inside
-the app against the key (23.11), so a GitHub Release on this public repo is the file.
+The owner's complaint was that the plate's panel held forty-five controls under one name, and the
+desk made it worse: thirty of its pins were filed under Fluid Physics while the sheet drew them under
+Squish Plate, so Fluid Physics' knobs on the deck were the glass's, the oil's and the magnet's.
 
-- **A release** is the owner's call: Actions → *Mac app* → *Run workflow* with *release*
-  ticked, or a `desktop-v<version>` tag. `desktop.yml` builds and checks the app as every run
-  does, then a `release` job on Ubuntu (no Mac minutes; the only job that may write) publishes
-  `desktop-v<version>` as the newest release with the .dmg under a fixed name
-  (`ChromaGlass-mac-arm64.dmg`), the zip, the blockmaps and `latest-mac.yml`. Not every merge:
-  main takes several a day and each would tell every installed app to update. The version is the
-  site's major and minor and the run's number, so nothing has to be bumped first (13-version is
-  what that leaves).
-- **The download**: Profile & Store has a Mac app card (`MacAppCard.tsx`, `src/lib/macApp.ts`):
-  Pro on a Mac gets Download for Mac; Pro on a phone, an iPad or a PC is told to open the page on
-  the Mac (the phone version); Free and Home are told it comes with Pro. The landing page's Pro
-  tier lists it, with a download line for a Mac. The link is GitHub's `releases/latest/download/`
-  of the fixed name, so a release never needs a deploy to be found.
-- **Updates in the app** (`desktop/updates.js`, electron-updater 6.8.10): twenty seconds after
-  opening and every six hours it reads the newest release's `latest-mac.yml`. macOS replaces an
-  app in place only when it is signed with a Developer ID (Squirrel.Mac checks the new copy's
-  signature against the old), and the owner has deferred the Apple account, so the build records
-  whether it was signed (`chromaglass.signed` in its package.json) and: ad hoc, the menu's
-  *Download ChromaGlass <version>…* and the profile card's button open the new .dmg; signed, it
-  downloads and installs on quit, with *Restart to Update*. It never restarts, opens a window or a
-  box by itself; one notification at most, none while a projector window is open; Check for
-  Updates… is the only box. What it found stays found through a later check that fails offline or
-finds the same release again, and on a signed Mac Restart to Update waits until Squirrel.Mac
-itself has the update (electron-updater says it is downloaded before Squirrel has taken it, and
-a click then would queue a quit for whenever Squirrel finished). A release runs only from main or
-a tag.
+What changed. Chemistry: Squish Plate keeps the glass (Plate Pressure, Plate Shape, Depth Drag, Thin
+Gap, Thickness, Press Lift, Glass Smear, Rain Drip, Viscosity); Oil & Soap is Oil Tension, Oil
+Bodies, Soap Bursts, Clear Film and Polarity; Ferrofluid is the phase, the six magnet controls,
+Labyrinth and Maze Detail; Reactions is pH Indicator, BZ Reaction, Liesegang Rings, and Lamp &
+Light's Chemistry, its two pattern controls and the Turing print's three. Motion: Tilt & Rock is
+Gravity, Tilt Direction, Slosh and Plate Rock (from Light Show Look). Swirl, Dye Weight and Heat
+Spread went to Fluid Physics; Layer Depth and Spectral Mix to Lamp & Light, beside Light Through Dye.
+The ids `squish`, `physics` and `lamp` stay and no control's key changed, so saved layouts, pins,
+MIDI maps and deep links open as before; the four new ids are in `SETTINGS_SECTIONS`. `panel` now
+asks of seven sections that the sliders the markup draws are exactly the ones the registry files
+under it, and that the lamp keeps the optics and Reactions the Turing pattern. A saved layout's
+Fluid Physics panel now shows only the flow (about a third of the knobs it did).
 
-Measured: `npm run updates` 69/69 (every updater event in order with stand-ins, what it must not
-do unasked, and that the builder config, the app and the site agree on the .dmg's name and the
-feed); `npm run desktop -- --packaged` 11/11 on the Linux pack, its new "updates" line the shipped
-electron-updater reading a feed the check serves (`1.3.0 → 999.0.0 (idle → checking →
-available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile card seeing the same and told it as it happened: `checking → available 999.0.0`).

@@ -1167,6 +1167,38 @@ try {
 
     if (label === 'Play, portrait') {
       check('Play: the gesture hint is over the tray on a first visit', await visible(page, 'play-hint'));
+      // Starting and stopping a clip on Play does not widen the Record pill or shift Shuffle beside it (PLAN.md 19v-4).
+      {
+        const measureRec = () => page.evaluate(() => {
+          const b = (id) => { const r = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; };
+          const t = document.querySelector('[data-testid="play-record-timer"]') || document.querySelector('[data-testid="play-record"] span.font-mono');
+          return {
+            rec: b('play-record'),
+            shuf: b('play-shuffle'),
+            look: b('play-look'),
+            on: document.querySelector('[data-testid="play-record"]')?.getAttribute('aria-pressed') === 'true',
+            timer: t ? (t.textContent || '').trim() : null,
+          };
+        });
+        const recBefore = await measureRec();
+        await tap(page, 'play-record');
+        let recDuring = null;
+        for (let i = 0; i < 10; i++) { await page.waitForTimeout(150); recDuring = await measureRec(); if (recDuring.on) break; }
+        await tap(page, 'play-record');
+        let recAfter = null;
+        for (let i = 0; i < 10; i++) { await page.waitForTimeout(150); recAfter = await measureRec(); if (!recAfter.on) break; }
+        const moved = (a, b) => (a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h)) : Infinity);
+        const dr = Math.max(moved(recBefore.rec, recDuring?.rec), moved(recBefore.rec, recAfter?.rec));
+        const ds = Math.max(moved(recBefore.shuf, recDuring?.shuf), moved(recBefore.shuf, recAfter?.shuf));
+        const dl = Math.max(moved(recBefore.look, recDuring?.look), moved(recBefore.look, recAfter?.look));
+        const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
+        check('Play: Record\'s running timer takes no extra width, so Record, Shuffle and the look stay where they are',
+          !recBefore.on && !!recDuring?.on && /^\d+:\d\d$/.test(recDuring.timer ?? '') && !recAfter?.on
+            && dr <= 0.5 && ds <= 0.5 && dl <= 0.5,
+          `pressed ${recBefore.on} → ${recDuring?.on} (${recDuring?.timer ?? 'no timer'}) → ${recAfter?.on}; `
+          + `Record ${fmt(recBefore.rec)} → ${fmt(recDuring?.rec)} (${dr.toFixed(1)} px); `
+          + `Shuffle ${fmt(recBefore.shuf)} → ${fmt(recDuring?.shuf)} (${ds.toFixed(1)} px)`);
+      }
       // The sheet: from the handle, six sliders in 44 rows, the looks, the two chips, the three buttons.
       await tap(page, 'play-handle');
       const sheetUp = await visible(page, 'play-sheet');

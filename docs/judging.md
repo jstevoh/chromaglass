@@ -257,7 +257,7 @@ drift with time as the rainbow's hue did.
 
 ## 12. Ferro Paint's colour pushed by the black
 
-Pushes Dye (Squish Plate, under the ferrofluid) is on full in Ferro Paint:
+Pushes Dye (Ferrofluid, under Phase Edge) is on full in Ferro Paint:
 where the black grows the colour leaves, and it packs as a bright line along
 the black's edges instead of sitting still under it. Seen only in the lab,
 on software WebGPU at 256². Two things to look at: whether the packed edge
@@ -987,7 +987,7 @@ in your hand and nothing on the plate.
 
 ## 34. A clear film that tears into lace (Clear Film, PLAN 20b)
 
-Settings → Squish Plate → Physics & chemistry → **Clear Film** (also MIDI, the desks,
+Settings → Oil & Soap → **Clear Film** (also MIDI, the desks,
 the remote and the phone's Dye sheet). 0 in every look. Up, a clear oil film is laid
 over the plate, that thick (1 is most of the gap), and it tears open by itself: thin
 parts and the dish's specks of dust first, and wherever a drop of Alcohol or Soap
@@ -1646,6 +1646,19 @@ On the laptop in a dark room, and on the phone, with no reading of labels:
 - **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
   tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
 
+## 75. The Mac app downloads, and finds its own updates (PLAN 13-update)
+
+On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
+Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
+copy that is there, and open it (the first open still needs System Settings → Privacy &
+Security → Open Anyway until the app is signed). On a phone the same card should say to open
+the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
+release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
+minute: one notification should say the new version is out, the ChromaGlass menu should offer
+Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
+while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
+another, and check that the first downloads it and becomes the new version after a quit.
+
 ## 72. A look saved in Chrome is in the Mac app (PLAN 23.18)
 
 Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
@@ -1679,16 +1692,20 @@ On the desk, press ⌘P (the panel browser) in Load-in, then in Build, and open 
 Bad: a section where you would not look first (tell me which and where it should be), a heading that
 cuts a name short on the phone, or a saved layout whose panels came back in a different place.
 
+## 74. Squish Plate in five (PLAN 35c)
 
-## 74. The Mac app downloads, and finds its own updates (PLAN 13-update)
+On the desk, open Settings (⌘K, All settings…) and look under Chemistry and Motion:
 
-On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
-Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
-copy that is there, and open it (the first open still needs System Settings → Privacy &
-Security → Open Anyway until the app is signed). On a phone the same card should say to open
-the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
-release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
-minute: one notification should say the new version is out, the ChromaGlass menu should offer
-Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
-while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
-another, and check that the first downloads it and becomes the new version after a quit.
+1. Chemistry now lists Squish Plate, Oil & Soap, Ferrofluid and Reactions; Motion lists Tilt & Rock
+   beside Kaleidoscope, Automation and Fluid Physics. Squish Plate holds only the glass (pressure,
+   shape, gap, smear, rain, viscosity).
+2. Every control you used to find under Squish Plate is in one of them: Oil Tension, Oil Bodies,
+   Soap Bursts, Clear Film and Polarity in Oil & Soap; the ferrofluid and the magnet in Ferrofluid;
+   pH, BZ, Liesegang and the Turing pattern (it was in Lamp & Light) in Reactions; Gravity, Tilt
+   Direction, Slosh and Plate Rock in Tilt & Rock.
+3. The same on the phone: More → Settings, the Chemistry and Motion tabs. A saved layout that had
+   the Squish Plate or Fluid Physics panel opens with them where they were; Fluid Physics now holds
+   only the flow (its knobs are fewer).
+
+Bad: a control you went looking for in the old place and could not find by the search box, or a
+section with so few controls that it should have been joined to another.

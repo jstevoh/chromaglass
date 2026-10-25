@@ -68,6 +68,26 @@
  *  16. signing in from that sheet brings the account back: the button says
  *      Account again and the sheet names the account
  *
+ * Email and password (PLAN.md 23.10e; the owner, 2026-10-24: "an email login
+ * option that stores passwords ... and if they have a google account it can
+ * link to that"). One account per email is Firebase's rule, and these hold the
+ * app to it:
+ *  17. a password sign-up on the desk makes one account, mails the confirmation
+ *      link, and starts the plate; until the link is opened a Pro key filed under
+ *      that email reads Free and the sheet says to confirm, and "I've confirmed"
+ *      after the link brings the licence in (the Worker refuses an unconfirmed
+ *      email, so a stranger cannot sign up as someone else's address)
+ *  18. on a phone, the password signs in to that same account (still one uid),
+ *      a wrong password is refused in words with the plate not started, and
+ *      "Forgot password?" mails a reset link
+ *  19. an address that already has a Google account, signed up again with a
+ *      password: no second account, the form says so, and "Continue with
+ *      Google and add this password" leaves ONE account with both ways in
+ *  20. a signed-in Google account and an emailed-link account can each set a
+ *      password from the sheet, and it then signs in to the same uid
+ *  21. the password form fits a laptop and a phone, upright and on its side:
+ *      nothing wider than the screen, every button a thumb's height
+ *
  * The hooks it reads (the brief, docs/handoff-signin.md, names each):
  *   [data-cg-signin]                               the sign-in screen
  *   [data-cg-signin-provider="google.com"|"apple.com"|"email"]
@@ -665,6 +685,236 @@ try {
   check('12. the account sheet opens from the desk and from the phone, and names the account', Object.values(sheet).every(Boolean), JSON.stringify(sheet));
   const litOk = (l, phone) => !!l && l.shown && l.lit && l.opens && (!phone || l.h >= 44);
   check('15. signed out with the plate up, the desk and the phone show a lit Sign in (44 px on the phone) that opens the sign-in over the running plate', litOk(lit[sizes[0].name], false) && litOk(lit[sizes[1].name], true), JSON.stringify(lit));
+
+  // ── 17–21: email and password (PLAN.md 23.10e) ───────────────────────────
+  {
+    const PW = 'correct horse 9';
+    const idpToken = (email) => {
+      const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+      return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ sub: 'google-' + email, email, email_verified: true, iss: 'https://accounts.google.com' })}.`;
+    };
+    /** An account that signed in with Google and has no password, made on the emulator's side. */
+    async function makeGoogleAccount(email) {
+      const r = await fetch(`${EMU}/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=demo-key`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ requestUri: 'http://localhost', returnSecureToken: true, postBody: `id_token=${idpToken(email)}&providerId=google.com` }),
+      });
+      if (!r.ok) throw new Error(`the emulator would not make a Google account (${r.status})`);
+    }
+    const accountsFor = async (email) => (await accounts()).filter((u) => u.email === email);
+    const providersFor = async (email) => (await accountsFor(email)).flatMap((u) => (u.providerUserInfo ?? []).map((i) => i.providerId)).sort();
+    const oobs = async (email, type) => ((await (await fetch(`${EMU}/emulator/v1/projects/${PROJECT}/oobCodes`)).json()).oobCodes ?? []).filter((o) => o.email === email && o.requestType === type);
+    /** Open the link a mail holds, as the browser would: the emulator's action endpoint. */
+    async function confirmEmail(email) {
+      const c = (await oobs(email, 'VERIFY_EMAIL')).pop();
+      if (!c) return false;
+      const r = await fetch(`${EMU}/identitytoolkit.googleapis.com/v1/accounts:update?key=demo-key`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ oobCode: c.oobCode }) });
+      return r.ok;
+    }
+    const flagSet = (p) => p.evaluate(() => localStorage.getItem('chromaglass-signed-in') === '1').catch(() => false);
+    /** The sign-in's password panel, open (sign-up when asked), from wherever the visit starts. */
+    async function openPasswordPanel(p, signup) {
+      if (!(await waitFor(() => signinOpen(p), 30_000))) return false;
+      await p.click('[data-cg-signin-provider="email"]').catch(() => {});
+      await p.click('[data-cg-signin-method="password"]').catch(() => {});
+      if (signup) await p.click('[data-cg-signin-mode="signup"]').catch(() => {});
+      return p.waitForSelector('[data-cg-signin-password]', { state: 'visible', timeout: 5000 }).then(() => true, () => false);
+    }
+    async function submitPassword(p, email, pw) {
+      await p.fill('[data-cg-signin-email]', email);
+      await p.fill('[data-cg-signin-password]', pw);
+      await p.click('[data-cg-signin-password-submit]');
+    }
+    /** The popup of the emulator's stand-in for Google, answered as the person with this email. */
+    async function answerGoogle(c, email) {
+      const pop = await c.waitForEvent('page', { timeout: 15_000 }).catch(() => null);
+      if (!pop) return false;
+      await pop.waitForURL((u) => u.toString().includes('/emulator/auth/handler'), { timeout: 15_000 }).catch(() => {});
+      await pop.waitForSelector('#add-account-button', { timeout: 15_000 }).catch(() => {});
+      await pop.click('#add-account-button button').catch(() => {});
+      await pop.fill('#email-input', email).catch(() => {});
+      await pop.click('#sign-in').catch(() => {});
+      return true;
+    }
+
+    // 17. A sign-up on the desk, and the confirmation it waits on.
+    {
+      const E = 'pw-desk@example.com';
+      await deleteAccount(E);
+      licKV.clear();
+      const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      await c.addInitScript(LICENSE_PUBLIC_INIT);
+      const p = await c.newPage();
+      await p.goto(ON + '&tierGates=1');
+      const opened = await openPasswordPanel(p, true);
+      if (opened) await submitPassword(p, E, PW);
+      const up = opened && await waitFor(() => appUp(p), BOOT_MS);
+      const made = await accountsFor(E);
+      const unconfirmed = made.length === 1 && made[0].emailVerified !== true;
+      const mailed = (await oobs(E, 'VERIFY_EMAIL')).length > 0;
+      // The Pro key is filed before the app starts again, so "Free" below is the
+      // Worker's refusal and not simply a missing key.
+      await fileProKey(E);
+      let freeWhileUnconfirmed = false, banner = false, proAfter = false, bannerGone = false;
+      if (up) {
+        await p.reload();
+        if (await waitFor(() => appUp(p), BOOT_MS)) {
+          await p.waitForTimeout(4000);
+          freeWhileUnconfirmed = (await tierShown(p)).split(',').includes('free') && !(await tierShown(p)).split(',').includes('pro');
+          await p.click('[data-cg-account-open]', { timeout: 10_000 }).catch(() => {});
+          banner = await p.waitForSelector('[data-cg-account-verify]', { state: 'visible', timeout: 10_000 }).then(() => true, () => false);
+          const opened = await confirmEmail(E);
+          await p.click('[data-cg-account-verify-done]').catch(() => {});
+          bannerGone = opened && await waitFor(() => p.evaluate(() => !document.querySelector('[data-cg-account-verify]')), 15_000);
+          proAfter = bannerGone && await waitFor(async () => (await tierShown(p)).split(',').includes('pro'), 20_000);
+          if (process.env.SIGNIN_SHOTS) await p.screenshot({ path: `${process.env.SIGNIN_SHOTS}/17.png` });
+        }
+      }
+      check('17. a password sign-up makes one unconfirmed account, mails the link, starts the plate; a Pro key reads Free until the email is confirmed, then Pro', opened && up && unconfirmed && mailed && freeWhileUnconfirmed && banner && proAfter, `form ${opened}, plate ${up}, accounts ${made.length}${unconfirmed ? ' unconfirmed' : ''}, mail ${mailed}, Free before ${freeWhileUnconfirmed}, banner ${banner}, Pro after ${proAfter}`);
+      await c.close();
+    }
+
+    // 18. On a phone: the password signs in to that same account, a wrong one is
+    // refused in words, and a reset mail is sent.
+    {
+      const E = 'pw-desk@example.com';
+      const before = (await accountsFor(E)).map((u) => u.localId);
+      const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
+      const wrong = await browser.newContext(phone);
+      const wp = await wrong.newPage();
+      await wp.goto(ON);
+      let refused = false, wrongStayed = false, resetSent = false, mailedReset = false;
+      if (await openPasswordPanel(wp, false)) {
+        await submitPassword(wp, E, 'not the password');
+        refused = await wp.waitForSelector('[data-cg-signin-error]', { state: 'visible', timeout: 15_000 }).then(async (el) => /don't match/.test((await el.textContent()) ?? ''), () => false);
+        wrongStayed = !(await flagSet(wp)) && !(await appUp(wp));
+        const n = (await oobs(E, 'PASSWORD_RESET')).length;
+        await wp.click('[data-cg-signin-reset]').catch(() => {});
+        resetSent = await wp.waitForSelector('[data-cg-signin-reset-sent]', { state: 'visible', timeout: 15_000 }).then(() => true, () => false);
+        mailedReset = (await oobs(E, 'PASSWORD_RESET')).length > n;
+      }
+      await wrong.close();
+      const good = await browser.newContext(phone);
+      const gp = await good.newPage();
+      await gp.goto(ON);
+      let up = false;
+      if (await openPasswordPanel(gp, false)) {
+        await submitPassword(gp, E, PW);
+        up = await waitFor(() => appUp(gp), BOOT_MS);
+      }
+      const after = (await accountsFor(E)).map((u) => u.localId);
+      const same = before.length === 1 && after.length === 1 && before[0] === after[0];
+      check('18. on a phone the password signs in to the same account (one uid), a wrong password is refused in words with no plate, and Forgot password mails a reset', up && same && refused && wrongStayed && resetSent && mailedReset, `plate ${up}, uid ${same ? 'unchanged' : 'changed'} (${after.length} accounts), wrong password ${refused ? 'refused in words' : 'not refused'}${wrongStayed ? '' : ', but the plate started or the flag was set'}, reset ${resetSent && mailedReset ? 'mailed' : 'not mailed'}`);
+      await good.close();
+    }
+
+    // 19. An address that already has a Google account, signed up again with a password.
+    {
+      const E = 'pw-google@example.com';
+      await deleteAccount(E);
+      await makeGoogleAccount(E);
+      const uid = (await accountsFor(E))[0]?.localId;
+      const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      const p = await c.newPage();
+      await p.goto(ON);
+      let said = false, onlyOne = false, linked = false, up = false, whyNot = '';
+      if (await openPasswordPanel(p, true)) {
+        await submitPassword(p, E, PW);
+        said = await p.waitForSelector('[data-cg-signin-exists]', { state: 'visible', timeout: 15_000 }).then(() => true, () => false);
+        onlyOne = (await accountsFor(E)).length === 1 && !(await flagSet(p));
+        if (said) {
+          const popup = answerGoogle(c, E);
+          await p.click('[data-cg-signin-google-add]');
+          await popup;
+          up = await waitFor(() => appUp(p), BOOT_MS);
+          if (!up) whyNot = (await p.textContent('[data-cg-signin-error]', { timeout: 1000 }).catch(() => 'no message')) ?? '';
+          const now = await accountsFor(E);
+          linked = now.length === 1 && now[0].localId === uid && (await providersFor(E)).join() === 'google.com,password';
+        }
+      }
+      check('19. an address with a Google account, signed up with a password: no second account, and Continue with Google leaves one account with both ways in', said && onlyOne && up && linked, `form said so ${said}, one account and nobody signed in ${onlyOne}, after Google: ${(await providersFor(E)).join(' + ') || 'no account'}${linked ? ' on the same uid' : ''}, plate ${up}${whyNot ? ` [${whyNot}]` : ''}`);
+      await c.close();
+    }
+
+    // 20. Setting a password from the sheet: a Google account (linkWithCredential)
+    // and an emailed-link account (updatePassword), each then signed in with it.
+    {
+      const results = [];
+      for (const kind of ['google', 'link']) {
+        const E = kind === 'google' ? 'pw-set-google@example.com' : 'pw-set-link@example.com';
+        await deleteAccount(E);
+        const c = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const p = await c.newPage();
+        await p.goto(ON);
+        let signedIn = false;
+        if (kind === 'google') {
+          if (await waitFor(() => signinOpen(p), 30_000)) {
+            const popup = answerGoogle(c, E);
+            await p.click('[data-cg-signin-provider="google.com"]');
+            await popup;
+            signedIn = await waitFor(() => appUp(p), BOOT_MS);
+          }
+        } else if (await waitFor(() => signinOpen(p), 30_000)) {
+          await p.click('[data-cg-signin-provider="email"]').catch(() => {});
+          await p.fill('[data-cg-signin-email]', E);
+          const n = (await oobs(E, 'EMAIL_SIGNIN')).length;
+          await p.click('[data-cg-signin-send]');
+          const link = await emailLink(E, n);
+          if (link) { await p.goto(link); signedIn = await waitFor(() => appUp(p), BOOT_MS); }
+        }
+        let saved = false, listed = '';
+        if (signedIn) {
+          await p.click('[data-cg-account-open]', { timeout: 10_000 }).catch(() => {});
+          await p.click('[data-cg-account-password-open]', { timeout: 10_000 }).catch(() => {});
+          await p.fill('[data-cg-account-password-input]', PW).catch(() => {});
+          await p.click('[data-cg-account-password-save]').catch(() => {});
+          saved = await p.waitForSelector('[data-cg-account-methods-note="ok"]', { timeout: 15_000 }).then(() => true, () => false);
+          listed = (await p.textContent('[data-cg-account-methods-list]').catch(() => '')) ?? '';
+          if (!saved) listed += ` [note: ${(await p.textContent('[data-cg-account-methods-note]').catch(() => 'none'))}]`;
+        }
+        await c.close();
+        const uid = (await accountsFor(E))[0]?.localId;
+        // Signed in again with the password only, in a browser that has never seen the account.
+        const c2 = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+        const p2 = await c2.newPage();
+        await p2.goto(ON);
+        let again = false;
+        if (saved && await openPasswordPanel(p2, false)) {
+          await submitPassword(p2, E, PW);
+          again = await waitFor(() => flagSet(p2), 20_000);
+        }
+        await c2.close();
+        const now = await accountsFor(E);
+        results.push({ kind, ok: signedIn && saved && again && now.length === 1 && now[0].localId === uid && /Email/.test(listed) && (kind === 'link' || /Google/.test(listed)), detail: `${kind}: signed in ${signedIn}, saved ${saved}, sheet lists "${listed.trim()}", password sign-in ${again}, ${now.length} account(s)${now[0]?.localId === uid ? ', same uid' : ''}` });
+      }
+      check('20. a Google account and an emailed-link account each set a password from the sheet, and it signs in to the same account', results.every((r) => r.ok), results.map((r) => r.detail).join('; '));
+    }
+
+    // 21. The password form on the same three screens as 11.
+    {
+      const fitText = [];
+      let all = true;
+      for (const sz of sizes) {
+        const c = await browser.newContext({ viewport: sz.viewport, isMobile: sz.touch, hasTouch: sz.touch, deviceScaleFactor: 2 });
+        const p = await c.newPage();
+        await p.goto(ON);
+        const open = await openPasswordPanel(p, true);
+        const f = open ? await p.evaluate(() => {
+          const W = innerWidth;
+          const buttons = [...document.querySelectorAll('[data-cg-signin] button, [data-cg-signin] [role="tab"]')].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+          const rects = buttons.map((b) => ({ r: b.getBoundingClientRect() }));
+          const bad = rects.filter(({ r }) => r.left < -0.5 || r.right > W + 0.5 || r.height < 43.5);
+          return { over: document.documentElement.scrollWidth > W + 1, n: rects.length, bad: bad.length };
+        }) : null;
+        const ok = !!f && !f.over && f.bad === 0 && f.n >= 6;
+        all = all && ok;
+        fitText.push(`${sz.name}: ${f ? `${f.n} buttons, ${f.bad} outside or under 44 px${f.over ? ', wider than the screen' : ''}` : 'panel did not open'}`);
+        if (process.env.SIGNIN_SHOTS && open) await p.screenshot({ path: `${process.env.SIGNIN_SHOTS}/21-${sz.viewport.width}.png` });
+        await c.close();
+      }
+      check('21. the password form fits a laptop and a phone, upright and on its side: nothing wider than the screen, every button a thumb\'s height', all, fitText.join('; '));
+    }
+  }
 } catch (e) {
   check('the check ran to its end', false, String(e?.message ?? e).split('\n')[0]);
 } finally {

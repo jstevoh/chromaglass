@@ -2787,11 +2787,11 @@ network):
   offers the download in its menu and the profile sheet. *Measure:* `npm run updates`
   (69/69, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
-  Judged on the owner's Mac: `docs/judging.md` §74.
+  Judged on the owner's Mac: `docs/judging.md` §75.
   - **13-update-signed** *(after 13.1-sign)*: with the Developer ID secrets in, the
     same code downloads in the background and installs on quit. Nothing to build;
     the first signed release is judged by installing the one before it and seeing it
-    replace itself (§74's last step).
+    replace itself (§75's last step).
   - *Trap:* the updater reads the repository's **newest** release. Any other kind of
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
     with `--latest=false`, or every installed app looks for `latest-mac.yml` in it
@@ -5422,14 +5422,11 @@ commit. *Size:* S.
   when a look changes and the plate stays under the hand. `layout` and `magnet` each ask it
   now. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
 - **19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
-  Found with 19v-3. In Build at 1280 × 800 the bar's children and gaps take 935–936 px of
-  its 936, the name already down to its 120 px floor. Record's labels change width while it
-  runs: "■ Stop video · 0:00" is 70 px wider than "● Video", "■ Stop · 0:00" 25 px wider
-  than "● Record", so starting a take drops the plate by a row (about 42 px) mid-show, and
-  any text that renders a pixel wider (Geist arriving late, another platform's fallback)
-  does it at rest. Give the record buttons a fixed width for their longest label (or show
-  the running time outside the bar), and give the bar some slack at 1280; extend the
-  `layout` line from 19v-3 to start and stop a take. Desk lane.
+  **Shipped** (2026-10-25): Record's running timer on the desk (`RecordControls`) and on
+  Play (`PhonePlay`) overlays its idle box and takes no extra width, so starting or stopping
+  Plate video, a Take, or both never widens the button in the plate bar at 1280 or shifts
+  Play's top pills. `layout` and `phone` each ask it now. The story is in
+  [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
 
 ### 19w. A fifth Mac shard, so no shard runs near its timeout
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
@@ -6453,6 +6450,64 @@ once the login works (23.14).*
   them. maybe later - but not now."). The button is held behind `APPLE_SIGN_IN` in
   `SignInScreen.tsx`, the landing page and the privacy page say Google or an emailed
   link. *Measure:* `npm run signin` line 4 fails if an Apple button is drawn.
+- **23.10e** (**shipped**, this PR): email and password accounts (the owner, 2026-10-24:
+  "an email login option that stores passwords and other account details ... and if they
+  have a google account it can link to that"). Firebase Email/Password beside Google and the
+  emailed link; Firebase keeps one account per email, so a password is one more way into the
+  same uid and the licence (keyed on the email, `keys:<email>`) follows with no Worker change.
+  *Sign-in form* (`SignInForm`, shared by the first-visit screen, the account sheet on the desk
+  and the phone): "Continue with email" opens an Emailed link / Password pair of tabs; Password
+  has sign in, create account, show/hide, and "Forgot password?". Sign-up mails the confirmation
+  link at once. An address that already has an account says so, and offers "Continue with Google
+  and add this password" (Google, then `linkWithCredential`). A Google sign-in Firebase refuses
+  because the email has a password keeps Google's credential and attaches it on the next
+  password sign-in. *Account sheet* (`AccountSignInMethods.tsx`): which ways in the account has,
+  "Set a password" (a Google account: `linkWithCredential`; an emailed-link one: `updatePassword`),
+  and, for an unconfirmed password account, a banner with "I've confirmed" (reload, renew the
+  token, ask the Worker for the licence) and "Send it again". **Why confirmation matters:** the
+  licence Worker already refuses an ID token whose email is not verified
+  (`license-worker.js`, `email_verified === false`), which is what stops a stranger signing up
+  with someone else's address from reading that person's licence; an unconfirmed account reads
+  Free until the link is opened. *Measure:* `npm run signin` 17–21 (the real SDK against the Auth
+  emulator): sign-up makes one unconfirmed account, mails the link, starts the plate, a filed Pro
+  key reads Free until confirmed and Pro after; on a phone the password signs in to the same uid,
+  a wrong one is refused in words, a reset is mailed; a Google account signed up again gets no
+  second account and ends with `google.com` + `password` on one uid; a Google and an
+  emailed-link account each set a password from the sheet and sign in with it; the password form
+  fits 1024×768 and a phone upright and on its side. *Owner's chore, once:* Firebase console →
+  Authentication → Sign-in method → enable Email/Password (the emailed-link toggle is already
+  on; email link cannot be on without the Email/Password provider, so this may already be done,
+  look before calling it owed) and leave Settings → User account linking on "Link accounts that
+  use the same email".
+  Open follow-ups:
+  **23.10e-1** (open): an emailed-link account cannot be told from a password one from the
+  browser (Firebase lists the `password` provider for both), so the sheet says "Email (link or
+  password)" and "Set a new password"; an Admin-SDK call in the Worker could say which.
+  **23.10e-2** (open): the reset and confirmation emails use Firebase's default templates and
+  sender; the console's template editor can carry the ChromaGlass name and the support address
+  once the mail service (23.13-mail) exists. **23.10e-3** (open): a password policy (the console's
+  password-strength setting) is not turned on; the form asks for 8 characters, Firebase's own
+  floor is 6. **23.10e-4** (open): the iPhone app's sign-in (23.15) needs the same form and the
+  keychain's autofill hints.
+  **23.10e-5** (open, from #475's review): `pendingProviderCredential` (Google's credential kept
+  when Firebase refuses a Google sign-in because the email has a password) is attached on the
+  next password sign-in for *any* email. Firebase refuses to link it to another account today
+  (`email-already-in-use`, swallowed), so it is safe by the platform and not by this code; store
+  the error's `customData.email` with the credential and link only when it matches the password
+  sign-in's email.
+  **23.10e-6** (open, from #475's review): `signInWithGoogleAddPassword` sets the signed-in flag
+  before checking the Google email is the typed one, so choosing the wrong Google account leaves
+  the person signed in as it with no plate; check first, or sign out on a mismatch. The same
+  path hits `auth/account-exists-with-different-credential` (a non-Gmail Google address whose
+  email already has a verified password) and says "Google is added when you do", but stashes no
+  credential, so it is not: stash it, or reword.
+  **23.10e-7** (open, from #475's review; pre-registration takeover, a known platform weakness):
+  someone can create a password account for another person's *non-Gmail* address with the public
+  key and link their own Google to it; if the real owner later resets the password and keeps
+  using the account, the attacker's Google still signs in to that uid, now with a verified email.
+  The emailed-link sign-in already runs on the Email/Password provider, so this is not new with
+  passwords. Fix: the sheet lists every linked provider with its own email and lets the owner
+  remove one, and a password reset signs the other providers out.
 - **23.15** (*later*, the owner 2026-10-24: no Apple sign-in for now; with §12's iPhone
   app, which needs it beside Google's under App Store guideline 4.8, and the paid Apple
   Developer account): Sign in with Apple on the site (`APPLE_SIGN_IN`, the Services ID
@@ -7425,14 +7480,24 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - ~~28f-1 the dead patches, the named looks, the hits as a patch source (desk, phone,
     Sound learn), the first three looks as the pattern~~ (**shipped**, this PR;
     `docs/plan-shipped.md` 28f).
-  - **28f-2, open (Antigravity, from `docs/sound-patches.md`).** Two or three liquid
-    patches per look from the bands and the hits, following Cyberpunk, Fillmore East and
-    Lava Lamp; judged on a fresh showreel.
-  - **28f-3, open.** Ten looks still sway the dish's turn with the music through the old
+  - **28f-2, open (from `docs/sound-patches.md`).** Two or three liquid patches or area cords
+    per look from the bands and the hits, following Cyberpunk, Poster 1969 and Lava Lamp;
+    judged on a fresh showreel. The two or three patches/cords per look are wired on all
+    looks in #473 and held by `npm run soundpatch` (`100 of 100 move`, `29 looks checked (+ 3
+    from 25h)`), with area cords (`25h`, `lib/areaCords.ts`) on `lumia`, `poster-1969`,
+    `cell-bloom`, `milk-marble` and `red-cabbage` (`25 cords on 8 looks`, `npm run areacords`),
+    but **still open**: a fresh showreel and a main-vs-head film on the same looks (seed 1,
+    band in a box) are still owed, and 27 of the 28 changed looks still miss one or more of
+    the 28i film bars (`2–3.5 swells a minute`, `at least 6 colour changes a minute`, `r1 in
+    [−0.13, 0.22]`; per-look numbers under 28i-3).
+  - ~~**28f-3.** Ten looks still sway the dish's turn with the music through the old
     `audioMappings.rotation` slot (27a-8). The owner's rule now says which: whole-plate
     motion from the music only on the named looks (`FRAME_MOVING_LOOKS`). Read it with
     the owner (a slow turn is the oil wheel's move), then move them off or onto the list,
-    and count the slot in `npm run framesway`.
+    and count the slot in `npm run framesway`.~~ (**shipped** with 28i-3, #473;
+    `docs/plan-shipped.md` 28i-3: eight moved off `audioMappings.rotation` to `'none'` +
+    liquid targets here; the other two of the ten, `timbre-shifter` in #351 and `deep-ocean`
+    in #408, had already left the slot; `npm run framesway` counts the slot, 59 of 59 still).
   - **28f-4, open.** Pitch is mostly the bass line on a band (72% of the showreel song's
     frames in the octave above C1): a patch on it walks with the bass, not the melody. A
     lead's pitch needs the analyser to find the strongest note above the bass.
@@ -7572,21 +7637,58 @@ Turing Print" work (#331), which also made the reaction grow at all.
     to 350 on the Fillmore), under the 30 a second where the plate stops flowing and
     starts stepping (`PINNED_STEP_RATE`, `LiquidVisualizer.tsx`). Find what makes Poster
     that heavy (its layers, its dye budget, its plate size) before it is made to move.
-  - **28i-3. Sound on the liquid, not the frame** (Antigravity, batch 3). Eight looks
-    still drive the rotation slot from sound (28f-3): Galaxy (energy), Cyberpunk
-    (complexity), Acid Trip (energy), Aurora (energy), Solar Flare (bass), Fractal Dream
-    (treble), Neon Coral Reef (timbre), Stardust (bass); each moves that reading to a
-    liquid target. Every look that hears sound gets two or three patches from hits,
-    bands, onsets and notes only (28f), and Milk Marbling's treble → airVelocity at
-    depth .02, which reads nothing, is fixed. Film: 2 to 3.5 swells a minute, six or
-    more colour changes a minute, r1 between −.13 and .22 (the Dregs and the Sheep).
-    *Split 2026-10-24* (the owner took the four directions of that day's exploration,
-    25h first): the eight looks' frame fixes and Milk Marbling's dead patch run now; the
-    two or three patches per look wait for 25h, so each look's music is written once, per
-    area, rather than plate-wide and then again. 25h has shipped: an area cord is
-    `{ area, setting: 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue', threshold, attack,
-    release }` (lib/areaCords.ts), and `npm run areacords` holds every look's area cords to
-    their areas and to fast readings. 28i-2 runs now as briefed.
+  - **28i-3. Sound on the liquid, not the frame** (batch 3, **open for the film measure**;
+    frame fixes on the eight looks and the Milk Marbling dead-patch fix **shipped** in #473,
+    story in `docs/plan-shipped.md` 28i-3).
+    - ~~**Frame fixes on the eight looks and Milk Marbling's dead patch**~~ (**shipped** in
+      #473): Galaxy (`energy`), Cyberpunk (`complexity`), Acid Trip (`energy`), Aurora
+      (`energy`), Solar Flare (`bass`), Fractal Dream (`treble`), Neon Coral Reef (`timbre`)
+      and Stardust Collapse (`bass`) moved `audioMappings.rotation` to `'none'` and onto
+      liquid targets (`npm run framesway` counts the slot, 59 of 59 still; the other two of
+      28f-3's ten, `timbre-shifter` in #351 and `deep-ocean` in #408, had already left the
+      slot). Milk Marbling's `treble → airVelocity` at depth `.02` (gated to `0` under `0.1`
+      in `LiquidVisualizer.tsx:4257`) is replaced with two area cords on its food-colouring
+      spots (`npm run soundpatch` §1 folds each patch on the look's own settings too, 100 of
+      100 move).
+    - **28i-3b, open (with 28f-2).** Every look that hears sound now carries two or three
+      fast liquid patches or area cords from `hits`, `bands`, onsets and notes only (#473;
+      `npm run soundpatch` §2 counts both plate-wide liquid patches and area cords on fast
+      readings toward the two or three, and holds area looks free of redundant plate-wide
+      patches; `npm run areacords` holds 25 cords on 8 looks: `velvet-underground`,
+      `jellyfish-bloom` and `bass-drop` from #454, plus `lumia`, `poster-1969`, `cell-bloom`,
+      `milk-marble` and `red-cabbage`). **Still open:** a fresh showreel (28f-2) and a
+      main-vs-head film on the same looks (seed 1, band in a box) are still owed, and 27 of
+      the 28 changed looks still miss one or more of the **film bar** (**2–3.5 swells a
+      minute, at least 6 colour changes a minute, r1 in [−0.13, 0.22]**):
+      `classic` (`3.9 swells/min`, `0.0 colour changes/min`, `r1 = 0.10`),
+      `comet` (`2.9 swells/min`, `0.0 colour changes/min`, `r1 = 0.51`),
+      `galaxy` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.06`),
+      `cyberpunk` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.78`),
+      `acid-trip` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.15`),
+      `microscopic-chaos` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.45`),
+      `aurora-borealis` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.10`),
+      `solar-flare` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.46`),
+      `fractal-dream` (`4.8 swells/min`, `11.6 colour changes/min`, `r1 = 0.00`),
+      `neon-coral-reef` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.22`),
+      `stardust-collapse` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.30`),
+      `lumia` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.19`),
+      `turing-print` (`2.7 swells/min` on 66 s / `0.0` on 30 s, `0.0 colour changes/min`, `r1 = 0.16`),
+      `poster-1969` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.27`),
+      `macro-bead` (`2.9 swells/min`, `2.9 colour changes/min`, `r1 = 0.39`),
+      `cell-bloom` (`1.9 swells/min`, `0.0 colour changes/min`, `r1 = -0.64`),
+      `lace-run` (`0.0 swells/min`, `5.8 colour changes/min`, `r1 = 0.31`),
+      `crowd-plate` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.51`),
+      `milk-marble` (`1.9 swells/min`, `0.0 colour changes/min`, `r1 = 0.17`),
+      `soap-film` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.07`),
+      `oil-and-water` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.27`),
+      `red-cabbage` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.07`),
+      `chemical-clock` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = 0.56`),
+      `magnet-garden` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.19`),
+      `home-movie` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.01`),
+      `clock-glass` (`3.0 swells/min` on 40 s / `0.0` on 30 s, `0.0 colour changes/min`, `r1 = 0.10`),
+      `ferro-paint` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.03`),
+      `roy` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.08`).
+      28i-2 stays open as briefed.
   - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
     magenta cells, no rainbow); then four or more hues on the film.
 
@@ -7611,8 +7713,9 @@ Turing Print" work (#331), which also made the reaction grow at all.
     check's 200 steps a window, 191 on one run and 215 on another, so the check measured
     the governor and not the press; it now runs on Bass Drop at its own 0.8, the one look
     left that ships the squeeze, the bar unchanged);
-    (d) `soundpatch`'s three pattern looks are Cyberpunk, Aurora Borealis and Lava Lamp
-    until 28i-3 gives Poster, 1969 patches (the Fillmore had two), and `lampjudge`'s
+    (d) ~~`soundpatch`'s three pattern looks are Cyberpunk, Aurora Borealis and Lava Lamp
+    until 28i-3 gives Poster, 1969 patches (the Fillmore had two)~~ (**fixed** in 28i-3:
+    `poster-1969` carries three area cords and is in `soundpatch` `PATTERN`), and `lampjudge`'s
     owner override for the Sensual Laboratory is gone with it; (e) `evolve`/`replay`
     start from Poster, 1969 and Clock Glass where they started from the Fillmore and the
     Oil Wheel, so their seeded rolls are different rolls; (f) the README's gallery
@@ -8481,16 +8584,24 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   `docs/plan-shipped.md` §35.
 - **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
   section (35c's work) or a different surface:
-  - Chemistry has one member, Squish Plate, until 35c splits it (Plate Rock to Motion, the
-    chemistry and ferrofluid stay): Lamp & Light's chemistry and Turing Print belong beside it.
   - Plates & LED holds the platform's spin, which is Motion's, but Stage is also the gate that
     keeps a panel out of Build and Gig (`isStagePanel`); its spin controls move with 35c.
   - The pin picker (`PickList`) and the command palette still list by section, not by the seven
     groups; the same headings would find a setting faster there.
-- **35c** One home per setting (phase 3): Flash Limit, Blackout, MIDI on, the audio
-  source and record/replay each appear in two places; Drive/Impact pairs sit in different
-  sections; Squish Plate splits up; the sequencer is behind Songs. After 35b.
-
+- ~~**35c-1** Squish Plate in five.~~ Shipped: Squish Plate (the glass: pressure, shape, depth drag,
+  Thin Gap and Thickness, Press Lift, smear, rain, viscosity), Oil & Soap, Ferrofluid and Reactions
+  (Chemistry), Tilt & Rock (Motion); Swirl, Dye Weight and Heat Spread went to Fluid Physics, Layer
+  Depth and Spectral Mix to Lamp & Light, and the Turing pattern and its print from Lamp & Light to
+  Reactions. The registry files each pin under the section that draws it (the desk's Fluid Physics
+  panel had been the glass's, the oil's and the magnet's forty knobs), held by `panel`. Story in
+  `docs/plan-shipped.md` §35.
+- **35c-2** One home per setting, what is left of phase 3: Flash Limit (Settings' Master and the
+  Wall), Blackout, MIDI on (Settings and Controller) and the audio source (Settings and Sound)
+  each appear in two places, with record and replay, and the unused `desk/PerformanceButton.tsx`;
+  Drive/Impact pairs sit in different sections (one Strength per input); the platform's spin in
+  Plates & LED is Motion's but Stage-gated; the sequencer is behind a 10 px, 40%-opacity link in
+  Songs; the Build layout's deck lists Fluid Physics, which used to be the glass's knobs, so it
+  could take Squish Plate beside it. After 35c-1.
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.
