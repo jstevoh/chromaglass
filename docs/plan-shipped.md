@@ -5297,6 +5297,29 @@ Checks. `panel` files each master with its source and each Drive with its master
 sliders-drawn-equal-sliders-filed rule of Plate Spin, the room, the film and the sound as well.
 `qa` reads Film Impact from the film's section.
 
+### 35c-3. One home for MIDI on and the audio source (shipped 2026-10-25)
+
+Two switches that were each drawn twice, in surfaces whose checks read the control.
+
+- **MIDI on.** Settings' Controller section and the MIDI sheet both drew the switch, the port,
+  the factory maps and Auto-map. The section is the home, since it is where a controller is
+  plugged in and set up (and where the dot's neighbour, the "Set up the APC40" button, already
+  was). It gained the **LEDs** out-port (`settings-midi-output`), which only the sheet drew. The
+  sheet is for teaching: Learn, banks, bindings, the picture, the file. It draws a state line
+  (`midi-state`, `data-on`) and a **Set up…** button (`midi-setup-open`) that opens the section.
+  The activity dot and the last message stay in the sheet, where a hand is touching things.
+- **Audio source.** Settings' Sound (five options) and the Sound sheet (six, with the plate as an
+  instrument) both chose it. The sheet is the superset and the home; Settings' Sound row is a state
+  line (`audio-source-state`, `data-source`) and **Change in Sound…** (`audio-source-open`), which
+  closes Settings and opens the sheet. The device picker stays in Settings, where the Mic dot lands.
+- The phone had one of each already: its Sound sheet chooses the source, and iOS has no Web MIDI.
+  Nothing there changed.
+
+Checks. `panel` reads the section for the switch, both ports and the factory maps, and the sheet for
+the absence of its old copies; `qa`'s Mic-dot block reads the state line and follows the link to the
+sheet's Mic tile; `opensource` and `kickbubbles` choose the band in the sheet and read the state
+line. Harnesses that set `chromaglass-audio-source` in storage are unchanged.
+
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
@@ -5309,4 +5332,4 @@ whatever is inside, which is how the panel header's tick and the phone's thumb t
 tools' pictograms are single lines on a 24 grid, one for what each tool does to the liquid; the desk's are
 keycaps with the letter in the corner, the held one pressed 2 px and lit, the phone's the same pictures in
 the dock. Snail and hare sit at the ends of the five pace controls and come up from faint when the control
-is at that end; they do not move. Judging §76.
+is at that end; they do not move. Judging §77.

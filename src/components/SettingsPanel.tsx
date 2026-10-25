@@ -185,6 +185,8 @@ interface SettingsPanelProps {
   midi?: MidiController;
   /** The full MIDI panel, for the things this panel's section does not hold. */
   onOpenMidi?: () => void;
+  /** Open the Sound sheet, where the source is chosen. */
+  onOpenSound?: () => void;
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: { source: string | null; bpm: number; taps: number };
   onTap?: () => void;
@@ -407,7 +409,7 @@ const DEMO_LOOPS = [
   { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
 ] as const;
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -740,24 +742,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="bassBoost"
         />
 
-        {/* What is listening at all */}
+        {/*
+          What is listening, said here and chosen in the Sound sheet.
+
+          The five-way switch that stood here was the second drawing of the
+          sheet's six, which also has the plate as an instrument; two homes
+          meant one could be changed while the other was read. The sheet is
+          the superset, so it is the home, and this row is the state and the
+          way there. The device below stays: it is where the Mic dot lands.
+        */}
         {onAudioSource && (
           <div className="mb-3.5 flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <Segmented
-              value={audioSource === 'file' ? 'file' : audioSource}
-              options={[
-                ['none', 'Off'],
-                ['microphone', 'Mic'],
-                ['system', 'System'],
-                ['file', 'File'],
-                ['simulated', 'Band'],
-              ] as const}
-              onChange={(v) => { if (v === 'file') onAudioFile?.(); else onAudioSource(v); }}
-              height={32}
-              fill
-              testId="audio-source"
-            />
+            <div className="flex items-center gap-2">
+              <div
+                className={`flex h-8 flex-1 items-center rounded-lg border px-3 text-[13px] font-medium ${audioSource === 'none' ? 'border-white/10 bg-white/5 text-white/60' : LIT}`}
+                role="status"
+                data-testid="audio-source-state"
+                data-source={audioSource}
+              >
+                {({ none: 'Off', microphone: 'Mic', system: 'System', file: 'File', simulated: 'Band', drone: 'Instrument' } as const)[audioSource]}
+              </div>
+              {onOpenSound && (
+                <button
+                  onClick={onOpenSound}
+                  className="h-8 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-medium transition-colors hover:bg-white/10"
+                  title="Choose what the plate listens to: the mic, a tab, a file, the band or the plate as an instrument"
+                  data-testid="audio-source-open"
+                >
+                  Change in Sound…
+                </button>
+              )}
+            </div>
             <Info>
               <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
             </Info>
@@ -2444,6 +2460,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       Nothing plugged in yet. Connect the controller by USB — it appears here by itself.
                     </p>
                   )}
+                </div>
+                {/* The port out, for the pads' LEDs: the MIDI sheet used to draw this next to the port in. */}
+                <div className="mb-3 flex flex-col gap-1.5">
+                  <span className="text-[13px] font-medium text-text">LEDs</span>
+                  <select
+                    value={midi.ports.output}
+                    onChange={e => midi.choosePorts({ output: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
+                    data-testid="settings-midi-output"
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="off">Off</option>
+                    {midi.outputs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
                 </div>
 
                 {/*
