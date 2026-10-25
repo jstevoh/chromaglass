@@ -128,6 +128,9 @@ deploy:
   file the site is built from differs from the commit that is live (a docs, check
   or workflow merge; PLAN.md 19j), the deploy checks and publishes nothing, green in
   seconds. A run started by hand always checks and deploys.
+- `ready.yml` labels an Antigravity PR (or one labelled `review-owed`)
+  `ready-for-review` and comments `READY #<n> <item> head <sha>` when `Checks` goes
+  green on its head, and takes the label off on the next push or a red run.
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured), `pixels.yml` (every
@@ -155,9 +158,13 @@ When CI is red, use the `steward` skill.
   sessions do not rebuild the same thing; keep to your own branch and PR.
 - **Some of those sessions are Antigravity's** (branches `antigravity/…`). How work is
   claimed and handed between the two tools, the handoff block in every PR body, and
-  the light review pass a Claude Code session owes Antigravity's PRs (the
-  `review-owed` label, about one per session) are in `docs/handoff.md`. Check that
-  label at the start of a session.
+  the review a Claude Code session owes Antigravity's PRs are in `docs/handoff.md`
+  ("Ready, review, merge"). At the start of a session, check
+  `gh pr list --label ready-for-review --label review-owed` (green and waiting on a
+  review before merge, up to three a session) and then the sampled pass on merged
+  `review-owed` PRs (about one a session). A verdict's first line is
+  `PASS #<n> head <sha>` or `CHANGES #<n> head <sha>`, and on a `PASS` the reviewer
+  squash-merges the PR itself, pinned to that head, and confirms the deploy.
 
 ## Agents and skills in this repo
 

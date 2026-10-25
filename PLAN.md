@@ -5852,6 +5852,28 @@ What the still shows:
 This is not batch 2's lacing, which paints hair-thin filaments along dye boundaries.
 Here the pale part is a liquid of its own, and the holes are where it has come apart.
 
+### 19ae. The handoff between the two tools waits on whoever notices
+
+- **19ae-1. A green head says so on the PR, and every hop names its commit.** **Shipped**
+  (`ready.yml`, `docs/handoff.md` "Small and short-lived" and "Ready, review, merge";
+  docs/plan-shipped.md 19ae-1).
+- **19ae-2. A `PASS` merges without waiting for Antigravity.** **Shipped** (the owner
+  chose it 2026-10-24): the reviewer merges on its own `PASS`, pinned to the head it
+  passed (`docs/handoff.md` "Ready, review, merge", step 4). GitHub's auto-merge was the
+  other option, not taken.
+- **19ae-5. Who takes what, by what the job needs.** **Shipped** (`docs/handoff.md`
+  "Who takes what", rewritten from the scorecard): Antigravity takes GPU-only work, builds
+  whose check already fails on `main`, and briefed physics; Claude Code keeps checks,
+  open-ended physics, sign-in and payments, CI, reviews. A PR with two `CHANGES` goes to
+  Claude Code (`handoff`) instead of a third round.
+- **19ae-3. The watcher no longer relays "ready".** With `READY` on the PR, the reviewing
+  thread can subscribe to each Antigravity PR and wake on the comment itself; the Mac
+  watcher keeps only what needs the Mac (full `qa`, driving Antigravity). A process note
+  for the coordinator, written into the project's model-routing notes.
+- **19ae-4. Measure how long each hop takes.** From the `READY`, `PASS`/`CHANGES` and merge
+  timestamps on each Antigravity PR: green → review, review → fix, fix → merge. The daily
+  scorecard reads the open → merge time today; split, it would show which hop to fix next.
+
 ### What each feature is, physically
 
 **The pale lace is clear liquid under the lamp, not white paint.** On a projector the

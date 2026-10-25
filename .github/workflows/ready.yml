@@ -1,0 +1,135 @@
+name: Ready for review
+
+# Says, on the PR itself, the moment an Antigravity PR's head is green.
+#
+# What went wrong on 2026-10-24: Antigravity finishes a run on the owner's Mac,
+# pushes, and CI takes 30 to 60 minutes. Nothing on GitHub said when that run
+# turned green, so a Claude session learnt it only from the Mac watcher, which
+# relayed "ready" to the coordinator, which started the review. The watcher's
+# waiting loop died that morning and two finished PRs sat green and unnoticed
+# for two hours. A process on a laptop that sleeps is the wrong place for the
+# one signal everything after it waits on; GitHub already knows the moment
+# `Checks` finishes, and anything subscribed to the PR wakes on a label or a
+# comment.
+#
+# So when a `Checks` run for a pull request finishes green, and the commit it
+# tested is still the PR's head, this adds the `ready-for-review` label and
+# posts one comment that starts with a line meant to be read by a program:
+#
+#   READY #355 18e head 5e68d109ba9b...(all 40 characters)
+#
+# The PR number, the plan item (from the body's `Plan item:` line, or the
+# title's prefix before the colon), and the commit that was green. A reviewer
+# reviews that commit, names it in its verdict, and a merge checks the head is
+# still it (docs/handoff.md, "Ready, review, merge").
+#
+# The label comes off again on the next push (the new head has not been
+# tested) and on a red run of the head. A cancelled run changes nothing: it
+# was superseded by a push, which already took the label off. A re-run that
+# turns a red head green labels it then; a second green run of a head that
+# already has its comment adds no second one.
+#
+# Only for `antigravity/` branches and PRs labelled `review-owed`: Claude Code's
+# own PRs merge on green with the session that opened them watching, and a
+# comment on each would be noise in every one of their threads.
+#
+# `workflow_run` runs with this repository's token whatever branch the PR came
+# from, so nothing here checks out or runs the PR's code, and the PR's title,
+# body and branch name (anyone with a PR can write them) reach the shell only
+# through environment variables, never through `${{ }}` in a script. The plan
+# item is cut to letters, digits, `.` and `-` before it goes into the comment.
+#
+# It never runs a Mac shard, so `scripts/reach.mjs` lists it with the other
+# workflows that do not reach one, and a PR touching only this file skips them.
+
+on:
+  workflow_run:
+    workflows: [Checks]
+    types: [completed]
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  green:
+    name: Label a green head
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Label and say so
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+        run: |
+          set -euo pipefail
+          # The run's own list of PRs is empty for some pushes; the branch
+          # finds the open PR then.
+          pr="${RUN_PR:-}"
+          if [ -z "$pr" ]; then
+            pr=$(gh pr list --head "$RUN_BRANCH" --state open --json number --jq '.[0].number // empty')
+          fi
+          if [ -z "$pr" ]; then echo "no open PR for this run"; exit 0; fi
+
+          view=$(gh pr view "$pr" --json state,headRefOid,headRefName,title,body,labels)
+          state=$(jq -r .state <<<"$view")
+          head=$(jq -r .headRefOid <<<"$view")
+          ref=$(jq -r .headRefName <<<"$view")
+          owed=$(jq -r '[.labels[].name] | index("review-owed") != null' <<<"$view")
+          if [ "$state" != OPEN ]; then echo "#$pr is $state"; exit 0; fi
+          case "$ref" in antigravity/*) ;; *) [ "$owed" = true ] || { echo "#$pr: not Antigravity's, no review owed"; exit 0; } ;; esac
+          if [ "$head" != "$RUN_SHA" ]; then
+            echo "#$pr: this run tested $RUN_SHA, the head is now $head; the head's own run decides"
+            exit 0
+          fi
+
+          gh label create ready-for-review --color 0e8a16 \
+            --description "Checks are green on the PR's current head" 2>/dev/null || true
+
+          if [ "$CONCLUSION" != success ]; then
+            gh pr edit "$pr" --remove-label ready-for-review 2>/dev/null || true
+            echo "#$pr: head $head is red; not ready"
+            exit 0
+          fi
+
+          item=$(jq -r '.body // ""' <<<"$view" | grep -m1 -oiP '^\s*plan item:\s*\K\S+' || true)
+          if [ -z "$item" ]; then item=$(jq -r .title <<<"$view" | sed -n 's/^\([^: ]*\):.*/\1/p'); fi
+          item=$(printf '%s' "$item" | tr -cd 'A-Za-z0-9.-' | cut -c1-24)
+          line="READY #$pr ${item:-none} head $head"
+
+          gh pr edit "$pr" --add-label ready-for-review
+          if gh pr view "$pr" --json comments --jq '.comments[].body' | grep -qE "^READY #$pr .*head $head"; then
+            echo "$line (already said)"
+            exit 0
+          fi
+          printf '%s\n\n%s\n' "$line" \
+            "Checks are green on this head ([run]($RUN_URL)). Review this commit and name it in the verdict; a push takes the label off (docs/handoff.md, \"Ready, review, merge\")." \
+            | gh pr comment "$pr" --body-file -
+          echo "$line"
+
+  pushed:
+    name: A push is not tested yet
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Take the label off
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HAS: ${{ contains(github.event.pull_request.labels.*.name, 'ready-for-review') }}
+        run: |
+          if [ "$HAS" = true ]; then gh pr edit "$PR" --remove-label ready-for-review; else echo "not labelled"; fi

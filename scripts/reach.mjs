@@ -16,9 +16,10 @@
 // can: a new directory, a new kind of file, a file that is read at run time
 // by a harness, all run the Mac. Markdown is read by people (the harnesses
 // that mention a `.md` write one or name one in a comment); `.claude/` is the
-// sessions' own; the six workflows named never run a Mac shard's steps (the
-// gallery, controls and film workflows run on a label or by hand, and the
-// iPhone and Mac apps have their own); `ios/` and `desktop/` are the native
+// sessions' own; the seven workflows named never run a Mac shard's steps (the
+// gallery, controls and film workflows run on a label or by hand, the iPhone
+// and Mac apps have their own, and `ready.yml` only labels a PR after
+// `Checks` has run); `ios/` and `desktop/` are the native
 // apps, which `npm run build` does not read and which `ios.yml` and
 // `desktop.yml` build. Three scripts about the workflows themselves
 // (`closedruns.mjs`, `macqueue.mjs`, `deploygate.sh`) are run by Measure, the
@@ -58,7 +59,7 @@ const NOT_MAC = [
   /^[^/]+\.md$/,
   /^docs\/.*\.md$/,
   /^\.claude\//,
-  /^\.github\/workflows\/(closed|gallery|controls|film|ios|desktop)\.yml$/,
+  /^\.github\/workflows\/(closed|gallery|controls|film|ios|desktop|ready)\.yml$/,
   /^ios\//,
   /^desktop\//,
   /^LICENSE[^/]*$/,
@@ -202,6 +203,8 @@ async function selftest() {
     ['.claude/agents/check-skeptic.md', false],
     ['.github/workflows/closed.yml', false],
     ['.github/workflows/gallery.yml', false],
+    ['.github/workflows/ready.yml', false],
+    ['.github/workflows/ready.yml.orig', true],
     ['ios/App/App/AppDelegate.swift', false],
     ['desktop/main.js', false],
     ['LICENSE', false],
