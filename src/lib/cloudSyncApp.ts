@@ -58,6 +58,9 @@ export function cloudSync(): CloudSync | null {
     base,
     account: getCachedEmail,
     token: async () => {
+      // Guarded here, where the bundler can see it, so a build with no Firebase
+      // config folds the import away and carries no Firebase (`npm run signin` 1a).
+      if (!import.meta.env.VITE_FIREBASE_API_KEY) return null;
       const auth = await import('./firebaseAuth').catch(() => null);
       return (await auth?.getCurrentIdToken().catch(() => null)) ?? null;
     },

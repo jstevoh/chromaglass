@@ -106,7 +106,7 @@ const ALLOW = {
   },
   'src/lib/cloudSync.ts': {
     crypto: 1,
-    why: 'the id one device signs its cloud-sync records with; two computers on the same ?seed= must still be two devices, and it is never drawn',
+    why: 'the id a device stamps on its cloud-sync records, so the cloud copy can tell two computers apart even when both opened on the same ?seed=; never drawn',
   },
 };
 
