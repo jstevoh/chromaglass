@@ -342,3 +342,28 @@
 .set-range::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,.10); }
 .set-range::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--color-accent); }
 .set-range::-moz-range-thumb { height: 14px; width: 14px; border: 0; border-radius: 50%; background: #FAFAFA; box-shadow: 0 0 0 3px rgba(139,92,246,.28); }
+
+/*
+ * Small machines inside controls (PLAN 35e, ui/Playful.tsx).
+ *
+ * The bottle leans once when it is picked, with a little overshoot, and then
+ * stands still. The viscosity drop forms and falls once when its button is
+ * hovered, focused or chosen, the fall as long as the carrier is thick
+ * (`--fall` is set from lib/dripPace.ts); at rest it is a drop hanging at the
+ * lip. Under reduced motion none of it moves: the bottle is simply tipped, the
+ * drop simply hangs.
+ */
+.cg-tip { transition: transform 300ms cubic-bezier(.3, 1.5, .5, 1); }
+.cg-drip .cg-form, .cg-drip .cg-fall, .cg-drip .cg-thread { transform-box: fill-box; }
+.cg-drip .cg-form { transform-origin: 50% 0; }
+.cg-drip .cg-thread { transform-origin: 50% 0; }
+@keyframes cg-drip-form { from { transform: scale(.3); } to { transform: scale(1); } }
+@keyframes cg-drip-fall { from { transform: translateY(0); opacity: 1; } 85% { opacity: 1; } to { transform: translateY(8px); opacity: 0; } }
+@keyframes cg-drip-thread { from { transform: scaleY(1); opacity: 1; } 85% { opacity: 1; } to { transform: scaleY(1.8); opacity: 0; } }
+button:is(:hover, :focus-visible, [aria-pressed="true"]) > .cg-drip .cg-form { animation: cg-drip-form var(--form) ease-out backwards; }
+button:is(:hover, :focus-visible, [aria-pressed="true"]) > .cg-drip .cg-fall { animation: cg-drip-fall var(--fall) linear var(--form) backwards; }
+button:is(:hover, :focus-visible, [aria-pressed="true"]) > .cg-drip .cg-thread { animation: cg-drip-thread var(--fall) linear var(--form) backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .cg-tip { transition: none; }
+  .cg-drip .cg-form, .cg-drip .cg-fall, .cg-drip .cg-thread { animation: none !important; }
+}

@@ -23,6 +23,7 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
+import { Bottle, LiveBottle } from '../ui/Playful';
 
 /**
  * ChromaGlass on a phone.
@@ -111,6 +112,8 @@ export interface PhoneStageProps {
   // The bottles
   liquids: LiquidType[];
   selectedLiquidId: string;
+  /** What is left of the Dye Budget, 0 to 1, for the bottle in hand. */
+  dyeRoom?: () => number;
   onLiquid: (id: string) => void;
   dyeColors: readonly string[];
   onDyeColor: (hex: string) => void;
@@ -647,7 +650,8 @@ export function PhoneStage(p: PhoneStageProps) {
             data-testid="phone-open-dye"
             className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? LIT : 'border-transparent text-text-2 active:bg-active'}`}
           >
-            <span className="h-5 w-5 rounded-full border-2 border-white/40" style={liquid ? bottleSwatch(liquid) : { backgroundColor: '#fff' }} />
+            {/* The bottle in hand, filled to what is left of the Dye Budget (PLAN 35e); it leans while its sheet is open. */}
+            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
@@ -697,7 +701,10 @@ export function PhoneStage(p: PhoneStageProps) {
                       data-testid={`phone-liquid-${l.id}`}
                       className={`flex h-12 items-center gap-2.5 rounded-lg border px-3 text-left text-[14px] ${on ? LIT : 'border-border bg-elevated text-text-2'}`}
                     >
-                      <span className="h-5 w-5 shrink-0 rounded-full border-2 border-white/30" style={bottleSwatch(l)} />
+                      {/* The picked bottle leans and shows what is left of the budget; the others stand full. */}
+                      {on
+                        ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} height={24} testId="phone-bottle-in-hand" />
+                        : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} height={24} />}
                       <span className="truncate">{l.name}</span>
                     </button>
                   );

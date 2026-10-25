@@ -58,3 +58,16 @@ export const lookTarget = (seedMean: number | null, dyeBudget: number, seedBudge
  */
 export const sparseDark = (lampGround: number | undefined, target: number): boolean =>
   (lampGround ?? 0) < 0.05 && target < 0.45;
+
+/**
+ * What is left of the Dye Budget: 1 on an empty plate, 0 at the budget.
+ *
+ * `mean` is the plate's mean dye density and `target` what the regulator holds
+ * it to (`lookTarget`, eased toward the closeup's own by the macro amount).
+ * The regulator turns the plate's dye over once it reaches the target, so
+ * this is the headroom a pour has before evaporation starts to take it back.
+ * The bottle on the desk and the phone is filled to it. Linear, as the
+ * budget is a mean density and a bottle's level reads as a share of it.
+ */
+export const dyeRoomOf = (mean: number, target: number): number =>
+  Math.max(0, Math.min(1, 1 - (Number.isFinite(mean) ? mean : 0) / Math.max(0.06, target)));

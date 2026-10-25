@@ -52,6 +52,10 @@ import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
 import { helpFor, CONTROL_HELP } from '../src/lib/controlHelp.ts';
 import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
+import { LAMP_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, gradeRedOverBlue, kelvinLabel, warmthKelvin } from '../src/lib/lampKelvin.ts';
+import { dripFallSeconds, FALL_THIN_S } from '../src/lib/dripPace.ts';
+import { THICK_NU, WATER_NU } from '../src/lib/turntable.ts';
+import { dyeRoomOf } from '../src/lib/dyeTarget.ts';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
@@ -1838,6 +1842,70 @@ check('and neither starts over the limit',
   for (const [s, l] of lines) same.set(l, [...(same.get(l) ?? []), s.label]);
   const dup = [...same.values()].filter(v => v.length > 1);
   check('and no two controls share a line', dup.length === 0, dup.map(v => v.join(' = ')).join('; ') || 'all different');
+}
+
+
+// ── The small machines inside controls (PLAN 35e) ────────────────────
+//
+// Three drawings that claim to be readings, not decoration: the bulb says a
+// temperature, the drop falls at a pace, the bottle stands at a level. Each is
+// held to the number it says, so a drawing that drifted from the thing it
+// reads fails here and not in a screenshot.
+{
+  const plateWgsl = readFileSync(join(root, 'src/gpu/wgsl/plate.ts'), 'utf8');
+  const ui = readFileSync(join(root, 'src/components/ui/Playful.tsx'), 'utf8');
+  const css = readFileSync(join(root, 'src/index.css'), 'utf8');
+  const deskPanels = readFileSync(join(root, 'src/components/desk/DeskPanels.tsx'), 'utf8');
+  const phoneStage = readFileSync(join(root, 'src/components/phone/PhoneStage.tsx'), 'utf8');
+
+  // Lamp Warmth in kelvin: a reading of the grade, so it must be the grade the shader applies.
+  const grade = plateWgsl.match(/outColor \* vec3f\(([\d.]+),\s*([\d.]+),\s*([\d.]+)\) \* vig, U\.lampWarmth/);
+  check("the kelvin readout reads the tint the plate's shader applies",
+    !!grade && [1, 2, 3].every(i => Number(grade[i]) === LAMP_GRADE[i - 1]),
+    grade ? `shader vec3f(${grade.slice(1, 4).join(', ')}), reader ${LAMP_GRADE.join(', ')}` : 'the Lamp warmth line in plate.ts was not found');
+
+  const steps = Array.from({ length: 21 }, (_, i) => i / 20);
+  const kel = steps.map(warmthKelvin);
+  check('Lamp Warmth 0 is the neutral and every notch toward 1 is warmer', kel[0] === NEUTRAL_KELVIN && kel.every((k, i) => i === 0 || k < kel[i - 1]),
+    `0 → ${kelvinLabel(0)}, 0.5 → ${kelvinLabel(0.5)}, 1 → ${kelvinLabel(1)}`);
+  let worstRB = 0, worstGB = 0;
+  for (const w of steps) {
+    const sh = blackbodyShift(warmthKelvin(w));
+    worstRB = Math.max(worstRB, Math.abs(sh[0] / sh[2] / gradeRedOverBlue(w) - 1));
+    const gb = (1 + (LAMP_GRADE[1] - 1) * w) / (1 + (LAMP_GRADE[2] - 1) * w);
+    worstGB = Math.max(worstGB, Math.abs(sh[1] / sh[2] / gb - 1));
+  }
+  check('the blackbody it names has the grade\'s red over blue to half a percent, and its green over blue to 3%',
+    worstRB < 0.005 && worstGB < 0.03, `worst ${(worstRB * 100).toFixed(2)}% and ${(worstGB * 100).toFixed(2)}% over 21 notches`);
+  const hot = blackbodyHex(9000), warm = blackbodyHex(1900), halo = blackbodyHex(3200);
+  const ch = (h, i) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
+  check('the filament is amber when cool and bluer when hot, from the blackbody and not a table',
+    ch(warm, 0) === 255 && ch(warm, 2) < 40 && ch(halo, 2) > ch(warm, 2) && ch(hot, 2) === 255 && ch(hot, 0) < 255,
+    `1900 K ${warm}, 3200 K ${halo}, 9000 K ${hot}`);
+
+  // Viscosity: the drop's fall is the carrier's viscosity over water's, the solver's own numbers.
+  const ratio = dripFallSeconds(THICK_NU) / dripFallSeconds(WATER_NU);
+  check('thick takes as many times longer to let go as the solver\'s thick is thicker than thin',
+    Math.abs(ratio - THICK_NU / WATER_NU) < 1e-9 && dripFallSeconds(WATER_NU) === FALL_THIN_S,
+    `${dripFallSeconds(WATER_NU)} s thin, ${dripFallSeconds(THICK_NU)} s thick, ratio ${ratio}`);
+  check('the Viscosity buttons draw that drop, timed by it, and the stylesheet plays it from the same number',
+    /<ViscosityDrip mode=\{v\} \/>/.test(panel) && /dripFallFor\(mode\)/.test(ui) && /'--fall': `\$\{fall\}s`/.test(ui) && /animation: cg-drip-fall var\(--fall\)/.test(css));
+
+  // The bottle: a share of the budget that is left, from the number the regulator holds the plate to.
+  check('the bottle is full on an empty plate, half at half the target, empty at it, and never past either',
+    dyeRoomOf(0, 0.85) === 1 && Math.abs(dyeRoomOf(0.425, 0.85) - 0.5) < 1e-12 && dyeRoomOf(0.85, 0.85) === 0 &&
+    dyeRoomOf(3, 0.85) === 0 && dyeRoomOf(NaN, 0.85) === 1);
+  check('the visualizer answers it from the regulator\'s own target and the closeup\'s, and the desk and phone ask for it',
+    /dyeRoom: \(\) => \{[\s\S]{0,420}dyeLookTarget\(f\.seedMean, st\.dyeBudget \?\? 0\.85, f\.seedBudget\)[\s\S]{0,200}macroAmountOf\(st\)/.test(panel0) &&
+    (panel0app.match(/dyeRoom=\{readDyeRoom\}/g) ?? []).length === 2);
+  check('the bottle in hand is the one that leans and reads the level; the others stand full',
+    /p\.bottleId === l\.id\s*\?\s*<LiveBottle[\s\S]{0,160}read=\{p\.dyeRoom\}[\s\S]{0,80}<Bottle[^>]*level=\{1\}/.test(deskPanels) &&
+    /on\s*\?\s*<LiveBottle[\s\S]{0,160}read=\{p\.dyeRoom\}[\s\S]{0,200}<Bottle[^>]*level=\{1\}/.test(phoneStage) &&
+    /<LiveBottle[^>]*read=\{p\.dyeRoom\}[^>]*tipped=\{sheet === 'dye'\}/.test(phoneStage));
+
+  // Motion stays in the control and stops for anyone who asked it to.
+  const rm = css.match(/@media \(prefers-reduced-motion: reduce\) \{[^}]*\.cg-tip \{ transition: none; \}[^}]*animation: none !important;/);
+  check('under reduced motion the bottle does not lean and the drop does not fall', !!rm);
 }
 
 // ── Result ──────────────────────────────────────────────────────────

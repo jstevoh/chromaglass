@@ -7,7 +7,7 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
-import { lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
+import { dyeRoomOf, lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE, WORKING_DYES, dyesOnPlate } from '../presetPlate';
 import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
@@ -874,6 +874,8 @@ export interface LiquidVisualizerHandle {
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
   /** What is on each live layer: how full it is, and the colour of it. */
   layerReport: () => { index: number; fill: number; colour: string }[];
+  /** What is left of the Dye Budget on the layer in hand, 0 to 1: the bottle's level (PLAN 35e). */
+  dyeRoom: () => number;
   describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
   /**
    * Take on a preset's dyes, injection style and liquids without clearing the
@@ -6240,6 +6242,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       fill: Math.max(0, Math.min(1, (f?.meanDensity ?? 0) / 0.35)),
       colour: f ? rgbToHex(f.meanColor[0], f.meanColor[1], f.meanColor[2]) : '#000000',
     })),
+    /*
+      The same target the regulator holds the plate to (`stepDecay`), without
+      the hand bank, read against the plate's mean density: a few reads a
+      second from the picked bottle, nothing per frame.
+    */
+    dyeRoom: () => {
+      const f = fluidsRef.current[activeLayerRef.current];
+      if (!f) return 1;
+      const st = settingsRef.current;
+      const budget = dyeLookTarget(f.seedMean, st.dyeBudget ?? 0.85, f.seedBudget);
+      return dyeRoomOf(f.meanDensity, budget + (0.28 - budget) * macroAmountOf(st));
+    },
     describePlate: () => ({
       contract: presetContractRef.current ? [...presetContractRef.current] : null,
       injectStyles: [...injectStyleRef.current],

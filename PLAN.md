@@ -8736,6 +8736,29 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   keycaps on the desk and pictograms on the phone's dock (`ToolGlyph`); a snail and a hare mark the ends of
   Master Speed, Evolve Speed, Gel Speed, Chase Speed and Kaleido Spin wherever they are drawn as a knob or a
   slider (`PACE_KEYS`, `PaceTrack`). Judging §77. Story in `docs/plan-shipped.md` §35.
+- ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~ Shipped: the
+  bottle in hand on the desk and the phone leans forward and stands filled to what is left of the Dye
+  Budget (`dyeRoom`, `dyeRoomOf`), the others standing full; the Viscosity buttons each let a drop go at
+  the pace of the carrier's viscosity (`dripFallSeconds`, 20 to 1); Lamp Warmth has a bulb whose filament
+  is the blackbody colour at the temperature its grade matches, written in kelvin (`lampKelvin.ts`,
+  6500 K at 0 down to 5100 K at 1). Held by `npm run panel`. Judging §78. Story in `docs/plan-shipped.md` §35.
+- **35e-2** What the readings showed, none changed here because each moves a look:
+  - **The lamp's grade tops out at 5100 K.** Read in kelvin, Lamp Warmth at full is a warm morning, not
+    the 3200 K of a quartz-halogen overhead projector, so the sealed-wheel look it was named for is only
+    about a third of the way there. A grade that reached 3200 K (a wider tint, red over blue 5.1, with
+    the vignette unchanged) would move every look that sets `lampWarmth` (Lamp Warmth 0.25 and 0.45 in
+    `presets.ts` and `lucky.ts`'s draws); the owner's call, with the bulb and its figure already in
+    place to show the new range. The tint is also applied to the picture, not to the lamp's own light
+    on the dye, so a real colour temperature would warm the dye's transmission too (`transmission`).
+  - **The viscosity drip is slow motion at one factor.** The ratio between thin and thick is the
+    physics (Stokes's terminal speed, the solver's 1 and 20 mm²/s); the thread behind a thick drop is
+    drawn stretching at the drop's speed, not solved, and a real thread at this viscosity pinches off in
+    microseconds. Named shortcut.
+  - **One tank, one bottle.** The Dye Budget is a number for the whole plate and each layer, so the
+    bottle in hand shows it and the rest stand full; a per-liquid supply (a bottle that empties and is
+    refilled) waits for the volume model (18c-2).
+  - The legacy bench's bottle list in `App.tsx` (the `liquid-…` test ids) still draws round swatches.
+  - The remote has no bottles or bulb (the owner's remote has Dye Budget and Lamp Warmth as sliders).
 - **35d-2** What batch A left: the remote's own sliders (Speed and Evolve Speed in `RemoteControl.tsx`) have
   no snail and hare, and the remote has no group colours; the phone's Settings sheet takes the cap colours
   only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
