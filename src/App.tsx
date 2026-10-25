@@ -36,7 +36,7 @@ import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide, rideSlot } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User } from 'lucide-react';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
@@ -72,6 +72,8 @@ import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
 import { useSceneCamera } from './hooks/useSceneCamera';
+import { useCameras } from './hooks/useCameras';
+import { cameraPresent } from './lib/cameras';
 import { useFilmSense } from './hooks/useFilmSense';
 import { touch } from './lib/midiTouch';
 import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
@@ -98,7 +100,7 @@ import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
-import { isFreeTierGated } from './lib/tierGates';
+import { getEffectiveTier, isFreeTierGated } from './lib/tierGates';
 import { syncServerLicense } from './lib/licenseKey';
 import { usePublishAccountShow } from './lib/accountShows';
 import { LOCKUP_URL } from './brand';
@@ -186,6 +188,8 @@ async function micAlreadyAllowed(): Promise<boolean> {
  */
 const SCENE_ON_KEY = 'chromaglass-scene-on';
 const SCENE_DEVICE_KEY = 'chromaglass-scene-device';
+/** The film's Webcam has a camera of its own, remembered apart from the motion camera's (PLAN 14ad). */
+const FILM_DEVICE_KEY = 'chromaglass-film-camera';
 
 // Detect which preset (if any) matches the current settings. Only the look is
 // compared: a look does not set the room (see RIG_KEYS).
@@ -284,6 +288,9 @@ interface ArmedLook {
 }
 
 import AccountSheet from './components/AccountSheet';
+import { ACCOUNTS_ON, useSignedIn } from './lib/useSignedIn';
+import { isSignedInCached, onAuthFlagChange } from './lib/authFlag';
+import { syncAccountLicense } from './lib/accountLicense';
 
 const hasAccountOrLicenseUI =
   Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
@@ -306,6 +313,10 @@ const isProfileRoute = () =>
 export default function App() {
   const [isActive, setIsActive] = useState(true);
   const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
+  // Signed out with the show up: every account button turns into a lit
+  // "Sign in" that opens the sheet's sign-in (the owner, 2026-10-24).
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
 
   const openProfileSheet = useCallback(() => {
     if (!hasAccountOrLicenseUI) return;
@@ -1377,16 +1388,61 @@ export default function App() {
     await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
     setFilmCartoon(null);
+    setFilmCameraLost(false);
   };
-  const startFilmCamera = async () => {
+  /*
+    Which camera the film shows (PLAN 14ad).
+
+    It used to be whichever one the browser called "environment", with no
+    say: a second webcam, a capture card or a virtual camera (the way a VJ
+    app's output arrives today, PLAN §13) could not be put on the plate. Now
+    the film's picker chooses, the choice is remembered apart from the motion
+    camera's (one camera usually watches the room while another looks down at
+    a dish), and an unplugged camera takes the film off, says so, and puts it
+    back when the same camera is plugged in again.
+  */
+  const cameras = useCameras();
+  const [filmCameraId, setFilmCameraId] = useState<string>(() => { try { return localStorage.getItem(FILM_DEVICE_KEY) ?? ''; } catch { return ''; } });
+  const filmCameraIdRef = useRef(filmCameraId);
+  filmCameraIdRef.current = filmCameraId;
+  /** What the film's camera opened as: its name, and whether the chosen one was missing. */
+  const [filmCamera, setFilmCamera] = useState<{ label: string | null; fellBack: boolean } | null>(null);
+  /** The film's camera was unplugged while it showed; it comes back when that camera does. */
+  const [filmCameraLost, setFilmCameraLost] = useState(false);
+  const startFilmCamera = async (id: string = filmCameraIdRef.current) => {
     try {
-      await wallRef.current?.startFilmCamera();
+      const got = await wallRef.current?.startFilmCamera(id, () => {
+        setFilmSource('none');
+        setFilmCamera(null);
+        setFilmCameraLost(true);
+        setToast('The film\u2019s camera was unplugged');
+      });
       setFilmSource('camera');
+      setFilmCartoon(null);
+      setFilmCamera(got ?? null);
+      setFilmCameraLost(false);
+      void cameras.refresh();
     } catch (err) {
       console.warn('ChromaGlass: camera unavailable for the film projector.', err);
       setFilmSource('none');
+      setFilmCamera(null);
     }
   };
+  const chooseFilmCamera = (id: string) => {
+    setFilmCameraId(id);
+    try { localStorage.setItem(FILM_DEVICE_KEY, id); } catch { /* private */ }
+    // Showing a camera already: the new one takes over at once, which is
+    // what choosing a camera while it is on the plate means.
+    if (filmSource === 'camera') void startFilmCamera(id);
+  };
+  useEffect(() => {
+    const id = filmCameraIdRef.current;
+    const back = filmCameraLost && cameraPresent(cameras.devices, id);
+    const arrived = filmSource === 'camera' && !!filmCamera?.fellBack && id !== '' && cameraPresent(cameras.devices, id);
+    if (back || arrived) void startFilmCamera(id);
+    // startFilmCamera is a fresh closure each render; the list is what changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameras.devices]);
   /*
     Film from a window.
 
@@ -1407,6 +1463,7 @@ export default function App() {
         () => setToast('That window is coming through black — share the tab instead'),
       );
       setFilmSource('window');
+      setFilmCameraLost(false);
     } catch (err) {
       if ((err as DOMException)?.name === 'NotAllowedError') return;   // picker cancelled
       console.warn('ChromaGlass: could not capture a window for the film projector.', err);
@@ -1416,6 +1473,7 @@ export default function App() {
     wallRef.current?.clearFilm();
     setFilmSource('none');
     setFilmCartoon(null);
+    setFilmCameraLost(false);
   };
   const filmCartoonNow = async (id: string) => {
     const c = CARTOON_BY_ID.get(id);
@@ -1423,6 +1481,7 @@ export default function App() {
     await wallRef.current?.loadFilmUrl(c.src);
     setFilmSource('file');
     setFilmCartoon(id);
+    setFilmCameraLost(false);
   };
   /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
   const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
@@ -1473,6 +1532,8 @@ export default function App() {
     enabled: sceneOn,
     userAsked: sceneAskedRef.current,
     deviceId: sceneDeviceId,
+    cameras: cameras.devices,
+    onOpened: cameras.refresh,
     mirror: settings.sceneMirror !== false,
     deadzone: settings.sceneDeadzone ?? 0.25,
     smooth: settings.sceneSmooth ?? 0.35,
@@ -3444,6 +3505,16 @@ export default function App() {
     return () => window.removeEventListener('cg-license-changed', onLicense);
   }, []);
 
+  // The account's licence key, brought here once the app is up signed in and
+  // again on any later sign-in (lib/accountLicense.ts): a Pro account read Free
+  // while this lived only in the profile sheet (the owner, 2026-10-24).
+  useEffect(() => {
+    if (!ACCOUNTS_ON) return;
+    const ask = () => { if (isSignedInCached()) void syncAccountLicense(); };
+    ask();
+    return onAuthFlagChange(ask);
+  }, []);
+
   const loadMark = useCallback((file: File) => {
     const effectiveFile = isFreeTierGated()
       ? new File(
@@ -4849,14 +4920,18 @@ export default function App() {
       sceneOn={sceneOn}
       onSceneToggle={toggleScene}
       sceneState={scene.state}
-      sceneDevices={scene.devices}
+      cameras={cameras.devices}
       sceneDeviceId={sceneDeviceId}
       onSceneDevice={chooseSceneDevice}
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       onFilmFile={loadFilm}
       onPourVideo={pourFile}
-      onFilmCamera={startFilmCamera}
+      onFilmCamera={() => void startFilmCamera()}
+      filmCameraId={filmCameraId}
+      onFilmCameraDevice={chooseFilmCamera}
+      filmCamera={filmSource === 'camera' ? filmCamera : null}
+      filmCameraLost={filmCameraLost}
       onFilmWindow={startFilmWindow}
       onFilmClear={clearFilm}
       markLoaded={markLoaded}
@@ -5150,10 +5225,10 @@ export default function App() {
             className={`absolute ${phone ? 'bottom-44' : 'bottom-20'} left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full border border-white/15 bg-black/80 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl`}
             data-testid="scene-resume"
             role="dialog"
-            aria-label="Room camera"
+            aria-label="Motion camera"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-live)]" />
-            <span>The room camera was on last time. Turn it back on?</span>
+            <span>The motion camera was on last time. Turn it back on?</span>
             <button
               onClick={() => toggleScene(true)}
               className="font-medium text-white hover:underline"
@@ -5853,6 +5928,8 @@ export default function App() {
             onLampGround={(v) => updateSettings({ lampGround: v })}
             twoProjectors={settings.twoProjectors ?? 0}
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
+            projectorFocus={settings.projectorFocus ?? 0.5}
+            onProjectorFocus={(v) => updateSettings({ projectorFocus: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
             slosh={settings.slosh ?? 0}
@@ -6489,13 +6566,7 @@ export default function App() {
       )}
 
       {showAccount && hasAccountOrLicenseUI && (
-        <AccountSheet
-          onClose={closeProfileSheet}
-          onOpenSettings={() => {
-            closeProfileSheet();
-            openAllSettings();
-          }}
-        />
+        <AccountSheet onClose={closeProfileSheet} />
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives
@@ -6584,12 +6655,18 @@ export default function App() {
           type="button"
           data-cg-account-open=""
           onClick={openAccount}
-          title="Profile, Settings & Store"
-          aria-label="Account"
-          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-amber-400/40 bg-black/75 px-3.5 py-1.5 text-[12px] font-semibold text-amber-100 shadow-xl backdrop-blur-xl transition-all hover:border-amber-400/70 hover:bg-black/90"
+          data-cg-account-signin={signedOut ? '' : undefined}
+          data-cg-tier={getEffectiveTier()}
+          title={signedOut ? 'Sign in' : 'Account, licence and store'}
+          aria-label={signedOut ? 'Sign in' : 'Account'}
+          className={`fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-medium shadow-xl backdrop-blur-xl transition-all ${
+            signedOut
+              ? 'bg-primary text-on-primary hover:opacity-90'
+              : 'border border-border-strong bg-black/75 text-text-2 hover:bg-black/90 hover:text-text'
+          }`}
         >
-          <User size={14} className="shrink-0 text-amber-300" />
-          <span>Profile &amp; Store</span>
+          {signedOut ? <LogIn size={14} className="shrink-0" /> : <User size={14} className="shrink-0 text-muted" />}
+          <span>{signedOut ? 'Sign in' : 'Account'}</span>
         </button>
       )}
 

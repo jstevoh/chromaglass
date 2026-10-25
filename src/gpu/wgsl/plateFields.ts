@@ -145,6 +145,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'spectral', type: 'f32', note: 'dyes mixed across six bands of the spectrum rather than three' },
   { name: 'benDay', type: 'f32', note: 'the finished picture printed as a comic: flat inks, Ben-Day dots in the tints (the Roy look)' },
   { name: 'lampGround', type: 'f32', note: 'the lamp shining up through the dye (PLAN 18b): 0 the dye painted as light on black, 1 the lamp filtered by it' },
+  { name: 'projectorFocus', type: 'f32', note: 'projector lens focus plane (0..1, 0.5 = in-focus, defocus shifts Becke lines)' },
 ];
 
 export const PLATE_LAYOUT = layOut(PLATE_FIELDS);

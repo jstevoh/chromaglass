@@ -256,8 +256,12 @@ export async function deleteCurrentAccount(): Promise<void> {
     new Promise<void>((resolve) => setTimeout(resolve, 1500)),
   ]);
   const user = auth.currentUser;
-  clearSignedInCached();
+  // The flag goes only once the account is gone. Firebase refuses a delete
+  // without a recent sign-in (auth/requires-recent-login), and clearing first
+  // turned that refusal into what looked like a sign-out, its error hidden
+  // with the signed-in half of the sheet (the review of #460).
   if (user) {
     await deleteUser(user);
   }
+  clearSignedInCached();
 }

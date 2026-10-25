@@ -16,7 +16,27 @@ interface SignInScreenProps {
 // Initialize Firebase Auth as soon as this lazy chunk loads so popup handlers fire synchronously.
 getFirebaseAuth();
 
-export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
+/**
+ * Sign in with Apple is not offered (the owner, 2026-10-24: "I don't want to do
+ * the apple developer account or accept logins from them. maybe later - but not
+ * now."). The provider was never finished on the live project either: Apple's
+ * half needs a Services ID and a key from a paid Apple Developer account, which
+ * the project does not have, so the button offered a sign-in that could not
+ * complete. The code stays
+ * behind this one switch rather than being deleted, because the iPhone app
+ * brings it back (App Store guideline 4.8 asks for it beside Google's; PLAN
+ * 23.15), and `npm run signin` line 4 holds the switch off: it fails if the
+ * button is drawn.
+ */
+const APPLE_SIGN_IN = false;
+
+/**
+ * The sign-in's buttons and the emailed-link form, without the screen around
+ * them, so the profile sheet can offer the same sign-in to someone already in
+ * the app (the owner, 2026-10-24: signed out while using the app, "there is no
+ * way to re-sign in"). The first-visit screen below wraps the same form.
+ */
+export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   const isCompletingLink = hasEmailSignInLink();
   const [emailOpen, setEmailOpen] = useState(isCompletingLink);
   const [email, setEmail] = useState('');
@@ -84,19 +104,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   };
 
   return (
-    <div
-      data-cg-signin=""
-      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 overflow-y-auto"
-      style={{ background: 'rgba(5, 5, 8, 0.55)', backdropFilter: 'blur(12px)' }}
-    >
-      <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/85 px-5 py-3.5 text-neutral-100 shadow-2xl">
-        <div className="mb-2.5 text-center">
-          <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
-          <p className="mt-0.5 text-xs text-neutral-400">
-            Sign in to enter the studio
-          </p>
-        </div>
-
+    <>
         <div className="flex flex-col gap-2">
           <button
             type="button"
@@ -117,17 +125,19 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
             <span>Continue with Google</span>
           </button>
 
-          <button
-            type="button"
-            data-cg-signin-provider="apple.com"
-            onClick={() => handleProvider('apple.com')}
-            className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15 active:bg-white/20"
-          >
-            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z" />
-            </svg>
-            <span>Continue with Apple</span>
-          </button>
+          {APPLE_SIGN_IN && (
+            <button
+              type="button"
+              data-cg-signin-provider="apple.com"
+              onClick={() => handleProvider('apple.com')}
+              className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15 active:bg-white/20"
+            >
+              <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z" />
+              </svg>
+              <span>Continue with Apple</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -152,13 +162,13 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               aria-label="Email address"
-              className="min-h-[40px] w-full rounded-xl border border-white/20 bg-black/50 px-3.5 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-amber-400/60 focus:outline-none"
+              className="min-h-[40px] w-full rounded-xl border border-white/20 bg-black/50 px-3.5 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-accent focus:outline-none"
             />
             <button
               type="submit"
               data-cg-signin-send=""
               disabled={sending}
-              className="min-h-[40px] w-full rounded-xl bg-amber-500/90 px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-amber-400 disabled:opacity-50"
+              className="min-h-[40px] w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-on-primary transition hover:opacity-90 disabled:opacity-50"
             >
               {isCompletingLink
                 ? 'Complete sign-in'
@@ -193,7 +203,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
               setMarketingOptInState(next);
               setMarketingOptIn(next);
             }}
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/30 bg-black accent-amber-500"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/30 bg-black accent-accent"
           />
           <span>
             Email me occasional ChromaGlass updates, new looks &amp; release notes (optional).
@@ -221,8 +231,25 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
           </a>
           <span>.</span>
         </div>
-      </div>
-    </div>
+    </>
   );
 };
+
+export const SignInScreen: React.FC<SignInScreenProps> = ({ onSignedIn }) => (
+  <div
+    data-cg-signin=""
+    className="fixed inset-0 z-50 flex items-center justify-center p-2.5 overflow-y-auto"
+    style={{ background: 'rgba(5, 5, 8, 0.55)', backdropFilter: 'blur(12px)' }}
+  >
+    <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-neutral-950/85 px-5 py-3.5 text-neutral-100 shadow-2xl">
+      <div className="mb-2.5 text-center">
+        <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
+        <p className="mt-0.5 text-xs text-neutral-400">
+          Sign in to enter the studio
+        </p>
+      </div>
+      <SignInForm onSignedIn={onSignedIn} />
+    </div>
+  </div>
+);
 export default SignInScreen;

@@ -1590,3 +1590,34 @@ record on, through the room microphone and through the laptop:
 Settings, Patches, on any of the three: each patch has a thumbnail of the plate with the
 look's areas; tap one to aim the patch there, and Fire on a hit gives it a gate. On the phone,
 the same sheet. Say whether the picker is clear and big enough under a thumb.
+
+## 68. Beat Squeeze's sheet gives back at the liquid's own pace (PLAN 27f-4)
+
+Classic with a band at 120 bpm, Beat Squeeze at 0.5, Kick Bloom at 0, Frame Sway 0. Each kick
+should still be a dent where it lands, but now its letting go is the liquid's: on the default oil
+most of it springs back at once and the last of it settles over a fifth of a second, with a faint
+ring of colour pushed out round the dent and drawn back. Turn Thickness to full: the dent should
+tighten and hold, coming back slowly over a second or two, the ring round it plainer. Toward water
+it should be wide and gone almost as it lands. Little outside the dent and its ring should move on
+the kick (under half of what the old dent moved there). Say whether the thick liquid's slow give-back reads as syrup or as lag, and whether
+the default oil's dent still reads as a press. A real sheet on a thin liquid would not just give back: on the
+default oil and toward water it would swing past rest once or twice (a slow wave under the sheet,
+about a quarter of a second a swing) before it settled, which the solve leaves out (PLAN 27f-8(f)).
+Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
+building.
+
+## 69. Any camera, and which camera does what (PLAN 14ad)
+
+With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual Camera):
+
+- **Settings, Film.** Pick the second camera under Webcam, then press Webcam: its picture
+  should be on the plate, and the Source line should name it. Pick the laptop's camera while
+  it shows: it should switch without pressing anything else.
+- **Pull the cable** while it shows: the film should go off with a line saying it was
+  unplugged. Plug it back in: it should come back by itself. Say how long that takes on a
+  real camera (the code waits for the browser to list it, not a timer).
+- **Settings, Motion camera.** Does the first line make it obvious that this one stirs and
+  is never shown, and that Webcam is the one that shows a picture? Pick a camera for it and
+  switch it on; the film's camera should stay what it was.
+- On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
+
