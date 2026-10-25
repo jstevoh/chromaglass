@@ -1791,7 +1791,27 @@ time on both buttons, a bulb whose number does not follow the slider, anything t
 motion on, or a violet or red that is not "on" or "live". Decide too: the 5100 K top is what the grade does
 today; if you would rather it reached a 3200 K halogen, that is PLAN 35e-2.
 
-## 79. Tape reels, a tap pad, a VU needle, a lens cap, a strobe ring (PLAN 35f)
+## 79. The Splodascope, and Film Hold (PLAN 28k)
+
+Open the Splodascope look on the lamp, with the owner's photograph beside it (in the project's
+shared files, `references/splodascope-2026-10-25.png`).
+
+1. A crowd of round drops of yellow, green, red and magenta oil in a cobalt water, from small to
+   cells a fifth of the plate across, a few with a drop of another colour inside a ring of water.
+2. Leave it a minute: drops press against one another and stay two, with a thin dark wall between
+   them. Some merge, slowly; the crowd should still be a crowd after a minute, not a few big blobs.
+3. With music: a kick presses the glass and now and then breaks a wall so two neighbours run
+   together. Nothing moves the frame as a whole.
+4. Settings → Oil & Soap → Film Hold to 0: the drops run together within a few seconds (that is the
+   plate as it was). Back to 1: the drops laid from then on hold again.
+
+On the phone: the look in the list, and Film Hold under Oil Bodies in Settings → Oil & Soap.
+
+Bad: walls between drops so thick the crowd reads as a lattice; drops that jitter against each
+other; colours going brown or black inside the drops; or a crowd that has merged into blobs within
+half a minute with no music playing.
+
+## 80. Tape reels, a tap pad, a VU needle, a lens cap, a strobe ring (PLAN 35f)
 
 On the desk and the phone, with a band or a microphone playing:
 

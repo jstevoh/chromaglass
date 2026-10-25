@@ -3155,6 +3155,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ oilBodies: v })}
           settingKey="oilBodies"
         />
+        {/* The water film between two drops holds them apart (FILM_WGSL): needs Oil Tension too. */}
+        <Slider
+          label="Film Hold"
+          value={settings.filmHold ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmHold: v })}
+          settingKey="filmHold"
+        />
         <Slider
           label="Soap Bursts"
           value={settings.surfactantFlow ?? 0}

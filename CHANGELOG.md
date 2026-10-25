@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the Splodascope, and Film Hold (PLAN 28k)
+
+- A new look, **Splodascope**, after a photograph of one: a crowd of yellow, green, red and
+  pink oil drops packed edge to edge in cobalt water, a few holding a drop of another colour.
+- A new **Film Hold** control (`filmHold`, Settings → Oil & Soap under Oil Bodies, MIDI, the
+  desks, the remote and the phone; 0 by default, which is the plate as it was): the water
+  film between two drops of oil pushes back as it thins (the disjoining pressure), so drops
+  crowd without merging until a press breaks the film. `npm run filmhold` measures it.
+
 ### Changed — edges from refraction, and Projector Focus (PLAN 18e)
 
 - On projected looks, dye and oil edges now come from refraction through the liquid

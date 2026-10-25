@@ -860,6 +860,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Oil Bodies" field="oilBodies" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* And Film Hold, which keeps the drops of that oil apart, likewise. */}
+          {(settings?.oilTension ?? 0) > 0.001 && (
+            <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
+          )}
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
