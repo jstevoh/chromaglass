@@ -16,8 +16,9 @@ import { lookOf } from '../lib/lookFade';
 import { clearShowInterval, showInterval, showNow } from '../lib/showClock';
 import {
   ShowSequence, ShowStage, SequencerStatus,
-  builtInSequences, loadUserSequences, saveUserSequences, lerpSettings,
+  builtInSequences, loadUserSequences, SEQUENCES_KEY, saveUserSequences, lerpSettings,
 } from '../lib/sequencer';
+import { useCloudSyncReload } from '../lib/cloudSyncApp';
 import {
   PACE_NEUTRAL, FROM_DARK_BELOW, ScenePlayer, type PaceMoment, type PaceSample, type SongCue,
 } from '../lib/scenePacing';
@@ -104,6 +105,7 @@ export function useShowSequencer(args: UseShowSequencerArgs) {
   argsRef.current = args;
 
   const [userSequences, setUserSequences] = useState<ShowSequence[]>(() => loadUserSequences());
+  useCloudSyncReload({ [SEQUENCES_KEY]: () => setUserSequences(loadUserSequences()) });
   const builtIns = useMemo(() => builtInSequences(), []);
   const sequences = useMemo(() => [...builtIns, ...userSequences], [builtIns, userSequences]);
   const sequencesRef = useRef(sequences);

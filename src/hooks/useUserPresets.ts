@@ -4,8 +4,9 @@ import type { Preset } from '../presets';
 import type { SongRef } from '../lib/songRef';
 import {
   UserPreset, downloadText, loadUserPresets, makeUserPreset, parsePresetFile, presetFileName,
-  saveUserPresets, serializePreset,
+  saveUserPresets, serializePreset, USER_PRESETS_KEY,
 } from '../lib/userPresets';
+import { useCloudSyncReload } from '../lib/cloudSyncApp';
 
 /**
  * The projectionist's own presets: kept in the browser so they are there next
@@ -14,6 +15,7 @@ import {
  */
 export function useUserPresets() {
   const [presets, setPresets] = useState<UserPreset[]>(() => loadUserPresets());
+  useCloudSyncReload({ [USER_PRESETS_KEY]: () => setPresets(loadUserPresets()) });
 
   const persist = useCallback((next: UserPreset[]) => {
     setPresets(next);

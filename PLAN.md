@@ -6276,11 +6276,14 @@ once the login works (23.14).*
   refused by every browser; the Worker could re-sign such records on `GET /keys` with the current
   key (it is the source of truth for what was sold), with a check that a forged token never enters
   KV that way.
-  **23.14-verify** (open, found 2026-10-24): `server/account-shows.js` `verifyAccountToken` reads
-  the token's uid, audience and issuer but never checks its signature, so anyone who can reach a
-  show server can name any uid and read or publish that account's running shows. It should verify
-  RS256 against Google's keys as the licence Worker now does (23.12-jwks), with an `accountlink` line
-  that a token signed by anyone else is refused.
+  **23.14-verify** (**shipped**, #467; found 2026-10-24): `server/account-shows.js`
+  `verifyAccountToken` read the token's uid, audience and issuer but never checked its
+  signature, so anyone who could reach a show server could name any uid and read or publish
+  that account's running shows. It now verifies RS256 against Google's keys in
+  `server/firebase-token.js` (cached and rate-limited as 23.12-jwks does), the project, the
+  issuer and the times; the emulator's unsigned tokens count only with `FIREBASE_AUTH_EMULATOR`
+  set. *Measure:* `npm run accountlink` 1b (a signed token taken; unsigned, forged and
+  other-project tokens refused), 7/7.
 - **23.14** (**shipped**, this PR): linking devices by
   account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
   with `server/remote-server.js` publishes its LAN relay address and show key to
@@ -6296,6 +6299,64 @@ once the login works (23.14).*
   and joined with a tap and no address typed while the QR code stays on `Phone · iPad`, a
   third page on another account sees nothing, and cutting off the internet and account
   service leaves the local remote socket driving the show.
+- **23.18** (**shipped**, this PR): cloud sync for Pro (`server/cloud-sync.js`,
+  `src/lib/cloudSync.ts`, `src/lib/cloudSyncApp.ts`, `CloudSyncCard` in the profile sheet,
+  desk and phone). Asked by the owner, 2026-10-25: the Mac app has its own storage, so looks
+  saved in Chrome were not in it. A Pro account now carries the saved looks, sequences, saved
+  sets and the working set list, song shows and action sets, custom liquids, the MIDI map,
+  tool amounts, music settings and Follow songs; every browser and Mac app signed in to it
+  keeps them in step through the licence Worker's `/sync` (one KV value per account, the tier
+  read from the keys filed under the account's email). Each device stays the source of truth
+  offline and saves exactly as before; the engine looks at the same localStorage keys every
+  5 s and stamps what changed. The rule is newest-wins per item with deletions as tombstones,
+  the cloud's copy on a tie, and what a device held before it first synced stamped oldest (so
+  a second machine's untouched starter set never replaces the first's). Clocks are corrected
+  by the skew each answer measures; a record far in the future is pulled back to a minute past
+  the server's clock. KV has no transactions, so a manifest every ten minutes finds a push lost
+  to another device's write and sends it again. Not synced, on purpose: the projector layout,
+  audio input and source, MIDI ports, desk mode, licence and sign-in, which belong to the
+  machine. The MIDI map syncs whole, one value: two computers with different controllers
+  replace each other's map (a map per controller is 23.18-midi). Erase the cloud copy from the
+  sheet (any signed-in account, Pro or not); the erase leaves a marker, and a push on a sign-in
+  token issued before it is refused, so a Mac app left open cannot put back an erased or
+  deleted account's copy. Deleting the account stops if the erase fails. A look the cloud
+  refuses (over 256 KB) is reported on the card and not sent again until edited.
+  *Measure:* `npm run cloudsync` (13/13, `checks.yml` `Measure · logic`): saved on one device
+  and read back by the stores' own load functions on the other, for arrival, the starter set
+  list, concurrent edits of different looks, the later edit of one look from a clock ten
+  minutes slow, deletion, offline edits, a lost write healed, Home/keyless/forged/other
+  accounts refused or isolated, unreadable storage never read as empty, erase, a future
+  stamp, a refused look and an id of `toString`, and the wiring (every synced key is its
+  module's, and every key held in React state reloads when the cloud writes it). Each guard
+  was broken in turn and its line went red.
+  **23.18-deploy** (*owner*): `/sync` exists once the licence Worker is deployed by hand from
+  the Mac (`npx wrangler deploy`, as for #460); until then a Pro sheet says sync stopped on an
+  error and retries, and nothing else changes.
+  **23.18-cost** (open): every push is one Workers KV write, and the free plan allows 1000 a
+  day for the whole Cloudflare account (licence webhooks and activations included). Pushes
+  wait for 4 s of quiet and come at most every 5 s, so a player editing all evening is a few
+  dozen; past about thirty busy Pro players a day the free plan runs out and writes fail
+  (sync then backs off and keeps everything local). Workers Paid ($5 a month) lifts it to
+  a million a month. If two devices of one account racing ever matters, a Durable Object per
+  account gives real transactions in place of the manifest's repair.
+  **23.18-music** (open): the song memory in IndexedDB (fingerprints, song maps, recorded
+  performances, `musicDb.ts`) does not sync: it is large and per room. A show kit
+  (`showKit.ts`) still carries it by file.
+  **23.18-prune** (open): tombstones are kept for ever (they no longer count toward a store's
+  2000-item cap, but they grow the account's value); drop those older than 90 days once every
+  device's rev is past them.
+  **23.18-verify-share** (open): the licence Worker keeps its own `verifyFirebaseIdToken` beside
+  `server/firebase-token.js`, which was written to run in both; one copy of security code
+  drifts less. Neither checks `auth_time`, which Firebase's documented steps include.
+  **23.18-midi** (open): a MIDI map per controller (keyed by the device's name), so two rigs
+  keep their own maps instead of the newest replacing the other.
+  **23.18-pack** (open): the Mac app packs `server/` from a hand list
+  (`desktop/electron-builder.config.cjs`), and this PR's new `firebase-token.js` was missing
+  from it until the packed app failed to start on CI's Mac. A line in `npm run desktop` that walks
+  `remote-server.js`'s relative imports and fails on any file the list leaves out would catch
+  the next one in the cloud, before the Mac job.
+  **23.18-exit** (open): a Mac app quit straight after an edit sends it the next time it opens
+  (no send on `pagehide`); a `keepalive` push of the waiting records under 64 KB would close it.
 - **23.10d** (**shipped**, #460): Sign in with Apple is not offered (the owner,
   2026-10-24: "I don't want to do the apple developer account or accept logins from
   them. maybe later - but not now."). The button is held behind `APPLE_SIGN_IN` in
