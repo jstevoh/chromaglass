@@ -104,6 +104,10 @@ const ALLOW = {
     'Math.random': 1,
     why: 'the fallback id of a projector surface in a saved output setup; never drawn',
   },
+  'src/lib/cloudSync.ts': {
+    crypto: 1,
+    why: 'the id one device signs its cloud-sync records with; two computers on the same ?seed= must still be two devices, and it is never drawn',
+  },
 };
 
 /** Every source of randomness in one file, by kind, with lines. */
