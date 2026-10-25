@@ -11,6 +11,9 @@
  * "comes with Pro" to everyone else, and that is a nudge, not a lock.
  */
 
+import { SHOW_PATH } from './showPath';
+import { getActiveLicenseInfo } from './tierGates';
+
 export const MAC_DOWNLOAD_URL = 'https://github.com/jstevoh/chromaglass/releases/latest/download/ChromaGlass-mac-arm64.dmg';
 export const MAC_RELEASES_URL = 'https://github.com/jstevoh/chromaglass/releases';
 
@@ -89,4 +92,37 @@ export function macAppRow(tier: string, mac: boolean, update: DesktopUpdateState
   }
   if (tier !== 'pro') return { kind: 'with-pro' };
   return mac ? { kind: 'download', href: MAC_DOWNLOAD_URL } : { kind: 'on-a-mac' };
+}
+
+/**
+ * The address a sign-in started in the Mac app finishes at, in the real
+ * browser (PLAN.md 23.17d): the show on the app's own server, so the account's
+ * key is handed to that server (`/license-activate`, accountLicense.ts) and the
+ * app's window, which watches the server's licence, opens by itself. The word
+ * tells that browser tab to say so and stop there, rather than start a second
+ * show beside the app's.
+ */
+export const MAC_SIGN_IN_PARAM = 'macSignIn';
+
+export function openSignInInBrowser(): void {
+  const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { openInBrowser?: (url: string) => void } }).__CHROMAGLASS_NATIVE__;
+  const url = `${window.location.origin}${SHOW_PATH}?${MAC_SIGN_IN_PARAM}=1`;
+  if (native?.openInBrowser) native.openInBrowser(url);
+  else window.open(url, '_blank', 'noopener');
+}
+
+/**
+ * The licences the Mac app opens on (PLAN.md 23.17d): Home and Pro, each with
+ * its own features, as on the website. Home's phone remote, song ID and
+ * full-length recording are sold as "in the ChromaGlass app", and the remote
+ * needs the app's show server, so a Home buyer shut out of the app would have
+ * paid for features they could not use. One list, read by the door and the
+ * start (main.tsx, AppLicenceGate.tsx).
+ */
+export const MAC_APP_TIERS: ReadonlyArray<'home' | 'pro'> = ['home', 'pro'];
+
+/** Does the key on this machine open the Mac app's show? */
+export function macAppLicensed(): boolean {
+  const lic = getActiveLicenseInfo();
+  return lic.valid && (MAC_APP_TIERS as readonly string[]).includes(lic.tier);
 }

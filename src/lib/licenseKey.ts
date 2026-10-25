@@ -248,6 +248,33 @@ export function clearCachedLicense(): void {
   notifyLicenseChanged(FREE_STATUS);
 }
 
+/**
+ * Take a refunded key off this machine from its next start (PLAN.md 23.17d,
+ * `heldKeyRefunded` in accountLicense.ts): out of this browser's storage and
+ * out of the show server's file, which is what the Mac app reads at launch.
+ *
+ * Not out of what this page already verified. The never-lock-out rule (PLAN.md
+ * 23.10): nothing an account says takes a running show down, so a set that
+ * started licensed finishes licensed, and the next start meets the gate.
+ */
+export async function retireStoredLicenseKey(): Promise<void> {
+  const token = verifiedState.token;
+  try {
+    localStorage.removeItem(STORAGE_KEY_TOKEN);
+  } catch {
+    // ignore
+  }
+  try {
+    await fetch('/license-deactivate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(token ? { key: token } : {}),
+    });
+  } catch {
+    // No show server (the website): the browser's copy was all there was.
+  }
+}
+
 export async function activateLocalLicenseKey(token: string): Promise<LicenseStatus> {
   const res = await verifyLicenseKey(token);
   if (!res.valid) {

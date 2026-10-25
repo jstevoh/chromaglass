@@ -51,6 +51,10 @@
  *                 rest of what desktop/updates.js promises, in plain Node)
  *   quits         closing the show window, with the projector open, quits
  *                 the app and frees the port
+ *   licence       the run above opened on a Pro key (signed for this run); the
+ *                 same app with no key shows its door, the sign-in, and no
+ *                 plate, and (built as it ships, VITE_MAC_APP=1) so does a
+ *                 plain browser opened on its server (PLAN.md 23.17d)
  *
  * The second screen is a stand-in: an init script adds one to what the real
  * `getScreenDetails` returns, so the real permission (granted by the app, not
@@ -60,7 +64,7 @@
  * Needs `npm --prefix desktop install` once (Electron is not a dependency of
  * the site). On Linux with no display it runs itself under xvfb-run.
  */
-import { _electron as electron } from 'playwright';
+import { _electron as electron, chromium } from 'playwright';
 import { spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -70,6 +74,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { signLicenseKey } from '../server/license-key.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DESKTOP = join(REPO, 'desktop');
@@ -153,6 +158,19 @@ const profile = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-'));
 const PORT = await freePort('tcp');
 const OSC_PORT = await freePort('udp');
 const QUERY = '?debug&look=classic';
+
+/*
+  The licence (PLAN.md 23.17d). The app as it ships opens only on a Home or
+  Pro key, so the show this check opens is a licensed one: a Pro key signed
+  with a key pair made for this run, which the app is told to trust
+  (LICENSE_PUBLIC_KEY; a packed app keeps that only with the network refused,
+  desktop/main.js) and handed as CHROMAGLASS_LICENSE_KEY, the way a terminal
+  `npm run show` takes one. From the repo the app asks for a licence only when
+  told to, so it is told to: both runs take the same door.
+*/
+const licPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+const LIC_PUBLIC = JSON.stringify(await crypto.subtle.exportKey('jwk', licPair.publicKey));
+const LIC_KEY = await signLicenseKey({ id: 'desktop-check-pro', tier: 'pro', email: 'desktop-check@example.com' }, await crypto.subtle.exportKey('jwk', licPair.privateKey));
 console.log(`The app ${app.label}; port ${PORT}, OSC ${OSC_PORT}, a new profile, the network off.\n`);
 
 /*
@@ -189,6 +207,9 @@ const env = {
   CHROMAGLASS_USER_DATA: profile,
   CHROMAGLASS_OFFLINE: '1',
   CHROMAGLASS_QUERY: QUERY,
+  CHROMAGLASS_REQUIRE_SIGNIN: '1',
+  LICENSE_PUBLIC_KEY: LIC_PUBLIC,
+  CHROMAGLASS_LICENSE_KEY: LIC_KEY,
   ...(isMac ? {} : { CHROMAGLASS_SOFTWARE_WEBGPU: '1' }),
 };
 delete env.SHOW_KEY;   // the app's own key, the one it keeps, is what is checked
@@ -597,6 +618,56 @@ try {
   await electronApp.close().catch(() => {});
   feed?.close();
   rmSync(profile, { recursive: true, force: true });
+}
+
+/*
+  ── licence ──────────────────────────────────────────────────────────
+  The same app with no key, signed out, on a profile of its own: the door
+  (AppLicenceGate.tsx) and no plate behind it, which before 23.17d was the
+  whole show, free, for every download. And when the site was built as the app
+  ships it (VITE_MAC_APP=1, desktop.yml), a plain browser opened on the app's
+  server meets the same door: without that, Chrome at localhost:<port> was the
+  show for free beside a locked app. The licensed run above is the other half:
+  it opened on its key with the gate never drawn (`opens`).
+*/
+{
+  const bare = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-bare-'));
+  const barePort = await freePort('tcp');
+  const bareEnv = { ...env, PORT: String(barePort), OSC_PORT: String(await freePort('udp')), CHROMAGLASS_USER_DATA: bare };
+  delete bareEnv.CHROMAGLASS_LICENSE_KEY;
+  delete bareEnv.CHROMAGLASS_UPDATE_FEED;
+  let second = null;
+  try {
+    second = await electron.launch({ executablePath: app.executablePath, args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], env: bareEnv, timeout: 60_000 });
+    const page = await second.firstWindow({ timeout: 60_000 });
+    const door = await page.waitForSelector('[data-cg-app-licence]', { state: 'visible', timeout: 60_000 }).then(() => true, () => false);
+    await sleep(3000);
+    const said = await page.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
+    const plate = await page.locator('#liquid-canvas').count().catch(() => 0);
+    const native = await page.evaluate(() => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function' })).catch(() => null);
+    check('licence: with no key the app shows its door, asks for a sign-in, and starts no plate', door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser,
+      `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser` : 'unread'}`);
+    if (process.env.VITE_MAC_APP !== '1') {
+      skip('licence: a browser on the app\'s server meets the same door', 'the site in dist/ was not built as the app ships it (VITE_MAC_APP=1, desktop.yml)');
+    } else {
+      const b = await chromium.launch();
+      try {
+        const bp = await b.newPage();
+        await bp.goto(`http://localhost:${barePort}/show?debug`, { timeout: 60_000 });
+        const browserDoor = await bp.waitForSelector('[data-cg-app-licence]', { state: 'visible', timeout: 60_000 }).then(() => true, () => false);
+        await sleep(3000);
+        const browserPlate = await bp.locator('#liquid-canvas').count().catch(() => 0);
+        check('licence: a browser on the app\'s server meets the same door, and no plate', browserDoor && browserPlate === 0, `door ${browserDoor}, plate canvas ${browserPlate ? 'THERE' : 'absent'}`);
+      } finally {
+        await b.close().catch(() => {});
+      }
+    }
+  } catch (err) {
+    check('licence: the keyless run finished', false, err?.message ?? String(err));
+  } finally {
+    await second?.close().catch(() => {});
+    rmSync(bare, { recursive: true, force: true });
+  }
 }
 
 const failed = results.filter((r) => !r.ok);

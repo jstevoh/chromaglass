@@ -68,6 +68,13 @@
  *  16. signing in from that sheet brings the account back: the button says
  *      Account again and the sheet names the account
  *
+ * The Mac app's door (PLAN.md 23.17d), on `?requireSignIn=1`, the word the app says:
+ *  22. signed out it shows the sign-in; a free account gets Confirm your email,
+ *      then Buy Home or Pro, and the plate never starts behind it
+ *  23. once the account holds a Home key, "check again" opens the show at Home
+ *  24. a refunded key: the running show stays up, the key leaves the machine,
+ *      and the next start asks to buy again
+ *
  * Email and password (PLAN.md 23.10e; the owner, 2026-10-24: "an email login
  * option that stores passwords ... and if they have a google account it can
  * link to that"). One account per email is Firebase's rule, and these hold the
@@ -913,6 +920,77 @@ try {
         await c.close();
       }
       check('21. the password form fits a laptop and a phone, upright and on its side: nothing wider than the screen, every button a thumb\'s height', all, fitText.join('; '));
+    }
+
+    // ── 22–24: the Mac app opens on a Home or Pro key, not on an account ──
+    // (PLAN.md 23.17d; the owner, 2026-10-25: "The Mac app should check the
+    // license. The app won't work for free.") `?requireSignIn=1` is the word
+    // the app's shell says (desktop/preload.cjs), read the same way here
+    // (lib/authFlag.ts); this build has the accounts, the emulator and the
+    // Worker, as the app as it ships does (desktop.yml). Under 23.11 a signed-in
+    // account opened the show, so 22 fails on the code before 23.17d: the plate
+    // came up behind a free account.
+    {
+      const E = 'mac-app@example.com';
+      await deleteAccount(E);
+      licKV.clear();
+      const MAC = SHOW + '&requireSignIn=1';
+      const step = (p) => p.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
+      const stepIs = (p, want, ms = 30_000) => waitFor(async () => (await step(p)) === want, ms);
+      const storedKey = (p) => p.evaluate(() => localStorage.getItem('chromaglass:license-key')).catch(() => null);
+      async function fileKey(email, tier, id) {
+        const now = Date.now();
+        const token = await signLicenseKey({ id, tier, email, issuedAt: now }, licEnv.LICENSE_PRIVATE_KEY);
+        licKV.set(`keys:${email}`, JSON.stringify([{ id, tier, email, token, issuedAt: now, maxMachines: 2, revoked: false }]));
+      }
+      const c = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await c.addInitScript(LICENSE_PUBLIC_INIT);
+      const p = await c.newPage();
+      await p.goto(MAC);
+
+      // 22. Signed out: the sign-in, no plate. A password account: first the
+      // confirmation (the Worker gives keys only to a confirmed email), then,
+      // with no key on the account, Home and Pro to buy, and still no plate.
+      const signin = await stepIs(p, 'signin');
+      let confirm = false, buy = false, plateBehind = false;
+      if (signin && await openPasswordPanel(p, true)) {
+        await submitPassword(p, E, PW);
+        confirm = await stepIs(p, 'confirm');
+        if (confirm && await confirmEmail(E)) {
+          await p.click('[data-cg-app-licence-confirm] button').catch(() => {});
+          buy = await stepIs(p, 'buy');
+        }
+        await p.waitForTimeout(2000);
+        plateBehind = await appUp(p);
+      }
+      const links = await p.evaluate(() => [...document.querySelectorAll('[data-cg-app-licence-checkout]')].map((a) => a.getAttribute('data-cg-app-licence-checkout') + (a.getAttribute('href')?.includes('lemonsqueezy.com/checkout') ? '' : ':no-store-link')).join(',')).catch(() => '');
+      check('22. the Mac app signed out shows the sign-in; a free account gets Confirm, then Buy Home or Pro, and never the plate', signin && confirm && buy && links === 'home,pro' && !plateBehind,
+        `sign-in ${signin}, confirm ${confirm}, buy ${buy} (${links || 'no checkout links'}), plate ${plateBehind ? 'UP behind it' : 'not started'}; at the end the screen says ${await step(p)}`);
+
+      // 23. The store files a Home key for the account; "check again" opens the
+      // show, and it is Home, not Pro: the tiers the website has.
+      await fileKey(E, 'home', 'mac-home-1');
+      await p.click('[data-cg-app-licence-recheck]').catch(() => {});
+      const up = await waitFor(() => appUp(p), BOOT_MS);
+      const tier = up ? await waitFor(async () => (await tierShown(p)).split(',').includes('home'), 20_000).then(() => tierShown(p)) : '';
+      check('23. once the account holds a Home key, check again opens the show, at Home', up && tier.split(',').includes('home') && !tier.split(',').includes('pro'), `plate ${up}, tier ${tier || 'not drawn'}`);
+
+      // 24. Refunded: the Worker's list no longer has the key (its refund drops
+      // it, server/license-worker.js). The show that is up stays up (never
+      // locked out mid-set); the key is gone from the machine; the next start
+      // is the buy screen again. Before 23.17d a refunded key verified for ever.
+      licKV.set(`keys:${E}`, JSON.stringify([]));
+      await p.reload();
+      const upAgain = await waitFor(() => appUp(p), BOOT_MS);
+      const retired = upAgain && await waitFor(async () => !(await storedKey(p)), 20_000);
+      await p.waitForTimeout(3000);
+      const stayed = await appUp(p);
+      await p.reload();
+      const backToBuy = await stepIs(p, 'buy', 45_000);
+      const noPlate = !(await appUp(p));
+      check('24. a refunded key: the running show stays up, the key leaves the machine, and the next start asks to buy', upAgain && retired && stayed && backToBuy && noPlate,
+        `opened on the held key ${upAgain}, key taken off ${retired}, show still up ${stayed}, next start ${await step(p) ?? 'the plate'}`);
+      await c.close();
     }
   }
 } catch (e) {

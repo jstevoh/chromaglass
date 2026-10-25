@@ -19,7 +19,7 @@
  * here only on demand, so a build without it (every check, a fork) carries none.
  */
 
-import { activateLocalLicenseKey, verifyLicenseKey, type LicenseTier } from './licenseKey';
+import { activateLocalLicenseKey, retireStoredLicenseKey, verifyLicenseKey, type LicenseTier } from './licenseKey';
 import { getCachedEmail } from './authFlag';
 import { getActiveLicenseInfo, getMarketingOptIn, hasExplicitMarketingChoice, setMarketingOptIn, syncMarketingPreferenceToServer } from './tierGates';
 
@@ -120,6 +120,44 @@ async function run(): Promise<AccountLicenseResult> {
     .filter((k) => !k.revoked && (k.token || k.key))
     .map((k) => ({ id: (k as { id?: string }).id, token: (k.token || k.key) as string, tier: (k.tier === 'pro' ? 'pro' : 'home') as LicenseTier }))
     .sort((a, b) => RANK[b.tier] - RANK[a.tier]);
+  const result = await pick(all);
+  // After the pick, so a Home key the account upgraded is judged by the Pro
+  // key that replaced it here, not before.
+  const held = getActiveLicenseInfo();
+  const account = await auth?.getCurrentUserEmail().catch(() => null) ?? getCachedEmail();
+  if (heldKeyRefunded(held, account, all.map((k) => k.id ?? ''))) {
+    void retireStoredLicenseKey();
+    return { state: 'none' };
+  }
+  return result;
+}
+
+/**
+ * Has the key this machine holds been taken back (PLAN.md 23.17d)?
+ *
+ * A refund takes the key out of the buyer's list in the licence Worker
+ * (`refund` in server/license-worker.js), and `/keys` lists only what is left.
+ * But a signed key verifies offline for ever, so until now a refunded buyer
+ * kept Pro on every machine that already held it: the Mac app, which is now
+ * sold rather than given, would be theirs for the price of a refund.
+ *
+ * Only a key filed under this very account can be judged by this account's
+ * list: one bought with another address, or typed in by hand from someone
+ * else's email, is not this account's to take away, and is left alone. So: the
+ * key's own email is the signed-in one, the Worker answered, and the key is not
+ * in what it said.
+ */
+export function heldKeyRefunded(
+  held: { valid: boolean; id: string | null; email: string | null },
+  accountEmail: string | null,
+  accountKeyIds: string[],
+): boolean {
+  if (!held.valid || !held.id || !held.email || !accountEmail) return false;
+  if (held.email.trim().toLowerCase() !== accountEmail.trim().toLowerCase()) return false;
+  return !accountKeyIds.includes(held.id);
+}
+
+async function pick(all: Array<{ id?: string; token: string; tier: LicenseTier }>): Promise<AccountLicenseResult> {
   if (!all.length) return { state: 'none' };
   const off = declined();
   const offered = all.filter((k) => !k.id || !off.includes(k.id));
