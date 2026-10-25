@@ -21,6 +21,7 @@ import type { GpuStepParams } from './solverTypes';
 import { PER_CELL, SPLAT_SCALE } from './particles';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
+import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 
 /** The grid the look was tuned on: `GRID_SIZE` in LiquidVisualizer. */
 export const LOGICAL_GRID = 192;
@@ -256,7 +257,13 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   // recorder: every material is already lit through this number.
   const dimmerNow = clamp01(s.dimmer ?? 1) * view.dimmerGain;
   pack.set('dimmer', dimmerNow);
-  pack.set('lampWarmth', clamp01(s.lampWarmth ?? 0));
+  // Up to LAMP_WARMTH_MAX (the halogen), not 1: the tint is the lamp's own colour, worked out here once, not in each pixel.
+  const warmth = Math.max(0, Math.min(LAMP_WARMTH_MAX, s.lampWarmth ?? 0));
+  const tint = lampTint(warmth);
+  pack.set('lampWarmth', warmth);
+  pack.set('lampTintR', tint[0]);
+  pack.set('lampTintG', tint[1]);
+  pack.set('lampTintB', tint[2]);
   /*
     The mixer (lib/mixer.ts): where each source sits in the stack, how much of
     it there is, and its grade.

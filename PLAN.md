@@ -8742,14 +8742,27 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   the pace of the carrier's viscosity (`dripFallSeconds`, 20 to 1); Lamp Warmth has a bulb whose filament
   is the blackbody colour at the temperature its grade matches, written in kelvin (`lampKelvin.ts`,
   6500 K at 0 down to 5100 K at 1). Held by `npm run panel`. Judging §78. Story in `docs/plan-shipped.md` §35.
-- **35e-2** What the readings showed, none changed here because each moves a look:
-  - **The lamp's grade tops out at 5100 K.** Read in kelvin, Lamp Warmth at full is a warm morning, not
-    the 3200 K of a quartz-halogen overhead projector, so the sealed-wheel look it was named for is only
-    about a third of the way there. A grade that reached 3200 K (a wider tint, red over blue 5.1, with
-    the vignette unchanged) would move every look that sets `lampWarmth` (Lamp Warmth 0.25 and 0.45 in
-    `presets.ts` and `lucky.ts`'s draws); the owner's call, with the bulb and its figure already in
-    place to show the new range. The tint is also applied to the picture, not to the lamp's own light
-    on the dye, so a real colour temperature would warm the dye's transmission too (`transmission`).
+- ~~**35e-2** The lamp's grade tops out at 5100 K.~~ Shipped (2026-10-25): Lamp Warmth reaches a quartz-halogen
+  projector's 3200 K. The slider is a temperature, even in mireds, and the plate multiplies by the blackbody's
+  own colour at it (`lampTint`, Planck and the CIE fit, worked out once on the CPU and handed in as
+  `lampTintR/G/B`), not a tint mixed in by the slider. It runs 0 to 3.75, and 0 to 1 is still 6500 K to 5100 K
+  (the new tint is the old grade to 1.5% a channel there), so saved looks, the presets and Lucky keep their
+  colour with no migration. The vignette is unchanged (full from 1 on). Held by `npm run panel`. Story in
+  `docs/plan-shipped.md` §35; judging §79.
+- **35e-3** What the readings left, none changed because each moves a look or waits on another step:
+  - **The lamp's colour is a multiply on the finished picture,** which is the lamp's spectrum times a white
+    surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
+    Planck spectrum entering `spectralThrough`'s six bands before the eye sums them, so a deep blue dye under
+    3200 K goes darker and more violet than a multiplied blue does (it already goes to a near black in the
+    lab picture). Named shortcut; replace it. The warm end is also about a third dimmer by design (a real lamp
+    gives a daylight-balanced eye that much less), and Exposure puts it back; if the owner wants the end held at
+    the same brightness, that is one normalisation in `lampTint`.
+  - **Velvet Underground (0.25) and Home Movie (0.45) keep their colour** to under 2% in blue, because their
+    numbers kept their meaning. Home Movie is the look an old projector's lamp is for: the owner's eye on
+    whether it should now go to 2 or 3 (judging §79 item 4); Lucky still draws 0 to 0.8, so it never reaches
+    the halogen.
+  - **Evolve wanders Lamp Warmth by a fifth of its travel,** which is now a fifth of 3.75: from a look at 0.25 up
+    to 1, from a look at 3 over the whole warm end. Pull it in (a per-dial span) if that reads as too much.
   - **The viscosity drip is slow motion at one factor.** The ratio between thin and thick is the
     physics (Stokes's terminal speed, the solver's 1 and 20 mm²/s); the thread behind a thick drop is
     drawn stretching at the drop's speed, not solved, and a real thread at this viscosity pinches off in

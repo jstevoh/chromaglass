@@ -42,6 +42,7 @@
 
 import { LEARNABLE_SETTINGS } from './midi.ts';
 import { MIX_CONTROLS } from './mixer.ts';
+import { LAMP_WARMTH_MAX } from './lampKelvin.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 import type { VisualizerSettings } from '../types.ts';
 
@@ -190,7 +191,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'sceneDeadzone', label: "Deadzone", min: 0, max: 1, section: 'room' },
   { key: 'sceneSmooth', label: "Smoothing", min: 0, max: 1, section: 'room' },
   { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 3, section: 'lamp' },
-  { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: 1, section: 'lamp' },
+  { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: LAMP_WARMTH_MAX, section: 'lamp' },
   // Film stock (F1): what the whole show is photographed on, as against the
   // `film*` settings, which drive the projector that plays video through dye.
   { key: 'stock', label: "Film Stock", min: 0, max: 1, section: 'stock' },

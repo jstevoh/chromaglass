@@ -77,7 +77,7 @@ export const CONTROL_HELP: Record<string, string> = {
   secondLamp: 'A second, cooler lamp from the other side, so two lights play across every bubble and edge.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
   iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
-  lampWarmth: 'A warm tint with a soft vignette. The bulb reads its colour in kelvin, from a neutral 6500 K toward the warm end.',
+  lampWarmth: 'The lamp\'s colour: neutral 6500 K down to a 3200 K halogen, with a soft vignette. Warmer is dimmer; lift Exposure.',
   transmission: 'How light passes through the dye: thin pale, thick deep. Zero is a flat glow.',
   exposure: 'Plate-wide exposure. Dye thinner than the plate\'s own floor reads as bare glass.',
   lumia: 'Slow folded sheets of light, in the manner of Wilfred\'s lumia, with no beat and no dye.',
