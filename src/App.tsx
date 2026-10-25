@@ -5909,6 +5909,8 @@ export default function App() {
             onLampGround={(v) => updateSettings({ lampGround: v })}
             twoProjectors={settings.twoProjectors ?? 0}
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
+            projectorFocus={settings.projectorFocus ?? 0.5}
+            onProjectorFocus={(v) => updateSettings({ projectorFocus: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
             slosh={settings.slosh ?? 0}

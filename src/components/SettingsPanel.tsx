@@ -1081,6 +1081,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="edgeRelief"
         />
         <Slider
+          label="Projector Focus"
+          value={settings.projectorFocus ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ projectorFocus: v })}
+          settingKey="projectorFocus"
+        />
+        <Slider
           label="Lacing"
           value={settings.lacing ?? 0}
           min={0}
