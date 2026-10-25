@@ -556,9 +556,17 @@ try {
     `label "${sysLabel}", picker intercepted ${asksAfter - asksBefore} time(s), audio port ${audioPort}, ear reads ${soundHeard.reads}, volume ${Math.round(soundHeard.volume)}`,
   );
 
+  // The ladder's governor exists once the renderer is up; the line below
+  // fails a show without one, so wait for it to be there before the toggle
+  // rather than read it in the instant the System audio step has just left
+  // (the first packed run on CI found none, 96975ef).
+  const governorUp = await page
+    .waitForFunction(() => Boolean(window.chromaglassGovernor?.()), null, { timeout: 15000 })
+    .then(() => true, () => false);
   await page.locator('[data-testid=sound-ambient-toggle]').click();
   const ambOn = await page.evaluate(async () => {
     const g = window.chromaglassGovernor?.();
+    const hadGovernor = Boolean(g);
     const dbg0 = window.chromaglassDebug?.();
     const dg0 = dbg0?.drawGate;
     const frames0 = dbg0?.frames ?? 0;
@@ -587,6 +595,7 @@ try {
     const skipped = (dg1?.skipped?.frame ?? 0) + (dg1?.skipped?.ask ?? 0) - skipped0;
     return {
       ambient: Boolean(cs1?.ambient),
+      hadGovernor,
       stepRate: g?.stepRate ?? null,
       rungIndex: g?.rungIndex ?? null,
       start: g?.start ?? null,
@@ -624,7 +633,7 @@ try {
   check(
     'ambient TV: caps solver at 30 steps/s, display at 60 Hz, and holds the opening rung',
     ambientWorks,
-    `on: ambient=${ambOn.ambient}, stepRate=${ambOn.stepRate}, rung=${ambOn.rungIndex}/${ambOn.start}, drawn=${ambOn.drawn}/s (frames=${ambOn.frames}/s, skipped=${ambOn.skipped} of 120 Hz offers), menu=${mainAmb}; off: ambient=${ambOff.ambient}, stepRate=${ambOff.stepRate}`,
+    `governor up before the toggle ${governorUp}, in the page ${ambOn.hadGovernor}; on: ambient=${ambOn.ambient}, stepRate=${ambOn.stepRate}, rung=${ambOn.rungIndex}/${ambOn.start}, drawn=${ambOn.drawn}/s (frames=${ambOn.frames}/s, skipped=${ambOn.skipped} of 120 Hz offers), menu=${mainAmb}; off: ambient=${ambOff.ambient}, stepRate=${ambOff.stepRate}`,
   );
 
   // ── network off, the whole run ────────────────────────────────────
