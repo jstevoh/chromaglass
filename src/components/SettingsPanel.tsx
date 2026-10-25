@@ -13,7 +13,7 @@ import { plateAreas, areaFamily, areaDye } from '../lib/plateAreas';
 import { PRESET_CONTRACTS } from '../presetPlate';
 import { PALETTE } from '../constants';
 import { AreaPicker } from './phone/AreaPicker';
-import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
+import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches, groupOf } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
 import { MixerPanel } from './MixerPanel';
@@ -590,7 +590,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         and the sheet opened on the microphone's sensitivity. It opens here now.
       */}
       {keep('master') && (
-      <section id="settings-master" className={`${CARD} ${shown('master') ? GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="master">
+      <section id="settings-master" className={`${CARD} ${shown('master') ? GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('master')} data-section="master">
         <h3 className={TITLE}>
           <Lightbulb size={12} /> Master
         </h3>
@@ -663,7 +663,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         slider here to read.
       */}
       {keep('mixer') && (
-      <section id="settings-mixer" className={`${CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="mixer">
+      <section id="settings-mixer" className={`${CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mixer')} data-section="mixer">
         <h3 className={TITLE}>
           <SlidersVertical size={12} /> Mixer
         </h3>
@@ -683,7 +683,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Sound Section */}
       {keep('audio-input') && (
-      <section id="settings-audio-input" className={`${CARD} ${shown('audio-input') ? GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-input">
+      <section id="settings-audio-input" className={`${CARD} ${shown('audio-input') ? GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('audio-input')} data-section="audio-input">
         <h3 className={TITLE}>
           <Activity size={12} /> Audio Input
         </h3>
@@ -989,7 +989,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Light Show Look Section */}
       {keep('look') && (
-      <section id="settings-look" className={`${CARD} ${shown('look') ? GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="look">
+      <section id="settings-look" className={`${CARD} ${shown('look') ? GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('look')} data-section="look">
         <h3 className={TITLE}>
           <Palette size={12} /> Light Show Look
         </h3>
@@ -1210,7 +1210,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Show Section */}
       {keep('show') && (
-      <section id="settings-show" className={`${CARD} ${shown('show') ? GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="show">
+      <section id="settings-show" className={`${CARD} ${shown('show') ? GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('show')} data-section="show">
         <h3 className={TITLE}>
           <Clapperboard size={12} /> Show
         </h3>
@@ -1338,7 +1338,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Camera Section */}
       {keep('camera') && (
-      <section id="settings-camera" className={`${CARD} ${shown('camera') ? GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="camera">
+      <section id="settings-camera" className={`${CARD} ${shown('camera') ? GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('camera')} data-section="camera">
         <h3 className={TITLE}>
           <Aperture size={12} /> Lens
         </h3>
@@ -1421,7 +1421,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Film stock — what the whole show is photographed on (F1). */}
       {keep('stock') && (
-      <section id="settings-stock" className={`${CARD} ${shown('stock') ? GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="look" data-section="stock">
+      <section id="settings-stock" className={`${CARD} ${shown('stock') ? GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('stock')} data-section="stock">
         <h3 className={TITLE}>
           <Film size={12} /> Film Stock
         </h3>
@@ -1511,7 +1511,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         each wedge, together, and all three on the MIDI list.
       */}
       {keep('kaleidoscope') && (
-      <section id="settings-kaleidoscope" className={`${CARD} ${shown('kaleidoscope') ? GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="kaleidoscope">
+      <section id="settings-kaleidoscope" className={`${CARD} ${shown('kaleidoscope') ? GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('kaleidoscope')} data-section="kaleidoscope">
         <h3 className={TITLE}>
           <Aperture size={12} /> Kaleidoscope
         </h3>
@@ -1565,7 +1565,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Lamp & Light Section */}
       {keep('lamp') && (
-      <section id="settings-lamp" className={`${CARD} ${shown('lamp') ? GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="lamp">
+      <section id="settings-lamp" className={`${CARD} ${shown('lamp') ? GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('lamp')} data-section="lamp">
         <h3 className={TITLE}>
           <Lightbulb size={12} /> Lamp &amp; Light
         </h3>
@@ -1756,7 +1756,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* The Room Section */}
       {keep('room') && (
-      <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
+      <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('room')} data-section="room">
         {/*
           Two cameras, two jobs, and the owner could not tell them apart
           (2026-10-24): "what the room control is vs. showing video on the
@@ -1903,7 +1903,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         dish or another window, how it shows, and what it does to the liquid.
       */}
       {keep('film') && (
-      <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
+      <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('film')} data-section="film">
         <h3 className={TITLE}>
           <Video size={12} /> Film
         </h3>
@@ -2125,7 +2125,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         over it are one place now, after the sources it reads.
       */}
       {keep('patches') && (
-      <section id="settings-patches" className={`${CARD} ${shown('patches') ? GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="patches">
+      <section id="settings-patches" className={`${CARD} ${shown('patches') ? GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('patches')} data-section="patches">
         <h3 className={TITLE}>
           <Cable size={12} /> Patches
         </h3>
@@ -2436,7 +2436,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         the picture) is still the panel, one click away.
       */}
       {keep('midi') && (
-      <section id="settings-midi" className={`${CARD} ${shown('midi') ? GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="midi">
+      <section id="settings-midi" className={`${CARD} ${shown('midi') ? GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('midi')} data-section="midi">
         <h3 className={TITLE}>
           <Sliders size={12} /> Controller
         </h3>
@@ -2590,7 +2590,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         is an input of its own.
       */}
       {keep('projectors') && (
-      <section id="settings-projectors" className={`${CARD} ${shown('projectors') ? GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="projectors">
+      <section id="settings-projectors" className={`${CARD} ${shown('projectors') ? GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('projectors')} data-section="projectors">
         <h3 className={TITLE}>
           <Projector size={12} /> Wall
         </h3>
@@ -2623,7 +2623,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Mapping Section */}
       {keep('mapping') && (
-      <section id="settings-mapping" className={`${CARD} ${shown('mapping') ? GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="mapping">
+      <section id="settings-mapping" className={`${CARD} ${shown('mapping') ? GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mapping')} data-section="mapping">
         <h3 className={TITLE}>
           <Shapes size={12} /> Mapping
         </h3>
@@ -2642,7 +2642,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         This one sits over the top and stays put for three hours.
       */}
       {keep('mark') && (
-      <section id="settings-mark" className={`${CARD} ${shown('mark') ? GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="stage" data-section="mark">
+      <section id="settings-mark" className={`${CARD} ${shown('mark') ? GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mark')} data-section="mark">
         <h3 className={TITLE}>
           <Image size={12} /> Logo &amp; Titles
         </h3>
@@ -2732,7 +2732,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       )}
 
       {keep('simulation') && (
-      <section id="settings-simulation" className={`${CARD} ${shown('simulation') ? GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="simulation">
+      <section id="settings-simulation" className={`${CARD} ${shown('simulation') ? GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('simulation')} data-section="simulation">
         <h3 className={TITLE}>
           <Zap size={12} /> Simulation
         </h3>
@@ -2842,7 +2842,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Macro Closeup Section */}
       {keep('macro') && (
-      <section id="settings-macro" className={`${CARD} ${shown('macro') ? GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="macro">
+      <section id="settings-macro" className={`${CARD} ${shown('macro') ? GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('macro')} data-section="macro">
         <h3 className={TITLE}>
           <Microscope size={12} /> Macro Closeup
         </h3>
@@ -3006,7 +3006,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Squish Plate Section */}
       {keep('squish') && (
-      <section id="settings-squish" className={`${CARD} ${shown('squish') ? GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="squish">
+      <section id="settings-squish" className={`${CARD} ${shown('squish') ? GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('squish')} data-section="squish">
         <h3 className={TITLE}>
           <Sliders size={12} /> Squish Plate
         </h3>
@@ -3411,7 +3411,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Manual Interaction Section */}
       {keep('interaction') && (
-      <section id="settings-interaction" className={`${CARD} ${shown('interaction') ? GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="interaction">
+      <section id="settings-interaction" className={`${CARD} ${shown('interaction') ? GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('interaction')} data-section="interaction">
         <h3 className={TITLE}>
           <Wind size={12} /> Manual Interaction
         </h3>
@@ -3454,7 +3454,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Liquids anyone can make, load from a file and save to one (lib/liquidFile.ts). */}
       {keep('liquids') && (
-      <section id="settings-liquids" className={`${CARD} ${shown('liquids') ? GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="liquids">
+      <section id="settings-liquids" className={`${CARD} ${shown('liquids') ? GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('liquids')} data-section="liquids">
         <h3 className={TITLE}>
           <FlaskConical size={12} /> Liquids
         </h3>
@@ -3464,7 +3464,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Fluid Physics Section */}
       {keep('physics') && (
-      <section id="settings-physics" className={`${CARD} ${shown('physics') ? GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="physics">
+      <section id="settings-physics" className={`${CARD} ${shown('physics') ? GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('physics')} data-section="physics">
         <h3 className={TITLE}>
           <Zap size={12} /> Fluid Physics
         </h3>
@@ -3549,7 +3549,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Automation Section */}
       {keep('automation') && (
-      <section id="settings-automation" className={`${CARD} ${shown('automation') ? GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="automation">
+      <section id="settings-automation" className={`${CARD} ${shown('automation') ? GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('automation')} data-section="automation">
         <h3 className={TITLE}>
           <Hourglass size={12} /> Automation
         </h3>
@@ -3615,7 +3615,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Mixer Section */}
       {keep('layers') && (
-      <section id="settings-layers" className={`${CARD} ${shown('layers') ? GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="layers">
+      <section id="settings-layers" className={`${CARD} ${shown('layers') ? GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('layers')} data-section="layers">
         <h3 className={TITLE}>
           <Layers size={12} /> Plates &amp; LED
         </h3>
@@ -3987,7 +3987,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           )}
           {railGroups.map(group => (
             <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
-              <div className="hidden px-3 pb-1.5 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:block" title={group.hint}>
+              {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
+              <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:pb-1.5 sm:pt-4" title={group.hint} data-testid={`rail-heading-${group.id}`}>
                 {group.name}
               </div>
               <div className="flex gap-0.5 sm:flex-col">

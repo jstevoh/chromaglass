@@ -2787,11 +2787,11 @@ network):
   offers the download in its menu and the profile sheet. *Measure:* `npm run updates`
   (69/69, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
-  Judged on the owner's Mac: `docs/judging.md` §72.
+  Judged on the owner's Mac: `docs/judging.md` §74.
   - **13-update-signed** *(after 13.1-sign)*: with the Developer ID secrets in, the
     same code downloads in the background and installs on quit. Nothing to build;
     the first signed release is judged by installing the one before it and seeing it
-    replace itself (§72's last step).
+    replace itself (§74's last step).
   - *Trap:* the updater reads the repository's **newest** release. Any other kind of
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
     with `--latest=false`, or every installed app looks for `latest-mac.yml` in it
@@ -7844,7 +7844,13 @@ the code's entry points, the checks to add and the scenes to match, in
     pass to be worth half its measured gap (`0.13R` of `0.27R` of lead; `13` of `25.9` half-full
     cells), so a stand-in that speeds the drop up cannot pass for the momentum pass; it also reads
     from the solver that the drop was whole (60 cells) and carried (centroid over `0.40` from `0.36`,
-    `0.42` measured) when the window opened. Metal is unmeasured until the first Mac run. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
+    `0.42` measured) when the window opened. On Metal (`WebGPU (macOS) · fifth`, `main` runs
+    `40154167142`, `40140795675` and `40123398910`, identical across all three and matching #373's
+    run `39280236231`), the window opens at step 60 with `84` half-full cells and centroid `0.422`;
+    the seven readings at steps 60..120 average a lead of `2.02R` (`1.71..2.35R`) and `61.4`
+    half-full cells (`84 → 40`, peak `0.96 → 0.65`) as given, `2.29R` (`1.85..2.74R`, `+0.27R` over
+    `on`) and `62.9` cells (`82 → 34`) with `phaseMomentum` off, and `2.06R` (`1.71..2.45R`) and
+    `35.7` cells (`76 → 0`, `-25.7` from `on`) with `phaseCompress` off. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
     re-read against the whole drag.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
@@ -8469,10 +8475,18 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The hand-built pick-one grids in Settings (On a New Song, Render Style, Film Stock,
     folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
     draw them once, once it takes a title per option and a number id.
-- **35b** Regroup the panels into seven: Play, Pour, Feed, Motion, Chemistry, Look, Stage
-  (phase 2). The owner chose all three phases, in order (2026-10-24). The four group vocabularies
-  to reconcile: `data-group` in SettingsPanel, `lib/settingsMap.ts`, the panel browser,
-  and the phone rail, whose headings are hidden.
+- ~~**35b** Regroup the panels into seven.~~ Shipped: Play, Pour, Feed, Motion, Chemistry, Look,
+  Stage, one vocabulary for the rail, the panel browser, the sections' `data-group`, the desk's own
+  panels and the phone's Settings strip (now with its headings drawn). Story in
+  `docs/plan-shipped.md` §35.
+- **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
+  section (35c's work) or a different surface:
+  - Chemistry has one member, Squish Plate, until 35c splits it (Plate Rock to Motion, the
+    chemistry and ferrofluid stay): Lamp & Light's chemistry and Turing Print belong beside it.
+  - Plates & LED holds the platform's spin, which is Motion's, but Stage is also the gate that
+    keeps a panel out of Build and Gig (`isStagePanel`); its spin controls move with 35c.
+  - The pin picker (`PickList`) and the command palette still list by section, not by the seven
+    groups; the same headings would find a setting faster there.
 - **35c** One home per setting (phase 3): Flash Limit, Blackout, MIDI on, the audio
   source and record/replay each appear in two places; Drive/Impact pairs sit in different
   sections; Squish Plate splits up; the sequencer is behind Songs. After 35b.

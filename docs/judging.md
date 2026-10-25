@@ -1646,7 +1646,7 @@ On the laptop in a dark room, and on the phone, with no reading of labels:
 - **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
   tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
 
-## 71. A look saved in Chrome is in the Mac app (PLAN 23.18)
+## 72. A look saved in Chrome is in the Mac app (PLAN 23.18)
 
 Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
 
@@ -1664,8 +1664,23 @@ Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to th
 Bad: a look that comes back after being deleted, a set list replaced by an empty one, or the
 plate stuttering when a sync lands mid-show.
 
+## 73. The seven groups (PLAN 35b)
 
-## 72. The Mac app downloads, and finds its own updates (PLAN 13-update)
+On the desk, press ⌘P (the panel browser) in Load-in, then in Build, and open Settings (⌘K, All settings…):
+
+1. The panel browser's headings are Play, Pour, Feed, Motion, Chemistry, Look, Stage, in that order,
+   and the desk's own panels (Cues, Rides, Recipe, Score under Play; Bottles, Dyes, Tools under Pour)
+   sit under the same headings as the settings sections. In Build and Gig there is no Stage heading.
+2. Settings' rail shows the same seven. Each section is where you would look for it: Film under Feed,
+   Kaleidoscope under Motion, Lamp & Light under Look.
+3. On the phone, More → Settings: the strip names the same seven above their tabs, and every tab still
+   takes a tap.
+
+Bad: a section where you would not look first (tell me which and where it should be), a heading that
+cuts a name short on the phone, or a saved layout whose panels came back in a different place.
+
+
+## 74. The Mac app downloads, and finds its own updates (PLAN 13-update)
 
 On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
 Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
