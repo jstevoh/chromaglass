@@ -5149,4 +5149,24 @@ guide names the seven. `desklayout` holds the list, every panel's group, the mar
 `data-group` and the Stage panels to their names; `phone` reads the seven headings drawn at phone
 width.
 
-Squish Plate keeps its name and its 45 controls in Chemistry: splitting it is 35c.
+Squish Plate keeps its name and its 45 controls in Chemistry: splitting it is 35c (done in 35c-1, below).
+
+### 35c-1. Squish Plate in five (shipped 2026-10-25)
+
+The owner's complaint was that the plate's panel held forty-five controls under one name, and the
+desk made it worse: thirty of its pins were filed under Fluid Physics while the sheet drew them under
+Squish Plate, so Fluid Physics' knobs on the deck were the glass's, the oil's and the magnet's.
+
+What changed. Chemistry: Squish Plate keeps the glass (Plate Pressure, Plate Shape, Depth Drag, Thin
+Gap, Thickness, Press Lift, Glass Smear, Rain Drip, Viscosity); Oil & Soap is Oil Tension, Oil
+Bodies, Soap Bursts, Clear Film and Polarity; Ferrofluid is the phase, the six magnet controls,
+Labyrinth and Maze Detail; Reactions is pH Indicator, BZ Reaction, Liesegang Rings, and Lamp &
+Light's Chemistry, its two pattern controls and the Turing print's three. Motion: Tilt & Rock is
+Gravity, Tilt Direction, Slosh and Plate Rock (from Light Show Look). Swirl, Dye Weight and Heat
+Spread went to Fluid Physics; Layer Depth and Spectral Mix to Lamp & Light, beside Light Through Dye.
+The ids `squish`, `physics` and `lamp` stay and no control's key changed, so saved layouts, pins,
+MIDI maps and deep links open as before; the four new ids are in `SETTINGS_SECTIONS`. `panel` now
+asks of seven sections that the sliders the markup draws are exactly the ones the registry files
+under it, and that the lamp keeps the optics and Reactions the Turing pattern. A saved layout's
+Fluid Physics panel now shows only the flow (about a third of the knobs it did).
+

@@ -257,7 +257,7 @@ drift with time as the rainbow's hue did.
 
 ## 12. Ferro Paint's colour pushed by the black
 
-Pushes Dye (Squish Plate, under the ferrofluid) is on full in Ferro Paint:
+Pushes Dye (Ferrofluid, under Phase Edge) is on full in Ferro Paint:
 where the black grows the colour leaves, and it packs as a bright line along
 the black's edges instead of sitting still under it. Seen only in the lab,
 on software WebGPU at 256². Two things to look at: whether the packed edge
@@ -987,7 +987,7 @@ in your hand and nothing on the plate.
 
 ## 34. A clear film that tears into lace (Clear Film, PLAN 20b)
 
-Settings → Squish Plate → Physics & chemistry → **Clear Film** (also MIDI, the desks,
+Settings → Oil & Soap → **Clear Film** (also MIDI, the desks,
 the remote and the phone's Dye sheet). 0 in every look. Up, a clear oil film is laid
 over the plate, that thick (1 is most of the gap), and it tears open by itself: thin
 parts and the dish's specks of dust first, and wherever a drop of Alcohol or Soap
@@ -1678,3 +1678,21 @@ On the desk, press ⌘P (the panel browser) in Load-in, then in Build, and open 
 
 Bad: a section where you would not look first (tell me which and where it should be), a heading that
 cuts a name short on the phone, or a saved layout whose panels came back in a different place.
+
+## 74. Squish Plate in five (PLAN 35c)
+
+On the desk, open Settings (⌘K, All settings…) and look under Chemistry and Motion:
+
+1. Chemistry now lists Squish Plate, Oil & Soap, Ferrofluid and Reactions; Motion lists Tilt & Rock
+   beside Kaleidoscope, Automation and Fluid Physics. Squish Plate holds only the glass (pressure,
+   shape, gap, smear, rain, viscosity).
+2. Every control you used to find under Squish Plate is in one of them: Oil Tension, Oil Bodies,
+   Soap Bursts, Clear Film and Polarity in Oil & Soap; the ferrofluid and the magnet in Ferrofluid;
+   pH, BZ, Liesegang and the Turing pattern (it was in Lamp & Light) in Reactions; Gravity, Tilt
+   Direction, Slosh and Plate Rock in Tilt & Rock.
+3. The same on the phone: More → Settings, the Chemistry and Motion tabs. A saved layout that had
+   the Squish Plate or Fluid Physics panel opens with them where they were; Fluid Physics now holds
+   only the flow (its knobs are fewer).
+
+Bad: a control you went looking for in the old place and could not find by the search box, or a
+section with so few controls that it should have been joined to another.

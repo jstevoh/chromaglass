@@ -123,7 +123,8 @@ const BARS = {
 const SETTINGS_SECTIONS = [['master', 'Master'], ['mixer', 'Mixer'], ['audio-input', 'Sound'], ['room', 'Motion camera'],
   ['film', 'Film'], ['patches', 'Patches'], ['midi', 'Controller'], ['look', 'Light Show Look'], ['show', 'Show'],
   ['kaleidoscope', 'Kaleidoscope'], ['lamp', 'Lamp & Light'], ['stock', 'Film Stock'], ['camera', 'Lens'],
-  ['macro', 'Macro Closeup'], ['automation', 'Automation'], ['squish', 'Squish Plate'], ['physics', 'Fluid Physics'],
+  ['macro', 'Macro Closeup'], ['automation', 'Automation'], ['squish', 'Squish Plate'], ['oil', 'Oil & Soap'], ['ferro', 'Ferrofluid'],
+  ['reactions', 'Reactions'], ['tilt', 'Tilt & Rock'], ['physics', 'Fluid Physics'],
   ['liquids', 'Liquids'], ['interaction', 'Manual Interaction'], ['projectors', 'Wall'], ['mapping', 'Mapping'],
   ['mark', 'Logo & Titles'], ['layers', 'Plates & LED'], ['simulation', 'Simulation']];
 
