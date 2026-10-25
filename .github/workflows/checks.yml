@@ -675,6 +675,15 @@ jobs:
       - name: Sign-in
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run signin
+      # One address (PLAN.md 23.16, scripts/onehost.mjs): chromaglass.web.app and
+      # chromaglass.firebaseapp.com forward to chromaglass.art with what they had
+      # saved, written before the app's module runs; Firebase's /__/ pages, an
+      # offline or internet-less cached show and a cast window with an opener
+      # stay; a carried fragment from anywhere else writes nothing. index.html
+      # served at the real names through request routing, under a minute.
+      - name: One address
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run onehost
       # Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):
       # two signed-in pages on the same account (a show and a phone) list and
       # join the show in one tap while keeping the QR code, a third page on
