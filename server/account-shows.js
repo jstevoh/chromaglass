@@ -9,6 +9,8 @@
  * control traffic stays on the local network WebSocket.
  */
 
+import { verifyFirebaseToken } from './firebase-token.js';
+
 export const ACCOUNT_SHOWS_PATH = '/account-shows';
 export const SHOW_TTL_MS = 90_000;
 const MAX_SHOWS_PER_ACCOUNT = 16;
@@ -22,52 +24,19 @@ const CORS_HEADERS = {
   'Cache-Control': 'no-store',
 };
 
-function decodeBase64Url(input) {
-  const padded = String(input)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/')
-    .padEnd(Math.ceil(String(input).length / 4) * 4, '=');
-  return Buffer.from(padded, 'base64').toString('utf8');
-}
-
 /**
- * Extract and validate the account identity (`uid`, `aud`, `email`) from a
- * Firebase Auth ID token (production or Firebase Auth Emulator).
+ * The account behind an `Authorization: Bearer <idToken>` header, or null. The
+ * token's signature, project and times are checked in firebase-token.js (PLAN
+ * 23.14-verify): this used to read the payload and trust it, so anyone on the
+ * venue's Wi-Fi could name another account's uid and be handed its show keys.
  */
-export function verifyAccountToken(authHeader, now = Date.now()) {
+export async function verifyAccountToken(authHeader, env = process.env, now = Date.now()) {
   if (typeof authHeader !== 'string') return null;
   const match = /^Bearer\s+(\S+)$/i.exec(authHeader.trim());
   if (!match) return null;
-  const parts = match[1].split('.');
-  if (parts.length < 2 || parts.length > 3) return null;
-  let header;
-  let payload;
-  try {
-    header = JSON.parse(decodeBase64Url(parts[0]));
-    payload = JSON.parse(decodeBase64Url(parts[1]));
-  } catch {
-    return null;
-  }
-  if (!header || typeof header !== 'object' || !payload || typeof payload !== 'object') {
-    return null;
-  }
-  const uid = typeof payload.sub === 'string' && payload.sub.trim()
-    ? payload.sub.trim()
-    : typeof payload.user_id === 'string' && payload.user_id.trim()
-      ? payload.user_id.trim()
-      : null;
-  const aud = typeof payload.aud === 'string' && payload.aud.trim() ? payload.aud.trim() : null;
-  const iss = typeof payload.iss === 'string' ? payload.iss : '';
-  const exp = Number(payload.exp);
-  if (!uid || uid.length > 128 || !aud) return null;
-  if (!iss.includes('securetoken') || !iss.endsWith('/' + aud)) return null;
-  if (!Number.isFinite(exp) || exp * 1000 <= now - 30_000) return null;
-  return {
-    accountKey: `${aud}:${uid}`,
-    uid,
-    aud,
-    email: typeof payload.email === 'string' ? payload.email : null,
-  };
+  const who = await verifyFirebaseToken(match[1], env, now);
+  if (!who) return null;
+  return { accountKey: `${who.aud}:${who.uid}`, uid: who.uid, aud: who.aud, email: who.email };
 }
 
 function validRelayOrigin(raw) {
@@ -184,7 +153,7 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-export function createAccountShowsHandler(store = createAccountShowsStore()) {
+export function createAccountShowsHandler(store = createAccountShowsStore(), env = process.env) {
   return async function handleAccountShows(req, res, url) {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, CORS_HEADERS);
@@ -192,7 +161,7 @@ export function createAccountShowsHandler(store = createAccountShowsStore()) {
       return;
     }
 
-    const auth = verifyAccountToken(req.headers.authorization ?? '');
+    const auth = await verifyAccountToken(req.headers.authorization ?? '', env);
     if (!auth) {
       sendJson(res, 401, { error: 'unauthorised' });
       return;

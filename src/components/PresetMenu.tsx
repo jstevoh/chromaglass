@@ -5,6 +5,7 @@ import { PRESETS, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
 import type { UserPreset } from '../lib/userPresets';
 import { songLabel, type SongRef } from '../lib/songRef';
+import { LIT } from './ui';
 
 /**
  * The presets, one click from the top of the screen. Grouped the way the
@@ -159,9 +160,10 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
               return (
                 <div key={p.id} className={`flex items-center gap-1 rounded-lg ${active ? 'bg-white/15' : 'hover:bg-white/10'}`}>
                   <button
+                    aria-current={active ? 'true' : undefined}
                     role="menuitem"
                     onClick={() => { onApplyUserPreset?.(p); onClose(); }}
-                    className={`flex-1 min-w-0 flex items-center justify-between gap-2 px-2.5 py-1.5 text-left ${active ? 'text-white' : 'text-white/75'}`}
+                    className={`flex-1 min-w-0 flex items-center justify-between gap-2 px-2.5 py-1.5 text-left ${active ? LIT : 'text-white/75'}`}
                     title={p.song ? `Made for ${songLabel(p.song)}` : (p.description ?? 'A saved palette')}
                     data-testid={`preset-menu-${p.id}`}
                   >
@@ -188,12 +190,13 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
               return (
                 <div key={p.id} className={`flex items-stretch rounded-lg transition-colors ${active ? 'bg-white/15' : 'hover:bg-white/10'}`}>
                   <button
+                    aria-current={active ? 'true' : undefined}
                     role="menuitem"
                     // Cue where the desk can, load where it cannot. A click
                     // used to put the look on the wall that instant, through
                     // the path that clears the plate first.
                     onClick={() => { if (onCuePreset) onCuePreset(p.id); else onApplyPreset(p.id, p.settings); onClose(); }}
-                    className={`flex flex-1 items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left ${active ? 'text-white' : 'text-white/75'}`}
+                    className={`flex flex-1 items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left ${active ? LIT : 'text-white/75'}`}
                     title={onCuePreset ? `Cue ${p.name} — ${p.description}` : p.description}
                     data-testid={`preset-menu-${p.id}`}
                   >

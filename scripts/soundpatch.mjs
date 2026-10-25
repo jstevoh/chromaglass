@@ -113,12 +113,20 @@ for (const p of PRESETS) {
       continue;
     }
     const travel = SETTING_TRAVEL[m.setting];
-    // The control at the middle of its travel, so a patch either way has room to move it.
+    // The control at the middle of its travel, so a patch either way has room to move it,
+    // and at the look's own setting, where it must cross the solver's 0.1 airVelocity gate
+    // and move the control by at least 3% of its travel (milk-marble's 0.02 moved 1.6% to 0.016).
     const mid = travel ? (travel.min + travel.max) / 2 : 0.5;
     const base = { ...DEFAULT_SETTINGS, ...p.settings, [m.setting]: mid, sceneMappings: [m], layerCount: 1 };
     const bay = new PatchBay(base, 1);
     bay.fold(base, ctx, 1, 0);
-    if (!travel || bay.global[m.setting] === mid) dead.push(`${p.id} ${m.source ?? 'room'}:${m.feature} on ${m.setting}`);
+    const own = { ...DEFAULT_SETTINGS, ...p.settings, sceneMappings: [m], layerCount: 1 };
+    const ownBay = new PatchBay(own, 1);
+    ownBay.fold(own, ctx, 1, 0);
+    const span = travel ? travel.max - travel.min : 1;
+    const gated = m.setting === 'airVelocity' && ownBay.global.airVelocity <= 0.1;
+    if (!travel || bay.global[m.setting] === mid || Math.abs(ownBay.global[m.setting] - own[m.setting]) < 0.03 * span || gated)
+      dead.push(`${p.id} ${m.source ?? 'room'}:${m.feature} on ${m.setting}`);
   }
 }
 check(`every patch on the shelf moves its control when its source hears something (${patches} patches)`,
@@ -134,15 +142,39 @@ for (const p of PRESETS) for (const m of p.settings.sceneMappings ?? []) {
   const src = m.source ?? 'room';
   if (!FAST.has(src) && !NOT_SOUND.has(src)) slow.push(`${p.id} ${src}:${m.feature}`);
 }
-const PATTERN = ['cyberpunk', 'aurora-borealis', 'lava-lamp'];
+const PATTERN = ['cyberpunk', 'aurora-borealis', 'lava-lamp', 'poster-1969'];
 const pattern = PATTERN.map((id) => {
   const ms = PRESETS.find((p) => p.id === id)?.settings.sceneMappings ?? [];
   return { id, n: ms.length, ok: ms.length >= 2 && ms.length <= 3 && ms.every((m) => FAST.has(m.source) && !FRAME_MOTION.has(m.setting)),
     says: ms.map((m) => `${m.source}:${m.feature} on ${m.setting} ${m.depth}`).join(', ') };
 });
-check('every sound patch on the shelf reads what is heard at once, and the three pattern looks have two or three each, into the liquid',
+check('every sound patch on the shelf reads what is heard at once, and the pattern looks have two or three each, into the liquid',
   slow.length === 0 && pattern.every((x) => x.ok),
   `${slow.length ? `not heard at once: ${slow.join('; ')}; ` : ''}${pattern.map((x) => `${x.id}: ${x.says || 'none'}`).join(' | ')}`);
+
+const REBUILT_25H = new Set(['velvet-underground', 'jellyfish-bloom', 'bass-drop']);
+const FAST_28I = new Set(['hits', 'bands']);
+const isFastReading = (m) =>
+  (m.source === 'hits' && HIT_FEATURES.includes(m.feature)) ||
+  (m.source === 'bands' && SOURCE_NAMES.includes(m.feature));
+const missing28i = [];
+for (const p of PRESETS) {
+  if (REBUILT_25H.has(p.id)) continue;
+  const areas = plateAreas(p.id);
+  const sm = (p.settings.sceneMappings ?? []).filter((m) => !NOT_SOUND.has(m.source ?? 'room'));
+  const platePatches = sm.filter((m) => !isAreaCord(m) && isFastReading(m) && !FRAME_MOTION.has(m.setting));
+  const areaCords = sm.filter((m) => isAreaCord(m) && Boolean(areas?.[m.area]) && isFastReading(m));
+  const total = platePatches.length + areaCords.length;
+  if (total < 2 || total > 3) missing28i.push(`${p.id}: ${platePatches.length} plate patches + ${areaCords.length} area cords`);
+  if (areas && areaCords.length >= 2 && platePatches.length > 0)
+    missing28i.push(`${p.id}: area look carries ${platePatches.length} redundant plate-wide patch(es)`);
+  for (const m of sm) {
+    if (!FAST_28I.has(m.source ?? '') || !isFastReading(m)) missing28i.push(`${p.id}: ${m.source}:${m.feature} is not hits or bands`);
+    if (FRAME_MOTION.has(m.setting)) missing28i.push(`${p.id}: ${m.setting} moves the frame`);
+  }
+}
+check('every look on the shelf carries 2–3 fast liquid patches or area cords from hits and bands only (PLAN 28i-3b)',
+  missing28i.length === 0, missing28i.join('; ') || `${PRESETS.length - REBUILT_25H.size} looks checked (+ 3 from 25h)`);
 
 // ── 3. The hits ─────────────────────────────────────────────────────────────
 

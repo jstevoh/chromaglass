@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowUp, ArrowDown, ChevronDown, RotateCcw } from 'lucide-react';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
-import { Slider } from './ui';
+import { Slider, LIT } from './ui';
 import {
   MIX_SOURCE_INFO, MIX_GRADES, MIX_CONTROLS, MIX_LAMP, MIX_BLENDS, MIX_BLEND_LABEL, OWN_BLEND,
   blendKey, fadeKey, gradeKey, gradeLabel, mixStack, moveInMix, MIX_FADE_KEYS,
@@ -123,7 +123,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
               title={b === 'own' ? `Its own way in: ${ownIs(id)}` : BLEND_HINT[b]}
               data-testid={`${testId}-${id}-blend-${b}`}
               className={`min-w-0 rounded-md border text-[12px] tracking-tight transition-colors ${touch ? 'h-12' : 'h-7'} ${
-                now === b ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border text-text-2 hover:bg-hover'
+                now === b ? LIT : 'border-border text-text-2 hover:bg-hover'
               }`}
             >
               {MIX_BLEND_LABEL[b]}
@@ -202,7 +202,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
         data-testid={`${testId}-${id}-take`}
         data-way={way}
         className={`mt-1 shrink-0 rounded-md border px-2 text-[12px] transition-colors ${touch ? 'h-12 min-w-[76px]' : 'h-7 min-w-[64px]'} ${
-          running ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border text-text-2 hover:bg-hover'
+          running ? LIT : 'border-border text-text-2 hover:bg-hover'
         }`}
       >
         {label}
@@ -283,7 +283,7 @@ export function MixerPanel({ settings, onSetting, hasFilm, hasMark, touch = fals
                 aria-label={id === 'front' ? `${info.name}'s fade time and grade: brightness, contrast, saturation, hue` : `${info.name}'s blend, fade time and grade`}
                 className={`flex shrink-0 items-center gap-1 rounded-md px-2 text-[12px] transition-colors hover:bg-hover ${
                   touch ? 'h-12' : 'h-7'
-                } ${graded ? 'border border-accent-border bg-accent-bg text-accent-text' : 'border border-transparent text-text-2'}`}
+                } ${graded ? `border ${LIT}` : 'border border-transparent text-text-2'}`}
                 data-testid={`${testId}-${id}-open`}
               >
                 {graded ? 'Graded' : 'Grade'}

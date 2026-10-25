@@ -830,6 +830,36 @@ try {
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       /*
+        Projector Focus (PLAN 18e), the projector's focus ring, on the Looks
+        sheet beside the lamp's controls: there on every look, at 50 % (no
+        look saves one, so each is in focus, as it was before the setting),
+        and it reaches 0 % and 100 %. Put back to 50 % after, by the
+        keyboard's own steps (ten of 5 %), so the checks below draw the
+        plate in focus as they did before this check was here.
+      */
+      await tap(page, 'phone-open-looks');
+      const focusShown = await visible(page, 'phone-projector-focus');
+      const focusRead = async () => (await page.getByTestId('phone-projector-focus').innerText()).match(/(\d+)%/)?.[1] ?? null;
+      const focusAt = focusShown ? await focusRead() : null;
+      let focusBottom = null, focusTop = null, focusBack = null;
+      if (focusShown) {
+        await page.getByTestId('phone-projector-focus').locator('input').focus();
+        await page.keyboard.press('Home');
+        await page.waitForTimeout(200);
+        focusBottom = await focusRead();
+        await page.keyboard.press('End');
+        await page.waitForTimeout(200);
+        focusTop = await focusRead();
+        for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowLeft');
+        await page.waitForTimeout(200);
+        focusBack = await focusRead();
+      }
+      check('Projector Focus is on the Looks sheet at 50 %, goes to 0 % and 100 %, and back to 50 %',
+        focusShown && focusAt === '50' && focusBottom === '0' && focusTop === '100' && focusBack === '50',
+        focusShown ? `at ${focusAt} %, then ${focusBottom} %, ${focusTop} % and back to ${focusBack} %` : 'missing from the Looks sheet');
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+
+      /*
         A projector's source (PLAN.md §16b), from the phone: More, Settings,
         Mapping, a shape added, and its source picked. The phone has no
         second screen of its own, but it is the remote at a gig, and the
@@ -901,6 +931,19 @@ try {
       check('every tab of the phone\'s Settings rail takes a tap where it is drawn',
         railCovered.tabs > 20 && railCovered.covered.length === 0,
         `${railCovered.tabs} tabs; ${railCovered.covered.length ? `covered: ${railCovered.covered.join(', ')}` : 'none covered'}`);
+      /*
+        And the strip names its groups (PLAN 35b). The seven headings were
+        drawn on the desk and hidden on a phone (`hidden ... sm:block`), so the
+        phone's rail was one flat run of tabs. Each heading is asked for its box
+        and its words, since a heading that is `display: none` has neither.
+      */
+      const headings = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="rail-heading-"]')].map(h => {
+        const r = h.getBoundingClientRect();
+        return { id: h.dataset.testid.replace('rail-heading-', ''), w: Math.round(r.width), h: Math.round(r.height), text: h.textContent };
+      }));
+      check('the phone\'s Settings strip names the seven groups, each heading drawn',
+        headings.map(x => x.text).join() === 'Play,Pour,Feed,Motion,Chemistry,Look,Stage' && headings.every(x => x.w > 20 && x.h > 8),
+        headings.map(x => `${x.text} ${x.w}×${x.h}`).join(' · ') || 'no headings');
       await tap(page, 'settings-nav-patches');
       const mappings = () => page.evaluate(() => window.chromaglassDebug?.().settings?.sceneMappings ?? null);
       const patchesBefore = (await mappings())?.length ?? null;
@@ -1124,6 +1167,38 @@ try {
 
     if (label === 'Play, portrait') {
       check('Play: the gesture hint is over the tray on a first visit', await visible(page, 'play-hint'));
+      // Starting and stopping a clip on Play does not widen the Record pill or shift Shuffle beside it (PLAN.md 19v-4).
+      {
+        const measureRec = () => page.evaluate(() => {
+          const b = (id) => { const r = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; };
+          const t = document.querySelector('[data-testid="play-record-timer"]') || document.querySelector('[data-testid="play-record"] span.font-mono');
+          return {
+            rec: b('play-record'),
+            shuf: b('play-shuffle'),
+            look: b('play-look'),
+            on: document.querySelector('[data-testid="play-record"]')?.getAttribute('aria-pressed') === 'true',
+            timer: t ? (t.textContent || '').trim() : null,
+          };
+        });
+        const recBefore = await measureRec();
+        await tap(page, 'play-record');
+        let recDuring = null;
+        for (let i = 0; i < 10; i++) { await page.waitForTimeout(150); recDuring = await measureRec(); if (recDuring.on) break; }
+        await tap(page, 'play-record');
+        let recAfter = null;
+        for (let i = 0; i < 10; i++) { await page.waitForTimeout(150); recAfter = await measureRec(); if (!recAfter.on) break; }
+        const moved = (a, b) => (a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h)) : Infinity);
+        const dr = Math.max(moved(recBefore.rec, recDuring?.rec), moved(recBefore.rec, recAfter?.rec));
+        const ds = Math.max(moved(recBefore.shuf, recDuring?.shuf), moved(recBefore.shuf, recAfter?.shuf));
+        const dl = Math.max(moved(recBefore.look, recDuring?.look), moved(recBefore.look, recAfter?.look));
+        const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
+        check('Play: Record\'s running timer takes no extra width, so Record, Shuffle and the look stay where they are',
+          !recBefore.on && !!recDuring?.on && /^\d+:\d\d$/.test(recDuring.timer ?? '') && !recAfter?.on
+            && dr <= 0.5 && ds <= 0.5 && dl <= 0.5,
+          `pressed ${recBefore.on} → ${recDuring?.on} (${recDuring?.timer ?? 'no timer'}) → ${recAfter?.on}; `
+          + `Record ${fmt(recBefore.rec)} → ${fmt(recDuring?.rec)} (${dr.toFixed(1)} px); `
+          + `Shuffle ${fmt(recBefore.shuf)} → ${fmt(recDuring?.shuf)} (${ds.toFixed(1)} px)`);
+      }
       // The sheet: from the handle, six sliders in 44 rows, the looks, the two chips, the three buttons.
       await tap(page, 'play-handle');
       const sheetUp = await visible(page, 'play-sheet');
@@ -1151,12 +1226,86 @@ try {
       // double-click, on a phone where every knob is a slider). Tapped at a
       // third of the way, so the first tap moves it and the second must undo
       // that as well as the move above.
-      await page.touchscreen.tap(track.x + track.width * 0.3, track.y + track.height / 2);
-      await page.waitForTimeout(60);
-      await page.touchscreen.tap(track.x + track.width * 0.3, track.y + track.height / 2);
-      await page.waitForTimeout(400);
-      const reset = await speedText();
-      check('Play: a double tap on Speed puts it back to the look\'s own speed', reset === before && after !== before, `${before} → ${after} → ${reset}`);
+      /*
+        The two taps carry a finger's times, stamped on the events, not the
+        moment the harness got round to sending each. What was seen: red on 10
+        of 173 Mac runs over the week to 2026-10-24 (5 of them green on the
+        same commit), every one reading "0.009 → 0.28 → 0.005": 0.005 is
+        Speed at a third of the track, so both taps landed and the second was
+        not taken as the other half of a double tap. TouchSlider reads a
+        double tap from the two lifts' `timeStamp`s, 320 ms apart at most
+        (DOUBLE_TAP_MS), which on a phone are the times the finger touched.
+        Playwright's `touchscreen.tap` stamps no time, so Chromium stamps
+        each event when the command reaches it, and Playwright sends the
+        second tap only once the page has handled the first. So the gap the
+        app reads is the 60 ms asked for plus however long the page was busy
+        with the first tap (here, the whole app re-rendering for a new speed
+        while the plate draws on a slow runner). Measured in a plain page
+        whose pointerup kept the thread busy: two such taps read 95 ms apart
+        with the thread free, 217 ms busy 150 ms, 466 ms busy 400 ms; the
+        same taps sent with their own times read 80 ms apart busy 400 ms.
+        So the old check failed on how slowly the page answered, which a
+        finger never does to the double tap, and passed or failed the
+        slider's logic by chance. Stamped, it asks exactly what a thumb does:
+        two taps 90 ms apart, wherever the page is. The page's own lag is
+        printed beside it, measured on the same two lifts, since that is a
+        real cost (a tap that takes a third of a second to answer) and
+        belongs to the renders and frame checks, not to this one.
+      */
+      const tapAt = { x: track.x + track.width * 0.3, y: track.y + track.height / 2 };
+      await page.evaluate(() => {
+        window.__cgLifts = [];
+        document.querySelector('[data-testid="play-slider-speed"]').addEventListener('pointerup', (e) => window.__cgLifts.push([e.timeStamp, performance.now()]), { capture: true });
+      });
+      // Two taps whose second lands `apart` seconds after the first, by the finger's clock.
+      const twoTaps = async (apart) => {
+        await page.evaluate(() => { window.__cgLifts = []; });
+        const pre = await speedText();
+        const cdp = await ctx.newCDPSession(page);
+        const t0 = Date.now() / 1000;
+        const finger = (type, at) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ ...tapAt, id: 1 }], timestamp: t0 + at });
+        await finger('touchStart', 0);
+        await finger('touchEnd', 0.03);
+        // Where one tap at a third of the track puts Speed, what the control
+        // must read: waited for, up to a second of the harness's time, which
+        // the stamps make no part of the gesture.
+        let one = await speedText();
+        for (let i = 0; i < 20 && one === pre; i++) { await page.waitForTimeout(50); one = await speedText(); }
+        /*
+          The second tap is sent no sooner than 0.4 s after the first, past
+          DOUBLE_TAP_MS, whatever its stamp says: so the double tap passes
+          only if the stamps are what the app reads (as the slow CI page
+          made it, but every run), and no stamp is ever in the future, which
+          a Chromium might clamp.
+        */
+        const early = t0 + Math.max(apart, 0.4) - Date.now() / 1000;
+        if (early > 0) await page.waitForTimeout(early * 1000);
+        await finger('touchStart', apart);
+        await finger('touchEnd', apart + 0.03);
+        await cdp.detach();
+        await page.waitForTimeout(400);
+        const lifts = await page.evaluate(() => window.__cgLifts);
+        const seen = lifts.length === 2 ? lifts[1][0] - lifts[0][0] : null;
+        return {
+          value: await speedText(), one,
+          // The stamps reached the app as sent, within 15 ms: otherwise a red
+          // says the instrument failed, not the slider.
+          stamped: seen != null && Math.abs(seen - apart * 1000) <= 15,
+          gap: seen != null ? `the lifts ${Math.round(seen)} ms apart as the finger made them (sent ${Math.round(apart * 1000)}), handled ${Math.round(lifts[1][1] - lifts[0][1])} ms apart` : `${lifts.length} lifts seen, not 2`,
+        };
+      };
+      const dbl = await twoTaps(0.09);
+      check('Play: a double tap on Speed puts it back to the look\'s own speed', dbl.value === before && after !== before && dbl.stamped, `${before} → ${after} → ${dbl.value}; ${dbl.gap}`);
+      /*
+        The control: the same two taps stamped 0.6 s apart are two single
+        taps and leave Speed where one tap there puts it, so the window has
+        an end and the slider does not reset on any second tap. That the
+        stamps are what the app reads is the line above's: its second tap
+        is sent 0.4 s after the first, so ignored stamps would read 0.4 s
+        apart and fail it, and `stamped` names that cause.
+      */
+      const slow = await twoTaps(0.6);
+      check('Play: and the control, two taps 0.6 s apart by the finger\'s clock are two taps, not a double tap', slow.value === slow.one && slow.value !== before && slow.stamped, `${before} → ${slow.value}, one tap there ${slow.one}; ${slow.gap}`);
       /*
         8j: a phone has no hover, so the name is the button. A tap on Soap's
         name opens the card with what it does and the value as printed on
@@ -1183,6 +1332,25 @@ try {
           !none && !!tipped && tipped.name === 'Soap' && tipped.help.length > 20 && tipped.value === soapBefore?.trim() && tipped.inside,
           tipped ? `"${tipped.help.slice(0, 40)}…", ${tipped.value}, ${tipped.inside ? 'on screen' : 'off screen'}` : 'no card');
         await shot(page, 'Play-portrait-name-card');
+        /*
+          8j: one card at a time. The owner found two desk cards up at once,
+          stacked; on the phone a tap on another slider's name must swap the
+          card, not lay a second over the first, and that second card must
+          shut on its own second tap like the first.
+        */
+        const swirlName = page.getByTestId('play-slider-swirl').locator('[data-info="name"]');
+        const sb = await swirlName.boundingBox();
+        await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.waitForTimeout(250);
+        const cards = await page.evaluate(() => [...document.querySelectorAll('[data-control-tip] [data-tip=name]')].map(n => n.textContent));
+        check('Play: a tap on another slider\'s name swaps the card for its own, one card at a time',
+          cards.length === 1 && cards[0] === 'Swirl', cards.join(' + ') || 'no card');
+        await page.touchscreen.tap(sb.x + sb.width / 2, sb.y + sb.height / 2);
+        await page.waitForTimeout(250);
+        check('Play: and a second tap on it shuts it', cards[0] === 'Swirl' && !(await readTip()));
+        // Soap's again, for the second-tap check below.
+        await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
+        await page.waitForTimeout(250);
         await page.touchscreen.tap(nb.x + nb.width / 2, nb.y + nb.height / 2);
         await page.waitForTimeout(250);
         check('Play: a second tap shuts it, and two taps on a name leave the value alone', !(await readTip()) && (await soapText()) === soapBefore,
@@ -1404,8 +1572,23 @@ try {
       const errorsFrom = pageErrors.length;
       const liftFrom = await lift();
       await touch('touchStart', [{ ...A, id: 5 }]);
-      await settle(600);
-      const whileHeld = await lift();
+      /*
+        "Held" is the plate having pressed within RELEASE_MS (150 ms) of the
+        read, and the plate presses again on each of its steps while the
+        finger is down, so one read at 600 ms is a read of whether a step
+        happened in the last 150 ms: on a Mac stepping 12 to 23 times a
+        second a stall of that length is not rare. Two reds of 177 (10-24 and
+        10-25, both "held false over 10 steps" with the lift laid where the
+        finger was afterwards, so the press had reached the plate) were
+        that. Read six times across the same 600 ms, and held on four of the
+        six: a press laid once and never renewed is held for the first 150
+        ms and reads one or two of six; a stall costs the reads it covers.
+        The rest of the line reads the last sample as it read the one.
+      */
+      const holdReads = [];
+      for (let k = 0; k < 6; k++) { await settle(100); holdReads.push(await lift()); }
+      const whileHeld = holdReads[holdReads.length - 1];
+      const heldReads = holdReads.filter((r) => r.held).length;
       await touch('touchEnd', [{ ...A, id: 5 }]);
       await settle(900);
       const afterLift = await lift();
@@ -1447,9 +1630,9 @@ try {
         const last = afterLift.last;
         const near = !!last && !!ref.A && Math.hypot(last.x - ref.A.x, last.y - ref.A.y) <= 2;
         check('a finger holding the Press lifts nothing until it comes off, then the glass lifts into fingers where it was',
-          whileHeld.held && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
+          heldReads >= 4 && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
             && afterLift.steps > 0 && near && last.cells > 0,
-          `held ${whileHeld.held} over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
+          `held on ${heldReads} of ${holdReads.length} reads over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
       }
       await settings({ fingering: 0 });
       await page.getByTestId('phone-tool-dropper').click();
@@ -1536,6 +1719,32 @@ try {
       const stateHeld = await plateState();
       await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(700);
+      /*
+        Not the plate's reader until it has spoken. All four reds of the 172
+        Mac runs from 2026-10-18 to 10-24 (19h-2) show the same thing in the
+        line below: 384² solvers #1 and #2 through the hold, 256² solvers #3
+        and #4 after it, so the governor stepped the grid down in the 700 ms
+        after the lift. A rebuilt solver opens on the plate its predecessor
+        handed it (`handOver`, on the GPU), but the CPU's copy that every
+        reader sees (`readDensity`) is a fresh array until its first
+        readback lands, and the snap below read that: "the plate gained −8
+        of 538" in the same line whose each-plate sums, read a moment later,
+        say 579. The dye was never lost, the check read the plate in the
+        frames before it could be read. So the snap waits for the same
+        solvers on two looks and three readbacks since the first of them (the
+        count is the plate's, and a new solver's first readback is among
+        them), up to three seconds; the bars and the cells are as they were.
+      */
+      {
+        let seen = null;
+        for (let k = 0; k < 30; k++) {
+          const st = await plateState();
+          const key = st.plates.map((p) => p.solver).join('/');
+          if (seen?.key !== key) seen = { key, rb: st.plates[0]?.readbacks ?? -1 };
+          else if ((st.plates[0]?.readbacks ?? -1) - seen.rb >= 3) break;
+          await settle(100);
+        }
+      }
       const after = await snap();
       const rb1 = await readbacks();
       const stateAfter = await plateState();

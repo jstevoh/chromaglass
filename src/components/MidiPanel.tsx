@@ -1,6 +1,6 @@
 import { HIT_FEATURES } from '../lib/hitSource';
 import { useEffect, useRef, useState } from 'react';
-import { Sheet } from './ui';
+import { Sheet, LIT } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Ear, Music } from 'lucide-react';
 import {
   ACTION_LABELS, FACTORY_MAPS, factoryFor, LEARNABLE_SETTINGS, sourceLabel, targetLabel,
@@ -28,7 +28,10 @@ interface MidiPanelProps {
 }
 
 const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40';
-const chip = (active: boolean) => `px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${active ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'}`;
+/** A chip, lit when it is the chosen one (a bank, a tab, the map that is plugged in): PLAN 35a. */
+const chip = (active: boolean) => `px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors ${active ? LIT : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'}`;
+/** The one action a step of the panel is for (Bind, Finish): white, the primary, never a state. */
+const primaryChip = 'px-2.5 py-1.5 rounded-lg border text-[12px] font-medium transition-colors bg-white text-black border-white hover:opacity-90';
 
 /** A depth as the panel prints it: signed, in percent of the setting's travel. */
 const depthLabel = (d: number | undefined): string => `${(d ?? 0) >= 0 ? '+' : '−'}${Math.round(Math.abs(d ?? 0) * 100)}%`;
@@ -113,7 +116,7 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
         )}
         <button
           onClick={() => onBind(mapping ? { source, target, depth } : { source, target })}
-          className={`${chip(true)} min-h-7`}
+          className={`${primaryChip} min-h-7`}
           data-testid="sound-bind"
         >
           Bind
@@ -177,9 +180,10 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
             {[...bound.map(b => sourceLabel(b.source)), ...heard.map(soundLabel)].join(', ')}
           </span>
           <button
+            aria-pressed={!!isLearning}
             onClick={() => (isLearning ? midi.cancelLearn() : midi.learn(target, encoder && target.kind === 'setting' ? 'relative' : 'absolute'))}
             disabled={!midi.enabled}
-            className={`px-2 py-1 rounded-md border text-[12px] font-medium disabled:opacity-30 ${isLearning ? 'bg-amber-400 text-black border-amber-400 animate-pulse' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`px-2 py-1 rounded-md border text-[12px] font-medium disabled:opacity-30 ${isLearning ? `${LIT} animate-pulse` : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid={`midi-learn-${key}`}
           >
             {isLearning ? 'Touch it…' : 'Learn'}
@@ -194,7 +198,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
             title={notMusic ?? `Bind ${label} to the music`}
             aria-label={`Bind ${label} to the music`}
             aria-expanded={open}
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:opacity-30 ${open || heard.length ? 'bg-amber-300/20 border-amber-300/50 text-amber-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border disabled:opacity-30 ${open || heard.length ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid={`sound-learn-${key}`}
           >
             <Music size={12} />
@@ -236,9 +240,10 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
       {/* Enable + devices */}
       <div className="flex items-center gap-2 mb-3">
         <button
+          aria-pressed={midi.enabled}
           onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
           disabled={!midi.supported}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[13px] font-medium disabled:opacity-30 ${midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10'}`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[13px] font-medium disabled:opacity-30 ${midi.enabled ? `border ${LIT}` : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}
           data-testid="midi-enable"
         >
           <Radio size={14} /> {midi.enabled ? 'MIDI on' : 'Turn MIDI on'}
@@ -320,7 +325,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onClose }: Midi
                       ? `${said.rides} rides${said.banks ? ` over ${said.banks + 1} layers` : ''} · ${said.presets} presets · ${said.dyes} dyes · ${said.actions} buttons`
                       : 'Nothing was touched, so nothing was changed.');
                   }}
-                  className={`${chip(true)} flex-1`}
+                  className={`${primaryChip} flex-1`}
                   data-testid="midi-auto-finish"
                 >
                   Map them

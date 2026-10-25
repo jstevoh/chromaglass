@@ -19,7 +19,7 @@ import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
-import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
+import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity, NU_REF } from '../gpu/fluid';
 import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, type SloshPress } from '../lib/slosh';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
@@ -47,7 +47,7 @@ import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../li
 import { stirOf } from '../lib/stir';
 import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
-import { canvasPixelsFor, detectTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
+import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
@@ -64,9 +64,11 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
+import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
+import { openCamera } from '../lib/cameras';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
 import { Modulators } from '../lib/modulators';
@@ -938,7 +940,13 @@ export interface LiquidVisualizerHandle {
   loadFilmFile: (file: File) => Promise<void>;
   /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
   loadFilmUrl: (url: string) => Promise<void>;
-  startFilmCamera: () => Promise<void>;
+  /**
+   * A camera's picture as the film (lib/cameras.ts): `deviceId` from the
+   * film's camera picker, '' for the browser's pick (a phone's back camera,
+   * pointed at a dish). `onEnded` fires when the camera is unplugged, and the
+   * answer says which camera opened and whether the chosen one was missing.
+   */
+  startFilmCamera: (deviceId?: string, onEnded?: () => void) => Promise<{ label: string | null; fellBack: boolean }>;
   /**
    * A window, a tab or a screen, picked from the browser's own chooser.
    *
@@ -1203,12 +1211,22 @@ class FluidSimulation {
    * Public for `npm run squeeze`, which reads how many release steps it laid.
    */
   readonly kickRelease = new KickRelease();
+  /**
+   * Beat Squeeze's rhythm sheet, solved (lib/sheet.ts, PLAN 27f-4): off the
+   * frame-moving looks on a thin gap a kick is a fingertip on this sheet,
+   * and the sheet's own motion, held and let go, is what the gap is laid
+   * each step (`sheetGap`, through its own channel). Public for `npm run sheet`.
+   */
+  readonly sheet = new RhythmSheet();
+  /** The sheet's change this step on the plate's grid, and whether anything is in it. */
+  private sheetGap: Float32Array | null = null;
+  private sheetLaid = false;
   /** Sound Drive's bass, as a hand on the glass (lib/squish.ts `BassPress`, PLAN 27e). */
   readonly bassPress = new BassPress();
   /** The last lift this plate laid: where, and how many cells it touched. */
   lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.bassPress.forget(); this.lastLift = null; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -1768,13 +1786,14 @@ class FluidSimulation {
       da[i4] = this.densityR[i]; da[i4 + 1] = this.densityG[i]; da[i4 + 2] = this.densityB[i]; da[i4 + 3] = this.density[i];
       va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
     }
-    gpu.applyDeltas(da, va, this.mul, dt, this.handsLaid ? this.hands : null, this.breathLaid ? this.breath : null);
+    gpu.applyDeltas(da, va, this.mul, dt, this.handsLaid ? this.hands : null, this.breathLaid ? this.breath : null, this.sheetLaid ? this.sheetGap : null);
     if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
     if (this.breathLaid) { this.breath!.fill(0); this.breathLaid = false; }
+    if (this.sheetLaid) { this.sheetGap!.fill(0); this.sheetLaid = false; }
     this.dirty = false;
   }
 
@@ -2250,7 +2269,8 @@ class FluidSimulation {
     if (this.breathLaid) { this.breath!.fill(0); this.breathLaid = false; }
     // A lift still running would go on laying the old plate's spokes into
     // the cleared one for up to a second, at the old look's Fingering.
-    this.pressLift.forget(); this.kickRelease.forget(); this.bassPress.forget(); this.lastLift = null;
+    this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.lastLift = null;
+    if (this.sheetLaid) { this.sheetGap!.fill(0); this.sheetLaid = false; }
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
@@ -2980,6 +3000,20 @@ class FluidSimulation {
     // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
     // no dye, only the gap given back, which the shader never opens past rest.
     this.kickRelease.step(this.size, this.dtSeconds, this.squishCell);
+    // The rhythm sheet's own motion (pressKick): solved a step, its change laid as the gap's,
+    // with the spring the shader will give the gap this step taken on the sheet too (lib/sheet.ts).
+    if (this.sheet.live) {
+      if (!this.gpu || !this.thinGap) { this.sheet.forget(); return; }
+      if (!this.sheetGap) this.sheetGap = new Float32Array(this.size * this.size);
+      const depth = this.sheet.closed, cells = this.sheet.pressedCells;
+      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap) > 0) {
+        this.sheetLaid = true;
+        this.dirty = true;
+        // As a stroke counts them (applySquish): the cells a held finger closes, and the depth.
+        this.pressedCells.kick += this.sheet.pressedCells - cells;
+        this.pressedDepth.kick += this.sheet.closed - depth;
+      }
+    }
   }
 
   /**
@@ -2990,11 +3024,28 @@ class FluidSimulation {
    * `amount` each disc's press. Remembered for the lift like a hand's press,
    * and let go a moment later (`kickRelease`).
    */
-  pressKick(x: number, y: number, amount: number, fingering: number, radii: readonly number[]): void {
+  pressKick(x: number, y: number, amount: number, fingering: number, radii: readonly number[], nu = NU_REF, curve = 0): void {
     x = Math.round(x);
     y = Math.round(y);
-    radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
-    this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
+    if (radii.length === 1 && this.gpu && this.thinGap) {
+      /*
+        The rhythm sheet, solved (lib/sheet.ts, PLAN 27f-4): a fingertip on
+        it here, held KICK_HOLD and lifted, pushing out from under it as much
+        liquid as the stamped bowl closed over the same reach (stampedVolume),
+        and from then on the sheet's own equation lays the gap, step by step
+        (liftStep). The lift's memory still hears the kick as a press, so
+        Fingering's fingers follow it as they followed the bowl.
+      */
+      const radius = Math.round(radii[0] * GRID_SCALE);
+      this.pressLift.press('kick', x, y, radius, amount, fingering, showNow());
+      this.sheet.setLiquid(nu);
+      // No deeper than the dome's rest under it (kickRoom): where the glasses touch, a kick presses nothing.
+      const u = (x + 0.5) / this.size, v = (y + 0.5) / this.size;
+      this.sheet.pressVolume(u, v, stampedVolume(amount, radii[0] / 128), radii[0] / 128, KICK_HOLD, kickRoom(u, v, curve));
+    } else {
+      radii.forEach((r, i) => this.applySquish(x, y, r, amount, fingering, i === 0, 'press', 'kick'));
+      this.kickRelease.kick(x, y, radii.map((r) => Math.round(r * GRID_SCALE)), amount, this.thinGap);
+    }
     // And the same glass on the slosh dish (stepSlosh), over the same radii the
     // gap was pressed with: off the frame-moving looks that is the sheet's one
     // dent (kickPress), so the dish is pushed down where the plate is and no
@@ -6418,15 +6469,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }, 300);
       }
     },
-    startFilmCamera: async () => {
+    startFilmCamera: async (deviceId = '', onEnded) => {
       stopFilm();
       const f = filmRef.current;
       const v = filmVideo();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
+      const opened = await openCamera(deviceId, 'environment', { width: 1280 });
+      const stream = opened.stream;
       f.stream = stream;
       v.srcObject = stream;
       f.kind = 'camera';
+      // Unplugged, the same way a captured window is taken away: the film
+      // comes off and the panel is told, rather than the plate holding the
+      // camera's last frame with the source still reading "live".
+      filmEndedRef.current = onEnded ?? null;
+      for (const t of stream.getVideoTracks()) {
+        t.addEventListener('ended', () => {
+          const cb = filmEndedRef.current;
+          stopFilm();
+          cb?.();
+        });
+      }
       try { await v.play(); } catch { /* as above */ }
+      return { label: opened.label, fellBack: opened.fellBack };
     },
     clearFilm: () => stopFilm(),
     loadMark: (source, width, height) => {
@@ -6582,6 +6646,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   useEffect(() => { onEngineStatusRef.current = onEngineStatus; }, [onEngineStatus]);
 
   useEffect(() => {
+    const onLicenseChanged = () => {
+      reladderRef.current();
+      resizeRef.current();
+    };
+    window.addEventListener('chromaglass:license-changed', onLicenseChanged);
+    window.addEventListener('cg-license-changed', onLicenseChanged);
+    return () => {
+      window.removeEventListener('chromaglass:license-changed', onLicenseChanged);
+      window.removeEventListener('cg-license-changed', onLicenseChanged);
+    };
+  }, []);
+
+  useEffect(() => {
     const currentCount = fluidsRef.current.length;
     // Whole layers only, whatever arrives (a fade, a fader, a saved show): a
     // fractional count here builds a solver on one change and drops it on the next.
@@ -6679,6 +6756,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let throwFrames = 0;
     /** `stepDownFrames(n)`: a rung lost on each of the next n frames — swaps faster than a readback lands (S3, S6). */
     let stepDownFrames = 0;
+    /*
+      What `forceStepDown` asked for, kept across frames. It used to set the
+      engine status once and let the next frame's own status overwrite it, and
+      on a one-rung ladder (software WebGPU in a cloud session: classifyAdapter
+      says 'software', so qualityLadder has one rung) `failRung` has nowhere to
+      go, `governor.steppedDown` stays false, and `npm run tiers` lost the
+      step-down nudge before it could read it (Measure · lab, "locator.textContent:
+      Timeout 30000ms", PLAN 19aa-10). On a real ladder the governor does move
+      and agrees with this anyway.
+    */
+    let forcedStepDown = false;
     /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
     let stormFrames = 0;
     /*
@@ -7458,8 +7546,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             grid: lead?.gpu ? lead.gpu.N : 0,
             dpr: dprRef.current,
             tier, gpu: renderer?.info.gpuClass ?? 'weak', renderer: renderer?.info.renderer ?? '',
-            governed,
-            steppedDown: governed && governor.steppedDown,
+            governed: governed || forcedStepDown,
+            steppedDown: forcedStepDown || (governed && governor.steppedDown),
             gpuUnavailable,
             frameMs: governor.frameMs,
             simMs: simMsRef.current,
@@ -9062,7 +9150,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   deep as a hard one; now two thirds (kickDepth).
                 */
                 const a = kickDepth(squeezeAmt, bass01, accent);
-                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii);
+                leadPlate.pressKick(cx, cy, a * press.share, currentSettings.fingering ?? 0, press.radii, thinGapViscosity(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), Math.max(-1, Math.min(1, currentSettings.plateCurve ?? 0)));
                 if ((currentSettings.beads ?? 0) > 0) beadsRef.current.disturb(cx, cy, (sheet ? press.radii[0] : 30) * GRID_SCALE, 0.4 * squeezeAmt * bass01 * accent);
               }
             }
@@ -10572,9 +10660,36 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         */
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
+        forceStepDown: (steppedDown = true) => {
+          forcedStepDown = steppedDown;
+          if (steppedDown) governorRef.current?.failRung(performance.now() * 0.001);
+          const prev = engineStatusRef.current;
+          const next: EngineStatus = {
+            label: prev?.label ?? 'WebGPU · 384² · 1.0x',
+            engine: prev?.engine ?? 'webgpu',
+            grid: prev?.grid ?? 384,
+            dpr: prev?.dpr ?? 1,
+            tier,
+            gpu: prev?.gpu ?? 'mid',
+            renderer: prev?.renderer ?? 'WebGPU',
+            governed: true,
+            steppedDown,
+            gpuUnavailable: false,
+            frameMs: prev?.frameMs ?? 24,
+            simMs: prev?.simMs ?? 12,
+            layers: prev?.layers ?? 1,
+            stepsPerSec: prev?.stepsPerSec ?? 30,
+            stepRate: prev?.stepRate ?? 30,
+            otherMs: prev?.otherMs ?? 4,
+          };
+          engineStatusRef.current = next;
+          engineStatusAtRef.current = performance.now() * 0.001;
+          onEngineStatusRef.current?.(next);
+        },
         errorStorm: (n: number) => { stormFrames = Math.max(0, n | 0); },
         ambientSeed: (on: boolean) => { ambientSeedRef.current = !!on; },
         gridCap: () => gridCapRef.current,
+        ladderRungs: () => governorRef.current?.rungs ?? [],
         ...(renderer?.debug?.() ?? {}),
       });
     if (!isDraftRef.current && new URLSearchParams(window.location.search).has('debug')) {
@@ -10731,7 +10846,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     let ladderKey = '';
     const govern = (r: PlateRenderer, fresh: boolean) => {
-      const ladder = qualityLadder(tier, r.info.gpuClass, stageRef.current, gridCapRef.current);
+      const ladderTier = effectiveLadderTier(tier);
+      const ladder = qualityLadder(ladderTier, r.info.gpuClass, stageRef.current, gridCapRef.current);
       const key = ladder.rungs.map((x) => `${x.grid}@${x.dpr}`).join(' ');
       if (!fresh && key === ladderKey && governorRef.current) return;
       ladderKey = key;

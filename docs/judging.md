@@ -257,7 +257,7 @@ drift with time as the rainbow's hue did.
 
 ## 12. Ferro Paint's colour pushed by the black
 
-Pushes Dye (Squish Plate, under the ferrofluid) is on full in Ferro Paint:
+Pushes Dye (Ferrofluid, under Phase Edge) is on full in Ferro Paint:
 where the black grows the colour leaves, and it packs as a bright line along
 the black's edges instead of sitting still under it. Seen only in the lab,
 on software WebGPU at 256². Two things to look at: whether the packed edge
@@ -987,7 +987,7 @@ in your hand and nothing on the plate.
 
 ## 34. A clear film that tears into lace (Clear Film, PLAN 20b)
 
-Settings → Squish Plate → Physics & chemistry → **Clear Film** (also MIDI, the desks,
+Settings → Oil & Soap → **Clear Film** (also MIDI, the desks,
 the remote and the phone's Dye sheet). 0 in every look. Up, a clear oil film is laid
 over the plate, that thick (1 is most of the gap), and it tears open by itself: thin
 parts and the dish's specks of dust first, and wherever a drop of Alcohol or Soap
@@ -1590,3 +1590,122 @@ record on, through the room microphone and through the laptop:
 Settings, Patches, on any of the three: each patch has a thumbnail of the plate with the
 look's areas; tap one to aim the patch there, and Fire on a hit gives it a gate. On the phone,
 the same sheet. Say whether the picker is clear and big enough under a thumb.
+
+## 68. Beat Squeeze's sheet gives back at the liquid's own pace (PLAN 27f-4)
+
+Classic with a band at 120 bpm, Beat Squeeze at 0.5, Kick Bloom at 0, Frame Sway 0. Each kick
+should still be a dent where it lands, but now its letting go is the liquid's: on the default oil
+most of it springs back at once and the last of it settles over a fifth of a second, with a faint
+ring of colour pushed out round the dent and drawn back. Turn Thickness to full: the dent should
+tighten and hold, coming back slowly over a second or two, the ring round it plainer. Toward water
+it should be wide and gone almost as it lands. Little outside the dent and its ring should move on
+the kick (under half of what the old dent moved there). Say whether the thick liquid's slow give-back reads as syrup or as lag, and whether
+the default oil's dent still reads as a press. A real sheet on a thin liquid would not just give back: on the
+default oil and toward water it would swing past rest once or twice (a slow wave under the sheet,
+about a quarter of a second a swing) before it settled, which the solve leaves out (PLAN 27f-8(f)).
+Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
+building.
+
+## 71. One Record button (PLAN 14ae)
+
+On the desk, press the Record button in the header (or R): a plate video starts, the button
+turns red with one clock, and a single Rec dot appears. Press it again: it stops and the file
+is in the Record panel (the sliders button) under Plate video. In the panel, turn on Take as
+well and press Record again: both run from the one press, and the dot says "Plate video + Take".
+Paint a little, stop, and the take is under Takes with Replay. Say whether "Record · Plate
+video" on a wide desk reads at a glance, whether "Plate video" and "Take" are the words you
+want, and whether the Song film row belongs in the Record panel. On the phone: More, then Record
+makes, pick Take and press Record.
+
+## 69. Any camera, and which camera does what (PLAN 14ad)
+
+With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual Camera):
+
+- **Settings, Film.** Pick the second camera under Webcam, then press Webcam: its picture
+  should be on the plate, and the Source line should name it. Pick the laptop's camera while
+  it shows: it should switch without pressing anything else.
+- **Pull the cable** while it shows: the film should go off with a line saying it was
+  unplugged. Plug it back in: it should come back by itself. Say how long that takes on a
+  real camera (the code waits for the browser to list it, not a timer).
+- **Settings, Motion camera.** Does the first line make it obvious that this one stirs and
+  is never shown, and that Webcam is the one that shows a picture? Pick a camera for it and
+  switch it on; the film's camera should stay what it was.
+- On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
+
+## 70. On reads on (PLAN 35a)
+
+On the laptop in a dark room, and on the phone, with no reading of labels:
+
+- **Film.** Load a demo loop with Film: its Film button and Video file in Source should be lit
+  violet, the row should say "playing as film", and Off should not be. Pour another: its Pour
+  lights too. Say whether you can tell which loop is doing what from across the room.
+- **The desk.** The layout switch, the tools, the layers, the bottles and the palette list: the
+  chosen one is a solid violet now, not a lighter grey. Blackout is grey until pressed, then
+  solid red. Say whether the violet is too loud anywhere, or
+  whether anything that is on still looks off.
+- **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
+  tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
+
+## 75. The Mac app downloads, and finds its own updates (PLAN 13-update)
+
+On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
+Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
+copy that is there, and open it (the first open still needs System Settings → Privacy &
+Security → Open Anyway until the app is signed). On a phone the same card should say to open
+the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
+release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
+minute: one notification should say the new version is out, the ChromaGlass menu should offer
+Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
+while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
+another, and check that the first downloads it and becomes the new version after a quit.
+
+## 72. A look saved in Chrome is in the Mac app (PLAN 23.18)
+
+Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
+
+1. In Chrome at chromaglass.art, open Profile & Store. *Cloud sync* says On and, within a few
+   seconds, "Up to date".
+2. Save a look, learn one control on the MIDI map, and change a tool's amount.
+3. Open the Mac app, signed in to the same account. Within a minute (or at once with
+   *Sync now*) the look is in the preset menu and the MIDI map is the one from Chrome. The
+   projector layout on the Mac is still the Mac's.
+4. Delete the look on the Mac. Back in Chrome, focus the window: the look goes, and does not
+   come back after a reload.
+5. On the phone, open the Account pill: the same card, readable and tappable at phone width.
+6. Turn the Wi-Fi off on the Mac, save a look, turn it back on: the look reaches Chrome.
+
+Bad: a look that comes back after being deleted, a set list replaced by an empty one, or the
+plate stuttering when a sync lands mid-show.
+
+## 73. The seven groups (PLAN 35b)
+
+On the desk, press ⌘P (the panel browser) in Load-in, then in Build, and open Settings (⌘K, All settings…):
+
+1. The panel browser's headings are Play, Pour, Feed, Motion, Chemistry, Look, Stage, in that order,
+   and the desk's own panels (Cues, Rides, Recipe, Score under Play; Bottles, Dyes, Tools under Pour)
+   sit under the same headings as the settings sections. In Build and Gig there is no Stage heading.
+2. Settings' rail shows the same seven. Each section is where you would look for it: Film under Feed,
+   Kaleidoscope under Motion, Lamp & Light under Look.
+3. On the phone, More → Settings: the strip names the same seven above their tabs, and every tab still
+   takes a tap.
+
+Bad: a section where you would not look first (tell me which and where it should be), a heading that
+cuts a name short on the phone, or a saved layout whose panels came back in a different place.
+
+## 74. Squish Plate in five (PLAN 35c)
+
+On the desk, open Settings (⌘K, All settings…) and look under Chemistry and Motion:
+
+1. Chemistry now lists Squish Plate, Oil & Soap, Ferrofluid and Reactions; Motion lists Tilt & Rock
+   beside Kaleidoscope, Automation and Fluid Physics. Squish Plate holds only the glass (pressure,
+   shape, gap, smear, rain, viscosity).
+2. Every control you used to find under Squish Plate is in one of them: Oil Tension, Oil Bodies,
+   Soap Bursts, Clear Film and Polarity in Oil & Soap; the ferrofluid and the magnet in Ferrofluid;
+   pH, BZ, Liesegang and the Turing pattern (it was in Lamp & Light) in Reactions; Gravity, Tilt
+   Direction, Slosh and Plate Rock in Tilt & Rock.
+3. The same on the phone: More → Settings, the Chemistry and Motion tabs. A saved layout that had
+   the Squish Plate or Fluid Physics panel opens with them where they were; Fluid Physics now holds
+   only the flow (its knobs are fewer).
+
+Bad: a control you went looking for in the old place and could not find by the search box, or a
+section with so few controls that it should have been joined to another.

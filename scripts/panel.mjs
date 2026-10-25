@@ -383,12 +383,15 @@ check('searching for what you came for finds it', misses.length === 0, misses.jo
 const onWall = PINNABLE.filter(s => s.section === 'projectors');
 check('the wall holds the wall and nothing a fader can reach', onWall.length === 0,
   onWall.map(s => s.label).join(', '));
-const LAMP = ['lumia', 'chemistry', 'gelWheel', 'gelSpeed', 'lampWarmth', 'exposure'];
+const LAMP = ['lumia', 'gelWheel', 'gelSpeed', 'lampWarmth', 'exposure'];
 check('the look effects live with the lamp',
   LAMP.every(k => PIN_RANGE.get(k)?.section === 'lamp'),
   LAMP.filter(k => PIN_RANGE.get(k)?.section !== 'lamp').map(k => `${k} → ${PIN_RANGE.get(k)?.section}`).join(', '));
+check('and the lamp holds the optics of the dye it shines through, not the reactions that were in it (PLAN 35c)',
+  ['thicknessOptics', 'spectralOptics', 'transmission'].every(k => PIN_RANGE.get(k)?.section === 'lamp')
+  && ['chemistry', 'chemistryPattern', 'chemistryWidth', 'turingPrint', 'turingInk', 'turingDrift'].every(k => PIN_RANGE.get(k)?.section === 'reactions'));
 check('and the film is an input of its own',
-  SECTION_BY_ID.get('film')?.category === 'inputs'
+  SECTION_BY_ID.get('film')?.category === 'feed'
   && ['filmMix', 'filmKey', 'filmDrive'].every(k => PIN_RANGE.get(k)?.section === 'film'));
 // ── The patch bay ───────────────────────────────────────────────────
 /*
@@ -410,6 +413,23 @@ const sectionSource = (id) => {
   const at = panel.indexOf(`data-section="${id}"`);
   return at < 0 ? '' : panel.slice(at, panel.indexOf('</section>', at));
 };
+/*
+  Squish Plate was forty controls in one section, and the desk's panel for the
+  same section was a different forty: thirty of the pins said 'physics' while
+  the sheet drew them under Squish Plate, so the Fluid Physics knobs were the
+  glass's, the oil's and the magnet's. Five sections now (PLAN 35c), and the
+  check is the one that would have caught it: a section's markup draws exactly
+  the sliders the registry files under it. Asked of the five that split, of the
+  lamp (which took two) and of Fluid Physics (which gave up three and kept the
+  rest).
+*/
+for (const id of ['squish', 'oil', 'ferro', 'reactions', 'tilt', 'lamp', 'physics']) {
+  const drawn = [...sectionSource(id).matchAll(/settingKey="(\w+)"/g)].map(m => m[1]).sort();
+  const filed = PINNABLE.filter(s => s.section === id).map(s => String(s.key)).sort();
+  const strays = [...drawn.filter(k => !filed.includes(k)).map(k => `${k} drawn, filed elsewhere`),
+    ...filed.filter(k => !drawn.includes(k)).map(k => `${k} filed, drawn elsewhere`)];
+  check(`${id}: the sliders it draws are the ones the registry files under it`, drawn.length > 0 && strays.length === 0, strays.join(', '));
+}
 const bay = sectionSource('patches');
 check('and the bay is drawn there, not in The Room',
   bay.includes('data-testid="scene-map-add"') && !sectionSource('room').includes('scene-map-add')

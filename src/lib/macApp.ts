@@ -1,0 +1,76 @@
+/**
+ * The Mac app's download, and what the app's updater found (PLAN.md 13-update).
+ *
+ * The download is the newest GitHub Release of this repo, which desktop.yml
+ * publishes when the owner asks for a release. The .dmg has the same name in
+ * every release (dmg.artifactName in desktop/electron-builder.config.cjs), so
+ * this one link always gives the newest, and a release never needs the site
+ * deployed again to be found. The owner chose a public file (2026-10-25): what
+ * Pro unlocks is checked inside the app against the key (23.11), the way the
+ * site checks it, so the profile sheet offers the button to Pro and says
+ * "comes with Pro" to everyone else, and that is a nudge, not a lock.
+ */
+
+export const MAC_DOWNLOAD_URL = 'https://github.com/jstevoh/chromaglass/releases/latest/download/ChromaGlass-mac-arm64.dmg';
+export const MAC_RELEASES_URL = 'https://github.com/jstevoh/chromaglass/releases';
+
+/** What desktop/updates.js says, as the preload hands it over. */
+export interface DesktopUpdateState {
+  status: 'off' | 'idle' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error';
+  current: string;
+  signed: boolean;
+  version: string | null;
+  url: string | null;
+  percent: number;
+  error: string | null;
+}
+
+export interface DesktopUpdates {
+  state: () => Promise<DesktopUpdateState>;
+  act: () => Promise<DesktopUpdateState>;
+  onChange: (fn: (s: DesktopUpdateState) => void) => () => void;
+}
+
+/** The updater, when this page is inside the Mac app (desktop/preload.cjs); null on the site. */
+export function desktopUpdates(): DesktopUpdates | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as { __CHROMAGLASS_NATIVE__?: { shell?: unknown; updates?: DesktopUpdates } };
+  const u = w.__CHROMAGLASS_NATIVE__?.shell === 'desktop' ? w.__CHROMAGLASS_NATIVE__.updates : undefined;
+  return u && typeof u.state === 'function' ? u : null;
+}
+
+/**
+ * Is this a Mac computer, the only thing the download runs on? An iPad asking
+ * for the desktop site says "Macintosh" too, and is told apart by its touch
+ * points. Intel or Apple silicon cannot be read from a page reliably; the
+ * button says Apple silicon (13-intel builds the other).
+ */
+export function onMacComputer(nav: Pick<Navigator, 'userAgent' | 'maxTouchPoints'> | undefined = typeof navigator === 'undefined' ? undefined : navigator): boolean {
+  if (!nav) return false;
+  return /Macintosh|Mac OS X/.test(nav.userAgent) && !/iPhone|iPad|iPod/.test(nav.userAgent) && !(nav.maxTouchPoints > 1);
+}
+
+/** What the profile sheet's Mac app row says and offers, for a tier, a device and the updater's state. */
+export type MacAppRow =
+  | { kind: 'download'; href: string }
+  | { kind: 'on-a-mac' }
+  | { kind: 'with-pro' }
+  | { kind: 'in-app'; current: string; line: string; button: string | null };
+
+export function macAppRow(tier: string, mac: boolean, update: DesktopUpdateState | null, inApp: boolean): MacAppRow {
+  if (inApp) {
+    const s = update;
+    const current = s?.current ?? '';
+    if (!s) return { kind: 'in-app', current, line: '…', button: null };
+    if (s.status === 'off') return { kind: 'in-app', current, line: 'Updates are off in this copy.', button: null };
+    if (s.status === 'available') return { kind: 'in-app', current, line: `ChromaGlass ${s.version} is out.`, button: `Download ${s.version}` };
+    if (s.status === 'downloading') return { kind: 'in-app', current, line: `Downloading ${s.version} (${s.percent}%). It installs when you quit.`, button: null };
+    if (s.status === 'ready') return { kind: 'in-app', current, line: `${s.version} is ready. It installs when you quit.`, button: 'Restart to Update' };
+    if (s.status === 'checking') return { kind: 'in-app', current, line: 'Checking for updates…', button: null };
+    if (s.status === 'none') return { kind: 'in-app', current, line: 'This is the newest version.', button: 'Check for Updates' };
+    if (s.status === 'error') return { kind: 'in-app', current, line: 'Could not reach the releases just now.', button: 'Check for Updates' };
+    return { kind: 'in-app', current, line: 'It looks for new versions by itself.', button: 'Check for Updates' };
+  }
+  if (tier !== 'pro') return { kind: 'with-pro' };
+  return mac ? { kind: 'download', href: MAC_DOWNLOAD_URL } : { kind: 'on-a-mac' };
+}

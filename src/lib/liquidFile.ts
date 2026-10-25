@@ -269,11 +269,11 @@ export function meets(a: LiquidType, b: LiquidType): Meeting {
   every read and write is guarded and the app runs with the built-in shelf
   alone when it does.
 */
-const STORE_KEY = 'chromaglass-custom-liquids';
+export const CUSTOM_LIQUIDS_KEY = 'chromaglass-custom-liquids';
 
 export function loadCustomLiquids(): LiquidType[] {
   try {
-    const text = localStorage.getItem(STORE_KEY);
+    const text = localStorage.getItem(CUSTOM_LIQUIDS_KEY);
     if (!text) return [];
     const taken = new Set<string>();
     const warnings: string[] = [];
@@ -290,5 +290,5 @@ export function loadCustomLiquids(): LiquidType[] {
 }
 
 export function saveCustomLiquids(liquids: LiquidType[]): void {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(liquids.filter(isCustomLiquid).map(liquidToSpec))); } catch { /* storage unavailable: kept for this session */ }
+  try { localStorage.setItem(CUSTOM_LIQUIDS_KEY, JSON.stringify(liquids.filter(isCustomLiquid).map(liquidToSpec))); } catch { /* storage unavailable: kept for this session */ }
 }

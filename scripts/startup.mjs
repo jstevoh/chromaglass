@@ -53,7 +53,12 @@
  *      A frame gap counts whole, except for the time in it, in the
  *      opening's first HELD_BY_S and before the first step, when the page's
  *      own thread ran nothing at all and its code was not picking up
- *      after an await (4b).
+ *      after an await (4b), and except, while the intro is held still
+ *      (from the first paint until the opening's render pipelines are
+ *      built), the time the page's thread was seen free, up to
+ *      STILL_IDLE_CAP_S: a still picture with the page idle is Chromium
+ *      starting the GPU, and no stop an audience sees (openingGaps says
+ *      what was measured).
  *      Heartbeats and steps only begin once the show opens, so until then
  *      frames are the only measure of the building ahead.
  *   4b. and the page's thread held from outside it, in stretches
@@ -233,6 +238,23 @@ const TICK_OK_MS = 150;
  * against check 4.
  */
 const HELD_BY_S = 3;
+/**
+ * The longest a gap between two ticks of the page's own timer (asked every
+ * 100 ms) may be for the page's thread to count as seen free between them,
+ * while the intro is held still (check 4, openingGaps). Two and a half asks:
+ * the timer's median was 108 to 118 ms on every one of the 41 red openings
+ * of the week to 2026-10-24, and a stretch of the page's own work longer than
+ * this holds the timer off and counts.
+ */
+const TICK_FREE_MS = 250;
+/**
+ * The most of the opening's frame gaps, all told, that the still intro may
+ * take out as the page seen free (check 4). The 41 red openings' gaps were
+ * 2.02 to 3.97 s whole, and Chromium's start ran 1.25 to 4.18 s in the 106
+ * openings read for COLD_CAP_S; past this the rest of the gap counts, so a
+ * GPU stop while the intro is still is not excused without end.
+ */
+const STILL_IDLE_CAP_S = 4.5;
 
 /**
  * The page's frame gaps, each with what is left of it once the time the
@@ -242,10 +264,10 @@ const HELD_BY_S = 3;
  * that drew no frame at all has none to show, and says so.
  */
 const frameStops = (x) => {
-  const [at, whole, own] = x.frameGaps[0] ?? [null, 0, 0];
+  const [at, whole, own, stillIdle] = x.frameGaps[0] ?? [null, 0, 0, 0];
   const longest = x.held.reduce((m, h) => (!m || h[1] > m[1] ? h : m), null);
   return {
-    frames: { gap: own, whole, at, first: x.framesSeen ? 0 : null },
+    frames: { gap: own, whole, at, stillIdle: stillIdle ?? 0, first: x.framesSeen ? 0 : null },
     held: {
       total: x.held.reduce((n, [, len]) => n + len, 0),
       stretches: x.held,
@@ -258,12 +280,47 @@ const frameStops = (x) => {
 };
 
 /**
- * The page's frame gaps, each [began, whole, less the held time] with the
- * largest of what is left first, the held stretches, and the silent ones
- * kept as the page's own code after an await with what settled before each
- * (seconds). Nothing is taken out unless long tasks could be seen and the
- * page's timer ticked as asked before the first step: then the page's own
- * work would look held.
+ * The page's frame gaps, each [began, whole, counted, the still intro's
+ * idle part] with the largest counted first, the held stretches, and the
+ * silent ones kept as the page's own code after an await with what settled
+ * before each (seconds). Nothing is taken out unless long tasks could be
+ * seen and the page's timer ticked as asked before the first step: then the
+ * page's own work would look held.
+ *
+ * Counted is the gap less the held time (4b), and less, while the intro was
+ * held still, the time the page's own thread was seen free (its timer
+ * ticking on time, TICK_FREE_MS), up to STILL_IDLE_CAP_S all told. Why the
+ * second (the owner's choice, 2026-10-24): over the week to 2026-10-24 this
+ * line was red on 41 of 193 Mac runs, on 25 branches and on main, the most
+ * of any check by three times. All 41 were a 2.0 to 4.0 s gap in frames
+ * beginning 0.24 to 4.08 s in, while Chromium was still giving the device
+ * (asked at 0.1 to 3.1 s, given up to 3.7 s later) or compiling the first
+ * kernel of all (2.4 to 4.6 s for `fluid/fill`, a few lines); in all 41 the
+ * page's own long tasks in the gap came to 0.7 s at most (in 38, none), and
+ * every gap had ended before the intro let go of its still (4.64 to 11.96 s).
+ * The intro is held still from the first paint until the opening's render
+ * pipelines are built (`introStill`, 14v-5) precisely because on a cold Mac
+ * that is when the GPU stops the page's frames, and a turning mark froze
+ * where a still one shows nothing. So those 41 were a still picture with
+ * the page idle and Chromium busy, which no audience sees and the app
+ * cannot shorten: warming the compiler at boot (#396) and asking the fills
+ * first (14v-6) each left it as red or redder (16% the week before 14v-6,
+ * 21% after). 4b already took out the stretches when the page's thread was
+ * held as well; in these the thread ran and only the frames stopped.
+ *
+ * What still counts in full: every gap outside the still stretches (the
+ * intro turning, the plate drawing), heartbeats and steps, which only begin
+ * once the show is up, a still that never let go, and inside them, any
+ * stretch the page's timer did not tick on time, so a long task, or the
+ * app's code running on after an await, that held the frames past
+ * MAX_GAP_S during the still intro fails as before (stillCases checks each
+ * of these on every run, on synthetic openings). Known limit,
+ * named: a stop the GPU process makes on the page's behalf while the intro
+ * is still (its compiles of the app's own shaders, its submits) is not the
+ * page's thread and is not counted; that is the stretch the still intro was
+ * made to cover, and its length is held by 1 and 1b (moving for good no
+ * later than the old way, the build no slower) and by the first step's cap.
+ * The idle part taken out is printed on the line, so a run says how much.
  */
 const openingGaps = (x, heldByMs = HELD_BY_S * 1000) => {
   const { frames, frameRan, ...rest } = x.raw;
@@ -271,10 +328,51 @@ const openingGaps = (x, heldByMs = HELD_BY_S * 1000) => {
   const { held, own } = seenOk
     ? heldStretches({ frames: frameRan, ...rest }, { stepRaw: x.stepRaw, t0: x.t0, heldMinMs: HELD_MIN_S * 1000, heldByMs })
     : { held: [], own: [] };
-  const heldIn = (a, b) => held.reduce((n, [st, en]) => n + Math.max(0, Math.min(b, en) - Math.max(a, st)), 0);
+  const overlap = (spans) => (a, b) => spans.reduce((n, [st, en]) => n + Math.max(0, Math.min(b, en) - Math.max(a, st)), 0);
+  const heldIn = overlap(held);
+  /*
+    The stretches the intro was held still (see the comment above), each
+    ending no later than the intro left for the plate, and only those it let
+    go of (a still that never ended is a regression of its own and excuses
+    nothing), and only when the page's work can be seen at all: otherwise
+    nothing in them can be told apart and the gap counts as it did.
+
+    In them, what is taken out of a frame gap is only time the page's thread
+    was seen free: between two ticks of its own 100 ms timer no more than
+    TICK_FREE_MS apart, as well as the held time (4b). Not "no long task
+    seen": the page's code running on after an await is not a long task in
+    every Chromium, and pagehold's own stretches only begin in the first
+    HELD_BY_S and last HELD_MIN_S, so a skeptic's openings of 2.5 s of code
+    after a pipeline's promise at 3.5 s, and of a chain of 0.45 s
+    continuations, read as idle under that first draft. Here both stop the
+    timer, and count. And no more than STILL_IDLE_CAP_S of it all told.
+  */
+  const out = x.intro?.out ?? null;
+  const still = !seenOk ? [] : (x.intro?.still ?? [])
+    .filter(([, e]) => e != null)
+    .map(([a, e]) => [a, Math.min(e, out ?? Infinity)])
+    .filter(([a, e]) => e > a);
+  const tickTs = x.raw.ticks ?? [];
+  const free = [];
+  for (let i = 1; i < tickTs.length; i++) if (tickTs[i] - tickTs[i - 1] <= TICK_FREE_MS) free.push([tickTs[i - 1], tickTs[i]]);
+  // Held stretches have no tick in them, so the two never overlap.
+  const freeIn = overlap(free);
+  const idleIn = (a, b) => still.reduce((n, [st, en]) => {
+    const lo = Math.max(a, st), hi = Math.min(b, en);
+    return hi > lo ? n + freeIn(lo, hi) : n;
+  }, 0);
   const ts = [...frames, x.now];
   const gaps = [];
-  for (let i = 1; i < ts.length; i++) gaps.push([ts[i - 1] / 1000, (ts[i] - ts[i - 1]) / 1000, (ts[i] - ts[i - 1] - heldIn(ts[i - 1], ts[i])) / 1000]);
+  let budget = STILL_IDLE_CAP_S * 1000;
+  for (let i = 1; i < ts.length; i++) {
+    const [a, b] = [ts[i - 1], ts[i]];
+    // Only out of a gap that would otherwise count past the bar: the
+    // budget is for Chromium's stops, not spent on every frame's 16 ms.
+    const idle = b - a - heldIn(a, b) > MAX_GAP_S * 1000 ? Math.min(budget, idleIn(a, b)) : 0;
+    budget -= idle;
+    // [began, whole, counted, of it the still intro's with the page seen free]
+    gaps.push([a / 1000, (b - a) / 1000, (b - a - heldIn(a, b) - idle) / 1000, idle / 1000]);
+  }
   gaps.sort((p, q) => q[2] - p[2]);
   return {
     frameGaps: gaps.slice(0, 12),
@@ -282,6 +380,47 @@ const openingGaps = (x, heldByMs = HELD_BY_S * 1000) => {
     settledStarts: own.map(([a, b, what]) => [a / 1000, (b - a) / 1000, what]),
   };
 };
+
+/**
+ * openingGaps' still-intro rule on synthetic openings, run on every run
+ * (check 4's next line), so a change to it that excuses the page's own
+ * work, or excuses nothing, goes red where the rule is and not on a Mac
+ * one week in five. Each opening: frames every 16 ms but where a gap is
+ * made, the page's timer every 100 ms but where it is stopped, the intro
+ * still from 0 until it lets go, and the plate up at 9 s. Each case is
+ * the longest counted gap it must read, to the millisecond.
+ */
+function stillCases() {
+  const span = (a, b, every) => Array.from({ length: Math.floor((b - a) / every) + 1 }, (_, i) => a + i * every);
+  const without = (ts, gaps) => ts.filter((t) => !gaps.some(([a, b]) => t > a && t < b));
+  const opening = ({ gaps, stopped = [], tickEvery = 100, still = [[0, 9000]], heldSeen = { longOk: true, tickMedian: 100 } }) => {
+    const frames = without(span(16, 12000, 16), gaps);
+    const ticks = without(span(100, 12000, tickEvery), stopped);
+    return {
+      raw: { frames, frameRan: frames, ticks, long: [], marks: [], loaf: [] },
+      heldSeen, stepRaw: 9000, t0: 0, now: 12000,
+      intro: { still, out: 9000 },
+    };
+  };
+  const cases = [
+    ['a gap of 3 s in the still intro, the timer on time: taken out, so the longest is a frame', { gaps: [[3008, 6000]] }, 0.016],
+    ['the same with the timer stopped 2.5 s from 3.5 s (the page\'s code after an await): counts', { gaps: [[3008, 6000]], stopped: [[3500, 6000]] }, 2.5],
+    ['the same with the timer every 450 ms (a chain of continuations): counts', { gaps: [[3008, 6000]], tickEvery: 450 }, 2.992],
+    ['a gap of 3.5 s across the still\'s end at 5 s: its part after counts', { gaps: [[4000, 7504]], still: [[0, 5000]] }, 2.504],
+    ['a still that never let go: counts whole', { gaps: [[3008, 6000]], still: [[0, null]] }, 2.992],
+    ['three gaps of 2.5 s, all still: no more than 4.5 s taken out, so the third counts whole', { gaps: [[1008, 3504], [4000, 6496], [6496, 8992]] }, 2.496],
+    // 14v-8(b): the gate on seeing the page at all (`seenOk`). Without it the timer, with the same gap and the same on-time ticks as the first case, would excuse the gap.
+    ['the same as the first with long tasks not observable (the page\'s work cannot be told from a wait): counts whole', { gaps: [[3008, 6000]], heldSeen: { longOk: false, tickMedian: 100 } }, 2.992],
+    ['the same with the timer slow to begin with (its median over TICK_OK_MS, so a tick on time says nothing): counts whole', { gaps: [[3008, 6000]], heldSeen: { longOk: true, tickMedian: TICK_OK_MS + 50 } }, 2.992],
+    ['the same with no timer reading at all: counts whole', { gaps: [[3008, 6000]], heldSeen: { longOk: true, tickMedian: null } }, 2.992],
+  ];
+  const wrong = [];
+  for (const [name, c, want] of cases) {
+    const g = openingGaps(opening(c)).frameGaps[0] ?? [null, 0, 0, 0];
+    if (Math.abs(g[2] - want) > 0.0015) wrong.push(`${name}: read ${g[2].toFixed(3)} s, not ${want} s`);
+  }
+  return { cases: cases.length, wrong };
+}
 
 const presetIds = [...readFileSync('src/presets.ts', 'utf8').matchAll(/^ {4}id: '([^']+)'/gm)].map((m) => m[1]);
 
@@ -1113,12 +1252,15 @@ const waitOf = (x, oldWay) => {
   let chromium = 0, end = 0;
   for (const [a, b] of asks) { const from = Math.max(a, end); if (b > from) chromium += b - from; end = Math.max(end, b); }
   let compile = 0, count = 0, at = null, stops = null;
+  // Where the compile was, in the same seconds as `steady`, for `leftOver` below.
+  const priced = [];
   if (x.prepared) {
     const seen = new Set();
     for (const [key, at, ms] of x.prepared.builds ?? []) {
       if (!oldWay.includes(key) || seen.has(key) || at / 1000 >= steady) continue;
       seen.add(key);
       compile += Math.min(ms / 1000, steady - at / 1000);
+      priced.push([at / 1000, at / 1000 + Math.min(ms / 1000, steady - at / 1000)]);
       count++;
     }
   } else {
@@ -1254,12 +1396,40 @@ const waitOf = (x, oldWay) => {
       compile += st.len;
       count++;
       at ??= [st.from, st.len];
+      priced.push([st.from + t0, st.from + t0 + st.len]);
     }
   }
-  return { steady: steady - t0, chromium, compile, shared: count, at, what: x.prepared ? 'built ahead' : count === 1 ? 'stop' : 'stops', stops, own: steady - t0 - chromium - compile };
+  /*
+    What the wait is made of, besides the two priced parts, printed and not
+    judged (PLAN 19aa-7). `own` is what is left of the wait once Chromium's
+    asks and the compile are taken off, and on 192 Mac runs of the week to
+    2026-10-25 it ran from 0.40 to 3.25 s for the show with a median of 0.78,
+    and for the old way's control from 0.5 to 3.4 s: the same tail on both
+    sides (2.0 s or more on 8% of the shows and a like share of the controls),
+    which the check holds to the control's plus a second, so it goes red when
+    only the show's lands (7 of 192). A tail like that is the page waiting
+    on a process that is not the page, or the page's own thread held: the two
+    read differently on the page's own timer, which 14v-7 already uses for
+    the frame gaps. So here the stretches that are neither Chromium's nor the
+    compile, how long they are all told, and how much of that the timer
+    ticked on time in (TICK_FREE_MS), the page seen free; and the longest,
+    where it began. The two priced parts overlap a little, so this is not
+    `own` to the hundredth.
+  */
+  const cut = (spans, out) => out.reduce((parts, [c, d]) => parts.flatMap(([p, q]) => (d <= p || c >= q ? [[p, q]]
+    : [[p, Math.min(q, c)], [Math.max(p, d), q]].filter(([u, v]) => v > u))), spans);
+  const rest = cut([[t0, steady]], [...asks, ...priced]);
+  const tickTs = x.ticks ?? [];
+  const tickFree = [];
+  for (let i = 1; i < tickTs.length; i++) if (tickTs[i] - tickTs[i - 1] <= TICK_FREE_MS / 1000) tickFree.push([tickTs[i - 1], tickTs[i]]);
+  const inFree = (a, b) => tickFree.reduce((n, [u, v]) => n + Math.max(0, Math.min(b, v) - Math.max(a, u)), 0);
+  const longestRest = rest.reduce((m, [a, b]) => (!m || b - a > m[1] ? [a - t0, b - a] : m), null);
+  const leftOver = { total: rest.reduce((n, [a, b]) => n + b - a, 0), free: rest.reduce((n, [a, b]) => n + inFree(a, b), 0), longest: longestRest, pieces: rest.length };
+  return { steady: steady - t0, chromium, compile, shared: count, at, what: x.prepared ? 'built ahead' : count === 1 ? 'stop' : 'stops', stops, own: steady - t0 - chromium - compile, leftOver };
 };
 const sayWait = (w) => (w == null ? 'never moving for good'
   : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}${w.at ? ` from ${w.at[0].toFixed(2)} s` : ''}), ${w.own.toFixed(2)} s the page's own`
+    + (w.leftOver ? ` (neither Chromium's nor a build's: ${w.leftOver.total.toFixed(2)} s in ${w.leftOver.pieces} stretches, ${w.leftOver.free.toFixed(2)} s of it with the page's timer ticking on time${w.leftOver.longest ? `, the longest ${w.leftOver.longest[1].toFixed(2)} s from ${w.leftOver.longest[0].toFixed(2)} s` : ''})` : '')
     // Every stop its frames made, so a pick that is wrong reads off the log.
     + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it, ${st.waited} first used before it and done as it ended (${st.last === undefined ? 'none out as it began' : st.last === null ? 'one out as it began never done' : `the last out as it began done ${st.last.toFixed(2)} s from its end`}, the page's timer silent at most ${st.silent.toFixed(2)} s)${st.taken ? `${st.follows ? ' (the compile going on from the stop before)' : ''}, priced` : ''}`).join('; ') : 'never'}]` : ''));
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);
@@ -1425,7 +1595,12 @@ try {
   const worst = Math.max(o.frames.gap, o.beats.gap, o.steps.gap);
   check(`no stop in the opening, or while the rest was built behind it (frames, heartbeats and steps each no more than ${MAX_GAP_S} s apart)`,
     o.frames.first != null && o.beats.first != null && o.steps.first != null && worst <= MAX_GAP_S,
-    `longest wait for a frame ${say(o.frames)}${o.frames.whole - o.frames.gap > 0.005 ? ` (of a ${o.frames.whole.toFixed(2)} s gap, the rest the page's thread held, 4b)` : ''}, for a heartbeat ${say(o.beats)}, for a step ${say(o.steps)}, watched to ${secs(o.watch)}`);
+    `longest wait for a frame ${say(o.frames)}${o.frames.whole - o.frames.gap > 0.005 ? ` (of a ${o.frames.whole.toFixed(2)} s gap: ${(o.frames.whole - o.frames.gap - o.frames.stillIdle).toFixed(2)} s the page's thread held, 4b, and ${o.frames.stillIdle.toFixed(2)} s the intro held still with the page idle)` : ''}, for a heartbeat ${say(o.beats)}, for a step ${say(o.steps)}, watched to ${secs(o.watch)}`);
+  {
+    const sc = stillCases();
+    check(`and the still intro takes out of a frame gap only the time the page was seen free, at most ${STILL_IDLE_CAP_S} s, on each of ${sc.cases} synthetic openings`,
+      sc.wrong.length === 0, sc.wrong.length ? sc.wrong.join('; ') : `${sc.cases} of ${sc.cases}`);
+  }
   const heldAt = (h) => (h.stretches.length ? h.stretches.map(([a, n]) => `${n.toFixed(2)} s from ${a.toFixed(2)} s`).join(', ') : 'none');
   const seenOk = held.seen.longOk && held.seen.tickMedian != null && held.seen.tickMedian <= TICK_OK_MS;
   const loafs = o.loaf.filter(([, d]) => d >= 0.2);
