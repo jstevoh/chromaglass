@@ -1790,3 +1790,31 @@ Bad: a level that sits still while the plate fills, a lean that keeps moving, a 
 time on both buttons, a bulb whose number does not follow the slider, anything that moves with reduced
 motion on, or a violet or red that is not "on" or "live". Decide too: the 5100 K top is what the grade does
 today; if you would rather it reached a 3200 K halogen, that is PLAN 35e-2.
+
+## 79. Tape reels, a tap pad, a VU needle, a lens cap, a strobe ring (PLAN 35f)
+
+On the desk and the phone, with a band or a microphone playing:
+
+1. Press R (or Record). Two small reels appear in the button beside the clock. The left one starts full and
+   turns slowly, the right one starts bare and turns about twice as fast; over several minutes the left
+   empties onto the right and the two turn rates come together and cross. Stop and they stop. On the phone,
+   the Play screen's Record pill shows the same two reels, still while it waits, turning while it records,
+   the clock under them, and the pill is red while it runs.
+2. Settings, Audio Input, Tempo: tap the Tap pad four times. The four pips fill, the tempo shows in segment
+   digits, and a small light on the pad blinks on the beat you tapped, staying with your tap if you tap a
+   fifth time a little late. On the phone it is in the Sound sheet. Listen clears it.
+3. The Sound sheet (desk and phone) has a small dial. With a source playing, the needle swings up on each
+   kick, about a third of a second to arrive and a soft fall; stop the sound and it lies on its stop; unplug a
+   USB input and the dial says "deaf". It is the only thing here that moves with sound.
+4. Blackout (header on the desk, Settings, the remote, Draw): off it is a bare lens; on, a cap snaps over the
+   lens once and the button is solid red. Draw's off state is no longer red. The remote has one Blackout now,
+   in the bar under the thumb.
+5. Settings, Plate Spin, above Auto Spin: a ring of dots. In Rate it turns at the dish's speed. In Tempo
+   with a tempo tapped or heard, and Beats a Turn at 16, the dots stand still while the dish turns. Set
+   Beats a Turn to 48 and they creep backward slowly (the alias). Off, the ring is dim and still.
+
+Bad: reels that turn at one speed, a beat light that drifts off your taps, a needle that jumps or sticks
+after the sound stops, a cap that is red when the room is lit, a ring that turns while locked, anything that
+moves with reduced motion on (the reels and ring stop and the needle shows the number instead), or a violet
+or red that is not "on" or "live". Decide too: the VU dial is the plate's own 0 to 100 volume, not decibels
+(PLAN 35f-2).

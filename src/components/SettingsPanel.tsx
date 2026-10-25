@@ -22,7 +22,8 @@ import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
 import { PaceTrack } from './ui/Pace';
-import { ViscosityDrip } from './ui/Playful';
+import { LensCap, StrobeRing, TapPad, ViscosityDrip } from './ui/Playful';
+import type { TempoReading } from '../lib/tempo';
 import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -191,6 +192,10 @@ interface SettingsPanelProps {
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: { source: string | null; bpm: number; taps: number };
   onTap?: () => void;
+  /** The tempo source's reading, for the tap pad's beat light (it polls this itself). */
+  readTempo?: () => TempoReading | null;
+  /** The tempo the dish's Tempo mode is lit by (tapped, clocked or heard), bpm, or 0. */
+  spinBpm?: number;
   onTempoClear?: () => void;
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
@@ -410,7 +415,7 @@ const DEMO_LOOPS = [
   { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
 ] as const;
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -615,10 +620,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <button
             aria-pressed={blackout}
             onClick={onBlackout}
-            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex w-full items-center justify-center gap-2 mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             title="Fade the plate to black and back (B on the keyboard)"
             data-testid="blackout-button"
           >
+            <LensCap capped={blackout} size={16} />
             {blackout ? 'Lights up' : 'Blackout'}
           </button>
         )}
@@ -845,20 +851,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </span>
             </div>
             <div className="flex gap-1.5">
-              <button
-                onClick={onTap}
-                data-testid="tempo-tap"
-                title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
-                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10"
-              >
-                Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
-              </button>
+              <TapPad tempo={tempo} read={readTempo} onTap={onTap} />
               <button
                 onClick={onTempoClear}
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
+                className="min-h-9 flex-none rounded-lg border border-white/10 bg-white/5 px-3 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
               >
                 Listen
               </button>
@@ -3589,6 +3588,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           flips it (a pad can too, as Reverse Spin), so reversing a dish in
           the middle of a song is one press and not a trip to a slider.
         */}
+        {/*
+          The platter's strobe rim (PLAN 35f): a ring of dots that drifts at
+          the dish's speed in Rate and stands still in Tempo once a tempo is
+          heard, because the dish then turns exactly one dot a beat.
+        */}
+        <div className="mb-1 flex items-center gap-3" data-testid="spin-strobe">
+          <StrobeRing mode={settings.spinAuto ?? 0} rpm={settings.spinRpm ?? 6} beats={settings.spinBeats ?? 16} bpm={spinBpm} />
+          <p className="text-[11px] leading-snug text-white/50" data-testid="spin-strobe-says">
+            {Math.round(settings.spinAuto ?? 0) === 2 && spinBpm > 0
+              ? `Locked to ${spinBpm} bpm: the dots stand still while the dish turns once in ${Math.round(settings.spinBeats ?? 16)} beats.`
+              : Math.round(settings.spinAuto ?? 0) === 0 ? 'Auto Spin is off.'
+              : `Turning at ${Math.abs(settings.spinRpm ?? 6).toFixed(1)} rpm${Math.round(settings.spinAuto ?? 0) === 2 ? ' until a tempo is heard' : ''}.`}
+          </p>
+        </div>
         <Slider
           label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
           value={settings.spinAuto ?? 0}

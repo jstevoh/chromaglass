@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Mic, Monitor, FileAudio, Music, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
 import { Sheet, LIT } from './ui';
+import { VuMeter } from './ui/Playful';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
 
@@ -41,6 +42,7 @@ export function SoundPanel({
   source, onSource, inputs, inputId, onInput,
   playing, time, loop, onLoop, onToggle, onSeek,
   nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle, onClose,
+  readLevel, deaf = false,
 }: {
   source: AudioSource;
   onSource: (s: AudioSource) => void;
@@ -62,6 +64,10 @@ export function SoundPanel({
   droneRunning: boolean;
   onDroneToggle: () => void;
   onClose: () => void;
+  /** The plate's volume right now, 0 to 100, or null with no ear: what the VU needle is moved by. */
+  readLevel: () => number | null;
+  /** Listening, but nothing is arriving: the needle rests on its stop and the dial says so. */
+  deaf?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const chosen = SOURCES.find(s => s.id === source) ?? SOURCES[0];
@@ -74,7 +80,15 @@ export function SoundPanel({
           onChange={e => { const f = e.target.files?.[0]; if (f) onPickFile(f); e.target.value = ''; }}
         />
 
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
+        {/*
+          The meter that says the plate hears: a needle with a VU's 300 ms
+          rise (PLAN 35f). Today's dot only says listening or deaf; a needle
+          that moves with the kick says the band is getting in.
+        */}
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
+          <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           {SOURCES.map(s => {
             const Icon = s.icon;

@@ -56,6 +56,9 @@ import { LAMP_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, gradeRedOverB
 import { dripFallSeconds, FALL_THIN_S } from '../src/lib/dripPace.ts';
 import { THICK_NU, WATER_NU } from '../src/lib/turntable.ts';
 import { dyeRoomOf } from '../src/lib/dyeTarget.ts';
+import { FULL_CM, HUB_CM, TAPE_CM_PER_S, TAPE_SECONDS, reelsAt } from '../src/lib/tapeReels.ts';
+import { VU_FULL, needleAtRest, needleDeg, stepNeedle } from '../src/lib/vuMeter.ts';
+import { MAX_DOTS, strobeOf } from '../src/lib/strobeRing.ts';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
@@ -1906,6 +1909,110 @@ check('and neither starts over the limit',
   // Motion stays in the control and stops for anyone who asked it to.
   const rm = css.match(/@media \(prefers-reduced-motion: reduce\) \{[^}]*\.cg-tip \{ transition: none; \}[^}]*animation: none !important;/);
   check('under reduced motion the bottle does not lean and the drop does not fall', !!rm);
+}
+
+// ── Show hardware: reels, tap pad, VU, lens cap, strobe ring (PLAN 35f) ──
+//
+// Five drawings that say a number: a reel's turn rate is the tape's speed over
+// its radius, a VU needle rises in 300 ms, a strobe ring stands still when the
+// dish turns one dot a beat. Each is held to the physics it names, and each
+// picture is checked to be on the control it belongs to, desk and phone.
+{
+  const read = (f) => readFileSync(join(root, f), 'utf8');
+  const ui = read('src/components/ui/Playful.tsx');
+  const css = read('src/index.css');
+  const recordSrc = read('src/components/desk/RecordControls.tsx');
+  const playSrc = read('src/components/phone/PhonePlay.tsx');
+  const stageSrc = read('src/components/phone/PhoneStage.tsx');
+  const soundSrc = read('src/components/SoundPanel.tsx');
+  const deskSrc = read('src/components/desk/Desk.tsx');
+  const drawSrc = read('src/components/DrawScreen.tsx');
+  const remoteSrc = read('src/components/RemoteControl.tsx');
+
+  // Tape: constant speed, so omega r is the tape's speed at every moment of the take, and the tape on the two reels is one tape.
+  let worstV = 0, worstArea = 0;
+  for (let t = 0; t <= TAPE_SECONDS; t += 15) {
+    const r = reelsAt(t);
+    worstV = Math.max(worstV, Math.abs(r.supplyOmega * r.supplyR / TAPE_CM_PER_S - 1), Math.abs(r.takeupOmega * r.takeupR / TAPE_CM_PER_S - 1));
+    worstArea = Math.max(worstArea, Math.abs((r.supplyR ** 2 + r.takeupR ** 2) / (FULL_CM ** 2 + HUB_CM ** 2) - 1));
+  }
+  check('each reel turns at the tape\'s speed over its radius, and the two packs hold one tape between them',
+    worstV < 1e-9 && worstArea < 1e-9, `omega r off the tape speed by ${worstV.toExponential(1)}, pack area off by ${worstArea.toExponential(1)}`);
+  const r0 = reelsAt(0), rEnd = reelsAt(TAPE_SECONDS);
+  check('a take starts with the left reel full and slow and the right bare and quick, and ends the other way',
+    Math.abs(r0.supplyR - FULL_CM) < 1e-9 && Math.abs(r0.takeupR - HUB_CM) < 1e-9 && r0.takeupOmega / r0.supplyOmega > 2 &&
+    Math.abs(rEnd.takeupR - FULL_CM) < 1e-9 && Math.abs(rEnd.supplyR - HUB_CM) < 1e-9,
+    `start ${r0.supplyOmega.toFixed(2)} and ${r0.takeupOmega.toFixed(2)} rad/s, end ${rEnd.supplyOmega.toFixed(2)} and ${rEnd.takeupOmega.toFixed(2)}`);
+  // The closed-form angle against a plain numeric integral of omega, across the end of the tape too.
+  let worstAng = 0;
+  for (const T of [30, 300, 600, 900]) {
+    let sup = 0, tak = 0;
+    const dt = 0.01;
+    for (let t = 0; t < T; t += dt) { const r = reelsAt(t + dt / 2); sup += r.supplyOmega * dt; tak += r.takeupOmega * dt; }
+    const r = reelsAt(T);
+    worstAng = Math.max(worstAng, Math.abs(r.supplyDeg / (sup * 180 / Math.PI) - 1), Math.abs(r.takeupDeg / (tak * 180 / Math.PI) - 1));
+  }
+  check('the angle each reel has turned through is the integral of its turn rate, to a tenth of a percent',
+    worstAng < 1e-3, `worst ${(worstAng * 100).toFixed(4)}% at 30, 300, 600 and 900 s`);
+
+  // VU: 99% of a steady tone in 300 ms, a touch of overshoot, back to its stop when the sound goes.
+  {
+    let n = needleAtRest(), t = 0, peak = 0, rose = -1;
+    const dt = 1 / 240;
+    for (; t < 2; t += dt) { n = stepNeedle(n, VU_FULL, dt); peak = Math.max(peak, n.x); if (rose < 0 && n.x >= 0.99) rose = t + dt; }
+    check('the needle reaches 99% of a steady tone in 300 ms and overshoots it by 1 to 1.5%',
+      Math.abs(rose - 0.3) < 0.01 && peak > 1.01 && peak < 1.015, `reaches 99% in ${(rose * 1000).toFixed(0)} ms, overshoot ${((peak - 1) * 100).toFixed(2)}%`);
+    let w = needleAtRest(), coarse = 0;
+    for (let u = 0; u < 1; u += 1 / 5) { w = stepNeedle(w, VU_FULL, 1 / 5); coarse = w.x; }
+    check('and the answer does not depend on the frame: five frames a second land where 240 do', Math.abs(coarse - stepNeedle(needleAtRest(), VU_FULL, 1).x) < 1e-9 && Math.abs(coarse - n.x) < 0.02,
+      `x at 1 s ${coarse.toFixed(4)} in 5 steps`);
+    let m = { x: 1, v: 0 }, floor = 0, back = -1;
+    for (let u = 0; u < 3; u += dt) { m = stepNeedle(m, 0, dt); floor = Math.min(floor, m.x); if (back < 0 && m.x < 0.01) back = u; }
+    check('when the sound stops or the input goes deaf the needle falls back to its stop and does not go past it',
+      floor >= 0 && back > 0 && back < 1.2, `at rest after ${(back * 1000).toFixed(0)} ms, lowest ${floor.toFixed(4)}`);
+    const big = stepNeedle({ x: 0.2, v: 5 }, 90, 5);
+    check('a long frame (a tab coming back) cannot throw the needle off the dial', Number.isFinite(big.x) && big.x >= 0 && needleDeg(big.x) <= needleDeg(1.08) + 1e-9,
+      `x ${big.x.toFixed(3)}`);
+  }
+
+  // The strobe ring: still when the dish turns one dot a beat.
+  {
+    const still = [1, 2, 4, 8, 16, 32].every(b => strobeOf(2, 6, b, 120).driftDegPerS === 0 && strobeOf(2, 6, b, 120).dots === b);
+    const aliased = strobeOf(2, 6, 48, 120);
+    const rate = strobeOf(1, 12, 16, 0), fast = strobeOf(1, 45, 16, 0);
+    // 48 beats on 32 dots: 7.5 deg a beat against an 11.25 deg spacing is seen as 3.75 deg back, twice a second at 120 bpm.
+    check('in Tempo with a tempo heard the ring stands still for any beats-a-turn the ring has dots for, and creeps past that',
+      still && aliased.dots === MAX_DOTS && Math.abs(aliased.driftDegPerS + 7.5) < 1e-9,
+      `32 beats ${strobeOf(2, 6, 32, 120).driftDegPerS} deg/s, 48 beats ${aliased.driftDegPerS.toFixed(2)} deg/s`);
+    check('in Rate, and in Tempo before any tempo is heard, the ring drifts at the dish\'s speed, and Off draws it dim and still',
+      rate.driftDegPerS === 36 && fast.driftDegPerS === 36 && !rate.strobed &&
+      strobeOf(2, 3, 16, 0).driftDegPerS === 18 && strobeOf(0, 12, 16, 120).off && strobeOf(0, 12, 16, 120).driftDegPerS === 0,
+      `12 rpm ${rate.driftDegPerS}, 45 rpm ${fast.driftDegPerS} (drawn at most 36 deg/s)`);
+    check('the way round shows: a negative rate drifts the other way', strobeOf(1, -3, 16, 0).driftDegPerS === -18 && strobeOf(1, 3, 16, 0).driftDegPerS === 18);
+  }
+
+  // Where each picture is drawn.
+  check('Record shows the reels on the desk button, the phone\'s Play pill and the More tile, the phone pill in a box that does not change width',
+    /<TapeReels seconds=\{reelSeconds\}/.test(recordSrc) && /<TapeReels seconds=\{p\.recording\.seconds\}[^>]*running=\{p\.recording\.on\}/.test(playSrc) &&
+    /h-7 w-7/.test(playSrc) && /glyph=\{<TapeReels seconds=\{p\.recording\.seconds\}/.test(stageSrc));
+  check('the Play pill is red while it records: live, not lit', /testId="play-record" pressed=\{p\.recording\.on\} live>/.test(playSrc));
+  check('the tap pad is on the desk\'s Tempo row and the phone\'s Sound sheet, polled from the tempo source and not a render',
+    /<TapPad tempo=\{tempo\} read=\{readTempo\}/.test(panel) && /<TapPad tempo=\{p\.tempo\} read=\{p\.readTempo\}/.test(stageSrc) &&
+    /const readTempo = useCallback\(\(\) => tempoRef\.current\?\.read/.test(panel0app) && /readTempo=\{readTempo\}/.test(panel0app) && (panel0app.match(/readTempo=\{readTempo\}/g) ?? []).length === 2);
+  check('the VU needle is on the desk\'s Sound sheet and the phone\'s, moved by a frame loop through a ref and never by state',
+    /<VuMeter read=\{readLevel\}/.test(soundSrc) && /<VuMeter read=\{p\.readLevel\}/.test(stageSrc) &&
+    /readLevel=\{readLevel\}/.test(panel0app) &&
+    /const frame = \(now: number\) => \{[^}]*node\.style\.transform/.test(ui) && !/const frame = \(now: number\) => \{[^}]*set[A-Z]/.test(ui));
+  const blackouts = [['desk', deskSrc], ['Settings', panel], ['remote', remoteSrc], ['Draw', drawSrc]];
+  check('Blackout is one capped lens on the desk, Settings, the remote and Draw',
+    blackouts.every(([, src]) => /<LensCap capped=\{/.test(src)), blackouts.filter(([, src]) => !/<LensCap capped=\{/.test(src)).map(([n]) => n).join(', ') || 'all four');
+  check('and the remote has the one Blackout, not two', (remoteSrc.match(/data-testid="remote-blackout"/g) ?? []).length === 1);
+  check('Draw\'s Blackout is not red while the room is lit: red is for live', !/'border-live-border bg-\[rgba\(17,17,19,\.78\)\] text-live'/.test(drawSrc));
+  check('the strobe ring is on Auto Spin in Settings and on the phone\'s Spin sheet, lit by the tempo heard',
+    /<StrobeRing mode=\{settings\.spinAuto \?\? 0\}/.test(panel) && /<StrobeRing mode=\{p\.spin\.auto\}/.test(stageSrc) && /spinBpm=\{/.test(panel0app) && /bpm: tempoLabel\.source \? tempoLabel\.bpm : heardBpm/.test(panel0app));
+  check('under reduced motion the reels do not turn, the cap does not snap and the ring does not drift',
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\.cg-reel \{ transform: none !important;[^}]*\}\s*\.cg-cap, \.cg-ring \{ animation: none !important; \}/.test(css) &&
+    /matchMedia\?\.\('\(prefers-reduced-motion: reduce\)'\)/.test(ui));
 }
 
 // ── Result ──────────────────────────────────────────────────────────
