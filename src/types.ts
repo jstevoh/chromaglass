@@ -337,13 +337,24 @@ export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape'
  * migration step to get wrong. Read them as `?? 'room'` and `?? 'all'` and the
  * old shape is a special case of the new one rather than a thing to convert.
  */
+/**
+ * What a hand does to one place on the plate (PLAN 25h, lib/areaCords.ts):
+ * warms it, stirs it with a paddle, pours into it, or picks which of its
+ * bottles pours. Only a cord aimed at an area can take one, and a cord aimed
+ * at an area can take nothing else.
+ */
+export type AreaTarget = 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue';
+
 export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
   /** A room/film feature, an audio one or a named source, depending on the source. */
   feature: SceneFeature | AudioFeature | SourceName | HitFeature;
-  /** Any numeric setting — the same list a MIDI fader can learn. */
-  setting: keyof VisualizerSettings;
+  /**
+   * Any numeric setting — the same list a MIDI fader can learn — or, on a
+   * cord aimed at an area, what the hand does there (`AreaTarget`).
+   */
+  setting: keyof VisualizerSettings | AreaTarget;
   /** How far the feature moves it, as a share of the setting's travel. −1..1. */
   depth: number;
   /**
@@ -354,6 +365,23 @@ export interface SceneMapping {
    * you aim it at, which is why the panel will not let you aim one.
    */
   layer?: number | 'all';
+  /**
+   * Which of the look's areas of the dish it works in (an index into its
+   * `PRESET_AREAS`, lib/plateAreas.ts), or absent for the whole plate as
+   * before. With one, `setting` is an `AreaTarget`: the hand works there and
+   * the rest of the plate is left as the look has it (PLAN 25h).
+   */
+  area?: number;
+  /**
+   * The cord's gate (the least of PLAN 30a): it opens when the reading
+   * crosses `threshold` (0..1), rises to the hit's height over `attack`
+   * seconds while open and falls over `release` once the reading drops back.
+   * All three absent, the cord follows its reading as it always has. Read on
+   * area cords (lib/areaCords.ts CordGate).
+   */
+  threshold?: number;
+  attack?: number;
+  release?: number;
 }
 
 export interface VisualizerSettings {

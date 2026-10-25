@@ -1988,6 +1988,51 @@ map loader and a loaded look alike; gestures typed as OSC's are; `hexCache` boun
 `NaN`, an unknown key and a 1,000-character colour, and finds the settings, the
 governor's ladder and the cache as they were.
 
+#### 14v-7. A frame gap while the intro is held still counts only the page's own work
+
+Shipped 2026-10-24, the owner's choice on a card ("judge pauses the audience sees").
+`npm run startup`'s "no stop in the opening" was the loudest check on CI: 41 FAIL of 193
+Mac runs in the week to 10-24 (`npm run flakes`), 25 branches, 4 of them main's, 20 green
+on the same commit; the week before 14v-6 it was 16%. Every one of the 41 logs read:
+
+- the longest frame gap 2.02 to 3.97 s, beginning 0.24 to 4.08 s in;
+- inside Chromium's own waits: the device given up to 3.7 s after it was asked, or the
+  first compute kernel of all (`fluid/fill`, a few lines) given 2.4 to 4.6 s after;
+- the page's own long tasks in the gap 0.83 s at most, none in 38 of them, and nothing
+  made, written or submitted in it;
+- every gap over before the intro let go of its still (4.64 to 11.96 s), the stretch
+  `introStill` (14v-5) holds the mark still exactly because the GPU stops the frames then.
+
+4b already took out the time the page's thread was held as well; in these the thread ran
+and only the frames stopped. Two fixes on the app's side had failed (#396 warmed the
+compiler, 14v-6 reordered the asks), and nothing a page does makes Chromium give it a
+device sooner. So, in `openingGaps`, a frame gap that would count past the bar loses,
+inside the still stretch, the time the page was seen free: between two ticks of its own
+100 ms timer no more than `TICK_FREE_MS` (250 ms) apart. At most `STILL_IDLE_CAP_S`
+(4.5 s, above the 41 gaps' 3.97 s and Chromium's start's 4.18 s) comes out all told, only
+of a still that let go (capped at the intro's leaving), and only when long tasks and the
+timer can be seen at all. Outside the still stretch, and for heartbeats and steps,
+nothing changed, and the 2 s bar did not move. The line prints how much of its gap was
+the still intro with the page seen free.
+
+The first draft took out everything but the page's long tasks and pagehold's after-await
+stretches. The check-skeptic fed it synthetic openings: 2.5 s of the page's code after a
+pipeline's promise at 3.5 s, or a chain of 0.45 s continuations, read as idle, since such
+code is not a long task in every Chromium and pagehold's stretches begin only in the first
+3 s; a still that never let go excused everything up to the intro's 60 s cap. The timer
+answers all three, and `stillCases` now runs six such openings on every run (excused,
+code after an await, a continuation chain, a gap across the still's end, a still never let
+go, the cap), each of which a mutant of the rule turns red. Replayed on the 41 logs by
+their printed long tasks: 0 red; the timer's ticks inside the gaps are not printed (its
+median was 108 to 118 ms in all 41), so the week after, by `npm run flakes`, decides. The
+new count is never more than the old, so no green run turns red.
+
+Named limit: a stop the GPU process makes for the page while the intro is still (its
+compiles of the app's shaders) is no longer counted here; its length is held by checks 1
+and 1b and the first step's cap. Weighed and not taken: one automatic re-run (about 4%
+red instead of 21%, and it hides a real one-in-five), warming Chromium's GPU in a page
+before the measured one (untested, and #396's warm in the same page did not help).
+
 ### 14m. Anyone on the venue's network can drive the show
 
 **Shipped** (this PR). What changed, in `server/remote-server.js` unless named:
@@ -2162,6 +2207,65 @@ in arithmetic, a quiet room's clicks were 46 of 46 kicks and are none; with the 
 playing, the beat clock fired 303 kicks for the band's 258 and fires 257; in the app,
 on the Perform desk 10 kicks for 10 presses and none, on the phone 9 for 9 taps and
 none, while knocks with no hand on anything are still all heard.
+
+
+### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped 2026-10-24)
+
+Asked by the owner 2026-10-24: early cartoons in the app to run in the background and feed
+the visuals, The Skeleton Dance first, and then "I don't want a short loop, I want the
+extended cartoon looped."
+
+What shipped. Four cartoons, each the whole film with only its title and end cards cut:
+The Skeleton Dance (1929, 5:08), Steamboat Willie (1928, 6:58), Swing You Sinners! (1930,
+7:28) and Out of the Inkwell's The Tantalizing Fly (1919, 3:19). A Cartoons shelf on the
+desk's Dye panel and in the phone's dye sheet gives each a Pour (into the dish as dye,
+looping, with Stop) and a Film (through the projector, under the dye; pressed again, off).
+They are not also in Settings' Film section: on the desk that section sits beside the Dye
+panel, and `npm run layout` caught the same buttons drawn twice.
+
+Copyright. Every one was published in 1930 or before, so it is in the US public domain
+(95 years from publication at the most). Where each copy came from, what was cut, and the
+caveats (Disney's trademarks in Mickey; later versions of the characters; that The
+Skeleton Dance's only copies online come from a modern transfer, not a print scan; status
+outside the US) are in `public/video/cartoons/SOURCES.md`. Steamboat Willie is a scan of
+an old 16mm print, cropped to the picture (its frame lines measured at rows 47 and 430 and
+its edges at columns 60 and 538 on every tenth second of the reel). Swing You Sinners! is a
+1950s television print whose distributor's title cards are cut.
+
+Size. Silent H.264 MP4, 384 px wide, grey, 24 fps, grain smoothed (hqdn3d) before
+encoding, the index at the front so a cartoon plays while it arrives: 6.1, 5.5, 8.1 and
+1.5 MB, 21.2 MB together. The first pass, 480 px with light smoothing, was 48 MB. Nothing
+is fetched at load (the files are not under `/assets/`, so the service worker leaves them
+alone), so 14v's load time is unchanged; a cartoon is given to the video by address, so it
+starts before it has all arrived.
+
+14ab-1, fixed with it. `App.tsx` handed the poured video to the plate on every animation
+frame, and `pourVideo` paused whatever it held before taking the new one, which was the
+same video: it was paused and played sixty times a second. Now `pourVideo` takes a video
+once (the same one again only makes sure it plays) and the app calls it once, on play.
+Measured by `npm run cartoons`'s pour line, on a phone page in Chromium: with the old pour
+(the per-frame hand-over and the old `pourVideo` put back), the page closed under the pour
+before its two seconds were up (the check's "the page lives through Pour and Film" red,
+10/11); with the fix, 2.00 s of the cartoon played in two seconds, 0 pauses, a picture
+range of 186 read back from it, 14/14.
+
+The film survives a rebuild. The GL effect's cleanup stopped the film, and that cleanup
+also runs when the plate is rebuilt (`glEpoch`: a lost device, a resolution change), so a
+loop, the camera or a window went dark on the projector while the panel still said it was
+playing. Found by `npm run cartoons` under software WebGPU (`PW_WEBGPU=1`), after its review
+made it ask what the projector holds: a second and a half after Film the projector held no
+film and the video had been reset (15/16). The film is now stopped only when the plate goes
+away, in its own effect (16/16 there).
+
+The check, after one review pass: besides the files and the licence record, it asks that
+the video the plate holds as its pour (`__cgVideo` under `?debug`) is the cartoon that
+played, and that the plate's frame loop read it where there is a plate (2–3 frames in two
+seconds on software WebGPU); that each loops (sent half a second from its end, back at its
+start 1.5 s later, no `ended`); and that Stop and Film-off pause that same element and the
+plate and projector let go. It runs in CI's browser part.
+
+Measured: `npm run cartoons` 16/16 (no GPU and `PW_WEBGPU=1`), `layout` 77/77, `phone`
+357/357, `desk` 48/48, `panel` 197/197, `lint` clean.
 
 ### 15i. Picking a bottle pours nothing (shipped)
 
@@ -3306,9 +3410,33 @@ sheet and the remote goes back to the liquid as it is. Water keeps a blue dye by
 (the first drop has to show), Ink is a dye, and the owner's own bottles pour as they did.
 The open items are 18d-3 to 18d-11 and 18d-12a to 12c in PLAN.md.
 
+### 18f. Heat comes from the lamp, and a level plate has no "up"
+
+**Shipped (#352):**
+- **Where:** `currentForces` previously pushed heat along `S.up` regardless of whether the plate was level or upright, saturated by an artificial `tanh(20T)` clamp. Centre gravity and rock used `tanh(dye - mean)`. The oil in `mixForce` had no buoyant density contrast, so oil never floated upward relative to water when the plate was tilted. Heat decayed per step rather than per second, meaning 60 Hz and 120 Hz simulations cooled at vastly different rates.
+- **The real phenomenon and changes:**
+  1. **Level plate has no in-plane buoyancy:** On a level dish, gravity points straight through the glass normal to the plate ($g_z$), so in-plane buoyancy ($g_x, g_y$) is identically zero. In `currentForces` and `mixForce`, in-plane thermal buoyancy is strictly gated on `upright` (zero on a level plate, active on a tilted/vertical plate).
+  2. **Linear Boussinesq:** Removed the artificial `tanh(20T)` clamp. For temperature differences of tens of kelvin, density changes are linear in temperature ($\Delta \rho = -\rho \beta \Delta T$), so buoyant acceleration scales linearly with temperature. Doubling temperature doubles plume acceleration (verified by `npm run heat` check 5).
+  3. **Beer–Lambert spectral absorption:** The lamp heats the dish in proportion to how much light the dye absorbs. In `decayVel`, dye absorption is decoded using the plate's `lampThrough` Beer–Lambert model (`exp(-d.rgb / d.a)` per unit depth), so dark dyes absorb strongly while pale dyes and clear water stay cool (verified by `npm run heat` checks 1 and 8). The central lamp hotspot is modeled by the spatial shortcut $1 / (1 + 2.5 r^2)$.
+  4. **Anchored physical units & Newton cooling:** Temperature is modeled in kelvin. The heating rate constant `LAMP_HEATING = 0.24` K/s is derived from physical irradiance absorbed in a thin layer: $I / (\rho \cdot c \cdot h) \approx 1000\text{ W/m}^2 / (1000\text{ kg/m}^3 \times 4184\text{ J/(kg K)} \times 0.001\text{ m})$. Newton cooling decays per-second with a real physical time constant in the tens of seconds ($\tau \approx 12.4\text{ s}$ via `heatDecay^(4*dt)`), remaining dt-independent across frame rates.
+  5. **Oil buoyant density:** In `mixForce`, oil ($\rho \approx 0.85\text{ g/cm}^3$) is less dense than water ($\rho = 1.0$), so oil experiences upward buoyancy along the tilted plate while heavier wax sinks.
+  6. **Temperature-dependent viscosity:** Water viscosity drops by ~2% per kelvin ($\mu(T) \approx \mu_0 / (1 + 0.02 \Delta T)$), causing thin-gap mobility under gravity to rise with temperature (~1.5× at 30°C).
+  7. **CPU twin alignment:** `LiquidVisualizer.tsx`'s `stepCurrent` mirrors the GPU solver: `fy = upright * p.currentBuoy * Math.min(50, Math.max(0, this.temp[q])) + p.rockY * dd`, removing `tanh(20T)` and gating on `upright`.
+- **Measured:**
+  - `npm run heat`: 9/9 checks passing on Metal and SwiftShader.
+  - Check 1 & 8: Dark dye heats to 0.0707 K in 0.5s under full dimmer, clear water stays at 0.0000 K; dark dye absorbs 12.95× more heat than pale dye of equal total density.
+  - Check 2: Dimmer at 0 produces 0.0000 K; dimmer at 0.5 heats to 0.0353 K (0.500× linear scaling).
+  - Check 3: 60 steps at dt=1/60s cool to 9.0703, 120 steps at dt=1/120s cool to 9.0625; ratio 1.0009 confirms dt-independence (per-step would diverge by 3.36×).
+  - Check 4: Level plate produces 0.000000 in-plane vy; upright plate produces upward plume vy = 0.126343.
+  - Check 5: Plume vy is 0.22839 at T=15 and 0.41284 at T=30; ratio 1.808 confirms linear Boussinesq scaling (tanh clamp would saturate to 1.10).
+  - Check 6: Thin-gap terminal velocity increases from 0.12048 to 0.18945 at 30°C (ratio 1.572), matching the ~2%/K viscosity drop.
+  - Check 7: Oil rises with vy = +0.00809, wax sinks with vy = -0.03311, level plate is 0.000000.
+
 ### 18g. Colour leaves by flushing, not by fading
 
 **18g-1** (2026-10-11): flushing at the open rim (#362). On a thin gap, old colour leaves by being pushed over the circular open rim ($r \ge 0.5$) into the overflow trough as new liquid enters, mirroring 18d-2's species rim, and a still dish loses no colour through its rim (`evapFactor` 1). Base evaporation still fades colour inside the dish until 18g-3/18g-5, and the dye-budget regulator is preserved as a named safety cap pending 18c-2 (pours add volume) to prevent runaway saturation on looks that inject dye without volume. Measured in `npm run flush` (9/9). Open items 18g-2 to 18g-5 remain in `PLAN.md`.
+
+**18g-6** (2026-10-24): the open rim holds the oil that touches it. Found building 27f-5: a body of oil against the rim drained out through it with the plate level, by its own surface tension. The thin gap's rim held the pressure at zero, the water's in the reservoir past the cover glass, in a cell of oil too, so the oil just inside the rim was at its body's Laplace pressure σκ and the rim's own cells at none. A real body cut by the rim has its interface past it, in the reservoir's water, and its oil there is at σκ. Now the rim is held at that pressure: `rimLaplace` integrates the capillary force along a ring two cells inside the rim, from its least oily sample (the water's zero), which across an interface is the jump σκ and inside a body flat, and `mixForce` takes the gradient of w(r)·φ(θ) off the capillary force over the last eight cells inside the rim. A gradient moves nothing between two glasses, so this is the same as holding the solve's rim at φ without touching the solve or the carries' faces, and short of the band the force is the same to the bit. The closed-dish circulation the item also offered (27f-5's way) would have been a second Poisson solve every step on every oil look. `npm run rimhold` (fifth shard): a lens of 0.06 against the rim at the middle of the grid's edge kept 9.6% of its oil over six seconds on main and 97.1% now, on the diagonal 99.0%; in their last three seconds the tension drains none beyond the weak-tension control's; at a hundredth of the tension, and in the middle of the dish, nothing changed; a pour still pushes oil out over the rim. `npm run oillift`'s own rim lens at the looks' tension keeps 98.5% (66% before); its half-dish sheet laid against the rim now settles off it in its first second, the picture's mean 0.31 mm/s for that second and 0.02 by the third, where before it drained through it at 0.14 mm/s while it lasted, and the frame the tilt adds is 0.05 mm/s against the bar's 0.15 (0.006 and 0.015 before, both runs of the difference now in that first second). `npm run physics` 20/20. Left: 18g-7 (a tension-free slow loss on the diagonal) and 18g-8 (the gap's own curvature, which decides whether a real body is drawn out under the cover's edge).
 
 ### 18h. Dye spreads along the flow (replaces isotropic diffusion and the conservation patch)
 
@@ -3495,6 +3623,27 @@ The check-skeptic's mutants: `failure` without its redaction fails the URL check
 sync wrapper rethrowing Node's own error fails two. `deploygate.sh` still puts the header
 on curl's command line, readable through `ps` while it runs on the owner's machine:
 19aa-4.
+
+### 19ac-1. The double tap's two taps carry a finger's times
+
+Shipped 2026-10-24. `npm run phone`'s "Play: a double tap on Speed puts it back to the
+look's own speed" was red on 10 of 173 Mac runs in the week to 10-24, 5 of them green on
+the same commit, every one reading `0.009 → 0.28 → 0.005`: both taps landed (0.005 is
+Speed at a third of the track) and the second was not taken as the other half of a double
+tap. `TouchSlider` reads a double tap from the two lifts' `timeStamp`s, at most 320 ms
+apart, which on a phone are the finger's times. Playwright's `touchscreen.tap` stamps
+none, so Chromium stamps each event when it reaches it, and the second tap is sent only
+once the page has handled the first: in a plain page whose pointerup kept the thread
+busy, two such taps 60 ms apart read 95 ms apart idle, 217 ms busy 150 ms and 466 ms busy
+400 ms; the same taps sent with their own times read 80 ms apart busy 400 ms. So the
+check measured how quickly the page answered the first tap, which a finger never waits
+for. The taps are now sent through `Input.dispatchTouchEvent` with times 90 ms apart; a
+second tap is sent no sooner than 0.4 s after the first, past the window, so the line
+passes only if the stamps are what the app reads, and no stamp is ever in the future;
+both lifts must reach the app within 15 ms of their stamps, so a red names the instrument;
+and a control stamped 0.6 s apart must leave Speed where one tap there puts it. The line
+prints how far apart the app handled the lifts (the page's own lag, which no check bounds
+for the phone's sheet yet: 19ac-2).
 
 ## 21. Looks after painters
 
@@ -3725,6 +3874,67 @@ Velvet Underground, Lumia and Cell Bloom are rebuilt on it (judging §34):
   dish's turn carries them round under it, and Cell Size 0.32 → 0.6 so the cells are
   drawn at its zoom.
 
+
+### 25h. Areas that listen for themselves (shipped)
+
+The owner, 2026-10-24: the presets want more complexity, more varied palettes and parts of
+the canvas reacting to the music; of the four directions explored that day, all taken, this
+one first. Areas already took the music's hands by band, but every patch cord moved one
+number for the whole plate and every area drew on one palette.
+
+- **A cord aimed at an area** (`SceneMapping.area`, an index into the look's areas) does one
+  of four things a hand does to one place (`lib/areaCords.ts`): **Heat here** (heat in
+  kelvin, 1.5 K/s at full, carried and cooled as the lamp's is; 25h-1 names that it opens no
+  hole until 18f-2), **Stir here** (a paddle drawn round the pool: the Finger's own solid on
+  a thin gap, one turn in 1.2 s, turning back on each hit of a gated cord), **Pour here**
+  (the area's bottles, 1.5 of density a second, under the look's fill as the music's pours
+  are) and **Bottle here** (which bottle pours next). A setting is one number per plate, a
+  uniform in the shaders, so an area takes the four acts and nothing else; the patch bay's
+  fold leaves an area cord alone. Every act eases to nothing over the area's rim.
+- **A gate on an area cord**, the least of 30a: a threshold (closing 0.05 under it, so a
+  reading dithering on the line is one hit), an attack and a release, linear, so the
+  envelope reaches a hit's height in the attack and falls from it in the release. None of
+  the three set, the cord follows its reading as every cord did.
+- **A colour family per area** (`PlateArea.dyes`). Absent, the family is the area's dye and
+  the next, which is what its pool's second colour and the Color route's cycle already took,
+  so Lumia and Cell Bloom lay and play as before. Velvet Underground's contract grew to six
+  (lavender, coral and purple after its three), one pair per pool.
+- **The looks.** Velvet Underground: the kick warms and stirs the soap well, the mids fold
+  the glycerine with a slow paddle, the hats pour the syrup's two bottles in turn. Jellyfish
+  Bloom (25b-6): its four bells are areas now and its seed lays them there (`OWN_SEED_AREAS`;
+  they were scattered at random), the kick pours the lowest bell's pink and teal, the hats
+  ruffle the top bell, the brilliance band picks its bottle (for the treble's sparks that land
+  there: the music's own hands in an area read its Bottle cord, `AreaHands.picked`, which the
+  first build left to the area's pour cords alone, and that bell had none), the mids pour the
+  side bells.
+  Bass Drop (25b-3): three soap wells on the bass, taken in turn by the kicks, Center
+  Gravity 0.4 → 0.15; the snare stirs the low well and the sub warms the left. Preset depths
+  stay at 0.6 or under, the most a one-second look change crossfades within `npm run desk`'s
+  0.03 a tick.
+- **The panel.** On a look with areas each patch gets an area picker over a thumbnail of the
+  plate (`components/phone/AreaPicker.tsx`, the areas drawn where they are in their
+  families' colours, 40 px targets for a thumb, the same sheet on the phone), and an area
+  cord gets the gate: Fire on a hit, Gate, Rise, Fall.
+- **Measured** (`npm run areacords`, the lab on SwiftShader, Velvet's pools on a thin gap,
+  laid through the app's own sink, each run against a control of the same plate with no
+  cords): one band's cords on the soap well changed the dye there 2×10⁵ times what they
+  changed outside every area and kept 1.946 of the 1.967 of density poured there, the flow
+  13.6x, and the heat 1.302 K on the run's mean of 1.310 K laid, against nothing outside;
+  with two areas on two bands, band 2 worked the well 773x (dye) and 17.4x (flow) more than
+  the syrup, and band 7 the syrup 286x and 18.4x more than the well; each gate opened once a
+  burst (8 of 8). The flow held to the paddle's own arithmetic (the review): 0.090 cells a step
+  meaned over the well, on 0.016 that the paddle's solid laid there and a paddle going 0.337
+  round its circle (the floors half and a tenth); with the paddle cut to a cell across (0.05 of
+  the area) the well went 0.006 and the check failed, where the ratio alone had passed. In
+  node, a hit that grows after the gate opens ends at 0.887 for 0.9 (0.500 with the height
+  untracked), and two cords alike keep a gate each. In node, a gate opened 14 times for 8 bursts and 6 stretches dithering on
+  its line, where reading the line alone opened 51; rise 0.250 s for 0.25 and fall 0.333 s for
+  0.35, for a hit of 0.9 and one of 0.5. The 25e
+  count of lit places, each look played by its own cords for four seconds of a groove with
+  every act in the plate's middle (where the music landed before areas) and then in its
+  areas: Jellyfish Bloom 1 → 3, Velvet Underground 1 → 1 (its cords pour in one pool; the
+  other two are stirred and warmed), Bass Drop 0 → 0 (its cords pour nothing; its wells take
+  the music's own hands, 25h-7).
 
 ## 26. A reaction that prints: Turing stripes in black and white
 
@@ -4021,6 +4231,79 @@ back 95% of the way at the default, 89% at full. Shortcuts (27f-4): the ring the
 never opened past rest), the reach is read at the 6 mm middle, and the release is KickRelease's
 third of a second rather than the sheet's own slower relaxation.
 
+### 27f-4. The rhythm sheet solved, not stamped (2026-10-24)
+
+27f-3 laid the kick's dent as its held shape (a clamped bowl 2.28 bending lengths across) and gave it
+back by a cosine over a third of a second. Now the sheet is solved (lib/sheet.ts `RhythmSheet`): a
+fingertip of 5 mm on 0.1 mm of polyester floating on the 6 mm layer, D∇⁴w + ρg w = F − p, the layer
+draining under it by lubrication, so w_t = M∇²(D∇⁴w + ρg w − F) with M = h₀³/12μ. Linear with
+constant coefficients, every Fourier mode has its own exact step, e^(−λdt) and the load's
+(1 − e^(−λdt))/(Dk⁴ + ρg), λ = Mk²(Dk⁴ + ρg): 128² modes on a box twice the plate's side, the plate
+in one corner and its negated mirror images in the others, so every mode is a product of sines and
+the sheet is held at rest, at the open air's pressure, on the plate's edges (the dish's open rim,
+whose reservoir lets the liquid out and back). One inverse transform a step, done as half a complex
+one because the sheet is real: 0.7 ms in node on the app's 192 plate. Each kick presses out from
+under the sheet, within the dent's reach, as much liquid as the stamped bowl closed there
+(stampedVolume, the shader's Stefan closing of the bowl), its middle capped at two thirds of the
+gap, so the dial moves the colour as it did. Pressed first only as deep in the middle as the bowl,
+the finger's sharper dent moved `npm run rides`' ring 1.9 cells at the default and 3.4 at full,
+against the stamp's 3.0 and 6.8 and the line's 4. The change is laid each step through its own channel (applyDeltas'
+`sheet`, squeezeUpdate's `sheetT`), as solved: no Stefan closing on top, and no ceiling at rest, which
+would have cut the ring and ratcheted the gap closed where it went. The plate's spring is taken on
+the sheet too, so what is laid is only the sheet's own motion. Off the GPU or off a thin gap the
+stamp stays.
+
+What the solve found. The liquid's weight was missing from 27f-3's reach: a floating sheet pushed
+down is held up by Archimedes as well as by its stiffness, the two balancing at (D/ρg)^(1/4), 14 mm,
+which is smaller than a dent. And the weight levels the layer as a puddle levels, at Mρg: 0.18 m²/s
+in water, 8e-3 on the default oil, 2e-4 in glycerine. Without it, kicked twice a second the dish's
+mean gap sank by more than half a dent's depth in a minute (the liquid pushed out under the sheet
+stood outside the dish and came back only through the box's slowest modes); with it and the rim,
+within 1.5% on the oil. 27f-4's own text had two things wrong: the dent does not shallow as
+t^(−1/3) (with no net volume an unbounded sheet's goes as t^(−2/3), and on the plate the rim takes it
+first), and syrup is not slower for the bending alone (every time in that solution is t/T; it is
+the weight, levelling a thin liquid fast and a thick one slowly, that makes it so).
+
+Measured (`npm run sheet`, 16 checks, node and the lab): the held dent within 1% of the integral of
+the same equation in water, the default oil and glycerine; 57, 43 and 24 mm to its zero, a ring of
+2%, 7% and 14% round it (the reach dentRadius now takes, by quadrature, within 5% of the solve's:
+35, 27 and 15 cells of 128, where the bending length alone said 47, 28 and 15); let go, water
+levels within a frame (96%), the oil gives back 96% in a fifth of a second and glycerine three
+quarters, each within 1% of the theory while the dent is the finger's and not the rim's, and
+water's last of it goes as the dish's slowest mode (0.231 a frame against e^(−λ₁/60) 0.231). On the
+plate the gap is the solve's cell for cell to 0.03% of a dent, held, letting go, after a dozen kicks
+and let go; the ring stands 7.6% of a dent past rest where the same change laid as a press is cut
+at rest; a dozen kicks and twenty seconds later the dish's mean is within 0.02% of a dent of rest;
+and past 4ℓ from a held kick the liquid moves 0.43 as fast as under the stamp. `npm run rides`'
+Beat Squeeze lines now press the solved sheet: its ring 30 cells out goes 2.7 cells at the default
+and 4.6 at full (the stamp's 3.0 and 6.8), 70 cells out 0.69, far off 0.175 of the glass's where a
+stamp's volume would say 0.339, and comes back 99% and 100%. The line that asked the reach to go
+exactly as μ^(−1/6) now asks it to narrow with thickness, the solve's (`npm run sheet` holds it
+against the grid), and the one that asked the far ring to move by the stamp's displaced volume now
+asks it to move less. Shortcuts (27f-8): the mobility is the rest depth's,
+the sheet's rim is the plate's square, the gap under it the 6 mm middle, the force set from the
+volume, the slosh dish's press keeps the stamp's timings, and (f) the layer drains by lubrication,
+which is the liquid's own pace only in glycerine.
+
+The review (the PR's one Opus pass) held the solve and found two places where it met the plate
+wrongly. On a dome (Plate Shape below zero) the middle rests near the floor; a dent there closed
+more than the gap had, the floor refused it, and the sheet's opening was then laid back in full,
+so every kick near the middle left the gap more open: at Plate Shape −1 a dozen default kicks left
+the middle a whole dent past rest and the dish's mean 10% of a dent open (13.5% at full; −0.5 at
+full 44.8% and 2.2%). Now a kick presses no deeper than the dome's rest under it (`kickRoom`), and
+the shader owes what its floor refuses (the squeeze texel's fourth number, paid out of the sheet's
+next openings, taking the spring as the gap does): read against each dome's own rest, a dozen kicks
+and let go, the gap is the solve's to 0.12% of a dent cell for cell and the mean within 0.06%. And
+the sheet set `pressed` on every cell it moved, which is every cell, so the press memory stopped
+for every other press while a kick's sheet was live: a hand press's push after it went from −4.5e2
+a step to under 3. The memory now carries a rate of its own (the texel's third number, this step's
+without the sheet's), and the same press reads the same, step for step, with a sheet live across
+the plate. The squeeze texture is RGBA32 for those two numbers. Also named by the review: Reynolds
+needs the layer's viscous time h²/ν short against the motion, true only in glycerine (27f-8(f));
+`rides`' far line now asks both ways against the solve's own share of the stamp's volume that
+leaves 70 cells (0.568, so 0.193 against the 0.175 read), and the quiet asks for the slowest
+mode's time (oil 1.400 s against 1.391), not 255 s.
+
 ### 27f-5. The rock lifts the oil, not the frame (2026-10-24)
 
 Oil on a tipped plate is lighter than the water round it (light mineral oil, 880 kg/m³), so
@@ -4036,7 +4319,7 @@ the water's colour alone (Oil Bodies' own share taken off, `WATER_DYE`), over it
 on the GPU this step (`hsOilMean`): weighed whole, a Clock Glass body's colour pulled it
 downhill about nine times as hard as its oil lifts, so the bodies sank against their buoyancy.
 
-Measured (`npm run oillift`, lab, sinθ 0.1): a lens rises at 6.22 mm/s against Hele-Shaw's 6.40
+Measured (`npm run oillift`, lab, sinθ 0.1): a lens rises at 6.21 mm/s against Hele-Shaw's 6.40
 worked out in SI for its soft edge (Δρ g sinθ h²/12μ, halved for the water it pushes round it,
 × (1 − a²/R²), × ∫c²/∫c); a level one stays put; a lens carrying Clock Glass's colour rises at
 88% of a plain one (the 6% of its colour Oil Bodies leaves in the water at its edge weighs as

@@ -175,6 +175,8 @@ export interface GpuStepParams {
   air: number;          // airVelocity (0 = off)
   evapFactor: number;
   time: number;
+  /** Master dimmer / lamp brightness (0 blackout to 1 full brightness), scaling lamp heat (PLAN 18f). */
+  dimmer?: number;
   /**
    * The lasting current (see `stepCurrent`). Everything here is per second in
    * solver velocity units, except `currentDamp` (per step) and `maxCurrent`.
@@ -328,8 +330,11 @@ export interface PlateSolver {
    * `breath`, when a Blow's wind blows on a thin gap: L²×4 of (τx, τy, 0, 0),
    * the air's stress on the surface in pascals, for the next step only
    * (PLAN 15g; lib/breath.ts, hsBody).
+   * `sheet`, when Beat Squeeze's rhythm sheet moved this step: L² of the
+   * gap's change, solved (lib/sheet.ts), laid as it is: no film closing on
+   * top and no ceiling at rest (squeezeUpdate's `sheetT`, PLAN 27f-4).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null): void;
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null): void;
   /**
    * Drive the slosh dish for the next step (lib/slosh.ts SloshDrive: the tilt,
    * the water's viscosity, the presses, whether to lay it level first), or null

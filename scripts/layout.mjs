@@ -730,6 +730,72 @@ try {
       // Put the value back for what follows.
       await knob.dblclick();
       await settle(200);
+      /*
+        8j: cards that stuck and stacked. The owner found Macro Zoom's card up
+        under Evolve Speed's, neither going, both reading "⌥ held while
+        dragging goes fine": each knob had missed the release and thought a
+        hand was still on it. When a mouse-up never reaches the page (the
+        system took it), Chromium sends no pointerup; on the next move, with
+        no button down, it drops the knob's capture and fires only
+        lostpointercapture. Done here to two knobs as the owner's hand would:
+        down on each, a turn, then a move with no button that the page never
+        saw a release before (a raw input event, as the system would leave
+        it). Before the fix both cards stayed up, stacked, after the hand had
+        gone; the check asks that each goes. The raw move fires both
+        lostpointercapture and a buttonless pointermove, and the knob ends the
+        drag on either, so this line holds the drag ending, not one path.
+      */
+      const tipNames = () => page.evaluate(() => [...document.querySelectorAll('[data-control-tip]')].map(t => t.querySelector('[data-tip=name]')?.textContent ?? ''));
+      const deckKnobs = page.locator('[data-testid="desk-deck"] [data-knob] input[type="range"]');
+      const cdp = await page.context().newCDPSession(page);
+      const pair = [deckKnobs.nth(0), deckKnobs.nth(1)];
+      const pairNames = await Promise.all(pair.map(k => k.getAttribute('aria-label')));
+      // Each knob read on its own, before the next is touched: the next one's
+      // card would put a stuck one's down (one card at a time) and hide it.
+      const reads = [];
+      for (const [i, k] of pair.entries()) {
+        const b = await k.boundingBox();
+        const x = b.x + b.width / 2, y = b.y + b.height / 2;
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x, y + 12, { steps: 3 });
+        await settle(100);
+        const held = await tipNames();
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5, button: 'none', buttons: 0 });
+        await settle(500);
+        const left = await tipNames();
+        reads.push({ name: pairNames[i], held: held.length === 1 && held[0] === pairNames[i], left });
+        // Playwright still thinks the button is down; let it up only after the
+        // reading, so a release the window does hear cannot hide a stuck drag.
+        await page.mouse.up();
+      }
+      check('a knob whose release the page never hears still lets its card go, each on its own',
+        reads.every(r => r.held && r.left.length === 0),
+        reads.map(r => `${r.name}: ${r.held ? 'its card up while held' : 'no card of its own while held'}, ${r.left.length ? `still up after: ${r.left.join(' + ')}` : 'gone after'}`).join('; '));
+      for (const k of pair) await k.dblclick();
+      await page.mouse.move(5, 5);
+      await settle(300);
+      /*
+        And one card at a time, whatever asked for it: a knob with the
+        keyboard's focus shows its card, and the hand going to another knob
+        puts that one up in its place, not on top of it. The focused card is
+        asked to be up first, so a focus that showed nothing cannot pass.
+      */
+      await page.keyboard.press('Tab');
+      await pair[0].focus();
+      await settle(700);
+      const byFocus = await tipNames();
+      const b1 = await pair[1].boundingBox();
+      await page.mouse.move(b1.x + b1.width / 2, b1.y + b1.height / 2);
+      await settle(800);
+      const byHand = await tipNames();
+      await page.mouse.move(5, 5);
+      await settle(400);
+      const after = await tipNames();
+      check('one card at a time: a hand on another knob replaces the focused knob\'s card, and none is left when it goes',
+        byFocus.length === 1 && byFocus[0] === pairNames[0] && byHand.length === 1 && byHand[0] === pairNames[1] && after.length === 0,
+        `focus: ${byFocus.join(' + ') || 'none'}; hand on ${pairNames[1]}: ${byHand.join(' + ') || 'none'}; hand gone: ${after.join(' + ') || 'none'}`);
+      await pair[0].evaluate(el => el.blur());
     }
   }
   {

@@ -14,6 +14,7 @@ import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -116,6 +117,8 @@ export interface PhoneStageProps {
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
+  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
+  cartoons?: CartoonShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -766,6 +769,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
+          {/* Not closed on a press, unlike the two above: Pour and Film are
+              each a toggle someone may want both of, and Stop is here too. */}
+          {p.cartoons && (
+            <div className="mt-4">
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
+              <CartoonShelf {...p.cartoons} size="phone" />
+            </div>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}

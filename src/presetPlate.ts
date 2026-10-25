@@ -66,7 +66,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'solar-flare':        [17, 0, 1, 21, 3, 4],
   'jellyfish-bloom':    [20, 2, 23, 10, 16, 7],
   'fractal-dream':      [17, 21, 20, 10, 16, 19],
-  'velvet-underground': [18, 20, 11],
+  'velvet-underground': [18, 20, 11, 23, 21, 10],   // ultramarine, magenta, raspberry; then each pool's second: lavender, coral, purple (PLAN 25h)
   'neon-coral-reef':    [21, 2, 17, 0, 16, 7],
   'stardust-collapse':  [15, 23, 10, 17, 21, 7],
   'lumia':              [10, 7, 1],
