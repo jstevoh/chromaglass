@@ -7842,10 +7842,14 @@ next step in the physics. (d) *Rupture is a relaxation to 8 nm*, not a nucleatio
 the lace and islands come from the flow's noise, not from a model of bursting. (e) *Explicit
 Marangoni plug flow* (the surfactant's own motion) is left out: it is stiff (wave speed
 about 7.7 m/s on this grid) and the Darcy flow already carries the exchange. (f) *Angled
-reflectance keeps normal-incidence Fresnel amplitudes (no s/p split).* At viewing angle
-`θ_i` the optical path in the film scales as `2 n d cos θ_t` by Snell's law, while the
-interface reflection amplitudes `r_01` and `r_12` remain the normal-incidence values
-`(n_a − n_b)/(n_a + n_b)` rather than splitting into s and p polarisations.
+reflectance keeps normal-incidence Fresnel amplitudes (no s/p split), and the 2D
+soft-box diffuse fill is a 4-point path quadrature plus a luminance-preserving linear
+notch floor.* At viewing angle `θ_i` the optical path in the film scales as `2 n d cos θ_t`
+by Snell's law, while the interface reflection amplitudes `r_01` and `r_12` remain the
+normal-incidence values `(n_a − n_b)/(n_a + n_b)` rather than splitting into s and p
+polarisations; on a 2D film (`ny > 1`), the extended soft-box hemisphere is summarised by a
+4-point angular path spread (`spread = 0.025`), dark-ground transmittance (`ground = 0.0004`),
+and a luminance-preserving linear notch floor (`notchFloor = 0.0725`, `chromaRetention = 0.67`).
 Literature the model sits in: Chomaz, *J. Fluid Mech.* 2001 (the vertical film's
 convection), Gros, Bussonnière and Cantat on marginal regeneration, and Huang and
 colleagues 2020.
@@ -7890,16 +7894,9 @@ a scratch prototype of the model above (not committed) it reads 23 of 23; with n
 `src/lib/soapFilm.ts` it exits 1 and says so. A bar is never moved to get green: if the
 model cannot reach one, the PR says what it reached and asks.
 
-### ~~32a. The CPU reference~~ — **Shipped, this PR (#403)** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a; named shortcuts (a)–(e) above stay open for 32b–32d)
+### ~~32a. The CPU reference~~ — **Shipped, #403** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a)
 
-### 32b. The reflected view
-
-A reflected-light read of the film that does not use the plate's transmission path:
-`soapFilmRgb` with the angle, a lamp that is a soft box and not a point, and the dark
-ground the photograph has. The look's own numbers (gain, how much silver) are tuned here
-against the photograph's 15% saturated and 10.9% silver. *Measure:* `npm run soapfilm` C7
-with its saturation bar unchanged, and a `look` render of the film beside the photograph at
-three viewing angles (the bands move, the black does not).
+### ~~32b. The reflected view~~ — **Shipped, this PR (#469)** (`soapFilmRgb` soft-box + dark-ground reflected optics in `src/lib/soapFilm.ts`, shortcut (f) named in `PLAN.md` §32 and `src/lib/soapFilm.ts`; `npm run soapfilm` 23/23 with C7 saturation bar unchanged, `npm run filmtable` 8/8; at t=110 s saturated 15%, silver 8.1%, dark 12.3%, black 1.5%, 12/12 hues; at t=120 s film under 30 nm 5.1%, dark 19.4%, saturated 13%, silver 10.2%, 8/12 hues; 3-angle render at 0°/30°/50° shows bands shift down by 13–18 rows while Newton-black lace stays at row 1.00–1.09; story in `docs/plan-shipped.md` §32b; named shortcuts (a)–(f) stay open for 32c–32d)
 
 ### 32c. The GPU solver
 

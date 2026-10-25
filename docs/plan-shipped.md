@@ -4823,7 +4823,7 @@ signed (a second window that gains over 3 cells is red too) and line 3 also hold
 
 ## 32. The soap film: a draining film seen in reflection
 
-### 32a. The CPU reference (this PR, #403)
+### 32a. The CPU reference (#403)
 
 Built `src/lib/soapFilm.ts` (`createSoapFilm`, `stepSoapFilm`, `soapFilmRgb`), added the
 sixth argument `cosI = 1` to `filmReflectance` (and optional `cosI = 1` to `filmColour`)
@@ -4847,6 +4847,36 @@ agreement 8.3e-17, table and angle match 0.00/255; C6 quarter means ordered from
 top reaches 10% black first at 115 s, no ruptured cell refills; C7 4 consecutive 5 s
 samples in the photograph window, at t=120 s 5.1% under 30 nm, 23.3% dark, 79% saturated,
 9/12 hue sectors); `npm run filmtable` 8/8; 600 steps of the 32×64 film in 0.69 s.
+
+### 32b. The reflected view (this PR, #469)
+
+Extended `soapFilmRgb` in `src/lib/soapFilm.ts` so a 2D draining vertical film (`ny > 1`, or
+`softBox: true`) is read in reflected light under an extended 5500 K soft-box lamp against a
+dark ground (`ground = 0.0004` through transmittance `1 − R`), rather than as a point source
+where out-of-gamut CIE XYZ → linear sRGB negative excursions hard-clamp to 0 and push 79–83%
+of the film past `chroma > 0.25`. At viewing angle `cosI`, Snell's law sets the internal path
+thickness `d_eff = h cos θ_t`; Airy reflectance is integrated over a 4-point angular path
+spread (`spread = 0.025`) around `d_eff`, out-of-gamut negative linear channels are clamped
+before mixing, and the extended soft-box hemisphere supplies a broadband notch floor
+(`notchFloor = 0.0725` of peak linear channel) and chromatic retention (`chromaRetention =
+0.67`) while preserving the film's physical luminous reflectance `Y(d_eff)`. A 1-row
+calibration strip (`ny === 1` with `softBox` unset) continues to read the raw point-source
+`filmColour` table directly. Named shortcut (f) (normal-incidence Fresnel amplitudes kept at
+all angles, no s/p split; plus the 4-point path spread and luminance-preserving linear notch
+floor) in `PLAN.md` §32 and `src/lib/soapFilm.ts`.
+
+Measured: `npm run soapfilm` 23/23 with C7's saturation bar unchanged (`4 samples in a row
+(5 s apart)` across `t = 105..120` s: at `t = 105` s saturated 17.2%, silver 10.7%, dark 9.5%,
+black 0.8%; at `t = 110` s saturated 14.8%, silver 8.1%, dark 12.3%, black 1.5%; at `t = 115` s
+saturated 12.5%, silver 7.4%, dark 16.6%, black 2.5%; at `t = 120` s film under 30 nm 5.1%,
+dark 19.4%, saturated 13%, silver 10.2%, 8/12 hues — against the photograph's 15% saturated,
+10.9% silver, 14.3% dark, 1.1% black, 9/12 hues); `npm run filmtable` 8/8. Three-angle render
+of the `t = 115` s film at `0°`, `30°` and `50°` (`cos θ_t = 1.000, 0.927, 0.817`): the
+Newton-black lace (`< 30` nm, `luma < 0.12`) stays pinned at the top (`centroid row = 1.00,
+1.01, 1.09`), while the first-order purple dark fringe (`d_eff ≈ 200` nm) shifts down from row
+27 (`h = 206.7` nm) at `0°` to row 28 (`h = 208.6` nm) at `30°` to row 45 (`h = 246.0` nm) at
+`50°`, and the second-order green-gold peak (`d_eff ≈ 320` nm) shifts down from row 71
+(`h = 319.9` nm) at `0°` to row 78 (`h = 353.1` nm) at `30°` to row 84 (`h = 393.2` nm) at `50°`.
 
 
 ## 33. Bubbles and the closeup, per liquid
