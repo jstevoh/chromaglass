@@ -5681,6 +5681,23 @@ Not a gate and no bar: a rate depends on what was pushed.
   the dye under each finger stays where it is. Same family as 19ad (a red that is about
   the runner's moment, not the branch). Found reviewing #352 (2026-10-24).
 
+### 19af. The repository's front page: a short README, the guide in docs/, a clean root (shipped 2026-10-25)
+
+- **19af-1. Shipped.** `README.md` was 79 KB of every feature and control, which is what a
+  visitor to the repository met first. It is now the front page (what ChromaGlass is, the
+  live link, four screenshots, how to run it, where things are, the licence); the old text
+  moved whole to `docs/guide.md` (same headings, so a section edited elsewhere moves
+  across), and `docs/README.md` maps the other docs. The root lost thirty-odd one-off
+  scratch files (`patch_*`, `test_dump*`, `scratch*`, `wait_ci*.sh`, `tmp_18.txt` and the
+  like: nothing in `package.json`, a workflow, a script or a doc named any of them, and
+  they stay in git history); `plan_comet.md` moved to `docs/plan-comet.md`. `dc.mjs` stays,
+  because `checks.yml` parses it by that name. New feature and control docs go in
+  `docs/guide.md`, not the README (`setting-auditor` and `CLAUDE.md` say so).
+- **19af-2. Open, the owner's, GitHub settings a session cannot change** (the agent proxy
+  refuses writes to repository-settings paths): the About description, the website link
+  (`https://chromaglass.art`) and the topics. Suggested text is in the PR that shipped
+  19af-1.
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
