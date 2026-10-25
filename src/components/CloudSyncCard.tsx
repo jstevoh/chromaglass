@@ -42,13 +42,15 @@ function line(s: SyncStatus | null, email: string | null): string {
     case 'syncing': return 'Syncing…';
     case 'synced': {
       const what = held(s.counts);
-      return `Up to date${s.at ? `, ${ago(s.at)}` : ''}.${what ? ` The cloud holds ${what}.` : ''}`;
+      const big = s.refused ? ` ${s.refused} item${s.refused === 1 ? ' is' : 's are'} too large to sync and stay${s.refused === 1 ? 's' : ''} on this computer.` : '';
+      return `Up to date${s.at ? `, ${ago(s.at)}` : ''}.${what ? ` The cloud holds ${what}.` : ''}${big}`;
     }
     case 'offline':
       return `Can't reach the cloud. Everything stays here${s.waiting ? ` (${s.waiting} change${s.waiting === 1 ? '' : 's'} waiting)` : ''} and goes up when it's back.`;
     case 'not-pro':
       return `No Pro key is filed under ${email ?? 'this account'}. Sync follows the Pro key bought with the address you sign in with.`;
     case 'full': return 'The cloud copy is full. Delete some saved looks you no longer use, then sync again.';
+    case 'erased': return 'The cloud copy was erased from another computer. This one fills it again within the hour unless you turn sync off here.';
     default: return 'Sync stopped on an error. It will try again.';
   }
 }
@@ -133,8 +135,8 @@ export const CloudSyncCard: React.FC<{ tier: 'free' | 'home' | 'pro'; email: str
         ) : (
           <div className="w-full rounded-lg border border-red-500/30 bg-red-950/40 p-2.5">
             <p className="text-xs text-red-200">
-              This removes what the cloud holds. Every computer keeps its own copy. Turn sync off on the others
-              first, or they fill the cloud again.
+              This removes what the cloud holds and turns sync off on this computer. Every computer keeps its
+              own copy. Turn sync off on the others too, or they fill the cloud again once they next sign in.
             </p>
             <div className="mt-2 flex gap-2">
               <button
@@ -144,6 +146,7 @@ export const CloudSyncCard: React.FC<{ tier: 'free' | 'home' | 'pro'; email: str
                 onClick={async () => {
                   const ok = await cloudSync()?.erase();
                   setConfirmErase(false);
+                  if (ok) setOn(false);
                   setNote(ok ? 'The cloud copy is erased.' : "Couldn't reach the cloud to erase it. Try again when you're online.");
                 }}
               >

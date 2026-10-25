@@ -88,6 +88,8 @@ export function startCloudSync(): () => void {
   let lastManifestAt = 0;
   let waitUntil = 0;
   let backoff = 0;
+  /** Why it waits: an unreachable cloud is asked again the moment the network is back; a refusal is not. */
+  let waitingFor: 'network' | 'pro' | null = null;
 
   const round = async (force = false) => {
     if (!cloudSyncActive()) return;
@@ -100,12 +102,15 @@ export function startCloudSync(): () => void {
       if (full) lastManifestAt = t;
       backoff = 0;
       waitUntil = 0;
+      waitingFor = null;
       firstDirtyAt = 0;
     } else if (state === 'not-pro') {
       waitUntil = Date.now() + NOT_PRO_WAIT_MS;
-    } else if (state === 'offline' || state === 'error' || state === 'full') {
+      waitingFor = 'pro';
+    } else if (state === 'offline' || state === 'error' || state === 'full' || state === 'erased') {
       backoff = Math.min(300_000, backoff ? backoff * 2 : 15_000);
       waitUntil = Date.now() + backoff;
+      waitingFor = state === 'offline' ? 'network' : null;
     }
   };
 
@@ -123,12 +128,16 @@ export function startCloudSync(): () => void {
     if (due) void round();
   };
 
-  const wake = () => {
-    if (document.visibilityState !== 'visible') return;
-    if (Date.now() - lastRoundAt >= MIN_GAP_MS * 2) void round();
+  // Back online, or back in front of the player: a cloud that was out of reach
+  // is asked at once rather than when the backoff runs out, which after a few
+  // failures was up to five minutes (the review of #467).
+  const wake = (ev: Event) => {
+    if (ev.type !== 'online' && document.visibilityState !== 'visible') return;
+    if (waitingFor === 'network') { backoff = 0; waitUntil = 0; }
+    if (ev.type === 'online' || Date.now() - lastRoundAt >= MIN_GAP_MS * 2) void round();
   };
   // A licence that just arrived (accountLicense.ts) may be the Pro key that lets this start.
-  const licence = () => { waitUntil = 0; void round(true); };
+  const licence = () => { waitUntil = 0; waitingFor = null; void round(true); };
 
   const first = setTimeout(() => void round(true), 3_000);
   const timer = setInterval(tick, TICK_MS);
@@ -164,10 +173,22 @@ export function useCloudSyncReload(reloads: Record<string, () => void>): void {
   useEffect(() => {
     const on = (ev: Event) => {
       const keys = (ev as CustomEvent<{ keys?: string[] }>).detail?.keys ?? [];
-      for (const k of keys) reloads[k]?.();
+      for (const k of keys) if (Object.hasOwn(reloads, k)) reloads[k]();
+    };
+    // A second tab of the app hears no `cg-cloud-sync`: the cloud's writes reach
+    // it as storage events, and without reading them its next save would read as
+    // deletions that travel to every device (the review of #467). Any other
+    // tab's saves arrive the same way, which keeps two tabs from overwriting each
+    // other too.
+    const fromTab = (ev: StorageEvent) => {
+      if (ev.key && Object.hasOwn(reloads, ev.key)) reloads[ev.key]();
     };
     window.addEventListener(SYNC_EVENT, on);
-    return () => window.removeEventListener(SYNC_EVENT, on);
+    window.addEventListener('storage', fromTab);
+    return () => {
+      window.removeEventListener(SYNC_EVENT, on);
+      window.removeEventListener('storage', fromTab);
+    };
     // The setters behind each reload are stable; the map is rebuilt each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

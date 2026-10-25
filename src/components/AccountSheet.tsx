@@ -196,8 +196,14 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose, onOpenSetti
     try {
       await unpublishAccountShows();
       // The cloud copy goes with the account (privacy.html says so). Asked while
-      // the account still exists, since the Worker needs its token to know whose.
-      await cloudSync()?.erase().catch(() => false);
+      // the account still exists, since the Worker needs its token to know whose,
+      // and the delete stops if it fails: once the account is gone no token could
+      // ever erase it (the review of #467).
+      const sync = cloudSync();
+      if (sync && !(await sync.erase().catch(() => false))) {
+        setError("Couldn't erase your cloud copy, so the account is not deleted yet. Try again when you're online.");
+        return;
+      }
       const authMod = await loadFirebaseAuth();
       if (authMod) await authMod.deleteCurrentAccount();
       setEmail(null);

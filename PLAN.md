@@ -6244,14 +6244,20 @@ once the login works (23.14).*
   the server's clock. KV has no transactions, so a manifest every ten minutes finds a push lost
   to another device's write and sends it again. Not synced, on purpose: the projector layout,
   audio input and source, MIDI ports, desk mode, licence and sign-in, which belong to the
-  machine. Erase the cloud copy from the sheet (any signed-in account, Pro or not).
-  *Measure:* `npm run cloudsync` (12/12, `checks.yml` `Measure · logic`): saved on one device
+  machine. The MIDI map syncs whole, one value: two computers with different controllers
+  replace each other's map (a map per controller is 23.18-midi). Erase the cloud copy from the
+  sheet (any signed-in account, Pro or not); the erase leaves a marker, and a push on a sign-in
+  token issued before it is refused, so a Mac app left open cannot put back an erased or
+  deleted account's copy. Deleting the account stops if the erase fails. A look the cloud
+  refuses (over 256 KB) is reported on the card and not sent again until edited.
+  *Measure:* `npm run cloudsync` (13/13, `checks.yml` `Measure · logic`): saved on one device
   and read back by the stores' own load functions on the other, for arrival, the starter set
   list, concurrent edits of different looks, the later edit of one look from a clock ten
   minutes slow, deletion, offline edits, a lost write healed, Home/keyless/forged/other
   accounts refused or isolated, unreadable storage never read as empty, erase, a future
-  stamp, and the wiring (every synced key is its module's, and every key held in React state
-  reloads when the cloud writes it). Each guard was broken in turn and its line went red.
+  stamp, a refused look and an id of `toString`, and the wiring (every synced key is its
+  module's, and every key held in React state reloads when the cloud writes it). Each guard
+  was broken in turn and its line went red.
   **23.18-deploy** (*owner*): `/sync` exists once the licence Worker is deployed by hand from
   the Mac (`npx wrangler deploy`, as for #460); until then a Pro sheet says sync stopped on an
   error and retries, and nothing else changes.
@@ -6265,6 +6271,14 @@ once the login works (23.14).*
   **23.18-music** (open): the song memory in IndexedDB (fingerprints, song maps, recorded
   performances, `musicDb.ts`) does not sync: it is large and per room. A show kit
   (`showKit.ts`) still carries it by file.
+  **23.18-prune** (open): tombstones are kept for ever (they no longer count toward a store's
+  2000-item cap, but they grow the account's value); drop those older than 90 days once every
+  device's rev is past them.
+  **23.18-verify-share** (open): the licence Worker keeps its own `verifyFirebaseIdToken` beside
+  `server/firebase-token.js`, which was written to run in both; one copy of security code
+  drifts less. Neither checks `auth_time`, which Firebase's documented steps include.
+  **23.18-midi** (open): a MIDI map per controller (keyed by the device's name), so two rigs
+  keep their own maps instead of the newest replacing the other.
   **23.18-exit** (open): a Mac app quit straight after an edit sends it the next time it opens
   (no send on `pagehide`); a `keepalive` push of the waiting records under 64 KB would close it.
 - **23.15** (with §12's iPhone app): Sign in with Apple native in the iPhone app, and

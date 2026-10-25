@@ -73,6 +73,13 @@ export function emptyDoc() {
   return { v: 1, rev: 0, stores: {} };
 }
 
+/**
+ * An item by its id, only if the document holds it as its own: a plain object
+ * answers `constructor` or `toString` from its prototype, so an item with such
+ * an id never synced and was never wanted (the review of #467 measured it).
+ */
+const own = (obj, id) => (obj && Object.hasOwn(obj, id) ? obj[id] : undefined);
+
 function validId(id) {
   return typeof id === 'string' && id.length > 0 && id.length <= MAX_ID;
 }
@@ -96,7 +103,8 @@ export function newer(incoming, held) {
  * the server took; `doc` is changed in place and its `rev` moves only if any.
  */
 export function mergePush(doc, stores, now = Date.now()) {
-  if (!stores || typeof stores !== 'object') return { taken: 0, refused: 0 };
+  const refusedIds = {};
+  if (!stores || typeof stores !== 'object') return { taken: 0, refused: 0, refusedIds };
   // The rev is the server's clock, not a count, so it never runs backwards: an
   // erased cloud copy starts again above every rev a device remembers from before.
   const rev = Math.max(doc.rev + 1, now);
@@ -106,20 +114,28 @@ export function mergePush(doc, stores, now = Date.now()) {
     const incoming = stores[name];
     if (!incoming || typeof incoming !== 'object') continue;
     const held = doc.stores[name] ?? (doc.stores[name] = {});
+    let live = Object.values(held).filter((r) => !r.del).length;
     for (const [id, raw] of Object.entries(incoming)) {
-      if (!validId(id) || !validRecord(raw)) { refused++; continue; }
+      const refuse = () => { refused++; if (validId(id)) (refusedIds[name] ??= []).push(id); };
+      if (!validId(id) || !validRecord(raw)) { refuse(); continue; }
       const rec = raw.del === true
         ? { t: Math.min(raw.t, now + MAX_FUTURE_MS), by: raw.by ?? '', del: true }
         : { t: Math.min(raw.t, now + MAX_FUTURE_MS), by: raw.by ?? '', d: raw.d };
-      if (!rec.del && JSON.stringify(rec.d).length > MAX_ITEM_BYTES) { refused++; continue; }
-      if (!newer(rec, held[id])) continue;
-      if (!held[id] && Object.keys(held).length >= MAX_ITEMS_PER_STORE) { refused++; continue; }
+      if (!rec.del && JSON.stringify(rec.d).length > MAX_ITEM_BYTES) { refuse(); continue; }
+      const was = own(held, id);
+      if (!newer(rec, was)) continue;
+      // Only live items count toward the cap: a store whose deletions are kept
+      // as tombstones must not fill up with them (pruning them is 23.18-prune).
+      const adds = !rec.del && (!was || was.del);
+      if (adds && live >= MAX_ITEMS_PER_STORE) { refuse(); continue; }
+      if (adds) live++;
+      else if (rec.del && was && !was.del) live--;
       held[id] = { ...rec, r: rev };
       taken++;
     }
   }
   if (taken) doc.rev = rev;
-  return { taken, refused };
+  return { taken, refused, refusedIds };
 }
 
 /** The records that changed after `since`, without the server's own `r`. */
@@ -151,7 +167,8 @@ export function wantFrom(doc, manifest) {
     const held = doc.stores[name] ?? {};
     for (const [id, t] of Object.entries(ids)) {
       if (!validId(id) || !Number.isFinite(t)) continue;
-      if (!held[id] || t > held[id].t) (want[name] ??= []).push(id);
+      const was = own(held, id);
+      if (!was || t > was.t) (want[name] ??= []).push(id);
     }
   }
   return want;
@@ -214,6 +231,17 @@ async function readCappedText(request, max) {
   return new TextDecoder().decode(all);
 }
 
+/** When the (already verified) token was issued, in ms; 0 if it cannot be read. */
+function issuedAtMs(token) {
+  try {
+    const part = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const iat = JSON.parse(atob(part + '='.repeat((4 - (part.length % 4)) % 4))).iat;
+    return Number.isFinite(iat) ? iat * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function reply(obj, status, cors) {
   return new Response(JSON.stringify(obj), {
     status,
@@ -240,8 +268,15 @@ export async function handleSync(request, env, cors, verifyToken) {
   const now = Date.now();
 
   if (request.method === 'DELETE') {
-    await env.LICENSE_KV.delete(key);
-    return reply({ ok: true, rev: 0, now }, 200, cors);
+    // Not a bare delete. Another device still signed in (the Mac app left open)
+    // holds an ID token good for up to an hour, and its next manifest would put
+    // the whole copy back (the review of #467). So the erase leaves a marker, and
+    // a push on a token issued before it is refused: an account deleted along
+    // with this erase can never be issued a newer token, so its copy stays gone;
+    // a device that signs in again afterwards fills it again, as the card says.
+    const erased = { ...emptyDoc(), rev: now, erasedAt: now };
+    await env.LICENSE_KV.put(key, JSON.stringify(erased));
+    return reply({ ok: true, rev: erased.rev, now }, 200, cors);
   }
 
   if (!(await accountIsPro(env, verified.email))) {
@@ -262,8 +297,11 @@ export async function handleSync(request, env, cors, verifyToken) {
   try { body = text ? JSON.parse(text) : {}; } catch { return reply({ error: 'not JSON', now }, 400, cors); }
 
   const doc = await readDoc(env, verified.uid);
+  if (Number.isFinite(doc.erasedAt) && issuedAtMs(match[1]) <= doc.erasedAt) {
+    return reply({ error: 'erased', now }, 409, cors);
+  }
   const since = Number(body?.since);
-  const { taken, refused } = mergePush(doc, body?.stores, now);
+  const { taken, refused, refusedIds } = mergePush(doc, body?.stores, now);
   if (taken) {
     const value = JSON.stringify(doc);
     if (value.length > SYNC_MAX_STORED_BYTES) return reply({ error: 'cloud full', now }, 413, cors);
@@ -280,6 +318,7 @@ export async function handleSync(request, env, cors, verifyToken) {
     now,
     taken,
     refused,
+    refusedIds,
     stores: changesSince(doc, since),
     want: wantFrom(doc, body?.manifest),
     counts: counts(doc),

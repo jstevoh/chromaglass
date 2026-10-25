@@ -93,7 +93,16 @@ interface Stamp {
   del?: boolean;
   /** Changed here and not yet taken by the cloud. */
   dirty?: boolean;
+  /** The cloud refused this version (too large, or the store full); sent again only once edited. */
+  refused?: boolean;
 }
+
+/**
+ * Own properties only: stamps are parsed JSON, and a plain object answers
+ * `constructor` or `toString` from its prototype (the review of #467).
+ */
+const own = <T,>(obj: Record<string, T> | undefined, id: string): T | undefined =>
+  obj && Object.hasOwn(obj, id) ? obj[id] : undefined;
 
 interface Meta {
   v: 1;
@@ -119,6 +128,7 @@ export type SyncState =
   | 'synced'
   | 'offline'      // the cloud could not be reached; everything stays here and goes later
   | 'full'         // the account's cloud copy is at its size limit
+  | 'erased'       // the cloud copy was erased after this device's sign-in token was issued
   | 'error';
 
 export interface SyncStatus {
@@ -127,6 +137,8 @@ export interface SyncStatus {
   at: number | null;
   /** Items still waiting to go up. */
   waiting: number;
+  /** Items the cloud would not take (too large, or a store at its limit). */
+  refused: number;
   /** What the cloud holds, by store. */
   counts: Record<string, number>;
 }
@@ -202,7 +214,7 @@ const PUSH_BATCH_BYTES = 900 * 1024;
 export function createCloudSync(deps: SyncDeps) {
   const now = deps.now ?? (() => Date.now());
   const lastRaw = new Map<string, string | null>();
-  let status: SyncStatus = { state: 'idle', at: null, waiting: 0, counts: {} };
+  let status: SyncStatus = { state: 'idle', at: null, waiting: 0, refused: 0, counts: {} };
   const listeners = new Set<(s: SyncStatus) => void>();
   let running: Promise<SyncState> | null = null;
 
@@ -241,6 +253,12 @@ export function createCloudSync(deps: SyncDeps) {
     return n;
   }
 
+  function countRefused(m: Meta): number {
+    let n = 0;
+    for (const items of Object.values(m.stamps)) for (const s of Object.values(items)) if (s.refused) n++;
+    return n;
+  }
+
   /** Stamp, in `m`, what changed here since the last look. Cheap when nothing did. */
   function scanInto(m: Meta): boolean {
     let touched = false;
@@ -255,7 +273,7 @@ export function createCloudSync(deps: SyncDeps) {
       const stamps = m.stamps[spec.name] ?? (m.stamps[spec.name] = {});
       for (const [id, v] of items) {
         const h = contentHash(spec, v);
-        const s = stamps[id];
+        const s = own(stamps, id);
         if (s && !s.del && s.h === h) continue;
         stamps[id] = { t: first ? 0 : clock(m), h, dirty: true };
         touched = true;
@@ -300,7 +318,7 @@ export function createCloudSync(deps: SyncDeps) {
       let wrote = false;
       for (const [id, rec] of Object.entries(recs)) {
         if (!rec || !Number.isFinite(rec.t)) continue;
-        const mine = stamps[id];
+        const mine = own(stamps, id);
         // Newest wins; the cloud's on a tie (server/cloud-sync.js `newer`).
         if (mine && mine.t > rec.t) continue;
         if (rec.del) {
@@ -331,7 +349,8 @@ export function createCloudSync(deps: SyncDeps) {
   function manifestOf(m: Meta): Record<string, Record<string, number>> {
     const out: Record<string, Record<string, number>> = {};
     for (const [name, items] of Object.entries(m.stamps)) {
-      for (const [id, s] of Object.entries(items)) (out[name] ??= {})[id] = s.t;
+      // A version the cloud refused is not asked for again until it is edited.
+      for (const [id, s] of Object.entries(items)) if (!s.refused) (out[name] ??= {})[id] = s.t;
     }
     return out;
   }
@@ -361,6 +380,7 @@ export function createCloudSync(deps: SyncDeps) {
     if (!res) return 'offline';
     if (res.status === 403) return 'not-pro';
     if (res.status === 413) return 'full';
+    if (res.status === 409) return 'erased';
     if (res.status === 401 || res.status >= 500) return 'offline';
     return 'error';
   }
@@ -423,8 +443,15 @@ export function createCloudSync(deps: SyncDeps) {
         // back is written over the stores they are in.
         scanInto(m);
         for (const [name, id, t] of sent) {
-          const s = m.stamps[name]?.[id];
+          const s = own(m.stamps[name], id);
           if (s && s.t === t) delete s.dirty;
+        }
+        const refusedIds = r.data.refusedIds as Record<string, string[]> | undefined;
+        for (const [name, ids] of Object.entries(refusedIds ?? {})) {
+          for (const id of ids) {
+            const s = own(m.stamps[name], id);
+            if (s && !s.dirty) s.refused = true;
+          }
         }
         const changed = apply(m, r.data.stores as WireStores | undefined);
         if (Number.isFinite(r.data.rev)) m.rev = r.data.rev as number;
@@ -433,14 +460,14 @@ export function createCloudSync(deps: SyncDeps) {
         if (want) {
           for (const [name, ids] of Object.entries(want)) {
             for (const id of ids) {
-              const s = m.stamps[name]?.[id];
-              if (s && !s.dirty) { s.dirty = true; wanted++; }
+              const s = own(m.stamps[name], id);
+              if (s && !s.dirty && !s.refused) { s.dirty = true; wanted++; }
             }
           }
         }
         writeMeta(m);
         if (changed.length) deps.onApplied?.(changed);
-        setStatus({ state: 'synced', at: now(), waiting: countWaiting(m), counts: (r.data.counts as Record<string, number>) ?? status.counts });
+        setStatus({ state: 'synced', at: now(), waiting: countWaiting(m), refused: countRefused(m), counts: (r.data.counts as Record<string, number>) ?? status.counts });
         wantManifest = false;
         if ((!more && !wanted) || ++rounds > 20) return 'synced';
       }
@@ -470,8 +497,9 @@ export function createCloudSync(deps: SyncDeps) {
   }
 
   /**
-   * Erase the account's cloud copy. This device keeps all it has, and starts its
-   * stamps again so that, if sync stays on, it fills the cloud afresh.
+   * Erase the account's cloud copy, and turn sync off here. This device keeps all
+   * it has, with its stamps started again, so turning sync back on fills the
+   * cloud afresh.
    */
   async function erase(): Promise<boolean> {
     if (running) await running;
@@ -479,7 +507,9 @@ export function createCloudSync(deps: SyncDeps) {
     if (!r?.res?.ok) return false;
     lastRaw.clear();
     writeMeta(freshMeta(readMeta().account));
-    setStatus({ state: isOn() ? 'idle' : 'off', counts: {}, waiting: 0 });
+    // Erasing means wanting it gone: this computer stops filling it again.
+    setOn(false);
+    setStatus({ state: 'off', counts: {}, waiting: 0, refused: 0 });
     return true;
   }
 

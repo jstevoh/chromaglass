@@ -29,8 +29,12 @@
  *      of theirs is stored; a forged token is refused (401); another Pro
  *      account sees none of A's;
  *   9. a store holding something unreadable is left alone, not sent as deleted;
- *  10. erasing the cloud copy removes it, for an account that is no longer Pro too;
+ *  10. erasing the cloud copy removes it, for an account that is no longer Pro too,
+ *      and a device still holding a sign-in token from before the erase (the Mac
+ *      app left open) cannot put it back; one signed in afresh can;
  *  11. a record stamped a day ahead cannot win for ever;
+ *  13. a look too large for the cloud is reported, not re-sent every manifest,
+ *      and goes once it is edited down; an item with the id `toString` syncs;
  *  12. every synced key is still the key its module saves under, every store the
  *      device sends is one the server takes, and every key held in React state
  *      is read again when the cloud writes it (cloudSync.ts says why that matters).
@@ -83,8 +87,10 @@ const env = {
   FIREBASE_PROJECT_ID: 'chromaglass',
 };
 
+/** Tokens are issued no earlier than this (s): a sign-in after an erase, in case 10. */
+let issuedFloor = 0;
 async function token(email, key = google.privateKey) {
-  const s = Math.floor(Date.now() / 1000);
+  const s = Math.max(Math.floor(Date.now() / 1000), issuedFloor + 10);
   const enc = (o) => b64u(new TextEncoder().encode(JSON.stringify(o)));
   const head = `${enc({ alg: 'RS256', typ: 'JWT', kid: 'g1' })}.${enc({
     iss: 'https://securetoken.google.com/chromaglass', aud: 'chromaglass',
@@ -106,17 +112,20 @@ await fileKey(PRO, 'pro');
 function device(name, email = PRO, { skewMs = 0, signingKey } = {}) {
   const storage = new MemStorage();
   const d = {
-    name, storage, online: true, applied: [],
+    name, storage, online: true, applied: [], sentBytes: 0,
+    /** A token this device holds on to, as a signed-in browser does for up to an hour. */
+    heldToken: null,
     use() { globalThis.localStorage = storage; return d; },
   };
   d.sync = createCloudSync({
     storage,
     base: 'https://licences.example',
     account: () => email,
-    token: () => token(email, signingKey),
+    token: async () => d.heldToken ?? token(email, signingKey),
     now: () => Date.now() + skewMs,
     fetch: async (url, init) => {
       if (!d.online) throw new TypeError('Failed to fetch');
+      d.sentBytes += typeof init?.body === 'string' ? init.body.length : 0;
       return worker.fetch(new Request(url, init), env);
     },
     onApplied: (keys) => d.applied.push(...keys),
@@ -281,14 +290,31 @@ check(
 
 // ── 10. Erase ─────────────────────────────────────────────────────────────
 
+const cloudItems = () => {
+  const doc = JSON.parse(env.LICENSE_KV.values.get(`sync:uid-${PRO}`) ?? '{"stores":{}}');
+  return Object.values(doc.stores ?? {}).reduce((n, items) => n + Object.values(items).filter((r) => !r.del).length, 0);
+};
+await B.sync.sync();
+B.heldToken = await token(PRO); // the Mac app, left open and signed in
 await fileKey(PRO, 'home'); // a refund to Home: the cloud copy can still be erased
+const heldBeforeErase = cloudItems();
 const erased = await A.sync.erase();
-check(
-  '10. erasing the cloud copy removes it, for an account no longer Pro too; the device keeps its own',
-  erased && !env.LICENSE_KV.values.has(`sync:uid-${PRO}`) && names(A).length > 0,
-  `erased=${erased}, cloud copy left=${env.LICENSE_KV.values.has(`sync:uid-${PRO}`)}, A keeps ${names(A).length}`,
-);
+const leftAfterErase = cloudItems();
 await fileKey(PRO, 'pro');
+const staleState = await B.sync.sync(true);
+const afterStale = cloudItems();
+// A sign-in after the erase: its token is issued later than the marker.
+issuedFloor = Math.floor(Date.now() / 1000) + 1;
+B.heldToken = null;
+const freshState = await B.sync.sync(true);
+check(
+  '10. erasing removes the cloud copy (Pro or not); a device on a token from before cannot put it back, one signed in afresh can',
+  erased && heldBeforeErase > 0 && leftAfterErase === 0 && names(A).length > 0 && !A.sync.isOn() &&
+    staleState === 'erased' && afterStale === 0 && freshState === 'synced' && cloudItems() === heldBeforeErase,
+  `held ${heldBeforeErase}, after erase ${leftAfterErase}, A keeps ${names(A).length} with sync ${A.sync.isOn() ? 'on' : 'off'}; old token: ${staleState}, cloud ${afterStale}; fresh sign-in: ${freshState}, cloud ${cloudItems()}`,
+);
+A.sync.setOn(true);
+await A.sync.sync(true);
 
 // ── 11. A record from the far future ──────────────────────────────────────
 
@@ -305,6 +331,29 @@ check(
   res.status === 200 && stored && stored.t <= Date.now() + 61_000,
   `stored ${stored ? Math.round((stored.t - Date.now()) / 1000) : '?'} s ahead`,
 );
+
+// ── 13. Too large, and an id from Object's prototype ─────────────────────
+
+{
+  A.use();
+  const huge = { ...look('Huge'), description: 'x'.repeat(300 * 1024) };
+  saveUserPresets([...loadUserPresets(), huge]);
+  saveUserSequences([...loadUserSequences(), { id: 'toString', name: 'Odd id', loop: false, stages: [] }]);
+  await A.sync.sync();
+  const refusedAfter = A.sync.status().refused;
+  const sentBefore = A.sentBytes;
+  await A.sync.sync(true); // a manifest round
+  const manifestBytes = A.sentBytes - sentBefore;
+  A.use(); saveUserPresets(loadUserPresets().map((p) => (p.id === huge.id ? { ...p, description: 'trimmed' } : p)));
+  await A.sync.sync();
+  await B.sync.sync();
+  check(
+    '13. a look too large is reported and not re-sent by the manifest, goes once edited down; an id of toString syncs',
+    refusedAfter === 1 && manifestBytes < 50 * 1024 && A.sync.status().refused === 0 &&
+      names(B).includes('Huge') && (B.use(), loadUserSequences().some((q) => q.id === 'toString')),
+    `refused ${refusedAfter}, the manifest round sent ${Math.round(manifestBytes / 1024)} KB, refused after the edit ${A.sync.status().refused}, on B: Huge ${names(B).includes('Huge')}, toString ${(B.use(), loadUserSequences().some((q) => q.id === 'toString'))}`,
+  );
+}
 
 // ── 12. The wiring ────────────────────────────────────────────────────────
 
