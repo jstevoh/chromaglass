@@ -1606,6 +1606,17 @@ about a quarter of a second a swing) before it settled, which the solve leaves o
 Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
 building.
 
+## 71. One Record button (PLAN 14ae)
+
+On the desk, press the Record button in the header (or R): a plate video starts, the button
+turns red with one clock, and a single Rec dot appears. Press it again: it stops and the file
+is in the Record panel (the sliders button) under Plate video. In the panel, turn on Take as
+well and press Record again: both run from the one press, and the dot says "Plate video + Take".
+Paint a little, stop, and the take is under Takes with Replay. Say whether "Record · Plate
+video" on a wide desk reads at a glance, whether "Plate video" and "Take" are the words you
+want, and whether the Song film row belongs in the Record panel. On the phone: More, then Record
+makes, pick Take and press Record.
+
 ## 69. Any camera, and which camera does what (PLAN 14ad)
 
 With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual Camera):

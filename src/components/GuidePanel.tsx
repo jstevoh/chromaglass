@@ -108,8 +108,8 @@ const SECTIONS: Section[] = [
           ['6. Clean Screen last', <>Hides every overlay and the cursor for the projection. Esc brings them back, or a finger held still on a touch screen.</>],
         ]} />
         <P>
-          <Em>Record</Em>, the red button beside Cast, writes the show and its music to a{' '}
-          <C>.webm</C> file. <C>B</C> is blackout — the thing to hit when something goes
+          <Em>Record</Em>, the red button beside Cast (<C>R</C>), writes the plate and its music to a{' '}
+          <C>.webm</C> file (the Plate video), keeps your strokes as a Take, or both: the sliders button beside it says which. <C>T</C> records a Take on its own. <C>B</C> is blackout — the thing to hit when something goes
           wrong, because it fades rather than cuts.
         </P>
         <H>When something is wrong</H>
