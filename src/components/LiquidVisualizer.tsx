@@ -5645,6 +5645,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * jumping, the stutter `npm run stutter` counts (PLAN.md 14aa-3).
    */
   const stepFramesRef = useRef([0, 0, 0, 0]);
+  /** Of the frames of two steps or more, those after a missed refresh (an interval over 25 ms). */
+  const lateStepFramesRef = useRef(0);
   const onEngineStatusRef = useRef(onEngineStatus);
   const onBackLookClearedRef = useRef(onBackLookCleared);
   onBackLookClearedRef.current = onBackLookCleared;
@@ -7305,7 +7307,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           simAccumRef.current = 0;
         }
         stepsThisFrame = simSteps;
-        if (!rendering) stepFramesRef.current[Math.min(simSteps, 3)]++;
+        if (!rendering) {
+          stepFramesRef.current[Math.min(simSteps, 3)]++;
+          // Two steps after an interval past one and a half refreshes is a
+          // refresh missed and caught up (the governor's to prevent); after an
+          // on-time interval it is the step count's own (the clock, 14aa).
+          if (simSteps >= 2 && realDt > 0.025) lateStepFramesRef.current++;
+        }
         /*
           The same elapsed time, counted in sixtieths of a second (H2b).
 
@@ -10518,6 +10526,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           catchUp: catchUpRef.current,
           layers: fluidsRef.current.length,
           stepFrames: [...stepFramesRef.current],
+          lateStepFrames: lateStepFramesRef.current,
         }),
         externalTilt: externalTiltRef.current,
         /** The pointer's Blow since the page loaded: steps as the straw, steps as the wind, and the colour the wind carried. */

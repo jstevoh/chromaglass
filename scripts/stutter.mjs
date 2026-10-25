@@ -19,14 +19,21 @@
  * log of its moves (`governor.moveLog`), which says why each was made and,
  * for a climb, what it predicted the new state would cost.
  *
- * Bars, for every look:
- *   - no frame of two steps after the opening (the first 10 s, where the
- *     governor opens at sixty steps before it has measured anything);
+ * A frame of two steps is told apart by the interval before it: past 25 ms it
+ * is a refresh missed and caught up, which is the governor's to prevent; on
+ * time, it is the step count landing either side of a step's edge, which is
+ * the step clock's (PLAN.md 14aa). The first Mac run of this on PR #474 (c29e9b6)
+ * counted 595 on Poster, 1969 with the governor never moving and the GPU at
+ * 10.1 ms a frame; this split is what says which of the two they were.
+ *
+ * Bars, for every look, after the opening (the first 10 s, where the
+ * governor opens at sixty steps before it has measured anything):
+ *   - no missed refresh caught up with two steps;
+ *   - no on-time frame of two steps (needs the even step clock of 14aa);
  *   - no climb undone within 10 s: a climb to a state it then leaves is one
  *     whose cost it could have known.
- * The first needs the even step clock of PLAN.md 14aa as well: on a loop that
- * still counts steps from `Date.now()`, Classic and Neon Coral Reef drew one
- * or two such frames in three minutes from the clock alone (14aa-2).
+ * On a loop that still counts steps from `Date.now()`, the second fails at
+ * sixty steps whatever the governor does (14aa-2: 9.16 % of Poster's frames).
  *
  * Software WebGPU cannot answer this (a step costs it seconds): in a cloud
  * session the run is refused rather than passed.
@@ -86,7 +93,7 @@ try {
       first = await page.evaluate(() => {
         const d = window.chromaglassDebug?.();
         const s = d?.solver?.();
-        return s && s.stepFrames.some((n) => n > 0) ? { at: performance.now() / 1000, frames: s.stepFrames } : null;
+        return s && s.stepFrames.some((n) => n > 0) ? { at: performance.now() / 1000, frames: s.stepFrames, late: s.lateStepFrames } : null;
       });
       if (!first) await page.waitForTimeout(500);
     }
@@ -109,8 +116,9 @@ try {
         const s = d.solver();
         const g = d.governor;
         return {
-          at: performance.now() / 1000, frames: s.stepFrames, stepRate: s.stepRate,
+          at: performance.now() / 1000, frames: s.stepFrames, late: s.lateStepFrames, stepRate: s.stepRate,
           rung: g ? `${g.rung.grid}²@${g.rung.dpr}` : '?', workMs: g?.workMs ?? null, stepMs: g?.stepMs ?? null,
+          moves: g?.moveLog?.length ?? null,
         };
       });
       ticks.push(t);
@@ -126,13 +134,15 @@ try {
     const total = last.frames.reduce((a, b) => a + b, 0) - first.frames.reduce((a, b) => a + b, 0);
     const twoAll = last.frames[2] + last.frames[3] - first.frames[2] - first.frames[3];
     const twoAfter = last.frames[2] + last.frames[3] - opening.frames[2] - opening.frames[3];
+    const lateAfter = last.late - opening.late;
+    const onTimeAfter = twoAfter - lateAfter;
     const climbs = moves.filter((m) => m.why === 'fast');
     const undone = climbs.filter((m) => {
       const next = moves.find((n) => n.at > m.at);
       return next !== undefined && next.at - m.at < 10;
     });
     const rel = (s) => (s - first.at).toFixed(1);
-    console.log(`\n${look}: ${total} frames in ${(last.at - first.at).toFixed(0)} s, ${twoAll} of two steps or more (${twoAfter} after the opening)`);
+    console.log(`\n${look}: ${total} frames in ${(last.at - first.at).toFixed(0)} s, ${twoAll} of two steps or more (${twoAfter} after the opening: ${lateAfter} after a missed refresh, ${onTimeAfter} on time)`);
     console.log(`  ends on ${last.rung} at ${last.stepRate} steps/s; GPU ${last.workMs?.toFixed(1)} ms a frame, ${last.stepMs?.toFixed(1)} ms a step`);
     for (const m of moves) {
       console.log(`  ${rel(m.at)} s  ${m.why.padEnd(8)} → ${ladder[m.rung] ?? m.rung} at ${m.stepRate}/s  (GPU ${m.workMs.toFixed(1)} ms${m.predictedMs !== null ? `, predicted ${m.predictedMs.toFixed(1)}` : ''})`);
@@ -141,10 +151,14 @@ try {
     const bursts = [];
     for (let i = 1; i < ticks.length; i++) {
       const n = ticks[i].frames[2] + ticks[i].frames[3] - ticks[i - 1].frames[2] - ticks[i - 1].frames[3];
-      if (n > 0) bursts.push(`${rel(ticks[i].at)} s: ${n}`);
+      const late = ticks[i].late - ticks[i - 1].late;
+      if (n > 0) bursts.push(`${rel(ticks[i].at)} s: ${n} (${late} late)`);
     }
     if (bursts.length) console.log(`  two-step frames by second: ${bursts.join(', ')}`);
-    verdict(twoAfter === 0, `${look}: no frame of two steps after the opening`, `${twoAfter} in ${(last.at - opening.at).toFixed(0)} s`);
+    verdict(lateAfter === 0, `${look}: no missed refresh caught up with two steps after the opening (the governor's)`,
+      `${lateAfter} in ${(last.at - opening.at).toFixed(0)} s`);
+    verdict(onTimeAfter === 0, `${look}: no on-time frame of two steps after the opening (the step clock's, PLAN.md 14aa)`,
+      `${onTimeAfter} in ${(last.at - opening.at).toFixed(0)} s`);
     verdict(undone.length === 0, `${look}: no climb undone within 10 s`,
       undone.length ? undone.map((m) => `${rel(m.at)} s to ${ladder[m.rung]} at ${m.stepRate}/s`).join('; ') : `${climbs.length} climb(s), all kept`);
   }
