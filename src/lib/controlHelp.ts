@@ -35,7 +35,7 @@ export const CONTROL_HELP: Record<string, string> = {
   beatLead: 'How far ahead of a heard beat a predicted kick fires, to make up for the sound\'s trip through the room and the mic.',
 
   // Look
-  dyeBudget: 'How full the plate runs. Low is mostly clear glass with the dye on it, high is wall to wall colour.',
+  dyeBudget: 'How full the plate runs, from mostly clear glass to wall to wall colour. The picked bottle shows what is left.',
   turbulenceScale: 'Adds stirring to the flow: swirls at many sizes, from lazy to churning.',
   turbulenceDetail: 'How many sizes of swirl are stirred in, from broad eddies only to fine curls on top.',
   plateRock: 'A hand tips the dish with the beat, and the heavier colour runs downhill each way.',
@@ -77,7 +77,7 @@ export const CONTROL_HELP: Record<string, string> = {
   secondLamp: 'A second, cooler lamp from the other side, so two lights play across every bubble and edge.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
   iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
-  lampWarmth: 'A halogen lamp\'s warm tint with a soft vignette.',
+  lampWarmth: 'A warm tint with a soft vignette. The bulb reads its colour in kelvin, from a neutral 6500 K toward the warm end.',
   transmission: 'How light passes through the dye: thin pale, thick deep. Zero is a flat glow.',
   exposure: 'Plate-wide exposure. Dye thinner than the plate\'s own floor reads as bare glass.',
   lumia: 'Slow folded sheets of light, in the manner of Wilfred\'s lumia, with no beat and no dye.',
