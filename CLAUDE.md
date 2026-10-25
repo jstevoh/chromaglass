@@ -17,6 +17,9 @@ story there in the same PR and leave the stub. The engine's own order is in
 
 ## How work is done here
 
+- **`README.md` is the front page, short.** What a feature or control does is written in
+  `docs/guide.md` (the long reference), and `docs/README.md` maps the other docs. Scratch
+  scripts live in `scratch/` (git-ignored), never in the root.
 - **Every claim has a check.** A fix comes with the `npm run …` script that
   measures it, printed numbers before and after in the commit message. A check
   asserts the *feature*, not a moment of the plate: see the long comments in

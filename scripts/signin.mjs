@@ -389,6 +389,8 @@ try {
   // (App.tsx), `chromaglassSettings` among them: the sign of the App being up.
   const ORIGIN = `http://127.0.0.1:${ON_PORT}/`;
   const ON = ORIGIN + '?debug', OFF = `http://127.0.0.1:${OFF_PORT}/?debug`;
+  // The show's own address: the site's `/` is the webpage for every visit (6b).
+  const SHOW = ORIGIN + 'show?debug';
   await fetch(`${EMU}/emulator/v1/projects/${PROJECT}/accounts`, { method: 'DELETE' });
   browser = await launchChromium(chromium);
 
@@ -464,6 +466,22 @@ try {
   const backMs = Date.now() - t;
   check('6. a returning visit goes straight to the plate, the sign-in and the landing page never drawn', back && !(await page.evaluate(() => window.__cgSigninSeen || window.__cgLandingSeen)), `up in ${(backMs / 1000).toFixed(1)} s, today's build ${(bootMs / 1000).toFixed(1)} s`);
 
+  // 6b. The site's own address is the webpage, signed in or not (the owner's
+  // choice, 2026-10-24; lib/showPath.ts): a signed-in visit to `/` meets the
+  // landing page, not the plate and not the sign-in, and its Play opens the
+  // plate at /show with no sign-in. 6 is the same visitor at /show, where the
+  // emailed link brought them back (5), the page never drawn.
+  const shown = new URL(page.url()).pathname;
+  await page.goto(ON);
+  const front = await waitFor(() => landingShown(page), 30_000);
+  const frontApp = await appUp(page);
+  await page.click('[data-cg-landing-play]', { timeout: 5000 }).catch(() => {});
+  const played = await waitFor(() => appUp(page), inTime());
+  const playedAt = new URL(page.url()).pathname;
+  check('6b. signed in, the site\'s own address is the webpage, and its Play opens the plate at /show with no sign-in',
+    shown === '/show' && front && !frontApp && played && playedAt === '/show' && !(await page.evaluate(() => window.__cgSigninSeen)),
+    `the link came back to ${shown}; webpage ${front ? 'drawn' : 'not drawn'}${frontApp ? ' over a running plate' : ''}; Play ${played ? `opened the plate at ${playedAt}` : 'opened no plate'}`);
+
   await cutGoogle(ctx);
   t = Date.now();
   await page.reload();
@@ -483,7 +501,7 @@ try {
   // the brief's rule, "don't subscribe the show to the account".
   const other = await ctx.newPage();
   other.on('dialog', (d) => d.accept());
-  await other.goto(ON);
+  await other.goto(SHOW);
   await waitFor(() => appUp(other), inTime());
   await page.evaluate(() => { window.__cgSigninSeen = false; });
   await other.click('[data-cg-account-open]').catch(() => {});
