@@ -6279,6 +6279,11 @@ once the login works (23.14).*
   drifts less. Neither checks `auth_time`, which Firebase's documented steps include.
   **23.18-midi** (open): a MIDI map per controller (keyed by the device's name), so two rigs
   keep their own maps instead of the newest replacing the other.
+  **23.18-pack** (open): the Mac app packs `server/` from a hand list
+  (`desktop/electron-builder.config.cjs`), and this PR's new `firebase-token.js` was missing
+  from it until the packed app failed to start on CI's Mac. A line in `npm run desktop` that walks
+  `remote-server.js`'s relative imports and fails on any file the list leaves out would catch
+  the next one in the cloud, before the Mac job.
   **23.18-exit** (open): a Mac app quit straight after an edit sends it the next time it opens
   (no send on `pagehide`); a `keepalive` push of the waiting records under 64 KB would close it.
 - **23.15** (with §12's iPhone app): Sign in with Apple native in the iPhone app, and
