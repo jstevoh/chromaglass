@@ -1140,6 +1140,8 @@ export class WebGPUFluid {
       // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
       ['addSlosh', [VEL], false],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
+      ['dampGridCurv', [dye], true],
+      ['dampGridLimit', [dye], true],
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
       ['jacobi', [VEL, dye], true],
@@ -2954,13 +2956,15 @@ export class WebGPUFluid {
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
-      this.run(pass, 'dampGrid', this.dye.write, [this.dye.read], k);
-      this.dye.swap();
+      const damp = (field: PingPong) => {
+        this.run(pass, 'dampGridCurv', this.scratchA, [field.read], k);
+        this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
+        this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
+        field.swap();
+      };
+      damp(this.dye);
       // The oil's share has the same grid in it, from the same faces.
-      if (bodiesOn) {
-        this.run(pass, 'dampGrid', this.oilDye!.write, [this.oilDye!.read], k);
-        this.oilDye!.swap();
-      }
+      if (bodiesOn) damp(this.oilDye!);
     }, gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried

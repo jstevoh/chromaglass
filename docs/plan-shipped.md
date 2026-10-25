@@ -3710,8 +3710,50 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   reads 0.48); Dye Weight 1 ×1.266 further at 20 s against the law's ×1.286. A numpy copy
   of the kernels at 768² (the cap binds harder there) reads 10.96 mm at 60 s. The
   before and after pictures are in the project's files (`diffusion/`).
-- **Found along the way:** the grid's checkerboard filter (`dampGrid`) adds dye at a
-  drop's rim, 3.2% in 20 s (18m-5); the check runs with it off.
+- **Found along the way:** the grid's checkerboard filter (`dampGrid`) added dye at a
+  drop's rim, 3.2% in 20 s (fixed in **18m-5** below).
+
+#### 18m-5. The grid filter makes dye at a drop's rim (shipped 2026-10-25)
+
+- **Reported:** 2026-10-20, found while building 18m (`scripts/slump.mjs`). `dampGrid` takes
+  the grid's checkerboard out of the dye with the 5×5 high-pass filter `f' = f − s·K(f)`,
+  `K = k⊗k/256`, `k = [1 −4 6 −4 1]`, and clamps each cell to the range `[lo, hi]` of its
+  3×3 neighbours so the negative lobes of `k` cannot ring past a hard edge. That cell-wise
+  clamp is not conservative: at a drop's rim on an empty plate (`f = 0` outside), `−s·K(f)`
+  is negative just outside the rim and positive just inside it; the clamp cuts off the
+  negative undershoot at `lo = 0` outside while keeping the positive lobe inside, making net
+  dye every step.
+- **Measured on main** (`7d77141`, 256², a 0.05 mL drop in glycerine, `gapThickness: 1`,
+  `solutalBuoyancy: 0`, `diff: 0`): with `gridDamp` off, dye total `231.13` (`+0.000%` at 2 s
+  and 20 s), front `3.94 mm` → `3.94 mm` (2 s) → `4.50 mm` (20 s). With `gridDamp` on, dye
+  total `231.13` → `233.27` (`+0.926%` at 2 s) → `238.53` (`+3.202%` at 20 s), front
+  `3.94 mm` → `4.13 mm` (2 s) → `4.66 mm` (`+0.72 mm` at 20 s).
+- **Why not face-by-face third-difference flux limiting:** writing `K(f) = (1/256) δx⁴ δy⁴ f`
+  as the divergence of face fluxes `Fx = δx³ δy⁴ f`, `Fy = δx⁴ δy³ f` and limiting each face
+  with Zalesak's limiter fails `pressed` in `npm run grating` (`68.7%–69.0%` worst channel vs
+  `< 68.0%` bar). A third difference is non-zero on a smooth wave whose fourth difference is
+  nearly zero, so scaling a cell's two opposite faces by different neighbour factors breaks
+  the cancellation `F_{i+1/2} − F_{i−1/2}` and traps that through-flux inside the cell as
+  grid-scale ripple.
+- **What was built:** a three-pass conservative filter (`dampGridCurv`, `dampGridLimit`,
+  `dampGrid` in `src/gpu/wgsl/fluid.ts`, dispatched by `src/gpu/fluid.ts`) that evaluates the
+  full fourth-difference update `u_p = −s·K(f)_p` first (with mirror reflection across the
+  grid walls so `∑_p u_p ≡ 0` and 1-cell lines and rows stay invariant), clamps each cell to
+  `c_p = clamp(f_p + u_p, lo_p, hi_p)`, and returns each clamped cell's excess
+  `e_p = c_p − (f_p + u_p)` back across the 5×5 stencil weighted by each neighbour's room
+  `w_p = min(c_p − lo_p, hi_p − c_p)` to its local bounds. Because `w_p > 0` only where
+  `e_p = 0`, clamped cells take none of their own excess back and receiving cells stay inside
+  `[lo_p, hi_p]`. In `dampGridLimit`, `hi` is gated on the four opposite neighbour pairs so
+  a monotone cell (`mn ≤ here ≤ mx`) only rises toward `mx` when `6·(here − mn) > mx − here`,
+  stopping dry concave staircase notches outside a circular rim from wicking dye across the
+  contact line. The `OPEN_RIM` under `thinGap` guard is unchanged.
+- **Measured after:** glycerine drop with `gridDamp` on holds `231.13` (`+0.000%` at 2 s and
+  20 s) and its front matches `gridDamp` off (`3.94 mm` at 2 s, `4.50 mm` at 20 s).
+  `npm run grating`: all 24 checks pass (1 step `94.6%`, 1 s `4.3%`, spread `29.7%` / `6.9%`,
+  pressed `66.0%` `< 68.0%`, 1-cell lines/rows `0.000%`, disc ring `0.002%`, halo `0.4%`,
+  conservation `+5.51 ppm/s` `< 10 ppm/s`). `npm run stages` (768², 2 layers, two alternating
+  pairs): `dye grid` goes from `1.54 ms` / `0.63 ms` (L0) and `0.81 ms` / `0.77 ms` (L1) on
+  main to `3.41 ms` / `3.76 ms` (L0) and `1.99 ms` / `2.33 ms` (L1) on this branch.
 
 ### 19aa-3. The API scripts never print the token
 
