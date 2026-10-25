@@ -582,7 +582,7 @@ export const PRESETS: Preset[] = [
       surge: 0.45,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.85,
+      gooeyEffect: 0.28,
       rotationSpeed: 0.115,      // 28i-2: keeps the bells drifting past 0.02 motion at 20 and 40 s
       centerGravity: 0.15,
       ledPlatform: true,
@@ -600,7 +600,6 @@ export const PRESETS: Preset[] = [
       viscosity: 'thick',
       polarity: 0.85,
       evaporationRate: 0.003,
-      dyeBudget: 0.52,
       airVelocity: 0.06,
       vibrationFrequency: 0.25,
       audioImpact: 0.7,

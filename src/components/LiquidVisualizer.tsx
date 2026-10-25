@@ -2627,8 +2627,8 @@ class FluidSimulation {
         for (let jf = 0; jf < 4; jf++) {
           const bell = bells[jf];
           this.rng.centred(); this.rng.centred();
-          const jx = S * bell.x;
-          const jy = S * bell.y;
+          const jx = S * (0.5 + (bell.x - 0.5) * 0.72);
+          const jy = S * (bell.y + 0.14);
           const c = col(bell.dye);
           const rim = col(bell.dye + 1);
           const bellR = (11.5 + this.rng.float() * 6.5) * k;
@@ -2638,7 +2638,7 @@ class FluidSimulation {
               if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
               const edge = r / bellR;
               const colMix = edge > 0.65 ? rim : c;
-              this.splatBlob(x, y, 2.1, (1.2 - edge * 0.7) * 2.2, colMix.r, colMix.g, colMix.b);
+              this.splatBlob(x, y, 2.1, (0.2 + 0.8 * edge) * (1.2 - edge * 0.7) * 0.132, colMix.r, colMix.g, colMix.b);
             }
           for (let t = 0; t < 3; t++) {
             const len = (32 + this.rng.float() * 14) * k;
@@ -2647,7 +2647,7 @@ class FluidSimulation {
               for (let dy = 0; dy < len; dy += 1.2) {
                 const wb = Math.sin(dy * 0.18 + t * 1.4 + jf + strand) * 3.8 * k;
                 const tc = (t === 1) ? rim : c;
-                this.splatBlob(tx + wb, jy + dy, 1.8, 1.15 / (1 + dy * 0.03), tc.r, tc.g, tc.b);
+                this.splatBlob(tx + wb, jy + dy, 1.8, 0.053 / (1 + dy * 0.03), tc.r, tc.g, tc.b);
               }
             }
           }
