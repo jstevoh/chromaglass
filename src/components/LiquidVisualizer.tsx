@@ -68,6 +68,7 @@ import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
+import { openCamera } from '../lib/cameras';
 import { Phrasing, type Phrase } from '../lib/phrasing';
 import { PACE_NEUTRAL, approachPace, type PaceSample } from '../lib/scenePacing';
 import { Modulators } from '../lib/modulators';
@@ -939,7 +940,13 @@ export interface LiquidVisualizerHandle {
   loadFilmFile: (file: File) => Promise<void>;
   /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
   loadFilmUrl: (url: string) => Promise<void>;
-  startFilmCamera: () => Promise<void>;
+  /**
+   * A camera's picture as the film (lib/cameras.ts): `deviceId` from the
+   * film's camera picker, '' for the browser's pick (a phone's back camera,
+   * pointed at a dish). `onEnded` fires when the camera is unplugged, and the
+   * answer says which camera opened and whether the chosen one was missing.
+   */
+  startFilmCamera: (deviceId?: string, onEnded?: () => void) => Promise<{ label: string | null; fellBack: boolean }>;
   /**
    * A window, a tab or a screen, picked from the browser's own chooser.
    *
@@ -6462,15 +6469,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }, 300);
       }
     },
-    startFilmCamera: async () => {
+    startFilmCamera: async (deviceId = '', onEnded) => {
       stopFilm();
       const f = filmRef.current;
       const v = filmVideo();
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
+      const opened = await openCamera(deviceId, 'environment', { width: 1280 });
+      const stream = opened.stream;
       f.stream = stream;
       v.srcObject = stream;
       f.kind = 'camera';
+      // Unplugged, the same way a captured window is taken away: the film
+      // comes off and the panel is told, rather than the plate holding the
+      // camera's last frame with the source still reading "live".
+      filmEndedRef.current = onEnded ?? null;
+      for (const t of stream.getVideoTracks()) {
+        t.addEventListener('ended', () => {
+          const cb = filmEndedRef.current;
+          stopFilm();
+          cb?.();
+        });
+      }
       try { await v.play(); } catch { /* as above */ }
+      return { label: opened.label, fellBack: opened.fellBack };
     },
     clearFilm: () => stopFilm(),
     loadMark: (source, width, height) => {

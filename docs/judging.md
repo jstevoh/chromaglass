@@ -1606,7 +1606,22 @@ about a quarter of a second a swing) before it settled, which the solve leaves o
 Say whether the give-back looks too dead next to that, which would make the inertial sheet worth
 building.
 
-## 69. On reads on (PLAN 35a)
+## 69. Any camera, and which camera does what (PLAN 14ad)
+
+With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual Camera):
+
+- **Settings, Film.** Pick the second camera under Webcam, then press Webcam: its picture
+  should be on the plate, and the Source line should name it. Pick the laptop's camera while
+  it shows: it should switch without pressing anything else.
+- **Pull the cable** while it shows: the film should go off with a line saying it was
+  unplugged. Plug it back in: it should come back by itself. Say how long that takes on a
+  real camera (the code waits for the browser to list it, not a timer).
+- **Settings, Motion camera.** Does the first line make it obvious that this one stirs and
+  is never shown, and that Webcam is the one that shows a picture? Pick a camera for it and
+  switch it on; the film's camera should stay what it was.
+- On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
+
+## 70. On reads on (PLAN 35a)
 
 On the laptop in a dark room, and on the phone, with no reading of labels:
 

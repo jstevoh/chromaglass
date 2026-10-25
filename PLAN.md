@@ -1282,6 +1282,15 @@ Open from Desk v2, each its own thread (the UI lane):
   control does.
   - **8j-1** (S) The remote page (`RemoteControl.tsx`) has its own sliders and no card;
     its names are whole, but the line would help there too.
+  - ~~**8j-2** Cards that stuck and stacked~~ (the owner, 2026-10-24: Macro Zoom's card
+    stayed up under Evolve Speed's). **Shipped.** A knob whose mouse-up never reached the
+    page thought a hand was still on it: Chromium then sends no pointerup, only a
+    lostpointercapture on the next buttonless move, which the knob did not hear. The
+    drag now ends on a lost capture, a release or cancel anywhere in the window, a move
+    with no button down, or the window losing focus; and one card is up at a time,
+    whatever asked for it. Checks: `npm run layout` (two knobs with swallowed releases;
+    a focused card replaced by a hovered one), `npm run phone` (a tap on another name
+    swaps the card). Which gesture on the owner's Mac swallowed the release is not known.
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
@@ -3606,6 +3615,28 @@ Open, found building it:
   greys and Film shows a grey picture. Whether the look's palette should tint them (Film's
   grade already can, in the Mixer) is the owner's call in §66.
 
+### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped, asked 2026-10-24)
+
+**Shipped** (2026-10-24): one camera list (`useCameras`, kept current on `devicechange`)
+and one picker (`CameraPicker.tsx`) in both places a camera opens, desk and phone alike: the
+motion camera (was "The Room") and the film's Webcam, which could only ever open the
+browser's "environment" camera. Each choice is remembered apart; a camera pulled out takes
+its source off and says so, and opens again by itself when it is plugged back in; a chosen
+camera that is missing opens the browser's pick, says so, and hands over when it arrives
+(`src/lib/cameras.ts`, `npm run cameras`). The room section is now **Motion camera**,
+its first line says its picture is never shown and points at Webcam, and the film's camera
+line says it shows a picture and points back. Story in `docs/plan-shipped.md`.
+
+- **14ad-1** (S) *The audio input does not come back either* (14g's first half): the same
+  `devicechange` reopen, for the sound's input.
+- **14ad-2** (S) *Room Drive and Room Impact keep the old word.* The section is Motion
+  camera; its two masters (and the patch source "Room") still say Room. Rename with
+  phase 3's one-home-per-setting pass, where the Drive/Impact pairs are settled, rather than
+  churn the patch bay's names twice.
+- **14ad-3** (S) *The browser keeps camera names back until one has been allowed.* Before
+  that the pickers list "Default camera" only, with a line saying why. A "find my cameras"
+  button that asks once and closes the camera at once would list them sooner.
+
 ### 14z. A new song: where songs start and end, and the change on the music (asked 2026-10-24)
 
 The owner: song detection does not work well enough to ship. It does not catch where
@@ -5614,6 +5645,26 @@ Not a gate and no bar: a rate depends on what was pushed.
   be split the way the Mac shards already are. Until then a red `open` on a branch that
   cannot reach the failing check is not evidence about the branch. Found while measuring
   0-tap (PR #429).
+
+- **19ad-3. The startup stall came back on a deploy.** The `open` shard's startup read a
+  **2.72 s longest wait against its 2.48 s bar** on the 38f3c07 deploy (2026-10-24) and
+  passed on one re-run. One more presentation for 19ad-2's question of whether the shard
+  is at the edge of its runner; the bar stays where it is.
+
+### 19ae. A phone check reads its dye across a plate rebuild and calls it a fault
+
+- **19ae-1. `npm run phone`'s "two fingers holding Drop lay dye under both" picks its
+  cells on one plate and reads them on another.** On #352's first deploy (run
+  40121831306, the `show` shard) both fingers read **0 under it**: between the pick and
+  the read the governor rebuilt the plate from 384² to 256² (solver #1 to #3), so the
+  cells the check picked were not the cells it read. The re-deploy passed. The plate line
+  the check prints on a red (`before:`/`held:`/`after:`, `scripts/phone.mjs` near its
+  `plateLine`) already carries each reading's plate, so the check has what it needs to
+  notice: when the plate's size or solver differs between the pick and the read, it
+  should say "the plate was rebuilt between pick and read" and measure again on the new
+  plate, not report FAIL with "0 under it". It must not pass in that case, and the bar on
+  the dye under each finger stays where it is. Same family as 19ad (a red that is about
+  the runner's moment, not the branch). Found reviewing #352 (2026-10-24).
 
 ## 20. Lace and holes: a pale film torn open over colour
 

@@ -425,14 +425,16 @@ const SECTIONS: Section[] = [
   // ─────────────────────────────────────────────────────────────────
   {
     id: 'room',
-    title: 'The room',
+    title: 'Motion camera',
     icon: <Video size={13} />,
     body: (
       <>
         <P>
           A camera pointed at the floor, read back rather than shown. The movement in
           front of it stirs the liquid, everyone it can hold becomes a hand on the glass,
-          and any feature of the room can ride any control a MIDI fader can learn.
+          and any feature of the room can ride any control a MIDI fader can learn. To put
+          a camera&rsquo;s picture on the plate instead, use Webcam in the film&rsquo;s
+          Source; each has its own camera picker.
         </P>
         <Rows items={[
           ['Room Drive', <>The optical-flow lattice upsampled onto the grid and added as velocity every solver step. A wave of an arm reaches the plate about 100 ms after it happens.</>],
