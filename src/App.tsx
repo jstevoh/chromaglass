@@ -907,7 +907,7 @@ export default function App() {
   const [barKnown, setBarKnown] = useState('');
   /** The tempo the beat grid hears, bpm rounded, or 0: what the strobe ring on Auto Spin is lit by when nothing was tapped or clocked in. */
   const [heardBpm, setHeardBpm] = useState(0);
-  const shownShape = useRef({ line: '', bar: '' });
+  const shownShape = useRef({ line: '', bar: '', heard: 0 });
   /** The last song-shape event the sequencer has been handed, by its number. */
   const songCueSeqRef = useRef(0);
   useEffect(() => {
@@ -919,7 +919,8 @@ export default function App() {
       const bar = report ? barLine(report.bar) : '';
       if (bar !== shownShape.current.bar) { shownShape.current.bar = bar; setBarKnown(bar); }
       const heard = report && report.bar.period > 0 && report.bar.beatConfidence >= 0.3 ? Math.round(60 / report.bar.period) : 0;
-      setHeardBpm(prev => (prev === heard ? prev : heard));
+      // Compared here, not in an updater that hands back the old value (the tempo label's note above): that still renders the App.
+      if (heard !== shownShape.current.heard) { shownShape.current.heard = heard; setHeardBpm(heard); }
     }, 250);
     return () => clearInterval(timer);
   }, []);
