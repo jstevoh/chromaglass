@@ -5780,7 +5780,23 @@ Not a gate and no bar: a rate depends on what was pushed.
   `.deb` taken out, "unmet dependencies" then a cold fetch, 7.5 s; a file whose hash does
   not match, refused by every mirror and the step red naming it; an older `.deb` than
   the installed one, exit 100 and nothing changed; the floor, curl exit 28 after 5 s on
-  a 40 KB/s transfer. CI's own seconds: this PR's runs.
+  a 40 KB/s transfer. On CI (#496, run 40365582373) the cold fill fetched the 87 packages,
+  61 MB, in 1 s, installed Ubuntu's ffmpeg and ffprobe 6.1.1, and saved the set; the step
+  took 16 s.
+  - **19ab-4a. Open: drop the cache's `restore-keys`.** `cache-hit` is true only on the
+    exact key, so when a new runner image restores the last image's set through
+    `restore-keys` and it installs cleanly, the save step stores that same old set under
+    the new key, and it rides forward image after image until an offline install fails:
+    Ubuntu's updates to ffmpeg and its libraries never reach CI, which is not what "keyed
+    by the runner image" says. Nothing goes vacuous (the decoder just stays fixed), and
+    the cold fill measured 16 s for the whole step, so the fallback buys about 15 s once
+    per image. Found by #496's review.
+  - **19ab-4b. Open: see the warm path run on CI.** #496's run was a cold miss, so "about
+    a second" from the cache is measured only in a cloud session. Read `Measure · sound`'s
+    ffmpeg step on the next run after the merge (it should print "installed from 87
+    cached packages, no mirror asked").
+  - **19ab-4c. Open: `--fetch` accepts only SHA256 and SHA512.** It takes MD5Sum and SHA1
+    too; apt on noble prints the strongest hash anyway, so this is hardening, not a hole.
 
 ### 19ac. The phone's double tap on Speed is judged on two taps landing in time
 
