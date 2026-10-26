@@ -91,6 +91,7 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
       'Phone remote',
       'Song ID with timed lyrics',
       'Your own logo on the glass',
+      'The Mac app: the show offline, the phone remote built in',
     ],
   },
   {
@@ -98,7 +99,6 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     price: '$199',
     lines: [
       'Everything in Home',
-      'The Mac app: the show offline, the projector and phone remote built in',
       'Several projectors with edge blending',
       'OSC, Art-Net / DMX and MIDI out',
     ],
@@ -269,13 +269,14 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
           ))}
         </div>
         {/* The Mac app's download is a public file (the owner's choice,
-            2026-10-25); what Pro unlocks is checked inside the app. On a phone
-            or a PC there is nothing here to run, so it says where to get it. */}
+            2026-10-25); the app opens only on a Home or Pro key (PLAN.md
+            23.17d: the owner chose Home too, 2026-10-26). On a phone or a PC
+            there is nothing here to run, so it says where to get it. */}
         <p data-cg-landing-mac="" className="mt-4 text-[13px] leading-relaxed text-muted">
           {mac ? (
-            <>Already on Pro? <a href={MAC_DOWNLOAD_URL} className="underline underline-offset-2 hover:text-text-2">Download the Mac app</a> (Apple silicon).{!MAC_APP_NOTARISED && <> {MAC_FIRST_OPEN}</>}</>
+            <>On Home or Pro? <a href={MAC_DOWNLOAD_URL} className="underline underline-offset-2 hover:text-text-2">Download the Mac app</a> (Apple silicon).{!MAC_APP_NOTARISED && <> {MAC_FIRST_OPEN}</>}</>
           ) : (
-            <>The Mac app comes with Pro. Download it on your Mac from this page or from Profile &amp; Store.</>
+            <>The Mac app comes with Home and Pro. Download it on your Mac from this page or from Profile &amp; Store.</>
           )}
         </p>
       </section>

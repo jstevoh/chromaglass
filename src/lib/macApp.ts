@@ -5,10 +5,10 @@
  * publishes when the owner asks for a release. The .dmg has the same name in
  * every release (dmg.artifactName in desktop/electron-builder.config.cjs), so
  * this one link always gives the newest, and a release never needs the site
- * deployed again to be found. The owner chose a public file (2026-10-25): what
- * Pro unlocks is checked inside the app against the key (23.11), the way the
- * site checks it, so the profile sheet offers the button to Pro and says
- * "comes with Pro" to everyone else, and that is a nudge, not a lock.
+ * deployed again to be found. The owner chose a public file (2026-10-25): the
+ * app itself opens only on a Home or Pro key (23.17d, MAC_APP_TIERS below), so
+ * the profile sheet offers the button to those tiers and says "comes with Home
+ * and Pro" to everyone else.
  */
 
 import { SHOW_PATH } from './showPath';
@@ -73,7 +73,7 @@ export function onMacComputer(nav: Pick<Navigator, 'userAgent' | 'maxTouchPoints
 export type MacAppRow =
   | { kind: 'download'; href: string }
   | { kind: 'on-a-mac' }
-  | { kind: 'with-pro' }
+  | { kind: 'with-a-licence' }
   | { kind: 'in-app'; current: string; line: string; button: string | null };
 
 export function macAppRow(tier: string, mac: boolean, update: DesktopUpdateState | null, inApp: boolean): MacAppRow {
@@ -90,7 +90,7 @@ export function macAppRow(tier: string, mac: boolean, update: DesktopUpdateState
     if (s.status === 'error') return { kind: 'in-app', current, line: 'Could not reach the releases just now.', button: 'Check for Updates' };
     return { kind: 'in-app', current, line: 'It looks for new versions by itself.', button: 'Check for Updates' };
   }
-  if (tier !== 'pro') return { kind: 'with-pro' };
+  if (!(MAC_APP_TIERS as ReadonlyArray<string>).includes(tier)) return { kind: 'with-a-licence' };
   return mac ? { kind: 'download', href: MAC_DOWNLOAD_URL } : { kind: 'on-a-mac' };
 }
 
@@ -112,12 +112,13 @@ export function openSignInInBrowser(): void {
 }
 
 /**
- * The licences the Mac app opens on (PLAN.md 23.17d): Home and Pro, each with
+ * The licences the Mac app opens on (PLAN.md 23.17d; the owner's choice,
+ * 2026-10-26, "Home can open the app"): Home and Pro, each with
  * its own features, as on the website. Home's phone remote, song ID and
  * full-length recording are sold as "in the ChromaGlass app", and the remote
  * needs the app's show server, so a Home buyer shut out of the app would have
  * paid for features they could not use. One list, read by the door and the
- * start (main.tsx, AppLicenceGate.tsx).
+ * start (main.tsx, AppLicenceGate.tsx), and the profile sheet's download row.
  */
 export const MAC_APP_TIERS: ReadonlyArray<'home' | 'pro'> = ['home', 'pro'];
 

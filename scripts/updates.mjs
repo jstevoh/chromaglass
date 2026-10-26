@@ -242,7 +242,8 @@ check('an iPad asking for the desktop site is not', onMacComputer(IPAD) === fals
 check('an iPhone and a PC are not', onMacComputer(IPHONE) === false && onMacComputer(PC) === false);
 check('Pro on a Mac: the download', macAppRow('pro', true, null, false).kind === 'download' && macAppRow('pro', true, null, false).href === MAC_DOWNLOAD_URL);
 check('Pro on a phone: where to get it (the phone version)', macAppRow('pro', false, null, false).kind === 'on-a-mac');
-check('Free and Home: it comes with Pro, no button', macAppRow('free', true, null, false).kind === 'with-pro' && macAppRow('home', true, null, false).kind === 'with-pro');
+check('Free: it comes with Home and Pro, no button', macAppRow('free', true, null, false).kind === 'with-a-licence');
+check('Home on a Mac: the download, as for Pro (the app opens on Home, 23.17d)', macAppRow('home', true, null, false).kind === 'download');
 const inApp = (status, extra = {}) => macAppRow('free', true, { status, current: '1.3.0', signed: false, version: '1.3.99', url: 'x', percent: 40, error: null, ...extra }, true);
 check('in the app: an update is a Download button', inApp('available').button === 'Download 1.3.99');
 check('in the app: a ready one is Restart to Update', inApp('ready').button === 'Restart to Update');
