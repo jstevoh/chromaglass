@@ -20,7 +20,9 @@
  * Written before the build, so it is the contract the build is held to. The
  * fields it sets on a cord (`SceneMapping`, src/types.ts):
  *
- *   mode       'follow' | 'gate'; absent reads as follow
+ *   mode       'follow' | 'gate'; absent reads as follow, even with a
+ *              threshold, attack or release set (a whole-plate cord ignores
+ *              them today; an area cord's own rule is unchanged)
  *   threshold  0..1 of the reading, as on an area cord today
  *   gain       what the reading is multiplied by before the threshold;
  *              absent reads as 1
@@ -105,6 +107,17 @@
  *                   against its own recent range as the named bands are.
  *   gain 2 in follow mode                    (30a) The same drag at gain 2 reads
  *                   twice band5, to Bloom's top, within 0.02.
+ *   no mode reads as follow                  (30a) The same drag with no mode but
+ *                   a threshold, attack and release set, at depth 0.5, reads
+ *                   half of band5 within 0.02.
+ *   (every drag gate line)                   (30a) Each fire's peak within 0.05
+ *                   of the burst's band5 peak × gain (to Bloom's top) × depth:
+ *                   the timing is relative to each fire's own peak, so a gate
+ *                   rising to half the hit passed everything before this.
+ *   gate at threshold 0.26 and 0.42          (30a) Counted: all eight in-drag
+ *                   bursts at 0.26, only the five loud ones at 0.42 (at depth
+ *                   0.5), so a threshold read 0.1 off either way, or held
+ *                   fixed, fires on the wrong set at one of the three.
  *   gate, attack 0.3 s, release 0.6 s        (30a) Threshold 0.5, gain 1, the
  *                   drag [1000, 1400]: one fire on each `in` and the `dip`
  *                   (five), each in the first 0.2 s of its burst; none on
@@ -147,8 +160,10 @@
  * snapped to band5 (4), the gain after the gate (1), dt fixed at 1/60 (2), a
  * gate that shuts on any fall (6), one that restarts on a rise (8), the gate
  * ignored (10), the drag on a fixed -60..0 dB scale (3), release ×1.25 (3),
- * attack ×1.15 (3). A drag one bin wider each side passes, as it should: that
- * build is near enough to right.
+ * attack ×1.15 (3); and from the review, a threshold read 0.12 high (1), 0.1
+ * low (1), fixed at 0.4 (1) or 0.5 (2), a gate rising to half the hit (7), one
+ * that skips the depth (1), and no mode read as a gate (1). A drag one bin
+ * wider each side passes, as it should: that build is near enough to right.
  *
  * How a fire is counted. The cord aims at Bloom (0..1, no steps, read once
  * for the picture) from 0 at depth 1, so the folded Bloom is the cord's
@@ -196,6 +211,14 @@ const THRESHOLD = 0.5;
 const TOLERANCE = 0.1;
 const FIRE_STEP = 0.1;
 const ONSET_S = 0.2;
+const HEIGHT_TOLERANCE = 0.05;
+/**
+ * Two more thresholds on the drag, counted: one under the quiet bursts and one
+ * over them, so a gate that reads its threshold wrong by 0.1 either way, or
+ * holds a fixed one, fires on the wrong set at one of the three.
+ */
+const LOW_THRESHOLD = 0.26;
+const HIGH_THRESHOLD = 0.42;
 
 const KINDS = {
   in: { hz: 1200, amp: LOUD, inDrag: true, inBand5: true },
@@ -330,7 +353,7 @@ function timing(tr, trace, fire) {
  * Hold a trace to the bursts it should fire on: one fire each, none
  * elsewhere, and each timed within TOLERANCE of `attack` and `release`.
  */
-function judge(tr, name, trace, shouldFire, attack, release) {
+function judge(tr, name, trace, shouldFire, attack, release, height) {
   const out = [];
   const say = (ok, n, detail) => out.push({ ok, name: n, detail });
   const got = fires(trace);
@@ -350,6 +373,20 @@ function judge(tr, name, trace, shouldFire, attack, release) {
     `${name}: one fire per burst over the threshold`,
     `${fired + stray} fires, ${want} wanted; doubled ${doubled}, between bursts ${stray}` +
     `${missed.length ? `, missed ${missed.join(' ')}` : ''}${wrong.length ? `, fired on ${wrong.join(' ')}` : ''}`);
+  if (height) {
+    // Each fire's peak against what the burst should lift it to: the timing
+    // below is relative to each fire's own peak, so without this a gate that
+    // rose to half the hit would pass every other line.
+    let worst = 0, n = 0;
+    for (const f of got) {
+      const b = f.at * tr.dt < LEAD_S - 0.2 ? -1 : burstOf(tr, f);
+      if (b < 0) continue;
+      worst = Math.max(worst, Math.abs(f.height - height(tr, b)));
+      n++;
+    }
+    say(n > 0 && worst <= HEIGHT_TOLERANCE, `${name}: each fire rises to the hit's height, within ${HEIGHT_TOLERANCE}`,
+      `${n} fires, worst ${worst.toFixed(3)} off`);
+  }
   if (attack === undefined) return out;
   const rises = [], falls = [];
   for (const f of got) {
@@ -417,8 +454,9 @@ const { band5 } = tr60;
   const trough = Math.min(...bursts.filter(b => b.dip).flatMap(b => middleOf(tr60, b).map(i => band5[i])));
   const qLo = Math.min(...quiet), qHi = Math.max(...quiet);
   line(margin >= 30 && Math.min(...twin) >= Math.min(...loud) - 0.05 &&
-    qHi <= THRESHOLD - 0.1 && 2 * qLo >= THRESHOLD + 0.1 && trough >= THRESHOLD + 0.15,
-    'the tape: the drag hears its bursts 30 dB over the rest, band5 hears the twin as the tone, the quiet ones sit either side of the threshold',
+    qHi <= THRESHOLD - 0.1 && 2 * qLo >= THRESHOLD + 0.1 && trough >= THRESHOLD + 0.15 &&
+    qLo >= LOW_THRESHOLD + 0.05 && qHi <= HIGH_THRESHOLD - 0.05,
+    'the tape: the drag hears its bursts 30 dB over the rest, band5 hears the twin as the tone, the quiet ones sit either side of each threshold',
     `drag ${Math.min(...inside).toFixed(1)} dB at its quietest burst, ${Math.max(...outside).toFixed(1)} dB at the loudest outside (margin ${margin.toFixed(1)} dB); ` +
     `band5 reads the twin ${Math.min(...twin).toFixed(2)}, the tone ${Math.min(...loud).toFixed(2)}, quiet ${qLo.toFixed(2)}–${qHi.toFixed(2)}, the dip's trough ${trough.toFixed(2)}`);
 }
@@ -513,10 +551,42 @@ if (!CONTROLS_ONLY) {
   follows('gain 2 in follow mode reads twice band5 (to Bloom\'s top), within 0.02',
     { feature: 'band8', mode: 'follow', band: BAND5, gain: 2 }, i => Math.min(1, 2 * band5[i]));
 
+  // `mode` left out reads as follow, even with a threshold, attack and release
+  // set: a whole-plate cord has always ignored those three, and a look saved
+  // with them must not start gating when 30a lands. (An area cord gates on
+  // them, as it does today: that is lib/areaCords.ts's rule, not this one.)
+  // At a depth of 0.5, so the depth is held too: half of band5.
+  follows('no mode reads as follow (threshold and times set), at depth 0.5 half of band5, within 0.02',
+    { feature: 'band8', band: BAND5, depth: 0.5, threshold: THRESHOLD, attack: 0.3, release: 0.6 }, i => 0.5 * band5[i]);
+
+  /**
+   * What a burst should lift a gate to: the most band5 (which holds the same
+   * tone as the drag, and reads as the drag does by the line above) reached
+   * in it, times the gain, to Bloom's top, times the depth.
+   */
+  const hitHeight = (gain, depth = 1) => (tr, i) => {
+    const b = bursts[i];
+    let peak = 0;
+    for (let k = Math.floor(b.start * tr.fps); k <= Math.ceil((b.start + BURST_S + 0.1) * tr.fps); k++) peak = Math.max(peak, tr.band5[k]);
+    return Math.min(1, gain * peak) * depth;
+  };
+
   const loudInDrag = b => b.inDrag && b.amp === LOUD;
   for (const [attack, release] of PAIRS) {
     const trace = bayTrace(tr60, { feature: 'band8', mode: 'gate', band: DRAG, threshold: THRESHOLD, gain: 1, attack, release });
-    report(judge(tr60, `gate on the drag, ${attack}/${release} s`, trace, loudInDrag, attack, release));
+    report(judge(tr60, `gate on the drag, ${attack}/${release} s`, trace, loudInDrag, attack, release, hitHeight(1)));
+  }
+
+  {
+    // Counted, not timed: the quiet bursts' reading is still climbing for a
+    // few frames after it crosses 0.26, so a gate rising to its height takes
+    // up to 0.48 s for a 0.3 s attack, the reading's doing (as the energy line).
+    const [attack, release] = PAIRS[0];
+    const low = bayTrace(tr60, { feature: 'band8', mode: 'gate', band: DRAG, threshold: LOW_THRESHOLD, attack, release });
+    report(judge(tr60, `gate on the drag at threshold ${LOW_THRESHOLD}`, low, b => b.inDrag, undefined, undefined, hitHeight(1)));
+    // And at a depth of 0.5, which the gate's height is scaled by.
+    const high = bayTrace(tr60, { feature: 'band8', mode: 'gate', band: DRAG, threshold: HIGH_THRESHOLD, depth: 0.5, attack, release });
+    report(judge(tr60, `gate on the drag at threshold ${HIGH_THRESHOLD}, depth 0.5`, high, loudInDrag, undefined, undefined, hitHeight(1, 0.5)));
   }
 
   {
@@ -525,13 +595,13 @@ if (!CONTROLS_ONLY) {
     const tr120 = track(FAST_FPS);
     const [attack, release] = PAIRS[0];
     const trace = bayTrace(tr120, { feature: 'band8', mode: 'gate', band: DRAG, threshold: THRESHOLD, gain: 1, attack, release });
-    report(judge(tr120, `gate on the drag at ${FAST_FPS} fps, ${attack}/${release} s`, trace, loudInDrag, attack, release));
+    report(judge(tr120, `gate on the drag at ${FAST_FPS} fps, ${attack}/${release} s`, trace, loudInDrag, attack, release, hitHeight(1)));
   }
 
   {
     const [attack, release] = PAIRS[0];
     const trace = bayTrace(tr60, { feature: 'band8', mode: 'gate', band: DRAG, threshold: THRESHOLD, gain: 2, attack, release });
-    report(judge(tr60, 'gain 2 opens the quiet ones', trace, b => b.inDrag));
+    report(judge(tr60, 'gain 2 opens the quiet ones', trace, b => b.inDrag, undefined, undefined, hitHeight(2)));
   }
 
   {

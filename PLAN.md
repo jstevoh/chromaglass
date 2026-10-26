@@ -8241,7 +8241,9 @@ cord's fields (`mode`, `threshold`, `gain` before the threshold, `attack`, `rele
 as `[loHz, hiHz]` winning over `feature`), read through `songAudioTrack` and `PatchBay.fold`
 with the gate's clock from `fold`'s `now`. Attack and release are the 2%-to-98% times of
 the cord's rise and fall, and a gate rises to the hit's height (the most the reading times
-the gain reached while open), as an area cord's does. CI runs it with `--controls` (the
+the gain reached while open), as an area cord's does. A whole-plate cord with no `mode`
+follows even if it carries a threshold, attack or release (it ignores them today); an area
+cord keeps its own rule. CI runs it with `--controls` (the
 tape, the counter on today's `CordGate`, the judge rejecting three wrong gates, every saved
 cord folding as before) until the build's PR drops the flag. 31c's two lines join it when 31c is built.
 - **30a-1. The dragged band on the cast display and the phone remote.** The cast display
