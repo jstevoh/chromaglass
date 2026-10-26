@@ -3171,6 +3171,11 @@ by side, a red one again alone. `npm run check` is now `quick --measure`. Found 
 way: the turntable step had no `if:`, so it ran in all four Measure parts; and 19i's carry
 never fired (above, under 19i).
 
+And the plate shard had reached its 20-minute timeout: 19.1 to 20.4 minutes on the PR runs
+of 2026-10-26, and #502's own run was stopped there with one check of 40 left (every one
+before it green). The rides (101 s) and the Ben-Day print (96 s), both lab checks, moved to
+tools, which ran 13.9 to 14.5: a one-line change each in the manifest now.
+
 *Measured.* Replayed over the 60 PRs merged up to #497 (2026-10-26), 14,213 Mac
 runner-minutes: six changed only check scripts (#429, #449, #456, #462, #465, #472) and
 spent 1,325 Mac minutes on every shard, where the shards their checks are on took 275.

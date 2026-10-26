@@ -27,8 +27,9 @@
 // software WebGPU the app's frames read back empty (PLAN 19l), so its green
 // here would be vacuous.
 //
-// Side by side, a check that measures time can go red because the others
-// took the cores (in a cloud session `npm run check` in parallel turned
+// Two checks that build dist/ or serve on the same port never run at once
+// (below). Side by side, a check that measures time can go red because the
+// others took the cores (in a cloud session `npm run check` in parallel turned
 // `layout` and `liquids` red once each, green alone). So every red is run
 // again alone at the end, and the summary says which were red alone and which
 // only in the crowd; the second is not a pass, it is a check to read.
@@ -67,7 +68,17 @@ for (const c of man.checks) {
   const app = files.some((f) => SERVES_APP.test(text(f)));
   const browser = app || files.some((f) => /from ['"](?:playwright|\.\/chromium\.mjs|\.\/lab\.mjs)['"]/.test(text(f)));
   const mac = man.shards.mac.includes(c.shard);
-  info.set(c, { reads: r, app, browser, here: !(mac && app), env: mac ? { PW_WEBGPU: '1' } : {} });
+  // What two checks cannot share at once. Seventy npm scripts start with
+  // `npm run build`, which rewrites dist/ under any check serving it; and
+  // the remote's checks serve on fixed ports (4197 is showkey's, phonelink's
+  // and draw's). The first `npm run check` side by side ran seven of them
+  // red together, every one green alone.
+  const own = new Set();
+  const cmds = [c.run, ...[...npmScriptsOf(c.run, scripts)].map((n) => scripts[n] ?? '')].join('\n');
+  if (/\bnpm run build\b|\bvite build\b/.test(cmds) || files.some((f) => /['"`/]dist['"`/]/.test(text(f)))) own.add('dist/');
+  for (const f of files) for (const m of text(f).matchAll(/(?:PORT\s*(?:\?\?|\|\||=)\s*|port:\s*|localhost:|--port[ =]['"`]?)(\d{4,5})\b/g)) own.add(`port ${m[1]}`);
+  for (const m of cmds.matchAll(/--outfile=(\S+)/g)) own.add(m[1]);
+  info.set(c, { reads: r, app, browser, own, here: !(mac && app), env: mac ? { PW_WEBGPU: '1' } : {} });
 }
 
 // Which checks, and why.
@@ -146,19 +157,23 @@ const keep = (u) => (b) => { results.get(u).out += b; };
 console.log(`${units.length} checks here, ${jobs} at once${macOnly.length ? `; ${macOnly.length} on the Mac only: ${macOnly.map((c) => c.name).join('; ')}` : ''}`);
 let browsers = 0;
 const maxBrowsers = Math.max(1, Math.floor(jobs / 2));
+const held = new Set();
+const free = (u) => [...info.get(u[0]).own].every((x) => !held.has(x));
 const queue = [...units];
 const worker = async () => {
   for (;;) {
     // A browser check waits for a slot of its own: two Chromiums with
     // SwiftShader fill four cores between them.
-    const i = queue.findIndex((u) => !info.get(u[0]).browser || browsers < maxBrowsers);
+    const i = queue.findIndex((u) => (!info.get(u[0]).browser || browsers < maxBrowsers) && free(u));
     if (i < 0) { if (!queue.length) return; await new Promise((r) => setTimeout(r, 200)); continue; }
     const [u] = queue.splice(i, 1);
     const b = info.get(u[0]).browser;
     if (b) browsers++;
+    for (const x of info.get(u[0]).own) held.add(x);
     results.set(u, { out: '' });
     const r = await runOne(u[0], { ...quiet, onOut: keep(u), onErr: keep(u), env: info.get(u[0]).env });
     if (b) browsers--;
+    for (const x of info.get(u[0]).own) held.delete(x);
     Object.assign(results.get(u), r);
     console.log(`${r.ok ? '✓' : '✗'} ${u.map((c) => c.name).join(' = ')}, ${fmt(r.secs)}`);
   }

@@ -1211,7 +1211,7 @@
     },
     {
       "name": "The rides move the plate",
-      "shard": "plate",
+      "shard": "tools",
       "run": "npm run rides",
       "timeout": 6,
       "why": [
@@ -1219,7 +1219,10 @@
         "the plate and the colour slides downhill through the clear liquid as",
         "Darcy says, Beat Squeeze presses the glass across the dish and the",
         "colour goes out and comes back, and Turbulence's dial reaches, each",
-        "against what it moved before."
+        "against what it moved before.",
+        "On tools since PLAN 19k: plate ran 19.1 to 20.4 minutes on the PR runs of",
+        "2026-10-26 against its 20, and #502's was stopped there with one check left;",
+        "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14."
       ]
     },
     {
@@ -1624,11 +1627,14 @@
     },
     {
       "name": "The Ben-Day print",
-      "shard": "plate",
+      "shard": "tools",
       "run": "npm run benday",
       "why": [
         "Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to",
-        "the screen, a pool one flat ink outlined in black, and only Roy prints."
+        "the screen, a pool one flat ink outlined in black, and only Roy prints.",
+        "On tools since PLAN 19k: plate ran 19.1 to 20.4 minutes on the PR runs of",
+        "2026-10-26 against its 20, and #502's was stopped there with one check left;",
+        "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14."
       ]
     },
     {
