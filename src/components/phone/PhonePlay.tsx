@@ -8,7 +8,7 @@ import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playG
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
-import { TapeReels } from '../ui/Playful';
+import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
 
 /**
  * Play: ChromaGlass on a phone for someone listening, not performing.
@@ -76,6 +76,8 @@ export interface PhonePlayProps {
   edited: boolean;
   looks: PhoneLook[];
   activeLookId: string | null;
+  /** The look on stage's place in `looks`, which way the slide tray clicks (PLAN 35g). */
+  lookSlot?: number | null;
   onLook: (id: string) => void;
   onShuffle: () => void;
   /** Save the plate as a new look under a name, asked for every time (QA-18), as the desks' Save. */
@@ -471,17 +473,17 @@ export function PhonePlay(p: PhonePlayProps) {
               <div className="min-w-0">
 
               <div className="mb-2 mt-4 flex items-baseline justify-between landscape:mt-1">
-                <span className="text-[14px] font-medium text-text">Looks</span>
+                <span className="flex items-center gap-2 text-[14px] font-medium text-text">Looks <span className="text-muted"><SlideTray at={p.lookSlot ?? null} size={22} /></span></span>
                 <span className="text-[12px] text-muted">swipe</span>
               </div>
-              <div ref={stripRef} className="-mx-4 flex snap-x gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1" data-testid="play-looks">
+              <div ref={stripRef} className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1" data-testid="play-looks">
                 {p.looks.map(l => {
                   const on = l.id === p.activeLookId;
                   return (
                     <button key={l.id} onClick={() => p.onLook(l.id)} aria-pressed={on} data-testid="play-look-tile"
-                      className="flex w-[92px] shrink-0 snap-start flex-col gap-1.5 text-left">
-                      {/* Lit like every other chosen thing (PLAN 35a): the look's own swatch cannot change colour, so its name takes the lit chip and the swatch a lit ring. */}
-                      <span className={`h-14 w-[92px] rounded-[12px] ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : 'border border-white/10'}`} style={{ background: l.swatch }} />
+                      className="flex w-[76px] shrink-0 snap-start snap-always flex-col gap-1.5 text-left">
+                      {/* Lit like every other chosen thing (PLAN 35a): the slide's own film cannot change colour, so its name takes the lit chip and the mount a lit ring (on a wrapper, since the mount's clipped corner would cut a ring drawn on it). A slide a flick, snapping one at a time (35g). */}
+                      <span className={`flex w-full justify-center rounded-[4px] py-1 ${on ? 'ring-2 ring-lit ring-offset-2 ring-offset-bg' : ''}`}><SlideMount swatch={l.swatch} size={60} /></span>
                       <span className={`w-full truncate rounded-[6px] px-1.5 text-[12px] ${on ? `${LIT} font-medium` : 'text-text-2'}`}>{l.name}</span>
                     </button>
                   );

@@ -2841,6 +2841,16 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   []);
 
+  // The stage look's place in each list, for the slide tray's click (PLAN 35g):
+  // the desk's is among all the presets, the phone's among its grouped list.
+  const deskLookSlot = useMemo(() => {
+    const i = pinnedPresetId ? allPresets.findIndex(p => p.id === pinnedPresetId) : -1;
+    return i < 0 ? null : i;
+  }, [allPresets, pinnedPresetId]);
+  const phoneLookSlot = useMemo(() => {
+    const i = pinnedPresetId ? phoneLooks.findIndex(l => l.id === pinnedPresetId) : -1;
+    return i < 0 ? null : i;
+  }, [phoneLooks, pinnedPresetId]);
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
@@ -5875,6 +5885,7 @@ export default function App() {
           edited={!activePresetName && fading <= 0 && !!pinnedLookName}
           looks={phoneLooks}
           activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+          lookSlot={phoneLookSlot}
           onLook={(id) => goLookNow(id)}
           onShuffle={triggerLucky}
           onSave={(name) => saveCurrentPreset(name, '', false)}
@@ -5921,6 +5932,7 @@ export default function App() {
             lookSwatch={swatchOf((activePresetId ?? (fading > 0 ? pinnedPresetId : null)) ?? undefined)}
             looks={phoneLooks}
             activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+            lookSlot={phoneLookSlot}
             // A look from the phone crossfades in, as Go does on the desk: a
             // thumb in front of a room should never cut the plate to clean glass.
             onLook={(id) => goLookNow(id)}
@@ -6348,7 +6360,7 @@ export default function App() {
           </button>
           {presetMenu === 'title' && (
             <PanelGuard name="The look menu" onClose={() => setPresetMenu('none')}>
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} swatchOf={swatchOf} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
             </PanelGuard>
           )}
         </div>
@@ -6733,6 +6745,9 @@ export default function App() {
           <CueBar
             cued={cued}
             liveName={liveLookName}
+            liveSwatch={swatchOf(activePresetId ?? (fading > 0 ? pinnedPresetId : null) ?? undefined)}
+            cuedSwatch={cued ? swatchOf(cued.id) : undefined}
+            liveAt={deskLookSlot}
             fading={fading}
             fadeSeconds={fadeSeconds}
             onFadeSeconds={setFadeSeconds}
