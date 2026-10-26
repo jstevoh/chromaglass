@@ -5724,6 +5724,64 @@ Not a gate and no bar: a rate depends on what was pushed.
   because a version bump changes the key.
   Found while measuring 0-tap (PR #429).
 
+- **19ab-2. apt runs only for a library that is really missing, and a missing one fails
+  by name (shipped 2026-10-24).** Two hours after 19ab-1 merged, `Install Chromium`
+  timed out at its six-minute bound on #429's browser shard (run 40117937609): the
+  mirror was sending 50 to 100 KB/s and had fetched 10 of 17 packages. The browser had
+  come from the cache in 4 s; the 17 were `--with-deps`' apt, 8 upgrades of libraries
+  already on the runner and 9 fonts (Japanese, Chinese, Thai, FreeFont, unifont) that
+  nothing the app draws asks for. The job carried on past the red step and every
+  browser harness after it passed, which is the proof the libraries were there.
+  The two answers on offer were both wrong: `continue-on-error` on the apt step keeps a
+  slow mirror green but lets a truly missing library turn up later as a harness's
+  browser "closed" at launch, nothing naming it; a longer bound waits longer for fonts.
+  Now `Install Chromium` fetches the browser alone, and `scripts/chromiumlibs.mjs`
+  asks the runner what is missing: ldd over every binary of both builds (headless
+  shell and full Chromium), then a launch of each. apt runs only when that fails, and
+  if the check still fails after apt the step is red with the library's name, before
+  the first harness. Found on the way: **Playwright's own check of this does nothing
+  in 1.63** — it looks for binaries in `chrome-linux` while the linux-x64 builds unpack
+  to `chrome-linux64`, and it skips itself for 30 days behind a `DEPENDENCIES_VALIDATED`
+  file that the cache now carries from runner to runner — so before this, a library
+  missing from Chromium's own binary was named only in the first harness's launch error,
+  mid-shard, and one missing from a helper not at all. Measured in a cloud session: 13
+  binaries checked, 3.4 s; with an `ldd` that reports `libatk-1.0.so.0` missing, exit 1
+  naming it in both builds; with an `ldd` that fails, or no build in place, exit 1
+  saying so. The two launches there both start the sandbox's full Chromium
+  (`chromiumPath`), so the headless shell's own launch is first run on CI. The
+  ffmpeg step keeps fetching every run (it is a real need) with apt's own retries
+  and a 30 s stall timeout added.
+  - **19ab-3. Open: the runner's fonts are printed, not held.** `--with-deps` pinned
+    fonts-liberation and fonts-noto-color-emoji; they are on the runner today
+    (its preinstalled Google Chrome depends on them), but an image that drops them
+    would move the layout and phone checks' text measurements with nothing red. The
+    step prints `fc-match sans-serif` and `emoji`; make it fail on a fallback that
+    is not the one the checks were measured with, once CI's own reading is known.
+- **19ab-4. ffmpeg comes from the Actions cache, and a cold fetch skips a slow mirror
+  (shipped 2026-10-26).** 19ab-1's four-minute bound on the sound shard's apt made the
+  outage legible but did not end it: on 2026-10-26 the step ran it out twice in an hour
+  (#495's run 40350041600, #402's run 40358831181), and then `bands`, `songends` and
+  `shape` failed on "no ffmpeg on the path" and `renders` on "no ffprobe on the path",
+  four reds on PRs that touched no sound. Retries and a stall timeout (19ab-2) do nothing
+  for a mirror that is slow rather than silent, and this PR's own first run measured it:
+  the Azure mirror sent the package lists at 11 MB/s and then the 87 packages (62.8 MB)
+  at about 55 KB/s, a second's wait per request, so apt would have needed some nineteen
+  minutes. Now `scripts/debcache.sh` installs the `.deb`s the Actions cache kept (keyed
+  by the runner image) with apt reading an empty source list, so a set that no longer
+  fits (a dependency missing, or a downgrade, refused under `-y`) fails at once rather
+  than downloading. On a miss apt only says which files; curl fetches them eight at a
+  time from the Azure mirror, then archive.ubuntu.com, then us.archive.ubuntu.com,
+  dropping a mirror that sends under 300 KB/s for 20 s and holding each file to apt's
+  size and hash, and a last pass without the floor in case the whole network is slow.
+  Ubuntu's own ffmpeg either way, so the shelf's MP3s are decoded by the decoder the
+  sound checks were measured with. The step then requires `ffmpeg` and `ffprobe` by
+  name. Measured in a cloud session on 24.04 with mpv standing in (14 `.deb`s): cold
+  with the first mirror unreachable, 8.9 s; from the cache 1.5 s, no source asked; one
+  `.deb` taken out, "unmet dependencies" then a cold fetch, 7.5 s; a file whose hash does
+  not match, refused by every mirror and the step red naming it; an older `.deb` than
+  the installed one, exit 100 and nothing changed; the floor, curl exit 28 after 5 s on
+  a 40 KB/s transfer. CI's own seconds: this PR's runs.
+
 ### 19ac. The phone's double tap on Speed is judged on two taps landing in time
 
 - **19ac-1. The double tap's two taps carry a finger's times (shipped 2026-10-24).**
