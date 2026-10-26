@@ -468,7 +468,7 @@ try {
   }
   /*
     Zoomed in, the zoom chip leaves Record alone (QA-4). The owner found the
-    chip (− 4.7× +, Hold / Follow / Auto) on top of Record performance as
+    chip (− 4.7× +, Hold / Follow / Auto) on top of Record as
     soon as the plate was zoomed past 1.05×: it was pinned to the window's
     top, which on a desk is the top strip Record sits in. Asked on both desks
     at the three desk widths: the chip and Record do not overlap, what is on
@@ -484,14 +484,14 @@ try {
       await settle(800);
       const where = await page.evaluate(() => {
         const box = (id) => { const el = document.querySelector(`[data-testid="${id}"]`); return el ? el.getBoundingClientRect() : null; };
-        const chip = box('macro-zoom'), rec = box('performance-button'), plate = box('desk-preview');
+        const chip = box('macro-zoom'), rec = box('record-button'), plate = box('desk-preview');
         if (!chip || !rec) return { chip: !!chip, rec: !!rec };
         const hit = document.elementFromPoint(rec.left + rec.width / 2, rec.top + rec.height / 2);
         const overlap = Math.max(0, Math.min(chip.right, rec.right) - Math.max(chip.left, rec.left))
           * Math.max(0, Math.min(chip.bottom, rec.bottom) - Math.max(chip.top, rec.top));
         const inPlate = !!plate && chip.left >= plate.left - 0.5 && chip.right <= plate.right + 0.5
           && chip.top >= plate.top - 0.5 && chip.bottom <= plate.bottom + 0.5;
-        return { chip: true, rec: true, overlap, onRecord: !!hit?.closest('[data-testid="performance-button"]'), inPlate, top: Math.round(chip.top) };
+        return { chip: true, rec: true, overlap, onRecord: !!hit?.closest('[data-testid="record-button"]'), inPlate, top: Math.round(chip.top) };
       });
       check(`zoomed in on ${mode} at ${width}, the zoom chip sits on the plate and Record stays clear`,
         where.chip && where.rec && where.overlap === 0 && where.onRecord && where.inPlate,
@@ -623,6 +623,74 @@ try {
       `clean ${before.marked ? 'no (already marked)' : 'yes'}, marked after ${after?.marked ? 'yes' : 'no'}; plate ${fmt(before.preview)} → ${fmt(after?.preview)} (${dp.toFixed(1)} px); Save ${fmt(before.save)} → ${fmt(after?.save)} (${ds.toFixed(1)} px)`);
   }
 
+  // ── The plate bar does not move when recording starts or stops (PLAN.md 19v-4) ──
+  {
+    /*
+      Found with 19v-3, and updated for #463's one Record button: at 1280 × 800
+      in Build, Record's running label ("■ Stop · 0:00") is 25 px wider than
+      its idle label ("● Record"), which widens the button and shifts its
+      neighbours in the plate bar as soon as a recording begins. Record now
+      keeps its idle label in flow and overlays the running clock inside the
+      same box, so starting and stopping Plate video, a Take, or both moves
+      neither Record, Save nor the plate.
+    */
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pg = await ctx.newPage();
+    await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* */ } });
+    await pg.goto(URL, { waitUntil: 'networkidle' });
+    for (let i = 0; i < 20 && !(await pg.getByTestId('desk-preview').count()); i++) await pg.waitForTimeout(300);
+    await pg.waitForTimeout(1500);
+    const measure = () => pg.evaluate(() => {
+      const box = (id) => { const r = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; };
+      const btn = document.querySelector('[data-testid="record-button"]');
+      const timer = document.querySelector('[data-testid="record-timer"]');
+      const title = btn?.getAttribute('title') ?? '';
+      const what = /^Stop recording \(([^,]+), \d+:\d\d\)/.exec(title)?.[1] ?? null;
+      const timerOn = timer ? getComputedStyle(timer).visibility === 'visible' : /\d+:\d\d/.test(btn?.textContent ?? '');
+      return {
+        preview: box('desk-preview'),
+        save: box('save-look'),
+        rec: box('record-button'),
+        on: !!what && timerOn,
+        what,
+      };
+    });
+    const waitState = async (pred) => {
+      let cur = null;
+      for (let i = 0; i < 12; i++) { await pg.waitForTimeout(150); cur = await measure(); if (pred(cur)) break; }
+      return cur;
+    };
+    const before = await measure();
+    await clickAt(pg, 'record-button');
+    const duringVideo = await waitState(m => m.on && m.what === 'Plate video');
+    await clickAt(pg, 'record-button');
+    await waitState(m => !m.on);
+    await pg.keyboard.press('t');
+    const duringTake = await waitState(m => m.on && m.what === 'Take');
+    await clickAt(pg, 'record-button');
+    await waitState(m => !m.on);
+    await clickAt(pg, 'record-button');
+    await waitState(m => m.on && m.what === 'Plate video');
+    await pg.keyboard.press('t');
+    const duringBoth = await waitState(m => m.on && m.what === 'Plate video + Take');
+    await clickAt(pg, 'record-button');
+    const after = await waitState(m => !m.on);
+    await ctx.close();
+    const moved = (a, b) => (a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h)) : Infinity);
+    const states = [duringVideo, duringTake, duringBoth, after];
+    const dp = Math.max(...states.map(s => moved(before.preview, s?.preview)));
+    const dr = Math.max(...states.map(s => moved(before.rec, s?.rec)));
+    const ds = Math.max(...states.map(s => moved(before.save, s?.save)));
+    const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
+    check('at 1280 in Build, starting and stopping a recording (video, take, both) does not move the plate: its hole, Record and Save keep their boxes',
+      !before.on && duringVideo?.what === 'Plate video' && duringTake?.what === 'Take' && duringBoth?.what === 'Plate video + Take' && !after?.on
+        && dp <= 0.5 && dr <= 0.5 && ds <= 0.5,
+      `states ${before.what ?? 'off'} → ${duringVideo?.what ?? 'off'} → ${duringTake?.what ?? 'off'} → ${duringBoth?.what ?? 'off'} → ${after?.what ?? 'off'}; `
+      + `plate ${fmt(before.preview)} → ${fmt(duringBoth?.preview)} (${dp.toFixed(1)} px); `
+      + `Record ${fmt(before.rec)} → ${fmt(duringVideo?.rec)} / ${fmt(duringTake?.rec)} / ${fmt(duringBoth?.rec)} (${dr.toFixed(1)} px); `
+      + `Save (${ds.toFixed(1)} px)`);
+  }
+
   // ── The rest of Desk v2 (PLAN.md 8c, 8e, 8f, 8h) ───────────────
   await page.setViewportSize({ width: 1440, height: 900 });
   await clickOn('mode-segmented-design');
@@ -730,6 +798,72 @@ try {
       // Put the value back for what follows.
       await knob.dblclick();
       await settle(200);
+      /*
+        8j: cards that stuck and stacked. The owner found Macro Zoom's card up
+        under Evolve Speed's, neither going, both reading "⌥ held while
+        dragging goes fine": each knob had missed the release and thought a
+        hand was still on it. When a mouse-up never reaches the page (the
+        system took it), Chromium sends no pointerup; on the next move, with
+        no button down, it drops the knob's capture and fires only
+        lostpointercapture. Done here to two knobs as the owner's hand would:
+        down on each, a turn, then a move with no button that the page never
+        saw a release before (a raw input event, as the system would leave
+        it). Before the fix both cards stayed up, stacked, after the hand had
+        gone; the check asks that each goes. The raw move fires both
+        lostpointercapture and a buttonless pointermove, and the knob ends the
+        drag on either, so this line holds the drag ending, not one path.
+      */
+      const tipNames = () => page.evaluate(() => [...document.querySelectorAll('[data-control-tip]')].map(t => t.querySelector('[data-tip=name]')?.textContent ?? ''));
+      const deckKnobs = page.locator('[data-testid="desk-deck"] [data-knob] input[type="range"]');
+      const cdp = await page.context().newCDPSession(page);
+      const pair = [deckKnobs.nth(0), deckKnobs.nth(1)];
+      const pairNames = await Promise.all(pair.map(k => k.getAttribute('aria-label')));
+      // Each knob read on its own, before the next is touched: the next one's
+      // card would put a stuck one's down (one card at a time) and hide it.
+      const reads = [];
+      for (const [i, k] of pair.entries()) {
+        const b = await k.boundingBox();
+        const x = b.x + b.width / 2, y = b.y + b.height / 2;
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x, y + 12, { steps: 3 });
+        await settle(100);
+        const held = await tipNames();
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5, button: 'none', buttons: 0 });
+        await settle(500);
+        const left = await tipNames();
+        reads.push({ name: pairNames[i], held: held.length === 1 && held[0] === pairNames[i], left });
+        // Playwright still thinks the button is down; let it up only after the
+        // reading, so a release the window does hear cannot hide a stuck drag.
+        await page.mouse.up();
+      }
+      check('a knob whose release the page never hears still lets its card go, each on its own',
+        reads.every(r => r.held && r.left.length === 0),
+        reads.map(r => `${r.name}: ${r.held ? 'its card up while held' : 'no card of its own while held'}, ${r.left.length ? `still up after: ${r.left.join(' + ')}` : 'gone after'}`).join('; '));
+      for (const k of pair) await k.dblclick();
+      await page.mouse.move(5, 5);
+      await settle(300);
+      /*
+        And one card at a time, whatever asked for it: a knob with the
+        keyboard's focus shows its card, and the hand going to another knob
+        puts that one up in its place, not on top of it. The focused card is
+        asked to be up first, so a focus that showed nothing cannot pass.
+      */
+      await page.keyboard.press('Tab');
+      await pair[0].focus();
+      await settle(700);
+      const byFocus = await tipNames();
+      const b1 = await pair[1].boundingBox();
+      await page.mouse.move(b1.x + b1.width / 2, b1.y + b1.height / 2);
+      await settle(800);
+      const byHand = await tipNames();
+      await page.mouse.move(5, 5);
+      await settle(400);
+      const after = await tipNames();
+      check('one card at a time: a hand on another knob replaces the focused knob\'s card, and none is left when it goes',
+        byFocus.length === 1 && byFocus[0] === pairNames[0] && byHand.length === 1 && byHand[0] === pairNames[1] && after.length === 0,
+        `focus: ${byFocus.join(' + ') || 'none'}; hand on ${pairNames[1]}: ${byHand.join(' + ') || 'none'}; hand gone: ${after.join(' + ') || 'none'}`);
+      await pair[0].evaluate(el => el.blur());
     }
   }
   {
@@ -749,7 +883,7 @@ try {
     if (parts[0]) {
       await page.getByTestId('output-test-pattern').first().click();
       await settle(400);
-      const pressed = await page.getByTestId('output-test-pattern').first().evaluate((el) => el.className.includes('bg-white text-black'));
+      const pressed = (await page.getByTestId('output-test-pattern').first().getAttribute('aria-pressed')) === 'true';
       // A gain change, so the config is written while the pattern is up.
       await page.evaluate(() => window.chromaglassOutput?.({ gain: 1.05 }));
       await settle(300);
@@ -800,8 +934,8 @@ try {
       right of the centred switch, so the Sound dot sat under it. Now the dots
       fold into one Status button when they do not fit. Asked of every
       layout: at 1024 the cluster is clear of the switch, and still clear
-      with a seventh dot in it (a span as wide as the Video dot with its word
-      under it); at a width where the dots fit with their words under them,
+      with a seventh dot in it (a span as wide as the Film dot with its word
+      under it, or wider than the room left, whichever is wider); at a width where the dots fit with their words under them,
       something wider than the room left folds them, the button opens every
       dot, and with it gone they unfold.
 
@@ -844,7 +978,12 @@ try {
       await page.setViewportSize({ width: 1024, height: 860 });
       await settle(900);
       const at1024 = await cluster();
-      await extra(true, dotW); await settle(600);
+      // A dot more, or the room left plus 8 px if that is wider, so that it
+      // must fold. A seventh dot used to be enough at 1024; since the Perf
+      // dot went into the one Rec dot (#463) and Video is called Film (35a,
+      // 24 px against Video's wider word), six dots and a seventh fit at
+      // 1024 with 26 px to spare, and the fold this asks for was not asked.
+      await extra(true, Math.max(dotW, Math.max(0, at1024.gap ?? 0) + 8)); await settle(600);
       const more1024 = await cluster();
       await extra(false);
       await page.setViewportSize({ width: roomy.w, height: 860 });
@@ -857,7 +996,7 @@ try {
         await clickOn('dot-fold');
         await settle(300);
         // Listed, and on top: each dot's middle is the dot, not the deck or a panel over the list.
-        listed = await page.evaluate(() => ['dot-sound', 'dot-video', 'dot-midi', 'dot-performance'].every((t) => {
+        listed = await page.evaluate(() => ['dot-sound', 'dot-video', 'dot-midi'].every((t) => {
           const el = document.querySelector(`[data-testid="dot-fold-list"] [data-testid="${t}"]`);
           if (!el) return false;
           const r = el.getBoundingClientRect();

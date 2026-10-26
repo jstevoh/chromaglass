@@ -12,17 +12,19 @@ import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
 import { speciesOf } from '../src/lib/liquidProps';
 import { DEFAULT_LIQUID_TYPES } from '../src/types';
+import { DISH_METRES, DISH_REST_GAP } from '../src/lib/turntable';
 import { normalizeOutput, type OutputConfig } from '../src/lib/outputConfig';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
-import { clockGlassBodies, clockGlassCell } from '../src/lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
-import { squishDisc, glassSpring, PressLift, type Stroke } from '../src/lib/squish';
+import { squishDisc, glassSpring, PressLift, KICK_HOLD, kickPress, type Stroke } from '../src/lib/squish';
+import { RhythmSheet, stampedVolume, kickRoom } from '../src/lib/sheet';
 import { PRESS_RING, pressDye, pressOil } from '../src/lib/pressRing';
 import { layFinger, handEdge } from '../src/lib/handSolid';
 import { layBreath, BREATH_STRESS } from '../src/lib/breath';
@@ -57,6 +59,9 @@ type Lab = {
   hands: Float32Array | null;
   /** A Blow's breath laid this step (layBreath), or null with none. */
   breath: Float32Array | null;
+  /** Beat Squeeze's rhythm sheet (lib/sheet.ts), made at its first press, and its change laid this step, or null with none. */
+  sheet: RhythmSheet | null;
+  sheetGap: Float32Array | null;
   /** The magnets the plate was last stepped with, as the app hands them to the picture. */
   magnets: { x: number; y: number; height: number; strength: number }[];
 };
@@ -88,7 +93,7 @@ const api = {
     device.addEventListener('uncapturederror', (e) => console.log('gpu error', (e as GPUUncapturedErrorEvent).error.message.slice(0, 400)));
     const solver = new WebGPUFluid(device, N, L, { float32Filterable: adapter.features.has('float32-filterable') });
     solver.clear();
-    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null };
+    lab = { solver, L, N, time: 0, cellClock: 0, magnets: [], dyeAdd: new Float32Array(L * L * 4), velAdd: new Float32Array(L * L * 4), mul: new Float32Array(L * L).fill(1), hands: null, breath: null, sheet: null, sheetGap: null };
     return { N, L };
   },
   /** The adapter `create` drew on, or null before it. */
@@ -198,10 +203,49 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath);
+    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath, l.sheetGap);
     l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
-    l.hands = null; l.breath = null;
+    l.hands = null; l.breath = null; l.sheetGap = null;
   },
+  /**
+   * Beat Squeeze's kick on the rhythm sheet, as the app presses it
+   * (LiquidVisualizer pressKick, lib/sheet.ts): a fingertip at plate
+   * fraction (x, y) on a liquid of viscosity `nu`, held `hold` seconds,
+   * pushing out as much liquid as the stamped bowl of a kick of `amount`
+   * closed over the dent's reach (kickPress's radius), no deeper than Plate
+   * Shape `curve`'s rest there allows (kickRoom; `room: false` presses as
+   * if the plate were flat, a control). Laid by `sheetStep`. Returns the
+   * depth its middle reaches.
+   */
+  sheetPress(x: number, y: number, amount: number, nu: number, hold = KICK_HOLD, curve = 0, room = true) {
+    const l = lab!;
+    if (!l.sheet) l.sheet = new RhythmSheet();
+    l.sheet.setLiquid(nu);
+    const R = kickPress(nu, 0).radii[0] / 128;
+    return l.sheet.pressVolume(x, y, stampedVolume(amount, R), R, hold, room ? kickRoom(x, y, curve) : undefined);
+  },
+  /** One step of the sheet (`dt` seconds, the gap's spring `spring` a step), its change laid for the next flush, as the app's liftStep lays it. Returns the cells laid. */
+  sheetStep(dt = 1 / 60, spring = BASE.gapSpring) {
+    const l = lab!;
+    if (!l.sheet?.live) return 0;
+    const out = new Float32Array(l.L * l.L);
+    const cells = l.sheet.step(l.L, dt, spring, out);
+    if (cells > 0) l.sheetGap = out;
+    return cells;
+  },
+  /** The sheet's change laid this step moved to the press's channel (the gap column of the velocity deltas), for the check that the press's ceiling cuts its ring. */
+  sheetAsPress() {
+    const l = lab!;
+    if (!l.sheetGap) return;
+    for (let q = 0; q < l.sheetGap.length; q++) l.velAdd[q * 4 + 3] += l.sheetGap[q];
+    l.sheetGap = null;
+  },
+  /** What the sheet has laid and pressed, and whether it still moves: for the checks. */
+  sheetState() { const s = lab!.sheet; return s ? { live: s.live, steps: s.steps, presses: s.pressCount, laid: s.laid, closed: s.closed } : null; },
+  /** The dent as the plate should hold it now (plate widths, L × L), from the sheet's own solve: a check sets the plate's gap against it. */
+  sheetHeld() { const h = lab!.sheet?.heldNow(); return h ? Array.from(h) : null; },
+  /** The kick's press (lib/squish.ts kickPress), for a check to ask which liquid's dent it is. */
+  kickPress,
   /**
    * A Finger in the liquid on a thin gap, laid as the app lays one
    * (lib/handSolid.ts): at grid cell (x, y) of the L × L plate, `r` cells
@@ -292,6 +336,13 @@ const api = {
   },
   /** One cell of Clock Glass's lay, as seedPreset lays it (src/lib/oilLay.ts). */
   clockGlassCell,
+  /** The splodascope's crowd as the app lays it (src/lib/oilLay.ts), from a seeded stream of the lab's own. */
+  splodascopeDiscs(seed: number, dyes: number) {
+    let s = seed;
+    return splodascopeDiscs(() => (s = s * 16807 % 2147483647) / 2147483647, dyes);
+  },
+  /** One cell of the splodascope's lay, as seedPreset lays it. */
+  splodascopeCell,
   /** Every shipped look's id, for a check that asks something of all of them. */
   lookIds() { return PRESETS.map(p => p.id); },
   /** A palette colour as the app lays it: the dye's absorbance per unit (lib/dye.ts). */
@@ -460,6 +511,16 @@ const api = {
   },
   /** The plate renderer, for checks on what it derives from the fields. */
   WebGPUPlate,
+  /**
+   * The shelf's bottles as src/types.ts writes them, each liquid's real
+   * numbers (viscosity, density, refractive index), and the dish's size and
+   * rest gap (lib/turntable.ts): what `npm run derive` works the optical
+   * path out from, so its expectation comes from the liquids and the dish
+   * and never from the shader it is checking.
+   */
+  liquids: DEFAULT_LIQUID_TYPES,
+  DISH_METRES,
+  DISH_REST_GAP,
   /**
    * The magnet's field as the solver and the plate both include it
    * (wgsl/spikes.ts with wgsl/magnetDisc.ts), and the TypeScript the solver

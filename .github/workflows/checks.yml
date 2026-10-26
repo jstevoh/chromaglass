@@ -159,6 +159,13 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run plate
 
+      # Areas that listen (PLAN 25h): the area cords' gate, timed, and every
+      # look's area cords on areas it has and fast readings it really has. The
+      # lab half, the cords on the real solver, runs on the Mac (plate shard).
+      - name: Area cords (the gate and the tables)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run areacords -- --node
+
       # That a look change never cuts the plate to black in front of a room.
       - name: The desk
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
@@ -195,6 +202,14 @@ jobs:
       - name: The panel
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run panel
+
+      # Every button drawn by a state says it, in the lit look (scripts/states.mjs,
+      # PLAN.md 35a): the source read for a className that changes with a state
+      # and no aria-pressed, -selected or -checked beside it, which the browser
+      # half (Switches read on and off) cannot see. A second, no browser.
+      - name: Buttons say their state
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run states
 
       # The guard on a check's bars and inputs, against #362's two real cases
       # and the things it must not fire on (comments, names, prose, printing).
@@ -441,6 +456,11 @@ jobs:
       - name: The set list file
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run setlist
+      # The one Record button (PLAN 14ae): what a press does for each choice,
+      # and one Record on the desk, the panel and the phone.
+      - name: The one Record button
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run record
       # The score (PLAN 28h): each of a song show's cues drawn where the
       # scheduler fires it, a cue pinned to a section firing on that section
       # through a stretched live take, and the nudge putting a late map's cue
@@ -558,6 +578,22 @@ jobs:
       - name: The licence-key Worker
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run license-worker
+      # The Mac app's updates (scripts/updates.mjs, PLAN.md 13-update): what
+      # desktop/updates.js does with each thing electron-updater says, above
+      # all what it must not do by itself in the middle of a set, and that the
+      # build, the app and the site agree on where a release's .dmg is. Plain
+      # Node with stand-ins for Electron, so `logic`; the real updater against
+      # a feed is `npm run desktop -- --packaged`, in desktop.yml.
+      - name: The Mac app's updates
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run updates
+      # Cloud sync for Pro (PLAN.md 23.18, scripts/cloudsync.mjs): two devices,
+      # each with its own storage like a browser and the Mac app, syncing through
+      # the licence Worker's /sync against in-memory KV with real RS256 tokens.
+      # Node only, so `logic`.
+      - name: Cloud sync between two devices
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run cloudsync
 
       # The layout, which is CSS and needs no GPU (scripts/layout.mjs): every
       # control fits, reads, and is not painted over, at every width, and the
@@ -682,6 +718,15 @@ jobs:
       - name: Sign-in
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
         run: npm run signin
+      # One address (PLAN.md 23.16, scripts/onehost.mjs): chromaglass.web.app and
+      # chromaglass.firebaseapp.com forward to chromaglass.art with what they had
+      # saved, written before the app's module runs; Firebase's /__/ pages, an
+      # offline or internet-less cached show and a cast window with an opener
+      # stay; a carried fragment from anywhere else writes nothing. index.html
+      # served at the real names through request routing, under a minute.
+      - name: One address
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'lab' }}
+        run: npm run onehost
       # Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):
       # two signed-in pages on the same account (a show and a phone) list and
       # join the show in one tap while keeping the QR code, a third page on
@@ -700,6 +745,14 @@ jobs:
       - name: The layout
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: npm run layout
+
+      # The cartoons that ship (PLAN 14ac): small, silent, recorded in
+      # SOURCES.md, and on a phone page they pour without the pour pausing
+      # every frame (14ab-1), loop, are what the plate and the projector hold,
+      # and stop. No GPU needed: the hand-over is the same without a plate.
+      - name: The cartoons
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: npm run cartoons
       # Preview builds on a copy while the wall keeps its look (PLAN.md 8b,
       # scripts/draftwall.mjs): which engine each settings change reaches,
       # what a receiver is sent, Send to wall, Live and the wall closing. Its
@@ -708,6 +761,15 @@ jobs:
       - name: Preview's copy
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/draftwall.mjs
+      # Any camera, anywhere (scripts/cameras.mjs, PLAN.md 14ad): two stand-in
+      # cameras behind navigator.mediaDevices, nameless until one is allowed.
+      # Both pickers (the motion camera and the film's Webcam) on the desk and
+      # the phone, a camera opened by the id picked, each choice remembered
+      # apart, an unplugged camera taken off and opened again when it is back.
+      # No GPU; the site the steps above built.
+      - name: Any camera
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
+        run: node scripts/cameras.mjs
 
       # The phone (scripts/phone.mjs): on an emulated phone, in portrait and
       # landscape, every tool and sheet in reach at 48 px, the plate keeping
@@ -730,7 +792,8 @@ jobs:
       # PLAN.md QA-30): on the desk, every Settings section, the phone's sheets,
       # Play and the remote, each control that says it has a state is read in
       # both, from computed styles. A knob against its track at 3:1, on against
-      # off at ΔE 20. Colours, so no GPU; the site the steps above built.
+      # off at ΔE 20 and at 3:1 in light (PLAN.md 35a). Colours, so no GPU; the
+      # site the steps above built.
       - name: Switches read on and off
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'browser' }}
         run: node scripts/switches.mjs
@@ -1014,6 +1077,14 @@ jobs:
       - name: The Finger drags the liquid
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         run: npm run fingerflow
+      # An area cord works its area and nowhere else (PLAN 25h): a band's cord
+      # on one pool changes the dye, the flow and the heat there 5x what it
+      # changes outside; two areas on two bands each answer their own; and the
+      # rebuilt looks' pours light a place per area where the middle lit one.
+      - name: Areas that listen
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        timeout-minutes: 12
+        run: npm run areacords
       # A Blow's wind on a thin gap as air on the film (PLAN 15g): the breath's
       # stress moves the liquid at τh/2μ, slower in a thick one, stops with
       # the breath, and carries the colour, the ferrofluid and the oil along
@@ -1047,6 +1118,15 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
         timeout-minutes: 4
         run: npm run oillift
+      # Beat Squeeze's sheet solved (PLAN 27f-4): the dent against the theory
+      # of a floating sheet in water, oil and glycerine, exact per mode, its
+      # rim, its release's pace; on the plate the gap is the solve's cell for
+      # cell, its ring past rest, no ratchet, the frame still. In the open
+      # shard: the plate shard is near its timeout.
+      - name: The rhythm sheet is solved
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        timeout-minutes: 4
+        run: npm run sheet
       # The music's own pushes as forces a thin gap keeps (PLAN 27e): Sound
       # Drive's bass is a hand on the glass that presses as the bass comes in
       # and lets up as it goes (the burst it replaces moved nothing), and the
@@ -1231,12 +1311,37 @@ jobs:
       - name: The lamp through the dye
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
         run: npm run lamp
+      # Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,
+      # warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,
+      # and Newton cooling decays per-second with a tens-of-seconds time constant.
+      - name: The heat
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'open' }}
+        run: npm run heat
       # More colours (PLAN 18l): most looks carry five dyes and five are on the
       # plate; a dye is paler thin than deep and a deep yellow turns orange; two
       # neighbouring dyes meeting walk between their hues; the grade keeps hue.
       - name: Enough colours, and the hues between them
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
         run: npm run colours
+      # The open rim holds a body of oil that touches it (PLAN 18g-6): held at
+      # the water's pressure in the oil too, the rim drained a lens against it
+      # to 9.6% in six seconds by its own surface tension; held at the oil's
+      # Laplace pressure it keeps it, the middle of the dish is untouched, and
+      # a pour still pushes oil out over the rim. In the fifth shard: the
+      # plate shard is near its timeout.
+      - name: The rim holds the oil that touches it
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        timeout-minutes: 4
+        run: npm run rimhold
+      # Film Hold (PLAN 28k): the Splodascope's crowd of oil drops stays a
+      # crowd, where the same plate without the hold merges it into a few
+      # bodies; no oil made or lost, and a lone drop untouched. Two 192²
+      # plates of six seconds and two small ones; in the fifth shard, beside
+      # the rim's oil.
+      - name: Drops of oil crowd without merging
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'fifth' }}
+        timeout-minutes: 6
+        run: npm run filmhold
       # A pour is liquid (PLAN 18c, 18d-2): water poured at the middle pushes a
       # ring of colour out by its volume, glycerine poured is all accounted
       # for, and a dish of glycerine flushed with a quarter of its volume of

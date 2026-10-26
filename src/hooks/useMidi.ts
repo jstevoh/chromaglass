@@ -3,12 +3,13 @@ import { unhandled } from '../lib/unhandled';
 import {
   apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
   parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover, sameSoundBinding, withLoadedMap,
-  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, settingLed, curveOf, valueAt, travelOf,
+  MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, MIDI_MAP_KEY, settingLed, curveOf, valueAt, travelOf,
   type FactoryMapId,
   type MidiAction, type MidiBinding, type MidiEvent, type MidiMap, type MidiRealtime, type MidiSource, type MidiTarget,
   type SoundBinding,
 } from '../lib/midi';
 import { SurfaceWatcher, buildAutoMap } from '../lib/autoMap';
+import { useCloudSyncReload } from '../lib/cloudSyncApp';
 import { PIN_RANGE, onStep } from '../lib/deskPins';
 import { PALETTE } from '../constants';
 import { touch, touchKey } from '../lib/midiTouch';
@@ -112,6 +113,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     try { return { input: 'all', output: 'auto', ...JSON.parse(localStorage.getItem(PORTS_KEY) ?? '{}') }; } catch { return { input: 'all', output: 'auto' }; }
   });
   const [map, setMapState] = useState<MidiMap>(() => loadMidiMap() ?? { format: MIDI_FORMAT, version: 1, name: 'My controller', bindings: [] });
+  useCloudSyncReload({ [MIDI_MAP_KEY]: () => setMapState(prev => loadMidiMap() ?? prev) });
   const [learning, setLearning] = useState<{ target: MidiTarget; mode: 'absolute' | 'relative' } | null>(null);
   /*
     The last message heard, for the MIDI panel's activity light and "Last:"

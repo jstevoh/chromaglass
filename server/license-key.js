@@ -79,6 +79,19 @@ export async function signLicenseKey(payload, privateJwk) {
   return `${signingInput}.${toBase64Url(sig)}`;
 }
 
+/*
+  The keys a key may be signed with, when the caller names none: the built-in
+  one (or LICENSE_PUBLIC_KEY, the checks' stand-in), and LICENSE_BUILD_CHECK_KEY,
+  which only the packed Mac app sets, from its own build (desktop/main.js): the
+  public half of a pair made for one CI build and thrown away with its runner,
+  so the check of that build can open the show (PLAN.md 23.17d).
+*/
+function trustedKeys(publicJwk) {
+  if (publicJwk) return [publicJwk];
+  const env = typeof process !== 'undefined' ? process.env : undefined;
+  return [env?.LICENSE_PUBLIC_KEY || DEFAULT_PUBLIC_JWK, env?.LICENSE_BUILD_CHECK_KEY].filter(Boolean);
+}
+
 export async function verifyLicenseKey(token, publicJwk) {
   if (typeof token !== 'string') return { valid: false, error: 'missing key' };
   const trimmed = token.trim();
@@ -93,14 +106,17 @@ export async function verifyLicenseKey(token, publicJwk) {
     return { valid: false, error: 'bad encoding' };
   }
 
-  try {
-    const key = await getVerifyKey(publicJwk);
-    const signingInput = new TextEncoder().encode(`cg1.${bodyB64}`);
-    const ok = await crypto.subtle.verify('Ed25519', key, sigBytes, signingInput);
-    if (!ok) return { valid: false, error: 'invalid-signature' };
-  } catch {
-    return { valid: false, error: 'invalid-signature' };
+  let ok = false;
+  for (const jwk of trustedKeys(publicJwk)) {
+    try {
+      const key = await getVerifyKey(jwk);
+      const signingInput = new TextEncoder().encode(`cg1.${bodyB64}`);
+      if (await crypto.subtle.verify('Ed25519', key, sigBytes, signingInput)) { ok = true; break; }
+    } catch {
+      // a malformed key: try the next
+    }
   }
+  if (!ok) return { valid: false, error: 'invalid-signature' };
 
   let payload;
   try {

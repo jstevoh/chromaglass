@@ -5,6 +5,9 @@ import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
 import { KNOB_PX, onRing, ringTravel } from '../../lib/knobDrag';
 import { helpFor } from '../../lib/controlHelp';
 import { useControlTip } from './ControlTip';
+import { groupOfSetting, paceOf } from '../../lib/settingsMap';
+import { Hare, PaceTrack, Snail } from './Pace';
+import { SlideMount } from './Playful';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -24,7 +27,40 @@ import type { VisualizerSettings } from '../../types';
  *   2. Hairlines, not fills. Panels separate with a 1px border at 8% white;
  *      background steps are reserved for interactive state.
  *   3. Nothing clickable under 32px on a desk or 48px under a thumb.
+ *
+ * And one look for on (PLAN 35a, 2026-10-24). The owner, with the Video
+ * panel open and a loop playing: "I really can't tell what buttons are
+ * turned on/off." Load loop, Camera, Window and Off were four identical
+ * grey buttons, and across the app a chosen or switched-on control was
+ * drawn nine ways: a white fill, a white tint at 5 to 15%, a brighter
+ * border, an amber, a raw purple, the accent, the active grey (1.19:1
+ * against the panel, the shared Segmented's own), a text colour alone, or
+ * nothing. Each panel's way was legible to whoever drew it and to nobody
+ * reading the next panel. So on is `lit`, a solid violet with white text,
+ * everywhere: the chosen segment, the pressed button (`pressed` below and
+ * `LIT` for a button that cannot be a Button). The switch's track keeps the
+ * accent, the same violet a step brighter: no text sits on a track, and
+ * against the off track the accent is 3.5:1 where lit would be 2.9. White
+ * stays the one primary action on a surface, red is only live-now
+ * (recording, blacked out), green only connected. `npm run switches` holds
+ * every control that says a state to 3:1 between on and off, and `npm run
+ * states` fails a button drawn by a state it does not say.
  */
+
+/**
+ * A hand-built button that is on: for a row whose shape a Button cannot take
+ * (a tile with a swatch, a loop row, a chip in a grid). Put it in the on
+ * branch with `aria-pressed` (or `aria-selected` in a tablist) beside it,
+ * and leave the off branch quiet. 3.47:1 against elevated.
+ */
+export const LIT = 'border-lit bg-lit text-on-lit';
+
+/**
+ * On, where on means live now: blacked out, recording. A solid red with dark
+ * text, never a red tint (a 20% red over the panel is 1.0:1 against the grey
+ * beside it in light, the same button to a glance).
+ */
+export const LIVE = 'border-live bg-live text-bg';
 
 // ── Keyboard chip ────────────────────────────────────────────────────
 
@@ -39,6 +75,10 @@ export function Kbd({ children }: { children: ReactNode }) {
 // ── Button ───────────────────────────────────────────────────────────
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+/** Lit, for a button that is on: what `pressed` draws in place of the variant. */
+const BUTTON_PRESSED = 'border border-lit bg-lit text-on-lit hover:opacity-90';
+/** And for one whose on is live now (Blackout, recording): solid red. */
+const BUTTON_LIVE = 'border border-live bg-live text-bg hover:opacity-90';
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary:   'bg-primary text-on-primary hover:opacity-90',
@@ -48,12 +88,18 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
 };
 
 export function Button({
-  children, onClick, variant = 'secondary', kbd, height = 40, full, title, disabled, testId, icon, midiKey,
+  children, onClick, variant = 'secondary', kbd, height = 40, full, title, disabled, testId, icon, midiKey, pressed, live = false,
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: ButtonVariant;
-  /** The shortcut, shown as a chip. Every key action shows its key. */
+  /**
+   * The shortcut. Every key action says its key, in the hover title and to a
+   * screen reader (aria-keyshortcuts), not on the button: as a chip inside it
+   * the key crowded the label, and on Save sat on the dirty dot (the owner,
+   * 2026-10-24: "hover over is probably better for descriptions and shortcut
+   * hints").
+   */
   kbd?: string;
   height?: number;
   full?: boolean;
@@ -63,23 +109,32 @@ export function Button({
   icon?: ReactNode;
   /** What a controller hits to press this, so the button lights when it does. */
   midiKey?: string | null;
+  /**
+   * A button that stays on (a mode, a hold): lit while true, the variant
+   * while false, and it says so to a screen reader and to `npm run switches`.
+   * Leave it undefined for a button that only does something once.
+   */
+  pressed?: boolean;
+  /** Pressed means live now (blacked out, recording): red rather than lit. */
+  live?: boolean;
 }) {
   const hit = useMidiTouch(midiKey ?? null);
   return (
     <button
       onClick={onClick}
-      title={title}
+      title={kbd ? `${title ?? (typeof children === 'string' ? children : 'Shortcut')} (${kbd})` : title}
+      aria-keyshortcuts={kbd}
       disabled={disabled}
+      aria-pressed={pressed}
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       style={{ height }}
       className={`inline-flex items-center justify-center gap-2 rounded-md px-4 transition-colors duration-[120ms] disabled:opacity-40 ${
         full ? 'w-full' : ''
-      } ${BUTTON_VARIANT[variant]} ${hit ? MIDI_HIT : ''}`}
+      } ${pressed ? (live ? BUTTON_LIVE : BUTTON_PRESSED) : BUTTON_VARIANT[variant]} ${hit ? MIDI_HIT : ''}`}
     >
       {icon}
       <span className={`${variant === 'primary' ? 'text-[14px]' : 'text-[13px]'} font-medium`}>{children}</span>
-      {kbd && <Kbd>{kbd}</Kbd>}
     </button>
   );
 }
@@ -137,13 +192,14 @@ export function Segmented<T extends string>({
           onClick={() => onChange(id)}
           style={{ height: height - 4 }}
           data-testid={testId ? `${testId}-${id}` : undefined}
-          title={compact && kbd ? `${label} (${kbd})` : undefined}
+          // The key in the hover title, never on the segment (see Button's kbd).
+          title={kbd ? `${label} (${kbd})` : undefined}
+          aria-keyshortcuts={kbd}
           className={`inline-flex items-center gap-1.5 rounded-sm ${fill ? 'min-w-0 flex-1 justify-center px-1 text-[12px]' : compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : tight ? 'px-2.5 text-[13px] xl:px-3.5' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] ${
-            value === id ? 'bg-active text-text' : 'text-muted hover:text-text-2'
+            value === id ? 'bg-lit text-on-lit' : 'text-muted hover:bg-hover hover:text-text-2'
           }`}
         >
           {label}
-          {kbd && <span className={`font-mono text-[11px] text-faint ${compact ? 'hidden 2xl:inline' : ''}`}>{kbd}</span>}
         </button>
         </span>
       ))}
@@ -337,6 +393,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     and the desk was wrong, which is the hardest kind of wrong to notice.
   */
   const settingKey = settingKeyOf(midiKey);
+  const bareSettingKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
   const curve = settingKey ? curveOf(settingKey) : 1;
   const at = curve === 1 ? (value - min) / (max - min) : travelOf(value, min, max, curve);
   const pct = at * 100;
@@ -359,7 +416,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
   });
   return (
-    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} {...tip.bind}>
+    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
       {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
         {touch && line ? (
@@ -385,21 +442,23 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
           <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
         </span>
       </div>
-      <input
-        type="range"
-        min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
-        step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
-        value={curve === 1 ? value : at}
-        onChange={e => {
-          const raw = Number(e.target.value);
-          if (curve === 1) { onChange(raw); return; }
-          onChange(handValueAt(raw, min, max, curve));
-        }}
-        aria-label={label}
-        onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
-        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
-        style={{ '--fill': `${pct}%` } as CSSProperties}
-      />
+      <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
+        <input
+          type="range"
+          min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
+          step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
+          value={curve === 1 ? value : at}
+          onChange={e => {
+            const raw = Number(e.target.value);
+            if (curve === 1) { onChange(raw); return; }
+            onChange(handValueAt(raw, min, max, curve));
+          }}
+          aria-label={label}
+          onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
+          className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
+          style={{ '--fill': `${pct}%` } as CSSProperties}
+        />
+      </PaceTrack>
     </div>
   );
 }
@@ -508,6 +567,9 @@ const SWEEP = RING * 0.75;              // 75.4
 
 export function Knob({ label, value, min, max, step, onChange, display, mapping, resetTo, disabled, midiKey, testId, size = 40, help }: KnobProps) {
   const settingKey = settingKeyOf(midiKey);
+  // The setting's own name even where no controller can learn it (Gel Speed): its group and its pace are by name.
+  const bareKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
+  const pace = paceOf(bareKey);
   const curve = settingKey ? curveOf(settingKey) : 1;
   const travel = (v: number) => Math.max(0, Math.min(1, curve === 1 ? (v - min) / (max - min || 1) : travelOf(v, min, max, curve)));
   const valueAt = (t: number) => {
@@ -555,6 +617,40 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
     return () => el.removeEventListener('wheel', onWheel);
   });
 
+  /*
+    A drag ends however the hand lets go, not only by a pointerup on the
+    input. The owner found two knobs' cards up at once and neither going,
+    both reading "⌥ held while dragging goes fine": each knob had missed its
+    release and thought a hand was still on it, and a held card stays up
+    whatever the pointer does. When the button comes up somewhere the page
+    never hears it (the system took the mouse-up), Chromium sends no
+    pointerup at all: on the next move, with no button down, it quietly drops
+    the capture and fires only lostpointercapture, which nothing here heard.
+    Two knobs turned that way drew the owner's picture exactly (`npm run
+    layout` does it). Which gesture on the owner's Mac swallowed the release
+    is not known, so every way it can go ends the drag: the capture going,
+    the button coming up or the pointer cancelled anywhere in the window, a
+    move with no button down, and the window losing focus.
+  */
+  const dragging = drag !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    const view = inputRef.current?.ownerDocument.defaultView ?? window;
+    const end = () => { grab.current = null; setDrag(null); };
+    const up = (e: PointerEvent) => { if (!grab.current || grab.current.id === e.pointerId) end(); };
+    const move = (e: PointerEvent) => { if (grab.current?.id === e.pointerId && (e.buttons & 1) === 0) end(); };
+    view.addEventListener('pointerup', up, true);
+    view.addEventListener('pointercancel', up, true);
+    view.addEventListener('pointermove', move, true);
+    view.addEventListener('blur', end);
+    return () => {
+      view.removeEventListener('pointerup', up, true);
+      view.removeEventListener('pointercancel', up, true);
+      view.removeEventListener('pointermove', move, true);
+      view.removeEventListener('blur', end);
+    };
+  }, [dragging]);
+
   const steps = step ? Math.round((max - min) / step) : 0;
   return (
     <div
@@ -563,6 +659,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       data-knob
+      data-group={groupOfSetting(bareKey)}
       {...tip.bind}
     >
       {tip.card}
@@ -579,10 +676,22 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           <circle cx="20" cy="20" r="16" fill="none" strokeWidth="3" strokeLinecap="round"
             style={{ stroke: drag ? 'var(--color-accent-text)' : 'var(--color-accent)' }}
             strokeDasharray={`${Math.max(0.01, SWEEP * at)} ${RING}`} transform="rotate(135 20 20)" />
-          <circle cx="20" cy="20" r="11" className="transition-colors group-hover:[fill:var(--color-knob-off)]" style={{ fill: 'var(--color-active)' }} />
-          <line x1="20" y1="15" x2="20" y2="10" stroke="#fff" strokeWidth="2" strokeLinecap="round"
+          {/* The cap wears its group's colour (index.css `--cap`): where the control lives, never whether it is on. */}
+          <circle cx="20" cy="20" r="11" className="transition-colors group-hover:[fill:var(--cap-hover,var(--color-knob-off))]" style={{ fill: 'var(--cap, var(--color-active))' }} />
+          <line x1="20" y1="15" x2="20" y2="10" strokeWidth="2" strokeLinecap="round" style={{ stroke: 'var(--cap-mark, #fff)' }}
             transform={`rotate(${-135 + 270 * at} 20 20)`} />
         </svg>
+        {pace && (
+          // At the two ends of the ring, in the margin the 58 px cell leaves either side of the 40 px knob.
+          <>
+            <span className={`pointer-events-none absolute transition-colors duration-[120ms] ${at < 0.06 ? 'text-text-2' : 'text-faint'}`} style={{ left: '-24%', top: '66%' }} data-pace-end={pace.bipolar ? 'hare' : 'snail'}>
+              {pace.bipolar ? <Hare size={size * 0.28} flip /> : <Snail size={size * 0.28} />}
+            </span>
+            <span className={`pointer-events-none absolute transition-colors duration-[120ms] ${at > 0.94 ? 'text-text-2' : 'text-faint'}`} style={{ right: '-24%', top: '66%' }} data-pace-end="hare">
+              <Hare size={size * 0.28} />
+            </span>
+          </>
+        )}
         {/*
           touch-none: on an iPad the browser would take a finger's drag as a
           page pan and cancel the pointer, so neither the ring nor the cap
@@ -636,6 +745,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           }}
           onPointerUp={e => { if (grab.current?.id === e.pointerId) { grab.current = null; setDrag(null); } }}
           onPointerCancel={() => { grab.current = null; setDrag(null); }}
+          onLostPointerCapture={e => { if (grab.current?.id === e.pointerId) { grab.current = null; setDrag(null); } }}
           onDoubleClick={() => { if (resetTo !== undefined && !disabled) onChange(resetTo); }}
           className="absolute inset-0 h-full w-full cursor-ns-resize touch-none appearance-none rounded-full opacity-0"
         />
@@ -671,12 +781,14 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   the fold.
 */
 export function PanelFrame({
-  id, title, meta, floating = false, collapsed = false, children, onFloat, onDock, onCollapse, onClose,
+  id, title, group, meta, floating = false, collapsed = false, children, onFloat, onDock, onCollapse, onClose,
   onPopOut, popped = false, onPopIn,
   onGripDown, onHeaderDown, onResizeDown, onTitleMenu, style, className = '', bodyClassName = '',
 }: {
   id: string;
   title: string;
+  /** The Settings group the panel belongs to (`SETTINGS_CATEGORIES`): its colour is the tick before the title and the cap of every knob inside. */
+  group?: string;
   meta?: ReactNode;
   floating?: boolean;
   collapsed?: boolean;
@@ -707,6 +819,7 @@ export function PanelFrame({
       style={style}
       data-testid={`panel-${id}`}
       data-panel={id}
+      data-group={group}
       data-floating={floating ? 'true' : undefined}
       data-popped={popped ? 'true' : undefined}
       data-collapsed={collapsed ? 'true' : undefined}
@@ -730,6 +843,7 @@ export function PanelFrame({
             </svg>
           </span>
         )}
+        {group && <span className="h-3 w-[3px] shrink-0 rounded-full" style={{ background: 'var(--cap)' }} data-group-tick aria-hidden />}
         <span className={`min-w-0 flex-1 truncate text-[13px] font-medium ${collapsed ? 'text-muted' : 'text-text'}`}>{title}</span>
         {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">floating</span>}
         {meta && <span className="min-w-0 shrink truncate font-mono text-[11px] text-faint">{meta}</span>}
@@ -831,7 +945,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       className={`group flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
-      <span className="h-6 w-6 shrink-0 rounded-sm" style={{ background: swatch }} />
+      <SlideMount swatch={swatch} size={28} />
       <span className={`flex-1 truncate text-[13px] font-medium ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
       {trailing}
     </button>

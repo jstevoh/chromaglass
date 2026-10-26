@@ -16,9 +16,27 @@ name: Mac app
 # Signing: with the secrets desktop/README.md lists, the download is signed
 # with the owner's Developer ID and notarized; without them it is signed ad hoc,
 # and macOS asks once before opening it.
+#
+# Releases (PLAN.md 13-update, asked 2026-10-25: "whenever we have a new release
+# update that app"). Run workflow with "release" ticked, or a pushed
+# `desktop-v<version>` tag, builds and checks the app as every run does, and
+# then the `release` job publishes it as this repo's newest GitHub Release:
+# the .dmg under one fixed name (the site's Download for Mac links to it), the
+# zip an in-place update downloads, and latest-mac.yml, which every installed
+# app reads to learn that it is out (desktop/updates.js). A release is the
+# owner's call, not every merge, and only from main (a release from a branch
+# would send every installed app an unmerged build): main takes several merges a day, and each
+# would tell every installed app to update. The version of a release run is
+# the site's major and minor and this run's number, so each is newer than the
+# last without a pull request to bump it first; a tag gives its own.
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish this build as a release that the installed apps update to'
+        type: boolean
+        default: false
   push:
     tags: ['desktop-v*']
   pull_request:
@@ -34,9 +52,17 @@ on:
       - 'package-lock.json'
       - '.github/workflows/desktop.yml'
 
+# Read-only unless a job says otherwise: the build runs npm ci and
+# electron-builder, and needs nothing more; only the release job writes.
+permissions:
+  contents: read
+
+# A newer push to a pull request replaces its older run; a run on main or a
+# tag is never cancelled by another, so a plain Run workflow started while a
+# release is going does not end the release.
 concurrency:
-  group: desktop-${{ github.ref }}
-  cancel-in-progress: true
+  group: desktop-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -54,7 +80,39 @@ jobs:
             desktop/package-lock.json
       - run: npm ci
       - run: npm ci --prefix desktop
-      - run: npm run build
+      # The site as the app ships it (PLAN.md 23.17d): with the accounts, so the
+      # app can sign in and fetch the account's key from the licence Worker, and
+      # VITE_MAC_APP, so the show opens only on a Home or Pro key, in the app's
+      # window and in any browser opened on the app's server (lib/authFlag.ts).
+      # Built with none of these, as until 23.17d, the app had no sign-in, gated
+      # nothing, and read Pro for every download. The same secrets as deploy.yml;
+      # a fork's run has none, and builds an app that opens on a typed key only.
+      - name: Build the site the app serves
+        run: npm run build
+        env:
+          VITE_MAC_APP: '1'
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_LICENSES_URL: ${{ secrets.VITE_FIREBASE_LICENSES_URL }}
+      # Only a release gets a version of its own; every other build keeps the
+      # site's, so a pull request's app never looks newer than a release.
+      - name: Which version
+        id: version
+        env:
+          RELEASE: ${{ inputs.release && github.ref == 'refs/heads/main' && 'yes' || '' }}
+        run: |
+          base=$(node -p "require('./package.json').version")
+          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then
+            v="${GITHUB_REF#refs/tags/desktop-v}"
+          elif [ -n "$RELEASE" ]; then
+            v="$(echo "$base" | cut -d. -f1-2).${GITHUB_RUN_NUMBER}"
+          else
+            v="$base"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "The app is version $v (the site is $base)."
       # The download is built first and the check opens the .app it was built
       # from, signed as it ships, so a missing entitlement cannot ship unseen.
       #
@@ -64,7 +122,22 @@ jobs:
       # on a pull request unless told to, which would leave the app with
       # Electron's own signature, broken by the rename, and "damaged" on an
       # Apple silicon Mac.
+      # A key pair for this build alone (PLAN.md 23.17d). The packed app opens
+      # only on a key, so the check below must open it on one; the app trusts
+      # this public half (its `checkKey`, electron-builder.config.cjs) and the
+      # check signs with the private half, which lives in a file on this runner
+      # and is gone when the job ends. Nobody holds it after, so a download
+      # trusts it for nothing. Never uploaded, never printed.
+      - name: A one-time key for the check
+        run: |
+          node --input-type=module -e "
+            const { publicKey, privateKey } = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+            const fs = await import('node:fs');
+            fs.writeFileSync(process.env.RUNNER_TEMP + '/check-key.json', JSON.stringify(await crypto.subtle.exportKey('jwk', privateKey)), { mode: 0o600 });
+            fs.appendFileSync(process.env.GITHUB_ENV, 'CHROMAGLASS_BUILD_CHECK_KEY=' + JSON.stringify(await crypto.subtle.exportKey('jwk', publicKey)) + '\n');
+          "
       - name: Build the download
+        id: build
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -72,17 +145,97 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_FOR_PULL_REQUEST: 'true'
+          DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ -z "$CSC_LINK" ]; then unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; fi
           npm --prefix desktop run dist
           codesign --verify --deep --strict --verbose=1 desktop/release/mac-arm64/ChromaGlass.app
+          # What Gatekeeper will say on a downloaded copy, asked of the app
+          # itself rather than read off which secrets were set: only an app
+          # signed with a Developer ID and notarised is accepted. The release
+          # notes tell the first open of any other build (13.1-sign). The
+          # source is read, not the exit code: a runner with assessments
+          # switched off answers "accepted, override=security disabled" for
+          # any app at all, and the notes would then drop the step.
+          verdict=$(spctl --assess --type execute -vv desktop/release/mac-arm64/ChromaGlass.app 2>&1 || true)
+          echo "Gatekeeper: $verdict"
+          if echo "$verdict" | grep -q 'source=Notarized Developer ID'; then
+            echo "gatekeeper=accepted" >> "$GITHUB_OUTPUT"
+          else
+            echo "gatekeeper=refused" >> "$GITHUB_OUTPUT"
+          fi
       - name: Check the built app (npm run desktop)
         run: node scripts/desktop.mjs --packaged
+        env:
+          # The site above was built as the app ships it: the check's licence
+          # lines ask a plain browser on the app's server for the door too.
+          VITE_MAC_APP: '1'
+          DESKTOP_CHECK_PRIVATE_KEY_FILE: ${{ runner.temp }}/check-key.json
+      - name: Throw the check's key away
+        if: always()
+        run: rm -f "$RUNNER_TEMP/check-key.json"
       - uses: actions/upload-artifact@v4
         with:
           name: ChromaGlass-mac
           path: |
             desktop/release/*.dmg
             desktop/release/*.zip
+            desktop/release/*.blockmap
+            desktop/release/latest-mac.yml
           if-no-files-found: error
           retention-days: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      gatekeeper: ${{ steps.build.outputs.gatekeeper }}
+
+  # On Ubuntu, from the Mac job's artifact: publishing needs no Mac minutes,
+  # and only this job may write to the repository.
+  release:
+    name: Mac app (release)
+    needs: build
+    if: ${{ (inputs.release && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/desktop-v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # A release is only ever a commit on main: a desktop-v tag pushed on a
+      # branch, or on an unmerged pull request's head, would otherwise be
+      # published as the newest release and every installed app told to take it.
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Only from main
+        run: |
+          git fetch --quiet origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "::error::$GITHUB_SHA is not on main; a release is only made from main"; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          name: ChromaGlass-mac
+          path: release
+      - name: Publish the release
+        if: ${{ (inputs.release && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/desktop-v') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+          GATEKEEPER: ${{ needs.build.outputs.gatekeeper }}
+        run: |
+          tag="desktop-v$VERSION"
+          ls -l release
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::$tag is already released; a release run makes a new version, so run it again"; exit 1
+          fi
+          grep -q "version: $VERSION" release/latest-mac.yml || { echo "::error::latest-mac.yml is not for $VERSION"; cat release/latest-mac.yml; exit 1; }
+          test -f release/ChromaGlass-mac-arm64.dmg || { echo "::error::no ChromaGlass-mac-arm64.dmg, which the site links to"; exit 1; }
+          printf '%s\n\n%s\n' \
+            "ChromaGlass $VERSION for the Mac (Apple silicon), built from ${GITHUB_SHA::7}." \
+            "Download **ChromaGlass-mac-arm64.dmg**, open it and drag ChromaGlass into Applications, over the old one if you have it. An app already installed finds this version by itself and says so in the ChromaGlass menu." > notes.md
+          # macOS 15 dropped right-click → Open for an app it cannot check;
+          # Settings' Open Anyway is the way left (the owner's Mac, 2026-10-25).
+          if [ "$GATEKEEPER" != accepted ]; then
+            printf '\n%s\n' "**The first time you open it**, macOS says it cannot check ChromaGlass for malicious software, because this build is not yet notarised by Apple. Click **Done**, then open **System Settings → Privacy & Security**, scroll to **Security** and click **Open Anyway** beside ChromaGlass. After that it opens like any app." >> notes.md
+          fi
+          gh release create "$tag" --target "$GITHUB_SHA" --title "ChromaGlass $VERSION for Mac" --notes-file notes.md --latest \
+            release/ChromaGlass-mac-arm64.dmg release/*.zip release/*.blockmap release/latest-mac.yml
+          echo "Released $tag: https://github.com/$GH_REPO/releases/tag/$tag"

@@ -7,6 +7,8 @@ import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { isPadPicture, type PadPictureMessage } from '../lib/padPicture';
 import { MARK_URL } from '../brand';
+import { LIT } from './ui';
+import { LensCap } from './ui/Playful';
 
 /**
  * Draw (PLAN §8-draw, the Desk v2 design's #3c phone and #3d iPad): the
@@ -349,7 +351,7 @@ export function DrawScreen(p: DrawScreenProps) {
         key={t.tool}
         onClick={() => p.setTool(t.tool)}
         disabled={!p.connected}
-        className={`flex shrink-0 flex-col items-center justify-center rounded-2xl disabled:opacity-40 ${on ? 'bg-primary text-on-primary' : `${GLASS} text-text`}`}
+        className={`flex shrink-0 flex-col items-center justify-center rounded-2xl disabled:opacity-40 ${on ? LIT : `${GLASS} text-text`}`}
         style={{ height: h, width: w }}
         aria-pressed={on}
         data-testid={`draw-tool-${t.tool}`}
@@ -382,7 +384,7 @@ export function DrawScreen(p: DrawScreenProps) {
     <button
       onClick={onClick}
       disabled={!p.connected}
-      className={`rounded-2xl px-5 text-[15px] font-semibold disabled:opacity-40 ${opts.flex ? 'flex-1' : ''} ${opts.on ? 'bg-primary text-on-primary' : `${GLASS} text-text`}`}
+      className={`rounded-2xl px-5 text-[15px] font-semibold disabled:opacity-40 ${opts.flex ? 'flex-1' : ''} ${opts.on ? LIT : `${GLASS} text-text`}`}
       style={{ height: opts.h }}
       aria-pressed={opts.on}
       data-testid={id}
@@ -398,12 +400,13 @@ export function DrawScreen(p: DrawScreenProps) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.action('blackout-toggle'); } }}
       disabled={!p.connected}
       className={`flex items-center justify-center gap-2 rounded-2xl border px-5 text-[15px] font-semibold disabled:opacity-40 ${flex ? 'flex-1' : ''} ${
-        dark ? 'border-live bg-live text-on-primary' : 'border-live-border bg-[rgba(17,17,19,.78)] text-live'
+        dark ? 'border-live bg-live text-on-primary' : 'border-border-strong bg-[rgba(17,17,19,.78)] text-text'
       }`}
       style={{ height: h, touchAction: 'none' }}
       aria-pressed={dark}
       data-testid="draw-blackout"
     >
+      <LensCap capped={dark} size={20} />
       {dark ? 'Dark' : 'Blackout'}
       {tablet && <span className={`text-[11px] font-normal ${dark ? 'text-on-primary/70' : 'text-live/70'}`}>hold</span>}
     </button>
@@ -488,7 +491,7 @@ export function DrawScreen(p: DrawScreenProps) {
                   key={liq.id}
                   onClick={() => p.chooseLiquid(liq.id)}
                   disabled={!p.connected}
-                  className={`flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] border px-2 text-left text-[12px] font-medium disabled:opacity-40 ${on ? 'border-accent-border bg-accent-bg text-text' : 'border-border bg-surface text-text-2'}`}
+                  className={`flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] border px-2 text-left text-[12px] font-medium disabled:opacity-40 ${on ? LIT : 'border-border bg-surface text-text-2'}`}
                   title={liq.description}
                   aria-pressed={on}
                   data-testid={`draw-bottle-${liq.id}`}

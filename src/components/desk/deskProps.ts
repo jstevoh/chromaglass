@@ -1,3 +1,4 @@
+import type { CartoonShelfProps } from '../CartoonShelf';
 import type { ReactNode, Ref } from 'react';
 import type { MixTakes } from '../../lib/mixFade';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -101,9 +102,10 @@ export interface DeskProps {
   onDeleteSaved: (id: string) => void;
   videoRecording?: boolean;
   videoSeconds?: number;
-  onToggleVideo?: () => void;
+  /** The one Record button: starts what is chosen, or stops whatever is running. */
+  onToggleRecord?: () => void;
+  recordChoice?: { video: boolean; take: boolean };
   onRecordOptions?: () => void;
-  onPerformance: () => void;
   performance: { clock: string; title?: string } | null;
   layer: number;
   layers: number;
@@ -171,6 +173,8 @@ export interface DeskProps {
   dyeBottles: LiquidType[];
   behaviourBottles: LiquidType[];
   bottleId: string;
+  /** What is left of the Dye Budget, 0 to 1, read off the plate when asked (the picked bottle polls it). */
+  dyeRoom?: () => number;
   onBottle: (id: string) => void;
   swatches: { hex: string; name: string }[];
   dye: string | null;
@@ -180,6 +184,8 @@ export interface DeskProps {
   onPalette: (i: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
+  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
+  cartoons?: CartoonShelfProps;
   tool: string;
   onTool: (t: string) => void;
   amountOf?: (tool: string) => number;

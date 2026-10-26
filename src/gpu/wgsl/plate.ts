@@ -543,7 +543,7 @@ fn filmColourAt(tR: f32, tP: f32) -> vec3f {
   return mix(rainbow, filmTableAt(tP, false), U.filmPhysics);
 }
 
-fn applyLighting(color: vec3f, normal: vec3f, darkBlend: bool, fuv: vec2f) -> vec3f {
+fn applyLighting(color: vec3f, normal: vec3f, darkBlend: bool, fuv: vec2f, isCamera: bool) -> vec3f {
   if (U.glossiness < 0.005) { return color; }
   let L = lampDir(fuv, U.lamp);
   let V = vec3f(0.0, 0.0, 1.0);
@@ -554,7 +554,8 @@ fn applyLighting(color: vec3f, normal: vec3f, darkBlend: bool, fuv: vec2f) -> ve
   let cosTheta = max(0.0, normal.z);
   let f0 = 0.04;
   let fresnel = f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
-  let specularTotal = specular + fresnel * 0.12;
+  let specMult = select(0.0, 1.0, isCamera);
+  let specularTotal = specular * specMult + fresnel * 0.12;
 
   var lit: vec3f;
   if (darkBlend) {
@@ -569,7 +570,7 @@ fn boundaryLine(diff: f32) -> f32 { return smoothstep(0.12, 0.75, diff); }
 
 fn boundaryEdge(t: texture_2d<f32>, fuv: vec2f) -> f32 { return boundaryLine(boundaryDiff(t, fuv)); }
 
-fn meniscus(color: vec3f, n: vec3f, a: f32, fuv: vec2f) -> vec3f {
+fn meniscus(color: vec3f, n: vec3f, a: f32, fuv: vec2f, isCamera: bool) -> vec3f {
   let rim = clamp((1.0 - n.z) * 6.0, 0.0, 1.0) * smoothstep(0.02, 0.2, a);
   let L = lampDir(fuv, U.lamp);
   let spec = pow(max(dot(n, L), 0.0), mix(10.0, 24.0, U.photo)) * mix(1.0, 0.3, U.photo);
@@ -578,12 +579,13 @@ fn meniscus(color: vec3f, n: vec3f, a: f32, fuv: vec2f) -> vec3f {
   let play = U.lightPlay;
   var c = color * (1.0 - rim * (0.55 + 0.3 * max(0.0, -facing) * play));
   c += color * rim * max(0.0, facing) * 0.7 * play;
-  c += vec3f(1.0, 0.98, 0.92) * spec * rim * 1.1;
+  let specMult = select(0.0, 1.0, isCamera);
+  c += vec3f(1.0, 0.98, 0.92) * spec * rim * 1.1 * specMult;
   if (U.lamp2.w > 0.001) {
     let L2 = lampDir(fuv, U.lamp2);
     let facing2 = clamp(dot(nd, L2.xy) * 3.0, -1.0, 1.0);
     let spec2 = pow(max(dot(n, L2), 0.0), 10.0);
-    c += (vec3f(0.72, 0.84, 1.0) * spec2 * rim * 1.0 + mix(color, vec3f(0.7, 0.85, 1.0), 0.4) * rim * max(0.0, facing2) * 0.6 * play) * U.lamp2.w;
+    c += (vec3f(0.72, 0.84, 1.0) * spec2 * rim * 1.0 * specMult + mix(color, vec3f(0.7, 0.85, 1.0), 0.4) * rim * max(0.0, facing2) * 0.6 * play) * U.lamp2.w;
   }
   return mix(color, c, U.edgeRelief);
 }
@@ -1300,12 +1302,135 @@ override FLIP_Y: f32 = 1.0;
  */
 export const DERIVE_WGSL = `${HEAD}${SAMPLING}${DECODE}${VERT}
 @group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var viewSrc: texture_2d<u32>;
+/*
+  The poured liquids' species (PLAN 18d, src/lib/liquidProps.ts), the
+  solver's own rgba32float field: r the share of the column that is poured
+  liquid, a the share-weighted sum of their refractive indices (each bottle's
+  own, from the shelf's table in src/types.ts: glycerine 1.4746, syrup
+  1.452, alcohol 1.361, milk 1.345). Read with textureLoad, never sampled:
+  a 32-bit float texture is not filterable (the layout says so in
+  deriveLayout, src/gpu/plate.ts). 1×1 and empty when nothing is poured.
+*/
+@group(0) @binding(4) var speciesSrc: texture_2d<f32>;
+
+// The plate's clear liquid: water, n 1.333 at 589 nm and room temperature.
+const N_CLEAR: f32 = 1.333;
+
+fn viewProps(uv: vec2f) -> vec3f {
+  let dims = textureDimensions(viewSrc);
+  if (dims.x <= 1u) { return vec3f(0.0, 0.03, 0.0); }
+  let coord = clamp(vec2i(uv * vec2f(dims)), vec2i(0), vec2i(dims) - 1);
+  let q = textureLoad(viewSrc, coord, 0);
+  let oil = unpack2x16unorm(q.x).y;
+  let gap = unpack2x16unorm(q.w).x * 0.06;
+  let film = f32(q.w >> 24u) / 255.0;
+  return vec3f(oil, gap, film);
+}
+
+/*
+  How far the poured liquids raise the column's index above the clear
+  liquid's (PLAN 18d-9): a share r of the column replaced by liquids whose
+  indices sum, share-weighted, to a gives n = (1 − r)·n_clear + a, so the
+  rise is a − r·n_clear. A column that is all glycerine reads
+  1.4746 − 1.333 = 0.1416; half glycerine, half water, half that (a mixture's
+  index is close to linear in its volume shares, the Arago–Biot rule, and
+  the field carries exactly those shares).
+*/
+fn pouredDn(uv: vec2f) -> f32 {
+  let dims = textureDimensions(speciesSrc);
+  if (dims.x <= 1u) { return 0.0; }
+  let coord = clamp(vec2i(uv * vec2f(dims)), vec2i(0), vec2i(dims) - 1);
+  let sp = textureLoad(speciesSrc, coord, 0);
+  return sp.a - sp.r * N_CLEAR;
+}
+
+/*
+  The optical path through the column, OPL = n·h, with h in rest gaps
+  (DISH_REST_GAP, 6 mm on the 0.2 m dish), so a column of clear water at
+  rest reads 1.333. v is viewProps' (oil, gap, film); dn is pouredDn's.
+  The dye's own term, d·0.015·dyeGain, is a named stand-in (refractionOptics
+  note 6): a dilute dye barely moves water's index, and this is what gives
+  a dye-only look its edges.
+*/
+fn calcOpl(d: f32, v: vec3f, dn: f32, dyeGain: f32) -> f32 {
+  let deltaDye = d * (0.015 * dyeGain);
+  let deltaOil = v.x * 0.137;
+  let deltaFilm = v.z * 0.087;
+  let n = N_CLEAR + deltaDye + deltaOil + deltaFilm + dn;
+  let gap = v.y;
+  let hScale = select(1.0, clamp(gap / 0.03, 0.3, 3.0), gap > 0.001);
+  let h = hScale * (1.0 - 0.5 * v.z);
+  return n * h;
+}
+
+// One tap's optical path, from its own view and its own poured index.
+fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
+  return calcOpl(d, viewProps(uv), pouredDn(uv), dyeGain);
+}
 
 @fragment fn fs(in: VsOut) -> @location(0) vec4f {
-  let g = sobelGrad(src, in.uv);
-  var diff = 0.0;
-  if (U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
-  return vec4f(g, diff, 0.0);
+  let macroAmt = clamp(U.macroOn, 0.0, 1.0);
+  let closeup = macroAmt > 0.001;
+  let isCamera = U.photo > 0.5 || closeup;
+  if (isCamera) {
+    let gCam = sobelGrad(src, in.uv);
+    var diff = 0.0;
+    if (U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
+    return vec4f(gCam, diff, 0.0);
+  }
+
+  let ts = 3.0 / U.logicalGrid;
+  let dyeGain = max(1.0, U.boundaryContrast * 3.0);
+
+  let d00 = decodeDensity(tex2(src, in.uv + vec2f(-ts, -ts)).a);
+  let d10 = decodeDensity(tex2(src, in.uv + vec2f( 0.0, -ts)).a);
+  let d20 = decodeDensity(tex2(src, in.uv + vec2f( ts, -ts)).a);
+  let d01 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  0.0)).a);
+  let dC  = decodeDensity(tex2(src, in.uv).a);
+  let d21 = decodeDensity(tex2(src, in.uv + vec2f( ts,  0.0)).a);
+  let d02 = decodeDensity(tex2(src, in.uv + vec2f(-ts,  ts)).a);
+  let d12 = decodeDensity(tex2(src, in.uv + vec2f( 0.0,  ts)).a);
+  let d22 = decodeDensity(tex2(src, in.uv + vec2f( ts,  ts)).a);
+
+  let gradX = (-d00 - 2.0 * d01 - d02 + d20 + 2.0 * d21 + d22) * 0.125;
+  let gradY = (-d00 - 2.0 * d10 - d20 + d02 + 2.0 * d12 + d22) * 0.125;
+  let g = vec2f(gradX, gradY);
+
+  let vC = viewProps(in.uv);
+  let oC = calcOpl(dC, vC, pouredDn(in.uv), dyeGain);
+
+  var o00: f32; var o10: f32; var o20: f32;
+  var o01: f32; var o21: f32;
+  var o02: f32; var o12: f32; var o22: f32;
+
+  // Each tap's own view and poured index wherever either can differ from
+  // the middle's: oil, a film, or any liquid poured (the species is 1×1
+  // with none, so a plate with nothing poured pays for none of these reads).
+  let poured = textureDimensions(speciesSrc).x > 1u;
+  if (vC.x > 0.001 || vC.z > 0.001 || poured) {
+    o00 = oplAt(d00, in.uv + vec2f(-ts, -ts), dyeGain);
+    o10 = oplAt(d10, in.uv + vec2f( 0.0, -ts), dyeGain);
+    o20 = oplAt(d20, in.uv + vec2f( ts, -ts), dyeGain);
+    o01 = oplAt(d01, in.uv + vec2f(-ts,  0.0), dyeGain);
+    o21 = oplAt(d21, in.uv + vec2f( ts,  0.0), dyeGain);
+    o02 = oplAt(d02, in.uv + vec2f(-ts,  ts), dyeGain);
+    o12 = oplAt(d12, in.uv + vec2f( 0.0,  ts), dyeGain);
+    o22 = oplAt(d22, in.uv + vec2f( ts,  ts), dyeGain);
+  } else {
+    o00 = calcOpl(d00, vC, 0.0, dyeGain);
+    o10 = calcOpl(d10, vC, 0.0, dyeGain);
+    o20 = calcOpl(d20, vC, 0.0, dyeGain);
+    o01 = calcOpl(d01, vC, 0.0, dyeGain);
+    o21 = calcOpl(d21, vC, 0.0, dyeGain);
+    o02 = calcOpl(d02, vC, 0.0, dyeGain);
+    o12 = calcOpl(d12, vC, 0.0, dyeGain);
+    o22 = calcOpl(d22, vC, 0.0, dyeGain);
+  }
+
+  let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
+
+  return vec4f(g, lap, oC);
 }
 `;
 
@@ -1845,6 +1970,68 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
   }
   return decodeFluidRaw(foldRaw(raw, pt, fuv));
 }
+
+/*
+  Refraction optics across plate liquid interfaces (PLAN 18e):
+  Hairline dark rims from light deflected outside the projector pupil (aperture loss),
+  and shadowgraph Becke line intensity doublets under projector defocus.
+
+  Named shortcuts:
+  1. Small-angle deflection θ ≈ |∇density| · 0.35 (from the air-masked slope g0 on Layer 0,
+     PLAN 33b) plus the hue-gated two-dye boundary deflection bEdge · edgeK · 1.1 (PLAN 33a,
+     shaped by smoothstep(0.25, 1.0, uB) * 0.78 so gentle overlap tails stay above mid-grey in
+     npm run mixer and an oil drop straddling two dyes keeps each side's colour in npm run
+     droplens) is evaluated from the dye slope and colour step rather than ∇(n·h); it omits oil,
+     film and gap thickness terms that the Laplacian includes, and operates per-texel so it
+     scales with grid resolution.
+  2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the OPL step.
+  3. Pupil overlap is approximated by a smoothstep with a 0.15 extinction floor (0.85 max loss),
+     weighted by reliefK (Edge Relief × plateAmt) on the meniscus slope and edgeK on the two-dye
+     boundary.
+  4. The shadowgraph transport 1 - Δz · ∇²OPL is divided by local OPL, scaled by
+     boundaryContrast * 2 and masked by an edge-deflection smoothstep; at default
+     projectorFocus = 0.5, Δz = 0 so the Becke term is 1 until the slider moves.
+  5. Layer 1 keeps a painted boundary line (edge1 * boundaryContrast * 1.6 from
+     |∇density|, gated on fluid1.a > 0.03) alongside refractionOptics(near1):
+     with both dishes at Δz = 0 at default focus, aperture loss alone darkens edges and
+     leaves the back plate's Screen/Multiply separation at 9.9 in npm run mixer (bar > 10,
+     11.0 on main, 10.1 with the line), while applying that brightening to Layer 0 clips
+     the 90th-percentile thin-dye rim in mixer's mid-grey contrast check (129.5 → 136.4
+     without it, 130.9 → 134.7 with it). Tracked in PLAN 18e-1 (with 31a) to replace once
+     the two dishes sit at separate heights in the projector's focal cone.
+  6. The dye's index, d · 0.015 · dyeGain in calcOpl (the derive pass), is a stand-in:
+     a few percent of dye in water moves its index by far less, and nothing in the
+     shelf's table gives a dye one. It is what gives a dye-only look its Becke lines.
+     The poured liquids' indices are real (the species field, PLAN 18d-9): glycerine
+     reads 1.4746 because the shelf says so, and npm run derive measures it so.
+  7. A clear poured liquid's edge (glycerine into water, no dye) reaches ∇²OPL, but
+     this function returns early where the dye's gradient is flat (gLen, from note 1),
+     so that edge draws no line yet. PLAN 18e-2: deflect by ∇OPL, not the dye's slope.
+*/
+fn refractionOptics(near: vec4f, bEdge: f32, reliefK: f32, edgeK: f32) -> f32 {
+  let grad = near.xy;
+  let gLen = length(grad);
+  let strength = max(reliefK, max(edgeK, abs(U.projectorFocus - 0.5)));
+  if (strength <= 0.005 || (gLen <= 0.005 && bEdge <= 0.005)) {
+    return 1.0;
+  }
+  let lap = near.z;
+  let opl = max(1.0, near.w);
+
+  let na = DROP_NA;
+  let theta = gLen * 0.35;
+  let u = clamp(theta / (2.0 * na), 0.0, 1.0);
+  let uB = clamp((bEdge * edgeK * 1.1) / (2.0 * na), 0.0, 1.0);
+  let uBound = smoothstep(0.25, 1.0, uB) * 0.78;
+  let aperture = 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK + uBound, 0.0, 0.85);
+
+  let deltaZ = (U.projectorFocus - 0.5) * 1.5;
+  let shadowGain = max(1.0, U.boundaryContrast * 2.0);
+  let edgeDeflect = smoothstep(0.005, 0.05, max(gLen, bEdge));
+  let shadow = clamp(1.0 - deltaZ * (lap / opl) * shadowGain * edgeDeflect, 0.2, 2.5);
+
+  return aperture * shadow;
+}
 `;
 
 /** The display pass: the plate as it reaches the wall. */
@@ -2256,6 +2443,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // true line would stay a pixel wide at any zoom, which the grid cannot say).
   let edgeK = U.boundaryContrast * (1.0 - 0.8 * macroAmt);
   let closeup = macroAmt > 0.001;   // not 'macro': that is a reserved word in WGSL
+  let isCamera = U.photo > 0.5 || closeup;
   /*
     How much of the plate-wide view is left: the plate's own dressing (the
     meniscus relief, the cells, the droplets) fades out over the same travel
@@ -2477,13 +2665,21 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // A hole the air cut is the bubble's edge, not the dye's (33b, airNear).
     normal0 = normalize(mix(normal0, vec3f(0.0, 0.0, 1.0), airNear(fuv0)));
   }
-  fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0), fluid0.a);
+  fluid0 = vec4f(applyLighting(fluid0.rgb, normal0, darkBlend, fuv0, isCamera), fluid0.a);
   if (darkBlend) { fluid0.a *= 0.6; film0 *= 0.6; }
 
-  if (U.boundaryContrast > 0.005 && fluid0.a > 0.03 && sharp0) {
-    var edge0 = boundaryLine(near0.z);
-    if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
-    fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * edgeK * 1.6 + vec3f(edge0 * edgeK * 0.25), fluid0.a);
+  if (sharp0 && fluid0.a > 0.03) {
+    if (!isCamera && U.derivedOn > 0.5) {
+      let g0 = -normal0.xy / (0.9 * max(normal0.z, 1e-4));
+      var bEdge0 = 0.0;
+      if (U.boundaryContrast > 0.005) { bEdge0 = boundaryEdge(layer0, fuv0); }
+      let reliefK0 = select(0.0, U.edgeRelief * plateAmt, plateOn && U.edgeRelief > 0.005);
+      fluid0 = vec4f(fluid0.rgb * refractionOptics(vec4f(g0, near0.zw), bEdge0, reliefK0, edgeK), fluid0.a);
+    } else if (U.boundaryContrast > 0.005) {
+      var edge0 = boundaryLine(near0.z);
+      if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
+      fluid0 = vec4f(fluid0.rgb + fluid0.rgb * edge0 * edgeK * 1.6 + vec3f(edge0 * edgeK * 0.25), fluid0.a);
+    }
   }
   // The per-pixel tests mask the result instead of branching around the
   // call: lacing measures two widths with fwidth, and WGSL reads a
@@ -2493,7 +2689,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     if (fluid0.a > 0.02 && sharp0) { fluid0 = vec4f(laced0, fluid0.a); }
   }
   if (plateOn && U.edgeRelief > 0.005 && sharp0) {
-    fluid0 = vec4f(mix(fluid0.rgb, meniscus(fluid0.rgb, normal0, fluid0.a, fuv0), plateAmt), fluid0.a);
+    if (isCamera || U.derivedOn <= 0.5) {
+      fluid0 = vec4f(mix(fluid0.rgb, meniscus(fluid0.rgb, normal0, fluid0.a, fuv0, isCamera), plateAmt), fluid0.a);
+    }
   }
 
   // ── Plate cells ───────────────────────────────────────────────
@@ -2874,11 +3072,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // drop on a projector is ringed by a thin dark line (the meniscus), and
     // its body, a weak lens, is a touch brighter than the water around it.
     if (view.oil > 0.004) {
-      let e = 1.2 / U.logicalGrid;
-      let og = vec2f(viewAt(fuvBase + vec2f(e, 0.0)).oil - viewAt(fuvBase - vec2f(e, 0.0)).oil,
-                     viewAt(fuvBase + vec2f(0.0, e)).oil - viewAt(fuvBase - vec2f(0.0, e)).oil);
-      let rim = clamp(length(og) * 2.2, 0.0, 1.0);
-      outColor = outColor * (1.0 - 0.55 * rim) + outColor * 0.08 * clamp(view.oil, 0.0, 1.0);
+      if (isCamera || U.derivedOn <= 0.5) {
+        let e = 1.2 / U.logicalGrid;
+        let og = vec2f(viewAt(fuvBase + vec2f(e, 0.0)).oil - viewAt(fuvBase - vec2f(e, 0.0)).oil,
+                       viewAt(fuvBase + vec2f(0.0, e)).oil - viewAt(fuvBase - vec2f(0.0, e)).oil);
+        let rim = clamp(length(og) * 2.2, 0.0, 1.0);
+        outColor = outColor * (1.0 - 0.55 * rim);
+      }
+      outColor = outColor + outColor * 0.08 * clamp(view.oil, 0.0, 1.0);
     }
     /*
       A pH indicator in the dye (red cabbage's anthocyanin). The indicator
@@ -2971,12 +3172,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let tint1 = fluid1.rgb;
     let alpha1 = fluid1.a;
     var more1 = 1.0;   // throughScaled
-    var lampMore1 = 1.0;
     if (U.dishSpread > 0.001) {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;
       more1 *= dish1.x;
-      lampMore1 *= dish1.x;
     }
 
     let bare1 = fluid1.a;   // the opacity the dye alone gives, for the grain below
@@ -2986,13 +3185,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     }
 
     // The grain after the edge, not before it: see the front plate's.
+    let film1 = fluid1.a;
     if (U.granulation > 0.002 && fluid1.a > 0.004) {
       let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
-      let gd1 = grainedDepth(bare1, grain);
-      fluid1.a = min(1.0, fluid1.a * gd1);
+      fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
       more1 *= grain;
-      lampMore1 *= gd1;
     }
+    let grained1 = fluid1.a;
 
     let sharp1 = dof < 0.55;
     var near1 = vec4f(0.0);
@@ -3005,13 +3204,24 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // plate's air in this layer's own coordinates, which differ under a
       // layer zoom or drift, so it would flatten relief where no bubble is.
     }
-    fluid1 = vec4f(applyLighting(fluid1.rgb, normal1, darkBlend, fuv1), fluid1.a);
+    fluid1 = vec4f(applyLighting(fluid1.rgb, normal1, darkBlend, fuv1, isCamera), fluid1.a);
     if (darkBlend) { fluid1.a *= 0.6; }
 
-    if (U.boundaryContrast > 0.005 && fluid1.a > 0.03 && sharp1) {
-      var edge1 = boundaryLine(near1.z);
-      if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
-      fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * edgeK * 1.6 + vec3f(edge1 * edgeK * 0.25), fluid1.a);
+    if (sharp1 && fluid1.a > 0.03) {
+      if (!isCamera && U.derivedOn > 0.5) {
+        fluid1 = vec4f(fluid1.rgb * refractionOptics(near1, 0.0, 0.0, 0.0), fluid1.a);
+        // Painted shortcut (see refractionOptics note 5, PLAN 18e-1 / 31a):
+        // keeps the upper dish's boundary brightness until 31a separates the
+        // two dishes' focal heights Δz in the projector cone.
+        if (U.boundaryContrast > 0.005) {
+          let edge1 = smoothstep(0.1, 0.6, length(near1.xy));
+          fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * edgeK * 1.6 + vec3f(edge1 * edgeK * 0.25), fluid1.a);
+        }
+      } else if (U.boundaryContrast > 0.005) {
+        var edge1 = boundaryLine(near1.z);
+        if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
+        fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * edgeK * 1.6 + vec3f(edge1 * edgeK * 0.25), fluid1.a);
+      }
     }
     // The per-pixel tests mask the result instead of branching around the
     // call: lacing measures two widths with fwidth, and WGSL reads a
@@ -3021,7 +3231,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       if (fluid1.a > 0.02 && sharp1) { fluid1 = vec4f(laced1, fluid1.a); }
     }
     if (plateOn && U.edgeRelief > 0.005 && sharp1) {
-      fluid1 = vec4f(mix(fluid1.rgb, meniscus(fluid1.rgb, normal1, fluid1.a, fuv1), plateAmt), fluid1.a);
+      if (isCamera || U.derivedOn <= 0.5) {
+        fluid1 = vec4f(mix(fluid1.rgb, meniscus(fluid1.rgb, normal1, fluid1.a, fuv1, isCamera), plateAmt), fluid1.a);
+      }
     }
 
     if (closeup) {
@@ -3068,12 +3280,19 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         own plate from a lamp dimmed to half (lampScreen, kept before the front
         plate's contact shadow). Halving each lamp is an exposure normalisation
         shortcut so clear glass stays at one lamp's level; outside the back plate's
-        disc lampMore1 is 0, so the second projector still lights the screen there.
+        disc its share of the lamp's path (dish1.x times the grain's factor, what
+        lampMore1 held before PLAN 18e) is 0, so the second projector still lights
+        the screen there.
         For other looks, they are stacked dishes on one lamp: a second filter in the
         light's path. A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
+        The grain's factor is recovered from the opacity before and after it
+        (grained1 / film1), as the front plate's is, so grainedDepth stays a
+        single-use expression on both plates: stored and used twice on this one,
+        Metal folded it in a different order when npm run lamp's before-lamp
+        surgery left it one use, 1 ULP that 18e's refraction pushed across a byte.
       */
       if (U.lampGround > 0.001) {
-        let filt1 = throughScaled(t1, lampMore1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        let filt1 = throughScaled(t1, dish1.x * select(1.0, grained1 / max(film1, 1e-4), film1 > 0.004) * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         var lit1 = outColor * filt1;
         if (U.twoProjectors > 0.5 && U.layerCount > 1) {
           lit1 = outColor + lampScreen * filt1;
@@ -3481,7 +3700,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.lampWarmth > 0.001) {
     let vc = (uv - 0.5) * vec2f(aspect, 1.0);
     let vig = 1.0 - smoothstep(0.45, 1.05, length(vc) * 1.25) * 0.45;
-    outColor = mix(outColor, outColor * vec3f(1.06, 0.9, 0.7) * vig, U.lampWarmth);
+    // The tint is the lamp's own colour (the blackbody at the temperature the slider names), already
+    // the whole grade at this setting. The vignette is the dish's and is blended as it always was,
+    // 1 - w + w*g*vig, which is tint - (tint - (1 - w)) * (1 - vig); past the old end of the travel
+    // (w above 1) it stays full, tint * vig. Multiplying the tint by a separately blended vignette
+    // was 4 to 6% too dark in the corners at the shipped looks (the pre-push review).
+    let tint = vec3f(U.lampTintR, U.lampTintG, U.lampTintB);
+    outColor = outColor * (tint - (tint - vec3f(1.0 - min(U.lampWarmth, 1.0))) * (1.0 - vig));
   }
 
   // ── The dish ─────────────────────────────────────────────────────

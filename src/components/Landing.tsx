@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
 
 /**
@@ -27,7 +28,7 @@ import { introOut } from '../lib/intro';
  *
  * "Play free" mounts the sign-in over this page rather than replacing it, so
  * the card sits on the hero and a visitor who backs out of it is still on the
- * page. The choice is kept in sessionStorage for the tab: Google and Apple
+ * page. The choice is kept in sessionStorage for the tab: Google can
  * sign in by a redirect that reloads the page, and the sign-in screen is what
  * collects that redirect, so a reload with the flag set goes straight to it.
  *
@@ -90,6 +91,7 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
       'Phone remote',
       'Song ID with timed lyrics',
       'Your own logo on the glass',
+      'The Mac app: the show offline, the phone remote built in',
     ],
   },
   {
@@ -114,6 +116,7 @@ const btnGhost =
 
 export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
   const [still] = useState(wantsStill);
+  const [mac] = useState(() => onMacComputer());
   const root = useRef<HTMLDivElement>(null);
 
   // The intro `index.html` painted has done its job: this page is what a
@@ -193,7 +196,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </a>
           </div>
           <p className="mt-4 text-[13px] leading-relaxed text-muted">
-            Free in your browser, nothing to install. Sign in with Google, Apple or an emailed link.
+            Free in your browser, nothing to install. Sign in with Google, an emailed link or a password.
           </p>
           <p className="mt-1 font-mono text-[12px] text-dim">
             Home $35 · Pro $199 · one-time payment, no subscription
@@ -265,6 +268,17 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </div>
           ))}
         </div>
+        {/* The Mac app's download is a public file (the owner's choice,
+            2026-10-25); the app opens only on a Home or Pro key (PLAN.md
+            23.17d: the owner chose Home too, 2026-10-26). On a phone or a PC
+            there is nothing here to run, so it says where to get it. */}
+        <p data-cg-landing-mac="" className="mt-4 text-[13px] leading-relaxed text-muted">
+          {mac ? (
+            <>On Home or Pro? <a href={MAC_DOWNLOAD_URL} className="underline underline-offset-2 hover:text-text-2">Download the Mac app</a> (Apple silicon).{!MAC_APP_NOTARISED && <> {MAC_FIRST_OPEN}</>}</>
+          ) : (
+            <>The Mac app comes with Home and Pro. Download it on your Mac from this page or from Profile &amp; Store.</>
+          )}
+        </p>
       </section>
 
       {/* From the maker */}

@@ -84,7 +84,7 @@ export type PanelKind = 'own' | 'knobs' | 'section' | 'mixer';
 export interface PanelSpec {
   id: string;
   name: string;
-  /** The panel browser's group: a settings category, or `live` for the desk's own. */
+  /** The panel browser's group: one of `SETTINGS_CATEGORIES`, the desk's own panels included. */
   category: string;
   kind: PanelKind;
   /** Its width in the deck. Four knobs fit 266. */
@@ -96,14 +96,14 @@ export interface PanelSpec {
  * settings section. Their ids are not section ids, so they cannot collide.
  */
 const OWN: PanelSpec[] = [
-  { id: 'cues',    name: 'Cues',    category: 'live',  kind: 'own', deckWidth: 304 },
-  { id: 'rides',   name: 'Rides',   category: 'live',  kind: 'own', deckWidth: 312 },
-  { id: 'recipe',  name: 'Recipe',  category: 'live',  kind: 'own', deckWidth: 320 },
+  { id: 'cues',    name: 'Cues',    category: 'play',  kind: 'own', deckWidth: 304 },
+  { id: 'rides',   name: 'Rides',   category: 'play',  kind: 'own', deckWidth: 312 },
+  { id: 'recipe',  name: 'Recipe',  category: 'play',  kind: 'own', deckWidth: 320 },
   // The song as a timeline, its show's cues and the nudge (PLAN 28h): the deck's widest, because a lane of sections is read across.
-  { id: 'score',   name: 'Score',   category: 'live',  kind: 'own', deckWidth: 400 },
-  { id: 'bottles', name: 'Bottles', category: 'plate', kind: 'own', deckWidth: 312 },
-  { id: 'dyes',    name: 'Dyes',    category: 'plate', kind: 'own', deckWidth: 360 },
-  { id: 'tools',   name: 'Tools',   category: 'plate', kind: 'own', deckWidth: 340 },
+  { id: 'score',   name: 'Score',   category: 'play',  kind: 'own', deckWidth: 400 },
+  { id: 'bottles', name: 'Bottles', category: 'pour', kind: 'own', deckWidth: 312 },
+  { id: 'dyes',    name: 'Dyes',    category: 'pour', kind: 'own', deckWidth: 360 },
+  { id: 'tools',   name: 'Tools',   category: 'pour', kind: 'own', deckWidth: 340 },
   { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 304 },
 ];
 
@@ -162,7 +162,7 @@ const empty = (): Omit<DeskLayout, 'plateMode'> => ({ left: [], right: [], deck:
   machine and the phone link in the deck.
 */
 export const SHIPPED: Record<LayoutName, DeskLayout> = {
-  build: { ...empty(), right: ['bottles', 'dyes', 'tools'], deck: ['recipe', 'physics', 'camera', 'audio-input', 'macro', 'patches'], plateMode: 'preview' },
+  build: { ...empty(), right: ['bottles', 'dyes', 'tools'], deck: ['recipe', 'physics', 'squish', 'camera', 'audio-input', 'macro', 'patches'], plateMode: 'preview' },
   gig: { ...empty(), left: ['cues'], right: ['rides'], deck: ['dyes', 'tools', 'patches'], plateMode: 'live' },
   loadin: { ...empty(), left: ['midi', 'audio-input'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' },
 };

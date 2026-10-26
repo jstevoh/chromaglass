@@ -35,7 +35,7 @@
  * rung costs on a real GPU.
  */
 
-import { qualityLadder, canvasPixelsFor } from '../src/lib/platform';
+import { qualityLadder, canvasPixelsFor, effectiveLadderTier } from '../src/lib/platform';
 import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf, handValueAt } from '../src/lib/midi';
 import { readSetting } from '../src/lib/readout';
 import { QualityGovernor, STEP_RATES } from '../src/lib/governor';
@@ -597,6 +597,26 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       seen(g.rung) === before.at && g.stepRate === before.rate,
       `${before.at} at ${before.rate}/s → ${seen(g.rung)} at ${g.stepRate}/s`);
   }
+}
+
+// ── Pro unlocks the full local ladder on hosted builds (PLAN.md §23.17) ──
+{
+  const hostedTier = effectiveLadderTier('hosted', false);
+  const proTier = effectiveLadderTier('hosted', true);
+  const hostedRetina = ladderAt(hostedTier, 'strong', 2).rungs;
+  const proRetina = ladderAt(proTier, 'strong', 2).rungs;
+  const pro1x = ladderAt(proTier, 'strong', 1).rungs;
+  check(
+    'a Pro licence promotes the hosted ladder to the full local GPU/CPU ladder (768² at 2x Retina and 1024² at 1x)',
+    hostedTier === 'hosted' &&
+      proTier === 'local' &&
+      hostedRetina[0].grid === 512 &&
+      hostedRetina[0].dpr === 1.5 &&
+      proRetina[0].grid === 768 &&
+      proRetina[0].dpr === 2 &&
+      pro1x[0].grid === 1024,
+    `hosted 2x top=${hostedRetina[0].grid}²@${hostedRetina[0].dpr}x, Pro 2x top=${proRetina[0].grid}²@${proRetina[0].dpr}x, Pro 1x top=${pro1x[0].grid}²@${pro1x[0].dpr}x`,
+  );
 }
 
 let failed = 0;

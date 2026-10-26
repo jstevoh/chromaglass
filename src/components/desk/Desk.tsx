@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { User } from 'lucide-react';
+import { LogIn, User } from 'lucide-react';
 import { Button, PanelFrame, Segmented, Tag } from '../ui';
+import { LensCap } from '../ui/Playful';
 import { PanelGuard } from '../PanelGuard';
 import { RecordControls } from './RecordControls';
 import { DeskHeader } from './DeskHeader';
@@ -14,6 +15,7 @@ import {
   type DeskLayout, type Slot,
 } from '../../lib/deskLayout';
 import { getEffectiveTier } from '../../lib/tierGates';
+import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import type { DeskProps } from './deskProps';
 
 /**
@@ -49,6 +51,8 @@ interface Drag { id: string; x: number; y: number; x0: number; y0: number; moved
 
 export function Desk(p: DeskProps) {
   const l = p.layout;
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
   const set = p.onLayout;
   const [browser, setBrowser] = useState<{ top: number; right: number } | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -249,6 +253,7 @@ export function Desk(p: DeskProps) {
           key={id}
           id={id}
           title={spec.name}
+          group={spec.category}
           floating={opts.floating}
           collapsed={false}
           className={opts.className}
@@ -273,6 +278,7 @@ export function Desk(p: DeskProps) {
         key={id}
         id={id}
         title={spec.name}
+        group={spec.category}
         meta={panelMeta(id, p)}
         floating={opts.floating}
         collapsed={collapsed}
@@ -355,8 +361,7 @@ export function Desk(p: DeskProps) {
         onVideo={p.onVideo}
         onWall={p.onOpenWall ?? p.onSendToWall}
         onMidi={p.onMidi}
-        onRecord={p.onRecordOptions ?? p.onToggleVideo}
-        onPerformance={p.onPerformance}
+        onRecord={p.onRecordOptions ?? p.onToggleRecord}
         onSearch={p.onSearch}
         leading={
           <button
@@ -368,18 +373,25 @@ export function Desk(p: DeskProps) {
             data-testid="panel-browser-button"
           >
             +<span className="hidden xl:inline"> Panel</span>
-            <span className="hidden font-mono text-[11px] text-faint 2xl:inline">⌘P</span>
           </button>
         }
         trailing={
-          /* Inverted while it is on: a blacked-out room is exactly when the button has to say so without being read. */
+          /*
+            Solid red while it is on: a blacked-out room is exactly when the
+            button has to say so without being read. It was a red outline
+            while off and white while on (PLAN 35a), which put red, the
+            colour of live, on the room that was lit, and white, the colour of
+            the primary, on the one that was dark.
+          */
           <Button
             height={32}
             kbd="B"
-            variant={p.blackout ? 'primary' : 'danger'}
+            pressed={!!p.blackout}
+            live
             onClick={p.onBlackout}
             midiKey="action:blackout-toggle"
             testId="blackout-button"
+            icon={<LensCap capped={!!p.blackout} size={16} />}
           >
             {p.blackout ? 'Blacked out' : 'Blackout'}
           </Button>
@@ -407,9 +419,9 @@ export function Desk(p: DeskProps) {
           <RecordControls
             videoRecording={p.videoRecording ?? false}
             videoSeconds={p.videoSeconds ?? 0}
-            onToggleVideo={p.onToggleVideo ?? (() => {})}
+            choice={p.recordChoice ?? { video: true, take: false }}
+            onToggleRecord={p.onToggleRecord ?? (() => {})}
             performance={p.performance}
-            onTogglePerformance={p.onPerformance}
             onOptions={p.onRecordOptions ?? (() => {})}
           />
           <Layers p={p} report={p.layoutName === 'build'} />
@@ -487,8 +499,10 @@ export function Desk(p: DeskProps) {
             onClick={() => set(x => ({ ...x, deckCollapsed: false }))}
             className="ml-auto inline-flex h-7 shrink-0 items-center gap-2 rounded-md px-2.5 text-[12px] text-muted hover:bg-hover hover:text-text"
             data-testid="deck-show"
+            title="Show the deck (⌥D)"
+            aria-keyshortcuts="Alt+D"
           >
-            Show deck <span className="font-mono text-[11px] text-faint">⌥D</span>
+            Show deck
           </button>
         </div>
       ) : (
@@ -526,19 +540,29 @@ export function Desk(p: DeskProps) {
       <footer className="col-[1/-1] flex items-center justify-between gap-3 border-t border-border px-3 font-mono text-[11px] text-dim">
         <span className="flex min-w-0 items-center gap-3 truncate">
           {p.onOpenAccount && (
+            // Signed out, the one place on the desk that lets you back in says so,
+            // lit, rather than "Profile" over nothing (the owner, 2026-10-24).
             <button
               type="button"
               data-cg-account-open=""
+              data-cg-account-signin={signedOut ? '' : undefined}
+              data-cg-tier={getEffectiveTier()}
               onClick={p.onOpenAccount}
-              className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/15 px-2.5 font-sans text-[11px] font-semibold text-amber-100 transition-colors hover:border-amber-400/70 hover:bg-amber-500/25"
-              title="Profile, Settings & Store"
-              aria-label="Account"
+              className={`inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 font-sans text-[11px] font-medium transition-colors ${
+                signedOut
+                  ? 'bg-primary text-on-primary hover:opacity-90'
+                  : 'border border-border-strong bg-elevated text-text-2 hover:bg-hover hover:text-text'
+              }`}
+              title={signedOut ? 'Sign in' : 'Account, licence and store'}
+              aria-label={signedOut ? 'Sign in' : 'Account'}
             >
-              <User size={12} className="shrink-0 text-amber-300" />
-              <span>Profile &amp; Store</span>
-              <span className="rounded bg-amber-500/25 px-1 py-px font-mono text-[9px] uppercase tracking-wider text-amber-200">
-                {getEffectiveTier()}
-              </span>
+              {signedOut ? <LogIn size={12} className="shrink-0" /> : <User size={12} className="shrink-0 text-muted" />}
+              <span>{signedOut ? 'Sign in' : 'Account'}</span>
+              {!signedOut && (
+                <span className="rounded-sm bg-accent-bg px-1 py-px font-mono text-[9px] uppercase tracking-wider text-accent-text">
+                  {getEffectiveTier()}
+                </span>
+              )}
             </button>
           )}
           <span className="truncate" data-testid="status-hearing">
@@ -685,7 +709,7 @@ function Layers({ p, report }: { p: DeskProps; report: boolean }) {
               style={{ height: 28 }}
               data-testid={`layer-segmented-${i}`}
               className={`inline-flex items-center gap-1.5 rounded-sm px-2 text-[13px] font-medium transition-colors duration-[120ms] 2xl:gap-2 2xl:px-3 ${
-                p.layer === i ? 'bg-active text-text' : 'text-muted hover:text-text-2'
+                p.layer === i ? 'bg-lit text-on-lit' : 'text-muted hover:bg-hover hover:text-text-2'
               }`}
               title={rep ? `Layer ${i + 1} — ${Math.round(rep.fill * 100)}% full` : `Layer ${i + 1}`}
             >

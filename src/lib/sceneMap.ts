@@ -118,14 +118,14 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
 export const PER_LAYER: ReadonlySet<string> = new Set([
   'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
   'blobSurfaceTension', 'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'damping', 'diffusionRate',
-  'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
+  'dimmer', 'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
   'plateCurve', 'plateSpring', 'depthDrag',
   // Whether the plate is a thin gap, and its liquid's thickness (PLAN §18a).
   'thinGap', 'gapThickness',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
-  'vorticityConfinement', 'oilTension', 'oilBodies', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
+  'vorticityConfinement', 'oilTension', 'oilBodies', 'filmHold', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
   // The clear film (PLAN §20b): the front plate's solver lays it; a back
   // plate is handed 0 until the display can draw one there (20b-5).
   'clearFilm',
@@ -173,6 +173,7 @@ export interface PatchContext {
 }
 
 const sourceOf = (m: SceneMapping): PatchSource => m.source ?? 'room';
+type SettingCord = SceneMapping & { setting: keyof VisualizerSettings };
 const NAMED: ReadonlySet<string> = new Set(SOURCE_NAMES);
 const layerOf = (m: SceneMapping): number | 'all' => m.layer ?? 'all';
 
@@ -221,6 +222,22 @@ function liveValue(
   if (now - reading.at > ROOM_STALE_MS) return null;
   return { value: getSceneValue(reading, feature as SceneFeature), impact };
 }
+
+/**
+ * One cord's reading this frame times its source's master, or null when the
+ * source has nothing to say: what the fold below rides a setting by, for a
+ * cord aimed at an area (lib/areaCords.ts), which is a hand in one place
+ * rather than a setting and so is not folded here.
+ */
+export function cordReading(ctx: PatchContext, m: SceneMapping, now: number = performance.now()): number | null {
+  if (!m || m.feature === 'none') return null;
+  const got = liveValue(ctx, sourceOf(m), m.feature, now);
+  return got ? got.value * got.impact : null;
+}
+
+/** A cord the fold rides: aimed at a setting, not at an area (`AreaTarget`s are not settings). */
+const onSetting = (m: SceneMapping): m is SceneMapping & { setting: keyof VisualizerSettings } =>
+  m.area === undefined && !!SETTING_TRAVEL[m.setting as keyof VisualizerSettings];
 
 /**
  * The patch bay, folded.
@@ -288,12 +305,13 @@ export class PatchBay {
 
     // One pass to find what is actually live, so a patch list with nothing
     // plugged in on the other end costs a walk and no copying.
-    const live: { m: SceneMapping; value: number; impact: number }[] = [];
+    const live: { m: SettingCord; value: number; impact: number }[] = [];
     let anyGlobal = false;
     const touched = new Set<number>();
     for (const m of maps) {
       if (!m || m.feature === 'none' || !m.depth) continue;
-      if (!SETTING_TRAVEL[m.setting]) continue;
+      // A cord aimed at an area is a hand there (lib/areaCords.ts), not a setting.
+      if (!onSetting(m)) continue;
       const got = liveValue(ctx, sourceOf(m), m.feature, now);
       if (!got) continue;
       const where = layerOf(m);
@@ -350,7 +368,7 @@ export class PatchBay {
    * Only what was aimed at `where`, so a setting no patch here touched is left
    * exactly as the look has it.
    */
-  private land(into: VisualizerSettings, live: { m: SceneMapping }[], where: number | 'all'): void {
+  private land(into: VisualizerSettings, live: { m: SettingCord }[], where: number | 'all'): void {
     for (const l of live) {
       if (layerOf(l.m) !== where) continue;
       const travel = SETTING_TRAVEL[l.m.setting];
@@ -372,7 +390,7 @@ export class PatchBay {
    */
   private ride(
     into: VisualizerSettings,
-    l: { m: SceneMapping; value: number; impact: number },
+    l: { m: SettingCord; value: number; impact: number },
   ): void {
     const travel = SETTING_TRAVEL[l.m.setting]!;
     const current = into[l.m.setting];

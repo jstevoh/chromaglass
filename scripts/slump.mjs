@@ -57,6 +57,27 @@
  *      and the cap are both worked out from the cell's size in metres)
  *  11. the slump makes and loses no dye: the water drop's total over 30 s
  *      is what it was to within 0.1%
+ *  12. a deep heavy pool on a fine plate stays a pool: the dye's cap (6) laid
+ *      3% of the plate across, coloured water in oil's density (Dye Weight
+ *      1), on a 768² plate for 2 s. Its total holds to 0.1%, its peak never
+ *      rises over what was laid, no cell goes below zero, and no checkerboard
+ *      grows (the share of the dye on the plate's finest alternating pattern,
+ *      |Σ(−1)^(x+y) a| / Σ a, stays under 0.1%; a round pool laid on the grid
+ *      reads about 1e-9 there, so only a checkerboard moves it)
+ *  13. and the same on a 1024² plate
+ *
+ * 12 and 13 are here because the drop in 1 to 11 is too shallow and too
+ * coarse to find what the review of #371 (2026-10-24) found: the slump is
+ * an explicit step, stable only while each face moves at most about a
+ * quarter of the difference across it, and a cell's rate goes as the pool's
+ * depth cubed and as one over the cell's width squared. With that bound
+ * taken off the face and the substeps still capped, this pool at 768² went
+ * from a total of 5003 to 25174 in 36 frames, every cell at the cap in a
+ * checkerboard; on main it holds 5003.56 to the last digit and its peak falls
+ * 6.0 → 1.9 in 2 s. A finer plate is the harder case (narrower cells), so
+ * 1024², which Pro offers (PLAN 23.17), is measured as well as 768².
+ * `npm run slump -- --deep` runs 12 and 13 alone (about ten minutes on
+ * software WebGPU, seconds on Metal).
  *
  * Not covered here: the oil's share (a cell of oil holds no current) and a
  * step other than 1/60 s.
@@ -113,6 +134,64 @@ async function drop(times, over, white = false, N = 256) {
   }, { N, times, over, white });
 }
 
+/**
+ * Checks 12 and 13: the dye's cap laid in a pool on an N² plate, stepped to
+ * frames 1, 6, 36 and 120 with Dye Weight 1. Each reading is the pool's
+ * least and greatest cell, its total and its share on the checkerboard.
+ */
+async function deepPool(N) {
+  return page.evaluate(async ({ N }) => {
+    await lab.create(N, N);
+    lab.dye(0.5, 0.5, 0.03, lab.dyeOf([0, 0.3, 0.9]), 6);
+    lab.flush();
+    const read = async (frame) => {
+      const f = await lab.field('dye');
+      let least = Infinity, most = -Infinity, total = 0, alternating = 0;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const a = f[(y * N + x) * 4 + 3];
+        least = Math.min(least, a); most = Math.max(most, a); total += a;
+        alternating += (x + y) & 1 ? -a : a;
+      }
+      return { frame, least, most, total, checker: Math.abs(alternating) / total };
+    };
+    const rows = [await read(0)];
+    let frame = 0;
+    for (const n of [1, 5, 30, 84]) {
+      await lab.step(n, { diff: 0, gridDamp: 0, thinGap: 1, gapThickness: 0, solutalBuoyancy: 1 });
+      frame += n;
+      rows.push(await read(frame));
+    }
+    return rows;
+  }, { N });
+}
+
+function reportDeep(label, N, rows) {
+  const [laid] = rows;
+  // A stable step cannot raise a peak; the 0.005 is one rounding step of a
+  // half-float dye at 6 (0.004), where a pool going unstable rises by units.
+  const kept = rows.every((r) => Math.abs(r.total / laid.total - 1) <= 0.001);
+  const fell = rows.every((r) => r.most <= laid.most + 0.005);
+  const above = rows.every((r) => r.least >= 0);
+  const smooth = rows.every((r) => r.checker < 0.001);
+  console.log(`  deep pool ${N}²: ${rows.map((r) => `frame ${r.frame} peak ${r.most.toFixed(3)} least ${r.least.toFixed(4)} total ${r.total.toFixed(2)} checker ${r.checker.toExponential(1)}`).join(' | ')}`);
+  const last = rows[rows.length - 1];
+  report(`${label}. a deep heavy pool on a ${N}² plate stays a pool: no dye made, no peak rising, no checkerboard`,
+    kept && fell && above && smooth,
+    `total ${laid.total.toFixed(2)} → ${last.total.toFixed(2)} (worst ×${Math.max(...rows.map((r) => r.total / laid.total)).toFixed(4)}), `
+      + `peak ${laid.most.toFixed(3)} → ${last.most.toFixed(3)} (highest ${Math.max(...rows.map((r) => r.most)).toFixed(3)}), `
+      + `least ${Math.min(...rows.map((r) => r.least)).toFixed(4)}, checker at most ${Math.max(...rows.map((r) => r.checker)).toExponential(1)}`);
+}
+
+if (process.argv.includes('--deep')) {
+  const d768 = await deepPool(768);
+  const d1024 = await deepPool(1024);
+  await close();
+  reportDeep('12', 768, d768);
+  reportDeep('13', 1024, d1024);
+  console.log(failed.length ? `\n${failed.length} failed` : '\nall passed');
+  process.exit(failed.length ? 1 : 0);
+}
+
 const nu = (thickness) => page.evaluate((x) => lab.thinGapViscosity(x), thickness);
 const huppert = (gPrime, V, nuv, t) => 0.894 * Math.pow(gPrime * V ** 3 / (3 * nuv), 1 / 8) * Math.pow(t, 1 / 8) * 1000;
 const at = (rows, T) => rows.find((r) => r.T === T);
@@ -131,6 +210,8 @@ const clear = await drop([0, 10], { gapThickness: 0, solutalBuoyancy: 0 }, true)
 // physics from Gaussian blurring.
 const blur = await drop([0, 5, 30], { gapThickness: 1, solutalBuoyancy: 0, diff: 8.5 });
 const fine = await drop([0, 20], { gapThickness: 0, solutalBuoyancy: 0 }, false, 512);
+const d768 = await deepPool(768);
+const d1024 = await deepPool(1024);
 const nuWater = await nu(0), nuSyrup = await nu(1);
 const dyeLayer = await page.evaluate(() => lab.dyeLayer);
 await close();
@@ -215,6 +296,9 @@ report('10. the plate\'s resolution does not set the answer', Math.abs(res - 1) 
 const kept = w30.total / water[0].total;
 report('11. the slump makes and loses no dye', Math.abs(kept - 1) <= 0.001,
   `the water drop's total ${water[0].total.toFixed(2)} at 0 s, ${w30.total.toFixed(2)} at 30 s (×${kept.toFixed(5)})`);
+
+reportDeep('12', 768, d768);
+reportDeep('13', 1024, d1024);
 
 console.log(failed.length ? `\n${failed.length} failed` : '\nall passed');
 process.exit(failed.length ? 1 : 0);

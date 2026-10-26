@@ -52,6 +52,14 @@ import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
 import { helpFor, CONTROL_HELP } from '../src/lib/controlHelp.ts';
 import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
+import { HALOGEN_KELVIN, LAMP_WARMTH_MAX, LEGACY_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, kelvinLabel, lampTint, warmthKelvin } from '../src/lib/lampKelvin.ts';
+import { dripFallSeconds, FALL_THIN_S } from '../src/lib/dripPace.ts';
+import { THICK_NU, WATER_NU } from '../src/lib/turntable.ts';
+import { dyeRoomOf } from '../src/lib/dyeTarget.ts';
+import { FULL_CM, HUB_CM, TAPE_CM_PER_S, TAPE_SECONDS, reelsAt } from '../src/lib/tapeReels.ts';
+import { VU_FULL, needleAtRest, needleDeg, stepNeedle } from '../src/lib/vuMeter.ts';
+import { MAX_DOTS, strobeOf } from '../src/lib/strobeRing.ts';
+import { MOUNT_MM, NOTCH_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_H_MM, WINDOW_W, WINDOW_W_MM, stepOf, trayDeg } from '../src/lib/slideTray.ts';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
@@ -383,12 +391,15 @@ check('searching for what you came for finds it', misses.length === 0, misses.jo
 const onWall = PINNABLE.filter(s => s.section === 'projectors');
 check('the wall holds the wall and nothing a fader can reach', onWall.length === 0,
   onWall.map(s => s.label).join(', '));
-const LAMP = ['lumia', 'chemistry', 'gelWheel', 'gelSpeed', 'lampWarmth', 'exposure'];
+const LAMP = ['lumia', 'gelWheel', 'gelSpeed', 'lampWarmth', 'exposure'];
 check('the look effects live with the lamp',
   LAMP.every(k => PIN_RANGE.get(k)?.section === 'lamp'),
   LAMP.filter(k => PIN_RANGE.get(k)?.section !== 'lamp').map(k => `${k} → ${PIN_RANGE.get(k)?.section}`).join(', '));
+check('and the lamp holds the optics of the dye it shines through, not the reactions that were in it (PLAN 35c)',
+  ['thicknessOptics', 'spectralOptics', 'transmission'].every(k => PIN_RANGE.get(k)?.section === 'lamp')
+  && ['chemistry', 'chemistryPattern', 'chemistryWidth', 'turingPrint', 'turingInk', 'turingDrift'].every(k => PIN_RANGE.get(k)?.section === 'reactions'));
 check('and the film is an input of its own',
-  SECTION_BY_ID.get('film')?.category === 'inputs'
+  SECTION_BY_ID.get('film')?.category === 'feed'
   && ['filmMix', 'filmKey', 'filmDrive'].every(k => PIN_RANGE.get(k)?.section === 'film'));
 // ── The patch bay ───────────────────────────────────────────────────
 /*
@@ -402,18 +413,47 @@ check('and the film is an input of its own',
   flat list of eighty.
 */
 const MASTERS = ['sceneImpact', 'filmImpact', 'soundImpact', 'shapeImpact'];
-check('every master sits with the patch bay',
-  MASTERS.every(k => PIN_RANGE.get(k)?.section === 'patches'),
-  MASTERS.filter(k => PIN_RANGE.get(k)?.section !== 'patches').map(k => `${k} → ${PIN_RANGE.get(k)?.section ?? 'nowhere'}`).join(', '));
+/*
+  The masters were gathered under the bay on purpose (above), and the owner
+  then found two strengths for one input in two sections: Room Drive in The
+  Room and Room Impact in Patches, likewise for the film and the sound (PLAN
+  35c-2, one Strength per input). Each master sits with the Drive of its own
+  source now; the shapes have no input section, so theirs stays at the bay.
+*/
+const MASTER_HOME = { sceneImpact: 'room', filmImpact: 'film', soundImpact: 'audio-input', shapeImpact: 'patches' };
+const DRIVE_OF = { sceneImpact: 'sceneDrive', filmImpact: 'filmDrive', soundImpact: 'audioImpact' };
+check('every master sits with its source: the three that have a Drive beside it, the shapes at the bay',
+  MASTERS.every(k => PIN_RANGE.get(k)?.section === MASTER_HOME[k]),
+  MASTERS.filter(k => PIN_RANGE.get(k)?.section !== MASTER_HOME[k]).map(k => `${k} → ${PIN_RANGE.get(k)?.section ?? 'nowhere'}`).join(', '));
+check('and a Drive and the master of the same source are filed in one section',
+  Object.entries(DRIVE_OF).every(([m, d]) => PIN_RANGE.get(m)?.section === PIN_RANGE.get(d)?.section),
+  Object.entries(DRIVE_OF).filter(([m, d]) => PIN_RANGE.get(m)?.section !== PIN_RANGE.get(d)?.section).map(([m, d]) => `${m} ≠ ${d}`).join(', '));
 /** The markup of one section, from its opening tag to the next `</section>`. */
 const sectionSource = (id) => {
   const at = panel.indexOf(`data-section="${id}"`);
   return at < 0 ? '' : panel.slice(at, panel.indexOf('</section>', at));
 };
+/*
+  Squish Plate was forty controls in one section, and the desk's panel for the
+  same section was a different forty: thirty of the pins said 'physics' while
+  the sheet drew them under Squish Plate, so the Fluid Physics knobs were the
+  glass's, the oil's and the magnet's. Five sections now (PLAN 35c), and the
+  check is the one that would have caught it: a section's markup draws exactly
+  the sliders the registry files under it. Asked of the five that split, of the
+  lamp (which took two) and of Fluid Physics (which gave up three and kept the
+  rest).
+*/
+for (const id of ['squish', 'oil', 'ferro', 'reactions', 'tilt', 'spin', 'lamp', 'physics', 'room', 'film', 'audio-input']) {
+  const drawn = [...sectionSource(id).matchAll(/settingKey="(\w+)"/g)].map(m => m[1]).sort();
+  const filed = PINNABLE.filter(s => s.section === id).map(s => String(s.key)).sort();
+  const strays = [...drawn.filter(k => !filed.includes(k)).map(k => `${k} drawn, filed elsewhere`),
+    ...filed.filter(k => !drawn.includes(k)).map(k => `${k} filed, drawn elsewhere`)];
+  check(`${id}: the sliders it draws are the ones the registry files under it`, drawn.length > 0 && strays.length === 0, strays.join(', '));
+}
 const bay = sectionSource('patches');
 check('and the bay is drawn there, not in The Room',
   bay.includes('data-testid="scene-map-add"') && !sectionSource('room').includes('scene-map-add')
-  && MASTERS.every(k => bay.includes(`settingKey="${k}"`)));
+  && bay.includes('settingKey="shapeImpact"') && !MASTERS.filter(k => k !== 'shapeImpact').some(k => bay.includes(`settingKey="${k}"`)));
 check('no source can ride a master',
   !PATCH_TARGETS.some(t => MASTERS.includes(String(t.key))),
   PATCH_TARGETS.filter(t => MASTERS.includes(String(t.key))).map(t => t.label).join(', '));
@@ -717,14 +757,16 @@ check('and nothing the solver reads is left off the list', missed.length === 0,
 // pass because neither branch existed. So the source is read instead, which is
 // a check that can actually fail.
 const midiPanel = readFileSync(join(root, 'src/components/MidiPanel.tsx'), 'utf8');
-for (const [where, src, id] of [
-  ['the MIDI panel', midiPanel, 'midi-auto-start'],
-  ['the settings section', panel, 'settings-midi-auto'],
-]) {
-  check(`${where} offers auto-map`, src.includes(id), src.includes(id) ? '' : `no ${id}`);
-}
-check('and both can be stopped once started',
-  midiPanel.includes('midi-auto-cancel') && panel.includes('settings-midi-auto-cancel'));
+// One home (PLAN 35c-3): the section turns MIDI on, picks the ports and auto-maps; the sheet teaches
+// and says the state. So auto-map and its cancel are the section's, and the sheet must not draw
+// a second copy of the switch or the map chips.
+check('the settings section offers auto-map', panel.includes('settings-midi-auto'));
+check('and it can be stopped once started', panel.includes('settings-midi-auto-cancel'));
+check('and the settings section has the switch, the ports in and out, and the factory maps',
+  ['settings-midi-enable', 'settings-midi-input', 'settings-midi-output', 'settings-midi-factory-'].every(id => panel.includes(id)));
+check('the MIDI panel sends the setup there instead of drawing it again',
+  midiPanel.includes('midi-setup-open') && midiPanel.includes('midi-state')
+  && !['midi-enable', 'midi-auto-start', 'midi-factory-', 'midi-input', 'midi-output'].some(id => midiPanel.includes(`"${id}`) || midiPanel.includes(`\`${id}`)));
 // A watcher that swallows every message and is never turned off is a
 // controller that has stopped working, with nothing on screen to say why.
 const hook = readFileSync(join(root, 'src/hooks/useMidi.ts'), 'utf8');
@@ -985,8 +1027,12 @@ for (const [dot, handler] of [['sound', 'onSound'], ['video', 'onVideo'], ['midi
     || new RegExp(`onClick=\\{${handler}\\}[\\s\\S]{0,240}dot-${dot}`).test(header));
 }
 // And the place the mic dot opens has to be able to change the mic.
-check('and the Sound section can choose the source, not just the device',
-  panel.includes('testId="audio-source"') && panel.includes('data-testid="audio-input"'));
+check('and the Sound section names the source and leads to the sheet that chooses it, with the device beside',
+  panel.includes('data-testid="audio-source-state"') && panel.includes('data-testid="audio-source-open"')
+  && panel.includes('data-testid="audio-input"'));
+// One home each (PLAN 35c-3): the switch is drawn once, not in the section and the sheet both.
+check('and the source is chosen in the Sound sheet alone',
+  !panel.includes('testId="audio-source"') && readFileSync(join(root, 'src/components/SoundPanel.tsx'), 'utf8').includes('sound-source-${s.id}'));
 check('and the sections the dots aim at exist',
   ['audio-input', 'projectors'].every(id => SECTION_BY_ID.has(id)));
 
@@ -1800,6 +1846,255 @@ check('and neither starts over the limit',
   for (const [s, l] of lines) same.set(l, [...(same.get(l) ?? []), s.label]);
   const dup = [...same.values()].filter(v => v.length > 1);
   check('and no two controls share a line', dup.length === 0, dup.map(v => v.join(' = ')).join('; ') || 'all different');
+}
+
+
+// ── The small machines inside controls (PLAN 35e) ────────────────────
+//
+// Three drawings that claim to be readings, not decoration: the bulb says a
+// temperature, the drop falls at a pace, the bottle stands at a level. Each is
+// held to the number it says, so a drawing that drifted from the thing it
+// reads fails here and not in a screenshot.
+{
+  const plateWgsl = readFileSync(join(root, 'src/gpu/wgsl/plate.ts'), 'utf8');
+  const ui = readFileSync(join(root, 'src/components/ui/Playful.tsx'), 'utf8');
+  const css = readFileSync(join(root, 'src/index.css'), 'utf8');
+  const deskPanels = readFileSync(join(root, 'src/components/desk/DeskPanels.tsx'), 'utf8');
+  const phoneStage = readFileSync(join(root, 'src/components/phone/PhoneStage.tsx'), 'utf8');
+
+  // Lamp Warmth in kelvin (PLAN 35e-2): the plate multiplies by the blackbody's colour at the temperature
+  // the slider names, so the shader has to take that tint from the uniforms the packer fills from the library.
+  const uniformsSrc = readFileSync(join(root, 'src/gpu/plateUniforms.ts'), 'utf8');
+  check("the plate's shader multiplies by the lamp's tint from the uniforms, and the packer fills them from lampTint",
+    /vec3f\(U\.lampTintR, U\.lampTintG, U\.lampTintB\)/.test(plateWgsl) &&
+    /const tint = lampTint\(warmth\);[\s\S]{0,200}'lampTintR', tint\[0\][\s\S]{0,60}'lampTintG', tint\[1\][\s\S]{0,60}'lampTintB', tint\[2\]/.test(uniformsSrc),
+    'plate.ts lamp line and plateUniforms.ts');
+
+  const steps = Array.from({ length: 76 }, (_, i) => i * LAMP_WARMTH_MAX / 75);
+  const kel = steps.map(warmthKelvin);
+  check('Lamp Warmth 0 is the neutral, every notch is warmer, and the top is the halogen\'s 3200 K',
+    kel[0] === NEUTRAL_KELVIN && kel.every((k, i) => i === 0 || k < kel[i - 1]) && Math.abs(kel[75] - HALOGEN_KELVIN) < 1e-6 && kelvinLabel(LAMP_WARMTH_MAX) === '3200 K',
+    `0 → ${kelvinLabel(0)}, 1 → ${kelvinLabel(1)}, 2 → ${kelvinLabel(2)}, ${LAMP_WARMTH_MAX} → ${kelvinLabel(LAMP_WARMTH_MAX)}`);
+  const mired = steps.map(w => 1e6 / warmthKelvin(w));
+  const dm = mired.slice(1).map((m, i) => m - mired[i]);
+  check('the slider moves in even steps of mired, the unit colour temperature is stepped in',
+    Math.max(...dm) - Math.min(...dm) < 1e-9, `${dm[0].toFixed(3)} mired a notch, spread ${(Math.max(...dm) - Math.min(...dm)).toExponential(1)}`);
+  // The blackbody it names has the tint's own colour ratios (a reading of what the shader does, not a label).
+  let worstBlackbody = 0;
+  for (const w of steps) {
+    const t = lampTint(w), sh = blackbodyShift(warmthKelvin(w));
+    worstBlackbody = Math.max(worstBlackbody, Math.abs(t[2] / t[0] / (sh[2] / sh[0]) - 1), Math.abs(t[1] / t[0] / (sh[1] / sh[0]) - 1));
+  }
+  check('the tint is the blackbody\'s blue and green over red at the temperature named, over the whole travel',
+    worstBlackbody < 1e-9, `worst ${worstBlackbody.toExponential(1)} over ${steps.length} notches`);
+  // Saved looks hold numbers from before the widening: 0 to 1 must stay the colour it was.
+  let worstLegacy = 0;
+  for (let i = 0; i <= 20; i++) {
+    const w = i / 20, t = lampTint(w);
+    for (let c = 0; c < 3; c++) worstLegacy = Math.max(worstLegacy, Math.abs(t[c] / (1 + (LEGACY_GRADE[c] - 1) * w) - 1));
+  }
+  check('from 0 to 1 the tint is the old grade to 1.5% a channel, so every saved look keeps its colour',
+    worstLegacy < 0.015, `worst ${(worstLegacy * 100).toFixed(2)}% over 21 notches`);
+  // The vignette blends as it always did (1 - w + w*g*vig), not tint times a second blend: the review found 6% in the corners.
+  const shaderForm = /tint - \(tint - vec3f\(1\.0 - min\(U\.lampWarmth, 1\.0\)\)\) \* \(1\.0 - vig\)/.test(plateWgsl);
+  let worstCorner = 0;
+  for (let i = 0; i <= 20; i++) for (const vig of [0.55, 0.8, 1]) {
+    const w = i / 20, t = lampTint(w);
+    for (let c = 0; c < 3; c++) {
+      const now = t[c] - (t[c] - (1 - Math.min(w, 1))) * (1 - vig), was = 1 - w + w * LEGACY_GRADE[c] * vig;
+      worstCorner = Math.max(worstCorner, Math.abs(now / was - 1));
+    }
+  }
+  check('the vignette blends as the old grade did, to 1.5% in the corners of the dish, from 0 to 1',
+    shaderForm && worstCorner < 0.015, `shader form ${shaderForm}, worst ${(worstCorner * 100).toFixed(2)}% over 21 notches and three corner depths`);
+  const pinLamp = readFileSync(join(root, 'src/lib/deskPins.ts'), 'utf8'), settingsSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+  check('the pin range, the Settings slider (typed as the number the sheet reads) and the bulb all end at the library\'s top',
+    /key: 'lampWarmth'[^}]*max: LAMP_WARMTH_MAX/.test(pinLamp) && /settingKey="lampWarmth"/.test(settingsSrc) && Number(/label="Lamp Warmth"[\s\S]{0,160}max=\{([\d.]+)\}/.exec(settingsSrc)?.[1]) === LAMP_WARMTH_MAX &&
+    /<Bulb warmth=\{at \* LAMP_WARMTH_MAX\}/.test(readFileSync(join(root, 'src/components/ui/Pace.tsx'), 'utf8')));
+  const hot = blackbodyHex(9000), warm = blackbodyHex(1900), halo = blackbodyHex(3200);
+  const ch = (h, i) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
+  check('the filament is amber when cool and bluer when hot, from the blackbody and not a table',
+    ch(warm, 0) === 255 && ch(warm, 2) < 40 && ch(halo, 2) > ch(warm, 2) && ch(hot, 2) === 255 && ch(hot, 0) < 255,
+    `1900 K ${warm}, 3200 K ${halo}, 9000 K ${hot}`);
+
+  // Viscosity: the drop's fall is the carrier's viscosity over water's, the solver's own numbers.
+  const ratio = dripFallSeconds(THICK_NU) / dripFallSeconds(WATER_NU);
+  check('thick takes as many times longer to let go as the solver\'s thick is thicker than thin',
+    Math.abs(ratio - THICK_NU / WATER_NU) < 1e-9 && dripFallSeconds(WATER_NU) === FALL_THIN_S,
+    `${dripFallSeconds(WATER_NU)} s thin, ${dripFallSeconds(THICK_NU)} s thick, ratio ${ratio}`);
+  check('the Viscosity buttons draw that drop, timed by it, and the stylesheet plays it from the same number',
+    /<ViscosityDrip mode=\{v\} \/>/.test(panel) && /dripFallFor\(mode\)/.test(ui) && /'--fall': `\$\{fall\}s`/.test(ui) && /animation: cg-drip-fall var\(--fall\)/.test(css));
+
+  // The bottle: a share of the budget that is left, from the number the regulator holds the plate to.
+  check('the bottle is full on an empty plate, half at half the target, empty at it, and never past either',
+    dyeRoomOf(0, 0.85) === 1 && Math.abs(dyeRoomOf(0.425, 0.85) - 0.5) < 1e-12 && dyeRoomOf(0.85, 0.85) === 0 &&
+    dyeRoomOf(3, 0.85) === 0 && dyeRoomOf(NaN, 0.85) === 1);
+  check('the visualizer answers it from the regulator\'s own target and the closeup\'s, and the desk and phone ask for it',
+    /dyeRoom: \(\) => \{[\s\S]{0,420}dyeLookTarget\(f\.seedMean, st\.dyeBudget \?\? 0\.85, f\.seedBudget\)[\s\S]{0,200}macroAmountOf\(st\)/.test(panel0) &&
+    (panel0app.match(/dyeRoom=\{readDyeRoom\}/g) ?? []).length === 2);
+  check('the bottle in hand is the one that leans and reads the level; the others stand full',
+    /p\.bottleId === l\.id\s*\?\s*<LiveBottle[\s\S]{0,160}read=\{p\.dyeRoom\}[\s\S]{0,80}<Bottle[^>]*level=\{1\}/.test(deskPanels) &&
+    /on\s*\?\s*<LiveBottle[\s\S]{0,160}read=\{p\.dyeRoom\}[\s\S]{0,200}<Bottle[^>]*level=\{1\}/.test(phoneStage) &&
+    /<LiveBottle[^>]*read=\{p\.dyeRoom\}[^>]*tipped=\{sheet === 'dye'\}/.test(phoneStage));
+
+  // Motion stays in the control and stops for anyone who asked it to.
+  const rm = css.match(/@media \(prefers-reduced-motion: reduce\) \{[^}]*\.cg-tip \{ transition: none; \}[^}]*animation: none !important;/);
+  check('under reduced motion the bottle does not lean and the drop does not fall', !!rm);
+}
+
+// ── Show hardware: reels, tap pad, VU, lens cap, strobe ring (PLAN 35f) ──
+//
+// Five drawings that say a number: a reel's turn rate is the tape's speed over
+// its radius, a VU needle rises in 300 ms, a strobe ring stands still when the
+// dish turns one dot a beat. Each is held to the physics it names, and each
+// picture is checked to be on the control it belongs to, desk and phone.
+{
+  const read = (f) => readFileSync(join(root, f), 'utf8');
+  const ui = read('src/components/ui/Playful.tsx');
+  const css = read('src/index.css');
+  const recordSrc = read('src/components/desk/RecordControls.tsx');
+  const playSrc = read('src/components/phone/PhonePlay.tsx');
+  const stageSrc = read('src/components/phone/PhoneStage.tsx');
+  const soundSrc = read('src/components/SoundPanel.tsx');
+  const deskSrc = read('src/components/desk/Desk.tsx');
+  const drawSrc = read('src/components/DrawScreen.tsx');
+  const remoteSrc = read('src/components/RemoteControl.tsx');
+
+  // Tape: constant speed, so omega r is the tape's speed at every moment of the take, and the tape on the two reels is one tape.
+  let worstV = 0, worstArea = 0;
+  for (let t = 0; t <= TAPE_SECONDS; t += 15) {
+    const r = reelsAt(t);
+    worstV = Math.max(worstV, Math.abs(r.supplyOmega * r.supplyR / TAPE_CM_PER_S - 1), Math.abs(r.takeupOmega * r.takeupR / TAPE_CM_PER_S - 1));
+    worstArea = Math.max(worstArea, Math.abs((r.supplyR ** 2 + r.takeupR ** 2) / (FULL_CM ** 2 + HUB_CM ** 2) - 1));
+  }
+  check('each reel turns at the tape\'s speed over its radius, and the two packs hold one tape between them',
+    worstV < 1e-9 && worstArea < 1e-9, `omega r off the tape speed by ${worstV.toExponential(1)}, pack area off by ${worstArea.toExponential(1)}`);
+  const r0 = reelsAt(0), rEnd = reelsAt(TAPE_SECONDS);
+  check('a take starts with the left reel full and slow and the right bare and quick, and ends the other way',
+    Math.abs(r0.supplyR - FULL_CM) < 1e-9 && Math.abs(r0.takeupR - HUB_CM) < 1e-9 && r0.takeupOmega / r0.supplyOmega > 2 &&
+    Math.abs(rEnd.takeupR - FULL_CM) < 1e-9 && Math.abs(rEnd.supplyR - HUB_CM) < 1e-9,
+    `start ${r0.supplyOmega.toFixed(2)} and ${r0.takeupOmega.toFixed(2)} rad/s, end ${rEnd.supplyOmega.toFixed(2)} and ${rEnd.takeupOmega.toFixed(2)}`);
+  // The closed-form angle against a plain numeric integral of omega, across the end of the tape too.
+  let worstAng = 0;
+  for (const T of [30, 300, 600, 900]) {
+    let sup = 0, tak = 0;
+    const dt = 0.01;
+    for (let t = 0; t < T; t += dt) { const r = reelsAt(t + dt / 2); sup += r.supplyOmega * dt; tak += r.takeupOmega * dt; }
+    const r = reelsAt(T);
+    worstAng = Math.max(worstAng, Math.abs(r.supplyDeg / (sup * 180 / Math.PI) - 1), Math.abs(r.takeupDeg / (tak * 180 / Math.PI) - 1));
+  }
+  check('the angle each reel has turned through is the integral of its turn rate, to a tenth of a percent',
+    worstAng < 1e-3, `worst ${(worstAng * 100).toFixed(4)}% at 30, 300, 600 and 900 s`);
+
+  // VU: 99% of a steady tone in 300 ms, a touch of overshoot, back to its stop when the sound goes.
+  {
+    let n = needleAtRest(), t = 0, peak = 0, rose = -1;
+    const dt = 1 / 240;
+    for (; t < 2; t += dt) { n = stepNeedle(n, VU_FULL, dt); peak = Math.max(peak, n.x); if (rose < 0 && n.x >= 0.99) rose = t + dt; }
+    check('the needle reaches 99% of a steady tone in 300 ms and overshoots it by 1 to 1.5%',
+      Math.abs(rose - 0.3) < 0.01 && peak > 1.01 && peak < 1.015, `reaches 99% in ${(rose * 1000).toFixed(0)} ms, overshoot ${((peak - 1) * 100).toFixed(2)}%`);
+    let w = needleAtRest(), coarse = 0;
+    for (let u = 0; u < 1; u += 1 / 5) { w = stepNeedle(w, VU_FULL, 1 / 5); coarse = w.x; }
+    check('and the answer does not depend on the frame: five frames a second land where 240 do', Math.abs(coarse - stepNeedle(needleAtRest(), VU_FULL, 1).x) < 1e-9 && Math.abs(coarse - n.x) < 0.02,
+      `x at 1 s ${coarse.toFixed(4)} in 5 steps`);
+    let m = { x: 1, v: 0 }, floor = 0, back = -1;
+    for (let u = 0; u < 3; u += dt) { m = stepNeedle(m, 0, dt); floor = Math.min(floor, m.x); if (back < 0 && m.x < 0.01) back = u; }
+    check('when the sound stops or the input goes deaf the needle falls back to its stop and does not go past it',
+      floor >= 0 && back > 0 && back < 1.2, `at rest after ${(back * 1000).toFixed(0)} ms, lowest ${floor.toFixed(4)}`);
+    const big = stepNeedle({ x: 0.2, v: 5 }, 90, 5);
+    check('a long frame (a tab coming back) cannot throw the needle off the dial', Number.isFinite(big.x) && big.x >= 0 && needleDeg(big.x) <= needleDeg(1.08) + 1e-9,
+      `x ${big.x.toFixed(3)}`);
+  }
+
+  // The strobe ring: still when the dish turns one dot a beat.
+  {
+    const still = [1, 2, 4, 8, 16, 32].every(b => strobeOf(2, 6, b, 120).driftDegPerS === 0 && strobeOf(2, 6, b, 120).dots === b);
+    const aliased = strobeOf(2, 6, 48, 120);
+    const rate = strobeOf(1, 12, 16, 0), fast = strobeOf(1, 45, 16, 0);
+    // 48 beats on 32 dots: 7.5 deg a beat against an 11.25 deg spacing is seen as 3.75 deg back, twice a second at 120 bpm.
+    check('in Tempo with a tempo heard the ring stands still for any beats-a-turn the ring has dots for, and creeps past that',
+      still && aliased.dots === MAX_DOTS && Math.abs(aliased.driftDegPerS + 7.5) < 1e-9,
+      `32 beats ${strobeOf(2, 6, 32, 120).driftDegPerS} deg/s, 48 beats ${aliased.driftDegPerS.toFixed(2)} deg/s`);
+    check('in Rate, and in Tempo before any tempo is heard, the ring drifts at the dish\'s speed, and Off draws it dim and still',
+      rate.driftDegPerS === 36 && fast.driftDegPerS === 36 && !rate.strobed &&
+      strobeOf(2, 3, 16, 0).driftDegPerS === 18 && strobeOf(0, 12, 16, 120).off && strobeOf(0, 12, 16, 120).driftDegPerS === 0,
+      `12 rpm ${rate.driftDegPerS}, 45 rpm ${fast.driftDegPerS} (drawn at most 36 deg/s)`);
+    check('the way round shows: a negative rate drifts the other way', strobeOf(1, -3, 16, 0).driftDegPerS === -18 && strobeOf(1, 3, 16, 0).driftDegPerS === 18);
+  }
+
+  // Where each picture is drawn.
+  check('Record shows the reels on the desk button, the phone\'s Play pill and the More tile, the phone pill in a box that does not change width',
+    /<TapeReels seconds=\{reelSeconds\}/.test(recordSrc) && /<TapeReels seconds=\{p\.recording\.seconds\}[^>]*running=\{p\.recording\.on\}/.test(playSrc) &&
+    /h-7 w-7/.test(playSrc) && /glyph=\{<TapeReels seconds=\{p\.recording\.seconds\}/.test(stageSrc));
+  check('the Play pill is red while it records: live, not lit', /testId="play-record" pressed=\{p\.recording\.on\} live>/.test(playSrc));
+  check('the tap pad is on the desk\'s Tempo row and the phone\'s Sound sheet, polled from the tempo source and not a render',
+    /<TapPad tempo=\{tempo\} read=\{readTempo\}/.test(panel) && /<TapPad tempo=\{p\.tempo\} read=\{p\.readTempo\}/.test(stageSrc) &&
+    /const readTempo = useCallback\(\(\) => tempoRef\.current\?\.read/.test(panel0app) && /readTempo=\{readTempo\}/.test(panel0app) && (panel0app.match(/readTempo=\{readTempo\}/g) ?? []).length === 2);
+  check('the VU needle is on the desk\'s Sound sheet and the phone\'s, moved by a frame loop through a ref and never by state',
+    /<VuMeter read=\{readLevel\}/.test(soundSrc) && /<VuMeter read=\{p\.readLevel\}/.test(stageSrc) &&
+    /readLevel=\{readLevel\}/.test(panel0app) &&
+    /const frame = \(now: number\) => \{[^}]*node\.style\.transform/.test(ui) && !/const frame = \(now: number\) => \{[^}]*set[A-Z]/.test(ui));
+  const blackouts = [['desk', deskSrc], ['Settings', panel], ['remote', remoteSrc], ['Draw', drawSrc]];
+  check('Blackout is one capped lens on the desk, Settings, the remote and Draw',
+    blackouts.every(([, src]) => /<LensCap capped=\{/.test(src)), blackouts.filter(([, src]) => !/<LensCap capped=\{/.test(src)).map(([n]) => n).join(', ') || 'all four');
+  check('and the remote has the one Blackout, not two', (remoteSrc.match(/data-testid="remote-blackout"/g) ?? []).length === 1);
+  check('Draw\'s Blackout is not red while the room is lit: red is for live', !/'border-live-border bg-\[rgba\(17,17,19,\.78\)\] text-live'/.test(drawSrc));
+  check('the strobe ring is on Auto Spin in Settings and on the phone\'s Spin sheet, lit by the tempo heard',
+    /<StrobeRing mode=\{settings\.spinAuto \?\? 0\}/.test(panel) && /<StrobeRing mode=\{p\.spin\.auto\}/.test(stageSrc) && /spinBpm=\{/.test(panel0app) && /bpm: tempoLabel\.source \? tempoLabel\.bpm : heardBpm/.test(panel0app));
+  check('under reduced motion the reels do not turn, the cap does not snap and the ring does not drift',
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\.cg-reel \{ transform: none !important;[^}]*\}\s*\.cg-cap, \.cg-ring \{ animation: none !important; \}/.test(css) &&
+    /matchMedia\?\.\('\(prefers-reduced-motion: reduce\)'\)/.test(ui));
+}
+
+// ── Looks as slides in a tray (PLAN 35g) ───────────────────────────────
+//
+// A look is a 35 mm slide and the stage takes one at a time from a round tray
+// that clicks one slot. Held to the real mount (2 x 2 in, a 24 x 36 mm frame
+// shown through a 22.5 x 34 mm aperture), to the changer's one slot a push
+// whatever the distance, and to every place a look is shown.
+{
+  const read = (f) => readFileSync(join(root, f), 'utf8');
+  const ui = read('src/components/ui/Playful.tsx');
+  const uiIndex = read('src/components/ui/index.tsx');
+  const css = read('src/index.css');
+  const cueSrc = read('src/components/CueBar.tsx');
+  const menuSrc = read('src/components/PresetMenu.tsx');
+  const deskPanelsSrc = read('src/components/desk/DeskPanels.tsx');
+  const playSrc = read('src/components/phone/PhonePlay.tsx');
+  const stageSrc = read('src/components/phone/PhoneStage.tsx');
+
+  check('the mount is square, its aperture is the 3:2 of a 35 mm frame and sits inside it, and one corner is clipped',
+    MOUNT_MM === 50 && Math.abs(WINDOW_W / WINDOW_H - 3 / 2) < 0.02 && WINDOW_W_MM < MOUNT_MM && WINDOW_H_MM < WINDOW_W_MM && WINDOW_W < 1 && NOTCH_MM > 0 && NOTCH_MM < MOUNT_MM / 4,
+    `${WINDOW_W_MM} x ${WINDOW_H_MM} mm in ${MOUNT_MM} mm, ratio ${(WINDOW_W / WINDOW_H).toFixed(3)}`);
+  check('the tray has whole slots round it, so a click always lands one in the gate',
+    Number.isInteger(TRAY_SLOTS) && Math.abs(SLOT_DEG * TRAY_SLOTS - 360) < 1e-9 && Math.abs(trayDeg(TRAY_SLOTS) - 360) < 1e-9, `${TRAY_SLOTS} slots, ${SLOT_DEG} deg`);
+  // The changer moves one slot a push, whatever the distance in the list, and the first look loaded is not a change.
+  const steps = [stepOf(3, 4), stepOf(4, 3), stepOf(0, 39), stepOf(39, 0), stepOf(5, 5), stepOf(null, 7), stepOf(7, null)];
+  check('a look later in the list clicks the tray forward one slot and an earlier one back one, however far, and no change or no place clicks nothing',
+    steps.join(',') === '1,-1,1,-1,0,0,0', steps.join(','));
+  // Pushes add up on the drum: +1, -1, none, +1, -1 leaves it where it started, and a slot is SLOT_DEG.
+  let drum = 0;
+  for (const [a, b] of [[0, 5], [5, 2], [2, 2], [2, 9], [9, 1]]) drum += stepOf(a, b);
+  let drum2 = 0;
+  for (const [a, b] of [[0, 5], [5, 7], [7, 9]]) drum2 += stepOf(a, b);
+  check('the drum is the sum of its pushes: out and back leaves it home, three forward leaves it three slots on',
+    drum === 0 && trayDeg(drum) === 0 && drum2 === 3 && trayDeg(drum2) === 3 * SLOT_DEG, `net ${drum}, then ${drum2}`);
+
+  check('a look is a slide on the set list rows, the cue bar, the preset menu, the performer\'s saved list and both phone surfaces',
+    /<SlideMount swatch=\{swatch\}/.test(uiIndex) && /<SlideMount swatch=\{liveSwatch\}/.test(cueSrc) && /<SlideMount swatch=\{cuedSwatch\}/.test(cueSrc) &&
+    (menuSrc.match(/<SlideMount swatch=\{swatchOf\(p\.id\)\}/g) ?? []).length === 2 && /<SlideMount swatch=\{l\.swatch\}/.test(deskPanelsSrc) &&
+    /<SlideMount swatch=\{p\.lookSwatch\}/.test(stageSrc) && /<SlideMount swatch=\{l\.swatch\}/.test(stageSrc) && /<SlideMount swatch=\{l\.swatch\} size=\{60\}/.test(playSrc));
+  check('the tray is on the cue bar and the phone\'s look button and Looks strip, each given the look\'s place in its own list',
+    /<SlideTray at=\{liveAt\}/.test(cueSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(stageSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(playSrc) &&
+    /liveAt=\{deskLookSlot\}/.test(panel0app) && (panel0app.match(/lookSlot=\{phoneLookSlot\}/g) ?? []).length === 2);
+  check('the Looks strip flicks one slide at a time: it snaps, and every slide stops it',
+    /snap-x snap-mandatory/.test(playSrc) && /snap-start snap-always/.test(playSrc));
+  const mountFn = ui.slice(ui.indexOf('export function SlideMount'), ui.indexOf('export function SlideTray'));
+  check('the film is the look\'s own palette and the mount takes no state colour: nothing lit, live or group-coloured inside SlideMount',
+    mountFn.includes('background: swatch') && !/color-lit|color-live|accent|ring-lit|group/.test(mountFn) && /MOUNT_COLOUR = '#[0-9a-f]{6}'/i.test(ui));
+  check('the tray moves only itself, from a count of pushes: no loop, no timer, and not under reduced motion',
+    !/setInterval|requestAnimationFrame/.test(ui.slice(ui.indexOf('export function SlideTray'))) &&
+    /@media \(prefers-reduced-motion: reduce\) \{[^@]*\.cg-tray \{ transform: none !important; transition: none; \}/.test(css) && /\.cg-tray \{ transition: transform 160ms/.test(css));
 }
 
 // ── Result ──────────────────────────────────────────────────────────

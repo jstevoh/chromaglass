@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ListMusic, Play, Square, Plus, Trash2, Download, FolderOpen, Save, ChevronUp, ChevronDown } from 'lucide-react';
-import { Sheet, Toggle } from './ui';
+import { Sheet, Toggle, LIT } from './ui';
 import type { SongRef } from '../lib/songRef';
 import {
   type ActionSet, type ActionWhat, type ActionWhen, type SectionKind, type SongAction, type SongLook, type SongShow,
@@ -160,10 +160,11 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
               const live = status.showId === s.id;
               return (
                 <button
+                  aria-pressed={selectedId === s.id}
                   key={s.id}
                   onClick={() => setSelectedId(s.id)}
                   className={`mb-1.5 w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                    selectedId === s.id ? 'border-white/40 bg-white/10' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                    selectedId === s.id ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
                   data-testid={`songs-item-${s.id}`}
                 >
                   <span className="block truncate text-xs font-semibold">{live ? '▶ ' : ''}{s.song.title}</span>
@@ -193,8 +194,13 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void readFile(f); e.target.value = ''; }} />
           </div>
           {fileError && <p className="mt-2 text-[10px] text-red-300" data-testid="songs-file-error">{fileError}</p>}
-          <button onClick={onOpenSequences} className="mt-3 text-left text-[10px] underline opacity-40 hover:opacity-70" data-testid="songs-open-sequences">
-            Stage sequences (the old sequencer)…
+          {/* A button like its neighbours, not a 10 px link at 40% opacity: the
+              sequencer is the other way to cue a set (a timeline of actions
+              against the clock rather than a show per song), and one that
+              cannot be seen cannot be chosen. */}
+          <button onClick={onOpenSequences} className={`${smallBtn} mt-3 w-full`} data-testid="songs-open-sequences"
+            title="Cue a set by the clock instead of by song: a timeline of actions">
+            <ListMusic size={12} /> Stage sequences…
           </button>
         </div>
 
