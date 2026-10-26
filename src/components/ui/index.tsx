@@ -7,6 +7,7 @@ import { helpFor } from '../../lib/controlHelp';
 import { useControlTip } from './ControlTip';
 import { groupOfSetting, paceOf } from '../../lib/settingsMap';
 import { Hare, PaceTrack, Snail } from './Pace';
+import { SlideMount } from './Playful';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -944,7 +945,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       className={`group flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
-      <span className="h-6 w-6 shrink-0 rounded-sm" style={{ background: swatch }} />
+      <SlideMount swatch={swatch} size={28} />
       <span className={`flex-1 truncate text-[13px] font-medium ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
       {trailing}
     </button>

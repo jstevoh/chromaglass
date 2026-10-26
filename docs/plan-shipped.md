@@ -5433,3 +5433,23 @@ header, Settings, the remote and Draw, the cap snapping on once in 140 ms and in
 Blackouts are one, the bar under the thumb. Auto Spin has a platter's strobe ring: in Rate the dots drift at
 the dish's speed, in Tempo with a tempo heard the dish turns exactly one dot a beat, so lit by the beat the
 ring stands still, up to 32 beats a turn and as a slow alias past that. Judging §81.
+
+### 35g. Looks as slides in a tray (shipped 2026-10-25)
+
+Item 12 and the last of the owner's playful-controls choice. A look is a 35 mm slide and the stage takes it
+from a round tray. The slide is drawn at a real mount's proportions (`slideTray.ts`): 50 mm square, one corner
+clipped so it can be told right way up in the dark, and a 34 by 22.5 mm aperture, the 3:2 a 24 by 36 mm
+frame shows through, with the look's own two palette colours (`swatchOf`, from its contract) on the film. The
+mount is one cardboard colour on every look and takes no state colour: lit stays the row's violet ring and
+live its red, so the picture says only "a slide". It replaces the flat swatch on the set list rows (`CueRow`),
+the cue bar (the look on stage, and the cued one behind the arrow), every row of the preset menu (new: it had
+none), the performer's saved list, the phone's look button and Looks sheet, and the Play screen's Looks strip.
+The strip is now a tray you flick: a mount a tile, snapping one slide at a time (`snap-mandatory`,
+`snap-always`), the lit ring on a wrapper because the clipped corner would cut a ring drawn on the mount.
+The round tray (`SlideTray`) is the drum from above with a fixed gate at the top. It clicks one slot when the
+look on stage changes, the way the changer pushes one slide back and lifts the next whatever the distance in
+the list: forward when the new look stands later in the list, back when earlier, nothing for the first look of
+a session or no change (`stepOf`). It holds only its count of pushes, turns in 160 ms with a small overshoot
+and settle, and has no loop and no timer. It is on the cue bar and beside the phone's look name and the Looks
+heading. Under reduced motion it does not turn. Held by `npm run panel` ("Looks as slides in a tray"). Judging
+§82.

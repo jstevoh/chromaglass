@@ -8830,9 +8830,22 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   Settings, the remote and Draw, and the remote's two Blackouts are one (the bar under the thumb); Auto Spin has
   a strobe ring that drifts at the dish's speed in Rate and stands still in Tempo once a tempo is heard
   (`strobeRing.ts`). Held by `npm run panel`. Judging §81. Story in `docs/plan-shipped.md` §35.
+- ~~**35g** Looks as slides in a tray (item 12 of the playful-controls choice, 2026-10-25).~~ Shipped: a look is a
+  35 mm slide at a real mount's proportions with its own palette on the film, on the set list, the cue bar, the
+  preset menu, the saved list and the phone's look button, Looks sheet and Looks strip (now flicked one slide at
+  a time); a round tray clicks one slot when the look on stage changes (`slideTray.ts`, `SlideMount`,
+  `SlideTray`). Held by `npm run panel`. Judging §82. Story in `docs/plan-shipped.md` §35.
+- **35g-2** What the tray left:
+  - **The drum has 10 slots, a real tray has 80.** At 28 px 80 slots is a grey ring, so one click turns the
+    drawing 36 degrees, not 4.5. Named shortcut of the picture; nothing about any look.
+  - **The tray does not know about the phone's cue.** It clicks when the stage's look changes (the tray is
+    the stage, not the cue); a cued look on the desk shows only its mount behind the arrow.
+  - **The remote and the Sequencer's stage list still show flat swatches** (`RemoteControl`, `SequencerPanel`,
+    the command palette and Add to Set sheet); the film could go there too.
+  - **The film is two colours.** The mount shows the first two palette colours of a look's contract, as the
+    cue rows always did, not a render of the look; a photograph of each look (the gallery's) would be a
+    truer slide.
 - **35f-2** What batch C left:
-  - **Item 12, Looks as slide-carousel mounts**, is its own piece (it touches the set list, so `desk`,
-    `setlist` and `panel` all have to hold).
   - **The VU reads the plate's volume, not decibels.** The dial is marked 0 to 100 in the plate's own volume
     unit (the loud end of the ear's range at 85, `soundLevels.ts`), because that is what the ear gives and the
     gain stages before it are not the app's to know. A dial in dBFS would need the analyser's raw peak.
@@ -8849,7 +8862,7 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   no snail and hare, and the remote has no group colours; the phone's Settings sheet takes the cap colours
   only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
   its hare at both ends but no snail at the stop in the middle (the slider has one under the track). Batches B
-  (liquid in the controls) and C (show hardware) have shipped (35e, 35f); item 12 is in `/handoff/playful-controls.md`.
+  (liquid in the controls) and C (show hardware) have shipped (35e, 35f), and item 12 (35g), the last.
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.

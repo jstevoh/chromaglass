@@ -1855,3 +1855,25 @@ after the sound stops, a cap that is red when the room is lit, a ring that turns
 moves with reduced motion on (the reels and ring stop and the needle shows the number instead), or a violet
 or red that is not "on" or "live". Decide too: the VU dial is the plate's own 0 to 100 volume, not decibels
 (PLAN 35f-2).
+
+## 82. Looks as slides in a tray (PLAN 35g)
+
+On the desk and the phone:
+
+1. Click the preset name at the top left. Every look in the menu is a small square slide: cardboard mount, one
+   clipped corner, a landscape window with the look's two colours on the film. The slide is the same cardboard
+   on every row; the look you are on keeps its violet row, nothing about the slide itself changes colour.
+2. Open the set list. Each row is a slide where the little colour square was. Cue a look: the cue bar shows the
+   one on stage as a slide, a round tray to its left, and the cued one as a slide behind the arrow.
+3. Press Go. The tray clicks one slot, a quick turn with a small overshoot, and settles; nothing else moves.
+   Go to a look earlier in the list and it clicks back; to a look far away and it still clicks only one slot.
+4. On the phone: the look button at the top shows the slide, the look's name and a small tray that clicks
+   when the look changes. The Looks sheet lists slides. On the Play screen the Looks strip is a row of slides
+   you flick; each flick stops on one slide (it cannot coast past several), the one up has the violet ring and
+   its name in the lit chip, and the tray beside "Looks" clicks when you tap one.
+5. With reduced motion on, the tray does not turn.
+
+Bad: a slide whose mount turns violet or red, a tray that spins freely or turns on the beat, a strip that
+coasts past slides, a ring clipped at the slide's corner, a click that is a slide-sized jump of the layout, or a
+tray on a screen that shows no look. Decide too: ten slots on the drum, a real tray has eighty (PLAN 35g-2).
+

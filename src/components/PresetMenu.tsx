@@ -6,6 +6,7 @@ import type { VisualizerSettings } from '../types';
 import type { UserPreset } from '../lib/userPresets';
 import { songLabel, type SongRef } from '../lib/songRef';
 import { LIT } from './ui';
+import { SlideMount } from './ui/Playful';
 
 /**
  * The presets, one click from the top of the screen. Grouped the way the
@@ -24,6 +25,8 @@ interface PresetMenuProps {
    */
   onCuePreset?: (presetId: string) => void;
   onClose: () => void;
+  /** The palette on a look's film, from its own contract (App's swatchOf): each row is a slide in its mount (PLAN 35g). */
+  swatchOf?: (presetId: string) => string;
   /** Where the menu hangs from: under the title on the left, or beside the toolbar. */
   align?: 'left' | 'right' | 'side';
   /**
@@ -50,7 +53,7 @@ const GROUPS: { label: string; pick: (p: Preset) => boolean }[] = [
 ];
 
 export const PresetMenu: React.FC<PresetMenuProps> = ({
-  activePresetId, onApplyPreset, onCuePreset, onClose, align = 'left', anchor = null,
+  activePresetId, onApplyPreset, onCuePreset, onClose, swatchOf, align = 'left', anchor = null,
   userPresets = [], onApplyUserPreset, onSaveCurrent, onLoadFile, onExportUserPreset, onDeleteUserPreset, currentSong = null,
 }) => {
   const [forSong, setForSong] = useState(false);
@@ -167,9 +170,12 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                     title={p.song ? `Made for ${songLabel(p.song)}` : (p.description ?? 'A saved palette')}
                     data-testid={`preset-menu-${p.id}`}
                   >
-                    <span className="min-w-0">
+                    <span className="flex min-w-0 items-center gap-2">
+                      {swatchOf && <SlideMount swatch={swatchOf(p.id)} size={22} />}
+                      <span className="min-w-0">
                       <span className="text-xs font-semibold truncate block">{p.name}</span>
                       {p.song && <span className="text-[9px] opacity-50 truncate block">♪ {songLabel(p.song)}</span>}
+                      </span>
                     </span>
                     {active && <span className="text-[8px] uppercase tracking-wider font-bold text-white/50 shrink-0">On</span>}
                   </button>
@@ -200,7 +206,10 @@ export const PresetMenu: React.FC<PresetMenuProps> = ({
                     title={onCuePreset ? `Cue ${p.name} — ${p.description}` : p.description}
                     data-testid={`preset-menu-${p.id}`}
                   >
-                    <span className="text-xs font-semibold truncate">{p.name}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      {swatchOf && <SlideMount swatch={swatchOf(p.id)} size={22} />}
+                      <span className="text-xs font-semibold truncate">{p.name}</span>
+                    </span>
                     {active && <span className="text-[8px] uppercase tracking-wider font-bold text-white/50 shrink-0">On</span>}
                   </button>
                   {onCuePreset && (
