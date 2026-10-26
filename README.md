@@ -41,7 +41,7 @@ npm run build
 npm run remote       # prints the phone address and the projector address
 ```
 
-Useful commands: `npm run lint` (typecheck), `npm run wgsl` (compile every shader), `npm run check` (everything that needs no GPU, in about a minute), `npm run phone` (the phone layout). The installable Mac app and the iPhone app are built from `desktop/` and `ios/`.
+Useful commands: `npm run lint` (typecheck), `npm run wgsl` (compile every shader), `npm run quick` (the checks your change reaches, side by side), `npm run check` (every check that needs no GPU), `npm run phone` (the phone layout). The installable Mac app and the iPhone app are built from `desktop/` and `ios/`.
 
 ## Where things are
 

@@ -5302,6 +5302,14 @@ Found with it, open:
 - **19k-3** (E, S): `actionlint` is not in the repository and a cloud session cannot fetch
   it (the download was refused in 19k's session), so CLAUDE.md asks for a check no session
   can run. Run it in Measure from a pinned release, or drop it from the table.
+- **19k-5** (E, S): side by side, some Measure checks go red that are green alone. On a
+  4-core cloud session `npm run check` (93 checks, 40.8 minutes, their times summing to 103)
+  ran seven red together the first time, every one green alone: the shared `dist/` and the
+  fixed port 4197, which `quick` now holds one at a time. The second time The room (`scene`,
+  red in 2 s), Switches read on and off and The intro were red beside the others and green
+  alone, and The intro was red alone once (the opening's render compiles never logged).
+  `quick` now keeps such a check's log in `scratch/quick/`; find what each shares or
+  measures of the machine, and fix that, not the bar.
 - **19k-4** (E, S): the Measure parts still run in full on every push. With the manifest
   they could run only the checks a diff reaches, as `quick` does; the logic part is about
   four minutes and the browser part twelve, off no queue, so this is wall time to green,

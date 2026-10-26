@@ -191,6 +191,16 @@ for (const u of red) {
 }
 const redAlone = red.filter((u) => !alone.get(u).ok);
 const crowd = red.filter((u) => alone.get(u).ok);
+// The crowd's red logs are kept: a check green alone and red beside others
+// is either sharing something it should not or measuring the machine, and
+// only its own words say which (scratch/ is git-ignored).
+const logs = path.join(ROOT, 'scratch', 'quick');
+for (const u of crowd) {
+  fs.mkdirSync(logs, { recursive: true });
+  const f = path.join(logs, `${u[0].name.replace(/[^\w]+/g, '-').toLowerCase()}.log`);
+  fs.writeFileSync(f, results.get(u).out);
+  console.log(`  ${u[0].name}, red beside the others: ${path.relative(ROOT, f)}`);
+}
 for (const u of redAlone) {
   const r = alone.get(u);
   console.log(`\n✗ ${u[0].name} (${u[0].run})${r.timedOut ? ', past its timeout' : ''}`);
