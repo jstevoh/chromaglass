@@ -5341,10 +5341,12 @@ a Mac check before it pushes; about a third of the Mac reds were the PR's own (1
 session and on the Mac: the lines that do not depend on the step rate agree. *Size:* M.
 
 *Built (2026-10-26, this PR):* `scripts/chromium.mjs` launches headed into an Xvfb it starts
-itself (`-displayfd`, so parallel harnesses never race for a display) when `PW_WEBGPU` is set on
-Linux, and turns off the GPU watchdog for software WebGPU only; `PW_HEADLESS=1` or a harness's
-`present: false` keeps the old launch (`intro` does: it times the page's own frames through an
-opening). `scripts/frame.mjs`'s `engineQuery()` adds `&dpr=0.25&steps=60` there, and two waits:
+itself (`-displayfd`, so parallel harnesses never race for a display), with the GPU watchdog off,
+when `PW_WEBGPU` is set on Linux and the harness asks (`present: true`: `tools`, `magnet`,
+`mirror`, `bottles`) or `PW_PRESENT=1` does. Asked for, not the default: the first push made it the
+default and CI's Linux lab part ran out of its 25 minutes, the twenty-odd checks that set
+`PW_WEBGPU=1` themselves (`signin`, `tiers`, ...) each driving a live software plate, and
+`intro`'s fade finishing 95 s late behind the first step. Those measure the page, not the plate. `scripts/frame.mjs`'s `engineQuery()` adds `&dpr=0.25&steps=60` there, and two waits:
 `waitForEngine` after the opening, `settlePlate` for every other wait in `tools`, `magnet`,
 `mirror` and `bottles`, the wall clock on a GPU exactly as before and, in software, also a share
 (`PW_STEP_SHARE`, 0.05) of the steps the Mac's sixty a second would take.
@@ -5370,6 +5372,14 @@ page's frames wait behind it (`npm run intro`'s fade took 95 s to finish headed)
 cold Metal cache pays a smaller share of the same on the owner's machine after a deploy that
 changes a shader is not measured: `npm run startup` on the Mac, with STARTUP_COLD=1, reading the
 first step's GPU time apart from the prepare's, would say. *Size:* S to measure.
+
+#### 19l-3. The other app checks, asked one at a time (found with 19l)
+
+Four harnesses present (`present: true`) and wait in steps (`settlePlate`). The other
+twenty-five that read the app's frames (`engineQuery()` in `qa`, `bubbles`, `finger`, `press`,
+`spin`, `startup`, ...) still launch headless on Linux; `PW_PRESENT=1` tries any of them headed.
+Each wants its own pass: its opening wait through `waitForEngine`, its waits through
+`settlePlate`, and a cloud run beside the Mac's to say which of its lines agree. *Size:* S each.
 
 ### 19m. Fragments for the shared documents, and this file as an index
 

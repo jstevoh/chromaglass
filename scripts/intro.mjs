@@ -62,8 +62,7 @@ const server = createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
-// Headless even on software WebGPU: it times the page's own frames through an opening (`present` in chromium.mjs).
-const browser = await launchChromium(chromium, { present: false });
+const browser = await launchChromium(chromium);
 
 /*
   Read from the page every frame, from before its first: whether the intro

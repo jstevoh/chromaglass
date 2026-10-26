@@ -46,49 +46,49 @@ const GPU_ARGS = process.platform === 'darwin' && !process.env.PW_SOFTWARE
   that drives the app stopped at "needs WebGPU" and could only be run on CI's
   Mac. `PW_WEBGPU=1` gives the app SwiftShader's WebGPU, as the lab has always
   had (scripts/lab.mjs): slow, but the same engine and the same checks.
-
-  Without the GPU watchdog. The app's device was "lost every few seconds"
-  in software (`scripts/startup.mjs` says so), and it was not lost: measured
-  2026-10-26 (Chromium 153), the show's first full solver step, 248 compute
-  passes, runs its first dispatches through SwiftShader's compiler on the
-  GPU process's one thread for 25 to 100 s, and Chromium's watchdog takes a
-  GPU thread that long to be hung and kills the process ("GPU process exited
-  unexpectedly", then the page's "A valid external Instance reference no
-  longer exists"). The page makes a new device, opens again, reaches the same
-  step, and is killed again, for good. With the watchdog off the step
-  finishes and the plate goes on at about 0.4 steps a second. Only software
-  WebGPU gets this: a Mac's GPU never needs it, and a real hang there should
-  still be the watchdog's to end.
 */
 const SOFTWARE_WEBGPU = process.platform !== 'darwin' && process.env.PW_WEBGPU
-  ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader', '--disable-gpu-watchdog']
+  ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-vulkan=swiftshader', '--use-webgpu-adapter=swiftshader']
   : [];
 
 /*
-  And on that same box, a window to present into.
+  And on that same box, a window to present into, for a harness that reads
+  the app's plate (PLAN.md 19l).
 
   Software WebGPU alone was enough for the lab, which computes and reads back
-  but never puts a frame on a canvas, and not for the app. Read 2026-10-04 in
-  a cloud session (Chromium 141, PLAN.md 19l): headless, the device was lost
-  at the app's first present ("A valid external Instance reference no longer
-  exists"), so every check that photographs the app's plate read zeros, or
-  nothing, and could only be run on CI's Mac after a push and a queue. Headed
-  under a virtual X display, with the same flags, the device survives and
-  `__cgFrame` answers with the plate.
+  but never puts a frame on a canvas, and not for the app: headless, the
+  device is lost at the first present ("A valid external Instance reference
+  no longer exists"; a bare canvas, 2026-10-26, Chromium 153: lost at once
+  headless, thirty frames headed). So every check that photographs the app's
+  plate read zeros, or nothing, and could only be run on CI's Mac after a
+  push and a queue. Headed into an X display it presents.
 
-  So when `PW_WEBGPU` is set on Linux, the browser is launched headed, into
-  the display this process already has (`DISPLAY`, as under `xvfb-run`, which
-  `scripts/desktop.mjs` re-executes itself under) or, with none, into an Xvfb
-  started here, once per process, and stopped when the process ends. Starting
-  it here rather than re-executing every harness under `xvfb-run` keeps the
-  change in this one file: eighty-odd harnesses launch through it, and none
-  of them has to know.
+  And without the GPU watchdog, which headed was not enough without. The
+  show's first full solver step, 248 compute passes, runs its first
+  dispatches through SwiftShader's compiler on the GPU process's one thread
+  for 25 to 100 s, and Chromium's watchdog takes a thread that long to be
+  hung and kills the process ("GPU process exited unexpectedly", then the
+  page's lost device). The page makes a new device, opens again, reaches the
+  same step and is killed again, for good: that was `scripts/startup.mjs`'s
+  "SwiftShader loses the app's device every few seconds". With the watchdog
+  off the step finishes and the plate goes on, at about 0.4 steps a second.
+  Only this launch gets it: a GPU never needs it, and a real hang on one is
+  still the watchdog's to end.
 
-  `PW_HEADLESS=1` keeps the old headless launch, to compare the two. A box
-  without Xvfb gets the headless launch too, with a line saying so: the lab
-  still works there, and the app's frames are what they always were.
+  Asked for, not the default. A harness that reads the plate passes
+  `present: true` (`tools`, `magnet`, `mirror`, `bottles`), and `PW_PRESENT=1`
+  asks for it for any other. The first push of 19l made it the default with
+  `PW_WEBGPU`, and CI's Linux lab part ran out of its 25 minutes: twenty-odd
+  checks there set `PW_WEBGPU=1` themselves (`signin`, `tiers`, ...), were
+  written against a plate that stops at its first present, and headed each
+  of them drove a live software plate the whole run. They measure the page,
+  not the plate, and stay as they were. The display is this process's own
+  (`DISPLAY`, as under `xvfb-run`, which `scripts/desktop.mjs` re-executes
+  itself under) or, with none, an Xvfb started here once per process and
+  stopped when it ends; with no Xvfb, the headless launch and a line saying so.
 */
-const PRESENT_IN_XVFB = process.platform === 'linux' && !!process.env.PW_WEBGPU && !process.env.PW_HEADLESS;
+const PRESENTS = process.platform === 'linux' && !!process.env.PW_WEBGPU;
+const HEADED_ARGS = ['--disable-gpu-watchdog'];
 
 let xvfb = null;          // { display, proc } once started
 let xvfbFailed = false;
@@ -145,29 +145,19 @@ export const BASE_ARGS = [
 ];
 
 /**
- * Launch it. `args` are added to the base set; anything else in `opts` is
- * passed through.
+ * Launch it. `args` are added to the base set; `present` asks for the
+ * headed launch above when it applies; anything else in `opts` is passed
+ * through.
  */
-export async function launchChromium(chromium, { args = [], present = true, ...opts } = {}) {
+export async function launchChromium(chromium, { args = [], present = false, ...opts } = {}) {
   const executablePath = chromiumPath();
-  /*
-    Headed wins over a harness's own `headless: true` here: most of them say
-    it only because headless was the default worth writing down, and on this
-    box headless is the launch whose app frames cannot be read.
-
-    `present: false` is the one way out, for a harness that measures the
-    page's own frames through an opening rather than the plate's: headed, the
-    first solver step holds the GPU process (see the watchdog above), and
-    every frame the page draws waits behind it, 95 s for `npm run intro`'s
-    fade on 2026-10-26, which on a GPU takes one. Headless, the page's frames
-    never wait on the plate, which is the opening that check was written for.
-  */
-  const display = PRESENT_IN_XVFB && present ? await virtualDisplay() : null;
+  // Headed wins over a harness's own `headless: true`: it asked to present.
+  const display = PRESENTS && (present || !!process.env.PW_PRESENT) ? await virtualDisplay() : null;
   presented = !!display;
   const headed = display ? { headless: false, env: { ...process.env, ...opts.env, DISPLAY: display } } : {};
   return chromium.launch({
     ...(executablePath ? { executablePath } : {}),
-    args: [...BASE_ARGS, ...args],
+    args: [...BASE_ARGS, ...(display ? HEADED_ARGS : []), ...args],
     ...opts,
     ...headed,
   });

@@ -84,7 +84,8 @@ const SCENARIOS = [
 */
 const RUN = process.env.MIRROR_ALL ? SCENARIOS : SCENARIOS.filter((sc) => sc.judge !== false);
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 try {
   for (const sc of RUN) {
     const page = await browser.newPage({ viewport: { width: 1418, height: 703 } });
