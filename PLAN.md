@@ -7825,9 +7825,11 @@ Turing Print" work (#331), which also made the reaction grow at all.
     `poster-1969` carries three area cords and is in `soundpatch` `PATTERN`), and `lampjudge`'s
     owner override for the Sensual Laboratory is gone with it; (e) `evolve`/`replay`
     start from Poster, 1969 and Clock Glass where they started from the Fillmore and the
-    Oil Wheel, so their seeded rolls are different rolls; (f) the README's gallery
+    Oil Wheel, so their seeded rolls are different rolls; (f) ~~the README's gallery
     pictures (`docs/shots`: the Fillmore, Oil on Water) are of retired looks:
-    `npm run shots` on the Mac for the new set, then the README table; (g) three checks count looks and now sit near their floors: `startup` asks for
+    `npm run shots` on the Mac for the new set, then the README table~~ (**shipped**, #492:
+    `poster-1969`, `oil-and-water`, `macro-bead` and `velvet-underground` shot on the Mac GPU
+    at `seed=1`, retired shots deleted, README and guide tables updated); (g) three checks count looks and now sit near their floors: `startup` asks for
     more than 30 looks (32 ship; 31 after Lumia, 28i-5), and `disc` names its two magnet looks
     where it asked for three.
 
