@@ -1118,6 +1118,11 @@ export default function App() {
           // are dropped while ScreenCaptureKit initializes.
           const ctx = new AudioContext();
           if (ctx.state === 'suspended') void ctx.resume();
+          // Under ?debug, for `npm run desktop` to say whether this context
+          // was running yet when it read the ear, beside the ear's own.
+          if (new URLSearchParams(window.location.search).has('debug')) {
+            (window as unknown as { __systemTapContext?: AudioContext }).__systemTapContext = ctx;
+          }
           const dest = ctx.createMediaStreamDestination();
           let displayStream: MediaStream | null = null;
           let nextTime = 0;
