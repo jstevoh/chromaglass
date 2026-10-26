@@ -562,6 +562,15 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
         run: npm run scene
 
+      # A sound cord's shape (PLAN 30a): tone bursts in and out of a dragged
+      # band, fires counted against the threshold and timed against the attack
+      # and release. Written before the build, so only its controls run until
+      # 30a lands (the tape, the counter on today's area-cord gate, and every
+      # saved cord folding as before); the build's PR drops `--controls`.
+      - name: The sound cords
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        run: npm run soundcords -- --controls
+
       # Four harnesses that were written as gates and then never gated
       # anything, because nothing here ran them. All four cover arithmetic
       # with no picture in it, which is the kind most able to be quietly
