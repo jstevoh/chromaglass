@@ -3073,6 +3073,34 @@ constantly." Measured from the Actions API over 04:00 to 23:45 UTC that day, 183
   different site files moving the same picture; the next PR's own run, on main with both,
   measures that.
 
+### 19i. A green Mac result carries across a merge of main
+
+**Shipped** (#429): When the new head's tree differs from the tree of the PR's last green Mac run only in files main changed (disjoint from the PR's own site files), or only in files that never reach a Mac shard, the shards are skipped with the verdict "carried" (annotated on What the change reaches), and the deploy gate follows that chain back to the run that passed. 14 selftest cases in `reach.mjs` and deploy gate history verified.
+
+*Measured 2026-10-04 over 25 merged PRs (#204 to #244), 103 `Checks` runs.* A PR ran its
+checks about four times. Of those runs, 53 started on a push that only merged main in, and
+8 on a docs-only commit: together 61 of 103 runs and 2,011 of 3,124 Mac runner-minutes
+(64 %), on pushes that added none of the PR's own site code. They also held 20 of the 29
+runs that went red on their first attempt. Each restarts all four shards, 37 to 62
+minutes of wall time since #239 (75 before), at a time when the five Mac runners were 87
+to 91 % busy, so every one of them lengthened everyone else's queue too.
+
+*Fix:* the PR side of `deploygate.sh`'s rule 5. When the new head's tree differs from the
+tree of the PR's last green Mac run only in files main changed (and those are disjoint
+from the PR's own site files, `reach.mjs --site`), or only in files that never reach a Mac
+shard, the shards are skipped with the verdict "carried", and the deploy gate follows that
+chain back to the run that passed. The ship skill then merges without bringing main in
+whenever the gate would say `disjoint`. *What it leaves unmeasured* is what 19h-3 already
+accepted for deploys: two PRs in different files moving the same picture. To keep every
+check running on the combined tree, one full Mac run on main every N merges, or after each
+publish with 19o's rollback behind it. *Measure:* Mac minutes per merged PR and runs per
+PR over the next 25 PRs, against 125 and 4.1. *Size:* M.
+
+*Found in 19k (2026-10-26):* `carry()` asked for a green run whose Mac shards were exactly
+`open,plate,show,tools`, written by hand, while `checks.yml` had run five since 19w
+(2026-10-11). So from the day it shipped no run carried, the same miss the deploy gate had
+before #393. 19k reads the shards from the manifest, and a selftest case runs four of five.
+
 ### 19j. A merge with no site change deploys nothing
 
 **Shipped** (#253). Eight of the last thirty merges changed no file the site is built from
@@ -3096,6 +3124,61 @@ followed a site change whose run was cancelled or red, so theirs was the deploy 
 up (d027626's 111 minutes, which this section first counted as a docs-only wait, were three
 PRs' site changes going out). The gain grows with 19i and 0.3: fewer red or superseded
 deploys leave more docs merges directly on top of a live commit.
+
+### 19k. One manifest of checks
+
+**Shipped** (#PRNUM). What was asked, as it stood in the plan:
+
+Every new check edits `.github/workflows/checks.yml` and `package.json` (13 and 14 of the
+last 30 merges), which is where three of the recorded merge conflicts were. Seven of the
+last 25 PRs changed only check scripts and needed one shard of four, but ran all four (17
+runs, about 30 Mac-minutes each). And `npm run check` runs about 35 scripts one after
+another, some 15 minutes, where its header says a minute.
+
+*Fix:* `scripts/checks.json`, one entry per check (its name, its shard, its command, the
+`src/` files it imports, from esbuild's metafile, as 19c traced). `checks.yml` builds each
+shard's steps from it; `package.json`'s scripts stay for hands, generated or checked against
+it. A PR that changes only check scripts runs the shards those scripts are in, plus Measure;
+a change to `src/`, a shared helper (`frame`, `chromium`, `lab`, `lab-entry`) or a workflow
+selects every shard. `npm run quick` reads the same map and runs, in parallel, the checks
+the diff reaches, which is CLAUDE.md's "which checks for which files" table made
+executable. *Measure:* Mac minutes on check-only PRs, and conflicts in `checks.yml` and
+`package.json`. *Size:* M.
+
+*What shipped.* `scripts/checks.json` is the list: every check CI ran, 180 steps lifted
+from `checks.yml` in their order with their comments as `why` (and one more, `npm run
+checks`, which holds it). `checks.yml` went from 1,734 lines to about 400: each Measure part
+and Mac shard keeps its setup (Node, the cached ffmpeg, Chromium, the build) and runs `node
+scripts/checks.mjs --ci <shard>`. Each check opens a `Run <command>` group as its step's log
+did, which is the line `flakes.mjs` files its FAILs under; a red check is an error
+annotation with its name and FAIL lines; each keeps its timeout and env; every check runs
+whatever failed before it; the job summary is a table of each check's time. One step a
+shard, not a workflow written out from the manifest, because a written-out workflow would
+still be edited by every new check.
+
+`reach.mjs --diff` now also says which Mac shards: a change that reaches the Mac only through
+check scripts (traced through their imports and the paths they name, held to esbuild's
+metafile by `npm run checks`), manifest entries (a `why` alone selects nothing) or the npm
+scripts checks run selects those checks' shards; anything else, a shared helper (`chromium`,
+`frame`, `lab`, `lab-entry`, `checks.mjs`) or a script no check traces selects every shard.
+The matrix is `fromJSON(needs.reach.outputs.shards)`, and `deploygate.sh` reads the shard
+list from the manifest.
+
+`npm run quick` reads the same manifest, asks each check what it reads (its scripts, the
+`src/` files they and the entries they bundle at run time import, from esbuild's metafile,
+and every site file for a check that serves the app), and runs the ones a diff reaches side
+by side, a red one again alone. `npm run check` is now `quick --measure`. Found along the
+way: the turntable step had no `if:`, so it ran in all four Measure parts; and 19i's carry
+never fired (above, under 19i).
+
+*Measured.* Replayed over the 60 PRs merged up to #497 (2026-10-26), 14,213 Mac
+runner-minutes: six changed only check scripts (#429, #449, #456, #462, #465, #472) and
+spent 1,325 Mac minutes on every shard, where the shards their checks are on took 275.
+Merge conflicts: 60 adjacent merges replayed with `git merge-tree` (each PR as if opened
+beside the one before) gave 9 conflicts, in PLAN.md, `docs/judging.md`,
+`docs/plan-shipped.md` and three `src/` files, none in `checks.yml` or `package.json`; so the
+conflict half of the claim is for 19k-2 to show over the next merges, not this PR.
+`deploygate --history 20` read the same 20 verdicts before and after.
 
 ### 19r. Smaller, for the same pass: the open shard evened
 
