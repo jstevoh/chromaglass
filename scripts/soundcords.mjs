@@ -72,7 +72,7 @@
  *
  * Lines, and what each would mean red:
  *
-  *   the tape        (control) The drag's own bins, read straight off the
+ *   the tape        (control) The drag's own bins, read straight off the
  *                   analyser, hear every in-band burst at least 30 dB over
  *                   every out-of-band one; fixed band5 hears the twin as
  *                   loud as the in-band tone; the quiet bursts read on band5
@@ -84,21 +84,33 @@
  *                   band5, fed the same frames: fires once on each burst band5
  *                   holds over the threshold (in, dip and twin), never on the
  *                   rest, and rises and falls within 10% of its attack and
- *                   release, at both pairs below. Red: the counter or the
- *                   timing is wrong, since that gate is linear and exact.
+ *                   release, at both pairs below; and on the `sound` source's
+ *                   `energy` at 0.35, once on each of the eleven loud bursts.
+ *                   Red: the counter, the burst windows or the timing is
+ *                   wrong, since that gate is linear and exact.
+ *   the judge rejects …  (control) The same judge on three gates known to be
+ *                   wrong must read at least one line red: CordGate with its
+ *                   attack 25% long, one that restarts its rise whenever the
+ *                   reading climbs, and the right gate half a second late.
+ *                   Without these, CI's controls would prove only that the
+ *                   judge says yes (a copy with FIRE_STEP 0.9 and a 500%
+ *                   tolerance passed every other control).
  *   follow unchanged (control) A `bands` cord with none of 30a's fields folds
  *                   to `base + reading · depth · travel` on every frame, to the
  *                   bit. Saved looks and presets carry such cords; 30a must not
  *                   move them.
  *   a drag on band5's edges reads as band5   (30a) In follow mode, a drag set
  *                   to exactly band5's edges reads what band5 reads, within
- *                   0.02, every frame: a dragged band is heard against its own
- *                   recent range as the named bands are.
+ *                   0.02, every frame after the lead: a dragged band is heard
+ *                   against its own recent range as the named bands are.
+ *   gain 2 in follow mode                    (30a) The same drag at gain 2 reads
+ *                   twice band5, to Bloom's top, within 0.02.
  *   gate, attack 0.3 s, release 0.6 s        (30a) Threshold 0.5, gain 1, the
  *                   drag [1000, 1400]: one fire on each `in` and the `dip`
- *                   (five), none on `quiet`, none on the twin, low or high,
- *                   none between bursts; and each fire's rise within 10% of
- *                   0.3 s and fall within 10% of 0.6 s.
+ *                   (five), each in the first 0.2 s of its burst; none on
+ *                   `quiet`, none on the twin, low or high, none between
+ *                   bursts; and each fire's rise within 10% of 0.3 s and fall
+ *                   within 10% of 0.6 s.
  *   gate, attack 0.6 s, release 1.2 s        (30a) The same at another pair, so
  *                   a gate with one timing baked in cannot pass.
  *   gate at 120 fps                          (30a) The first pair again, the
@@ -109,17 +121,34 @@
  *                   gain is applied before the threshold, as Beat Reactor's is:
  *                   it decides what crosses, not only how far the cord goes
  *                   (which the depth already does).
+ *   a gate on a sound cord                   (30a) A `sound` cord on `energy`,
+ *                   threshold 0.35: one fire on each loud burst, none on the
+ *                   quiet ones. Counted, not timed (see the line).
  *
- * Measured 2026-10-26. On main: the three controls pass, the 30a lines are
- * red (the bay ignores `mode`, `band` and the gate, so the cords follow
- * band8's empty range). On a sketch of the build (the drag read by the ear's
- * own arithmetic, `CordGate` in the bay, its clock from `now`; kept in the
- * project's shared files, not in the repo): every line passes, rises and falls
- * within 2.8%. Each of these on that sketch turns lines red: the drag snapped
- * to band5 (4 lines), the gain after the gate (1), dt fixed at 1/60 (2), a
- * gate that shuts on any fall (7), one that restarts on a rise (10), the gate
- * ignored (9), the drag on a fixed -60..0 dB scale (2), release ×1.25 (3),
- * attack ×1.15 (3).
+ * What the gate's times mean. Attack is the time from shut to 98% of the
+ * hit's height, from 2% of it; release is the time from 98% back to 2%. A
+ * linear envelope (today's CordGate) reads its own times that way to within a
+ * frame; a curved one passes if its 2%-to-98% time is the attack, and not if
+ * it takes the attack to settle within 1% (11 to 14% off, the skeptic found).
+ * The height is the most the reading (times the gain) reached while the gate
+ * was open, as on an area cord; a one-shot pulse that rises and falls on each
+ * crossing whatever the burst does also passes, and fits "a crossing fires a
+ * shaped pulse". A noise gate (the reading times an envelope) does not: the
+ * dip counts as a second hit and its fall is the reading's tail.
+ *
+ * Measured 2026-10-26. On main: every control passes, and the 30a lines are
+ * red (the bay ignores `mode`, `gain`, `band` and the gate, so the drag cords
+ * follow band8's empty range and the sound cord follows energy). On a sketch
+ * of the build (the drag read by the ear's own arithmetic, `CordGate` in the
+ * bay, its clock from `now`; kept in the project's shared files, not in the
+ * repo): every line passes, rises and falls within 2.8%. Each of these on that
+ * sketch turns lines red: the gate's input half a second late (11 lines), the
+ * gate only on `bands` cords (1), the gain only in gate mode (1), the drag
+ * snapped to band5 (4), the gain after the gate (1), dt fixed at 1/60 (2), a
+ * gate that shuts on any fall (6), one that restarts on a rise (8), the gate
+ * ignored (10), the drag on a fixed -60..0 dB scale (3), release ×1.25 (3),
+ * attack ×1.15 (3). A drag one bin wider each side passes, as it should: that
+ * build is near enough to right.
  *
  * How a fire is counted. The cord aims at Bloom (0..1, no steps, read once
  * for the picture) from 0 at depth 1, so the folded Bloom is the cord's
@@ -127,16 +156,15 @@
  * last counted peak, after a fall of at least 0.1 from that peak: a gate that
  * shut and reopened inside one burst shows as two, and one that fired on every
  * frame over the threshold (no latch) shows as one long rise, which is fine,
- * since that is what it looks like on the plate.
+ * since that is what it looks like on the plate. It belongs to the burst whose
+ * first 0.2 s it cleared 0.1 in (`burstOf`), and to none otherwise.
  *
  * How a rise and fall are timed. For each fire, its height H is the most the
  * envelope reaches before it falls back: the rise is from the last frame under
  * 2% of H to the first at 98% of it, the fall from the last frame at 98% to the
- * first under 2%. A linear envelope (today's CordGate) reads its attack and
- * release to within a frame that way, at 60 frames a second; 10% of the
- * shortest time measured, 0.3 s, is 1.8 frames.
+ * first under 2%. 10% of the shortest time measured, 0.3 s, is 1.8 frames.
  *
- * Exits non-zero if any line fails. `--controls` runs the three controls only,
+ * Exits non-zero if any line fails. `--controls` runs the controls only,
  * which is what CI runs until 30a lands: they hold on main, and they keep the
  * tape and the counter honest while the rest waits for the build. The build's
  * PR drops `--controls` from checks.yml in the same change.
@@ -147,6 +175,7 @@ import { songAudioTrack } from '../src/lib/songTrack.ts';
 import { PatchBay } from '../src/lib/sceneMap.ts';
 import { CordGate } from '../src/lib/areaCords.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
+import { getAudioValue } from '../src/constants.ts';
 
 const CONTROLS_ONLY = process.argv.includes('--controls');
 const SR = 44100;
@@ -166,6 +195,7 @@ const FADE_S = 0.005;
 const THRESHOLD = 0.5;
 const TOLERANCE = 0.1;
 const FIRE_STEP = 0.1;
+const ONSET_S = 0.2;
 
 const KINDS = {
   in: { hz: 1200, amp: LOUD, inDrag: true, inBand5: true },
@@ -266,13 +296,17 @@ function fires(trace) {
 }
 
 /**
- * Which burst a fire belongs to: the one sounding when the rise cleared
- * FIRE_STEP (the analyser's window and smoothing put that a frame or three
- * after the burst begins), or none.
+ * Which burst a fire belongs to: the one whose first ONSET_S the rise cleared
+ * FIRE_STEP in, or none. On the sketch that is 17 to 117 ms after the burst
+ * begins (the analyser's window and smoothing, then the attack's first 0.1).
+ * The window is where, not whether: a gate half a second late, or one that
+ * fires as the burst ends, clears it outside every burst and counts as a fire
+ * between bursts (the skeptic's mutants; a window of the whole burst passed
+ * both).
  */
 function burstOf(tr, fire) {
   const t = fire.at * tr.dt;
-  return bursts.findIndex(b => t >= b.start && t <= b.start + BURST_S + 0.1);
+  return bursts.findIndex(b => t >= b.start && t <= b.start + ONSET_S);
 }
 
 /** Rise and fall of one fire, in seconds, by the 2%/98% rule above. */
@@ -297,6 +331,8 @@ function timing(tr, trace, fire) {
  * elsewhere, and each timed within TOLERANCE of `attack` and `release`.
  */
 function judge(tr, name, trace, shouldFire, attack, release) {
+  const out = [];
+  const say = (ok, n, detail) => out.push({ ok, name: n, detail });
   const got = fires(trace);
   const per = bursts.map(() => 0);
   let stray = 0;
@@ -310,11 +346,11 @@ function judge(tr, name, trace, shouldFire, attack, release) {
   const missed = bursts.filter((b, i) => shouldFire(b) && per[i] === 0).map(b => b.kind);
   const wrong = bursts.filter((b, i) => !shouldFire(b) && per[i] > 0).map(b => b.kind);
   const fired = per.reduce((a, n) => a + n, 0);
-  line(fired === want && doubled === 0 && stray === 0 && missed.length === 0 && wrong.length === 0,
+  say(fired === want && doubled === 0 && stray === 0 && missed.length === 0 && wrong.length === 0,
     `${name}: one fire per burst over the threshold`,
     `${fired + stray} fires, ${want} wanted; doubled ${doubled}, between bursts ${stray}` +
     `${missed.length ? `, missed ${missed.join(' ')}` : ''}${wrong.length ? `, fired on ${wrong.join(' ')}` : ''}`);
-  if (attack === undefined) return;
+  if (attack === undefined) return out;
   const rises = [], falls = [];
   for (const f of got) {
     if (f.at * tr.dt < LEAD_S - 0.2 || burstOf(tr, f) < 0) continue;
@@ -325,10 +361,25 @@ function judge(tr, name, trace, shouldFire, attack, release) {
   const worst = (xs, want) => xs.reduce((w, x) => Math.max(w, Math.abs(x - want) / want), 0);
   const fmt = xs => xs.length ? `${Math.min(...xs).toFixed(3)}–${Math.max(...xs).toFixed(3)} s` : 'none';
   const rw = worst(rises, attack), fw = worst(falls, release);
-  line(rises.length > 0 && rw <= TOLERANCE, `${name}: rise within 10% of the attack, ${attack} s`,
+  say(rises.length > 0 && rw <= TOLERANCE, `${name}: rise within 10% of the attack, ${attack} s`,
     `${rises.length} rises, ${fmt(rises)}, worst ${(rw * 100).toFixed(1)}% off`);
-  line(falls.length > 0 && fw <= TOLERANCE, `${name}: fall within 10% of the release, ${release} s`,
+  say(falls.length > 0 && fw <= TOLERANCE, `${name}: fall within 10% of the release, ${release} s`,
     `${falls.length} falls, ${fmt(falls)}, worst ${(fw * 100).toFixed(1)}% off`);
+  return out;
+}
+
+/** Print a judge's lines as they stand. */
+const report = results => results.forEach(r => line(r.ok, r.name, r.detail));
+
+/**
+ * A judge that must say no: `results` are a judge's lines on a gate known to
+ * be wrong, and at least one of them has to be red, or the judge is passing
+ * gates it cannot tell apart.
+ */
+function rejects(name, results) {
+  const red = results.filter(r => !r.ok);
+  line(red.length > 0, `the judge rejects ${name}`,
+    red.length ? `${red.length} of ${results.length} red: ${red.map(r => r.name.split(': ').pop()).join('; ')}` : `all ${results.length} lines pass it`);
 }
 
 // ── Through the patch bay ─────────────────────────────────────────────────
@@ -373,13 +424,49 @@ const { band5 } = tr60;
 }
 
 const PAIRS = [[0.3, 0.6], [0.6, 1.2]];
+const loudInBand5 = b => b.inBand5 && b.amp === LOUD;
+
+/** Today's area-cord gate stepped over a reading, at 60 fps; `tweak` turns it into a wrong one. */
+function cordGateTrace(reading, cord, tweak) {
+  const gate = new CordGate();
+  let prev = 0;
+  return reading.map(x => {
+    if (tweak === 'restart' && gate.open && x > prev + 0.03) gate.env = 0;
+    prev = x;
+    return gate.step(x, tr60.dt, tweak === 'slow' ? { ...cord, attack: cord.attack * 1.25 } : cord);
+  });
+}
 
 for (const [attack, release] of PAIRS) {
   const cord = { source: 'bands', feature: 'band5', setting: 'bloom', depth: 1, threshold: THRESHOLD, attack, release };
-  const gate = new CordGate();
-  const trace = band5.map(x => gate.step(x, tr60.dt, cord));
-  judge(tr60, `the counter (CordGate on band5, ${attack}/${release} s)`, trace,
-    b => b.inBand5 && b.amp === LOUD, attack, release);
+  report(judge(tr60, `the counter (CordGate on band5, ${attack}/${release} s)`, cordGateTrace(band5, cord), loudInBand5, attack, release));
+}
+
+// The `sound` source too: 30a shapes a `sound` cord as it does a `bands` one.
+// Its `energy` reads every loud burst, in band or out, at 0.84 and the quiet
+// ones at 0.06, and the dip's trough at 0.44: a threshold of 0.35 sits 0.09
+// under the trough (past the 0.05 of hysteresis) and 0.29 over the quiet.
+const energy = tr60.frames.map(f => getAudioValue(f, 'energy'));
+const ENERGY_THRESHOLD = 0.35;
+const loudAny = b => b.amp === LOUD;
+{
+  const [attack, release] = PAIRS[0];
+  const cord = { source: 'sound', feature: 'energy', setting: 'bloom', depth: 1, threshold: ENERGY_THRESHOLD, attack, release };
+  report(judge(tr60, `the counter (CordGate on sound energy, ${attack}/${release} s)`, cordGateTrace(energy, cord), loudAny));
+}
+
+// And the judge has to say no to gates that are wrong, or the lines above
+// prove only that it says yes: an attack a quarter long, a gate that starts
+// its rise again whenever the reading climbs (the dip's recovery and every
+// onset), and the right gate half a second late.
+{
+  const [attack, release] = PAIRS[0];
+  const cord = { source: 'bands', feature: 'band5', setting: 'bloom', depth: 1, threshold: THRESHOLD, attack, release };
+  rejects('an attack 25% long', judge(tr60, 'slow', cordGateTrace(band5, cord, 'slow'), loudInBand5, attack, release));
+  rejects('a gate that restarts on a rise', judge(tr60, 'restart', cordGateTrace(band5, cord, 'restart'), loudInBand5, attack, release));
+  const late = Math.round(0.5 * FPS);
+  const right = cordGateTrace(band5, cord);
+  rejects('the right gate 0.5 s late', judge(tr60, 'late', right.map((_, i) => (i >= late ? right[i - late] : 0)), loudInBand5, attack, release));
 }
 
 {
@@ -404,23 +491,32 @@ for (const [attack, release] of PAIRS) {
 // ── 30a ───────────────────────────────────────────────────────────────────
 
 if (!CONTROLS_ONLY) {
-  {
-    // `feature` names band8 (7.6 to 16 kHz, where this tape has nothing), so a
-    // build that ignored the drag reads silence rather than band5 by luck.
-    const trace = bayTrace(tr60, { feature: 'band8', mode: 'follow', band: BAND5 });
+  // From the end of the lead: before the warm-up tone sets a range, a band's
+  // reading is its seeding (see the tape), and a drag a bin wider than band5
+  // differs from it there by 0.027 and by 0.012 after.
+  const settled = i => i * tr60.dt >= LEAD_S - 0.2;
+  const follows = (name, cord, want) => {
+    const trace = bayTrace(tr60, cord);
     let worst = 0, at = 0;
     for (let i = 0; i < trace.length; i++) {
-      const d = Math.abs(trace[i] - band5[i]);
+      if (!settled(i)) continue;
+      const d = Math.abs(trace[i] - want(i));
       if (d > worst) { worst = d; at = i; }
     }
-    line(worst <= 0.02, 'a drag on band5\'s edges reads as band5, every frame, within 0.02',
-      `worst ${worst.toFixed(3)} at ${(at * tr60.dt).toFixed(2)} s`);
-  }
+    line(worst <= 0.02, name, `worst ${worst.toFixed(3)} at ${(at * tr60.dt).toFixed(2)} s`);
+  };
+  // `feature` names band8 (7.6 to 16 kHz, where this tape has nothing), so a
+  // build that ignored the drag reads band8's empty range, not band5 by luck.
+  follows('a drag on band5\'s edges reads as band5, every frame after the lead, within 0.02',
+    { feature: 'band8', mode: 'follow', band: BAND5 }, i => band5[i]);
+  // The gain in follow mode too: twice the reading, until Bloom's travel ends.
+  follows('gain 2 in follow mode reads twice band5 (to Bloom\'s top), within 0.02',
+    { feature: 'band8', mode: 'follow', band: BAND5, gain: 2 }, i => Math.min(1, 2 * band5[i]));
 
   const loudInDrag = b => b.inDrag && b.amp === LOUD;
   for (const [attack, release] of PAIRS) {
     const trace = bayTrace(tr60, { feature: 'band8', mode: 'gate', band: DRAG, threshold: THRESHOLD, gain: 1, attack, release });
-    judge(tr60, `gate on the drag, ${attack}/${release} s`, trace, loudInDrag, attack, release);
+    report(judge(tr60, `gate on the drag, ${attack}/${release} s`, trace, loudInDrag, attack, release));
   }
 
   {
@@ -429,13 +525,24 @@ if (!CONTROLS_ONLY) {
     const tr120 = track(FAST_FPS);
     const [attack, release] = PAIRS[0];
     const trace = bayTrace(tr120, { feature: 'band8', mode: 'gate', band: DRAG, threshold: THRESHOLD, gain: 1, attack, release });
-    judge(tr120, `gate on the drag at ${FAST_FPS} fps, ${attack}/${release} s`, trace, loudInDrag, attack, release);
+    report(judge(tr120, `gate on the drag at ${FAST_FPS} fps, ${attack}/${release} s`, trace, loudInDrag, attack, release));
   }
 
   {
     const [attack, release] = PAIRS[0];
     const trace = bayTrace(tr60, { feature: 'band8', mode: 'gate', band: DRAG, threshold: THRESHOLD, gain: 2, attack, release });
-    judge(tr60, 'gain 2 opens the quiet ones', trace, b => b.inDrag);
+    report(judge(tr60, 'gain 2 opens the quiet ones', trace, b => b.inDrag));
+  }
+
+  {
+    const [attack, release] = PAIRS[0];
+    const trace = bayTrace(tr60, { source: 'sound', feature: 'energy', mode: 'gate', threshold: ENERGY_THRESHOLD, attack, release });
+    // Counted, not timed: `energy` is smoothed, so it is still climbing for a
+    // few frames after it crosses, and a gate that rises to the hit's height
+    // (as CordGate does) reaches it two frames after its attack, which is the
+    // reading's doing; the drag's lines above time the gate on a reading that
+    // arrives at once.
+    report(judge(tr60, 'a gate on a sound cord (energy)', trace, loudAny));
   }
 } else {
   console.log('SKIP  30a\'s own lines (--controls): they wait for the build');
