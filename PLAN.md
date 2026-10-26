@@ -206,7 +206,7 @@ re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering
 music, explored as four directions the same day and all four taken, in this order:
 ~~**25h** areas that listen for themselves~~ (shipped), then **24.3-place** the melody walks across the plate (B, M), then **25i**
 colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
-14r read per area); then **30a**'s rest, shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
+14r read per area); then **30a**'s rest, shaped sound cords (M; its check `soundcords` written 2026-10-26, Antigravity's Brief 8), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
@@ -8250,6 +8250,23 @@ dragged band: crossings counted against the threshold (equal, none doubled, none
 outside the band), and the patch's rise and fall timed within 10% of its attack and
 release.
 
+*Check written first (2026-10-26):* `npm run soundcords` (`scripts/soundcords.mjs`), red on
+main in its 30a lines and green on a sketch of the build. Its header is the contract: the
+cord's fields (`mode`, `threshold`, `gain` before the threshold, `attack`, `release`, `band`
+as `[loHz, hiHz]` winning over `feature`), read through `songAudioTrack` and `PatchBay.fold`
+with the gate's clock from `fold`'s `now`. Attack and release are the 2%-to-98% times of
+the cord's rise and fall, and a gate rises to the hit's height (the most the reading times
+the gain reached while open), as an area cord's does. A whole-plate cord with no `mode`
+follows even if it carries a threshold, attack or release (it ignores them today); an area
+cord keeps its own rule. CI runs it with `--controls` (the
+tape, the counter on today's `CordGate`, the judge rejecting three wrong gates, every saved
+cord folding as before) until the build's PR drops the flag. 31c's two lines join it when 31c is built.
+- **30a-1. The dragged band on the cast display and the phone remote.** The cast display
+  rebuilds `AudioData` from the wire with no spectrum behind it (`liveValue`, sceneMap.ts),
+  so a dragged-band cord there reads nothing, as a `bands` cord does today. Whether the
+  wire carries the cord's reading or the projector just shows the laptop's fold is the
+  build's to decide and say.
+
 ### 30b. The LFOs and envelopes are fixed
 
 `modulators.ts` has four LFOs locked to bars and two envelopes, all fixed: an eight-bar
@@ -8514,6 +8531,37 @@ red-black projection, the limited advection), run on the plate's grid. A lab che
 to the CPU reference within a stated tolerance, so the GPU is judged by the model and not
 by whatever it draws. *Measure:* `soapgpu` plus `wgsl`, `physics` and `derive` unchanged,
 and the pass's cost in ms at the plate's size.
+
+**The check is written first (this PR), and red on main for the one right reason:** with no
+`src/gpu/soapFilm.ts` it prints that and exits 1, as `soapfilm` did before 32a, so it is not
+in `checks.yml` yet; 32c wires it in. `scripts/soapgpu.mjs` runs soapfilm.mjs's C1–C4 and C6
+films, seeds, steps and bars through the GPU solver, and steps the same films on the CPU
+reference beside it: the first step's face flows within 2% and its change in thickness within
+5% (RMS, cell by cell), the thickness after one second within 5% of its change (at dt 0.05, at the frame's 1/60 s, and
+at zeta 0.25 and dt 0.2 s where the reference takes 4 CFL sub-steps), each patch's
+travel within 1.5 rows, every quarter's mean within 2% every 5 s of the drain, the top black
+within 5 s of the reference's, and a hole torn in the film never refilled, its black spreading
+within 15% of the reference's. Two float64 bars move for float32 storage, and only two:
+conservation to 1e-6 (not 1e-9; float32 storage of the whole reference measured 7.7e-9) and
+a still film to 1e-5 nm of the float32 film it was handed (not 1e-6 of the float64 one). The solver's contract
+(`createSoapFilmGpu(device, { nx, ny, dx })` with `write`, `step`, `read`) is written in
+`scripts/soapgpu-cpu.ts`, the reference dressed in it, which `npm run soapgpu -- --selftest`
+runs: 29/29. Look-alikes, each the reference with one thing changed (in a cloud session):
+first-order upwind fails 8 lines, an MC limiter 3 (first step 7.0%, one second 6.3%, drain
+9.6%), a projection stopped at 20 sweeps 4, Jacobi at 200 sweeps 1 (flows 2.8%), semi-Lagrangian
+advection 11 (conservation 8.9e-4), no rupture marks the 2 hole lines, a step that ignores dt
+2, one that ignores zeta 1, one with no sub-steps 1 (26% off); red-black SOR at 60
+sweeps and Jacobi at 1000 pass all 25, so a faithful float32 solver can. The flows' 2% bar
+is a convergence bar, cold, on the first step: plain Jacobi needs about 1000 sweeps on 32 × 64
+to meet it, red-black SOR 60, so 32c's projection is red-black SOR (or multigrid), warm-started.
+The check also asks that the work be the GPU's: the solver's bundle may not carry
+`src/lib/soapFilm.ts`'s code, every step submits to the queue and every read maps a buffer.
+
+- **32c-1. The drain's own "a ruptured cell stays black" never fires.** soapfilm.mjs C6 reads
+  it on the drain, where measured, the reference with its rupture marks removed refills no cell
+  either (thick film never presses on black there), so that line in `npm run soapfilm` would pass
+  a solver with no marks. `soapgpu` asks it on a torn hole instead; soapfilm.mjs should get the
+  same hole for the CPU reference (a check session; it moves an input, so `Check changes:`).
 
 ### 32d. On the plate
 
