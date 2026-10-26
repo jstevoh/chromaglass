@@ -5791,10 +5791,15 @@ Not a gate and no bar: a rate depends on what was pushed.
     by the runner image" says. Nothing goes vacuous (the decoder just stays fixed), and
     the cold fill measured 16 s for the whole step, so the fallback buys about 15 s once
     per image. Found by #496's review.
-  - **19ab-4b. Open: see the warm path run on CI.** #496's run was a cold miss, so "about
-    a second" from the cache is measured only in a cloud session. Read `Measure · sound`'s
-    ffmpeg step on the next run after the merge (it should print "installed from 87
-    cached packages, no mirror asked").
+  - **19ab-4b. Open: see the warm path run on CI.** #496's run was a cold miss, and so was
+    #497's (run of f9da96f, 53 s for the step), though #496 had saved the set under the
+    same image's key: an Actions cache saved by a pull request is scoped to that PR's merge
+    ref, and other PRs read only their own and the default branch's. So the set is shared
+    only once a run on `main` saves it, which the deploy's Measure does (#496's deploy,
+    run 40377261338); a deploy that skips its checks saves nothing. Read `Measure · sound`'s
+    ffmpeg step on the first PR run after that deploy: it should print "installed from 87
+    cached packages, no mirror asked". This also bears on 19ab-4a: without `restore-keys`,
+    PRs fill cold on each new image until a deploy that runs Measure saves its set.
   - **19ab-4c. Open: `--fetch` accepts only SHA256 and SHA512.** It takes MD5Sum and SHA1
     too; apt on noble prints the strongest hash anyway, so this is hardening, not a hole.
 
