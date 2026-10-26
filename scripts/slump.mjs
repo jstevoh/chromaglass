@@ -67,14 +67,25 @@
  *  13. and the same on a 1024² plate
  *  14. the grid's checkerboard filter (dampGrid) makes no dye at a drop's
  *      rim and does not move its front: the glycerine drop of 7, run once
- *      with the filter on (as every look has it) and once with it off,
- *      holds its total to 0.01% at 2 s and 20 s and its front within
- *      0.05 mm of the run without it (a cell here is 0.78 mm, and one cell
- *      more over the 2% contour moves the front 0.02 mm). The filter as it
- *      was before 18m-5 read +0.93% and +0.19 mm at 2 s, +3.20% and
- *      +0.16 mm at 20 s on Metal (#485's runs on main 7d77141). And the
- *      filter ran: a damper takes out variance, so the run with it on ends
- *      with less Σa² than the run without, or 14 is comparing two bare runs
+ *      with the filter on (as every look has it) and once with it off, has
+ *      the bare run's total to within 0.01% at 2 s and 20 s, and its front
+ *      (the radius at 2% of the peak) within 0.05 mm of the bare run's (a
+ *      cell here is 0.78 mm, and one cell more over the contour moves the
+ *      radius 0.02 mm). Measured against the bare run, not against what was
+ *      laid, so the step's own drift (11's 0.1%) neither eats the bar nor
+ *      hides a gain. The filter as it was before 18m-5 read +0.93% and
+ *      +0.19 mm at 2 s, and +3.20% and +0.17 mm (its front 0.72 mm out from
+ *      where it was laid, against the bare run's 0.55) at 20 s, on Metal and
+ *      on software WebGPU alike (#485's runs on main 7d77141, and this
+ *      check's measure on a lab built from 7d77141's fluid sources). And the
+ *      filter ran: the field with it is not the bare run's, its Σa² at 20 s
+ *      at least FILTER_MOVED away (0.50% on Metal, 0.48% on software WebGPU;
+ *      two runs of one program on one plate agree to the bit, so a filter
+ *      that never ran reads 0). Not which way: at Grid Damp 0.05 the filter
+ *      takes 0.5% out, at 0.5 the clamp's return puts 3.3% in.
+ *      The radius at 5% of the peak is printed, not held: the filter moves
+ *      it out 0.18 mm in 20 s (before 18m-5, 0.35), the same at 0.05 and 0.5
+ *      (PLAN 18m-5c)
  *
  * 12 and 13 are here because the drop in 1 to 11 is too shallow and too
  * coarse to find what the review of #371 (2026-10-24) found: the slump is
@@ -97,7 +108,7 @@
  * Until 18m-5 it was off here: it clamped its high-pass to the 3×3
  * neighbourhood's range, a drop's rim is where that clamp bites, and it
  * moved the glycerine drop's front 0.72 mm in 20 s and added 3.2% to its dye
- * on its own. Now it hands the clamp's excess back to the neighbours, and 14
+ * on its own (the front at 20 s, from where it was laid). Now it hands the clamp's excess back to the neighbours, and 14
  * holds it to that. It stays off in 12 and 13: they watch the slump's own
  * step for a checkerboard, and the filter takes 5% of one out a step, enough
  * to hide a step going slowly unstable.
@@ -313,11 +324,17 @@ report('11. the slump makes and loses no dye', Math.abs(kept - 1) <= 0.001,
 reportDeep('12', 768, d768);
 reportDeep('13', 1024, d1024);
 
-const rim = [2, 20].map((T) => ({ T, made: at(syrup, T).total / syrup[0].total - 1, moved: at(syrup, T).front - at(syrupBare, T).front }));
+const rim = [2, 20].map((T) => {
+  const on = at(syrup, T), bare = at(syrupBare, T);
+  return { T, made: on.total / bare.total - 1, drift: bare.total / syrupBare[0].total - 1, moved: on.front - bare.front, moved05: on.r05 - bare.r05 };
+});
+// The filter changed the field: 0.50% on Metal, 0.48% on software WebGPU; a stage never run reads 0.
+const FILTER_MOVED = 0.001;
+const ran = Math.abs(1 - at(syrup, 20).square / at(syrupBare, 20).square);
 report('14. the grid filter makes no dye at a drop\'s rim and does not move its front',
-  rim.every((r) => Math.abs(r.made) <= 1e-4 && Math.abs(r.moved) <= 0.05) && at(syrup, 20).square < at(syrupBare, 20).square,
-  rim.map((r) => `${r.T} s: dye ${r.made >= 0 ? '+' : ''}${(r.made * 100).toFixed(4)}%, front ${r.moved >= 0 ? '+' : ''}${r.moved.toFixed(3)} mm against the filter off`).join('; ')
-    + `; Σa² ×${(at(syrup, 20).square / at(syrupBare, 20).square).toFixed(6)} of the bare run's at 20 s (before 18m-5: +0.93% and +0.19 mm at 2 s)`);
+  rim.every((r) => Math.abs(r.made) <= 1e-4 && Math.abs(r.moved) <= 0.05) && ran >= FILTER_MOVED,
+  rim.map((r) => `${r.T} s: dye ${r.made >= 0 ? '+' : ''}${(r.made * 100).toFixed(4)}% of the bare run's (its own drift ${(r.drift * 100).toFixed(4)}%), front ${r.moved >= 0 ? '+' : ''}${r.moved.toFixed(3)} mm (at 5% of the peak ${r.moved05 >= 0 ? '+' : ''}${r.moved05.toFixed(3)} mm, not held)`).join('; ')
+    + `; Σa² ${(ran * 100).toFixed(3)}% from the bare run's at 20 s, at least ${(FILTER_MOVED * 100).toFixed(1)}% (before 18m-5: +0.93% and +0.19 mm at 2 s)`);
 
 console.log(failed.length ? `\n${failed.length} failed` : '\nall passed');
 process.exit(failed.length ? 1 : 0);
