@@ -5492,6 +5492,16 @@ commit. *Size:* S.
   a red check in the last month of `antigravity/` PRs before widening it, since every
   widening costs ordinary physics work a line in the body.
 
+- **19x-3. Measured quotes what it printed.** **Shipped** (2026-10-26, the owner's rule from
+  the scorecard): the `Check changes named` job also fails an Antigravity PR (`antigravity/…`
+  branch) whose `Measured:` has a command with no printed line quoted beside it, a group with
+  no command, a script that is not in `package.json`, or no `Measured:` at all (`npm run
+  checkguard`; the form is in `docs/handoff.md`). It reads the form, not the truth; the
+  reviewer runs one script and compares. Found along the way: `namedLines` does not read a
+  `Check changes:` that is itself a list item (`- **Check changes:**`, how Antigravity's
+  bodies write the whole block), so a named change under that form is not seen. It fails
+  safe (red, never green) but costs a round; read it the way `measuredGroups` does.
+
 ### 19y. Compaction and helper models set from the repo, not the host
 Found 2026-10-17: the 200k compaction window chosen on 10-12 was never in effect. A cloud
 session's environment still carried `CLAUDE_CODE_AUTO_COMPACT_WINDOW=500000` with the

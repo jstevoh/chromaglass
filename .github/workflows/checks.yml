@@ -1714,10 +1714,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Every change to a check's bar or input is named in the PR's body
+      - name: Every change to a check's bar or input is named, and an Antigravity PR's Measured lines quote what they printed
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
           PR_BODY: ${{ github.event.pull_request.body }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/checkguard.mjs --diff
