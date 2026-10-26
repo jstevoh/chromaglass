@@ -65,6 +65,27 @@
  *      |Σ(−1)^(x+y) a| / Σ a, stays under 0.1%; a round pool laid on the grid
  *      reads about 1e-9 there, so only a checkerboard moves it)
  *  13. and the same on a 1024² plate
+ *  14. the grid's checkerboard filter (dampGrid) makes no dye at a drop's
+ *      rim and does not move its front: the glycerine drop of 7, run once
+ *      with the filter on (as every look has it) and once with it off, has
+ *      the bare run's total to within 0.01% at 2 s and 20 s, and its front
+ *      (the radius at 2% of the peak) within 0.05 mm of the bare run's (a
+ *      cell here is 0.78 mm, and one cell more over the contour moves the
+ *      radius 0.02 mm). Measured against the bare run, not against what was
+ *      laid, so the step's own drift (11's 0.1%) neither eats the bar nor
+ *      hides a gain. The filter as it was before 18m-5 read +0.93% and
+ *      +0.19 mm at 2 s, and +3.20% and +0.17 mm (its front 0.72 mm out from
+ *      where it was laid, against the bare run's 0.55) at 20 s, on Metal and
+ *      on software WebGPU alike (#485's runs on main 7d77141, and this
+ *      check's measure on a lab built from 7d77141's fluid sources). And the
+ *      filter ran: the field with it is not the bare run's, its Σa² at 20 s
+ *      at least FILTER_MOVED away (0.50% on Metal, 0.48% on software WebGPU;
+ *      two runs of one program on one plate agree to the bit, so a filter
+ *      that never ran reads 0). Not which way: at Grid Damp 0.05 the filter
+ *      takes 0.5% out, at 0.5 the clamp's return puts 3.3% in.
+ *      The radius at 5% of the peak is printed, not held: the filter moves
+ *      it out 0.18 mm in 20 s (before 18m-5, 0.35), the same at 0.05 and 0.5
+ *      (PLAN 18m-5c)
  *
  * 12 and 13 are here because the drop in 1 to 11 is too shallow and too
  * coarse to find what the review of #371 (2026-10-24) found: the slump is
@@ -83,12 +104,14 @@
  * step other than 1/60 s.
  *
  * The grid's checkerboard filter (dampGrid, GRID_DAMP a step on every look
- * with no Diffusion Rate) is off in every run here. Left on, it moved the
- * glycerine drop's front 0.72 mm in 20 s and added 3.2% to its dye on its
- * own (measured by skipping each stage of the step in turn: only it changed
- * the total, +0.93% in 2 s), because it clamps its high-pass to the 3×3
- * neighbourhood's range and a drop's rim is where that clamp bites. That is
- * its own fault, written into PLAN 18m-5, and not what this measures.
+ * with no Diffusion Rate) is on in 1 to 11, as the app has it (PLAN 18m-5a).
+ * Until 18m-5 it was off here: it clamped its high-pass to the 3×3
+ * neighbourhood's range, a drop's rim is where that clamp bites, and it
+ * moved the glycerine drop's front 0.72 mm in 20 s and added 3.2% to its dye
+ * on its own (the front at 20 s, from where it was laid). Now it hands the clamp's excess back to the neighbours, and 14
+ * holds it to that. It stays off in 12 and 13: they watch the slump's own
+ * step for a checkerboard, and the filter takes 5% of one out a step, enough
+ * to hide a step going slowly unstable.
  *
  * Checks 6 to 9 are the controls on 2 to 5: the same measure, with the
  * physics the law says should change it changed, and once with the slump off
@@ -119,16 +142,16 @@ async function drop(times, over, white = false, N = 256) {
     let t = 0;
     for (const T of times) {
       const n = Math.round((T - t) / lab.stepSeconds); t = T;
-      if (n > 0) await lab.step(n, { diff: 0, gridDamp: 0, thinGap: 1, ...over });
+      if (n > 0) await lab.step(n, { diff: 0, thinGap: 1, ...over });
       const f = await lab.field('dye');
-      let total = 0, pk = 0;
-      for (let k = 3; k < f.length; k += 4) { total += f[k]; pk = Math.max(pk, f[k]); }
+      let total = 0, pk = 0, square = 0;
+      for (let k = 3; k < f.length; k += 4) { total += f[k]; pk = Math.max(pk, f[k]); square += f[k] * f[k]; }
       const radius = (share) => {
         let c = 0;
         for (let k = 3; k < f.length; k += 4) if (f[k] > share * pk) c++;
         return Math.sqrt(c / Math.PI) * cell * 1000;
       };
-      rows.push({ T, total, peak: pk, front: radius(0.02), r05: radius(0.05), r50: radius(0.5), volume: total * cell * cell * lab.dyeLayer });
+      rows.push({ T, total, peak: pk, front: radius(0.02), r05: radius(0.05), r50: radius(0.5), volume: total * cell * cell * lab.dyeLayer, square });
     }
     return rows;
   }, { N, times, over, white });
@@ -201,7 +224,8 @@ const g0 = 9.81 * 0.02, g1 = 9.81 * 0.15;
 
 const water = await drop([0, 5, 20, 30], { gapThickness: 0, solutalBuoyancy: 0 });
 const heavy = await drop([0, 20], { gapThickness: 0, solutalBuoyancy: 1 });
-const syrup = await drop([0, 20], { gapThickness: 1, solutalBuoyancy: 0 });
+const syrup = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0 });
+const syrupBare = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0, gridDamp: 0 });
 const clear = await drop([0, 10], { gapThickness: 0, solutalBuoyancy: 0 }, true);
 // 18h calibrated diff: 0.0002 to physical molecular diffusion (Dm ≈ 4e-10 m²/s),
 // which in 30 s barely moves a drop. The blur control tests unphysical rapid diffusion
@@ -216,7 +240,7 @@ const nuWater = await nu(0), nuSyrup = await nu(1);
 const dyeLayer = await page.evaluate(() => lab.dyeLayer);
 await close();
 
-for (const [name, rows] of [['water', water], ['heavy', heavy], ['glycerine', syrup], ['clear', clear], ['blur', blur], ['water 512²', fine]]) {
+for (const [name, rows] of [['water', water], ['heavy', heavy], ['glycerine', syrup], ['glycerine, no grid filter', syrupBare], ['clear', clear], ['blur', blur], ['water 512²', fine]]) {
   console.log(`  ${name}: ${rows.map((r) => `${r.T}s front ${mm(r.front)} half ${mm(r.r50)} peak ${r.peak.toFixed(2)} total ${r.total.toFixed(1)}`).join(' | ')}`);
 }
 
@@ -299,6 +323,18 @@ report('11. the slump makes and loses no dye', Math.abs(kept - 1) <= 0.001,
 
 reportDeep('12', 768, d768);
 reportDeep('13', 1024, d1024);
+
+const rim = [2, 20].map((T) => {
+  const on = at(syrup, T), bare = at(syrupBare, T);
+  return { T, made: on.total / bare.total - 1, drift: bare.total / syrupBare[0].total - 1, moved: on.front - bare.front, moved05: on.r05 - bare.r05 };
+});
+// The filter changed the field: 0.50% on Metal, 0.48% on software WebGPU; a stage never run reads 0.
+const FILTER_MOVED = 0.001;
+const ran = Math.abs(1 - at(syrup, 20).square / at(syrupBare, 20).square);
+report('14. the grid filter makes no dye at a drop\'s rim and does not move its front',
+  rim.every((r) => Math.abs(r.made) <= 1e-4 && Math.abs(r.moved) <= 0.05) && ran >= FILTER_MOVED,
+  rim.map((r) => `${r.T} s: dye ${r.made >= 0 ? '+' : ''}${(r.made * 100).toFixed(4)}% of the bare run's (its own drift ${(r.drift * 100).toFixed(4)}%), front ${r.moved >= 0 ? '+' : ''}${r.moved.toFixed(3)} mm (at 5% of the peak ${r.moved05 >= 0 ? '+' : ''}${r.moved05.toFixed(3)} mm, not held)`).join('; ')
+    + `; Σa² ${(ran * 100).toFixed(3)}% from the bare run's at 20 s, at least ${(FILTER_MOVED * 100).toFixed(1)}% (before 18m-5: +0.93% and +0.19 mm at 2 s)`);
 
 console.log(failed.length ? `\n${failed.length} failed` : '\nall passed');
 process.exit(failed.length ? 1 : 0);

@@ -1068,8 +1068,12 @@ jobs:
         run: npm run straw
       # A drop of ink on a level plate slumps out along the lower glass as a
       # viscous gravity current, its front where Huppert's law puts it (PLAN 18m).
+      # On tools since 18m-5a, which runs it with the grid filter on and adds
+      # a glycerine run without it (55 s on Metal): plate was killed at its
+      # 20 minutes twice on #498 in ferro.mjs, its second-to-last step, with
+      # every check before it passed, where tools ran in 14.
       - name: A drop slumps under its own weight
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'plate' }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.shard == 'tools' }}
         run: npm run slump
       # A press goes down round and lifts into fingers, and a plain spring lift does not.
       - name: The press and its lift

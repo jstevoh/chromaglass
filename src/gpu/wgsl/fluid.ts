@@ -4707,17 +4707,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     main's +1.47 ppm/s, bar < 10 ppm/s). `npm run grating` holds it to all of
     this.
 
+    Why the three passes share their work rather than each working it out
+    (PLAN 18m-5b): as #485 shipped them, all three evaluated the 25-tap
+    stencil and the 3×3 bounds for every cell, and the stage cost 7.1–9.5% of
+    a layer's step on Metal against 1.4–3.8% for the one-pass filter before
+    it. Only the first pass needs them everywhere. `dampGridCurv` now writes
+    c into the field's write side as well as w into the room, so where
+    nothing comes back (w = 0, or ∑β = 0, which is everywhere but within
+    three cells of a clamp) `dampGrid` writes nothing and c stands, the same
+    number the old pass stored. Where something does come back it works c,
+    lo and hi out again in f32, as before, rather than reading c back from
+    the field, so that on a half-float dye the value it adds to is not the
+    rounded one. `dampGrid` reads its 14×14 of β once per 8×8 workgroup into
+    shared memory instead of 49 texture loads a cell, summed in the same
+    order. The 7×7 sums drop the rim test on each tap (only the grid's own
+    bounds remain) because both passes before them write 0 past the rim, and
+    adding 0 to a sum that starts at +0 changes no bit. Nothing about what
+    the filter does changed: `npm run grating` and `npm run slump` read the
+    same as before.
+
     A.a.x is s.
   */
   dampGridCurv: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(3) var clamped: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
 fn pastRim(p: vec2i) -> bool {
   return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
-}
-fn inDom(q: vec2i) -> bool {
-  let n = i32(S.n);
-  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
 }
 fn reflect1(x: i32, n: i32) -> i32 {
   if (x < 0) { return -1 - x; }
@@ -4744,11 +4760,12 @@ fn loadBox(q: vec2i, here: vec4f) -> vec4f {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
+  let here = textureLoad(src, p, 0);
   if (pastRim(p)) {
+    textureStore(clamped, p, here);
     textureStore(dst, p, vec4f(0.0));
     return;
   }
-  let here = textureLoad(src, p, 0);
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
   var acc = vec4f(0.0);
   for (var j = -2; j <= 2; j++) {
@@ -4783,6 +4800,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let c = clamp(here + u, lo, hi);
   let e = c - (here + u);
   let w = max(vec4f(0.0), min(c - lo, hi - c));
+  textureStore(clamped, p, c);
   textureStore(dst, p, select(w, vec4f(-1.0), abs(e) > vec4f(1e-20)));
 }`,
 
@@ -4792,10 +4810,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
 fn pastRim(p: vec2i) -> bool {
   return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
-}
-fn inDom(q: vec2i) -> bool {
-  let n = i32(S.n);
-  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
 }
 fn reflect1(x: i32, n: i32) -> i32 {
   if (x < 0) { return -1 - x; }
@@ -4842,10 +4856,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       acc += (k[i + 2] * wy) * (loadDom(q, here) - here);
     }
   }
+  let n = i32(S.n);
   for (var j = -3; j <= 3; j++) {
     for (var i = -3; i <= 3; i++) {
       let q = p + vec2i(i, j);
-      if (inDom(q)) {
+      if (q.x >= 0 && q.x < n && q.y >= 0 && q.y < n) {
         sumW += max(vec4f(0.0), textureLoad(room, q, 0));
       }
     }
@@ -4884,12 +4899,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var room: texture_2d<f32>;
 @group(0) @binding(4) var lim: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+var<workgroup> betas: array<vec4f, 196>;
 fn pastRim(p: vec2i) -> bool {
   return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
-}
-fn inDom(q: vec2i) -> bool {
-  let n = i32(S.n);
-  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
 }
 fn reflect1(x: i32, n: i32) -> i32 {
   if (x < 0) { return -1 - x; }
@@ -4913,14 +4925,39 @@ fn loadBox(q: vec2i, here: vec4f) -> vec4f {
   if (pastRim(qp)) { return here; }
   return textureLoad(src, qp, 0);
 }
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+${W} fn main(
+  @builtin(global_invocation_id) id: vec3u,
+  @builtin(workgroup_id) wg: vec3u,
+  @builtin(local_invocation_index) li: u32,
+) {
+  // The group's 8×8 cells and three either side: 14×14 of β, read once.
+  let n = i32(S.n);
+  let base = vec2i(wg.xy) * 8 - vec2i(3);
+  for (var t = li; t < 196u; t += 64u) {
+    let q = base + vec2i(i32(t % 14u), i32(t / 14u));
+    var b = vec4f(0.0);
+    if (q.x >= 0 && q.x < n && q.y >= 0 && q.y < n) { b = textureLoad(lim, q, 0); }
+    betas[t] = b;
+  }
+  workgroupBarrier();
+
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
-  let here = textureLoad(src, p, 0);
-  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
-    textureStore(dst, p, here);
-    return;
+  // Past the rim, and wherever nothing comes back, dampGridCurv's c stands.
+  if (pastRim(p)) { return; }
+  let w = max(vec4f(0.0), textureLoad(room, p, 0));
+  if (all(w == vec4f(0.0))) { return; }
+  let at = p - base;
+  var sumB = vec4f(0.0);
+  for (var j = -3; j <= 3; j++) {
+    for (var i = -3; i <= 3; i++) {
+      sumB += betas[(at.y + j) * 14 + at.x + i];
+    }
   }
+  let d = w * sumB;
+  if (all(d == vec4f(0.0))) { return; }
+
+  let here = textureLoad(src, p, 0);
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
   var acc = vec4f(0.0);
   for (var j = -2; j <= 2; j++) {
@@ -4953,21 +4990,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   let u = -A.a.x * (acc * (1.0 / 256.0));
   let c = clamp(here + u, lo, hi);
-  let w = max(vec4f(0.0), textureLoad(room, p, 0));
-  if (all(w == vec4f(0.0))) {
-    textureStore(dst, p, c);
-    return;
-  }
-  var sumB = vec4f(0.0);
-  for (var j = -3; j <= 3; j++) {
-    for (var i = -3; i <= 3; i++) {
-      let q = p + vec2i(i, j);
-      if (inDom(q)) {
-        sumB += textureLoad(lim, q, 0);
-      }
-    }
-  }
-  textureStore(dst, p, clamp(c + w * sumB, lo, hi));
+  textureStore(dst, p, clamp(c + d, lo, hi));
 }`,
 
   // Box-filter a field down to the logical grid, for the CPU's readers.
