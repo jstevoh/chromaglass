@@ -7,6 +7,10 @@
  * that appears is used at once, with no click (useProjector), because the app
  * opens the window itself and a popup needs no gesture here.
  *
+ * `requireSignIn` says the app opens only on a Home or Pro key (always, in the
+ * app as it ships; main.js), and `license` is the key main.js verified at
+ * launch, so a licensed launch never shows the gate for a frame.
+ *
  * `updates` is the profile sheet's view of what the app's updater found
  * (desktop/updates.js): `state()` asks, `act()` does what the menu item does
  * (open the new download, or restart into the one that has arrived), and
@@ -26,7 +30,7 @@ let license = { valid: false, tier: 'free', email: null, id: null, exp: null, er
 try {
   const encoded = parseArg('--chromaglass-license=');
   if (encoded) {
-    const json = Buffer.from(encoded, 'base64url').toString('utf8');
+    const json = decodeURIComponent(encoded);
     const parsed = JSON.parse(json);
     if (parsed && typeof parsed === 'object') license = parsed;
   }
@@ -39,6 +43,9 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   platform: process.platform,
   requireSignIn,
   license,
+  // A sign-in that must finish in the real browser (PLAN.md 23.17d): main.js
+  // opens only this app's own address.
+  openInBrowser: (url) => ipcRenderer.invoke('chromaglass:open-browser', String(url)),
   updates: {
     state: () => ipcRenderer.invoke('chromaglass:update-state'),
     act: () => ipcRenderer.invoke('chromaglass:update-act'),

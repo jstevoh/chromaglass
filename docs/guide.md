@@ -424,7 +424,7 @@ The same build serves three situations, and only the assumed headroom differs:
 |---|---|---|
 | **Hosted** | chromaglass.web.app | up to 512² at 1.5x pixels — starts low and climbs only if the machine holds it |
 | **Local** | `npm run remote` on your own machine | up to 768² at native pixel density, plus the phone remote |
-| **Native** | a desktop shell around `dist/` (not built yet) | as local |
+| **Native** | the Mac app (`desktop/`), which opens only on a Home or Pro licence (`desktop/README.md`) | as local |
 
 The tier is detected from where the page was loaded (`localhost`, a private
 LAN address or `.local` is local; an Electron/Tauri shell is native), and the

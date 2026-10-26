@@ -3,8 +3,8 @@ import { desktopUpdates, MAC_APP_NOTARISED, MAC_FIRST_OPEN, macAppRow, onMacComp
 
 /**
  * The Mac app in Profile & Store (PLAN.md 13-update). On the site it is the
- * download, for Pro on a Mac; on a phone or a PC it says where to get it, and
- * to anyone not on Pro that it comes with Pro. Inside the app it is the app's
+ * download, for Home and Pro on a Mac; on a phone or a PC it says where to get
+ * it, and to anyone on neither that it comes with them. Inside the app it is the app's
  * own version and what its updater found, with the one button the menu item
  * also gives (desktop/updates.js), so an update is found where the performer
  * already looks for their account, not only in the menu bar.
@@ -26,7 +26,7 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
   // The sheet's own classes (AccountSheet, CloudSyncCard), so the card reads as one of its sections.
   const label = 'text-[11px] font-medium uppercase tracking-wider text-dim';
   const note = 'mt-1 text-[12px] leading-snug text-muted';
-  const what = 'The show offline, with the phone remote, OSC and the projector built in.';
+  const what = 'The show offline, with the phone remote and the projector built in.';
   return (
     <div data-cg-mac-app={row.kind} className="border-t border-border pt-4">
       <div className="flex items-center justify-between">
@@ -49,7 +49,7 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
         </>
       )}
       {row.kind === 'on-a-mac' && <p className={note}>Open chromaglass.art on your Mac and download it from this sheet there.</p>}
-      {row.kind === 'with-pro' && <p className={note}>The Mac app comes with Pro. {what}</p>}
+      {row.kind === 'with-a-licence' && <p className={note}>The Mac app comes with Home and Pro. {what}</p>}
       {row.kind === 'in-app' && (
         <>
           <p className="mt-1 text-[13px] text-text" data-cg-mac-update={state?.status ?? 'off'} aria-live="polite">{row.line}</p>

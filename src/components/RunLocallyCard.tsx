@@ -92,7 +92,7 @@ export function RunLocallyCard({ status }: { status: EngineStatus | null }) {
         automatic quality ladder climb to 768² at 2x and 1024² at 1x
         {status.tier === 'native'
           ? '.'
-          : ', plus the Mac app with a window of its own and the projector outputs.'}
+          : ', plus several projectors with edge blending in the Mac app.'}
       </p>
       <div className="mb-3 flex items-center gap-2">
         <a
