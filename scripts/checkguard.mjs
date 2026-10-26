@@ -572,11 +572,13 @@ export function measuredGroups(body) {
     }
     if (!inside) continue;
     if (l === '') continue;
-    // The section ends at a heading or at the next label at its own level. A
-    // list item such as "- Mac GPU: …" is a line of the section, not a label,
-    // unless it is bold ("- **Controls:**") or one of the handoff block's own.
+    // The section ends at a heading or at the next label at its own level: a
+    // bold one ("**Controls:**") or one of the handoff block's own. A line such
+    // as "Mac GPU: …" or "CI: all green" is not one, listed or not: with no
+    // blank line before it Markdown renders it inside the last item, so it is
+    // read as a line of the section, and fails if it quotes nothing.
     const isLabel = indent <= labelAt && /^[A-Z][\w '’/-]{0,40}:(\s|$)/.test(label)
-      && (!item.test(l) || /^(\*\*|__)/.test(l.replace(item, '')) || /^(plan item|done|controls|review owed|check changes|left):/i.test(label));
+      && (/^(\*\*|__)/.test(l.replace(item, '')) || /^(plan item|done|controls|review owed|check changes|left):/i.test(label));
     if (/^#+\s/.test(l) || isLabel) { inside = false; continue; }
     const text = l.replace(item, '');
     groupAt ??= indent;
@@ -594,13 +596,16 @@ const COMMAND = /^(?:[A-Z_][A-Z0-9_]*=\S+\s+)*(?:npm run ([\w:.-]+)|node (?:--[\
   What the printed line has to look like: two words or more, and either a
   number or the word a check prints in front of its result ("ok …", "FAIL …",
   "all ok"). "passed", "green", "ok" and a bare "1" are verdicts, not output, and so
-  is a verdict with a date or a SHA after it ("passed on 2026-10-26").
+  is a verdict with a date or a SHA, or inside a sentence ("it passed on
+  2026-10-26"), unless the span begins as a check's line does ("ok 12/12 passed").
 */
 export function looksPrinted(text) {
   const t = text.trim();
   if (t.split(/\s+/).length < 2) return false;
-  if (/^(pass\w*|green|clean|success\w*|done|works?)\b/i.test(t)) return false;
-  return /\d/.test(t) || /^(all )?ok\b/i.test(t) || /^FAIL\b/.test(t);
+  const leads = /^(all )?ok\b/i.test(t) || /^FAIL\b/.test(t);
+  // A verdict anywhere in a span that does not begin as a check's line does.
+  if (!leads && /\b(pass\w*|green|clean|success\w*|works?)\b/i.test(t)) return false;
+  return leads || /\d/.test(t);
 }
 
 /*
@@ -991,6 +996,11 @@ function selftest() {
   t(mp('Measured:\n- `npm run wall` → `ok 4/4 stamps lit`\n#485: `npm run grating` passed').length === 1, 'a bare "#" does not end the section, and the line after it is read');
   t(mp('<!--\nMeasured:\n- `npm run grating` → `ok 12/12 holds` -->\nDone: x').length > 0, 'a Measured section inside an HTML comment is not there');
   t(mp('Measured the plate by eye\nLeft: y').length > 0, 'a line that starts with the word is not the label');
+  // The reviewer's: a plain "Word:" line under a good one is read, not taken for the next label.
+  t(mp('Measured:\n- `npm run wall` → `ok 4/4 stamps lit`\nMac GPU: `npm run grating` passed\nCI: all green').length === 2, 'plain "Mac GPU:" and "CI:" lines under a good line are read and fail');
+  t(mp('Measured:\n- `npm run wall` → `ok 4/4 stamps lit`\nMac GPU: `npm run grating` → `ok 24/24 holds`').length === 0, 'and one that quotes its line passes');
+  t(mp('Measured: `npm run grating` → `it passed on 2026-10-26`').length > 0 && mp('Measured: `npm run grating` → `24 checks green`').length > 0, 'a verdict inside a sentence is a verdict');
+  t(mp('Measured: `npm run grating` → `ok 12/12 passed`').length === 0 && mp('Measured: `npm run grating` → `exit 0`').length === 0, 'but "ok 12/12 passed" is a check\'s line, and "exit 0" is what a silent command is quoted by');
   t(isAntigravity('antigravity/18m-5') && !isAntigravity('claude/project-thread-x') && !isAntigravity('feature/antigravity/x') && !isAntigravity(''), 'only branches antigravity/… are held to it');
   return failed;
 }

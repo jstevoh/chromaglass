@@ -83,7 +83,7 @@ were in 6 of the 8 first reviews sent back since that tool returned):
 ```
 Measured:
 - Mac GPU: `npm run grating` → `ok 24/24 pressed plate 4.15e-3 against 6.28e-3`
-- `npm run lint` → `ok 0 errors`
+- `npm run lint` → `exit 0`
 ```
 
 CI fails the PR when a command has no printed line after it on its line (`npm run lint`
@@ -91,7 +91,9 @@ clean, `npm run panel` 197/197, "CI green"), when a group names no command, when
 script is not in `package.json`, or when there is no `Measured:` at all; the guard is the
 same job as `Check changes:` (`npm run checkguard`), so after editing the body, re-run the
 failed jobs; no push is needed. A printed line is two words or more and a number or the
-word a check puts first (`ok …`, `FAIL …`, `all ok`); "passed" and "green" are not. Write
+word a check puts first (`ok …`, `FAIL …`, `all ok`); "passed", "green" and "clean" are not,
+anywhere in the span unless it begins `ok` or `FAIL`. A command that prints nothing when it
+passes (`npm run lint` is `tsc --noEmit`) is quoted by its exit status, `exit 0`. Write
 the lines inline in backticks, not in a code block. A list item may have the numbers the
 check printed nested under it as detail, and a header item may hold several commands, each
 quoted on its own line. A PR that changes only Markdown may say `Measured: none`. Claude
