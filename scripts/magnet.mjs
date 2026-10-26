@@ -40,7 +40,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery, isGpuEngine } from './frame.mjs';
+import { engineQuery, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4341;
 const checks = [];
@@ -96,7 +96,8 @@ try {
     the performer's, RIG_KEYS), so the set-down magnet is sized (check 4).
   */
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256&set=magnetSize=0.9${engineQuery()}`, { waitUntil: 'load' });
-  await page.waitForTimeout(9000);
+  await settlePlate(page, 9000);
+  await waitForEngine(page);
 
   const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
   check('the GPU solver is the one being measured', isGpuEngine(engine), engine ?? 'no debug hook');
@@ -150,7 +151,7 @@ try {
   const laysBefore = await lays();
   await page.mouse.click(5, 5);
   await page.keyboard.press('m');
-  await page.waitForTimeout(2500);
+  await settlePlate(page, 2500);
   const pickedStep = await page.evaluate(() => {
     const d = window.chromaglassDebug(), st = d.fluids?.[0]?.lastStep;
     return { tool: d.tool?.() ?? null, strength: st ? +st.magnetStrength : null, magnets: d.magnets?.().length ?? null };
@@ -160,7 +161,7 @@ try {
   check('picked, and not yet touched, the Magnet puts no magnet under the plate',
     pickedStep.tool === 'magnet' && pickedStep.strength === 0 && pickedStep.magnets === 0,
     `${pickedStep.tool} in hand; the solver is stepped with magnet strength ${pickedStep.strength}, ${pickedStep.magnets} magnets on the plate`);
-  await page.waitForTimeout(9000);
+  await settlePlate(page, 9000);
   const untouched = await phase();
   const laysPicked = await lays();
   check('and pours no ferrofluid: the plate is as it was until a hand touches it',
@@ -307,12 +308,12 @@ try {
     `(${plan.start.len.toFixed(2)}), in the window ${plan.start.w.map(Math.round)} → ${plan.end.w.map(Math.round)}` : `none (${plan.why}): from near the left edge, across the window`}`);
   await page.mouse.move(...startW);
   await page.mouse.down();
-  await page.waitForTimeout(1500);
+  await settlePlate(page, 1500);
   const first = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
   const firstAt = first ? { x: Math.max(0.05, Math.min(0.95, first.x)), y: Math.max(0.05, Math.min(0.95, first.y)) } : null;
   const bareHeld = await phase(firstAt, 0.18), liveHeld = await live(), givenHeld = await given(), laysHeld = await lays();
   await page.mouse.up();
-  await page.waitForTimeout(1500);
+  await settlePlate(page, 1500);
   const bareAfter = await phase(), liveAfter = await live(), givenAfter = await given(), laysAfter = await lays();
   const offMiddle = firstAt ? Math.hypot(firstAt.x - 0.5, firstAt.y - 0.5) : 0;
   check('touching a bare plate with the Magnet brings no ferrofluid, and gives the look its magnet',
@@ -341,7 +342,7 @@ try {
   */
   const POOL = 0.9 * Math.PI * 0.157 ** 2 / 2;
   if (firstAt) await page.evaluate(({ x, y }) => window.chromaglassDebug().fluids[0].gpu.addPhase(x, y, 0.157, 0.9), firstAt);
-  await page.waitForTimeout(500);
+  await settlePlate(page, 500);
   const poured = await phase(firstAt, 0.18), livePoured = await live();
   const sceneBefore = await scene();
   const atTouch = await where();
@@ -349,7 +350,7 @@ try {
   await page.mouse.down();
   const early = [];
   for (let k = 0; k < 6; k++) {
-    await page.waitForTimeout(250);
+    await settlePlate(page, 250);
     early.push(await page.evaluate(() => { const m = window.chromaglassDebug().magnetNow?.(); return m ? `${m.held ? 'H' : '-'}${m.x.toFixed(2)},${m.y.toFixed(2)}` : '?'; }));
   }
   const sceneTouch = await scene();
@@ -414,12 +415,12 @@ try {
     const f = i / 40;
     // No way planned: the old line across the window, and the check below says so.
     await page.mouse.move(...(plan.end ? [startW[0] + (plan.end.w[0] - startW[0]) * f, startW[1] + (plan.end.w[1] - startW[1]) * f] : at(0.05 + 0.7 * f)));
-    await page.waitForTimeout(150);
+    await settlePlate(page, 150);
     if (i % 4 === 0) await sample();
   }
   const hold = [];
   for (let k = 0; k < 12; k++) {
-    await page.waitForTimeout(250); await sample();
+    await settlePlate(page, 250); await sample();
     hold.push(await page.evaluate(() => { const m = window.chromaglassDebug().magnetNow?.(); return m ? `${m.held ? 'H' : '-'}${m.x.toFixed(2)},${m.y.toFixed(2)}` : '?'; }));
   }
   console.log(`     the solver's magnet through the hold: ${hold.join(' ')}`);
@@ -468,7 +469,7 @@ try {
   check('and dragging it neither makes nor loses liquid',
     sameGrid && once && Math.abs(kept - 1) < 0.08,
     `kept ${(kept * 100).toFixed(0)}%; ${counts}${sameGrid ? '' : ` (the grid moved ${drag0.n} → ${drag1.n})`}`);
-  await page.waitForTimeout(1000);
+  await settlePlate(page, 1000);
 
   /*
     3. Let go, and the magnet stays where the hand left it.
@@ -534,16 +535,16 @@ try {
   const probe = await page.evaluate(([x, y]) => window.chromaglassDebug().plateAt?.(x, y) ?? null, at(0.85));
   const corner = { x: (probe?.x ?? 0.5) > 0.5 ? 0.1 : 0.9, y: (probe?.y ?? 0.5) > 0.5 ? 0.1 : 0.9 };
   await page.evaluate((c) => Object.assign(window.chromaglassDebug().settings, { magnetX: c.x, magnetY: c.y }), corner);
-  await page.waitForTimeout(1000);
+  await settlePlate(page, 1000);
   const home = await readStep();
   check('the look\'s own magnet is where the check put it, in the far corner',
     asLook(home) && Math.hypot(home.x - corner.x, home.y - corner.y) < 0.02,
     `asked for ${corner.x},${corner.y}; the solver was given ${fmt(home)}`);
   await page.mouse.down();
-  await page.waitForTimeout(1000);
+  await settlePlate(page, 1000);
   const left = await page.evaluate(() => window.chromaglassDebug().magnetHand?.());
   await page.mouse.up();
-  await page.waitForTimeout(2000);
+  await settlePlate(page, 2000);
   const letGo = await readStep();
   const away = left && home ? Math.hypot(clamp(left.x) - home.x, clamp(left.y) - home.y) : 0;
   const off = left && letGo ? Math.hypot(letGo.x - clamp(left.x), letGo.y - clamp(left.y)) : Infinity;
@@ -570,7 +571,7 @@ try {
   */
   const across = corner.x > 0.5 ? 0.3 : 0.7;
   await page.evaluate((x) => { window.chromaglassDebug().settings.magnetX = x; }, across);
-  await page.waitForTimeout(1000);
+  await settlePlate(page, 1000);
   const placed = await readStep();
   check('moving Magnet Across takes it from where the hand left it',
     asLook(placed) && Math.abs(placed.x - across) < 0.02 && Math.abs(placed.y - corner.y) < 0.02,
@@ -598,7 +599,7 @@ try {
     await page.getByTestId('tool-segmented-magnet').click({ button: 'right' });
     await page.getByTestId('tool-options-size').fill(String(v));
     await page.mouse.click(5, 5);
-    await page.waitForTimeout(300);
+    await settlePlate(page, 300);
     return page.evaluate(() => window.chromaglassDebug().settings?.magnetSize ?? null);
   };
   const sizes = [];
@@ -606,10 +607,10 @@ try {
     sizes.push(await setSize(size));
     await page.mouse.move(...at(0.5));
     await page.mouse.down();
-    await page.waitForTimeout(800);
+    await settlePlate(page, 800);
     const m = await readStep();
     await page.mouse.up();
-    await page.waitForTimeout(300);
+    await settlePlate(page, 300);
     return m;
   };
   const small = await heldAt(0.1), big = await heldAt(0.9);
@@ -654,7 +655,8 @@ try {
   const page2 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page2.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page2.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&rung=2&set=magnetSize=0.9${engineQuery()}`, { waitUntil: 'load' });
-  await page2.waitForTimeout(9000);
+  await settlePlate(page2, 9000);
+  await waitForEngine(page2);
   const counts2 = () => page2.evaluate(() => {
     const d = window.chromaglassDebug(), st = d.fluids?.[0]?.lastStep;
     return {
@@ -683,7 +685,7 @@ try {
     const from = (await counts2()).grid, seen = [from];
     for (let i = 0; i < 4; i++) {
       await page2.evaluate(() => window.chromaglassDebug().stepDownFrames(1));
-      await page2.waitForTimeout(2500);
+      await settlePlate(page2, 2500);
       const g = (await counts2()).grid;
       if (g !== seen[seen.length - 1]) seen.push(g);
       if (g > 0 && from > 0 && g !== from) return { seen, moved: true };
@@ -693,10 +695,10 @@ try {
   const bare = await phase2();
   await page2.mouse.click(5, 5);
   await page2.keyboard.press('m');
-  await page2.waitForTimeout(1500);
+  await settlePlate(page2, 1500);
   const picked2 = await counts2();
   const grids1 = await newGrid();
-  await page2.waitForTimeout(3000);
+  await settlePlate(page2, 3000);
   const regrid1 = await counts2(), plate1 = await phase2();
   check('a new grid with the Magnet picked and untouched lays nothing: no ring, no magnet under the middle',
     grids1.moved && grids1.seen[0] === 512 && picked2.lays >= 0
@@ -716,10 +718,10 @@ try {
   const box2 = await plateBox(page2);
   await page2.mouse.move(box2.x + box2.width * 0.2, box2.y + box2.height * 0.5);
   await page2.mouse.down();
-  await page2.waitForTimeout(1500);
+  await settlePlate(page2, 1500);
   const touched2 = await counts2();
   const grids2 = await newGrid();
-  await page2.waitForTimeout(2000);
+  await settlePlate(page2, 2000);
   const hand2 = await page2.evaluate(() => window.chromaglassDebug().magnetHand?.());
   const regrid2 = await counts2(), plate2 = await phase2();
   const strength2 = await page2.evaluate(() => window.chromaglassDebug().settings?.magnetStrength ?? 0);
@@ -758,7 +760,8 @@ try {
   const page3 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page3.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page3.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&rung=2${engineQuery()}`, { waitUntil: 'load' });
-  await page3.waitForTimeout(9000);
+  await settlePlate(page3, 9000);
+  await waitForEngine(page3);
   const POOLS = [{ x: 0.3, y: 0.55, r: 0.12 }, { x: 0.7, y: 0.32, r: 0.07 }];
   const counts3 = () => page3.evaluate(() => {
     const d = window.chromaglassDebug();
@@ -779,14 +782,14 @@ try {
     return { total: total / (n * n), near: near.map(v => (total ? v / total : 0)), n };
   }, POOLS);
   await page3.evaluate((POOLS) => { const g = window.chromaglassDebug().fluids[0].gpu; for (const p of POOLS) g.addPhase(p.x, p.y, p.r, 0.9); }, POOLS);
-  await page3.waitForTimeout(500);
+  await settlePlate(page3, 500);
   await page3.evaluate(() => window.chromaglassSettings({ phaseAmount: 0.6 }));
-  await page3.waitForTimeout(1500);
+  await settlePlate(page3, 1500);
   const before3 = await counts3(), poured3 = await pools3();
   let grids3 = { seen: [before3.grid], moved: false };
   for (let i = 0; i < 4 && !grids3.moved; i++) {
     await page3.evaluate(() => window.chromaglassDebug().stepDownFrames(1));
-    await page3.waitForTimeout(2500);
+    await settlePlate(page3, 2500);
     const g = (await counts3()).grid;
     if (g !== grids3.seen[grids3.seen.length - 1]) grids3.seen.push(g);
     grids3.moved = g > 0 && g !== before3.grid;
@@ -820,23 +823,24 @@ try {
   const page4 = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page4.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page4.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });
-  await page4.waitForTimeout(9000);
+  await settlePlate(page4, 9000);
+  await waitForEngine(page4);
   const box4 = await plateBox(page4).then(b => ({ x: b.x, y: b.y, w: b.width, h: b.height }));
   const frozen4 = () => page4.evaluate(() => { const d = window.chromaglassDebug(); return { active: d.active?.() ?? null, steps: d.fluids?.[0]?.stepCount ?? -1, strength: d.settings?.magnetStrength ?? null }; });
   await page4.mouse.click(5, 5);
   await page4.keyboard.press('m');
   await page4.keyboard.press('f');
-  await page4.waitForTimeout(500);
+  await settlePlate(page4, 500);
   const f0 = await frozen4();
   await page4.mouse.move(box4.x + box4.w * 0.25, box4.y + box4.h * 0.3);
   await page4.mouse.down();
-  await page4.waitForTimeout(1000);
+  await settlePlate(page4, 1000);
   const hand4 = await page4.evaluate(() => window.chromaglassDebug().magnetHand?.());
   await page4.mouse.up();
-  await page4.waitForTimeout(1000);
+  await settlePlate(page4, 1000);
   const f1 = await frozen4();
   await page4.keyboard.press('f');
-  await page4.waitForTimeout(2000);
+  await settlePlate(page4, 2000);
   const thawed = await page4.evaluate(() => { const st = window.chromaglassDebug().fluids?.[0]?.lastStep; return st ? { x: +st.magnetX, y: +st.magnetY, strength: +st.magnetStrength } : null; });
   const off4 = hand4 && thawed ? Math.hypot(thawed.x - clamp(hand4.x), thawed.y - clamp(hand4.y)) : Infinity;
   check('held with the show frozen, the Magnet gives the look its magnet, set down where the hand left it',

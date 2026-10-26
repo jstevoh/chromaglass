@@ -5340,6 +5340,37 @@ a Mac check before it pushes; about a third of the Mac reds were the PR's own (1
 *Measure:* the same commit through `tools`, `magnet`, `mirror` and `bottles` in a cloud
 session and on the Mac: the lines that do not depend on the step rate agree. *Size:* M.
 
+*Built (2026-10-26, this PR):* `scripts/chromium.mjs` launches headed into an Xvfb it starts
+itself (`-displayfd`, so parallel harnesses never race for a display) when `PW_WEBGPU` is set on
+Linux, and turns off the GPU watchdog for software WebGPU only; `PW_HEADLESS=1` or a harness's
+`present: false` keeps the old launch (`intro` does: it times the page's own frames through an
+opening). `scripts/frame.mjs`'s `engineQuery()` adds `&dpr=0.25&steps=60` there, and two waits:
+`waitForEngine` after the opening, `settlePlate` for every other wait in `tools`, `magnet`,
+`mirror` and `bottles`, the wall clock on a GPU exactly as before and, in software, also a share
+(`PW_STEP_SHARE`, 0.05) of the steps the Mac's sixty a second would take.
+*What was found on the way, Chromium 153:* headless still loses the device at the first present
+(a bare canvas: lost at once headless, thirty frames headed). Headed was not enough by itself:
+the app's first full solver step (248 compute passes) holds SwiftShader's one GPU thread for
+25 to 100 s, compiling as it first dispatches, and Chromium's watchdog takes that for a hang
+and kills the GPU process, so the page lost its device, made a new one, reached the same step
+and was killed again, for good. That is what `startup.mjs`'s "SwiftShader loses the app's
+device every few seconds" was. With the watchdog off, the plate's frame reads back (mean 0.40
+on classic, moving) and the plate makes about 0.4 steps a second at 256² and at 128² alike
+(the cost is a step's dispatches, not its cells), against about sixty on Metal; the drawing
+was 90% of a 1280×800 software frame (36 s), 2 to 3 s at `dpr=0.25`. `stages` read 0.7 to
+1 s a solver layer a step. So a cloud session runs a Mac check's logic on a plate that moves,
+at a twentieth of its steps, and not its magnitudes.
+*Measured:* see the PR (tools, magnet, mirror, bottles here against the same commit's Mac shards).
+
+#### 19l-2. The first step's stall on a cold compiler (found with 19l)
+
+The opening builds its pipelines ahead and uses each once (`gpu/prepare.ts`), and still the
+first full step, in software, spends 25 to 100 s in first dispatches before it finishes; the
+page's frames wait behind it (`npm run intro`'s fade took 95 s to finish headed). Whether a
+cold Metal cache pays a smaller share of the same on the owner's machine after a deploy that
+changes a shader is not measured: `npm run startup` on the Mac, with STARTUP_COLD=1, reading the
+first step's GPU time apart from the prepare's, would say. *Size:* S to measure.
+
 ### 19m. Fragments for the shared documents, and this file as an index
 
 Of 61 merges of main into PR branches, 25 recorded conflicts: `PLAN.md` 14, `docs/judging.md`

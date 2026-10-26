@@ -31,7 +31,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery } from './frame.mjs';
+import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4351;
 const checks = [];
@@ -114,7 +114,8 @@ try {
       } catch { /* none */ }
     });
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${sc.look}${engineQuery()}`, { waitUntil: 'load' });
-    await page.waitForTimeout(8000);
+    await settlePlate(page, 8000);
+    await waitForEngine(page);
     await page.evaluate(({ sc, CALM }) => {
       window.chromaglassSettings?.({ ...CALM, ...sc.settings });
       if (sc.output) window.chromaglassOutput?.(sc.output);
@@ -122,7 +123,7 @@ try {
       window.chromaglassLayer?.(sc.layer);
       window.chromaglassTool?.(sc.tool ?? 'dropper');
     }, { sc, CALM });
-    await page.waitForTimeout(3000);
+    await settlePlate(page, 3000);
     const hole = await page.getByTestId('desk-preview').boundingBox();
     if (!hole) { check(`${sc.name}: the Design desk's preview is there`, false); await page.close(); continue; }
     // Pictures stay in the page and only the 6x6 means come back: shipping
@@ -161,14 +162,14 @@ try {
     const driftReps = [], changeReps = [];
     let hand = null;
     for (let rep = 0; rep < REPS; rep++) {
-      const a = await shot(); await page.waitForTimeout(1300); const b = await shot();
+      const a = await shot(); await settlePlate(page, 1300); const b = await shot();
       await page.mouse.move(hx, hy);
       await page.mouse.down();
       if (!hand) hand = await page.evaluate(() => window.chromaglassDebug?.().pointer?.());
-      for (let k = 1; k <= 6; k++) { await page.mouse.move(hx + k * 2, hy + k); await page.waitForTimeout(100); }
+      for (let k = 1; k <= 6; k++) { await page.mouse.move(hx + k * 2, hy + k); await settlePlate(page, 100); }
       await page.mouse.up();
       await page.mouse.move(hole.x + hole.width * 0.02, hole.y + hole.height * 0.02);
-      await page.waitForTimeout(500);
+      await settlePlate(page, 500);
       const c = await shot();
       const d = await grid(a, b), ch = await grid(b, c);
       add(drift, d); add(change, ch); driftReps.push(d); changeReps.push(ch);
