@@ -5762,6 +5762,23 @@ Not a gate and no bar: a rate depends on what was pushed.
     would move the layout and phone checks' text measurements with nothing red. The
     step prints `fc-match sans-serif` and `emoji`; make it fail on a fallback that
     is not the one the checks were measured with, once CI's own reading is known.
+- **19ab-4. ffmpeg comes from the Actions cache, not the mirror (shipped 2026-10-26).**
+  19ab-1's four-minute bound on the sound shard's apt made the outage legible but did not
+  end it: on 2026-10-26 the step ran it out twice in an hour (#495's run 40350041600,
+  #402's run 40358831181), and then `bands`, `songends` and `shape` failed on "no ffmpeg
+  on the path" and `renders` on "no ffprobe on the path", four reds on PRs that touched
+  no sound. Retries and a stall timeout (19ab-2) do nothing for a mirror that is slow
+  rather than silent. Now the `.deb`s apt fetches for ffmpeg are kept in the Actions
+  cache, keyed by the runner image, and a run that has them installs them from disk with
+  apt reading an empty source list, so a set that no longer fits the image (a dependency
+  missing, or a downgrade, which apt refuses under `-y`) fails at once and falls back to
+  the mirror, which then saves a fresh set. Kept Ubuntu's own build rather than a static
+  ffmpeg from elsewhere, so the shelf's MP3s are decoded by the decoder the sound checks
+  were measured with. The step then requires `ffmpeg` and `ffprobe` by name. Measured in
+  a cloud session on 24.04 with a stand-in package (mpv, 14 `.deb`s): from the mirror
+  4.9 s; from the cache 0.9 s with no source asked; one `.deb` taken out of the set,
+  "unmet dependencies" in 0.04 s, then the mirror, 7.2 s; an older `.deb` than the one
+  installed, exit 100 and nothing changed. CI's own seconds: this PR's runs.
 
 ### 19ac. The phone's double tap on Speed is judged on two taps landing in time
 

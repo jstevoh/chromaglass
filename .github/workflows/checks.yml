@@ -252,16 +252,68 @@ jobs:
       # its own and the shard dies before its first sound check runs — every PR in
       # the repo red for an hour, whatever it changed. Four minutes is ten times
       # the warm cost; past that the mirror is not answering and the useful
-      # output is this step's name, not a cancelled harness. ffmpeg is a real
-      # need, unlike the browser's fonts (19ab-2), so it is fetched every run and
-      # a failure stays a failure; the retries only stop one stalled connection
-      # from spending the whole four minutes.
+      # output is this step's name, not a cancelled harness.
+      #
+      # The bound only made the outage legible; it kept coming (PLAN 19ab-4): on
+      # 2026-10-26 the step ran out its four minutes twice in an hour, on #495 and
+      # #402, and every ffmpeg check after it failed on "no ffmpeg on the path" and
+      # "no ffprobe on the path" for a diff that touched no sound. ffmpeg is a real
+      # need, unlike the browser's fonts (19ab-2), so the answer is not to skip it
+      # but to stop asking the mirror every run. The packages apt fetches are kept
+      # in the Actions cache, and a run that has them installs them from disk with
+      # apt reading no sources at all (an empty source list, so a gap in the set is
+      # an instant "unmet dependencies", never a quiet download): about a second,
+      # and the same Ubuntu build of ffmpeg the checks were measured with, not a
+      # static build from elsewhere whose decoder would be a new input. Only a run
+      # without them, or whose set no longer fits the image (a dependency missing,
+      # or a downgrade apt refuses), goes to the mirror, with apt's retries and a
+      # 30 s stall timeout, and saves what it fetched. The cache is keyed by the
+      # runner image so a new image is tried against the last image's set first.
+      # The step then requires both binaries by name, so a run where this fails
+      # says so here and not as four sound checks' FAIL lines.
+      - name: Which runner image, for ffmpeg's packages
+        id: image
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        run: |
+          echo "os=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "version=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+      - name: ffmpeg's packages, from the cache
+        id: ffdebs
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/ffmpeg-debs
+          key: ffmpeg-debs-${{ steps.image.outputs.os }}-${{ steps.image.outputs.version }}
+          restore-keys: ffmpeg-debs-${{ steps.image.outputs.os }}-
       - name: ffmpeg, for the shelf and the render's files
+        id: ffmpeg
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         timeout-minutes: 4
         run: |
-          apt=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30)
-          sudo apt-get "${apt[@]}" update -qq && sudo apt-get "${apt[@]}" install -y -qq --no-install-recommends ffmpeg
+          d="$HOME/ffmpeg-debs"
+          nosrc=$(mktemp -d)
+          offline=(-o Dir::Etc::SourceList=/dev/null -o "Dir::Etc::SourceParts=$nosrc")
+          if compgen -G "$d/*.deb" > /dev/null && sudo apt-get "${offline[@]}" install -y -q --no-install-recommends "$d"/*.deb; then
+            echo "ffmpeg installed from $(ls "$d"/*.deb | wc -l) cached packages, no mirror asked"
+          else
+            echo "::warning title=ffmpeg::no cached packages that fit this runner; fetching from the mirror"
+            rm -rf "$d" && mkdir -p "$d/partial"
+            apt=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30)
+            sudo apt-get "${apt[@]}" update -q
+            sudo apt-get "${apt[@]}" install -y -q --no-install-recommends --download-only -o "Dir::Cache::archives=$d" ffmpeg
+            sudo apt-get "${offline[@]}" install -y -q --no-install-recommends "$d"/*.deb
+            sudo rm -rf "$d/partial" "$d/lock"
+          fi
+          for b in ffmpeg ffprobe; do
+            command -v "$b" > /dev/null || { echo "::error title=ffmpeg::$b is not on the path after the install; every sound check that decodes or opens a file fails on it"; exit 1; }
+            "$b" -hide_banner -version | sed -n 1p
+          done
+      - name: ffmpeg's packages, kept for the next run
+        if: ${{ !cancelled() && steps.ffmpeg.outcome == 'success' && steps.ffdebs.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/ffmpeg-debs
+          key: ffmpeg-debs-${{ steps.image.outputs.os }}-${{ steps.image.outputs.version }}
       - name: The bands
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         run: npm run bands
