@@ -21,6 +21,33 @@ The site inside is the one from the day it was built. Every change still lands o
 the website first; a release (below) brings it to the app, and an installed app
 finds the release by itself.
 
+## What it opens on: a Home or Pro licence
+
+The app opens the show only with a ChromaGlass Home or Pro licence on the Mac
+(PLAN.md 23.17d); the website stays the free tier. The first start shows a door
+(`src/components/AppLicenceGate.tsx`):
+
+- **Sign in** with the account the licence was bought with. Email and password
+  finish in the app's window. Google, and the emailed link, finish in the real
+  browser on the app's own server (`http://localhost:3000/show?macSignIn=1`):
+  that tab fetches the account's key and files it with the app's server, and the
+  app's window, which watches the server, opens by itself.
+- A new password account is asked to **confirm its email** first (the licence
+  Worker hands keys only to a confirmed address).
+- An account with no licence gets **Buy Home** and **Buy Pro** (the store, in the
+  browser) and *I have bought it: check again*.
+- **Have a licence key?** takes a `cg1.` key typed in, checked offline.
+
+Once a key is on the Mac it is verified against its signature at every start, with
+no network and no time limit: a gig with no Wi-Fi opens like any other night. When
+the app is online and signed in it asks the account again; a key the account no
+longer holds (refunded) leaves the Mac at the next start, never in the middle of a
+show. Home and Pro unlock what they unlock on the website.
+
+The packed app always asks. From the repo (`npm run app`) it asks only with
+`CHROMAGLASS_REQUIRE_SIGNIN=1`, so working on the app needs no key. A key for a
+terminal show is still `CHROMAGLASS_LICENSE_KEY=cg1.… npm run show`.
+
 ## Getting the app
 
 **The download.** The newest release is always at
@@ -76,7 +103,11 @@ switches it off.
 Until it is signed with a Developer ID (below), macOS says it cannot check the app
 for malicious software. Open it once, let macOS refuse, then System Settings →
 Privacy & Security → *Open Anyway* (macOS 15 no longer offers this from the
-right-click menu). After that it opens like any app.
+right-click menu, and a double-click only says it may harm your Mac). After that
+it opens like any app. In Terminal, `xattr -dr com.apple.quarantine
+/Applications/ChromaGlass.app` does the same. The release notes and the profile
+sheet say this for every build Gatekeeper refuses (`spctl` asks the built app in
+`desktop.yml`); notarising (13.1-sign) is what takes the warning away.
 
 macOS then asks, each once:
 

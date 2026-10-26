@@ -1810,3 +1810,91 @@ On the phone: the look in the list, and Film Hold under Oil Bodies in Settings �
 Bad: walls between drops so thick the crowd reads as a lattice; drops that jitter against each
 other; colours going brown or black inside the drops; or a crowd that has merged into blobs within
 half a minute with no music playing.
+
+today (widened in §80).
+
+## 80. Lamp Warmth reaches a 3200 K halogen (PLAN 35e-2)
+
+In Settings, Lamp & Light, on any look with some colour on the plate (the bulb is also on the phone's Settings):
+
+1. Lamp Warmth now runs from 6500 K at 0 to 3200 K at the right-hand end, and the bulb's figure follows it, even
+   steps of colour all the way. The old 0 to 1 is the first quarter and looks as it did.
+2. Drag it slowly to the end. The picture should go from white through cream and amber to the orange of an old
+   overhead projector's lamp; blues and violets should die away first, as under a real tungsten lamp, and reds
+   and oranges hold. The warm end is dimmer on purpose; Exposure brings it back.
+3. Bad: a jump or a band as you drag, a look that changed colour with the slider where it was, a bulb figure that
+   does not follow, a dark corner that gets worse beyond the old end (the vignette is meant to stop at 1).
+4. Decide: Home Movie (0.45) and Velvet Underground (0.25) kept their colour. Try Home Movie at 2 or 3, which is
+   what an old projector's lamp is; say if you want it, and if you want the end held at the same brightness
+   instead of dimmer (PLAN 35e-3).
+
+## 81. Tape reels, a tap pad, a VU needle, a lens cap, a strobe ring (PLAN 35f)
+
+On the desk and the phone, with a band or a microphone playing:
+
+1. Press R (or Record). Two small reels appear in the button beside the clock. The left one starts full and
+   turns slowly, the right one starts bare and turns about twice as fast; over several minutes the left
+   empties onto the right and the two turn rates come together and cross. Stop and they stop. On the phone,
+   the Play screen's Record pill shows the same two reels, still while it waits, turning while it records,
+   the clock under them, and the pill is red while it runs.
+2. Settings, Audio Input, Tempo: tap the Tap pad four times. The four pips fill, the tempo shows in segment
+   digits, and a small light on the pad blinks on the beat you tapped, staying with your tap if you tap a
+   fifth time a little late. On the phone it is in the Sound sheet. Listen clears it.
+3. The Sound sheet (desk and phone) has a small dial. With a source playing, the needle swings up on each
+   kick, about a third of a second to arrive and a soft fall; stop the sound and it lies on its stop; unplug a
+   USB input and the dial says "deaf". It is the only thing here that moves with sound.
+4. Blackout (header on the desk, Settings, the remote, Draw): off it is a bare lens; on, a cap snaps over the
+   lens once and the button is solid red. Draw's off state is no longer red. The remote has one Blackout now,
+   in the bar under the thumb.
+5. Settings, Plate Spin, above Auto Spin: a ring of dots. In Rate it turns at the dish's speed. In Tempo
+   with a tempo tapped or heard, and Beats a Turn at 16, the dots stand still while the dish turns. Set
+   Beats a Turn to 48 and they creep backward slowly (the alias). Off, the ring is dim and still.
+
+Bad: reels that turn at one speed, a beat light that drifts off your taps, a needle that jumps or sticks
+after the sound stops, a cap that is red when the room is lit, a ring that turns while locked, anything that
+moves with reduced motion on (the reels and ring stop and the needle shows the number instead), or a violet
+or red that is not "on" or "live". Decide too: the VU dial is the plate's own 0 to 100 volume, not decibels
+(PLAN 35f-2).
+
+## 82. Looks as slides in a tray (PLAN 35g)
+
+On the desk and the phone:
+
+1. Click the preset name at the top left. Every look in the menu is a small square slide: cardboard mount, one
+   clipped corner, a landscape window with the look's two colours on the film. The slide is the same cardboard
+   on every row; the look you are on keeps its violet row, nothing about the slide itself changes colour.
+2. Open the set list. Each row is a slide where the little colour square was. Cue a look: the cue bar shows the
+   one on stage as a slide, a round tray to its left, and the cued one as a slide behind the arrow.
+3. Press Go. The tray clicks one slot, a quick turn with a small overshoot, and settles; nothing else moves.
+   Go to a look earlier in the list and it clicks back; to a look far away and it still clicks only one slot.
+4. On the phone: the look button at the top shows the slide, the look's name and a small tray that clicks
+   when the look changes. The Looks sheet lists slides. On the Play screen the Looks strip is a row of slides
+   you flick; each flick stops on one slide (it cannot coast past several), the one up has the violet ring and
+   its name in the lit chip, and the tray beside "Looks" clicks when you tap one.
+5. With reduced motion on, the tray does not turn.
+
+Bad: a slide whose mount turns violet or red, a tray that spins freely or turns on the beat, a strip that
+coasts past slides, a ring clipped at the slide's corner, a click that is a slide-sized jump of the layout, or a
+tray on a screen that shows no look. Decide too: ten slots on the drum, a real tray has eighty (PLAN 35g-2).
+
+
+## 83. The Mac app opens only on a Home or Pro licence (PLAN 23.17d)
+
+After the next Mac release (Actions → Mac app → Run workflow, release ticked), on a Mac:
+
+1. Install the new app over the old one and open it. If this Mac already had a key, the show opens at once,
+   with no screen in front of it. Otherwise a sign-in screen is drawn where the plate would be, and nothing
+   plays behind it.
+2. Sign in with the email and password of an account that has bought nothing. The screen asks you to confirm
+   your email if the account is new, then offers Buy Home and Buy Pro. The show does not open.
+3. Sign out, and choose Continue with Google. Your own browser opens on the app's address (localhost), you
+   sign in there, that tab says you can go back to the app, and the app's window opens the show by itself
+   within a few seconds. The tier in the profile sheet is the one you bought.
+4. Quit, turn Wi-Fi off and open the app again. It still opens straight to the show.
+5. With the app open, open `http://localhost:` and the app's port in Chrome on the same Mac. Chrome shows the
+   same sign-in screen, not the show.
+
+Bad: the show visible for a frame before the sign-in screen, a Google sign-in that opens inside the app's
+window and is refused, a browser tab that signs in but the app never notices, a licensed app that asks again
+with Wi-Fi off, or Chrome on localhost playing the show free. Decide too: offline, a refunded key keeps working
+until the app next goes online (no grace period, PLAN 23.17h).

@@ -1,12 +1,13 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle, Lightbulb } from 'lucide-react';
+import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import { SwitchPill, LIT, LIVE } from './ui';
+import { LensCap } from './ui/Playful';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
@@ -758,18 +759,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           <Slider label="Speed" field="globalSpeed" step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Evolve Speed" field="automateRate" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('automateRate') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Dimmer" field="dimmer" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('dimmer') as number | undefined} {...sliderProps} connected={connected} />
+          {/* One Blackout on the remote: the one in the bar under the thumb (PLAN 35f). */}
           <div className="mb-6 flex gap-3">
-            <button
-              aria-pressed={!!state?.blackout}
-              onClick={() => action('blackout-toggle')}
-              disabled={!connected}
-              className={`flex flex-[2] items-center justify-center gap-2 rounded-2xl border py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors active:scale-95 disabled:opacity-30 ${
-                state?.blackout ? LIVE : 'border-white/10 bg-white/5 text-white/80'
-              }`}
-              data-testid="remote-blackout"
-            >
-              <Lightbulb size={16} /> {state?.blackout ? 'Lights up' : 'Blackout'}
-            </button>
             <button
               aria-pressed={state?.recording != null}
               onClick={() => action('record-toggle')}
@@ -1074,7 +1065,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             }`}
             data-testid="remote-blackout"
           >
-            <Lightbulb size={16} />
+            <LensCap capped={!!state?.blackout} size={22} />
             {state?.blackout ? 'Blacked out' : 'Blackout'}
           </button>
           {/*

@@ -185,6 +185,10 @@ export function isHostedSiteBuild(): boolean {
 
 export function isTierGatingEnforced(): boolean {
   if (isHostedSiteBuild()) return true;
+  // The site as built for the Mac app (desktop.yml), in a browser opened on the
+  // app's own server: Home's and Pro's features by the key, as in the app's
+  // window (PLAN.md 23.17d), not everything because no shell said so.
+  if (import.meta.env?.VITE_MAC_APP === '1') return true;
   const native = getNativeBridge();
   return Boolean(native?.license?.enforced || native?.requireSignIn);
 }

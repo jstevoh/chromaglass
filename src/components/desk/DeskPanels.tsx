@@ -21,7 +21,7 @@ import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import { ToolGlyph } from '../ui/ToolGlyph';
-import { Bottle, LiveBottle } from '../ui/Playful';
+import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
 
@@ -329,7 +329,7 @@ function CuesBody({ p }: { p: DeskProps }) {
                       data-testid={`perform-saved-${l.id}`}
                       data-state={state}
                     >
-                      <span className="h-4 w-4 shrink-0 rounded-sm" style={{ background: l.swatch }} />
+                      <SlideMount swatch={l.swatch} size={20} />
                       <span className={`truncate text-[13px] ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{l.name}</span>
                     </button>
                     {state === 'live' ? <Tag tone="live">live</Tag> : state === 'next' ? <Tag tone="next">next</Tag> : null}

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import type { TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
   Magnet,
@@ -23,7 +24,7 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
-import { Bottle, LiveBottle } from '../ui/Playful';
+import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 
 /**
  * ChromaGlass on a phone.
@@ -85,6 +86,8 @@ export interface PhoneStageProps {
   lookSwatch: string;
   looks: PhoneLook[];
   activeLookId: string | null;
+  /** The look on stage's place in `looks`, which way the slide tray clicks (PLAN 35g). */
+  lookSlot?: number | null;
   onLook: (id: string) => void;
   onRandomLook: () => void;
   onRevert: (() => void) | null;
@@ -148,7 +151,7 @@ export interface PhoneStageProps {
     a turn. On the Play sheet beside the flick, since a turning dish is
     something played, not set up.
   */
-  spin: { auto: number; rpm: number; beats: number; onChange: (patch: Partial<VisualizerSettings>) => void };
+  spin: { auto: number; rpm: number; beats: number; /** The tempo the dish's Tempo mode is lit by, bpm, or 0. */ bpm: number; onChange: (patch: Partial<VisualizerSettings>) => void };
   // The closeup
   zoom: number;
   onZoom: () => void;
@@ -186,6 +189,12 @@ export interface PhoneStageProps {
   mapLine: string | null;
   /** Listening but hearing nothing (hooks/useAudioAnalyzer.ts): the dock's dot turns amber and the sound sheet says so. */
   deaf: boolean;
+  /** The plate's volume, 0 to 100, or null with no ear: what the VU needle in the Sound sheet is moved by. */
+  readLevel: () => number | null;
+  /** The tempo source: where the tempo comes from, a tap, and the reading the beat light polls. */
+  tempo: { source: string | null; bpm: number; taps: number };
+  onTap: () => void;
+  readTempo: () => TempoReading | null;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
     the filmed shows (lib/scenePacing.ts), started and stopped from a tile on
@@ -337,8 +346,10 @@ function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 /** A square button for a sheet's grid: icon over a word, 64 tall. */
-function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
+function Tile({ icon: Icon, label, on = false, onPress, testId, tone, glyph }: {
   icon: ComponentType<{ size?: number }>; label: string; on?: boolean; onPress: () => void; testId?: string; tone?: 'live';
+  /** A picture in place of the icon (Record's tape reels). */
+  glyph?: ReactNode;
 }) {
   return (
     <button
@@ -351,7 +362,7 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
           : 'border-border bg-elevated text-text-2 active:bg-active'
       }`}
     >
-      <Icon size={20} />
+      {glyph ?? <Icon size={20} />}
       <span className="tabular-nums">{label}</span>
     </button>
   );
@@ -418,8 +429,9 @@ export function PhoneStage(p: PhoneStageProps) {
           data-testid="phone-look-button"
           aria-label="Choose a look"
         >
-          <span className="h-9 w-9 shrink-0 rounded-full border border-white/20" style={{ background: p.lookSwatch }} />
+          <SlideMount swatch={p.lookSwatch} size={36} />
           <span className="truncate text-[14px] font-medium text-text">{p.lookName ?? 'Custom'}</span>
+          <span className="shrink-0 text-muted"><SlideTray at={p.lookSlot ?? null} size={20} /></span>
           <ChevronDown size={16} className="shrink-0 text-muted" />
         </button>
         <div className="pointer-events-auto flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
@@ -889,7 +901,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       data-testid={`phone-look-${l.id}`}
                       className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
                     >
-                      <span className="h-10 w-10 shrink-0 rounded-md border border-white/10" style={{ background: l.swatch }} />
+                      <SlideMount swatch={l.swatch} size={44} />
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
                         {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
@@ -907,7 +919,10 @@ export function PhoneStage(p: PhoneStageProps) {
       {sheet === 'sound' && (
         <PhoneSheet title="Sound" onClose={close} testId="phone-sheet-sound">
           <PanelGuard name="The Sound sheet" inline onClose={close}>
-          <p className="mb-3 text-[13px] leading-snug text-muted">What the plate listens to. It moves with whatever is playing.</p>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-[13px] leading-snug text-muted">What the plate listens to. It moves with whatever is playing.</p>
+            <VuMeter read={p.readLevel} listening={p.audioSource !== 'none'} deaf={p.audioSource !== 'none' && p.deaf} width={72} />
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Mic} label="Microphone" on={p.audioSource === 'microphone'} onPress={() => p.onAudioSource(p.audioSource === 'microphone' ? 'none' : 'microphone')} testId="phone-sound-mic" />
             <Tile icon={Music} label="Band" on={p.audioSource === 'simulated'} onPress={() => p.onAudioSource(p.audioSource === 'simulated' ? 'none' : 'simulated')} testId="phone-sound-band" />
@@ -981,6 +996,13 @@ export function PhoneStage(p: PhoneStageProps) {
               </p>
             </div>
           )}
+          <SectionLabel>Tap the tempo</SectionLabel>
+          <div className="flex items-stretch gap-2" data-testid="phone-tempo">
+            <TapPad tempo={p.tempo} read={p.readTempo} onTap={p.onTap} touch />
+          </div>
+          <p className="mt-1 text-[12px] leading-snug text-dim" data-testid="phone-tempo-says">
+            {p.tempo.source ? `${p.tempo.bpm} bpm, ${p.tempo.source === 'clock' ? 'from MIDI clock' : p.tempo.source === 'tap' ? 'tapped' : 'set'}. Four taps give a good one.` : 'Listening for the tempo. Two taps give one, four give a good one.'}
+          </p>
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
@@ -1050,6 +1072,15 @@ export function PhoneStage(p: PhoneStageProps) {
             )}
           </div>
           <SectionLabel>Turn the dish by itself</SectionLabel>
+          <div className="mb-2 flex items-center gap-3" data-testid="phone-spin-strobe">
+            <StrobeRing mode={p.spin.auto} rpm={p.spin.rpm} beats={p.spin.beats} bpm={p.spin.bpm} size={44} />
+            <p className="text-[12px] leading-snug text-dim" data-testid="phone-spin-strobe-says">
+              {Math.round(p.spin.auto) === 2 && p.spin.bpm > 0
+                ? `Locked to ${p.spin.bpm} bpm: the dots stand still while the dish turns once in ${Math.round(p.spin.beats)} beats.`
+                : Math.round(p.spin.auto) === 0 ? 'Auto Spin is off.'
+                : `Turning at ${Math.abs(p.spin.rpm).toFixed(1)} rpm${Math.round(p.spin.auto) === 2 ? ' until a tempo is heard' : ''}.`}
+            </p>
+          </div>
           <div className="grid grid-cols-3 gap-1.5" data-testid="phone-spin-auto">
             {(['Off', 'Rate', 'Tempo'] as const).map((name, mode) => (
               <button key={name} onClick={() => p.spin.onChange({ spinAuto: mode })} aria-pressed={Math.round(p.spin.auto) === mode}
@@ -1112,6 +1143,7 @@ export function PhoneStage(p: PhoneStageProps) {
               tone="live"
               onPress={p.recording.onToggle}
               testId="phone-record"
+              glyph={<TapeReels seconds={p.recording.seconds} running={p.recording.on} height={20} />}
             />
             <Tile icon={Clapperboard} label="Songs" onPress={() => { close(); p.onSongs(); }} testId="phone-songs" />
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />

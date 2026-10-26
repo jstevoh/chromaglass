@@ -1,20 +1,20 @@
 /**
  * Lamp Warmth, read in kelvin.
  *
- * The slider has always been a number from 0 to 1, and a lighting designer
- * does not think in that: the lamp is a temperature. The plate's grade
- * (`plate.ts`, "Lamp warmth") multiplies the picture by a fixed warm tint,
- * `LAMP_GRADE`, in proportion to the slider. This reads that tint as the
- * colour temperature it matches: the blackbody, seen by an eye adapted to
- * the plate's own white, whose red-to-blue ratio is the grade's at that
- * position. So the figure is not a label put on the slider but a reading of
- * what the shader does, and it is held to it by `npm run panel`.
+ * The slider is a lamp temperature. Its travel is even in mireds (a million
+ * over the kelvin), the unit lighting designers step colour in because equal
+ * steps of it look equal to the eye, where equal steps of kelvin crowd all
+ * the change into the warm end. The plate multiplies the picture by the
+ * blackbody's own colour at that temperature (`lampTint`): its red, green
+ * and blue against the neutral's, taken from Planck's law and the eye's
+ * response, not a tint chosen by eye.
  *
- * What it says, which the slider never did: the grade at full is about
- * 5100 K, the colour of a warm morning, and not the 3200 K of the quartz
- * halogen lamps in the old overhead projectors. A wider grade that reached
- * 3200 K would change every look that uses the lamp (PLAN 35e-3), so it is
- * written down and not done here.
+ * It used to be a fixed tint mixed in by the slider, which topped out at
+ * about 5100 K, a warm morning and not the 3200 K of the quartz-halogen lamps
+ * in the old overhead projectors (PLAN 35e-2). The travel is now wider, and
+ * the numbers saved looks already hold keep their colour: 0 to 1 is still
+ * 6500 K to 5100 K (the new law agrees with the old one to a few mireds all
+ * along it), and 1 to `LAMP_WARMTH_MAX` carries on to 3200 K.
  *
  * The neutral is 6500 K: the blackbody nearest the white of sRGB, which the
  * plate shows when the grade is off.
@@ -25,8 +25,20 @@
  * in by eye.
  */
 
-/** The tint `plate.ts` multiplies the picture by at Lamp Warmth 1 (its `vec3f(1.06, 0.9, 0.7)`). */
-export const LAMP_GRADE = [1.06, 0.9, 0.7] as const;
+/** Where the slider ends: the quartz-halogen lamp of an overhead projector. */
+export const HALOGEN_KELVIN = 3200;
+
+/** The slider's top. 1 is the old end of the travel (about 5100 K); this is the halogen. */
+export const LAMP_WARMTH_MAX = 3.75;
+
+/**
+ * The old grade at Lamp Warmth 1, `vec3f(1.06, 0.9, 0.7)`, kept as the thing
+ * the new one is held to over the old range (`npm run panel`).
+ */
+export const LEGACY_GRADE = [1.06, 0.9, 0.7] as const;
+
+/** The red the old grade added at its end: a lamp's warm picture is a little redder than the white, not only less blue. */
+const RED_LIFT = 0.06;
 
 /** Lamp Warmth 0, the plate's own white, as the blackbody it is nearest to. */
 export const NEUTRAL_KELVIN = 6500;
@@ -67,41 +79,34 @@ export function blackbodyShift(kelvin: number): [number, number, number] {
   return [c[0] / NEUTRAL[0], c[1] / NEUTRAL[1], c[2] / NEUTRAL[2]];
 }
 
-/** The grade's red over blue at a position of the slider: `mix(1, grade, w)` per channel. */
-export function gradeRedOverBlue(warmth: number): number {
-  const w = Math.max(0, Math.min(1, warmth));
-  return (1 + (LAMP_GRADE[0] - 1) * w) / (1 + (LAMP_GRADE[2] - 1) * w);
-}
+const MIRED_NEUTRAL = 1e6 / NEUTRAL_KELVIN;
+const MIRED_PER_UNIT = (1e6 / HALOGEN_KELVIN - MIRED_NEUTRAL) / LAMP_WARMTH_MAX;
 
-const T_LOW = 2000, T_STEP = 10;
-let redOverBlue: number[] | null = null;
-/** r/b of the blackbody against the neutral, from 2000 K to the neutral in steps of 10 K, built once. */
-function ratios(): number[] {
-  if (redOverBlue) return redOverBlue;
-  const out: number[] = [];
-  for (let t = T_LOW; t <= NEUTRAL_KELVIN; t += T_STEP) {
-    const s = blackbodyShift(t);
-    out.push(s[0] / s[2]);
-  }
-  return (redOverBlue = out);
-}
-
-/**
- * The colour temperature the grade matches at Lamp Warmth `warmth` (0 to 1),
- * unrounded: the blackbody whose red over blue equals the grade's.
- */
+/** The colour temperature at Lamp Warmth `warmth`, unrounded: even steps of the slider are even steps of mired. */
 export function warmthKelvin(warmth: number): number {
-  const target = gradeRedOverBlue(warmth);
-  const r = ratios();
-  // Red over blue falls as the temperature rises: find where it crosses the target.
-  let lo = 0, hi = r.length - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (r[mid] > target) lo = mid; else hi = mid;
-  }
-  const span = r[lo] - r[hi];
-  const f = span > 1e-12 ? (r[lo] - target) / span : 0;
-  return Math.min(NEUTRAL_KELVIN, T_LOW + (lo + Math.max(0, Math.min(1, f))) * T_STEP);
+  const w = Math.max(0, Math.min(LAMP_WARMTH_MAX, Number.isFinite(warmth) ? warmth : 0));
+  return 1e6 / (MIRED_NEUTRAL + MIRED_PER_UNIT * w);
+}
+
+let tintMemo: { w: number; tint: [number, number, number] } | null = null;
+/**
+ * What the plate multiplies the picture by at Lamp Warmth `warmth`: the
+ * blackbody's red, green and blue against the neutral's, held to the red
+ * channel so that warmth takes its light from blue and green and leaves red
+ * where it was, plus the small red lift the old grade had.
+ * Holding red still is a choice, made so that 0 to 1 stays the old grade: it
+ * is what makes the warm end about a third dimmer (luminance 0.66 at 3200 K).
+ * A lamp's brightness is not fixed by its colour temperature, so this is not
+ * physics; Exposure puts it back.
+ */
+export function lampTint(warmth: number): [number, number, number] {
+  const w = Math.max(0, Math.min(LAMP_WARMTH_MAX, Number.isFinite(warmth) ? warmth : 0));
+  if (tintMemo && tintMemo.w === w) return tintMemo.tint;
+  const s = blackbodyShift(warmthKelvin(w));
+  const lift = 1 + RED_LIFT * Math.min(w, 1);
+  const tint: [number, number, number] = [lift, lift * s[1] / s[0], lift * s[2] / s[0]];
+  tintMemo = { w, tint };
+  return tint;
 }
 
 /** What the readout says: to the nearest 50 K, as a lighting plot would. */

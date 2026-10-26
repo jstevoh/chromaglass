@@ -5390,3 +5390,66 @@ blue is the grade's at that position, and glows that blackbody's own colour. The
 shader does, and says what the slider never did: it tops out at 5100 K. `npm run panel` holds the kelvin to
 the shader's tint, the drop's pace to the solver's viscosities, the bottle's level to its formula and the
 wiring, and the reduced-motion rule. Judging §78.
+
+**35e-2, the lamp widened to the halogen (2026-10-25).** The grade read in kelvin topped out at 5100 K, a warm
+morning and not the 3200 K of an overhead projector's quartz-halogen lamp. Lamp Warmth is now the lamp's
+temperature, stepped evenly in mireds (a million over the kelvin, the unit colour is graded in) from 6500 K to
+3200 K, and the plate multiplies the picture by the blackbody's colour there: its red, green and blue against the
+neutral's from Planck's law and the Wyman fit of the CIE functions, held to red plus the small red lift the old
+grade had, worked out once on the CPU and passed in as `lampTintR/G/B` rather than the fixed `vec3f(1.06, 0.9,
+0.7)` mixed in by the slider. The travel is 0 to 3.75, so that the number saved looks hold keeps its meaning:
+0 to 1 is still 6500 K to 5100 K, and the new tint is the old grade to 1.45% a channel there, which is why no preset
+or saved look moved (the shipped ones that use it: Velvet Underground 0.25, Home Movie 0.45). Measured on the lab's
+seeded plate, mean 0 to 255 per channel, old then new: 0.25 (64.4, 44.1, 55.9) then (64.5, 44.3, 55.3); 0.45
+(65.5, 43.1, 51.2) then (65.5, 43.3, 50.3); 1 (67.6, 39.6, 37.5) then (67.5, 39.9, 37.4); the halogen end 3.75 is
+(68.8, 25.4, 6.0), against 6500 K's (63.5, 45.8, 61.4), a blue dye going nearly black as it does under a real
+tungsten lamp. The vignette is unchanged, blended as it was (a first version multiplied by a second blend and was 4 to 6% dark in the corners, which the review caught), and full from 1 on. `npm run panel` holds the shader to the uniforms, the
+kelvin to even mireds ending at 3200 K, the tint to the blackbody's ratios, and 0 to 1 to the old grade.
+
+### 35f. Show hardware (shipped 2026-10-25)
+
+Batch C of the owner's playful-controls choice, items 7 to 11 (the slide carousel, 12, is its own piece): five
+controls drawn as the machines they stand in for, each moving only inside its own few pixels and holding
+still under reduced motion. Record is two tape reels. Tape runs past the heads at one speed, so a reel's
+turn rate is that speed over the radius of tape on it: the supply reel starts full and slow and speeds up as it
+empties onto the take-up, which starts a bare hub and slows as it fills (a compact cassette's 4.76 cm/s, hub
+0.9 cm, pack 2.1 cm, a constant-thickness roll so the pack's area, not its radius, is the tape wound on). The
+angle a reel has turned through is the integral of v / r, which has a closed form for a radius that is a
+square root of time, so the button is stateless: the angle is a function of the clock and a one-second linear
+transition carries it round. `npm run panel` integrates the turn rate numerically and holds the closed form
+to a tenth of a percent, across the end of the tape too. The phone's Play pill takes the reels in a fixed box
+(the pill still does not widen when a clip starts, and is red while it runs, which the audit said it was not),
+the More sheet's tile takes them at 20 px. Tap Tempo is a pad with a light that blinks on the beat the source
+has locked, four pips that fill with the taps, and the tempo in segment digits. The light is a Web Animations
+loop at the source's period and phase, resynced every quarter second if it slipped 30 ms, so a beat renders
+nothing. The VU needle is a moving coil: a second-order system with a damping ratio of 0.81 (1.3% overshoot,
+inside the standard's 1 to 1.5) and a natural frequency set so its step response first reaches 99% at
+300 ms, solved exactly over each step because an Euler step added damping of its own that took the overshoot
+to 0.8% and the rise to 208 ms. It reads the plate's volume on its own frame through a ref (nothing
+re-renders with it), falls to its stop when the sound stops, writes "deaf" on the dial when the input
+is, and under reduced motion shows the number. Blackout is a lens with a cap: the same drawing on the desk
+header, Settings, the remote and Draw, the cap snapping on once in 140 ms and in the button's own colours
+(red where the button is live, neutral otherwise: Draw's was red while the room was lit); the remote's two
+Blackouts are one, the bar under the thumb. Auto Spin has a platter's strobe ring: in Rate the dots drift at
+the dish's speed, in Tempo with a tempo heard the dish turns exactly one dot a beat, so lit by the beat the
+ring stands still, up to 32 beats a turn and as a slow alias past that. Judging §81.
+
+### 35g. Looks as slides in a tray (shipped 2026-10-25)
+
+Item 12 and the last of the owner's playful-controls choice. A look is a 35 mm slide and the stage takes it
+from a round tray. The slide is drawn at a real mount's proportions (`slideTray.ts`): 50 mm square, one corner
+clipped so it can be told right way up in the dark, and a 34 by 22.5 mm aperture, the 3:2 a 24 by 36 mm
+frame shows through, with the look's own two palette colours (`swatchOf`, from its contract) on the film. The
+mount is one cardboard colour on every look and takes no state colour: lit stays the row's violet ring and
+live its red, so the picture says only "a slide". It replaces the flat swatch on the set list rows (`CueRow`),
+the cue bar (the look on stage, and the cued one behind the arrow), every row of the preset menu (new: it had
+none), the performer's saved list, the phone's look button and Looks sheet, and the Play screen's Looks strip.
+The strip is now a tray you flick: a mount a tile, snapping one slide at a time (`snap-mandatory`,
+`snap-always`), the lit ring on a wrapper because the clipped corner would cut a ring drawn on the mount.
+The round tray (`SlideTray`) is the drum from above with a fixed gate at the top. It clicks one slot when the
+look on stage changes, the way the changer pushes one slide back and lifts the next whatever the distance in
+the list: forward when the new look stands later in the list, back when earlier, nothing for the first look of
+a session or no change (`stepOf`). It holds only its count of pushes, turns in 160 ms with a small overshoot
+and settle, and has no loop and no timer. It is on the cue bar and beside the phone's look name and the Looks
+heading. Under reduced motion it does not turn. Held by `npm run panel` ("Looks as slides in a tray"). Judging
+§82.
