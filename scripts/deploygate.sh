@@ -124,7 +124,7 @@ api() {
 
 treeof() { api "git/commits/$1" | jq -r '.tree.sha // empty'; }
 
-# The Mac shards, read from checks.yml's matrix rather than written out here.
+# The Mac shards, read from the manifest rather than written out here.
 # The list used to be written here by hand, four names, and when PLAN.md 19w
 # gave checks.yml a fifth shard (`fifth`, 2026-10-11) nothing told this file:
 # from then on every PR run had five green shards, "five" is not "these four",
@@ -133,19 +133,21 @@ treeof() { api "git/commits/$1" | jq -r '.tree.sha // empty'; }
 # the Mac shards (fifth=success,open=success,plate=success,show=success,
 # tools=success)", so each of those deploys re-ran the whole Mac, about 55
 # minutes from merge to live, on a tree that had just passed it. Reading the
-# names from the workflow makes the next shard count without anyone
-# remembering this file. It is the checked-out tree's checks.yml, the one being
-# deployed: a run whose own matrix was different (rule 5, a run on an older
-# main before a shard was added or renamed) does not match it and is not
-# trusted, which costs that one deploy the Mac and never trusts a run that
-# skipped a shard. No shard line, or more than one, stops the script, which in
-# deploy.yml runs the checks in full.
-MACSHARDS=$(sed -n 's/^[[:space:]]*shard:[[:space:]]*\[\(.*\)\][[:space:]]*$/\1/p' \
-  "$(dirname "$0")/../.github/workflows/checks.yml")
-[ -n "$MACSHARDS" ] && [ "$(printf '%s\n' "$MACSHARDS" | wc -l)" -eq 1 ] \
-  || { echo "checks.yml has no single 'shard: [...]' line to read the Mac shards from" >&2; exit 1; }
-MACSHARDS=$(printf '%s\n' "$MACSHARDS" | tr ',' '\n' | tr -d ' "'"'"'' | grep -v '^$' | sort \
-  | jq -Rnc '[inputs | "\(.)=success"]')
+# names from the tree makes the next shard count without anyone remembering
+# this file. It is the checked-out tree's list, the one being deployed: a run
+# whose own matrix was different (rule 5, a run on an older main before a
+# shard was added or renamed) does not match it and is not trusted, which
+# costs that one deploy the Mac and never trusts a run that skipped a shard.
+# No list stops the script, which in deploy.yml runs the checks in full.
+#
+# Since PLAN.md 19k the list is the manifest's (scripts/checks.json), which
+# checks.yml's matrix runs through `reach`: a PR whose change was only check
+# scripts runs the shards those checks are on, and such a run is not a Mac run
+# here, since it skipped the rest. Its merge changes no site file, so the
+# deploy publishes nothing (19j) and never asks.
+MACSHARDS=$(jq -c '.shards.mac // empty | map(select(type == "string")) | sort | map("\(.)=success")' \
+  "$(dirname "$0")/checks.json") && [ -n "$MACSHARDS" ] && [ "$MACSHARDS" != "[]" ] \
+  || { echo "scripts/checks.json has no shards.mac list to read the Mac shards from" >&2; exit 1; }
 
 # "ran" when run $1's Mac jobs are exactly the shards above and every one is
 # green; otherwise what it ran, joined ("none" for a run that skipped them).

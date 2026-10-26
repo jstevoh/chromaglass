@@ -61,9 +61,10 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   docs-only merge still ran the whole Mac; #245, which wrote this order, waited 79
   minutes.~~ #253 (3 of those 30 answer `nothing`; the other five rightly carried a site
   change that was not yet live)
-- **0.2** **19i** (E, M): a green Mac result carries across a merge of main that is disjoint
+- **0.2** ~~**19i** (E, M): a green Mac result carries across a merge of main that is disjoint
   from the PR's own site files. Those pushes were 56 % of the PRs' Mac minutes and 16
-  of their 29 reds; this is the largest saving in the file.
+  of their 29 reds; this is the largest saving in the file.~~ #429, and carrying at all
+  since 19k (#502): it asked for four shards where there were five
 - **0.3** **19s, then one PR per check** (E, S each): the checks that go red on trees they do
   not measure, each to its root cause and never by loosening it, worst first by the
   ledger: the drop map's "nowhere else" (19h-1, #238), the phone's two-finger Drop
@@ -80,9 +81,10 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   sample, and make the check say which.
 - **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
   docs/plan-shipped.md 19r).
-- **0.5** **19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
+- **0.5** ~~**19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
   only their shards, a new check edits no shared file, and `npm run quick` runs what
-  the diff needs, in parallel.
+  the diff needs, in parallel.~~ #502; open with it 19k-1 (the guard reads the
+  manifest) to 19k-4
 - **0.6** **19m** (F, M, at a quiet moment): fragment files for the shared documents, and this
   file as an index with one file per section; 23 of the last 25 merge conflicts were in
   `PLAN.md`, `docs/judging.md`, the changelog or `package.json`.
@@ -553,7 +555,7 @@ Where each batch stands, as of 2026-09-27:
 | 15 | Every tool on every liquid | Audited 2026-09-27 (table in 15); 15a, every laying tool lays the bottle, **shipped** (`npm run bottles`, Mac); 15d, the Press moves the oil with its colour, **shipped** (`npm run pressoil`), not yet judged on the Mac; the ferrofluid's half **shipped under Thin Gap** (a pressed pool stays full, spreads by the volume the glass displaced and comes back on lift; the ferrofluid's own viscosity in the gap; `npm run ferropress`), not yet judged on the Mac, and with Thin Gap off a press still greys it; 15c, Blow's wind carries the colour and the oil rather than erasing them, **shipped** (`npm run wind`, and `tools` on the Mac) as a carry, a shortcut 15g replaces with air's shear on the film; not yet judged on the Mac; 15b, the Finger as a solid that moves every liquid on a thin gap, **shipped** (`npm run fingerflow`), not yet judged on the Mac (judging §33), its Blow, old-plate, inside-the-hand and remote halves open; 15i, picking a bottle lays nothing, **shipped** (`npm run bottles`, Mac); **15g's first part, the moving Blow as air on the film, shipped** (the breath's stress a body force on a thin gap, its carries retired there; `npm run airblow`), not yet judged on the Mac (judging §44); 15e, 15f, 15g-2 to 15g-6, 15j open |
 | 16 | Many plates (rig-plan R1, at the end of this plan) | Picked by the owner 2026-09-27 ("Let's build multi-plate next"); planned in five steps. 16a, the back plate's own look, **shipped** (#231, `npm run backplate`), not yet seen on the Mac; 16b, a projector picks its source, **shipped** (#226, `map`, `mixer`, `wall`), not yet seen on the Mac; 16c, beams add and the seam goes, **shipped** (#232, `beams`); 16f, add and take off the back plate on every look, **shipped** (#273, `layout`, `phone`); 16d–16e not started |
 | 18 | The physics under the look | Audited 2026-09-28 (section 18): the shortcuts where the plate imitates a liquid's result instead of simulating it, ranked by gain against GPU cost; the top four are the plate as a Hele-Shaw cell (18a, which the tools' 15b/15g and the grates thread's fingering wait on), the lamp through the dye (18b), a pour that adds liquid (18c) and each liquid's real properties (18d). **18a first part shipped** behind Thin Gap (off in every look; `npm run thingap`); **the Press draws the liquid back when you let go, on Thin Gap, shipped** (carries in substeps, the press a bowl, the glass lifting in seconds, the Press's carries retired there; `npm run presslift`, `tools` on the Mac), not yet judged on the Mac; **Thin Gap on in every look, shipped** (#248, the owner's pick; saved looks carried over; the opening builds its pipelines before the first step), its cost not yet read on the Mac (2.1); **forces as forces (18a-2) shipped** (body forces answer the liquid's viscosity, Rain Drip heavy colour, Updraft a shear, Glass Smear a sliding glass; `npm run forces`); 18a-3 to 18a-11 left, each its own PR; **18b the lamp through the dye, shipped** behind Lamp Ground (`npm run lamp`); **18b-1 which looks go on it, shipped** (#262: eleven looks on the lamp, ten picked by a written rule from Mac pictures, `npm run lampjudge`, one by the owner); 18b-2 to 18b-9 left; **18d-1 each poured liquid's viscosity, shipped** (glycerine crawls, syrup runs ahead in a thick look; `npm run thick`); **18c-1 a pour adds liquid and 18d-2 flushing, shipped** (a held bottle pushes the plate out into rings, a poured liquid stays until it is pushed over the rim; `npm run flush`); **18d-11a the poured liquid rides the colour's carry, shipped** (what it adds to a step halved on CI's Mac, 13.54 to 6.73 ms at 768², a whole colour carry to half of one; `npm run thick`); 18c-2 to 18c-5 and 18d-3 to 18d-11 left |
-| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work), not started |
+| 19 | The checks, the build and the plan itself (at the end of this plan) | Found 2026-09-28 in a review of the workflows, the harnesses and the build: `gallery.yml` holds the Mac runners (19a, **shipped**: by label or by hand, and a merged PR's runs stop, `npm run macqueue`), Measure is near its timeout (19b, **shipped** with 19h: three parts side by side, every step runs, and the `wgsl` and parse gates), checks that can pass unmeasured or that nothing runs (19c), the build (19d), the harnesses as code (19e), the plan out of step (19f); what a red PR costs and which reds are the PR's own (19h, **shipped** in part: docs-only PRs skip the Mac, the shards evened, two flaky lines handed off; and a deploy skips the Mac when the PR's site files are apart from main's newer ones); 19i to 19t, faster coding and releases, measured 2026-10-04 (Wave 0 of the order of work): 19i, 19j, 19k and 19r **shipped**, the rest open |
 | 20 | Lace and holes: a pale film torn open over colour | Planned 2026-09-28 from a still of another show: clear film dewetting in the gap, under the lamp (18b), edges from refraction (18e), oil discs on the front layer. A CPU prototype tears a film into lace with holes over a hundredfold of sizes. The lamp ground it needs shipped (18b, #256: a clear pool throws 100% of the lamp, `npm run lamp`); 20a–20f open |
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
@@ -5279,47 +5281,39 @@ like day (`npm run macqueue -- --hours 24` for the time).
   dye); a GPU carry of the dye, as `handOver` carries the ferrofluid, would end it.
 
 ### 19i. A green Mac result carries across a merge of main
-**Shipped**: When the new head's tree differs from the tree of the PR's last green Mac run only in files main changed (disjoint from the PR's own site files), or only in files that never reach a Mac shard, the shards are skipped with the verdict "carried" (annotated on What the change reaches), and the deploy gate follows that chain back to the run that passed. 14 selftest cases in `reach.mjs` and deploy gate history verified.
-
-*Measured 2026-10-04 over 25 merged PRs (#204 to #244), 103 `Checks` runs.* A PR ran its
-checks about four times. Of those runs, 53 started on a push that only merged main in, and
-8 on a docs-only commit: together 61 of 103 runs and 2,011 of 3,124 Mac runner-minutes
-(64 %), on pushes that added none of the PR's own site code. They also held 20 of the 29
-runs that went red on their first attempt. Each restarts all four shards, 37 to 62
-minutes of wall time since #239 (75 before), at a time when the five Mac runners were 87
-to 91 % busy, so every one of them lengthened everyone else's queue too.
-
-*Fix:* the PR side of `deploygate.sh`'s rule 5. When the new head's tree differs from the
-tree of the PR's last green Mac run only in files main changed (and those are disjoint
-from the PR's own site files, `reach.mjs --site`), or only in files that never reach a Mac
-shard, the shards are skipped with the verdict "carried", and the deploy gate follows that
-chain back to the run that passed. The ship skill then merges without bringing main in
-whenever the gate would say `disjoint`. *What it leaves unmeasured* is what 19h-3 already
-accepted for deploys: two PRs in different files moving the same picture. To keep every
-check running on the combined tree, one full Mac run on main every N merges, or after each
-publish with 19o's rollback behind it. *Measure:* Mac minutes per merged PR and runs per
-PR over the next 25 PRs, against 125 and 4.1. *Size:* M.
+**Shipped** (#429; carrying fixed in 19k, #502, since until then it asked for four shards where there were five and so never carried): a run whose tree differs from the PR's last green Mac run only in main's files, or in files no Mac shard reads, skips the shards as "carried", and the deploy gate follows the chain back. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ### 19j. A merge with no site change deploys nothing
 **Shipped** (#253): a merge that changes no site file deploys nothing, checking and publishing nothing and green in seconds (`npm run deploygate`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 ### 19k. One manifest of checks
+**Shipped** (#502): `scripts/checks.json` holds every check CI runs (180 steps, in order, with their comments), `checks.yml` runs each Measure part and Mac shard from it (`node scripts/checks.mjs --ci <shard>`), a PR whose Mac-reaching change is only check scripts, manifest entries or their npm scripts runs only those checks' shards, and `npm run quick` runs the checks a diff reaches, side by side. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-Every new check edits `.github/workflows/checks.yml` and `package.json` (13 and 14 of the
-last 30 merges), which is where three of the recorded merge conflicts were. Seven of the
-last 25 PRs changed only check scripts and needed one shard of four, but ran all four (17
-runs, about 30 Mac-minutes each). And `npm run check` runs about 35 scripts one after
-another, some 15 minutes, where its header says a minute.
+Found with it, open:
 
-*Fix:* `scripts/checks.json`, one entry per check (its name, its shard, its command, the
-`src/` files it imports, from esbuild's metafile, as 19c traced). `checks.yml` builds each
-shard's steps from it; `package.json`'s scripts stay for hands, generated or checked against
-it. A PR that changes only check scripts runs the shards those scripts are in, plus Measure;
-a change to `src/`, a shared helper (`frame`, `chromium`, `lab`, `lab-entry`) or a workflow
-selects every shard. `npm run quick` reads the same map and runs, in parallel, the checks
-the diff reaches, which is CLAUDE.md's "which checks for which files" table made
-executable. *Measure:* Mac minutes on check-only PRs, and conflicts in `checks.yml` and
-`package.json`. *Size:* M.
+- **19k-1** (E, S): `checkguard.mjs` does not read the manifest. A check whose entry is
+  removed, or whose command, env or timeout changes (`QA_GPU=mid`, a `--node` flag), stops
+  measuring what it did with nothing to name; it was as blind to a deleted step in
+  `checks.yml`. Hold a removed or changed entry to `Check changes:` as a removed check is.
+- **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs: Mac minutes on
+  check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), and
+  merge conflicts in `checks.json`, `checks.yml` and `package.json` (60 adjacent merges
+  replayed with `git merge-tree` before it: 9 conflicted, none in those files).
+- **19k-3** (E, S): `actionlint` is not in the repository and a cloud session cannot fetch
+  it (the download was refused in 19k's session), so CLAUDE.md asks for a check no session
+  can run. Run it in Measure from a pinned release, or drop it from the table.
+- **19k-5** (E, S): side by side, some Measure checks go red that are green alone. On a
+  4-core cloud session `npm run check` (93 checks, 40.8 minutes, their times summing to 103)
+  ran seven red together the first time, every one green alone: the shared `dist/` and the
+  fixed port 4197, which `quick` now holds one at a time. The second time The room (`scene`,
+  red in 2 s), Switches read on and off and The intro were red beside the others and green
+  alone, and The intro was red alone once (the opening's render compiles never logged).
+  `quick` now keeps such a check's log in `scratch/quick/`; find what each shares or
+  measures of the machine, and fix that, not the bar.
+- **19k-4** (E, S): the Measure parts still run in full on every push. With the manifest
+  they could run only the checks a diff reaches, as `quick` does; the logic part is about
+  four minutes and the browser part twelve, off no queue, so this is wall time to green,
+  not runner time.
 
 ### 19l. App frames readable in a cloud session
 

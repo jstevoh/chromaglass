@@ -557,10 +557,12 @@ runs them before anything reaches the live site (`.github/workflows/checks.yml`)
 `qa` needs a Chromium; it looks for one at `/opt/pw-browsers/chromium` and takes
 `PW_CHROMIUM` for anywhere else. `npm run qa -- --head` watches it happen.
 
-**Before a push, `npm run check`.** It runs everything above that needs no GPU
-(the ubuntu job's list, read from `checks.yml`), the shader compile and the layout,
-in about a minute, and reports every failure rather than the first. What reads the
-plate is left to the macOS job, and it says so.
+**Before a push, `npm run quick`.** It runs the checks your change reaches, side by
+side: it reads the list CI runs (`scripts/checks.json`), works out what each check
+reads, and picks the ones whose files you changed; `npm run quick -- --dry` says which
+and why. `npm run check` runs every check that needs no GPU (Measure's list, from the
+same file) the same way. Both report every failure rather than the first, run a red
+one again alone, and leave what reads the app's frames to the macOS job, saying so.
 
 ## Tech Stack
 

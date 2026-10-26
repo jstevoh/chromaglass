@@ -94,11 +94,17 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`, `server/remote-server.js`), the Phone · iPad panel | `applink`, `remotemix`, `phonelink` (the panel's code, and the relay's count of phones); the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
 | the Mac app (`desktop/`, `scripts/desktop.mjs`), and what it leans on: `useProjector`, `useCastSession`, `CastDisplay`, `server/remote-server.js` | `desktop` (`npm --prefix desktop install` once; `-- --packaged` after `npm --prefix desktop run pack`); `desktop.yml` checks the packed app on a Mac |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
-| a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
+| a new or changed check in `scripts/` | that check, and the `check-skeptic` agent; a new one is an entry in `scripts/checks.json` (its shard, its command, why), never a step in `checks.yml`, then `npm run checks` |
 | `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
-| `.github/workflows/checks.yml`, `scripts/reach.mjs` | `npm run reach`, `npm run closedruns`, `actionlint`; `npm run macqueue -- --hours 24` for the Mac time before and after |
+| `.github/workflows/checks.yml`, `scripts/reach.mjs`, `scripts/checks.mjs`, `scripts/checks.json` | `npm run checks`, `npm run reach`, `npm run closedruns`, `actionlint` (not fetchable in a cloud session, PLAN 19k-3); `npm run macqueue -- --hours 24` for the Mac time before and after |
 | a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/gpu/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
+
+`npm run quick` is this table made executable (PLAN 19k): it reads
+`scripts/checks.json`, works out what each check reads (its scripts, the `src/` files
+they import, every site file for a check that serves the app) and runs, side by side,
+the checks your diff from `origin/main` reaches and a cloud session can run; `-- --dry`
+says which and why. The rows above stay for what it cannot see: agents, pictures, the Mac.
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
 not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
@@ -110,13 +116,19 @@ deploy:
 
 - **Measure** (ubuntu, four parts side by side, 4–12 min each): typecheck, every script
   parsing, the shaders compiling on SwiftShader, and the node harnesses.
+- Which checks each Measure part and Mac shard runs is `scripts/checks.json`; each job's
+  one `The checks` step runs its shard's list (`scripts/checks.mjs --ci`), each check in a
+  `Run <command>` log group, a red one an error annotation with its name and FAIL lines,
+  the job summary a table of every check's time.
 - **Check changes named** (`scripts/checkguard.mjs`, under `Measure`): a PR that moves a
   check's bar or input names each change in its body under `Check changes:`, or is red.
   Re-run the failed jobs after editing the body; no push is needed.
 - **What the change reaches** (`scripts/reach.mjs`): a PR that changes only Markdown,
   `.claude/`, `ios/`, `desktop/`, a workflow that never runs a Mac shard or the scripts
   that check the workflows (`closedruns`, `macqueue`, `deploygate`) skips the
-  Mac shards (Measure still runs), and the deploy gate never trusts such a run.
+  Mac shards (Measure still runs), and the deploy gate never trusts such a run. A PR
+  whose Mac-reaching change is only check scripts, manifest entries or the npm scripts
+  checks run runs only those checks' shards (PLAN 19k).
 - **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
   jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is, or when `reach` skipped them all.
 - A deploy skips the checks when main's new tree is the exact tree its PR's
