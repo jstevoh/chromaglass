@@ -32,7 +32,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery } from './frame.mjs';
+import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4346;
 const checks = [];
@@ -48,7 +48,8 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise((r) => setTimeout(r, 2500));
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 /*
   Set once the page exists, and run in the `finally` below: `page` itself is
   scoped to the `try`, so the restore cannot reach it from there.
@@ -60,6 +61,7 @@ try {
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(8000);
+  await waitForEngine(page);
 
   // A calm plate: nothing moves the dye but the hand. The music would pour,
   // the turbulence and the turning would carry, the drips would streak.
@@ -76,8 +78,9 @@ try {
     await page.evaluate((want) => window.chromaglassTool?.(want), t);
     await page.waitForFunction((want) => window.chromaglassDebug?.().tool?.() === want, t, { timeout: 10000 });
   };
-  const clear = async () => { await page.evaluate(() => window.chromaglassAction?.('clear')); await page.waitForTimeout(2500); };
-  const settle = (ms) => page.waitForTimeout(ms);
+  const clear = async () => { await page.evaluate(() => window.chromaglassAction?.('clear')); await settle(2500); };
+  // The wall clock on a GPU; in software, its share of the steps too (`settlePlate`, PLAN.md 19l).
+  const settle = (ms) => settlePlate(page, ms);
 
   /** The lead plate's density, and where the pointer is on it (grid cells). */
   const snap = (keep) => page.evaluate((keep) => {

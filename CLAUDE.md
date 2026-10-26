@@ -62,12 +62,12 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 
 | Where | Can verify | Cannot |
 |---|---|---|
-| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `regrid`, `particles`, `derive`, `mixer`, `disc`), the Mac app's `desktop` (under xvfb, all but its lit plate and hidden-window lines), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving`, `film` fail or pass vacuously here |
+| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `regrid`, `particles`, `derive`, `mixer`, `disc`), the Mac app's `desktop` (under xvfb, all but its lit plate and hidden-window lines), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | The **app's** numbers: with `PW_WEBGPU=1` the app runs headed under Xvfb and its frames read back (PLAN.md 19l), but at about 0.4 solver steps a second against Metal's sixty, so `tools`, `magnet`, `mirror`, `bottles` run their logic on a twentieth of the steps (`settlePlate` in `scripts/frame.mjs`) and not their magnitudes; `qa`, `gallery`, `moving`, `film` are still the Mac's |
 | CI, macOS runner (Metal) | Everything | — |
 | The owner's machine | How it looks at 60 fps | — |
 
-`PW_WEBGPU=1` gives a harness software WebGPU (`scripts/chromium.mjs`), which is
-enough for the lab, not for the app. For pictures of a change, use the `look`
+`PW_WEBGPU=1` gives a harness software WebGPU (`scripts/chromium.mjs`): enough for the lab,
+and for the app's logic at a crawl. For pictures of a change, use the `look`
 skill: the lab renders the real plate shader on a deterministic plate.
 
 ## Which checks for which files
