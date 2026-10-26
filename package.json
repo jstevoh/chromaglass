@@ -33,6 +33,7 @@
     "timecode": "node --experimental-strip-types scripts/timecode.mjs",
     "cellride": "node --experimental-strip-types scripts/cellride.mjs",
     "scene": "esbuild scripts/scene.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/scene.mjs && node node_modules/.cache/scene.mjs",
+    "soundcords": "esbuild scripts/soundcords.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundcords.mjs && node node_modules/.cache/soundcords.mjs",
     "music": "node --experimental-strip-types scripts/music.mjs",
     "songends": "node --experimental-strip-types scripts/songends.mjs",
     "bands": "node --experimental-strip-types scripts/bands.mjs",

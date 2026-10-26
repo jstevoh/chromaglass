@@ -204,7 +204,7 @@ re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering
 music, explored as four directions the same day and all four taken, in this order:
 ~~**25h** areas that listen for themselves~~ (shipped), then **24.3-place** the melody walks across the plate (B, M), then **25i**
 colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
-14r read per area); then **30a**'s rest, shaped sound cords (M), **14t-pc** Program Change (S), **24.3** notes as voices
+14r read per area); then **30a**'s rest, shaped sound cords (M; its check `soundcords` written 2026-10-26, Antigravity's Brief 8), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
@@ -8255,6 +8255,23 @@ the spectrum strip. *Measure:* a new check fed synthetic tone bursts in and out 
 dragged band: crossings counted against the threshold (equal, none doubled, none from
 outside the band), and the patch's rise and fall timed within 10% of its attack and
 release.
+
+*Check written first (2026-10-26):* `npm run soundcords` (`scripts/soundcords.mjs`), red on
+main in its 30a lines and green on a sketch of the build. Its header is the contract: the
+cord's fields (`mode`, `threshold`, `gain` before the threshold, `attack`, `release`, `band`
+as `[loHz, hiHz]` winning over `feature`), read through `songAudioTrack` and `PatchBay.fold`
+with the gate's clock from `fold`'s `now`. Attack and release are the 2%-to-98% times of
+the cord's rise and fall, and a gate rises to the hit's height (the most the reading times
+the gain reached while open), as an area cord's does. A whole-plate cord with no `mode`
+follows even if it carries a threshold, attack or release (it ignores them today); an area
+cord keeps its own rule. CI runs it with `--controls` (the
+tape, the counter on today's `CordGate`, the judge rejecting three wrong gates, every saved
+cord folding as before) until the build's PR drops the flag. 31c's two lines join it when 31c is built.
+- **30a-1. The dragged band on the cast display and the phone remote.** The cast display
+  rebuilds `AudioData` from the wire with no spectrum behind it (`liveValue`, sceneMap.ts),
+  so a dragged-band cord there reads nothing, as a `bands` cord does today. Whether the
+  wire carries the cord's reading or the projector just shows the laptop's fold is the
+  build's to decide and say.
 
 ### 30b. The LFOs and envelopes are fixed
 
