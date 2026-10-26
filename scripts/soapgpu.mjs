@@ -43,7 +43,9 @@
  *     change, Jacobi at 200 sweeps 2.8% on the flows; red-black SOR at 60
  *     sweeps, a plausible GPU solver, 0.4% and 2.8%.
  *   - Cell by cell, one second (20 steps): the thickness within 5% of the RMS
- *     of the reference's own change over that second.
+ *     of the reference's own change over that second, and the same over a second
+ *     stepped at the frame's 1/60 s, and at zeta 0.25 and dt 0.2 s, where the
+ *     reference takes several CFL sub-steps.
  *   - The sort and the reverse sort: each patch's travel within 1.5 rows of
  *     the reference's (a 64-row film; the patch is 8 rows across).
  *   - The drain: every quarter's mean thickness, every 5 s to 120 s, within 2%
@@ -70,7 +72,9 @@
  * And the work has to be the GPU's: the solver's bundle may not carry the CPU
  * reference's code, every step() must submit to the GPU queue and every read()
  * map a buffer (counted in the page), or the control itself, which is the
- * reference run in the page, would pass as a GPU solver. That catches a
+ * reference run in the page, would pass as a GPU solver. (So the solver copies
+ * the reference's constants, 30 nm, 8 nm, 0.5 s, zeta 1.5, under the same
+ * names, rather than importing them from src/lib/soapFilm.ts.) That catches a
  * solver left on the CPU, not one disguised: a renamed copy of the reference
  * that submits an empty command buffer a step and maps a buffer it never
  * wrote passes all of it (measured), and only reading the solver says so.
@@ -253,6 +257,35 @@ try {
     const frac = outside / (nx * ny);
     check('C4 the thickness moves with the flow it reports (-dt div(h u), walls shut)', moved > 0.05 * nx * ny && frac < 0.01 && wall === 0,
       `${(100 * frac).toFixed(2)}% of cells changed by more than the faces allow (under 1%), ${moved} cells moved, flow through the walls ${wall.toExponential(1)}`);
+  }
+
+  /*
+    The step's own inputs. Every 32a scenario steps 0.05 s at the default drag
+    (zeta 1.5) and never needs the reference's CFL sub-steps (the fastest
+    face moves a third of 0.45 of a cell a step), so a solver that ignored dt,
+    zeta or the sub-steps passed every line above: measured, a reference that
+    always steps 0.05 s and one with no sub-steps each read 25 of 25. The
+    plate steps the film by the frame (1/60 s), and 32d's time compression is
+    zeta (shortcut b). So the noisy film again, held to the reference cell by
+    cell over one second (the same 5%-of-its-change bar): at the frame's dt,
+    and at a sixth of the drag and four times the dt, where the reference
+    itself takes several sub-steps (printed, and asked: if it took one, this
+    line would not be asking about them).
+  */
+  {
+    const f = film({ noise: 0.3, seed: 9 }), h0 = Array.from(f.h), nx = 32, ny = 64;
+    const frame = scenario({ nx, ny, h: h0, dt: 1 / 60, steps: 60, reads: [60] });
+    const [G, C] = [await gpu(frame), cpu(frame)];
+    const ref = rms(diff(C.reads[60].h, h0)), err = rms(G.reads[60].h, C.reads[60].h) / ref;
+    check('at the frame\'s dt (1/60 s, 60 steps) the thickness is the reference\'s (within 5% of its change)', ref > 0 && err <= 0.05,
+      `RMS difference ${(100 * err).toFixed(3)}% of the reference's change, ${ref.toFixed(2)} nm`);
+    const fast = scenario({ nx, ny, h: h0, dt: 0.2, steps: 5, reads: [1, 5], flows: true, opts: { zeta: 0.25 } });
+    const [Gz, Cz] = [await gpu(fast), cpu(fast)];
+    let uMax = 0; for (const x of [...Cz.reads[1].uf, ...Cz.reads[1].vf]) uMax = Math.max(uMax, Math.abs(x));
+    const subs = Math.max(1, Math.ceil((uMax * 0.2) / (0.45 * 1e-3)));
+    const refz = rms(diff(Cz.reads[5].h, h0)), errz = rms(Gz.reads[5].h, Cz.reads[5].h) / refz;
+    check('at a sixth of the drag (zeta 0.25) and dt 0.2 s, where the reference sub-steps, the thickness is the reference\'s (within 5% of its change)', subs > 1 && refz > 0 && errz <= 0.05,
+      `RMS difference ${(100 * errz).toFixed(3)}% of the reference's change, ${refz.toFixed(2)} nm; the reference's first step takes ${subs} sub-steps (wanted more than 1)`);
   }
 
   // ── C1 / C4: the sort ────────────────────────────────────────────────
