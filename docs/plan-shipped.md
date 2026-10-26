@@ -3735,25 +3735,39 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   nearly zero, so scaling a cell's two opposite faces by different neighbour factors breaks
   the cancellation `F_{i+1/2} − F_{i−1/2}` and traps that through-flux inside the cell as
   grid-scale ripple.
-- **What was built:** a three-pass conservative filter (`dampGridCurv`, `dampGridLimit`,
-  `dampGrid` in `src/gpu/wgsl/fluid.ts`, dispatched by `src/gpu/fluid.ts`) that evaluates the
-  full fourth-difference update `u_p = −s·K(f)_p` first (with mirror reflection across the
-  grid walls so `∑_p u_p ≡ 0` and 1-cell lines and rows stay invariant), clamps each cell to
-  `c_p = clamp(f_p + u_p, lo_p, hi_p)`, and returns each clamped cell's excess
-  `e_p = c_p − (f_p + u_p)` back across the 5×5 stencil weighted by each neighbour's room
-  `w_p = min(c_p − lo_p, hi_p − c_p)` to its local bounds. Because `w_p > 0` only where
-  `e_p = 0`, clamped cells take none of their own excess back and receiving cells stay inside
-  `[lo_p, hi_p]`. In `dampGridLimit`, `hi` is gated on the four opposite neighbour pairs so
-  a monotone cell (`mn ≤ here ≤ mx`) only rises toward `mx` when `6·(here − mn) > mx − here`,
-  stopping dry concave staircase notches outside a circular rim from wicking dye across the
-  contact line. The `OPEN_RIM` under `thinGap` guard is unchanged.
+- **What was built:** a three-pass filter (`dampGridCurv`, `dampGridLimit`, `dampGrid` in
+  `src/gpu/wgsl/fluid.ts`, dispatched by `src/gpu/fluid.ts`) that evaluates the full
+  fourth-difference update `u_p = −s·K(f)_p` first (with half-sample reflection `reflect1`
+  across the grid walls so the stencil matrix is symmetric with zero column sums and 1-cell
+  lines and rows stay invariant), clamps each cell to `c_p = clamp(f_p + u_p, lo_p, hi_p)`,
+  and returns each clamped cell's excess `e_p = c_p − (f_p + u_p)` back across the 7×7
+  neighbourhood (`-3..3`) weighted by each neighbour's room `w_p = min(c_p − lo_p, hi_p − c_p)`
+  to its local bounds. The return window is 7×7 (`-3..3`) rather than 5×5 (`-2..2`) because the
+  5×5 filter clamps a two-cell-wide band at a steep drop rim (`room = -1`), so a 5×5 return
+  window leaves the inner rim cell short of unclamped neighbours (`+0.028%` at 20 s on the
+  glycerine drop vs `+0.000%` with 7×7). Because `w_p > 0` only where `e_p = 0`, clamped cells
+  take none of their own excess back and receiving cells stay inside `[lo_p, hi_p]`. On the
+  four opposite neighbour pairs, `hi` is gated by the one-sided numerical rule
+  `6.0 * (here − mn) > mx − here` (where `6` matches the central stencil weight `k_0 = 6` of
+  `k = [1 −4 6 −4 1]`): the plain 3×3 max blocks the distance-2 overshoot ring (`k_{±2} = +1`)
+  but lets the distance-1 weight (`k_{±1} = −4`, `+4s/256 > 0`) diffuse dye one cell outward
+  into a dry toe (moving the glycerine drop's front to `4.13 mm` at 2 s and `4.66 mm` at 20 s).
+  Across gate factors `4.0`, `6.0`, and `8.0`, the glycerine drop holds `231.13` (`+0.000%` at
+  2 s and 20 s) with its front at `3.94 mm` (2 s) and `4.50 mm` (20 s), and `pressed` reads
+  `65.91%`, `65.96%`, and `65.95%`. The 3×3 neighbour box mirrors across grid walls with
+  whole-cell reflection `mirror1` (`−x` and `2n − 2 − x`) so `macCormack`'s wall-clamped outer
+  ring does not set `nW = here` (`here − mn = 0`) and trip the one-sided `hi` gate along the
+  wall (`+5.51 ppm/s` with `reflect1` on the 3×3 box vs `+0.42 ppm/s` with `mirror1`). The
+  `OPEN_RIM` under `thinGap` guard is unchanged.
 - **Measured after:** glycerine drop with `gridDamp` on holds `231.13` (`+0.000%` at 2 s and
   20 s) and its front matches `gridDamp` off (`3.94 mm` at 2 s, `4.50 mm` at 20 s).
-  `npm run grating`: all 24 checks pass (1 step `94.6%`, 1 s `4.3%`, spread `29.7%` / `6.9%`,
+  `npm run grating`: all 24 checks pass (1 step `94.6%`, 1 s `4.2%`, spread `29.7%` / `6.9%`,
   pressed `66.0%` `< 68.0%`, 1-cell lines/rows `0.000%`, disc ring `0.002%`, halo `0.4%`,
-  conservation `+5.51 ppm/s` `< 10 ppm/s`). `npm run stages` (768², 2 layers, two alternating
-  pairs): `dye grid` goes from `1.54 ms` / `0.63 ms` (L0) and `0.81 ms` / `0.77 ms` (L1) on
-  main to `3.41 ms` / `3.76 ms` (L0) and `1.99 ms` / `2.33 ms` (L1) on this branch.
+  conservation `+0.42 ppm/s` against `+1.47 ppm/s` on `main`, bar `< 10 ppm/s`).
+  `npm run stages` (768², 2 layers, `apple` / `metal-3`, two alternating pairs): `dye grid`
+  goes from `1.54 ms` / `0.63 ms` (`3.4%` / `1.4%` of L0) and `0.81 ms` / `0.77 ms`
+  (`3.8%` / `3.5%` of L1) on `main` to `3.41 ms` / `3.76 ms` (`7.1%` / `7.5%` of L0) and
+  `1.99 ms` / `2.33 ms` (`8.5%` / `9.5%` of L1) on this branch.
 
 ### 19aa-3. The API scripts never print the token
 
