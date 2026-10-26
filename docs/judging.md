@@ -1877,3 +1877,24 @@ Bad: a slide whose mount turns violet or red, a tray that spins freely or turns 
 coasts past slides, a ring clipped at the slide's corner, a click that is a slide-sized jump of the layout, or a
 tray on a screen that shows no look. Decide too: ten slots on the drum, a real tray has eighty (PLAN 35g-2).
 
+
+## 83. The Mac app opens only on a Home or Pro licence (PLAN 23.17d)
+
+After the next Mac release (Actions → Mac app → Run workflow, release ticked), on a Mac:
+
+1. Install the new app over the old one and open it. If this Mac already had a key, the show opens at once,
+   with no screen in front of it. Otherwise a sign-in screen is drawn where the plate would be, and nothing
+   plays behind it.
+2. Sign in with the email and password of an account that has bought nothing. The screen asks you to confirm
+   your email if the account is new, then offers Buy Home and Buy Pro. The show does not open.
+3. Sign out, and choose Continue with Google. Your own browser opens on the app's address (localhost), you
+   sign in there, that tab says you can go back to the app, and the app's window opens the show by itself
+   within a few seconds. The tier in the profile sheet is the one you bought.
+4. Quit, turn Wi-Fi off and open the app again. It still opens straight to the show.
+5. With the app open, open `http://localhost:` and the app's port in Chrome on the same Mac. Chrome shows the
+   same sign-in screen, not the show.
+
+Bad: the show visible for a frame before the sign-in screen, a Google sign-in that opens inside the app's
+window and is refused, a browser tab that signs in but the app never notices, a licensed app that asks again
+with Wi-Fi off, or Chrome on localhost playing the show free. Decide too: offline, a refunded key keeps working
+until the app next goes online (no grace period, PLAN 23.17h).
