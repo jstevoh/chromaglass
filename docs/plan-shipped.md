@@ -3769,6 +3769,36 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   (`3.8%` / `3.5%` of L1) on `main` to `3.41 ms` / `3.76 ms` (`7.1%` / `7.5%` of L0) and
   `1.99 ms` / `2.33 ms` (`8.5%` / `9.5%` of L1) on this branch.
 
+#### 18m-5a. `npm run slump` with the grid filter on (shipped 2026-10-26)
+
+- `scripts/slump.mjs` ran every drop with `gridDamp: 0`, because until 18m-5 the filter made
+  dye at a drop's rim. Checks 1 to 11 now run with it on, as every look has it. Check 14 runs
+  the glycerine drop of check 7 twice, with the filter and without, and holds the dye to 0.01%
+  at 2 s and 20 s and the front within 0.05 mm of the bare run (the filter before 18m-5:
+  +0.93% and +0.19 mm at 2 s). It also asks that the run with the filter ends with less Σa²
+  than the bare run, so that it is not comparing two bare runs. Checks 12 and 13 keep the
+  filter off: they look for a checkerboard growing out of the slump's own step, and the
+  filter takes 5% of one out each step.
+
+#### 18m-5b. The grid filter's three passes each worked out the stencil again (shipped 2026-10-26)
+
+- **Measured after 18m-5** (#485, `npm run stages`, 768² + 512², Metal): `dye grid` took
+  7.1–9.5% of a layer's step, against 1.4–3.8% for the one-pass filter before it. All three
+  passes evaluated the 25-tap stencil and the 3×3 bounds for every cell, and the last one
+  also summed a 7×7 of β from the texture wherever a cell had room.
+- **What changed:** `dampGridCurv` writes the clamped c into the field's write side as well as
+  the room. `dampGrid` returns at once where the room is zero or no β comes back, which is
+  everywhere except within three cells of a clamp, and leaves c standing. Where β does come
+  back it works c, lo and hi out again in f32, so that a half-float dye adds to the same
+  unrounded number as before. It reads its 14×14 of β once per 8×8 workgroup into shared
+  memory and sums them in the same order. The 7×7 sums test only the grid's bounds, because
+  the passes before them already write 0 past the rim.
+- **Same to the bit** (a scratch lab with main's two fluid sources swapped in through an
+  esbuild plugin, on software WebGPU at 256²): 40 drops, some hard-edged, a stirred open
+  plate, a hard-edged plate with its rim, and the glycerine drop. After 1, 31 and 121 steps,
+  0 of 262,144 numbers differ. Control: with `dampGrid` stopped before its correction,
+  21,104 to 173,518 of them differ (worst 3.42 units).
+
 ### 19aa-3. The API scripts never print the token
 
 **Shipped** 2026-10-19. A transient 502 from the Actions API stopped `npm run flakes` on

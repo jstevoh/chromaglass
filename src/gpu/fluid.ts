@@ -2982,8 +2982,16 @@ export class WebGPUFluid {
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
+      /*
+        dampGridCurv writes the clamped c straight into field.write as well as
+        each cell's room, and dampGrid then writes only the cells near a clamp
+        that get dye back; everywhere else c stands as the answer. Each of the
+        three passes used to work the 25-tap stencil and the 3×3 bounds out
+        again for every cell, and the stage cost 7.1–9.5% of a layer's step on
+        Metal against the one-pass filter's 1.4–3.8% (PLAN 18m-5b).
+      */
       const damp = (field: PingPong) => {
-        this.run(pass, 'dampGridCurv', this.scratchA, [field.read], k);
+        this.run(pass, 'dampGridCurv', this.scratchA, [field.read, field.write], k);
         this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
         this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
         field.swap();
