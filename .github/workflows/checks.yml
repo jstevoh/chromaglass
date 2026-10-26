@@ -259,18 +259,18 @@ jobs:
       # #402, and every ffmpeg check after it failed on "no ffmpeg on the path" and
       # "no ffprobe on the path" for a diff that touched no sound. ffmpeg is a real
       # need, unlike the browser's fonts (19ab-2), so the answer is not to skip it
-      # but to stop asking the mirror every run. The packages apt fetches are kept
-      # in the Actions cache, and a run that has them installs them from disk with
-      # apt reading no sources at all (an empty source list, so a gap in the set is
-      # an instant "unmet dependencies", never a quiet download): about a second,
-      # and the same Ubuntu build of ffmpeg the checks were measured with, not a
-      # static build from elsewhere whose decoder would be a new input. Only a run
-      # without them, or whose set no longer fits the image (a dependency missing,
-      # or a downgrade apt refuses), goes to the mirror, with apt's retries and a
-      # 30 s stall timeout, and saves what it fetched. The cache is keyed by the
-      # runner image so a new image is tried against the last image's set first.
-      # The step then requires both binaries by name, so a run where this fails
-      # says so here and not as four sound checks' FAIL lines.
+      # but to stop waiting on the mirror. scripts/debcache.sh installs the .debs
+      # the Actions cache kept with apt reading no sources at all (about a second),
+      # and only on a miss, or a set that no longer fits the image, fetches them:
+      # apt says which, and curl fetches them eight at a time from whichever mirror
+      # delivers, dropping one that sends under 300 KB/s, each file held to apt's
+      # hash. Not apt's own download: on this PR's first run the Azure mirror gave
+      # the lists at 11 MB/s and the 87 packages at 55 KB/s, nineteen minutes'
+      # worth, and apt has no speed floor. Ubuntu's own ffmpeg either way, not a
+      # static build whose decoder would be a new input to the sound checks. The
+      # cache is keyed by the runner image, a new image trying the last one's set
+      # first. Then both binaries are required by name, so a failure here says so
+      # here and not as four sound checks' FAIL lines.
       - name: Which runner image, for ffmpeg's packages
         id: image
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
@@ -290,20 +290,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'sound' }}
         timeout-minutes: 4
         run: |
-          d="$HOME/ffmpeg-debs"
-          nosrc=$(mktemp -d)
-          offline=(-o Dir::Etc::SourceList=/dev/null -o "Dir::Etc::SourceParts=$nosrc")
-          if compgen -G "$d/*.deb" > /dev/null && sudo apt-get "${offline[@]}" install -y -q --no-install-recommends "$d"/*.deb; then
-            echo "ffmpeg installed from $(ls "$d"/*.deb | wc -l) cached packages, no mirror asked"
-          else
-            echo "::warning title=ffmpeg::no cached packages that fit this runner; fetching from the mirror"
-            rm -rf "$d" && mkdir -p "$d/partial"
-            apt=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30)
-            sudo apt-get "${apt[@]}" update -q
-            sudo apt-get "${apt[@]}" install -y -q --no-install-recommends --download-only -o "Dir::Cache::archives=$d" ffmpeg
-            sudo apt-get "${offline[@]}" install -y -q --no-install-recommends "$d"/*.deb
-            sudo rm -rf "$d/partial" "$d/lock"
-          fi
+          bash scripts/debcache.sh "$HOME/ffmpeg-debs" ffmpeg
           for b in ffmpeg ffprobe; do
             command -v "$b" > /dev/null || { echo "::error title=ffmpeg::$b is not on the path after the install; every sound check that decodes or opens a file fails on it"; exit 1; }
             "$b" -hide_banner -version | sed -n 1p
