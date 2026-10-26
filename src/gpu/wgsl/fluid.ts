@@ -452,6 +452,76 @@ fn rimRing(n: f32) -> f32 { return ${OPEN_RIM.toFixed(2)} - 2.0 / n; }
 // w(r): nothing short of the band, one from a cell and a half inside the rim outward.
 fn rimRamp(r: f32, n: f32) -> f32 { return smoothstep(${OPEN_RIM.toFixed(2)} - (1.5 + ${RIM_BAND.toFixed(1)}) / n, ${OPEN_RIM.toFixed(2)} - 1.5 / n, r); }
 `;
+/*
+  Film Hold: the water film between two drops of oil, and why it holds.
+
+  Asked from a photograph of a splodascope (the owner, 2026-10-25): a
+  crowd of round cells of yellow, red, pink and green oil packed edge to
+  edge in blue water, some inside others, none merging. On this plate two
+  bodies of oil merged the moment their edges met, because a single
+  Cahn–Hilliard field charges for boundary and nothing else, and two
+  boundaries a few cells apart are cheaper as none, and the capillary force
+  pulls them shut besides (mixFilm says why). In the lab (192², the look's
+  crowd of 35 drops, six seconds) the plate as it was left 3 bodies; with
+  the hold, 31 (npm run filmhold).
+
+  Real drops do not merge on touching. Two drops pressed together first
+  have to squeeze out the water between them, and a light show's water
+  carries soap or the dyes' own wetting agents, whose molecules sit on both
+  faces of the film. When the faces come within a few tens of nanometres
+  they repel (the double layers' charge and the surfactant's tails: the
+  disjoining pressure Π(h), Derjaguin's), and the film stops thinning at
+  the thickness where Π balances the drops' Laplace pressure. That is why a
+  soapy emulsion, or foam, is a crowd of cells with walls between them, and
+  why the walls between unequal drops curve into the bigger one. The film
+  breaks only if something presses harder than Π can hold: a hand on the
+  glass, a hard current, the top glass pushed down.
+
+  Simulated as the disjoining pressure is in a diffuse-interface model:
+  an energy for the water in a film, added to the oil's chemical potential
+  there, so oil flows out of a thinning film and back into its own drop
+  (the push back), and nothing anywhere else changes. A cell is in a film
+  when it has oil on both sides of it along a line: along the two axes and
+  the two diagonals, the most oil within FILM_REACH cells ahead and the
+  most behind, the lesser of the two, the greatest of the four lines. Each
+  is weighted by how far off it is, falling by e every FILM_DECAY cells,
+  so a thinner film pushes harder, as Π does (an exponential, the double
+  layer's own form). A cell beside one drop has oil on one side only and
+  reads nothing, so a lone drop rounds as before, and Film Hold at 0 adds
+  nothing at all. Only oil well past a half counts (0.55 to 0.9): the
+  field's edge is a few cells of part-oil, and read as oil, a cell in
+  that band saw it on both sides along the edge's own tangent and the
+  hold reshaped a lone drop's edge (the filmhold check, 0.081 of a cell's
+  oil at worst, against the bar of 0.01); and only a cell that is water
+  itself is in a film, for the same reason on the oil's side (0.026).
+
+  Shortcuts, named (PLAN 28k-2): a real film is tens of nanometres; on the
+  grid it is the narrowest the field can draw, two or three cells, so the
+  wall between two cells is drawn as thick as the field's own edge. And the
+  film breaks when it is pressed past what Π holds, which is the threshold
+  of the real rupture but not its timing: a real film also breaks by chance
+  as it drains, sooner when it is dirty or hot.
+*/
+export const FILM_REACH = 6;
+export const FILM_DECAY = 2.5;
+const FILM_WGSL = /* wgsl */ `
+fn filmReach(p: vec2i, e: vec2i, n: f32) -> f32 {
+  let len = length(vec2f(e));
+  var m = 0.0;
+  for (var k = 1; k <= ${FILM_REACH}; k++) {
+    let d = f32(k) * len;
+    m = max(m, smoothstep(0.55, 0.9, cc(p + e * k, n)) * exp(-(d - 1.0) / ${FILM_DECAY.toFixed(2)}));
+  }
+  return m;
+}
+fn filmSqueeze(p: vec2i, n: f32) -> f32 {
+  var s = min(filmReach(p, vec2i(1, 0), n), filmReach(p, vec2i(-1, 0), n));
+  s = max(s, min(filmReach(p, vec2i(0, 1), n), filmReach(p, vec2i(0, -1), n)));
+  s = max(s, min(filmReach(p, vec2i(1, 1), n), filmReach(p, vec2i(-1, -1), n)));
+  s = max(s, min(filmReach(p, vec2i(1, -1), n), filmReach(p, vec2i(-1, 1), n)));
+  return s;
+}
+`;
 const MAGNET_WGSL = /* wgsl */ `
 // The magnetic energy density a magnet under the glass sets up in the plate,
 // up to its constant. m = (x, y, height, strength); its field B is the
@@ -3643,8 +3713,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     shortest boundary for its area, and a thin thread breaks into drops for
     the same reason (Rayleigh–Plateau). Neither is drawn; both fall out.
     Stored in the mix's alpha for the update and the force to read.
+
+    And, with Film Hold (A.a.x), the water film between two bodies of oil
+    pushes back as it thins: FILM_WGSL says what that is and why.
   */
-  mixMu: `${HEAD}
+  mixMu: `${HEAD}${FILM_WGSL}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 fn cc(p: vec2i, n: f32) -> f32 { return textureLoad(src, clampP(p, n), 0).r; }
@@ -3655,7 +3728,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let m = textureLoad(src, p, 0);
   let c = m.r;
   let lap = cc(p + vec2i(1, 0), n) + cc(p - vec2i(1, 0), n) + cc(p + vec2i(0, 1), n) + cc(p - vec2i(0, 1), n) - 4.0 * c;
-  let mu = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap;
+  var mu = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap;
+  // In the water only: an edge cell on the oil's side sees its own oil
+  // both ways along the edge's tangent, and is not in a film.
+  if (A.a.x > 0.0) { mu += A.a.x * filmSqueeze(p, n) * (1.0 - smoothstep(0.15, 0.5, c)); }
   let outVal = vec4f(m.rgb, mu);
   textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));
 }`,
@@ -3893,6 +3969,62 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, safeVel(v));
 }`,
 
+  /*
+    Film Hold's push on the flow: the near-contact force (FILM_WGSL has the
+    physics). The disjoining pressure is a pressure, so the film pushes on
+    the liquid as well as costing the oil: without this, two drops a few
+    cells apart were pulled together by the capillary force itself, which is
+    taken from the oil blurred five cells wide (mixSmooth) and so reads two
+    drops that close as one body with a waist, whose curvature pulls the
+    waist shut. That is the numerical coalescence every smoothed-interface
+    solver has, and it is cured the way Montessori, Lauricella, Tirelli and
+    Succi cure it in their lattice Boltzmann emulsions (J. Fluid Mech. 872,
+    2019): a force on each interface, along its normal into its own drop,
+    wherever another interface faces it across the water within
+    FILM_REACH cells, stronger the thinner the film. The two faces of a film
+    are pushed apart alike, so it makes no momentum.
+
+    Each edge cell looks out along its own normal through the water: past
+    the edge it is on (the oil falling under a half) to where oil rises over
+    a half again, and the distance h there sets the push,
+    exp(−h / FILM_DECAY), times how much edge the cell holds (|∇c̃|).
+
+    A.a.x = the push at h = 0 per unit of edge (σ's own scale times Film
+    Hold), A.a.y = the most a cell may add, as mixForce's.
+  */
+  mixFilm: `${HEAD}${CAPILLARY}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var mix: texture_2d<f32>;
+@group(0) @binding(4) var soft: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+fn oilAt(q: vec2f, n: f32) -> f32 { return textureLoad(mix, clampP(vec2i(floor(q)), n), 0).r; }
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = S.n;
+  var v = textureLoad(vel, p, 0);
+  let g = grad(p, n);
+  let edge = length(g);
+  if (edge > 0.01) {
+    let into = g / edge;           // toward this cell's own oil
+    let here = vec2f(p) + 0.5;
+    var out = false;
+    var h = -1.0;
+    for (var k = 1; k <= ${FILM_REACH * 2}; k++) {
+      let d = 0.5 * f32(k);
+      let c = oilAt(here - into * d, n);
+      if (!out) { out = c < 0.5; }
+      else if (c > 0.5) { h = d; break; }
+    }
+    if (h > 0.0) {
+      var f = A.a.x * exp(-h / ${FILM_DECAY.toFixed(2)}) * g;
+      let l = length(f);
+      if (l > A.a.y) { f *= A.a.y / l; }
+      v = vec4f(v.xy + f, v.zw);
+    }
+  }
+  textureStore(dst, p, safeVel(v));
+}`,
   /*
     The ferrofluid under a strong field: labyrinths (Ohta–Kawasaki).
 

@@ -1861,6 +1861,79 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
+  {
+    id: 'splodascope',
+    name: 'Splodascope',
+    description: 'A crowd of yellow, green, red and pink oil drops packed edge to edge in blue water, lit from below: they press together without merging, some sit inside others, and a kick on the glass breaks a few films so neighbours run together.',
+    settings: {
+      lampGround: 1,
+      /*
+        After the owner's photograph of a splodascope (2026-10-25): round
+        cells of saturated oil crowded in a blue water, specks to cells a
+        fifth of the frame across, a few with another colour inside. Oil
+        Bodies keeps each drop's colour its own, and Film Hold is what makes
+        it a crowd: the water film between two drops pushes back as it thins
+        (FILM_WGSL in wgsl/fluid.ts), so drops that touch stay two. Without
+        it the lab's 90 drops ran into 25 in two seconds and 11 in ten, and
+        every merge mixed its colours toward brown. The crowd is laid by
+        seedPreset's 'splodascope' (src/lib/oilLay.ts).
+      */
+      oilTension: 0.9,
+      oilBodies: 1,
+      filmHold: 1,
+      globalSpeed: 0.0126,
+      surge: 0.3,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.4,
+      rotationSpeed: 0.04,       // the dish's motor, slow: the crowd turns and jostles
+      centerGravity: 0.05,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      diffusionRate: 0,
+      buoyancy: 0.1,
+      advection: 0.45,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.08,
+      platePressure: 0.4,
+      glassSmear: 0.15,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.85,
+      evaporationRate: 0.002,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.05,
+      audioImpact: 0.5,
+      blobSurfaceTension: 0.45,
+      boundaryContrast: 0.3,
+      saturationBoost: 1.3,      // at 1.6 the hot pink read as a second red
+      dyeBudget: 0.8,
+      glossiness: 0.3,
+      postBlurRadius: 0.1,
+      plateCurve: 0.45,          // the bowed glass gathers the crowd to the middle, where it packs
+      depthDrag: 1.2,
+      plateSpring: 0.35,
+      beatSqueeze: 0.0,
+      transmission: 0.4,
+      dishVignette: 0.6,
+      lampHotspot: 0.45,
+      /*
+        Fast readings only (the owner's rule): a kick presses the top glass,
+        and a hard one presses past what a film holds, so a few neighbours
+        run together on the beat while the rest of the crowd stands; the
+        snare shears the crowd a little; and mid harmony rounds the drops.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.15 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.15 },
+      ],
+      audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
+    }
+  },
   /*
     Two looks were made after Chemical Bouillon's ferrofluid films, the references the
     owner gave for how ferrofluid should look (docs/bubbles-plan.md); Ferro Maze

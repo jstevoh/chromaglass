@@ -8,10 +8,10 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 
 | | |
 |---|---|
-| ![The Fillmore East, 1969 preset](shots/fillmore-east-1969.jpg) | ![The Oil on Water preset](shots/oil-on-water.jpg) |
-| *Fillmore East, 1969* — each layer its own dish on a black screen, pressed on every kick | *Oil on Water* — the photographic render: domes with dark menisci, satellite droplets, a camera pass with real depth of field |
-| ![The Macro Bead preset](shots/macro-bead.jpg) | ![The Lumia preset](shots/lumia.jpg) |
-| *Macro Bead* — a tracking camera chasing a single bead at high magnification | *Lumia* — Thomas Wilfred's slow folded sheets of light, under the plate |
+| ![The Poster, 1969 preset](shots/poster-1969.jpg) | ![The Oil & Water preset](shots/oil-and-water.jpg) |
+| *Poster, 1969* — two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster | *Oil & Water* — amber oil on teal water between two glasses, each keeping its own colour as bodies round up and merge |
+| ![The Macro Bead preset](shots/macro-bead.jpg) | ![The Velvet Underground preset](shots/velvet-underground.jpg) |
+| *Macro Bead* — a tracking camera chasing a single bead at high magnification | *Velvet Underground* — three pools apart on deep violet: glycerine on the mids, soap on the bass, syrup on the treble |
 
 Frames from the app itself, written by `npm run shots`. These were made on a
 machine rasterising in software, so they undersell what a real GPU draws;
@@ -424,7 +424,7 @@ The same build serves three situations, and only the assumed headroom differs:
 |---|---|---|
 | **Hosted** | chromaglass.web.app | up to 512² at 1.5x pixels — starts low and climbs only if the machine holds it |
 | **Local** | `npm run remote` on your own machine | up to 768² at native pixel density, plus the phone remote |
-| **Native** | a desktop shell around `dist/` (not built yet) | as local |
+| **Native** | the Mac app (`desktop/`), which opens only on a Home or Pro licence (`desktop/README.md`) | as local |
 
 The tier is detected from where the page was loaded (`localhost`, a private
 LAN address or `.local` is local; an Electron/Tauri shell is native), and the
@@ -517,9 +517,10 @@ with.
 | Pushes Dye | Settings → Ferrofluid, under Phase Edge: the black pushes the colour aside where it grows and packs it along its edges; at 0 it is drawn over still dye (on the phone while there is ferrofluid) |
 | Oil Tension | Settings → Oil & Soap: oil and silicone poured on the plate pull into drops that round up and merge, as oil does on water; at 0 they spread as any other liquid |
 | Oil Bodies | Settings → Oil & Soap, under Oil Tension: the oil and the water each keep their own colour, so oil drops round up, merge and are dragged as bodies of their own colour; at 0 one dye blends across every edge (on the phone while there is oil) |
+| Film Hold | Settings → Oil & Soap, under Oil Bodies: the water film between two drops of oil pushes back as it thins (the disjoining pressure soap gives a film), so drops crowd edge to edge and sit inside one another without merging, until a press harder than the film holds breaks it; at 0 two drops merge the moment their edges meet. Needs Oil Tension (on the phone while there is oil). The Splodascope look is built on it |
 | Thin Gap / Thickness | Settings → Squish Plate, under Depth Drag: the liquid between the glasses moves as a thin layer does, not at a clamped speed. A push lasts as long as the gap and the liquid say (Thickness, from water to glycerine: seconds to nothing), a press pushes out the liquid it displaces across the dish's open rim and draws it back when the glass lifts, and a tight gap carries less than an open one. On in every look (the owner's pick, 2026-10-03), and in looks saved before it; a switch on MIDI, the desks, the phone's Press Amount and the remote (Thickness on the remote while it is on). `?set=thinGap=0` brings back the old plate |
 | Show | Settings → Show: hue journey, beat squeeze, background loop, kaleidoscope, round dish |
-| Lamp & Light | Settings → Lamp & Light: lamp ground, light play, lamp motion, hot-spot, second lamp, iridescence, then the other machines — lumia, chemistry, gel wheel, lamp warmth, exposure |
+| Lamp & Light | Settings → Lamp & Light: lamp ground, light play, lamp motion, hot-spot, second lamp, iridescence, then the other machines — lumia, chemistry, gel wheel, lamp warmth (6500 K down to a 3200 K halogen), exposure |
 | Camera | Settings → Camera: light show or photograph, paper colours, lens, focus, aperture, bloom, chromatic aberration, refraction, micro-droplets, thin film, film physics (the rainbow to a real soap film's colours, for Thin Film and the bubbles' Iridescence; on the phone while a film is up) |
 | All settings | Every section, on a rail grouped Play, Pour, Feed, Motion, Chemistry, Look and Stage (the panel browser and the phone's Settings use the same seven), one section at a time. **All settings…** sits under the rides on Perform and under the recipe on Design, and ⌘K reaches a section by name ("the room", "wall", "patches") or by anything in it ("keystone", "film mix"). The sheet's search box finds a section by what it is *about* — "camera", "people" and "crowd" all reach The Room, and none of those words is in its heading — or by the name on any of its controls, old names included |
 | About / `?` | The manual, in the app: getting started, a reference for every group of controls, how they interact, and a history of the project |

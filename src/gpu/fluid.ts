@@ -192,6 +192,21 @@ const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 const CH_SUBSTEPS = 4;
 /*
+  Film Hold at 1, as a chemical potential: what the water in a film one
+  cell thick costs the oil, against the double well's own height (1/16)
+  and its steepest pull (0.19 at a fifth full). Set in the lab against
+  the packed splodascope plate (npm run filmhold): see there.
+*/
+const FILM_MU = 0.6;
+/*
+  Film Hold at 1, as a push (mixFilm): the force on an edge with another
+  edge touching it across the water, as a curvature, in the capillary
+  force's own units (σκ∇c̃), so it scales with Oil Tension as the pull it
+  answers does. The spurious pull across a film is the curvature of the
+  waist the blur reads, up to about one over a cell.
+*/
+const FILM_PUSH = 1.5;
+/*
   The clear film (PLAN §20b, wgsl/film.ts), on a grid of its own.
 
   FILM_GRID is the prototype's (lace.py, 384²), whose numbers the kernels
@@ -1262,6 +1277,10 @@ export class WebGPUFluid {
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
       ['mixForce', [VEL], open.gravity],
+      // Film Hold's push: built behind the show, as the oil's other kernels
+      // are (no look opens with it in its first steps' set; startup fails one
+      // waited for and never run).
+      ['mixFilm', [VEL], false],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
@@ -2558,6 +2577,13 @@ export class WebGPUFluid {
       if (thin) this.run(pass, 'rimLaplace', rim, [smooth], args, 1);
       this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth, rim], args);
       this.vel.swap();
+      // Film Hold's push: the film between two drops holds them apart (mixFilm).
+      const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
+      if (hold > 0.001 && oil > 0.001) {
+        this.run(pass, 'mixFilm', this.vel.write, [this.vel.read, mix!.read, smooth],
+          this.arg('mix film', [oil * OIL_TENSION * perSecond * N * N * FILM_PUSH * hold, OIL_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
+        this.vel.swap();
+      }
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
     /*
       On a thin gap, Rain Drip's heavy dye, Plate Rock's tilt, Updraft's
@@ -3193,8 +3219,10 @@ export class WebGPUFluid {
           many the oil takes.
         */
         const subs = oil > 0 ? CH_SUBSTEPS : 1;
+        // Film Hold: the water film between two drops pushes back (FILM_WGSL).
+        const film = oil > 0 ? this.arg('mix mu', [FILM_MU * Math.max(0, Math.min(1, p.filmHold ?? 0)), 0, 0, 0]) : none;
         for (let k = 0; k < subs; k++) {
-          this.run(pass, 'mixMu', m.write, [m.read], none);
+          this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
             ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), 0.08, Math.pow(0.1, (p.magnetSeconds ?? 1 / 60) / 10), 0.04])
@@ -3794,7 +3822,8 @@ export class WebGPUFluid {
     this.run(pass, 'mixSplat', m.write, [m.read],
       this.arg('mix splat', [x, y, radius, 1, what.oil ?? 0, what.soap ?? 0, what.acid ?? 0, 0]));
     // Flat to its edge (mixSplat), so a disc's worth; the clamp at full is not counted.
-    this.oilPoured += Math.max(0, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius;
+    // A negative oil cuts a hole (a compound drop's, oilLay.ts), and is taken off.
+    this.oilPoured = Math.max(0, this.oilPoured + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
     m.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);

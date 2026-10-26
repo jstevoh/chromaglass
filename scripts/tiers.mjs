@@ -485,6 +485,10 @@ try {
       proGridNudgeWhilePro === 0 &&
         floatingNudgeWhilePro === 0 &&
         nudgeText.includes('ChromaGlass Pro') &&
+        // Home opens the Mac app too (PLAN.md 23.17b, 23.17d), so the card
+        // sells what Pro alone adds there, never the app itself.
+        !nudgeText.includes('plus the Mac app') &&
+        nudgeText.includes('several projectors') &&
         !nudgeText.includes('git clone') &&
         !nudgeText.includes('Run it locally') &&
         nudgeCtaHref.includes('lemonsqueezy.com/checkout/buy/') &&
@@ -494,7 +498,7 @@ try {
         free1024Disabled === true,
       `proGridWhilePro=${proGridNudgeWhilePro} floatWhilePro=${floatingNudgeWhilePro} ` +
         `1024 pro=${pro1024Count}/${pro1024Disabled ? 'disabled' : 'enabled'} ` +
-        `free=${free1024Count}/${free1024Disabled ? 'disabled' : 'enabled'} href=${nudgeCtaHref}`,
+        `free=${free1024Count}/${free1024Disabled ? 'disabled' : 'enabled'} href=${nudgeCtaHref} text=${JSON.stringify(nudgeText.slice(0, 220))}`,
     );
 
     await ctx.close();

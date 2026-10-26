@@ -125,7 +125,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // Whether the plate is a thin gap, and its liquid's thickness (PLAN §18a).
   'thinGap', 'gapThickness',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
-  'vorticityConfinement', 'oilTension', 'oilBodies', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
+  'vorticityConfinement', 'oilTension', 'oilBodies', 'filmHold', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
   // The clear film (PLAN §20b): the front plate's solver lays it; a back
   // plate is handed 0 until the display can draw one there (20b-5).
   'clearFilm',

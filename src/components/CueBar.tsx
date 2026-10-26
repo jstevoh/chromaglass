@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Play, X, Undo2, Timer } from 'lucide-react';
 import { FADE_CHOICES } from '../lib/lookFade';
+import { SlideMount, SlideTray } from './ui/Playful';
 
 /**
  * The armed look, and the button that sends it.
@@ -18,12 +19,22 @@ import { FADE_CHOICES } from '../lib/lookFade';
  *
  * Revert is here rather than in a menu because the fastest fix mid-show is
  * undo, and a menu is not fast.
+ *
+ * Each look is a slide (PLAN 35g): the one on stage in its mount, the cued one
+ * in its mount behind the arrow, and a round tray that clicks one slot when
+ * the stage takes a new look. The tray is the only thing that moves, and only
+ * inside its own square.
  */
 interface CueBarProps {
   /** The armed look, or null when nothing is waiting. */
   cued: { id: string; name: string } | null;
   /** What is on the stage now. */
   liveName: string | null;
+  /** The palette on the film of the look on stage and of the cued one (App's swatchOf). */
+  liveSwatch?: string;
+  cuedSwatch?: string;
+  /** The stage look's place in the list of looks, which way the tray clicks. */
+  liveAt?: number | null;
   /** 0 while nothing is fading, else how far through. */
   fading: number;
   fadeSeconds: number;
@@ -34,7 +45,7 @@ interface CueBarProps {
   onRevert: (() => void) | null;
 }
 
-export function CueBar({ cued, liveName, fading, fadeSeconds, onFadeSeconds, onGo, onCancel, onRevert }: CueBarProps) {
+export function CueBar({ cued, liveName, liveSwatch, cuedSwatch, liveAt = null, fading, fadeSeconds, onFadeSeconds, onGo, onCancel, onRevert }: CueBarProps) {
   const busy = fading > 0;
   if (!cued && !busy && !onRevert) return null;
 
@@ -48,6 +59,8 @@ export function CueBar({ cued, liveName, fading, fadeSeconds, onFadeSeconds, onG
     >
       {/* What is live, and what is waiting behind it. */}
       <div className="flex items-center gap-3 px-1">
+        <span className="text-white/60" title="The tray clicks one slot as each look goes up"><SlideTray at={liveAt} size={28} /></span>
+        {liveSwatch && <SlideMount swatch={liveSwatch} size={30} />}
         <div className="flex flex-col">
           <span className="text-[9px] uppercase tracking-[0.2em] text-white/40">On stage</span>
           <span className="text-[12px] font-semibold max-w-[11rem] truncate" data-testid="cue-live">{liveName ?? '—'}</span>
@@ -55,6 +68,7 @@ export function CueBar({ cued, liveName, fading, fadeSeconds, onFadeSeconds, onG
         {cued && (
           <>
             <span className="text-white/25">→</span>
+            {cuedSwatch && <SlideMount swatch={cuedSwatch} size={30} />}
             <div className="flex flex-col">
               <span className="text-[9px] uppercase tracking-[0.2em] text-amber-300/70">Cued</span>
               <span className="text-[12px] font-semibold max-w-[11rem] truncate text-amber-200" data-testid="cue-armed">{cued.name}</span>

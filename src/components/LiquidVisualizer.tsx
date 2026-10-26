@@ -7,10 +7,10 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
-import { lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
+import { dyeRoomOf, lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE, WORKING_DYES, dyesOnPlate } from '../presetPlate';
-import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../lib/oilLay';
 import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, pointInArea, pickArea, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
 import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
@@ -874,6 +874,8 @@ export interface LiquidVisualizerHandle {
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
   /** What is on each live layer: how full it is, and the colour of it. */
   layerReport: () => { index: number; fill: number; colour: string }[];
+  /** What is left of the Dye Budget on the layer in hand, 0 to 1: the bottle's level (PLAN 35e). */
+  dyeRoom: () => number;
   describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
   /**
    * Take on a preset's dyes, injection style and liquids without clearing the
@@ -2903,6 +2905,29 @@ class FluidSimulation {
         break;
       }
 
+      case 'splodascope': {
+        /*
+          The splodascope's crowd (src/lib/oilLay.ts, and why): a blue water
+          across the dish and a packed crowd of oil drops in it, each with
+          one of the other dyes, a few big ones holding a drop of another
+          colour in a ring of water. The look's Film Hold keeps them apart
+          where they touch, and Oil Bodies keeps each one's colour its own.
+        */
+        const water = col(0);
+        const discs = splodascopeDiscs(this.rng.float, harmony.length);
+        const g = this.gpu;
+        for (const d of discs) g?.addMix?.(d.x, d.y, d.r, { oil: d.oil });
+        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+          const cell = splodascopeCell((x + 0.5) / S, (y + 0.5) / S, S, discs);
+          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
+          if (cell.dye > 0) {
+            const c = col(discs[cell.disc].dye);
+            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
+          }
+        }
+        break;
+      }
+
       // Boyle's bench starts from clean glass, as Turing Print does now that the
       // Sensual Laboratory is retired (PLAN 28i-1): the pattern is the subject,
       // not a seed of blobs, and its colour is the reaction's alone (depositChem).
@@ -4213,6 +4238,7 @@ class FluidSimulation {
       vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
       oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
+      filmHold: Math.max(0, Math.min(1, settings.filmHold ?? 0)),
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
       // The front plate only: the display reads the film from the front
       // plate's packed view alone, so a film on the back plate would be
@@ -6240,6 +6266,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       fill: Math.max(0, Math.min(1, (f?.meanDensity ?? 0) / 0.35)),
       colour: f ? rgbToHex(f.meanColor[0], f.meanColor[1], f.meanColor[2]) : '#000000',
     })),
+    /*
+      The same target the regulator holds the plate to (`stepDecay`), without
+      the hand bank, read against the plate's mean density: a few reads a
+      second from the picked bottle, nothing per frame.
+    */
+    dyeRoom: () => {
+      const f = fluidsRef.current[activeLayerRef.current];
+      if (!f) return 1;
+      const st = settingsRef.current;
+      const budget = dyeLookTarget(f.seedMean, st.dyeBudget ?? 0.85, f.seedBudget);
+      return dyeRoomOf(f.meanDensity, budget + (0.28 - budget) * macroAmountOf(st));
+    },
     describePlate: () => ({
       contract: presetContractRef.current ? [...presetContractRef.current] : null,
       injectStyles: [...injectStyleRef.current],

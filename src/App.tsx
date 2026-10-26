@@ -430,6 +430,8 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
   const tapTempo = useCallback(() => tempoRef.current?.tap(performance.now()), []);
+  /** The source's reading, for the tap pad's beat light, which polls it itself so the App never re-renders for a beat (PLAN 35f). */
+  const readTempo = useCallback(() => tempoRef.current?.read(performance.now()) ?? null, []);
   const clearTempo = useCallback(() => tempoRef.current?.clear(), []);
   const setTempoBpm = useCallback((bpm: number) => tempoRef.current?.setBpm(bpm), []);
   /*
@@ -903,7 +905,9 @@ export default function App() {
   const [songLine, setSongLine] = useState('');
   /** What the bar grid knows (lib/barGrid.ts barLine), for Accent the One on the phone. */
   const [barKnown, setBarKnown] = useState('');
-  const shownShape = useRef({ line: '', bar: '' });
+  /** The tempo the beat grid hears, bpm rounded, or 0: what the strobe ring on Auto Spin is lit by when nothing was tapped or clocked in. */
+  const [heardBpm, setHeardBpm] = useState(0);
+  const shownShape = useRef({ line: '', bar: '', heard: 0 });
   /** The last song-shape event the sequencer has been handed, by its number. */
   const songCueSeqRef = useRef(0);
   useEffect(() => {
@@ -914,6 +918,9 @@ export default function App() {
       if (next !== shownShape.current.line) { shownShape.current.line = next; setSongLine(next); }
       const bar = report ? barLine(report.bar) : '';
       if (bar !== shownShape.current.bar) { shownShape.current.bar = bar; setBarKnown(bar); }
+      const heard = report && report.bar.period > 0 && report.bar.beatConfidence >= 0.3 ? Math.round(60 / report.bar.period) : 0;
+      // Compared here, not in an updater that hands back the old value (the tempo label's note above): that still renders the App.
+      if (heard !== shownShape.current.heard) { shownShape.current.heard = heard; setHeardBpm(heard); }
     }, 250);
     return () => clearInterval(timer);
   }, []);
@@ -1602,6 +1609,8 @@ export default function App() {
   */
   const earLive = ear.live;
   const hear = useCallback(() => renderAudioRef.current ?? earLive.current, [earLive]);
+  /** The plate's volume, 0 to 100, for the VU needle (it polls this on its own frame; nothing renders for it). */
+  const readLevel = useCallback(() => hear()?.volume ?? null, [hear]);
   const [renderHold, setRenderHold] = useState(false);
   const renderHoldRef = useRef(false);
   const audioData = renderAudio ?? liveAudio;
@@ -1978,6 +1987,8 @@ export default function App() {
    * layer is does not need sixty looks a second at the cost of a re-render
    * each.
    */
+  /** What is left of the Dye Budget, for the picked bottle on the desk and the phone (PLAN 35e); a stable function, so asking re-renders nothing here. */
+  const readDyeRoom = useCallback(() => visualizerRef.current?.dyeRoom?.() ?? 1, []);
   const [layerReport, setLayerReport] = useState<{ index: number; fill: number; colour: string }[]>([]);
   const layerReportKey = useRef('');
   /** Which desk is up, for the poll below, which is armed once and never re-armed. */
@@ -2830,6 +2841,16 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   []);
 
+  // The stage look's place in each list, for the slide tray's click (PLAN 35g):
+  // the desk's is among all the presets, the phone's among its grouped list.
+  const deskLookSlot = useMemo(() => {
+    const i = pinnedPresetId ? allPresets.findIndex(p => p.id === pinnedPresetId) : -1;
+    return i < 0 ? null : i;
+  }, [allPresets, pinnedPresetId]);
+  const phoneLookSlot = useMemo(() => {
+    const i = pinnedPresetId ? phoneLooks.findIndex(l => l.id === pinnedPresetId) : -1;
+    return i < 0 ? null : i;
+  }, [phoneLooks, pinnedPresetId]);
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
@@ -4960,6 +4981,8 @@ export default function App() {
       wallTest={wallTest}
       onWallTest={setWallTest}
       tempo={tempoLabel}
+      readTempo={readTempo}
+      spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
       onTap={tapTempo}
       onTempoClear={clearTempo}
       onTempoBpm={setTempoBpm}
@@ -5862,6 +5885,7 @@ export default function App() {
           edited={!activePresetName && fading <= 0 && !!pinnedLookName}
           looks={phoneLooks}
           activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+          lookSlot={phoneLookSlot}
           onLook={(id) => goLookNow(id)}
           onShuffle={triggerLucky}
           onSave={(name) => saveCurrentPreset(name, '', false)}
@@ -5908,6 +5932,7 @@ export default function App() {
             lookSwatch={swatchOf((activePresetId ?? (fading > 0 ? pinnedPresetId : null)) ?? undefined)}
             looks={phoneLooks}
             activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+            lookSlot={phoneLookSlot}
             // A look from the phone crossfades in, as Go does on the desk: a
             // thumb in front of a room should never cut the plate to clean glass.
             onLook={(id) => goLookNow(id)}
@@ -5927,6 +5952,7 @@ export default function App() {
             onAmount={(v) => setToolAmount(activeTool, v)}
             liquids={liquidTypes}
             selectedLiquidId={selectedLiquidId}
+            dyeRoom={readDyeRoom}
             onLiquid={setSelectedLiquidId}
             dyeColors={DROPPER_COLORS}
             onDyeColor={(hex) => updateLiquidColor(selectedLiquidId, hex)}
@@ -5950,7 +5976,7 @@ export default function App() {
             onClear={() => setClearTrigger(n => n + 1)}
             onDrain={() => setDrainTrigger(n => n + 1)}
             onSpin={() => flickPlate(activeLayer)}
-            spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, onChange: updateSettings }}
+            spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, bpm: tempoLabel.source ? tempoLabel.bpm : heardBpm, onChange: updateSettings }}
             onLucky={triggerLucky}
             zoom={settings.macroZoom ?? 1}
             onZoom={() => runAction('macro-toggle')}
@@ -5971,6 +5997,10 @@ export default function App() {
             score={scoreProps}
             mapLine={followLine(musicIntel.state.follow, musicIntel.state.track?.title)}
             deaf={earDeaf}
+            readLevel={readLevel}
+            tempo={tempoLabel}
+            onTap={tapTempo}
+            readTempo={readTempo}
             show={{
               running: sequencer.status.running,
               paused: !!sequencer.status.sequenceId && !sequencer.status.running,
@@ -6155,6 +6185,8 @@ export default function App() {
             onDrone={changeDrone}
             droneRunning={droneRunning}
             onDroneToggle={toggleDrone}
+            readLevel={readLevel}
+            deaf={earDeaf}
             onClose={() => setShowSound(false)}
           />
           </PanelGuard>
@@ -6328,7 +6360,7 @@ export default function App() {
           </button>
           {presetMenu === 'title' && (
             <PanelGuard name="The look menu" onClose={() => setPresetMenu('none')}>
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} swatchOf={swatchOf} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
             </PanelGuard>
           )}
         </div>
@@ -6619,6 +6651,7 @@ export default function App() {
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}
+          dyeRoom={readDyeRoom}
           onBottle={(id) => { setSelectedLiquidId(id); }}
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
@@ -6712,6 +6745,9 @@ export default function App() {
           <CueBar
             cued={cued}
             liveName={liveLookName}
+            liveSwatch={swatchOf(activePresetId ?? (fading > 0 ? pinnedPresetId : null) ?? undefined)}
+            cuedSwatch={cued ? swatchOf(cued.id) : undefined}
+            liveAt={deskLookSlot}
             fading={fading}
             fadeSeconds={fadeSeconds}
             onFadeSeconds={setFadeSeconds}
