@@ -234,8 +234,10 @@ try {
   await page.waitForSelector('#liquid-canvas', { state: 'attached', timeout: 60_000 }).catch(() => null);
   const url = page.url();
   const canvas = await page.locator('#liquid-canvas').count();
-  check('opens: the show, from the server inside the app', url === `http://localhost:${PORT}/${QUERY}` && canvas === 1,
-    `${url}, ${canvas ? 'the plate canvas is there' : 'no plate canvas'}`);
+  // On its key (PLAN.md 23.17d): the door never drawn, and the key the app verified handed to the page.
+  const keyed = await page.evaluate(() => !document.querySelector('[data-cg-app-licence]') && !!window.__CHROMAGLASS_NATIVE__?.license?.valid).catch(() => false);
+  check('opens: the show, from the server inside the app, on its licence', url === `http://localhost:${PORT}/${QUERY}` && canvas === 1 && keyed,
+    `${url}, ${canvas ? 'the plate canvas is there' : 'no plate canvas'}, ${keyed ? 'on the key the app verified' : 'the door drawn or no key handed to the page'}`);
 
   // The profile card's way of hearing the updater (desktop/preload.cjs), set
   // up before the feed answers; read in the updates line below.
@@ -635,6 +637,8 @@ try {
   const barePort = await freePort('tcp');
   const bareEnv = { ...env, PORT: String(barePort), OSC_PORT: String(await freePort('udp')), CHROMAGLASS_USER_DATA: bare };
   delete bareEnv.CHROMAGLASS_LICENSE_KEY;
+  // Packed, the app must raise the door by itself: nothing tells it to.
+  if (PACKAGED) delete bareEnv.CHROMAGLASS_REQUIRE_SIGNIN;
   delete bareEnv.CHROMAGLASS_UPDATE_FEED;
   let second = null;
   try {

@@ -937,7 +937,8 @@ try {
       const MAC = SHOW + '&requireSignIn=1';
       const step = (p) => p.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
       const stepIs = (p, want, ms = 30_000) => waitFor(async () => (await step(p)) === want, ms);
-      const storedKey = (p) => p.evaluate(() => localStorage.getItem('chromaglass:license-key')).catch(() => null);
+      // 'unread' when the page cannot be asked, so an unreadable page never reads as "the key is gone".
+      const storedKey = (p) => p.evaluate(() => localStorage.getItem('chromaglass:license-key')).catch(() => 'unread');
       async function fileKey(email, tier, id) {
         const now = Date.now();
         const token = await signLicenseKey({ id, tier, email, issuedAt: now }, licEnv.LICENSE_PRIVATE_KEY);
@@ -952,13 +953,14 @@ try {
       // confirmation (the Worker gives keys only to a confirmed email), then,
       // with no key on the account, Home and Pro to buy, and still no plate.
       const signin = await stepIs(p, 'signin');
-      let confirm = false, buy = false, plateBehind = false;
+      let confirm = false, buy = false, plateBehind = false, buyAt = 0;
       if (signin && await openPasswordPanel(p, true)) {
         await submitPassword(p, E, PW);
         confirm = await stepIs(p, 'confirm');
         if (confirm && await confirmEmail(E)) {
           await p.click('[data-cg-app-licence-confirm] button').catch(() => {});
           buy = await stepIs(p, 'buy');
+          buyAt = Date.now();
         }
         await p.waitForTimeout(2000);
         plateBehind = await appUp(p);
@@ -970,26 +972,32 @@ try {
       // 23. The store files a Home key for the account; "check again" opens the
       // show, and it is Home, not Pro: the tiers the website has.
       await fileKey(E, 'home', 'mac-home-1');
-      await p.click('[data-cg-app-licence-recheck]').catch(() => {});
-      const up = await waitFor(() => appUp(p), BOOT_MS);
+      // The button, not the screen's own re-ask every 20 s: the door must be
+      // gone within 5 s of the click and before the first re-ask would come.
+      const clicked = await p.click('[data-cg-app-licence-recheck]', { timeout: 5000 }).then(() => Date.now(), () => 0);
+      const doorGone = clicked > 0 && await waitFor(async () => (await step(p)) === null, 5000);
+      const byButton = doorGone && Date.now() - buyAt < 18_000;
+      const up = byButton && await waitFor(() => appUp(p), BOOT_MS);
       const tier = up ? await waitFor(async () => (await tierShown(p)).split(',').includes('home'), 20_000).then(() => tierShown(p)) : '';
-      check('23. once the account holds a Home key, check again opens the show, at Home', up && tier.split(',').includes('home') && !tier.split(',').includes('pro'), `plate ${up}, tier ${tier || 'not drawn'}`);
+      check('23. once the account holds a Home key, check again opens the show, at Home', byButton && up && tier.split(',').includes('home') && !tier.split(',').includes('pro'), `${!clicked ? 'no check-again button' : doorGone ? `the door went ${((Date.now() - buyAt) / 1000).toFixed(0)} s after Buy appeared${byButton ? ', on the click' : ', too late to be the click'}` : 'the door stayed after the click'}; plate ${up}, tier ${tier || 'not drawn'}`);
 
       // 24. Refunded: the Worker's list no longer has the key (its refund drops
       // it, server/license-worker.js). The show that is up stays up (never
       // locked out mid-set); the key is gone from the machine; the next start
       // is the buy screen again. Before 23.17d a refunded key verified for ever.
+      // The control: a key really is on the machine before the refund.
+      const heldBefore = await storedKey(p);
       licKV.set(`keys:${E}`, JSON.stringify([]));
       await p.reload();
       const upAgain = await waitFor(() => appUp(p), BOOT_MS);
-      const retired = upAgain && await waitFor(async () => !(await storedKey(p)), 20_000);
+      const retired = upAgain && typeof heldBefore === 'string' && heldBefore.startsWith('cg1.') && await waitFor(async () => (await storedKey(p)) === null, 20_000);
       await p.waitForTimeout(3000);
       const stayed = await appUp(p);
       await p.reload();
       const backToBuy = await stepIs(p, 'buy', 45_000);
       const noPlate = !(await appUp(p));
       check('24. a refunded key: the running show stays up, the key leaves the machine, and the next start asks to buy', upAgain && retired && stayed && backToBuy && noPlate,
-        `opened on the held key ${upAgain}, key taken off ${retired}, show still up ${stayed}, next start ${await step(p) ?? 'the plate'}`);
+        `a key held before ${typeof heldBefore === 'string' && heldBefore.startsWith('cg1.')}, opened on it ${upAgain}, key taken off ${retired}, show still up ${stayed}, next start ${await step(p) ?? 'the plate'}`);
       await c.close();
     }
   }
