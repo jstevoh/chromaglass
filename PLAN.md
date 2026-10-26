@@ -8521,6 +8521,37 @@ to the CPU reference within a stated tolerance, so the GPU is judged by the mode
 by whatever it draws. *Measure:* `soapgpu` plus `wgsl`, `physics` and `derive` unchanged,
 and the pass's cost in ms at the plate's size.
 
+**The check is written first (this PR), and red on main for the one right reason:** with no
+`src/gpu/soapFilm.ts` it prints that and exits 1, as `soapfilm` did before 32a, so it is not
+in `checks.yml` yet; 32c wires it in. `scripts/soapgpu.mjs` runs soapfilm.mjs's C1–C4 and C6
+films, seeds, steps and bars through the GPU solver, and steps the same films on the CPU
+reference beside it: the first step's face flows within 2% and its change in thickness within
+5% (RMS, cell by cell), the thickness after one second within 5% of its change (at dt 0.05, at the frame's 1/60 s, and
+at zeta 0.25 and dt 0.2 s where the reference takes 4 CFL sub-steps), each patch's
+travel within 1.5 rows, every quarter's mean within 2% every 5 s of the drain, the top black
+within 5 s of the reference's, and a hole torn in the film never refilled, its black spreading
+within 15% of the reference's. Two float64 bars move for float32 storage, and only two:
+conservation to 1e-6 (not 1e-9; float32 storage of the whole reference measured 7.7e-9) and
+a still film to 1e-5 nm of the float32 film it was handed (not 1e-6 of the float64 one). The solver's contract
+(`createSoapFilmGpu(device, { nx, ny, dx })` with `write`, `step`, `read`) is written in
+`scripts/soapgpu-cpu.ts`, the reference dressed in it, which `npm run soapgpu -- --selftest`
+runs: 29/29. Look-alikes, each the reference with one thing changed (in a cloud session):
+first-order upwind fails 8 lines, an MC limiter 3 (first step 7.0%, one second 6.3%, drain
+9.6%), a projection stopped at 20 sweeps 4, Jacobi at 200 sweeps 1 (flows 2.8%), semi-Lagrangian
+advection 11 (conservation 8.9e-4), no rupture marks the 2 hole lines, a step that ignores dt
+2, one that ignores zeta 1, one with no sub-steps 1 (26% off); red-black SOR at 60
+sweeps and Jacobi at 1000 pass all 25, so a faithful float32 solver can. The flows' 2% bar
+is a convergence bar, cold, on the first step: plain Jacobi needs about 1000 sweeps on 32 × 64
+to meet it, red-black SOR 60, so 32c's projection is red-black SOR (or multigrid), warm-started.
+The check also asks that the work be the GPU's: the solver's bundle may not carry
+`src/lib/soapFilm.ts`'s code, every step submits to the queue and every read maps a buffer.
+
+- **32c-1. The drain's own "a ruptured cell stays black" never fires.** soapfilm.mjs C6 reads
+  it on the drain, where measured, the reference with its rupture marks removed refills no cell
+  either (thick film never presses on black there), so that line in `npm run soapfilm` would pass
+  a solver with no marks. `soapgpu` asks it on a torn hole instead; soapfilm.mjs should get the
+  same hole for the CPU reference (a check session; it moves an input, so `Check changes:`).
+
 ### 32d. On the plate
 
 A "Soap Film" look: the film's reflected colour on a dark ground, a time-compression rate
