@@ -169,7 +169,7 @@ function getNativeBridge() {
 }
 
 export function isHostedSiteBuild(): boolean {
-  if (import.meta.env.VITE_FIREBASE_HOSTED_SITE === '1' || import.meta.env.VITE_FIREBASE_HOSTED_SITE === 'true') {
+  if (import.meta.env?.VITE_FIREBASE_HOSTED_SITE === '1' || import.meta.env?.VITE_FIREBASE_HOSTED_SITE === 'true') {
     return true;
   }
   if (typeof window !== 'undefined') {
