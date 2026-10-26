@@ -7,10 +7,10 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
-import { lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
+import { dyeRoomOf, lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE, WORKING_DYES, dyesOnPlate } from '../presetPlate';
-import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../lib/oilLay';
 import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, pointInArea, pickArea, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
 import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
@@ -874,6 +874,8 @@ export interface LiquidVisualizerHandle {
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
   /** What is on each live layer: how full it is, and the colour of it. */
   layerReport: () => { index: number; fill: number; colour: string }[];
+  /** What is left of the Dye Budget on the layer in hand, 0 to 1: the bottle's level (PLAN 35e). */
+  dyeRoom: () => number;
   describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
   /**
    * Take on a preset's dyes, injection style and liquids without clearing the
@@ -2926,7 +2928,7 @@ class FluidSimulation {
         field(0.25, 0.74, 0.2, 0);
         field(0.18, 0.2, 0.17, 1);
         field(0.9, 0.86, 0.12, 1);
-        shape(0.3, 0.36, 0.09, 0, [[2.6, 0.6], [4.2, 0.5]]);
+        shape(0.3, 0.36, 0.10, 0, [[2.6, 0.6], [4.2, 0.5], [0.4, 0.6]]);
         shape(0.5, 0.14, 0.05, 2, [[0.3, 0.6]]);
         shape(0.86, 0.46, 0.05, 1, []);
         shape(0.68, 0.74, 0.1, 2, [[5.6, 0.55], [1.9, 0.5]]);
@@ -2939,16 +2941,16 @@ class FluidSimulation {
         // Additional comic shapes in the same ink as their neighbours so they
         // never create a three-channel stain while keeping gallery flat <=0.50
         // and luma <=0.60 across the 16:9 frame (PLAN 28i-2).
-        shape(0.50, 0.64, 0.092, 0, [[0.2, 0.6]]);
+        shape(0.48, 0.63, 0.095, 0, [[0.2, 0.6]]);
         shape(0.36, 0.15, 0.086, 2, [[3.1, 0.6]]);
-        shape(0.92, 0.16, 0.088, 2, []);
-        shape(0.08, 0.74, 0.088, 0, []);
-        shape(-0.05, 0.44, 0.125, 2, [[1.5, 0.65]]);
-        shape(1.05, 0.46, 0.125, 0, [[4.7, 0.65]]);
-        shape(-0.05, 0.20, 0.11, 2, []);
-        shape(1.05, 0.20, 0.11, 2, []);
-        shape(-0.05, 0.74, 0.11, 0, []);
-        shape(1.05, 0.74, 0.11, 2, []);
+        shape(0.94, 0.24, 0.092, 2, []);
+        shape(0.06, 0.72, 0.092, 0, [[0.2, 0.55]]);
+        shape(-0.04, 0.32, 0.115, 1, []);
+        shape(-0.04, 0.48, 0.12, 0, [[1.5, 0.6]]);
+        shape(1.04, 0.46, 0.125, 0, [[4.7, 0.65]]);
+        shape(1.04, 0.24, 0.11, 2, []);
+        shape(-0.04, 0.68, 0.115, 0, []);
+        shape(1.04, 0.68, 0.115, 0, []);
         break;
       }
 
@@ -2977,6 +2979,29 @@ class FluidSimulation {
           if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
           if (cell.dye > 0) {
             const c = col(bodies[cell.body].dye);
+            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
+          }
+        }
+        break;
+      }
+
+      case 'splodascope': {
+        /*
+          The splodascope's crowd (src/lib/oilLay.ts, and why): a blue water
+          across the dish and a packed crowd of oil drops in it, each with
+          one of the other dyes, a few big ones holding a drop of another
+          colour in a ring of water. The look's Film Hold keeps them apart
+          where they touch, and Oil Bodies keeps each one's colour its own.
+        */
+        const water = col(0);
+        const discs = splodascopeDiscs(this.rng.float, harmony.length);
+        const g = this.gpu;
+        for (const d of discs) g?.addMix?.(d.x, d.y, d.r, { oil: d.oil });
+        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+          const cell = splodascopeCell((x + 0.5) / S, (y + 0.5) / S, S, discs);
+          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
+          if (cell.dye > 0) {
+            const c = col(discs[cell.disc].dye);
             this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
           }
         }
@@ -3025,36 +3050,40 @@ class FluidSimulation {
       }
 
       case 'chemical-clock': {
-        // Alternating ferroin/cerium indicator waves across the dish so the
-        // oscillating clock reorganises its colour histogram >=6 times/min (PLAN 28i-2).
+        // Translucent indicator pools (seedMean ~0.68 <= 0.75 budget, spaced
+        // apart with exposure 0.58 so Beer-Lambert transmission stays bright at
+        // 8 s while the oscillating clock reorganises its colour histogram >=6
+        // times/min, PLAN 28i-2).
         for (let i = 0; i < 6; i++) {
           const a = (i / 6) * Math.PI * 2;
           const c = col(i);
-          const x = cx + Math.cos(a) * S * 0.20;
-          const y = cy + Math.sin(a) * S * 0.18;
-          this.splatBlob(x, y, 13, 2.2, c.r, c.g, c.b);
-          this.addVelocity(Math.floor(x), Math.floor(y), -Math.sin(a) * 0.08, Math.cos(a) * 0.08);
+          const x = cx + Math.cos(a) * S * 0.24;
+          const y = cy + Math.sin(a) * S * 0.20;
+          this.splatBlob(x, y, 12, 1.55, c.r, c.g, c.b);
+          this.addVelocity(Math.floor(x), Math.floor(y), -Math.sin(a) * 0.10, Math.cos(a) * 0.10);
         }
         break;
       }
 
       case 'lava-lamp': {
-        // Warm wax columns across the bottle (unheated at t=0 so solutalBuoyancy
-        // settles them into LAMP_HEAT at the base instead of shooting out the top
-        // rim) for a steady >=0.02 rise-and-sink cycle at luma <=0.60 (PLAN 28i-2).
-        const blobs: [number, number, number, number][] = [
-          [0.50, 0.68, 22, 0],
-          [0.34, 0.62, 19, 1],
-          [0.66, 0.60, 19, 2],
-          [0.50, 0.48, 20, 0],
-          [0.32, 0.42, 17, 1],
-          [0.68, 0.40, 17, 2],
-          [0.42, 0.30, 16, 0],
-          [0.58, 0.28, 16, 1],
+        // Translucent wax plumes (seedMean ~0.52 so Beer-Lambert transmission stays
+        // bright at 8 s without opaque blackout) with warm rising lower blobs and
+        // sinking upper blobs so convection is already underway by 8 s and sustains
+        // >=0.02 motion through 40 s at luma <=0.60 (PLAN 28i-2).
+        const blobs: [number, number, number, number, number, number][] = [
+          [0.50, 0.66, 14, 0, 14, -0.10],
+          [0.34, 0.62, 13, 1, 12, -0.08],
+          [0.66, 0.60, 13, 2, 12, -0.08],
+          [0.48, 0.46, 13, 0,  6, -0.05],
+          [0.34, 0.36, 12, 1,  0,  0.08],
+          [0.66, 0.36, 12, 2,  0,  0.08],
         ];
-        for (const [fx, fy, rad, ci] of blobs) {
+        for (const [fx, fy, rad, ci, heat, vy] of blobs) {
           const c = col(ci);
-          this.splatBlob(fx * S, fy * S, rad, 3.2, c.r, c.g, c.b);
+          const x = fx * S, y = fy * S;
+          this.splatBlob(x, y, rad, 1.15, c.r, c.g, c.b);
+          if (heat > 0) this.addTemp(Math.floor(x), Math.floor(y), heat);
+          this.addVelocity(Math.floor(x), Math.floor(y), 0, vy);
         }
         break;
       }
@@ -4362,6 +4391,7 @@ class FluidSimulation {
       vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
       oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
+      filmHold: Math.max(0, Math.min(1, settings.filmHold ?? 0)),
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
       // The front plate only: the display reads the film from the front
       // plate's packed view alone, so a film on the back plate would be
@@ -6389,6 +6419,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       fill: Math.max(0, Math.min(1, (f?.meanDensity ?? 0) / 0.35)),
       colour: f ? rgbToHex(f.meanColor[0], f.meanColor[1], f.meanColor[2]) : '#000000',
     })),
+    /*
+      The same target the regulator holds the plate to (`stepDecay`), without
+      the hand bank, read against the plate's mean density: a few reads a
+      second from the picked bottle, nothing per frame.
+    */
+    dyeRoom: () => {
+      const f = fluidsRef.current[activeLayerRef.current];
+      if (!f) return 1;
+      const st = settingsRef.current;
+      const budget = dyeLookTarget(f.seedMean, st.dyeBudget ?? 0.85, f.seedBudget);
+      return dyeRoomOf(f.meanDensity, budget + (0.28 - budget) * macroAmountOf(st));
+    },
     describePlate: () => ({
       contract: presetContractRef.current ? [...presetContractRef.current] : null,
       injectStyles: [...injectStyleRef.current],

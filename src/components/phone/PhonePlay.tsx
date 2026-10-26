@@ -8,6 +8,7 @@ import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playG
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
+import { TapeReels } from '../ui/Playful';
 
 /**
  * Play: ChromaGlass on a phone for someone listening, not performing.
@@ -345,16 +346,16 @@ export function PhonePlay(p: PhonePlayProps) {
               <Pill onPress={p.onShuffle} label="Shuffle the look" testId="play-shuffle"><Shuffle size={18} /></Pill>
               {p.recording.supported && (
                 <Pill onPress={p.recording.onToggle} label={p.recording.on ? 'Stop recording' : 'Record a clip'} testId="play-record" pressed={p.recording.on} live>
-                  <span className="relative flex h-4 w-4 items-center justify-center">
-                    <span
-                      aria-hidden={p.recording.on || undefined}
-                      className={`h-4 w-4 rounded-full border-2 border-[#F87171] ${p.recording.on ? 'invisible' : ''}`}
-                    />
+                  {/*
+                    Two tape reels, still while it waits and turning while it records,
+                    the clock under them. A fixed box so starting a clip never widens
+                    the pill (PLAN 19v-4); the reels are the same picture as the
+                    desk's Record, and the pill is red while it runs (Pill live).
+                  */}
+                  <span className="relative flex h-7 w-7 flex-col items-center justify-center gap-px" data-testid="play-record-box">
+                    <TapeReels seconds={p.recording.seconds} running={p.recording.on} height={p.recording.on ? 11 : 13} />
                     {p.recording.on && (
-                      <span
-                        data-testid="play-record-timer"
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-mono text-[11px] tabular-nums"
-                      >
+                      <span data-testid="play-record-timer" className="whitespace-nowrap font-mono text-[9px] leading-none tabular-nums">
                         {clock(p.recording.seconds)}
                       </span>
                     )}

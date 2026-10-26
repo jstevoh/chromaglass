@@ -8,6 +8,7 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { isPadPicture, type PadPictureMessage } from '../lib/padPicture';
 import { MARK_URL } from '../brand';
 import { LIT } from './ui';
+import { LensCap } from './ui/Playful';
 
 /**
  * Draw (PLAN §8-draw, the Desk v2 design's #3c phone and #3d iPad): the
@@ -399,12 +400,13 @@ export function DrawScreen(p: DrawScreenProps) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.action('blackout-toggle'); } }}
       disabled={!p.connected}
       className={`flex items-center justify-center gap-2 rounded-2xl border px-5 text-[15px] font-semibold disabled:opacity-40 ${flex ? 'flex-1' : ''} ${
-        dark ? 'border-live bg-live text-on-primary' : 'border-live-border bg-[rgba(17,17,19,.78)] text-live'
+        dark ? 'border-live bg-live text-on-primary' : 'border-border-strong bg-[rgba(17,17,19,.78)] text-text'
       }`}
       style={{ height: h, touchAction: 'none' }}
       aria-pressed={dark}
       data-testid="draw-blackout"
     >
+      <LensCap capped={dark} size={20} />
       {dark ? 'Dark' : 'Blackout'}
       {tablet && <span className={`text-[11px] font-normal ${dark ? 'text-on-primary/70' : 'text-live/70'}`}>hold</span>}
     </button>

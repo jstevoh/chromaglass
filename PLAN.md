@@ -155,7 +155,7 @@ Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet
 with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-smoke**, the site on two Windows PCs, by hand (§13).
 The owner's account steps sit here too: **S8-on** (switch the crash reports on),
 **19g** (more Mac runners), **12.2** (the store accounts), **13.1-sign** (the Mac app's
-Developer ID).
+Developer ID and notarisation, which takes away the "may harm your Mac" refusal on first open).
 
 ### Wave 3. Seams in the two big files (one session, in a quiet week)
 
@@ -2785,13 +2785,24 @@ network):
   Mac (Profile & Store for Pro, the landing page) links to its fixed-name .dmg; the app
   finds new releases itself (electron-updater, `desktop/updates.js`) and, ad hoc,
   offers the download in its menu and the profile sheet. *Measure:* `npm run updates`
-  (69/69, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
+  (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §75.
   - **13-update-signed** *(after 13.1-sign)*: with the Developer ID secrets in, the
     same code downloads in the background and installs on quit. Nothing to build;
     the first signed release is judged by installing the one before it and seeing it
-    replace itself (§75's last step).
+    replace itself (§75's last step). Signing is also what takes away the first-open
+    warning: set `MAC_APP_NOTARISED` true in `src/lib/macApp.ts` then, and the profile
+    sheet and landing page stop telling the way round (the release notes stop by
+    themselves, from what `spctl` says of the built app).
+  - **13-first-open** *(shipped)*: the first release, 1.3.622 (2026-10-25), was refused on
+    the owner's Mac ("may harm your Mac"), and the reply sent then said right-click →
+    Open, which macOS 15 no longer offers for an app it cannot check. The release notes
+    (when `spctl` refuses the build), the profile sheet's Mac app card and the landing
+    page's download line now say System Settings → Privacy & Security → Open Anyway;
+    `desktop/README.md` adds the `xattr` way. Only a Developer ID **and** notarisation
+    (13.1-sign) removes the warning. *Measure:* `npm run updates`, two lines (the words,
+    and the notes' gate before publishing).
   - *Trap:* the updater reads the repository's **newest** release. Any other kind of
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
     with `--latest=false`, or every installed app looks for `latest-mac.yml` in it
@@ -6570,11 +6581,11 @@ once the login works (23.14).*
   a wrong one is refused in words, a reset is mailed; a Google account signed up again gets no
   second account and ends with `google.com` + `password` on one uid; a Google and an
   emailed-link account each set a password from the sheet and sign in with it; the password form
-  fits 1024×768 and a phone upright and on its side. *Owner's chore, once:* Firebase console →
-  Authentication → Sign-in method → enable Email/Password (the emailed-link toggle is already
-  on; email link cannot be on without the Email/Password provider, so this may already be done,
-  look before calling it owed) and leave Settings → User account linking on "Link accounts that
-  use the same email".
+  fits 1024×768 and a phone upright and on its side. *Console step, **done** (the owner, 2026-10-25): Email/Password is on and
+  "Link accounts that use the same email" is on.* Live since the 10:23 AM PT deploy on
+  2026-10-25. *Owed by the owner:* the one hand-try the emulator cannot do (Google account,
+  Account, Set a password, sign out, sign in with the password, same licence;
+  `linkWithCredential` against the real project).
   Open follow-ups:
   **23.10e-1** (open): an emailed-link account cannot be told from a password one from the
   browser (Firebase lists the `password` provider for both), so the sheet says "Email (link or
@@ -7715,13 +7726,27 @@ Turing Print" work (#331), which also made the reaction grow at all.
     fails on any quoted retired id in src/, so retiring the look trips it on the layer.
     5b learns to tell a preset id from a setting key (named under `Check changes:`, its
     reach unchanged for preset ids), then the look retires.
-  - ~~**28i-2. Give back the black, make the still ones move**~~ (Antigravity, batch 2,
+  - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2,
     **shipped** in this PR; story in `docs/plan-shipped.md` 28i-2): all 21 reworked looks
     meet their gallery (`8/20/40 s`) and film (`90 s`) bars; `jellyfish-bloom` appears once
     in `evolution.ts`'s `calm` bucket and `poster-1969` appears once in `sequencer.ts`'s
     `Pace` sequence. `poster-1969` now runs on a single plate (`layerCount: 1`), raising its
     12 s step rate from `15.9 steps/s` (two 384² plates) to `24.8 steps/s` (one 384² plate);
-    reaching `>= 30 steps/s` on a single 256² rung is owned by the governor thread (`14aa-3`).
+    reaching `>= 30 steps/s` (`PINNED_STEP_RATE = 30`) is open as **28i-2a** below.
+  - **28i-2a, open. Poster, 1969's step rate on a single 384² plate.** Measured over 12 s
+    (`squeeze` harness), `poster-1969` on `main` ran `layerCount: 2` (`2 × 384²` thin-gap
+    plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at
+    `15.9 steps/s` (`191 steps / 12 s`, `simMs = 45.2 ms`, `2.05 substeps/frame`, `7.8 fps`).
+    Moving `poster-1969` to a single plate (`layerCount: 1`, matching its 28i-1 description
+    `"Poster, 1969 draws on one plate"`) cuts its GPU solver work in half and raises its
+    12 s step rate by +56% to `24.8 steps/s` (`298 steps / 12 s`, `simMs = 24.1 ms`,
+    `2.00 substeps/frame`, `12.4 fps`), still below `PINNED_STEP_RATE = 30` (`>= 200` steps
+    in a 6.67 s window) because the governor stays on the `384²` rung where each thin-gap
+    step takes ~12 ms on an integrated GPU. Stepping down to the `256²` rung on a single
+    plate reaches `35.2 steps/s` (`422 steps / 12 s`, `simMs = 11.4 ms`, `1.88 substeps/frame`,
+    `18.7 fps`), clearing `30 steps/s` with +17% margin; `governor.ts` needs a step-rate /
+    `simMs` downshift rule (or a `256²` start when `simMs > 16 ms`) so single-plate thin-gap
+    looks reach `PINNED_STEP_RATE = 30`.
   - **28i-3. Sound on the liquid, not the frame** (batch 3, **open for the film measure**;
     frame fixes on the eight looks and the Milk Marbling dead-patch fix **shipped** in #473,
     story in `docs/plan-shipped.md` 28i-3).
@@ -7847,6 +7872,34 @@ Turing Print" work (#331), which also made the reaction grow at all.
     its blended value by its full depth in one tick. Crossfade the depths as 28j-1 does
     the patches, and add the same step-per-tick bar to `desk`.
 
+
+- **28k. Splodascope: a crowd of oil drops that do not merge** (the owner, 2026-10-25, from a
+  photograph of a splodascope: round cells of yellow, green, red and pink oil packed edge
+  to edge in blue water, some inside others; "if not, let's fix the physics").
+  - ~~**28k-1. Film Hold and the Splodascope look**~~ (**shipped**, this PR; the story in
+    `docs/plan-shipped.md` §28k). `npm run filmhold`: the look's crowd held 35 → 31 bodies in
+    six seconds, the same plate without the hold 35 → 3.
+  - **28k-2. Shortcuts named in 28k-1.** (a) The film is drawn as thick as the field's own
+    edge (two to five cells), where a real one is tens of nanometres. (b) A film breaks when
+    pressed past what it holds, which is the real threshold but not the real timing: real
+    films also drain and rupture by chance, sooner when dirty or warm. Replace with a
+    drainage time per contact (Reynolds' film drainage, μR²/(gap·σ)-scaled, as the research
+    on bubbles and drops item 7 gives for the beads) and a rupture drawn from it.
+  - **28k-3. The tiny specks.** The photograph's crowd runs down to specks a hundredth of the
+    frame; the field cannot hold a drop of under about three cells (Cahn–Hilliard dissolves
+    it), so the look lays nothing under a sixtieth of the plate. The beads (`beads.ts`,
+    `beadDrops`) are the drops under the grid; give the look a scatter of them in the oil's
+    colours once 28k-1 is judged.
+  - **28k-4. Judged on the Mac** (`docs/judging.md` §79): the look beside the photograph at
+    the app's own grid, and whether a kick (Plate Pressure) breaks a few films and no more.
+  - **28k-5. The colours darken at the walls over time** (found here, lab at 256²): yellow
+    drops go orange and brown from their edges inward over ten seconds, and green darkens,
+    though the oil's own share of the dye holds (19369 → 19368). The water's cobalt meets
+    each drop's colour in the edge's few cells of part-oil and the two multiply toward
+    black there; pressed into a crowd, a drop is mostly edge. Measure where the colour
+    goes (the dye per drop against its laid colour, the angle of its absorbance) and find
+    whether it is the partition's hand-over at a held film (bodyPartition) or the edge's
+    width; never by thinning the dyes further.
 
 ## 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
 
@@ -8710,6 +8763,93 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
     (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.
   - 35b-2's pin picker and command palette still list by section, not by the seven groups.
+
+- **35c-2** One home per setting, what is left of phase 3: Flash Limit (Settings' Master and the
+  Wall), Blackout, MIDI on (Settings and Controller) and the audio source (Settings and Sound)
+  each appear in two places, with record and replay, and the unused `desk/PerformanceButton.tsx`;
+  Drive/Impact pairs sit in different sections (one Strength per input); the platform's spin in
+  Plates & LED is Motion's but Stage-gated; the sequencer is behind a 10 px, 40%-opacity link in
+  Songs; the Build layout's deck lists Fluid Physics, which used to be the glass's knobs, so it
+  could take Squish Plate beside it. After 35c-1.
+- ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~ Shipped: a knob's
+  cap, the tick in a panel's header, the dot on a rail heading and the phone's touch thumb wear their group's
+  colour (the seven in `index.css`; a setting's group is its section's, `groupOfSetting`); the tools are
+  keycaps on the desk and pictograms on the phone's dock (`ToolGlyph`); a snail and a hare mark the ends of
+  Master Speed, Evolve Speed, Gel Speed, Chase Speed and Kaleido Spin wherever they are drawn as a knob or a
+  slider (`PACE_KEYS`, `PaceTrack`). Judging §77. Story in `docs/plan-shipped.md` §35.
+- ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~ Shipped: the
+  bottle in hand on the desk and the phone leans forward and stands filled to what is left of the Dye
+  Budget (`dyeRoom`, `dyeRoomOf`), the others standing full; the Viscosity buttons each let a drop go at
+  the pace of the carrier's viscosity (`dripFallSeconds`, 20 to 1); Lamp Warmth has a bulb whose filament
+  is the blackbody colour at the temperature its grade matches, written in kelvin (`lampKelvin.ts`,
+  6500 K at 0 down to 5100 K at 1). Held by `npm run panel`. Judging §78. Story in `docs/plan-shipped.md` §35.
+- ~~**35e-2** The lamp's grade tops out at 5100 K.~~ Shipped (2026-10-25): Lamp Warmth reaches a quartz-halogen
+  projector's 3200 K. The slider is a temperature, even in mireds, and the plate multiplies by the blackbody's
+  own colour at it (`lampTint`, Planck and the CIE fit, worked out once on the CPU and handed in as
+  `lampTintR/G/B`), not a tint mixed in by the slider. It runs 0 to 3.75, and 0 to 1 is still 6500 K to 5100 K
+  (the new tint is the old grade to 1.5% a channel there), so saved looks, the presets and Lucky keep their
+  colour with no migration. The vignette is unchanged (full from 1 on). Held by `npm run panel`. Story in
+  `docs/plan-shipped.md` §35; judging §80.
+- **35e-3** What the readings left, none changed because each moves a look or waits on another step:
+  - **The lamp's colour is a multiply on the finished picture,** which is the lamp's spectrum times a white
+    surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
+    Planck spectrum entering `spectralThrough`'s six bands before the eye sums them, so a deep blue dye under
+    3200 K goes darker and more violet than a multiplied blue does (it already goes to a near black in the
+    lab picture). Named shortcut; replace it. The warm end is also about a third dimmer, which is a choice and not
+    physics (holding red still keeps 0 to 1 the old grade; a lamp's brightness is not set by its colour
+    temperature), and Exposure puts it back; if the owner wants the end held at the same brightness, that is one
+    normalisation in `lampTint`. Two more shortcuts: the neutral is the 6500 K blackbody, not D65 (sRGB's white,
+    which sits a little off the blackbody curve), so the figure is approximate; and the full blackbody ratio is
+    what a camera or film balanced for daylight records, where an eye in the room would partly adapt to the warm
+    light and see less orange.
+  - **Velvet Underground (0.25) and Home Movie (0.45) keep their colour** to under 2% in blue, because their
+    numbers kept their meaning. Home Movie is the look an old projector's lamp is for: the owner's eye on
+    whether it should now go to 2 or 3 (judging §80 item 4); Lucky still draws 0 to 0.8, so it never reaches
+    the halogen.
+  - **Evolve wanders Lamp Warmth by a fifth of its travel,** which is now a fifth of 3.75: from a look at 0.25 up
+    to 1, from a look at 3 over the whole warm end. Pull it in (a per-dial span) if that reads as too much.
+  - **The viscosity drip is slow motion at one factor.** The ratio between thin and thick is the
+    physics (Stokes's terminal speed, the solver's 1 and 20 mm²/s); the thread behind a thick drop is
+    drawn stretching at the drop's speed, not solved, and a real thread at this viscosity pinches off in
+    microseconds. Named shortcut.
+  - **One tank, one bottle.** The Dye Budget is a number for the whole plate and each layer, so the
+    bottle in hand shows it and the rest stand full; a per-liquid supply (a bottle that empties and is
+    refilled) waits for the volume model (18c-2).
+  - The legacy bench's bottle list in `App.tsx` (the `liquid-…` test ids) still draws round swatches.
+  - The remote has no bottles or bulb (the owner's remote has Dye Budget and Lamp Warmth as sliders).
+- ~~**35f** Show hardware (batch C of the playful-controls choice, 2026-10-25; items 7 to 11).~~ Shipped: Record
+  is two tape reels turning at the tape's speed over their radius, the full one slow and the bare one fast
+  (`tapeReels.ts`: a compact cassette's 4.76 cm/s, hub 0.9 cm, pack 2.1 cm; angle by closed form, so the
+  button holds no clock of its own) on the desk button, the phone's Play pill (a fixed box, so it does not widen,
+  and red while it runs) and the More tile; Tap Tempo is a pad with a beat light on the locked beat, four pips
+  and the tempo in segment digits (`TapPad`; the light runs on the Web Animations clock from the source's period
+  and phase, so the App never re-renders for a beat), on the desk's Tempo row and the phone's Sound sheet; the
+  Sound sheet on both has a VU needle with a moving coil's ballistics, 99% of a steady tone in 300 ms and a
+  1.3% overshoot, falling to its stop and writing "deaf" on the dial when the input stops (`vuMeter.ts`, moved
+  through a ref on its own frame); Blackout is a lens with a red cap on it, one drawing on the desk header,
+  Settings, the remote and Draw, and the remote's two Blackouts are one (the bar under the thumb); Auto Spin has
+  a strobe ring that drifts at the dish's speed in Rate and stands still in Tempo once a tempo is heard
+  (`strobeRing.ts`). Held by `npm run panel`. Judging §81. Story in `docs/plan-shipped.md` §35.
+- **35f-2** What batch C left:
+  - **Item 12, Looks as slide-carousel mounts**, is its own piece (it touches the set list, so `desk`,
+    `setlist` and `panel` all have to hold).
+  - **The VU reads the plate's volume, not decibels.** The dial is marked 0 to 100 in the plate's own volume
+    unit (the loud end of the ear's range at 85, `soundLevels.ts`), because that is what the ear gives and the
+    gain stages before it are not the app's to know. A dial in dBFS would need the analyser's raw peak.
+  - **A take is not a tape with an end.** The reels fill in ten minutes (`TAPE_SECONDS`) and a longer take
+    leaves the right reel full and still turning at v / r. Named shortcut of the picture, not of any recording.
+  - **The ring stands still only up to 32 beats a turn.** Past that it has too few dots for the dish's turn
+    between two beats and creeps at the alias (48 beats at 120 bpm: 7.5 degrees a second back).
+  - **The mic-heard tempo lights the ring but not the tap pad's beat light.** The pad polls the tempo source
+    (tap, MIDI clock, typed), which a heard beat does not set; the ring takes the beat grid's tempo when
+    nothing was tapped. Lighting the pad from the grid is a follow-up if the owner wants it.
+  - The remote's Record, Auto Spin and tempo are still plain buttons and sliders (35d-2's remote list grows
+    by these), and the Settings Source row has no meter (the needle is in the Sound sheet).
+- **35d-2** What batch A left: the remote's own sliders (Speed and Evolve Speed in `RemoteControl.tsx`) have
+  no snail and hare, and the remote has no group colours; the phone's Settings sheet takes the cap colours
+  only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
+  its hare at both ends but no snail at the stop in the middle (the slider has one under the track). Batches B
+  (liquid in the controls) and C (show hardware) have shipped (35e, 35f); item 12 is in `/handoff/playful-controls.md`.
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.

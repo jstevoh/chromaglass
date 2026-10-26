@@ -561,6 +561,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // because the way down is a gesture too: the colours start to cross the
   // edges and the bodies bleed into the water they sit in.
   { key: 'oilBodies',       label: 'Oil Bodies',       min: 0, max: 1 },
+  { key: 'filmHold',        label: 'Film Hold',        min: 0, max: 1 },
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.
   { key: 'clearFilm',       label: 'Clear Film',       min: 0, max: 1 },

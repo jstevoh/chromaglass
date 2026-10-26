@@ -80,13 +80,14 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'oil-and-water':      [17, 16],             // amber oil, teal water
   'red-cabbage':        [2, 20, 16, 19, 10],  // hot pink acid, violet neutral, teal-green base across the dish
   // Ferroin's red and blue fronts turn the plate as the waves sweep across it.
-  'chemical-clock':     [16, 20, 19, 8, 3],   // teal, magenta and emerald indicator pools under the ferroin red and blue fronts
+  'chemical-clock':     [16, 20, 19, 8, 3],   // teal, magenta, emerald, ultramarine and red indicator pools under the ferroin waves
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
   'lava-lamp':          [4, 1, 20, 17, 21, 11],  // the wax: crimson, orange, magenta, amber, coral, raspberry
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
+  'splodascope':        [9, 0, 6, 3, 2],        // cobalt water; yellow, green, red and hot pink oil, as the owner's photograph (the first is the water; cobalt under yellow is the photograph's green)
   // Fully saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye. The three
@@ -139,6 +140,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'roy':                ['pour', 'drop'],         // big flat shapes, and a drop now and then to break one
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
+  'splodascope':        ['drop'],                 // a drop at a time into the crowd, as an eyedropper does
 };
 
 /**
@@ -233,6 +235,8 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // Oil that rounds into bodies, as a clock-glass dish is laid; syrup finds
   // the low point of a curved glass, which is the middle.
   'clock-glass':        ['oil', 'water', 'oil', 'syrup'],
+  // More oil into the crowd, and now and then the soapy water that holds the films.
+  'splodascope':        ['oil', 'oil', 'water'],
 };
 
 /**

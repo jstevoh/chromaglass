@@ -339,7 +339,7 @@ export const PRESETS: Preset[] = [
     name: 'Bass Drop',
     description: 'Every bass hit drops a heavy splash from height: crimson and ultramarine thrown across ice, the plate squeezed on the kick.',
     settings: {
-      globalSpeed: 0.021,
+      globalSpeed: 0.022,
       beads: 0.25,
       surge: 1.0,
       layerCount: 2,
@@ -350,56 +350,59 @@ export const PRESETS: Preset[] = [
       ledPlatform: false,
       diffusionRate: 0.0002,
       buoyancy: 0.05,
-      advection: 0.50,
-      damping: 0.85,
+      advection: 0.62,
+      damping: 0.82,
       heatDecay: 0.90,
-      automateRate: 0.14,
-      platePressure: 0.08,
+      automateRate: 0.10,
+      platePressure: 0.05,
       glassSmear: 0.0,           // rests below the 0.2 smear gate between drops; hats open it on the full-band chorus kicks
-      turbulenceScale: 0.55,
+      turbulenceScale: 0.08,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.7,
-      evaporationRate: 0.009,
-      dyeBudget: 0.28,
+      evaporationRate: 0.020,
+      dyeBudget: 0.24,
       airVelocity: 0.02,
       vibrationFrequency: 0.0,
       audioImpact: 0.95,
       dropHeight: 0.95,
       beatSqueeze: 0.8,
-      beatAccent: 1.0,           // 28i-2: squeeze and rock land on the bar's downbeat and fills so the plate rests between drops (peak >= 2.5x median)
-      kickBloom: 0.15,
-      plateRock: 0.07,
-      // The one look whose music moves the frame (FRAME_MOVING_LOOKS):
-      // Frame Sway lets the rock carry the picture on the downbeat without
-      // moving any other look on the shelf.
-      frameSway: 0.96,
+      beatAccent: 1.0,           // 28i-2: squeeze and rock accent the bar's downbeat so the plate rests between drops (peak >= 2.5x median)
+      kickBloom: 0.06,           // 28i-2: quiet verse kick ring; hats + hatsHit open glassSmear past 0.20 in the chorus to carry peak >= 2.5x median
+      // The one look whose music moves the frame (FRAME_MOVING_LOOKS): a
+      // third of Frame Sway's travel, so the rock carries the picture without
+      // the full slide #347 had on every look.
+      frameSway: 0.35,
       sceneMappings: [
         /*
           The kick throws the plate, a hard kick harder. The patch was written
           on the `sound` source, whose features are the hook's loudness, bass,
           mid and treble: `kick` was not one of them, so it read 0 and never
-          moved anything (28f). Bass Drop is the one look that may move the
-          frame with the music (FRAME_MOVING_LOOKS, lib/plateRock.ts): its
-          Frame Sway above lets the rock carry the picture when the hats and
-          kicks arrive together, and open the glass smear past its 0.2 rest
-          gate on the full kit.
+          moved anything (28f). It is the kick's hit now (the `hits` source:
+          how hard it landed, falling over a quarter second), not the kick's
+          level, which is loud between kicks too. Bass Drop is the one look
+          that may move the frame with the music (FRAME_MOVING_LOOKS,
+          lib/plateRock.ts): its Frame Sway above lets the rock carry the
+          picture, while the liquid's own smear (opened past its 0.20 gate
+          only when both hats level and hat hits are high in the chorus) and
+          chorus pour carry its 2.5x peak-over-median swell (PLAN 28i-2).
         */
-        { source: 'hits', feature: 'hatsHit', setting: 'plateRock', depth: 0.60 },
-        { source: 'bands', feature: 'hats', setting: 'glassSmear', depth: 0.35 },
-        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.32, threshold: 0.4, attack: 0.02, release: 0.35 },
+        { source: 'hits', feature: 'kickHit', setting: 'plateRock', depth: 0.5 },
+        { source: 'bands', feature: 'hats', setting: 'glassSmear', depth: 0.15 },
+        { source: 'hits', feature: 'hatsHit', setting: 'glassSmear', depth: 0.16 },
+        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.45, threshold: 0.38, attack: 0.02, release: 0.35 },
         /*
           Its three wells (PLAN 25b-3, 25h): the kicks take them in turn
           (areaForBand), and on top of that the snare stirs the low well (area
           2) and the sub (band 1, 40 to 85 Hz) warms the left one (area 0)
           while it holds.
         */
-        { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 2, depth: 0.5, threshold: 0.3, attack: 0.02, release: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 2, depth: 0.6, threshold: 0.35, attack: 0.02, release: 0.35 },
         { source: 'bands', feature: 'band1', setting: 'areaHeat', area: 0, depth: 0.6, threshold: 0.5, attack: 0.05, release: 1.0 },
       ],
       audioMappings: {
         velocity: 'none',
-        density: 'bass',
+        density: 'none',
         color: 'none',
         rotation: 'none',
       },
@@ -696,10 +699,10 @@ export const PRESETS: Preset[] = [
     settings: {
       globalSpeed: 0.0084,
       surge: 0.35,
-      layerCount: 2,
+      layerCount: 1,
       blendMode: 'overlay',
-      gooeyEffect: 0.75,
-      rotationSpeed: 0.068,      // 28i-2: keeps the three pools moving above 0.02 at 20 and 40 s while holding their area cords
+      gooeyEffect: 0.55,
+      rotationSpeed: 0.27,       // 28i-2: above lookMotorRate's 0.1 vertex (~0.086 rad/s, ~1.2 min/turn) so the three pools clear M >= 0.02 at 20 and 40 s
       // Flat: a concave dish slid all three pools into one in the middle. The
       // pools are its areas of the dish now (lib/plateAreas.ts).
       centerGravity: 0.0,
@@ -708,17 +711,17 @@ export const PRESETS: Preset[] = [
       ledColor: '#220044',
       ledSpeed: 0.0,
       diffusionRate: 0.00006,
-      buoyancy: 0.45,
+      buoyancy: 0.35,
       advection: 0.2,
       damping: 0.992,
       heatDecay: 0.997,
-      automateRate: 0.14,       // the hands tend three areas now, so a little more often (was 0.08)
+      automateRate: 0.16,       // the hands tend three areas now, so a little more often (was 0.08)
       platePressure: 0.45,
-      glassSmear: 0.25,
+      glassSmear: 0.22,
       rainDrip: 0.6,
       viscosity: 'thick',
       polarity: 0.9,
-      evaporationRate: 0.003,
+      evaporationRate: 0.004,
       airVelocity: 0.04,
       vibrationFrequency: 0.15,
       audioImpact: 0.7,
@@ -728,7 +731,8 @@ export const PRESETS: Preset[] = [
       glossiness: 0.35,
       edgeRelief: 0.45,
       boundaryContrast: 0.5,
-      dyeBudget: 0.45,          // dark violet between the pools: at the default 0.85 they ran into one wash
+      exposure: 0.78,
+      dyeBudget: 0.42,          // dark violet between the pools: at the default 0.85 they ran into one wash
       /*
         Each pool hears its own instrument (PLAN 25h, lib/areaCords.ts). The
         kick warms and stirs the soap well (area 1): a heat source under it
@@ -1643,8 +1647,9 @@ export const PRESETS: Preset[] = [
       advection: 0.65,
       platePressure: 0.45,
       beatSqueeze: 0.35,
-      dyeBudget: 0.75,
-      bzReaction: 1,
+      dyeBudget: 0.75,           // 28i-2: holds the indicator bath while exposure 0.58 lets the #fbf6ee lamp shine through at 8 s
+      exposure: 0.58,            // 28i-2: exposes thin indicator gel against filmLevel so t=8 s reads bright instead of Beer-Lambert dark
+      bzReaction: 0.78,
       ledColor: '#fbf6ee',
       surge: 0.6,
       layerCount: 1,
@@ -1676,14 +1681,15 @@ export const PRESETS: Preset[] = [
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
       /*
-        The Belousov-Zhabotinsky gel dish (PLAN 28i-3b): kicks push the
-        oxidation wave drift outward, snares shear wave tips into spiral
-        pairs, and mid harmony deepens the ferroin reaction.
+        The Belousov-Zhabotinsky gel dish (PLAN 28i-2, 28i-3b): bass and mid
+        harmony shift the ferroin oxidation weight so the dish alternates
+        between red/blue spiral fronts and the multi-hue indicator bath (>=6
+        colour changes/min), while snares shear wave tips into spiral pairs.
       */
       sceneMappings: [
-        { source: 'hits', feature: 'kickHit', setting: 'turingDrift', depth: 0.3 },
-        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.2 },
-        { source: 'bands', feature: 'tonalMid', setting: 'chemistry', depth: 0.15 },
+        { source: 'bands', feature: 'tonalLow', setting: 'bzReaction', depth: -0.58 },
+        { source: 'bands', feature: 'tonalMid', setting: 'bzReaction', depth: -0.55 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
@@ -1888,6 +1894,79 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
+  {
+    id: 'splodascope',
+    name: 'Splodascope',
+    description: 'A crowd of yellow, green, red and pink oil drops packed edge to edge in blue water, lit from below: they press together without merging, some sit inside others, and a kick on the glass breaks a few films so neighbours run together.',
+    settings: {
+      lampGround: 1,
+      /*
+        After the owner's photograph of a splodascope (2026-10-25): round
+        cells of saturated oil crowded in a blue water, specks to cells a
+        fifth of the frame across, a few with another colour inside. Oil
+        Bodies keeps each drop's colour its own, and Film Hold is what makes
+        it a crowd: the water film between two drops pushes back as it thins
+        (FILM_WGSL in wgsl/fluid.ts), so drops that touch stay two. Without
+        it the lab's 90 drops ran into 25 in two seconds and 11 in ten, and
+        every merge mixed its colours toward brown. The crowd is laid by
+        seedPreset's 'splodascope' (src/lib/oilLay.ts).
+      */
+      oilTension: 0.9,
+      oilBodies: 1,
+      filmHold: 1,
+      globalSpeed: 0.0126,
+      surge: 0.3,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.4,
+      rotationSpeed: 0.04,       // the dish's motor, slow: the crowd turns and jostles
+      centerGravity: 0.05,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      diffusionRate: 0,
+      buoyancy: 0.1,
+      advection: 0.45,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.08,
+      platePressure: 0.4,
+      glassSmear: 0.15,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.85,
+      evaporationRate: 0.002,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.05,
+      audioImpact: 0.5,
+      blobSurfaceTension: 0.45,
+      boundaryContrast: 0.3,
+      saturationBoost: 1.3,      // at 1.6 the hot pink read as a second red
+      dyeBudget: 0.8,
+      glossiness: 0.3,
+      postBlurRadius: 0.1,
+      plateCurve: 0.45,          // the bowed glass gathers the crowd to the middle, where it packs
+      depthDrag: 1.2,
+      plateSpring: 0.35,
+      beatSqueeze: 0.0,
+      transmission: 0.4,
+      dishVignette: 0.6,
+      lampHotspot: 0.45,
+      /*
+        Fast readings only (the owner's rule): a kick presses the top glass,
+        and a hard one presses past what a film holds, so a few neighbours
+        run together on the beat while the rest of the crowd stands; the
+        snare shears the crowd a little; and mid harmony rounds the drops.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.15 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.15 },
+      ],
+      audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
+    }
+  },
   /*
     Two looks were made after Chemical Bouillon's ferrofluid films, the references the
     owner gave for how ferrofluid should look (docs/bubbles-plan.md); Ferro Maze
@@ -1984,31 +2063,31 @@ export const PRESETS: Preset[] = [
       // 88% of the dots held under a turn at 1, against its 90%).
       transmission: 0.5,
       benDay: 1,
-      globalSpeed: 0.014,
+      globalSpeed: 0.016,
       surge: 0.45,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.7,
       rotationSpeed: 0.0,
-      centerGravity: 0.1,
+      centerGravity: 0.28,
       // The paper: a white light table, as Ferro Maze's.
       ledPlatform: true,
       ledMode: 'single',
       ledColor: '#ffffff',
       ledSpeed: 0.0,
       diffusionRate: 0.00002,
-      buoyancy: 0.25,
-      advection: 0.4,
+      buoyancy: 0.28,
+      advection: 0.42,
       damping: 0.985,
       heatDecay: 0.985,
-      automateRate: 0.22,
-      platePressure: 0.35,
+      automateRate: 0.28,
+      platePressure: 0.38,
       glassSmear: 0.15,
       rainDrip: 0.0,
       viscosity: 'thick',
       // Two primaries that meet stay two primaries, with a hard seam.
       polarity: 1.0,
-      evaporationRate: 0.0008,
+      evaporationRate: 0.0006,
       airVelocity: 0.02,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
@@ -2021,11 +2100,11 @@ export const PRESETS: Preset[] = [
       /*
         28i-2: at 0.45 with 0.003 evaporation, the Ben-Day dot washes thinned
         below the print's dot threshold within 8 seconds, leaving 65% bare
-        white paper (luma 0.75, flat 0.65). At 0.65 with 0.0008 evaporation
-        and 0.22 automation, the comic shapes and dot fields hold across the
-        panel (flat <= 0.5, luma <= 0.6) while staying below the stain cap.
+        white paper (luma 0.75, flat 0.65). At 0.68 with 0.0006 evaporation
+        and 0.28 automation, the comic shapes and dot fields hold across the
+        panel (flat <= 0.5, luma <= 0.6 at 8..40 s) while staying below the stain cap.
       */
-      dyeBudget: 0.65,
+      dyeBudget: 0.68,
       glossiness: 0.0,
       postBlurRadius: 0.1,
       edgeRelief: 0.0,
@@ -2087,22 +2166,22 @@ export const PRESETS: Preset[] = [
       lampGround: 1,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#b89264',
+      ledColor: '#b58c5c',
       ledSpeed: 0.0,
-      globalSpeed: 0.014,
+      globalSpeed: 0.0168,
       surge: 0.38,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.6,
       rotationSpeed: 0,          // a lamp does not turn: down has to stay down the screen
-      centerGravity: 0.25,       // 28i-2: holds the rising wax inside the bottle instead of draining out the open rim
+      centerGravity: 0.32,       // 28i-2: holds the rising wax inside the bottle instead of draining out the open rim
       diffusionRate: 0,
-      buoyancy: 0.35,
-      advection: 0.45,
+      buoyancy: 0.42,
+      advection: 0.48,
       damping: 0.988,
-      automateRate: 0.24,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
-      platePressure: 0.25,
-      glassSmear: 0.15,
+      automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
+      platePressure: 0.28,
+      glassSmear: 0.18,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
@@ -2110,15 +2189,15 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.04,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
-      turbulenceScale: 0.35,
+      turbulenceScale: 0.42,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.4,
       saturationBoost: 1.45,
-      exposure: 0.52,
+      exposure: 0.46,
       glossiness: 0.15,
       plateRock: 0.25,
       beatSqueeze: 0.0,
-      dyeBudget: 1.0,
+      dyeBudget: 0.65,
       bubbles: 0,
       /*
         The pattern for a look's own patches (28f, the owner: "only use things

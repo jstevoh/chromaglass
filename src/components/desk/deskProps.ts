@@ -173,6 +173,8 @@ export interface DeskProps {
   dyeBottles: LiquidType[];
   behaviourBottles: LiquidType[];
   bottleId: string;
+  /** What is left of the Dye Budget, 0 to 1, read off the plate when asked (the picked bottle polls it). */
+  dyeRoom?: () => number;
   onBottle: (id: string) => void;
   swatches: { hex: string; name: string }[];
   dye: string | null;

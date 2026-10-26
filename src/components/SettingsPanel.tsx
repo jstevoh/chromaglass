@@ -21,6 +21,9 @@ import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
+import { PaceTrack } from './ui/Pace';
+import { LensCap, StrobeRing, TapPad, ViscosityDrip } from './ui/Playful';
+import type { TempoReading } from '../lib/tempo';
 import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -189,6 +192,10 @@ interface SettingsPanelProps {
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: { source: string | null; bpm: number; taps: number };
   onTap?: () => void;
+  /** The tempo source's reading, for the tap pad's beat light (it polls this itself). */
+  readTempo?: () => TempoReading | null;
+  /** The tempo the dish's Tempo mode is lit by (tapped, clocked or heard), bpm, or 0. */
+  spinBpm?: number;
   onTempoClear?: () => void;
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
@@ -356,23 +363,25 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
           </span>
         </div>
       </div>
-      <input
-        type="range"
-        min={curve === 1 ? min : 0}
-        max={curve === 1 ? max : 1}
-        step={curve === 1 ? step : 0.001}
-        value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
-        disabled={!!disabled}
-        aria-label={label}
-        onChange={(e) => {
-          const raw = parseFloat(e.target.value);
-          if (curve === 1) { onChange(raw); return; }
-          // Three figures, not the setting's step: see handValueAt.
-          onChange(handValueAt(raw, min, max, curve));
-        }}
-        className="set-range"
-        style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
-      />
+      <PaceTrack settingKey={settingKey} at={Math.max(0, Math.min(1, (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve))))}>
+        <input
+          type="range"
+          min={curve === 1 ? min : 0}
+          max={curve === 1 ? max : 1}
+          step={curve === 1 ? step : 0.001}
+          value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
+          disabled={!!disabled}
+          aria-label={label}
+          onChange={(e) => {
+            const raw = parseFloat(e.target.value);
+            if (curve === 1) { onChange(raw); return; }
+            // Three figures, not the setting's step: see handValueAt.
+            onChange(handValueAt(raw, min, max, curve));
+          }}
+          className="set-range"
+          style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
+        />
+      </PaceTrack>
     </div>
   );
 };
@@ -406,7 +415,7 @@ const DEMO_LOOPS = [
   { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
 ] as const;
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -611,10 +620,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <button
             aria-pressed={blackout}
             onClick={onBlackout}
-            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex w-full items-center justify-center gap-2 mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             title="Fade the plate to black and back (B on the keyboard)"
             data-testid="blackout-button"
           >
+            <LensCap capped={blackout} size={16} />
             {blackout ? 'Lights up' : 'Blackout'}
           </button>
         )}
@@ -841,20 +851,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </span>
             </div>
             <div className="flex gap-1.5">
-              <button
-                onClick={onTap}
-                data-testid="tempo-tap"
-                title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
-                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10"
-              >
-                Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
-              </button>
+              <TapPad tempo={tempo} read={readTempo} onTap={onTap} />
               <button
                 onClick={onTempoClear}
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
+                className="min-h-9 flex-none rounded-lg border border-white/10 bg-white/5 px-3 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
               >
                 Listen
               </button>
@@ -1688,7 +1691,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           label="Lamp Warmth"
           value={settings.lampWarmth ?? 0}
           min={0}
-          max={1.0}
+          max={3.75}
           step={0.05}
           onChange={(v: number) => onUpdate({ lampWarmth: v })}
           settingKey="lampWarmth"
@@ -3111,10 +3114,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 aria-pressed={settings.viscosity === v}
                 key={v}
                 onClick={() => onUpdate({ viscosity: v })}
-                className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
+                title={v === 'thick' ? 'A light oil, 20 times water\'s viscosity. Hover to watch a drop fall through it.' : 'Water. Hover to watch a drop fall through it.'}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-1 text-[12px] rounded-md transition-all ${
                   settings.viscosity === v ? `${LIT} font-bold` : 'text-muted hover:bg-hover'
                 }`}
               >
+                {/* A drop that lets go at the pace of this viscosity (PLAN 35e, lib/dripPace.ts). */}
+                <ViscosityDrip mode={v} />
                 {v}
               </button>
             ))}
@@ -3148,6 +3154,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ oilBodies: v })}
           settingKey="oilBodies"
+        />
+        {/* The water film between two drops holds them apart (FILM_WGSL): needs Oil Tension too. */}
+        <Slider
+          label="Film Hold"
+          value={settings.filmHold ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmHold: v })}
+          settingKey="filmHold"
         />
         <Slider
           label="Soap Bursts"
@@ -3582,6 +3598,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           flips it (a pad can too, as Reverse Spin), so reversing a dish in
           the middle of a song is one press and not a trip to a slider.
         */}
+        {/*
+          The platter's strobe rim (PLAN 35f): a ring of dots that drifts at
+          the dish's speed in Rate and stands still in Tempo once a tempo is
+          heard, because the dish then turns exactly one dot a beat.
+        */}
+        <div className="mb-1 flex items-center gap-3" data-testid="spin-strobe">
+          <StrobeRing mode={settings.spinAuto ?? 0} rpm={settings.spinRpm ?? 6} beats={settings.spinBeats ?? 16} bpm={spinBpm} />
+          <p className="text-[11px] leading-snug text-white/50" data-testid="spin-strobe-says">
+            {Math.round(settings.spinAuto ?? 0) === 2 && spinBpm > 0
+              ? `Locked to ${spinBpm} bpm: the dots stand still while the dish turns once in ${Math.round(settings.spinBeats ?? 16)} beats.`
+              : Math.round(settings.spinAuto ?? 0) === 0 ? 'Auto Spin is off.'
+              : `Turning at ${Math.abs(settings.spinRpm ?? 6).toFixed(1)} rpm${Math.round(settings.spinAuto ?? 0) === 2 ? ' until a tempo is heard' : ''}.`}
+          </p>
+        </div>
         <Slider
           label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
           value={settings.spinAuto ?? 0}
@@ -4088,9 +4118,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
           )}
           {railGroups.map(group => (
-            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
+            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`} data-group={group.id}>
               {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
               <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:pb-1.5 sm:pt-4" title={group.hint} data-testid={`rail-heading-${group.id}`}>
+                <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
                 {group.name}
               </div>
               <div className="flex gap-0.5 sm:flex-col">

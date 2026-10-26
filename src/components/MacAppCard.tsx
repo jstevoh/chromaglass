@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { desktopUpdates, macAppRow, onMacComputer, type DesktopUpdateState } from '../lib/macApp';
+import { desktopUpdates, MAC_APP_NOTARISED, MAC_FIRST_OPEN, macAppRow, onMacComputer, type DesktopUpdateState } from '../lib/macApp';
 
 /**
  * The Mac app in Profile & Store (PLAN.md 13-update). On the site it is the
@@ -45,6 +45,7 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
             <span className="text-accent-text" aria-hidden="true">↓</span>
           </a>
           <p className={note}>Drag it into Applications. It tells you when a new version is out.</p>
+          {!MAC_APP_NOTARISED && <p className={note} data-cg-mac-first-open="">{MAC_FIRST_OPEN}</p>}
         </>
       )}
       {row.kind === 'on-a-mac' && <p className={note}>Open chromaglass.art on your Mac and download it from this sheet there.</p>}

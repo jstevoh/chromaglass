@@ -1,5 +1,6 @@
 import { SlidersHorizontal } from 'lucide-react';
 import { Button } from '../ui';
+import { TapeReels, clockSeconds } from '../ui/Playful';
 import { makesText, runningText } from '../../lib/recordChoice';
 
 /**
@@ -31,6 +32,7 @@ export function RecordControls({
   const running = videoRecording || !!performance;
   const videoClock = `${Math.floor(videoSeconds / 60)}:${String(videoSeconds % 60).padStart(2, '0')}`;
   const clock = videoRecording ? videoClock : performance?.clock ?? '0:00';
+  const reelSeconds = videoRecording ? videoSeconds : clockSeconds(clock);
   const idleWhat = makesText(choice);
   const what = running ? runningText({ videoOn: videoRecording, takeOn: !!performance }) : idleWhat;
 
@@ -38,11 +40,11 @@ export function RecordControls({
     <div className="flex shrink-0 items-center gap-1 xl:gap-1.5" data-testid="record-controls-cluster">
       {/*
         The running timer takes no extra width (PLAN.md 19v-4, as Save's dot in
-        19v-3): the idle label stays in flow to size the button, and the stop
-        mark + clock ("■ 0:00", or "■ Stop · 0:00" at 2xl; what is recording is
-        in the hover title and dot-rec) sit over that same box while recording
-        so starting a recording never widens the button or shifts its
-        neighbours in the bar.
+        19v-3): the idle label stays in flow to size the button, and the
+        reels + clock (two tape reels turning at v / r, then "0:00", or
+        "Stop · 0:00" at 2xl; what is recording is in the hover title and
+        dot-rec) sit over that same box while recording so starting a
+        recording never widens the button or shifts its neighbours in the bar.
       */}
       <Button
         height={32}
@@ -63,9 +65,10 @@ export function RecordControls({
           {running && (
             <span
               data-testid="record-timer"
-              className="absolute inset-0 flex items-center justify-center tabular-nums"
+              className="absolute inset-0 flex items-center justify-center gap-1.5 tabular-nums"
             >
-              ■ <span className="hidden 2xl:inline">Stop · </span>{clock}
+              <TapeReels seconds={reelSeconds} height={12} />
+              <span className="hidden 2xl:inline">Stop · </span>{clock}
             </span>
           )}
         </span>

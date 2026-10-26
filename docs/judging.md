@@ -1745,3 +1745,113 @@ On the desk (the phone already had one of each):
    **Set up…** (opens Settings → Controller), and still teaches: Learn, banks, bindings, the picture,
    Save and Load file. It no longer has a switch, a port picker, factory chips or Auto-map.
 
+
+## 77. Coloured knob caps, tool keycaps, a snail and a hare (PLAN 35d)
+
+On the desk (Build, with Recipe, Fluid Physics, Lens and Tools open):
+
+1. Every knob's cap wears the colour of its group: Play off-white, Pour blue, Feed orange, Motion
+   green, Chemistry teal, Look yellow, Stage grey. The same colour is the small tick before a panel's
+   title and the dot on a Settings rail heading. Violet still means on and red still means live; no cap
+   should read as either.
+2. Speed and Evolve Speed (and Gel Speed, Chase Speed, Kaleido Spin where you pin them) have a snail
+   at the slow end of the ring and a hare at the fast end, faint until the knob is at that end. Kaleido
+   Spin has a hare at each end, since it turns either way.
+3. The Tools panel is ten keycaps: a drawn picture, the name, the letter in the corner. The held tool
+   is lit violet and sits 2 px lower. Press a letter on the keyboard and the held key moves.
+
+On the phone: the dock's ten tools carry the same pictures (the held one lit and 2 px lower); Motion's
+Evolve speed and Play's Speed have the snail and hare at the ends of the track, and the thumb takes its
+group's colour.
+
+Bad: a cap you read as "on" or "live", a colour you cannot tell from its neighbour at arm's length, a
+picture that does not say what its tool does, or a snail and hare you do not see until you look for them.
+
+
+## 78. Bottles that tip, drops that fall, a bulb in kelvin (PLAN 35e)
+
+On the desk (Build, with Bottles open) and in Settings:
+
+1. Pick a bottle. It leans forward once, with a little overshoot, and stands still; its outline and name
+   stay lit violet. Pour with it for a minute: its level sinks as the plate fills toward the Dye Budget,
+   and rises as the plate empties. Lower Dye Budget and the level drops sooner; raise it and it holds. The
+   other bottles stand full.
+2. In Settings, Viscosity (Squish Plate): hover **thin** and a small drop forms and falls in under a
+   second; hover **thick** and the drop hangs and strings out for about five. Choosing one runs it once.
+   At rest each is a drop hanging at the lip.
+3. In Settings, Lamp & Light, Lamp Warmth has a bulb at the left. At 0 it reads 6500 K and glows white;
+   turn it up and it falls to 5100 K at full, the filament going from white to cream. The figure is the
+   temperature of the grade the slider applies to the picture, not a label.
+
+On the phone: the Dye sheet's picked bottle leans and shows its level, and the dock's dye button holds the
+bottle in hand, leaning while the sheet is open. Settings has the same drops and bulb.
+
+Bad: a level that sits still while the plate fills, a lean that keeps moving, a drop that falls in the same
+time on both buttons, a bulb whose number does not follow the slider, anything that moves with reduced
+motion on, or a violet or red that is not "on" or "live". Decide too: the 5100 K top is what the grade does
+today; if you would rather it reached a 3200 K halogen, that is PLAN 35e-2.
+
+## 79. The Splodascope, and Film Hold (PLAN 28k)
+
+Open the Splodascope look on the lamp, with the owner's photograph beside it (in the project's
+shared files, `references/splodascope-2026-10-25.png`).
+
+1. A crowd of round drops of yellow, green, red and magenta oil in a cobalt water, from small to
+   cells a fifth of the plate across, a few with a drop of another colour inside a ring of water.
+2. Leave it a minute: drops press against one another and stay two, with a thin dark wall between
+   them. Some merge, slowly; the crowd should still be a crowd after a minute, not a few big blobs.
+3. With music: a kick presses the glass and now and then breaks a wall so two neighbours run
+   together. Nothing moves the frame as a whole.
+4. Settings → Oil & Soap → Film Hold to 0: the drops run together within a few seconds (that is the
+   plate as it was). Back to 1: the drops laid from then on hold again.
+
+On the phone: the look in the list, and Film Hold under Oil Bodies in Settings → Oil & Soap.
+
+Bad: walls between drops so thick the crowd reads as a lattice; drops that jitter against each
+other; colours going brown or black inside the drops; or a crowd that has merged into blobs within
+half a minute with no music playing.
+
+today (widened in §80).
+
+## 80. Lamp Warmth reaches a 3200 K halogen (PLAN 35e-2)
+
+In Settings, Lamp & Light, on any look with some colour on the plate (the bulb is also on the phone's Settings):
+
+1. Lamp Warmth now runs from 6500 K at 0 to 3200 K at the right-hand end, and the bulb's figure follows it, even
+   steps of colour all the way. The old 0 to 1 is the first quarter and looks as it did.
+2. Drag it slowly to the end. The picture should go from white through cream and amber to the orange of an old
+   overhead projector's lamp; blues and violets should die away first, as under a real tungsten lamp, and reds
+   and oranges hold. The warm end is dimmer on purpose; Exposure brings it back.
+3. Bad: a jump or a band as you drag, a look that changed colour with the slider where it was, a bulb figure that
+   does not follow, a dark corner that gets worse beyond the old end (the vignette is meant to stop at 1).
+4. Decide: Home Movie (0.45) and Velvet Underground (0.25) kept their colour. Try Home Movie at 2 or 3, which is
+   what an old projector's lamp is; say if you want it, and if you want the end held at the same brightness
+   instead of dimmer (PLAN 35e-3).
+
+## 81. Tape reels, a tap pad, a VU needle, a lens cap, a strobe ring (PLAN 35f)
+
+On the desk and the phone, with a band or a microphone playing:
+
+1. Press R (or Record). Two small reels appear in the button beside the clock. The left one starts full and
+   turns slowly, the right one starts bare and turns about twice as fast; over several minutes the left
+   empties onto the right and the two turn rates come together and cross. Stop and they stop. On the phone,
+   the Play screen's Record pill shows the same two reels, still while it waits, turning while it records,
+   the clock under them, and the pill is red while it runs.
+2. Settings, Audio Input, Tempo: tap the Tap pad four times. The four pips fill, the tempo shows in segment
+   digits, and a small light on the pad blinks on the beat you tapped, staying with your tap if you tap a
+   fifth time a little late. On the phone it is in the Sound sheet. Listen clears it.
+3. The Sound sheet (desk and phone) has a small dial. With a source playing, the needle swings up on each
+   kick, about a third of a second to arrive and a soft fall; stop the sound and it lies on its stop; unplug a
+   USB input and the dial says "deaf". It is the only thing here that moves with sound.
+4. Blackout (header on the desk, Settings, the remote, Draw): off it is a bare lens; on, a cap snaps over the
+   lens once and the button is solid red. Draw's off state is no longer red. The remote has one Blackout now,
+   in the bar under the thumb.
+5. Settings, Plate Spin, above Auto Spin: a ring of dots. In Rate it turns at the dish's speed. In Tempo
+   with a tempo tapped or heard, and Beats a Turn at 16, the dots stand still while the dish turns. Set
+   Beats a Turn to 48 and they creep backward slowly (the alias). Off, the ring is dim and still.
+
+Bad: reels that turn at one speed, a beat light that drifts off your taps, a needle that jumps or sticks
+after the sound stops, a cap that is red when the room is lit, a ring that turns while locked, anything that
+moves with reduced motion on (the reels and ring stop and the needle shows the number instead), or a violet
+or red that is not "on" or "live". Decide too: the VU dial is the plate's own 0 to 100 volume, not decibels
+(PLAN 35f-2).

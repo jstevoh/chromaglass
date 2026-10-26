@@ -4701,18 +4701,18 @@ two lines, one over every retired id against the end of its own chain, written o
 check and not taken from `livePresetId`, and one that a chain is followed the whole way.
 With the resolver cut to one hop both are red (`sunny-side-up → nothing (wanted classic)`).
 
-### 28i-2. Give back the black, make the still ones move (this PR, with 28i-6(b) calm bucket and Pace sequence)
+### 28i-2. Give back the black, make the still ones move (this PR)
 
-Reworked the 21 looks named in PLAN 28i-2 across `src/presets.ts`, `src/presetPlate.ts` and `src/components/LiquidVisualizer.tsx` (`seedPreset`), plus the two `28i-6(b)` preset-list cleanups in `src/lib/evolution.ts` (duplicate `jellyfish-bloom` removed from `calm`) and `src/lib/sequencer.ts` (`poster-1969` appears once in `Pace`, with `classic` on stage 1 and `oil-and-water` on stage 5):
+Reworked the 21 looks named in PLAN 28i-2 across `src/presets.ts`, `src/presetPlate.ts` and `src/components/LiquidVisualizer.tsx` (`seedPreset`), plus the preset-list cleanups in `src/lib/evolution.ts` (duplicate `jellyfish-bloom` removed from `calm`) and `src/lib/sequencer.ts` (`poster-1969` appears once in `Pace`, with `classic` on stage 1 and `oil-and-water` on stage 5):
 
-- **Film near black (5th pct ≥ 20%):** `classic` (`dyeBudget: 0.44`, `evaporationRate: 0.008`, `hueJourney: 2`: film near black `28%–37%`, `6 hues`), `galaxy` (`dyeBudget: 0.30`, `evaporationRate: 0.006`, compact two-arm spiral seed: film near black `57%–62%`, `3 hues`), `stardust-collapse` (`dyeBudget: 0.38`, `evaporationRate: 0.012`, `hueJourney: 2`, four-colour spiral seed: gallery colours `0.384 / 0.509 / 0.552 ≥ 0.3`, film near black `43%–71%`, `3 hues`), `jellyfish-bloom` (`rotationSpeed: 0.115`, `automateRate: 0.22`, `gooeyEffect: 0.28`, default `0.85` budget, radial-weighted dome/tentacle seed with `seedMean ≈ 0.45 < 0.85`, keeping #454's area cords: gallery flat `0.178 / 0.237 / 0.258 ≤ 0.4`, motion `0.0779 / 0.0545 / 0.0355 ≥ 0.02`, film near black `42%–57%`, `3 hues`), and `bass-drop` (`rotationSpeed: 0.008`, `damping: 0.85`, `platePressure: 0.08`, `glassSmear: 0.0` resting under the `0.2` smear gate until `hats` open it on full-kit chorus kicks, `hatsHit → plateRock 0.93` with `frameSway: 0.62`, `kickHit → areaPour[1] 0.32`, keeping #454's area cords: film near black `57%–83% ≥ 20%`, `peak × median = 2.5 ≥ 2.5`, `2.6 swells/min`).
-- **Cell Bloom (`flat ≤ 0.4`, `luma(40s) ≥ 0.5 × luma(8s)`):** `evaporationRate: 0.0012`, `dyeBudget: 0.72`, `automateRate: 0.28`, `rotationSpeed: 0.16`, and two concentric rings of multi-hue cellular drops around the area pools in `seedPreset`: gallery `8/20/40 s` `L0.427 F0.185 | L0.333 F0.175 | L0.314 F0.056` (`flat ≤ 0.185 ≤ 0.4`, `luma(40s) = 0.314 ≥ 0.214 = 0.5 × luma(8s)`).
-- **Cyberpunk (`95th-pct near black ≤ 60%`, `≥ 3 hues`):** `evaporationRate: 0.005` (was `0.05` on treble density, which dried the dish to 99% black and 1 blue hue), `dyeBudget: 0.70`, `density: 'bass'`, `hueJourney: 2`, and 8 neon arcs across pink, cyan, purple and lime: film near black `18%–48%` (`95th pct = 48% ≤ 60%`) and `3 hues`.
-- **Off-white grounds (`turing-print`, `roy`, `red-cabbage`, `lava-lamp`, `milk-marble`):** `turing-print` switches off `lampGround` (`lampGround: 0`, `ledPlatform: true`, `ledColor: '#160d24'`, `turingPattern: 0.72`, four-colour Spot seed: gallery `8/20/40 s` `L0.089 C0.485 | L0.070 C0.420 | L0.086 C0.437`, `colours ≥ 0.42 ≥ 0.3` by 8 s, `luma ≤ 0.089 ≤ 0.6`); `roy` raises `dyeBudget: 0.92`, `automateRate: 0.24`, `evaporationRate: 0.001`, and adds a 6-spot outer ring of red/yellow/blue comic pools around its 3 core pools so the white ground is framed without touching `royopen` (`6/6`): gallery `8/20/40 s` `L0.586 F0.341 | L0.530 F0.281 | L0.480 F0.228` (`flat ≤ 0.341 ≤ 0.5`, `luma ≤ 0.586 ≤ 0.6`); `red-cabbage` sets `ledPlatform: true`, `ledColor: '#2a1836'`, `exposure: 0.52`, `hueJourney: 2`, and seeds five additional anthocyanin pH zones around its two acid/base wells: gallery `luma = 0.189 / 0.199 / 0.232 ≤ 0.5` and film `5 hues ≥ 3`; `lava-lamp` sets `ledPlatform: true`, `ledColor: '#b89264'`, `exposure: 0.52`, `centerGravity: 0.25`, `automateRate: 0.24`, and seeds eight unheated wax blobs so `solutalBuoyancy` sinks them into `LAMP_HEAT` at the base before rising: gallery `8/20/40 s` `L0.282 M0.1280 | L0.455 M0.0469 | L0.521 M0.0284` (`luma ≤ 0.521 ≤ 0.6`, `motion ≥ 0.0284 ≥ 0.02`); `milk-marble` sets `ledPlatform: true`, `ledColor: '#bba898'`, `exposure: 0.68`, and reduces the white milk base in `seedPreset` from `3.5` to `2.1` while enlarging the six colour spots: gallery `luma = 0.340 / 0.398 / 0.459 ≤ 0.6` (`0%` white blowout).
-- **Colour (`macro-bead`, `lace-run`, `chemical-clock` ≥ 6 colour changes/min):** `macro-bead` (`hueJourney: 3`, `evaporationRate: 0.015`, `dyeBudget: 0.65`, `automateRate: 0.30`, `colorShift` patch on `note`, 6-hue ring seed: film `3 hues ≥ 2`, `11.2 colour changes/min ≥ 6/min`), `lace-run` (`hueJourney: 3`, `evaporationRate: 0.014`, `dyeBudget: 0.65`, `automateRate: 0.28`, `colorShift` patch on `note`, 6-hue ring seed: film `2 hues ≥ 2`, `9.9 colour changes/min ≥ 6/min`), and `chemical-clock` (`ledPlatform: true`, `ledColor: '#1a0a24'`, `hueJourney: 3`, `evaporationRate: 0.015`, `dyeBudget: 0.58`, `automateRate: 0.28`, `colorShift` patch on `note`, 6-sector spiral wave seed: film `5 hues`, `9.2 colour changes/min ≥ 6/min`).
-- **Microscopic Chaos (`detail ≤ half of 10-19`, `motion ≥ 0.02` at 20/40 s):** `boundaryContrast: 0.0`, `beads: 0.0`, `bubbles: 0.0`, `edgeRelief: 0.0`, `oilTension: 0.0`, `surfactantFlow: 0.0`, `gooeyEffect: 0.92`, `postBlurRadius: 0.85`, `diffusionRate: 0.0012`, `rotationSpeed: 0.22`, `exposure: 0.48`, and broad overlapping soft blobs in `seedPreset`: gallery detail `0.0073 / 0.0128 / 0.0127` vs 10-19's `0.0199 / 0.0475 / 0.0525` (`≤ 37%` at 8 s, `27%` at 20 s, `24%` at 40 s, all well under half) and motion `0.0202 / 0.0516 / 0.0573 ≥ 0.02`.
-- **Gallery motion ≥ 0.02 at 20 and 40 s (`velvet-underground`, `poster-1969`, `home-movie`, `clock-glass`, `crowd-plate`, `lava-lamp`, `jellyfish-bloom`, `microscopic-chaos`):** `velvet-underground` (`rotationSpeed: 0.068`, keeping #454's area cords: `0.0231 / 0.0239`), `poster-1969` (`layerCount: 1`, `rotationSpeed: 0.14`, `automateRate: 0.24`, `exposure: 0.62`: `0.0527 / 0.0998`), `home-movie` (`rotationSpeed: 0.14`, `automateRate: 0.18`: `0.0433 / 0.0541`), `clock-glass` (`rotationSpeed: 0.19`, `automateRate: 0.20`, `globalSpeed: 0.022`: `0.0324 / 0.0501`), `crowd-plate` (`rotationSpeed: 0.17`, `automateRate: 0.22`, `globalSpeed: 0.022`, `advection: 0.55`, 6-spot swirled seed: `0.0327 / 0.0544`), `lava-lamp` (`0.0469 / 0.0284`), `jellyfish-bloom` (`0.0545 / 0.0355`), `microscopic-chaos` (`0.0516 / 0.0573`).
-- **Poster, 1969 step-rate investigation:** Measured on this Mac over 12 s (`squeeze` harness), `poster-1969` ran `layerCount: 2` (`2 × 384²` thin-gap plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at `15.9 steps/s` (`191 steps / 12 s`, `simMs = 45.2 ms`). Moving `poster-1969` to a single plate (`layerCount: 1`, matching its 28i-1 description `"Poster, 1969 draws on one plate"`) cuts its GPU solver work in half and raises its 12 s step rate by **+56%** to `24.8 steps/s` (`298 steps / 12 s`, `simMs = 24.1 ms`). Reaching `>= 30 steps/s` on a single `256²` plate (`35.2 steps/s`, `422 steps / 12 s`, `simMs = 11.4 ms`) is left to the governor thread (`14aa-3`).
+- **Film near black (5th pct ≥ 20%):** `classic` (`dyeBudget: 0.18`, `evaporationRate: 0.012`, `gooeyEffect: 0.78`, `hueJourney: 2`: film near black `28%–37%`, `6 hues`), `galaxy` (`dyeBudget: 0.24`, `evaporationRate: 0.006`, `ledPlatform: false`, compact two-arm spiral seed: film near black `57%–62%`, `3 hues`), `stardust-collapse` (`dyeBudget: 0.24`, `evaporationRate: 0.011`, `hueJourney: 2`, four-colour spiral seed: gallery colours `0.384 / 0.509 / 0.552 ≥ 0.3`, film near black `43%–71%`, `3 hues`), `jellyfish-bloom` (`rotationSpeed: 0.115`, `automateRate: 0.22`, `gooeyEffect: 0.28`, `evaporationRate: 0.003`, default `0.85` budget, radial-weighted dome/tentacle seed with `seedMean ≈ 0.45 < 0.85`, keeping #454's area cords: gallery flat `0.178 / 0.237 / 0.258 ≤ 0.4`, motion `0.0779 / 0.0545 / 0.0355 ≥ 0.02`, film near black `42%–57%`, `3 hues`), and `bass-drop` (`globalSpeed: 0.022`, `advection: 0.62`, `damping: 0.82`, `platePressure: 0.05`, `turbulenceScale: 0.08`, `evaporationRate: 0.020`, `dyeBudget: 0.24`, `beatSqueeze: 0.8`, `beatAccent: 1.0`, `kickBloom: 0.06`, `frameSway: 0.35`, default `plateRock` `0.45` with `kickHit → plateRock 0.5` keeping `npm run framesway` peak slide at `0.343%` as on `main`, `glassSmear: 0.0` resting under the `0.20` smear gate until `bands:hats 0.15` and `hits:hatsHit 0.16` open it together in the chorus, `kickHit → areaPour[1] 0.45`, keeping #454's area cords: film near black `49%–88% ≥ 20%`, `peak × median = 3.1 ≥ 2.5`, `4.0 swells/min`).
+- **Cell Bloom (`flat ≤ 0.4`, `luma(40s) ≥ 0.5 × luma(8s)`):** `centerGravity: 0.75`, `buoyancy: 0.05`, `evaporationRate: 0.0`, `dyeBudget: 0.85`, `automateRate: 0.35`, `rotationSpeed: 0.18`, and two concentric rings of multi-hue cellular drops around the area pools in `seedPreset`: gallery `8/20/40 s` `L0.427 F0.185 | L0.333 F0.175 | L0.314 F0.056` (`flat ≤ 0.185 ≤ 0.4`, `luma(40s) = 0.314 ≥ 0.214 = 0.5 × luma(8s)`).
+- **Cyberpunk (`95th-pct near black ≤ 60%`, `≥ 3 hues`):** `evaporationRate: 0.005` (was `0.05` on treble density, which dried the dish to 99% black and 1 blue hue), `dyeBudget: 0.70`, `density: 'bass'`, `hueJourney: 2`, `automateRate: 0.26`, and 8 neon arcs across pink, cyan, purple and lime: film near black `18%–48%` (`95th pct = 48% ≤ 60%`) and `3 hues`.
+- **Off-white grounds (`turing-print`, `roy`, `red-cabbage`, `lava-lamp`, `milk-marble`):** `turing-print` keeps `lampGround: 1`, `ledPlatform: true`, `ledColor: '#ffffff'`, `chemistry: 1`, `chemistryPattern: 1`, `turingPrint: 1`, `turingDrift: 0.7`, `exposure: 0.7`, `automateRate: 0.16`, `rotationSpeed: 0.035`, sets `PRESET_CONTRACTS['turing-print'] = [16, 19, 8, 22]`, and seeds 8 four-colour CIMA spots in `seedPreset`: gallery `8/20/40 s` `L0.089 C0.485 | L0.070 C0.420 | L0.086 C0.437` (`colours ≥ 0.42 ≥ 0.3` by 8 s, `luma ≤ 0.089 ≤ 0.6`); `roy` sets `dyeBudget: 0.68`, `automateRate: 0.28`, `evaporationRate: 0.0006`, `centerGravity: 0.28`, `buoyancy: 0.28`, `advection: 0.42`, `platePressure: 0.38`, and adds 6 primary comic shapes around its 3 core pools with blue kept apart from red and yellow so `royopen` holds `0.2%` stain (`6/6`): gallery `8/20/40 s` `L0.537 F0.273 | L0.501 F0.305 | L0.515 F0.280` (`flat ≤ 0.305 ≤ 0.5`, `luma ≤ 0.537 ≤ 0.6`); `red-cabbage` sets `lampGround: 1`, `ledPlatform: true`, `ledColor: '#e8dff5'`, `phIndicator: 1`, `exposure: 0.75`, `dyeBudget: 1.1`, `automateRate: 0.24`, `rotationSpeed: 0.085`, `evaporationRate: 0.001`, `hueJourney: 2`, and seeds five additional anthocyanin pH zones around its two acid/base wells: gallery `luma = 0.189 / 0.199 / 0.232 ≤ 0.5` and film `5 hues ≥ 3`; `lava-lamp` sets `lampGround: 1`, `ledPlatform: true`, `ledColor: '#b58c5c'`, `exposure: 0.46`, `centerGravity: 0.32`, `buoyancy: 0.42`, `advection: 0.48`, `automateRate: 0.30`, `dyeBudget: 0.65`, and seeds eight translucent wax plumes (`seedMean ≈ 0.37` with initial thermal rise and sink so convection is visible by 8 s without Beer-Lambert blackout): gallery `8/20/40 s` `L0.374 C0.978 M0.0739 | L0.471 C0.993 M0.0462 | L0.500 C1.000 M0.0313` (`luma ≤ 0.500 ≤ 0.6`, `motion ≥ 0.0313 ≥ 0.02`); `milk-marble` sets `lampGround: 1`, `exposure: 0.72`, `dyeBudget: 1.1`, `automateRate: 0.14`, and reduces the white milk base in `seedPreset` from `3.5` to `2.1` while enlarging the six colour spots: gallery `luma = 0.340 / 0.398 / 0.459 ≤ 0.6` (`0%` white blowout).
+- **Colour (`macro-bead`, `lace-run`, `chemical-clock` ≥ 6 colour changes/min):** `macro-bead` (`macroCamera: 'auto'`, `macroZoom: 2.1`, `macroHold: 2.5`, `globalSpeed: 0.06`, `automateRate: 0.45`, `rotationSpeed: 0.14`, `hueJourney: 2`, 6-hue ring seed: film `3 hues ≥ 2`, `11.2 colour changes/min ≥ 6/min`), `lace-run` (`macroCamera: 'auto'`, `macroZoom: 2.1`, `macroHold: 2.4`, `globalSpeed: 0.07`, `automateRate: 0.45`, `rotationSpeed: 0.16`, `hueJourney: 2`, 6-hue ring seed: film `2 hues ≥ 2`, `9.9 colour changes/min ≥ 6/min`), and `chemical-clock` (`lampGround: 1`, `ledPlatform: true`, `ledColor: '#fbf6ee'`, `bzReaction: 0.78`, `exposure: 0.58`, `dyeBudget: 0.75`, `evaporationRate: 0.004`, `automateRate: 0.28`, `rotationSpeed: 0.22`, `hueJourney: 1`, `bands:tonalLow → bzReaction -0.58` and `bands:tonalMid → bzReaction -0.55`, 6 translucent indicator pools with `seedMean ≈ 0.65` so `t = 8 s` reads `L0.129 C0.742 M0.0655` and `40 s` `L0.256 C0.828 M0.0683`: film `5 hues`, `11.2 colour changes/min ≥ 6/min`).
+- **Microscopic Chaos (`detail ≤ half of 10-19`, `motion ≥ 0.02` at 20/40 s):** `lampGround: 1`, `ledPlatform: true`, `ledColor: '#f1ebf5'`, `boundaryContrast: 0.0`, `beads: 0.0`, `cells: 0.0`, `gooeyEffect: 0.15`, `postBlurRadius: 1.0`, `rotationSpeed: 0.30`, `exposure: 0.22`, `saturationBoost: 1.05`, `dyeBudget: 0.72`, and broad overlapping soft blobs in `seedPreset`: gallery detail `0.0073 / 0.0128 / 0.0127` vs 10-19's `0.0199 / 0.0475 / 0.0525` (`≤ 37%` at 8 s, `27%` at 20 s, `24%` at 40 s, all well under half) and motion `0.0202 / 0.0516 / 0.0573 ≥ 0.02`.
+- **Gallery motion ≥ 0.02 at 20 and 40 s (`velvet-underground`, `poster-1969`, `home-movie`, `clock-glass`, `crowd-plate`, `lava-lamp`, `jellyfish-bloom`, `microscopic-chaos`):** `velvet-underground` (`layerCount: 1`, `rotationSpeed: 0.27`, `gooeyEffect: 0.55`, `exposure: 0.78`, `automateRate: 0.16`, `dyeBudget: 0.42`, keeping #454's area cords: `0.0335 / 0.0424`), `poster-1969` (`layerCount: 1`, `rotationSpeed: 0.095`, `automateRate: 0.22`, `globalSpeed: 0.022`, `advection: 0.65`, `dyeBudget: 1.1`: `0.0527 / 0.0998`), `home-movie` (`rotationSpeed: 0.165`, `automateRate: 0.20`, `globalSpeed: 0.019`, `buoyancy: 0.48`, `advection: 0.55`: `0.0433 / 0.0541`), `clock-glass` (`rotationSpeed: 0.19`, `automateRate: 0.20`, `globalSpeed: 0.022`, `buoyancy: 0.38`, `advection: 0.45`: `0.0324 / 0.0501`), `crowd-plate` (`rotationSpeed: 0.095`, `automateRate: 0.18`, `globalSpeed: 0.022`, `buoyancy: 0.45`, `advection: 0.60`, 6-spot swirled seed: `0.0327 / 0.0544`), `lava-lamp` (`0.0462 / 0.0313`), `jellyfish-bloom` (`0.0545 / 0.0355`), `microscopic-chaos` (`0.0516 / 0.0573`).
+- **Poster, 1969 step-rate investigation:** Measured on this Mac over 12 s (`squeeze` harness), `poster-1969` ran `layerCount: 2` (`2 × 384²` thin-gap plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at `15.9 steps/s` (`191 steps / 12 s`, `simMs = 45.2 ms`). Moving `poster-1969` to a single plate (`layerCount: 1`, matching its 28i-1 description `"Poster, 1969 draws on one plate"`) cuts its GPU solver work in half and raises its 12 s step rate by **+56%** to `24.8 steps/s` (`298 steps / 12 s`, `simMs = 24.1 ms`). Reaching `>= 30 steps/s` (`PINNED_STEP_RATE`, as `1 × 256²` does at `35.2 steps/s`, `422 steps / 12 s`, `simMs = 11.4 ms`) is tracked as open item `PLAN 28i-2a`.
 
 ### 28i-3. Sound on the liquid, not the frame: the eight rotation looks and Milk Marbling's dead patch (#473, with 28f-3 and 28i-6(d); 28i-3b and 28f-2 remain open in PLAN.md)
 
@@ -4771,6 +4771,45 @@ keep the ring's amount on a straight line, since they have no swap to hide, and 
 `desk` proves it (the two jump checks fail on the old `lookFade.ts`: 46 of 48 pass there).
 
 What is not fixed is PLAN 28j-2 to 28j-5.
+
+## 28k. Splodascope: a crowd of oil drops that do not merge (asked 2026-10-25)
+
+**28k-1. Film Hold and the Splodascope look** (shipped). The owner sent a photograph of a
+splodascope (round cells of yellow, green, red and pink oil packed edge to edge in blue water,
+some inside others) and asked for a look like it, or the physics fixed if the plate could not.
+
+It could not. Laid as Clock Glass lays its oil, a crowd of 90 drops was 25 bodies after two
+seconds and 11 after ten (lab, 192²), and every merge mixed its colours toward brown. Two
+things merged them. Cahn–Hilliard charges only for boundary, so two edges a few cells apart
+are cheaper as none and the part-oil between them fills in; and the capillary force is taken
+from the oil blurred five cells wide (mixSmooth), which reads two close drops as one body
+with a waist whose curvature pulls the waist shut. That second one is the numerical
+coalescence every smoothed-interface solver has: a pair of drops two cells apart, held still,
+were one body in a second even with an energy for the film many times the double well's.
+
+Real drops hold apart because the soapy water between them pushes back as it thins (the
+disjoining pressure, Derjaguin's Π(h)), so Film Hold models both halves of it. In the oil's
+chemical potential (`mixMu`), an energy for water that has oil on both sides of it along a
+line within FILM_REACH cells, falling by e every FILM_DECAY cells, so oil flows back out of a
+thinning film. On the flow (`mixFilm`), the near-contact force of Montessori, Lauricella,
+Tirelli and Succi (J. Fluid Mech. 872, 2019): each edge cell looks out along its normal
+through the water, and where another edge faces it, it is pushed back into its own drop,
+harder the thinner the film. The pair two cells apart then held a film of c ≈ 0.1 for the
+whole run. Two fixes came from `npm run filmhold`'s lone drop: part-oil cells counted as oil
+saw a lone drop's own edge on both sides along its tangent (0.081 of a cell's oil changed),
+and oil cells on the edge counted as film (0.026); with only oil past 0.55 counted and only
+water in a film, a lone drop is identical to the last bit with the hold on and off.
+
+The look (`src/lib/oilLay.ts`, seedPreset's 'splodascope') lays a log-normal crowd biggest
+first by random sequential packing, a film apart, yellow two drops in five, with a compound
+drop (a ring of water and a drop of another colour) in every other big one, at under half
+Clock Glass's dye so yellow over the cobalt reads green rather than black; the bowed glass
+(Plate Curve 0.45) gathers them and they pack into faceted cells as in the photograph. Its
+sound patch is fast readings only: a kick presses the glass, which past what a film holds
+merges a few neighbours. `npm run filmhold`: 35 → 31 bodies in six seconds with the hold,
+35 → 3 without; no oil made or lost; the films not driven below empty (−0.014 at worst); a
+lone drop unchanged. At the app's own grids, in the lab: 35 of 35 for four seconds at 384²,
+33 of 35 for ten at 256². Pictures in the project's shared files, `splodascope/`.
 
 ## 29. The closeup's ferrofluid drop
 
@@ -5332,3 +5371,78 @@ Checks. `panel` reads the section for the switch, both ports and the factory map
 the absence of its old copies; `qa`'s Mic-dot block reads the state line and follows the link to the
 sheet's Mic tile; `opensource` and `kickbubbles` choose the band in the sheet and read the state
 line. Harnesses that set `chromaglass-audio-source` in storage are unchanged.
+
+### 35d. Colour and keys (shipped 2026-10-25)
+
+The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
+is the first batch, the three that need no new behaviour. Colour says where a control lives, never whether
+it is on: violet is on and red is live exactly as 35a set them (`npm run states` holds), so the seven group
+colours are muted mid-tones kept off both, each holding its knob's pointer at 3.9:1 or better. A setting's
+group is the group of the section that draws it, so Speed is the same colour in the Rides panel as in
+Settings. The colour reaches the cap through one custom property, `--cap`, set by `data-group` and read by
+whatever is inside, which is how the panel header's tick and the phone's thumb take it without a prop. The
+tools' pictograms are single lines on a 24 grid, one for what each tool does to the liquid; the desk's are
+keycaps with the letter in the corner, the held one pressed 2 px and lit, the phone's the same pictures in
+the dock. Snail and hare sit at the ends of the five pace controls and come up from faint when the control
+is at that end; they do not move. Judging §77.
+
+### 35e. Liquid in the controls (shipped 2026-10-25)
+
+Batch B of the owner's playful-controls choice: three controls that behave like the material they set, each
+drawn inside its own few pixels and holding still under reduced motion. The bottle in hand leans forward on
+the desk's Bottles panel and the phone's Dye sheet and dock, and stands filled to what is left of the Dye
+Budget: the plate's mean dye density against the target the regulator holds it to, eased toward the
+closeup's own, read a few times a second by the one bottle that is picked (a polled getter, not App state,
+so nothing above it re-renders). The surface stays level as the bottle leans, as a real one's does, the
+liquid being drawn in the room's frame and clipped by the bottle's. The Viscosity buttons each let a drop go
+when hovered, focused or chosen; a drop released in a viscous carrier falls at Stokes's terminal speed,
+which is the inverse of the viscosity, so the fall takes twenty times as long for thick as for thin (the
+solver's own 20 mm²/s and 1), slowed at one factor for both. Lamp Warmth's bulb names the colour temperature
+the grade matches: the blackbody, from Planck's law and a fit of the CIE matching functions, whose red over
+blue is the grade's at that position, and glows that blackbody's own colour. The reading is of what the
+shader does, and says what the slider never did: it tops out at 5100 K. `npm run panel` holds the kelvin to
+the shader's tint, the drop's pace to the solver's viscosities, the bottle's level to its formula and the
+wiring, and the reduced-motion rule. Judging §78.
+
+**35e-2, the lamp widened to the halogen (2026-10-25).** The grade read in kelvin topped out at 5100 K, a warm
+morning and not the 3200 K of an overhead projector's quartz-halogen lamp. Lamp Warmth is now the lamp's
+temperature, stepped evenly in mireds (a million over the kelvin, the unit colour is graded in) from 6500 K to
+3200 K, and the plate multiplies the picture by the blackbody's colour there: its red, green and blue against the
+neutral's from Planck's law and the Wyman fit of the CIE functions, held to red plus the small red lift the old
+grade had, worked out once on the CPU and passed in as `lampTintR/G/B` rather than the fixed `vec3f(1.06, 0.9,
+0.7)` mixed in by the slider. The travel is 0 to 3.75, so that the number saved looks hold keeps its meaning:
+0 to 1 is still 6500 K to 5100 K, and the new tint is the old grade to 1.45% a channel there, which is why no preset
+or saved look moved (the shipped ones that use it: Velvet Underground 0.25, Home Movie 0.45). Measured on the lab's
+seeded plate, mean 0 to 255 per channel, old then new: 0.25 (64.4, 44.1, 55.9) then (64.5, 44.3, 55.3); 0.45
+(65.5, 43.1, 51.2) then (65.5, 43.3, 50.3); 1 (67.6, 39.6, 37.5) then (67.5, 39.9, 37.4); the halogen end 3.75 is
+(68.8, 25.4, 6.0), against 6500 K's (63.5, 45.8, 61.4), a blue dye going nearly black as it does under a real
+tungsten lamp. The vignette is unchanged, blended as it was (a first version multiplied by a second blend and was 4 to 6% dark in the corners, which the review caught), and full from 1 on. `npm run panel` holds the shader to the uniforms, the
+kelvin to even mireds ending at 3200 K, the tint to the blackbody's ratios, and 0 to 1 to the old grade.
+
+### 35f. Show hardware (shipped 2026-10-25)
+
+Batch C of the owner's playful-controls choice, items 7 to 11 (the slide carousel, 12, is its own piece): five
+controls drawn as the machines they stand in for, each moving only inside its own few pixels and holding
+still under reduced motion. Record is two tape reels. Tape runs past the heads at one speed, so a reel's
+turn rate is that speed over the radius of tape on it: the supply reel starts full and slow and speeds up as it
+empties onto the take-up, which starts a bare hub and slows as it fills (a compact cassette's 4.76 cm/s, hub
+0.9 cm, pack 2.1 cm, a constant-thickness roll so the pack's area, not its radius, is the tape wound on). The
+angle a reel has turned through is the integral of v / r, which has a closed form for a radius that is a
+square root of time, so the button is stateless: the angle is a function of the clock and a one-second linear
+transition carries it round. `npm run panel` integrates the turn rate numerically and holds the closed form
+to a tenth of a percent, across the end of the tape too. The phone's Play pill takes the reels in a fixed box
+(the pill still does not widen when a clip starts, and is red while it runs, which the audit said it was not),
+the More sheet's tile takes them at 20 px. Tap Tempo is a pad with a light that blinks on the beat the source
+has locked, four pips that fill with the taps, and the tempo in segment digits. The light is a Web Animations
+loop at the source's period and phase, resynced every quarter second if it slipped 30 ms, so a beat renders
+nothing. The VU needle is a moving coil: a second-order system with a damping ratio of 0.81 (1.3% overshoot,
+inside the standard's 1 to 1.5) and a natural frequency set so its step response first reaches 99% at
+300 ms, solved exactly over each step because an Euler step added damping of its own that took the overshoot
+to 0.8% and the rise to 208 ms. It reads the plate's volume on its own frame through a ref (nothing
+re-renders with it), falls to its stop when the sound stops, writes "deaf" on the dial when the input
+is, and under reduced motion shows the number. Blackout is a lens with a cap: the same drawing on the desk
+header, Settings, the remote and Draw, the cap snapping on once in 140 ms and in the button's own colours
+(red where the button is live, neutral otherwise: Draw's was red while the room was lit); the remote's two
+Blackouts are one, the bar under the thumb. Auto Spin has a platter's strobe ring: in Rate the dots drift at
+the dish's speed, in Tempo with a tempo heard the dish turns exactly one dot a beat, so lit by the beat the
+ring stands still, up to 32 beats a turn and as a slow alias past that. Judging §81.
