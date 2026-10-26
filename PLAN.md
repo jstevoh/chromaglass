@@ -8059,7 +8059,7 @@ the code's entry points, the checks to add and the scenes to match, in
     `0.975` (bar `>= 0.96`), and its halo grows by `+94` (`324 → 418`, bar `<= +120`), while on the
     dragged drop the cells over `0.01` fall from `1602` to `1238`. The deep plate's `phaseCH` stays
     as on `main` (under **29c-1**).
-  - **29c-8. A dragged drop loses its trailing rim to the oil's return flow.** With the
+  - **29c-8. A dragged drop loses its trailing rim to the oil's return flow.** *(In progress on `antigravity/29c-8-trailing-rim`.)* With the
     limiter-matched `phaseCompress` (29c-1) and degenerate mobility in `phaseCHVolume` (29c-7) both
     in place (`ferropress` 7/7, `magnetgain` 5/5, `ferrorest` 5/5), a drop dragged `0.3` of the
     plate in 3 s under a `0.4` magnet at depth `0.2` (`npm run ferrodrag`) still loses its trailing
