@@ -3127,7 +3127,7 @@ deploys leave more docs merges directly on top of a live commit.
 
 ### 19k. One manifest of checks
 
-**Shipped** (#PRNUM). What was asked, as it stood in the plan:
+**Shipped** (#502). What was asked, as it stood in the plan:
 
 Every new check edits `.github/workflows/checks.yml` and `package.json` (13 and 14 of the
 last 30 merges), which is where three of the recorded merge conflicts were. Seven of the
