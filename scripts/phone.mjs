@@ -1360,9 +1360,14 @@ try {
       // One that is not up already, or the pill would read right with nothing done.
       const other = page.locator('[data-testid="play-look-tile"][aria-pressed="false"]').nth(1);
       const name = (await other.locator('span').last().textContent())?.trim();
+      const trayAt = () => page.getByTestId('play-screen').locator('[data-testid="slide-tray"]').getAttribute('data-clicks').then(Number);
+      const trayBefore = await trayAt();
       await other.tap(); await page.waitForTimeout(2500);
       const pill = (await page.getByTestId('play-look').textContent())?.trim();
       check('Play: a look tapped in the strip is the look up', !!name && pill?.startsWith(name), `${name} / ${pill}`);
+      // One slot a push, whatever the distance (PLAN 35g): the changer lifts one slide.
+      const trayAfter = await trayAt();
+      check('Play: and the tray beside Looks clicked one slot for it, not none and not the distance', Math.abs(trayAfter - trayBefore) === 1, `${trayBefore} → ${trayAfter}`);
       const w0 = await page.getByTestId('play-wander').getAttribute('aria-pressed');
       await tap(page, 'play-wander');
       check('Play: Wander on its own turns Evolve on and off', (await page.getByTestId('play-wander').getAttribute('aria-pressed')) !== w0);

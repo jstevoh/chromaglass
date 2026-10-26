@@ -217,9 +217,15 @@ const webPreferences = () => ({
   preload: join(HERE, 'preload.cjs'),
   contextIsolation: true,
   sandbox: true,
+  // No developer tools in the app as it ships: the page's storage and its
+  // licence state are one keystroke from edits there (the review of #494).
+  devTools: !app.isPackaged,
   backgroundThrottling: false,
   additionalArguments: [
-    `--chromaglass-license=${Buffer.from(JSON.stringify(show.license)).toString('base64url')}`,
+    // Percent-encoded, not base64url: a sandboxed preload's Buffer does not
+    // read base64url, so the page was handed the free default and never the
+    // key verified here (found with PLAN.md 23.17d; `npm run desktop` licence).
+    `--chromaglass-license=${encodeURIComponent(JSON.stringify(show.license))}`,
     `--chromaglass-require-signin=${show.requireSignIn ? '1' : '0'}`,
   ],
 });
@@ -371,7 +377,41 @@ async function start() {
   show.port = await choosePort();
   show.key = showKey();
   show.osc = Number(process.env.OSC_PORT ?? 9000);
-  show.requireSignIn = Boolean(process.env.CHROMAGLASS_REQUIRE_SIGNIN);
+  /*
+    The app opens on a Home or Pro licence (PLAN.md 23.17d; the owner,
+    2026-10-25: "The Mac app should check the license. The app won't work for
+    free"). The page's gate is AppLicenceGate.tsx; this tells it the app is
+    asking, and tells the server to gate its features by the key. Always for
+    the app as it ships, packed: there is no switch that opens a packed app
+    for free. From the repo (`npm run app`, the checks) it stays open as
+    before unless CHROMAGLASS_REQUIRE_SIGNIN asks, so working on the app needs
+    no key.
+
+    And a packed app takes no signing key from its environment, ever.
+    LICENSE_PUBLIC_KEY lets the checks verify keys they sign themselves
+    (server/license-key.js); in a shipped app it would let anyone who can set
+    an environment variable sign their own Pro key, network or none (the
+    review of #494: an earlier draft kept it with CHROMAGLASS_OFFLINE, and an
+    offline show is still a show). The one other key a packed app trusts is
+    its own build's `checkKey` (electron-builder.config.cjs), whose private
+    half nobody holds once that build's job has ended.
+  */
+  show.requireSignIn = app.isPackaged || Boolean(process.env.CHROMAGLASS_REQUIRE_SIGNIN);
+  if (show.requireSignIn) process.env.CHROMAGLASS_REQUIRE_SIGNIN = '1';
+  if (app.isPackaged) {
+    delete process.env.LICENSE_PUBLIC_KEY;
+    delete process.env.LICENSE_BUILD_CHECK_KEY;
+    const checkKey = packedFlags().checkKey;
+    if (checkKey) process.env.LICENSE_BUILD_CHECK_KEY = JSON.stringify(checkKey);
+  }
+  // A sign-in with Google, or by the emailed link, finishes in the real
+  // browser on this app's server (SignInScreen.tsx, lib/macApp.ts). Only our
+  // own address crosses: the page cannot have the app open anything else.
+  ipcMain.handle('chromaglass:open-browser', (_e, url) => {
+    if (typeof url !== 'string' || !isOurs(url) || new URL(url).protocol !== 'http:') return false;
+    void shell.openExternal(url);
+    return true;
+  });
   const licenseFile = process.env.CHROMAGLASS_LICENSE_FILE ?? join(app.getPath('userData'), 'license.json');
   process.env.CHROMAGLASS_LICENSE_FILE = licenseFile;
   // The server reads its settings from the environment, as it does in a terminal.

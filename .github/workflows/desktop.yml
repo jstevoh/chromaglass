@@ -80,7 +80,22 @@ jobs:
             desktop/package-lock.json
       - run: npm ci
       - run: npm ci --prefix desktop
-      - run: npm run build
+      # The site as the app ships it (PLAN.md 23.17d): with the accounts, so the
+      # app can sign in and fetch the account's key from the licence Worker, and
+      # VITE_MAC_APP, so the show opens only on a Home or Pro key, in the app's
+      # window and in any browser opened on the app's server (lib/authFlag.ts).
+      # Built with none of these, as until 23.17d, the app had no sign-in, gated
+      # nothing, and read Pro for every download. The same secrets as deploy.yml;
+      # a fork's run has none, and builds an app that opens on a typed key only.
+      - name: Build the site the app serves
+        run: npm run build
+        env:
+          VITE_MAC_APP: '1'
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_LICENSES_URL: ${{ secrets.VITE_FIREBASE_LICENSES_URL }}
       # Only a release gets a version of its own; every other build keeps the
       # site's, so a pull request's app never looks newer than a release.
       - name: Which version
@@ -107,6 +122,20 @@ jobs:
       # on a pull request unless told to, which would leave the app with
       # Electron's own signature, broken by the rename, and "damaged" on an
       # Apple silicon Mac.
+      # A key pair for this build alone (PLAN.md 23.17d). The packed app opens
+      # only on a key, so the check below must open it on one; the app trusts
+      # this public half (its `checkKey`, electron-builder.config.cjs) and the
+      # check signs with the private half, which lives in a file on this runner
+      # and is gone when the job ends. Nobody holds it after, so a download
+      # trusts it for nothing. Never uploaded, never printed.
+      - name: A one-time key for the check
+        run: |
+          node --input-type=module -e "
+            const { publicKey, privateKey } = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+            const fs = await import('node:fs');
+            fs.writeFileSync(process.env.RUNNER_TEMP + '/check-key.json', JSON.stringify(await crypto.subtle.exportKey('jwk', privateKey)), { mode: 0o600 });
+            fs.appendFileSync(process.env.GITHUB_ENV, 'CHROMAGLASS_BUILD_CHECK_KEY=' + JSON.stringify(await crypto.subtle.exportKey('jwk', publicKey)) + '\n');
+          "
       - name: Build the download
         id: build
         env:
@@ -137,6 +166,14 @@ jobs:
           fi
       - name: Check the built app (npm run desktop)
         run: node scripts/desktop.mjs --packaged
+        env:
+          # The site above was built as the app ships it: the check's licence
+          # lines ask a plain browser on the app's server for the door too.
+          VITE_MAC_APP: '1'
+          DESKTOP_CHECK_PRIVATE_KEY_FILE: ${{ runner.temp }}/check-key.json
+      - name: Throw the check's key away
+        if: always()
+        run: rm -f "$RUNNER_TEMP/check-key.json"
       - uses: actions/upload-artifact@v4
         with:
           name: ChromaGlass-mac

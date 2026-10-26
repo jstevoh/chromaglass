@@ -24,7 +24,7 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
-import { Bottle, LiveBottle, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
+import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 
 /**
  * ChromaGlass on a phone.
@@ -86,6 +86,8 @@ export interface PhoneStageProps {
   lookSwatch: string;
   looks: PhoneLook[];
   activeLookId: string | null;
+  /** The look on stage's place in `looks`, which way the slide tray clicks (PLAN 35g). */
+  lookSlot?: number | null;
   onLook: (id: string) => void;
   onRandomLook: () => void;
   onRevert: (() => void) | null;
@@ -427,8 +429,9 @@ export function PhoneStage(p: PhoneStageProps) {
           data-testid="phone-look-button"
           aria-label="Choose a look"
         >
-          <span className="h-9 w-9 shrink-0 rounded-full border border-white/20" style={{ background: p.lookSwatch }} />
+          <SlideMount swatch={p.lookSwatch} size={36} />
           <span className="truncate text-[14px] font-medium text-text">{p.lookName ?? 'Custom'}</span>
+          <span className="shrink-0 text-muted"><SlideTray at={p.lookSlot ?? null} size={20} /></span>
           <ChevronDown size={16} className="shrink-0 text-muted" />
         </button>
         <div className="pointer-events-auto flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
@@ -898,7 +901,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       data-testid={`phone-look-${l.id}`}
                       className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
                     >
-                      <span className="h-10 w-10 shrink-0 rounded-md border border-white/10" style={{ background: l.swatch }} />
+                      <SlideMount swatch={l.swatch} size={44} />
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
                         {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
