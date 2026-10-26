@@ -64,7 +64,7 @@
  * Needs `npm --prefix desktop install` once (Electron is not a dependency of
  * the site). On Linux with no display it runs itself under xvfb-run.
  */
-import { _electron as electron, chromium } from 'playwright';
+import { _electron as electron } from 'playwright';
 import { spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -677,17 +677,22 @@ try {
     if (process.env.VITE_MAC_APP !== '1') {
       skip('licence: a browser on the app\'s server meets the same door', 'the site in dist/ was not built as the app ships it (VITE_MAC_APP=1, desktop.yml)');
     } else {
-      const b = await chromium.launch();
-      try {
-        const bp = await b.newPage();
-        await bp.goto(`http://localhost:${barePort}/show?debug`, { timeout: 60_000 });
-        const browserDoor = await bp.waitForSelector('[data-cg-app-licence]', { state: 'visible', timeout: 60_000 }).then(() => true, () => false);
-        await sleep(3000);
-        const browserPlate = await bp.locator('#liquid-canvas').count().catch(() => 0);
-        check('licence: a browser on the app\'s server meets the same door, and no plate', browserDoor && browserPlate === 0, `door ${browserDoor}, plate canvas ${browserPlate ? 'THERE' : 'absent'}`);
-      } finally {
-        await b.close().catch(() => {});
-      }
+      // The browser is a window the app's own Chromium opens with none of
+      // the app's preload, in a session of its own: the page meets no shell,
+      // as in Chrome (the Mac runner has no Playwright browser of its own).
+      const plainUrl = `http://localhost:${barePort}/show?debug`;
+      await second.evaluate(({ BrowserWindow }, u) => {
+        const w = new BrowserWindow({ show: true, width: 1024, height: 700, webPreferences: { partition: 'cg-plain-browser', contextIsolation: true, sandbox: true } });
+        void w.loadURL(u);
+      }, plainUrl);
+      const bp = await second.waitForEvent('window', { predicate: (w) => w.url().startsWith(plainUrl), timeout: 30_000 }).catch(() => null)
+        ?? second.windows().find((w) => w.url().startsWith(plainUrl)) ?? null;
+      const shell = bp ? await bp.evaluate(() => !!window.__CHROMAGLASS_NATIVE__).catch(() => true) : true;
+      const browserDoor = !!bp && await bp.waitForSelector('[data-cg-app-licence]', { state: 'visible', timeout: 60_000 }).then(() => true, () => false);
+      await sleep(3000);
+      const browserPlate = bp ? await bp.locator('#liquid-canvas').count().catch(() => 0) : 0;
+      check('licence: a browser on the app\'s server meets the same door, and no plate', !!bp && !shell && browserDoor && browserPlate === 0,
+        !bp ? 'the plain window never opened' : `${shell ? 'the window had the app\'s shell, so it was no plain browser; ' : ''}door ${browserDoor}, plate canvas ${browserPlate ? 'THERE' : 'absent'}`);
     }
   } catch (err) {
     check('licence: the keyless run finished', false, err?.message ?? String(err));
