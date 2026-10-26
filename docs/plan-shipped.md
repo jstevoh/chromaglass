@@ -4962,6 +4962,33 @@ and the script runs both off-scenes itself and requires each pass worth half its
 signed (a second window that gains over 3 cells is red too) and line 3 also holds Σc·h at step 380;
 `docs/judging.md` §54 says what the rim pull and `phaseMomentum` look like.
 
+**29c-8. Two-phase carry at the trailing rim (#495).** Chosen fix: a **two-phase carry**
+(`phaseVelocity` in `src/gpu/wgsl/fluid.ts`, writing `this.phaseVelT` read by `phaseAdvect`,
+`phaseAdvectPlan` and `phaseCompress` while `this.vel` remains the mixture velocity for the dye, oil
+and `phaseMomentum`), chosen over a pre-projection Korteweg or sub-grid contact-line force because
+any force added before `hsProject` still leaves a single projected cell velocity
+`u_mix = φ·u_ff + (1 − φ)·u_oil` shared by both phases (and any curl-free edge force is removed by
+the pressure projection). Where the back rim of a dragged drop thins below half full, the displaced
+oil's dipole return flow dominates `u_mix` and turns it backward into the wake; carrying the
+ferrofluid phase with its own velocity `u_ff` keeps the trailing rim moving with the drop.
+Named shortcut: instead of solving two coupled momentum and Darcy-projection equations for `u_ff`
+and `u_oil` across the diffuse interface (queued as `PLAN.md` **29c-9**), `phaseVelocity`
+reconstructs the local drop velocity `u_m` and centre-of-mass offset `x_m` from the half-full body
+(`φ >= 0.50`) within an 11-cell Gaussian window (`w = ((φ − 0.50)/0.50)·exp(−r²/64)`), gated off on
+labyrinth and standing-spike scenes (`cohere = (1 − 2·maze)·(1 − spikeAmt)` while `!filmHeld`) so an
+11-cell window never bridges the 2–4 cell valleys between standing domes or labyrinth fingers
+(`spikes` 6/6, `maze` 4/4, `fingers` 4/4, `domes` 4/4). Leaving `v` untouched whenever
+`dot(v.xy, u_m) >= |u_m|²` makes the pass a no-op on radial squeeze flows under a press where
+`|u(r)| ∝ r` (`ferropress` 7/7: middle `0.968 → 0.981`, worst ring `0.012`), and weighting the
+carry by `along = dot(x_m, u_m)/|u_m|` carries the trailing rim (`along > 0`, `φ < 0.96`) at `u_m`
+while carrying only the outer leading toe (`along < 0`, `φ < 0.49`) so the front half-full contour
+keeps its Taylor–Saffman two-liquid Darcy speed (`magnetgain` 5/5: `+2%` weak, `+3%` strong) and
+MUSCL shear (`ferrohold` 5/5: mean lead `1.69R` vs `1.93R` with `phaseMomentum` off, `+0.24R` against
+`0.13R`; mean half-full `107.6` vs `92.6` with `phaseCompress` off, `+15.0` against `13`). On the Mac
+GPU, `npm run ferrodrag` reaches **3/3** (lag `1.82R` against `2.0R`, half-full cells `100 → 106`,
+`106.0%` kept against `±15%`, cells over `0.01` `324 → 378` vs `1238` on `main`, stationary control
+`0.010` cells). Per the 29c-8 brief, `ferrodrag` was not added to `checks.yml` in #495.
+
 ## 32. The soap film: a draining film seen in reflection
 
 ### 32a. The CPU reference (#403)

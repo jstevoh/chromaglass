@@ -7958,16 +7958,16 @@ the code's entry points, the checks to add and the scenes to match, in
   of the ferrofluid as though the drop filled the gap. The dye's own passes belong to
   other threads (18h, the dye's spread along the flow; 18m, a pour's slump): this one
   changes only how the dye is carried where the ferrofluid is, after coordinating.
-- ~~**29c. The drop follows the hand and holds together.**~~ **Partly shipped** (#373; the story in
+- ~~**29c. The drop follows the hand and holds together.**~~ **Shipped** (#373, #495; the story in
   `docs/plan-shipped.md` §29c): the rim's force read against the ferrofluid's own drag (`phaseForce`),
   the moving edge compressed back by the flux limiter's deficit from a once-a-step blur (`phaseBlur`,
-  `phaseCompress`, 29c-1), the gain derived in SI and held to the solver (`npm run magnetgain` 5/5, bars 20%, 29c-2), the ferrofluid's momentum carried with it (`phaseMomentum`), and degenerate mobility
+  `phaseCompress`, 29c-1), the gain derived in SI and held to the solver (`npm run magnetgain` 5/5, bars 20%, 29c-2), the ferrofluid's momentum carried with it (`phaseMomentum`), degenerate mobility
   `mob = 4m(1 − m)` in the thin gap's Cahn–Hilliard step (`phaseCHVolume`, 29c-7) with the
-  resting-drop check `npm run ferrorest` (5/5, with a second window), and the dragged drop held
+  resting-drop check `npm run ferrorest` (5/5, with a second window), the dragged drop held
   while it is dragged by `npm run ferrohold` (each pass switched off by hand turns its own line red;
-  `phaseCompress` is a lab-only step option, 1 by default). The dragged drop's trailing rim in the oil's return
-  flow remains open as **29c-8** (`npm run ferrodrag` stays out of CI as known red, 1/3, until
-  29c-8). If the closeup's camera ever follows the drop, it follows smoothly and never with the
+  `phaseCompress` is a lab-only step option, 1 by default), and two-phase carry of a coherent drop's
+  trailing rim on the thin gap (`phaseVelocity`, 29c-8; `npm run ferrodrag` 3/3 on the Mac GPU,
+  `ferrohold` 5/5). If the closeup's camera ever follows the drop, it follows smoothly and never with the
   sound (the sway work's `frameSway`, default 0, stays the only way sound moves the frame). Still
   open:
   - **29c-1. The moving edge is compressed back to the grid's width, and the deep plate keeps
@@ -8059,37 +8059,49 @@ the code's entry points, the checks to add and the scenes to match, in
     `0.975` (bar `>= 0.96`), and its halo grows by `+94` (`324 → 418`, bar `<= +120`), while on the
     dragged drop the cells over `0.01` fall from `1602` to `1238`. The deep plate's `phaseCH` stays
     as on `main` (under **29c-1**).
-  - **29c-8. A dragged drop loses its trailing rim to the oil's return flow.** *(In progress on `antigravity/29c-8-trailing-rim`.)* With the
+  - ~~**29c-8. A dragged drop loses its trailing rim to the oil's return flow.**~~ **Shipped** (#495;
+    `npm run ferrodrag` 3/3 on the Mac GPU, story in `docs/plan-shipped.md` §29c). With the
     limiter-matched `phaseCompress` (29c-1) and degenerate mobility in `phaseCHVolume` (29c-7) both
     in place (`ferropress` 7/7, `magnetgain` 5/5, `ferrorest` 5/5), a drop dragged `0.3` of the
-    plate in 3 s under a `0.4` magnet at depth `0.2` (`npm run ferrodrag`) still loses its trailing
-    rim to the oil's dipole return flow (`ferrodrag` 1/3: lag `3.24R` against the `2R` bar,
+    plate in 3 s under a `0.4` magnet at depth `0.2` (`npm run ferrodrag`) still lost its trailing
+    rim to the oil's dipole return flow (`ferrodrag` 1/3 on `main`: lag `3.24R` against the `2R` bar,
     half-full cells `100 → 0` against the `±15%` bar, cells over `0.01` `324 → 1238`, centroid at
-    rest moved `0.010` cells). Where the drop's back rim thins, the cell's single velocity
-    `u_mix = φu_ff + (1 − φ)u_oil` turns backward with the oil closing in behind the drop, so
-    `phaseAdvect` carries that faint ferrofluid into the wake, and `phaseCompress` (which restores
-    only what the limiter withheld along the step's own velocity) compresses it along the wake
-    rather than back into the drop. Needs a two-phase carry or capillary Korteweg / sub-grid
-    contact-line force at the trailing rim that keeps the back edge moving with the drop without
-    sharpening smooth pools under the Press (`ferropress`) or disturbing `spikes`, `maze` and
-    `fingers` (the failure modes of 29c-4's attempts). Until then `npm run ferrodrag` stays in
-    `scripts/` with its bars and inputs unchanged, out of `checks.yml` as known red.
-    What CI holds meanwhile is `npm run ferrohold`: the same scene read every 10 steps from step 60
-    to 120, while the drop is still whole, the magnet's lead over its centroid at most `2.15R`
-    (`2.01R` with both passes on, `2.28R` with `phaseMomentum` off) and at least `47` half-full cells
-    on average (`60.3` on, `34.4` with `phaseCompress` off, the lab-only step option). The script
-    runs the scene three times (as given, `phaseMomentum` off, `phaseCompress` off) and requires each
-    pass to be worth half its measured gap (`0.13R` of `0.27R` of lead; `13` of `25.9` half-full
-    cells), so a stand-in that speeds the drop up cannot pass for the momentum pass; it also reads
-    from the solver that the drop was whole (60 cells) and carried (centroid over `0.40` from `0.36`,
-    `0.42` measured) when the window opened. On Metal (`WebGPU (macOS) · fifth`, `main` runs
-    `40154167142`, `40140795675` and `40123398910`, identical across all three and matching #373's
-    run `39280236231`), the window opens at step 60 with `84` half-full cells and centroid `0.422`;
-    the seven readings at steps 60..120 average a lead of `2.02R` (`1.71..2.35R`) and `61.4`
-    half-full cells (`84 → 40`, peak `0.96 → 0.65`) as given, `2.29R` (`1.85..2.74R`, `+0.27R` over
-    `on`) and `62.9` cells (`82 → 34`) with `phaseMomentum` off, and `2.06R` (`1.71..2.45R`) and
-    `35.7` cells (`76 → 0`, `-25.7` from `on`) with `phaseCompress` off. When 29c-8 lands, `ferrodrag` joins CI and these two bars are
-    re-read against the whole drag.
+    rest moved `0.010` cells). Where the drop's back rim thinned, the cell's single mixture velocity
+    `u_mix = φu_ff + (1 − φ)u_oil` turned backward with the oil closing in behind the drop, so
+    `phaseAdvectPlan` carried that faint ferrofluid into the wake and `phaseCompress` compressed it
+    along the wake rather than back into the drop. Chosen fix: **two-phase carry** (`phaseVelocity`
+    in `src/gpu/wgsl/fluid.ts`, writing `this.phaseVelT` read by `phaseAdvect`, `phaseAdvectPlan`
+    and `phaseCompress` while `this.vel` remains the mixture velocity for dye, oil and
+    `phaseMomentum`), chosen over a pre-projection Korteweg or contact-line force because any force
+    before `hsProject` still leaves a single projected cell velocity `u_mix` shared by both phases
+    (and any curl-free edge force is removed by the pressure projection). For each rim cell on a
+    thin gap when no labyrinth or standing-spike field is parting the pool (`cohere = (1 − 2·maze)·(1 − spikeAmt)`
+    while `!filmHeld`), `phaseVelocity` samples the half-full drop body (`φ >= 0.50`) within 11
+    cells weighted by `((φ − 0.50)/0.50)·exp(−r²/64)` to get the local body velocity `u_m` and
+    centre-of-mass offset `x_m`. It leaves `v` untouched whenever `dot(v.xy, u_m) >= |u_m|²` (so
+    radial squeeze flows under a press where `|u(r)| ∝ r` are a no-op: `ferropress` 7/7, middle
+    `0.968 → 0.981`, worst ring `0.012`), and weights the carry by position along the drop's motion
+    (`along = dot(x_m, u_m)/|u_m|`: full carry up to `φ = 0.96` on the trailing side `along > 0`,
+    and only the outer leading toe `φ < 0.49` on the leading side `along < 0` so the front
+    half-full contour keeps its two-liquid Darcy speed and MUSCL shear). On the Mac GPU,
+    `npm run ferrodrag` reaches **3/3** (lag `1.82R` against `2.0R`, half-full cells `100 → 106`,
+    `106.0%` kept against `±15%`, cells over `0.01` `324 → 378`, stationary control `0.010` cells),
+    `ferrohold` holds **5/5** (step 60 `110` half-full cells, centroid `0.426`; mean lead `1.69R`
+    vs `1.93R` with `phaseMomentum` off, `+0.24R` against `0.13R`; mean half-full `107.6` vs `92.6`
+    with `phaseCompress` off, `+15.0` against `13`), `magnetgain` holds **5/5** (`+2%` weak, `+3%`
+    strong against Darcy's), and `ferrorest` (`5/5`), `spikes` (`6/6`), `maze` (`4/4`), `fingers`
+    (`4/4`), `domes` (`4/4`) and `ferrohands` (`4/4`) are unchanged. Per the 29c-8 brief, `ferrodrag`
+    was not added to `checks.yml` in #495.
+  - **29c-9. Replace `phaseVelocity`'s local window reconstruction with a coupled two-fluid velocity
+    solve.** `phaseVelocity` (29c-8) is a named shortcut: instead of solving two coupled momentum
+    and Darcy-projection equations for `u_ff` and `u_oil` across the diffuse interface (with
+    interfacial drag and capillary stress jumping between the two phase velocities), it reconstructs
+    `u_ff` in the rim from the nearby half-full body (`φ >= 0.50`) over an 11-cell Gaussian window
+    and gates the pass off on labyrinth and standing-spike scenes (`cohere`). Replace the window
+    reconstruction with a two-fluid velocity or slip solve so the rim's ferrofluid velocity comes
+    from the momentum balance on every scene without a window or a labyrinth/spike gate, and wire
+    `npm run ferrodrag` into `.github/workflows/checks.yml` alongside re-reading `ferrohold`'s two
+    bars against the whole drag.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the
