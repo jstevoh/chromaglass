@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Magnet, Waves, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Droplets, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye } from 'lucide-react';
+import { X, FlaskConical, Magnet, Waves, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Droplets, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye, RotateCw } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { SOURCE_NAMES } from '../lib/audioFeatures';
@@ -21,6 +21,9 @@ import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
+import { PaceTrack } from './ui/Pace';
+import { LensCap, StrobeRing, TapPad, ViscosityDrip } from './ui/Playful';
+import type { TempoReading } from '../lib/tempo';
 import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
@@ -184,9 +187,15 @@ interface SettingsPanelProps {
   midi?: MidiController;
   /** The full MIDI panel, for the things this panel's section does not hold. */
   onOpenMidi?: () => void;
+  /** Open the Sound sheet, where the source is chosen. */
+  onOpenSound?: () => void;
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: { source: string | null; bpm: number; taps: number };
   onTap?: () => void;
+  /** The tempo source's reading, for the tap pad's beat light (it polls this itself). */
+  readTempo?: () => TempoReading | null;
+  /** The tempo the dish's Tempo mode is lit by (tapped, clocked or heard), bpm, or 0. */
+  spinBpm?: number;
   onTempoClear?: () => void;
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
@@ -354,23 +363,25 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
           </span>
         </div>
       </div>
-      <input
-        type="range"
-        min={curve === 1 ? min : 0}
-        max={curve === 1 ? max : 1}
-        step={curve === 1 ? step : 0.001}
-        value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
-        disabled={!!disabled}
-        aria-label={label}
-        onChange={(e) => {
-          const raw = parseFloat(e.target.value);
-          if (curve === 1) { onChange(raw); return; }
-          // Three figures, not the setting's step: see handValueAt.
-          onChange(handValueAt(raw, min, max, curve));
-        }}
-        className="set-range"
-        style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
-      />
+      <PaceTrack settingKey={settingKey} at={Math.max(0, Math.min(1, (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve))))}>
+        <input
+          type="range"
+          min={curve === 1 ? min : 0}
+          max={curve === 1 ? max : 1}
+          step={curve === 1 ? step : 0.001}
+          value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
+          disabled={!!disabled}
+          aria-label={label}
+          onChange={(e) => {
+            const raw = parseFloat(e.target.value);
+            if (curve === 1) { onChange(raw); return; }
+            // Three figures, not the setting's step: see handValueAt.
+            onChange(handValueAt(raw, min, max, curve));
+          }}
+          className="set-range"
+          style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
+        />
+      </PaceTrack>
     </div>
   );
 };
@@ -404,7 +415,7 @@ const DEMO_LOOPS = [
   { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
 ] as const;
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -609,10 +620,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <button
             aria-pressed={blackout}
             onClick={onBlackout}
-            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex w-full items-center justify-center gap-2 mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             title="Fade the plate to black and back (B on the keyboard)"
             data-testid="blackout-button"
           >
+            <LensCap capped={blackout} size={16} />
             {blackout ? 'Lights up' : 'Blackout'}
           </button>
         )}
@@ -709,6 +721,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="audioImpact"
         />
         <Slider
+          label="Sound Impact"
+          disabled={!listens('sound') && !listens('bands') && !listens('hits') && !midi?.map.sound?.some(isMapping) && 'no patch reads the sound'}
+          value={settings.soundImpact ?? 1}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ soundImpact: v })}
+          settingKey="soundImpact"
+        />
+        <Slider
           label="Sensitivity"
           value={settings.sensitivity}
           min={0.1}
@@ -727,24 +749,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="bassBoost"
         />
 
-        {/* What is listening at all */}
+        {/*
+          What is listening, said here and chosen in the Sound sheet.
+
+          The five-way switch that stood here was the second drawing of the
+          sheet's six, which also has the plate as an instrument; two homes
+          meant one could be changed while the other was read. The sheet is
+          the superset, so it is the home, and this row is the state and the
+          way there. The device below stays: it is where the Mic dot lands.
+        */}
         {onAudioSource && (
           <div className="mb-3.5 flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <Segmented
-              value={audioSource === 'file' ? 'file' : audioSource}
-              options={[
-                ['none', 'Off'],
-                ['microphone', 'Mic'],
-                ['system', 'System'],
-                ['file', 'File'],
-                ['simulated', 'Band'],
-              ] as const}
-              onChange={(v) => { if (v === 'file') onAudioFile?.(); else onAudioSource(v); }}
-              height={32}
-              fill
-              testId="audio-source"
-            />
+            <div className="flex items-center gap-2">
+              <div
+                className={`flex h-8 flex-1 items-center rounded-lg border px-3 text-[13px] font-medium ${audioSource === 'none' ? 'border-white/10 bg-white/5 text-white/60' : LIT}`}
+                role="status"
+                data-testid="audio-source-state"
+                data-source={audioSource}
+              >
+                {({ none: 'Off', microphone: 'Mic', system: 'System', file: 'File', simulated: 'Band', drone: 'Instrument' } as const)[audioSource]}
+              </div>
+              {onOpenSound && (
+                <button
+                  onClick={onOpenSound}
+                  className="h-8 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-medium transition-colors hover:bg-white/10"
+                  title="Choose what the plate listens to: the mic, a tab, a file, the band or the plate as an instrument"
+                  data-testid="audio-source-open"
+                >
+                  Change in Sound…
+                </button>
+              )}
+            </div>
             <Info>
               <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
             </Info>
@@ -815,20 +851,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </span>
             </div>
             <div className="flex gap-1.5">
-              <button
-                onClick={onTap}
-                data-testid="tempo-tap"
-                title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
-                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10"
-              >
-                Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
-              </button>
+              <TapPad tempo={tempo} read={readTempo} onTap={onTap} />
               <button
                 onClick={onTempoClear}
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
+                className="min-h-9 flex-none rounded-lg border border-white/10 bg-white/5 px-3 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
               >
                 Listen
               </button>
@@ -1662,7 +1691,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           label="Lamp Warmth"
           value={settings.lampWarmth ?? 0}
           min={0}
-          max={1.0}
+          max={3.75}
           step={0.05}
           onChange={(v: number) => onUpdate({ lampWarmth: v })}
           settingKey="lampWarmth"
@@ -1785,6 +1814,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ sceneDrive: v })}
           disabled={!sceneOn && 'off'}
           settingKey="sceneDrive"
+        />
+        <Slider
+          label="Room Impact"
+          value={settings.sceneImpact ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sceneImpact: v })}
+          disabled={!sceneOn ? 'needs the room camera on' : !listens('room') && 'no patch reads the room'}
+          settingKey="sceneImpact"
         />
         <Slider
           label="Hands"
@@ -2048,8 +2087,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ filmDrive: v })}
           settingKey="filmDrive"
         />
+        <Slider
+          label="Film Impact"
+          disabled={(filmSource ?? 'none') === 'none'
+            ? 'needs a loop, the camera or a window'
+            : !listens('film') && 'no patch reads the film'}
+          value={settings.filmImpact ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmImpact: v })}
+          settingKey="filmImpact"
+        />
         <p className="mb-3 text-[12px] leading-relaxed text-white/40">
-          Any feature of the film onto any control is a patch, in {goTo('patches', 'film')}, where Film Impact is its master.
+          Any feature of the film onto any control is a patch, in {goTo('patches', 'film')}, where Film Impact, just above, is its master.
         </p>
         {filmSource !== 'none' && (
           <Info>
@@ -2321,7 +2372,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           )}
         </div>
         {/*
-          The masters, one per source, in the order the Source menu lists them.
+          The masters, one per source. Three of them sit beside the Drive of
+          the source they scale (Room Impact under Room Drive, Film Impact
+          under Film Drive, Sound Impact under Sound Drive): the owner found
+          two strengths for one input in two sections (PLAN 35c-2). Shapes
+          have no input section, a wave or an envelope being the bay's own, so
+          their master stays here.
 
           Each is greyed until a patch actually reads its source, rather than
           until any patch exists. With one room patch in the bay the old rule
@@ -2329,38 +2385,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           panel keeps being fixed for.
         */}
         <div className="mt-6 mb-3 text-[13px] font-medium text-text">Masters</div>
-        <Slider
-          label="Room Impact"
-          value={settings.sceneImpact ?? 0.5}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ sceneImpact: v })}
-          disabled={!sceneOn ? 'needs the room camera on' : !listens('room') && 'no patch reads the room'}
-          settingKey="sceneImpact"
-        />
-        <Slider
-          label="Film Impact"
-          disabled={(filmSource ?? 'none') === 'none'
-            ? 'needs a loop, the camera or a window'
-            : !listens('film') && 'no patch reads the film'}
-          value={settings.filmImpact ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ filmImpact: v })}
-          settingKey="filmImpact"
-        />
-        <Slider
-          label="Sound Impact"
-          disabled={!listens('sound') && !listens('bands') && !listens('hits') && !midi?.map.sound?.some(isMapping) && 'no patch reads the sound'}
-          value={settings.soundImpact ?? 1}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ soundImpact: v })}
-          settingKey="soundImpact"
-        />
         <Slider
           label="Shapes Impact"
           disabled={!listens('shape') && 'no patch reads a shape'}
@@ -2372,7 +2396,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="shapeImpact"
         />
         <Info>
-          Each source has one master over every patch that reads it, so a whole source can be pulled down on one fader without touching the patches themselves: the room out of a quiet song, the film under the band, the sound off while the reel carries it. <span className="text-white/70">Film Impact</span> starts at zero, so a look saved before the film could ride anything does exactly what it did.
+          Each source has one master over every patch that reads it, so a whole source can be pulled down on one fader without touching the patches themselves: the room out of a quiet song, the film under the band, the sound off while the reel carries it. <span className="text-white/70">Room Impact</span> is in {goTo('room', 'patches')}, <span className="text-white/70">Film Impact</span> in {goTo('film', 'patches')} and <span className="text-white/70">Sound Impact</span> in {goTo('audio-input', 'patches')}, each under the Drive of the same source; Shapes Impact is the one here. Film Impact starts at zero, so a look saved before the film could ride anything does exactly what it did.
         </Info>
       </section>
       )}
@@ -2436,6 +2460,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       Nothing plugged in yet. Connect the controller by USB — it appears here by itself.
                     </p>
                   )}
+                </div>
+                {/* The port out, for the pads' LEDs: the MIDI sheet used to draw this next to the port in. */}
+                <div className="mb-3 flex flex-col gap-1.5">
+                  <span className="text-[13px] font-medium text-text">LEDs</span>
+                  <select
+                    value={midi.ports.output}
+                    onChange={e => midi.choosePorts({ output: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
+                    data-testid="settings-midi-output"
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="off">Off</option>
+                    {midi.outputs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
                 </div>
 
                 {/*
@@ -3076,10 +3114,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                 aria-pressed={settings.viscosity === v}
                 key={v}
                 onClick={() => onUpdate({ viscosity: v })}
-                className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
+                title={v === 'thick' ? 'A light oil, 20 times water\'s viscosity. Hover to watch a drop fall through it.' : 'Water. Hover to watch a drop fall through it.'}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-1 text-[12px] rounded-md transition-all ${
                   settings.viscosity === v ? `${LIT} font-bold` : 'text-muted hover:bg-hover'
                 }`}
               >
+                {/* A drop that lets go at the pace of this viscosity (PLAN 35e, lib/dripPace.ts). */}
+                <ViscosityDrip mode={v} />
                 {v}
               </button>
             ))}
@@ -3113,6 +3154,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ oilBodies: v })}
           settingKey="oilBodies"
+        />
+        {/* The water film between two drops holds them apart (FILM_WGSL): needs Oil Tension too. */}
+        <Slider
+          label="Film Hold"
+          value={settings.filmHold ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmHold: v })}
+          settingKey="filmHold"
         />
         <Slider
           label="Soap Bursts"
@@ -3486,6 +3537,212 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
       )}
 
+      {/*
+        The plate turning. Rotation Speed, the flick, Auto Spin and everything
+        that steers them were the first half of Plates & LED, a Stage panel,
+        which keeps a panel out of Build and Gig: the dish's spin is a motion
+        the hand rides in a set, so it is Motion's and findable there (PLAN
+        35c-2). Plates & LED keeps what is the rig's: how many plates, how
+        they blend, and the LED platform under them.
+      */}
+      {keep('spin') && (
+      <section id="settings-spin" className={`${CARD} ${shown('spin') ? GRID : 'hidden'} ${focusSection === 'spin' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('spin')} data-section="spin">
+        <h3 className={TITLE}>
+          <RotateCw size={12} /> Plate Spin
+        </h3>
+        <Slider
+          label="Rotation Speed"
+          value={settings.rotationSpeed}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ rotationSpeed: v })}
+          settingKey="rotationSpeed"
+        />
+        {/*
+          The plate as a flywheel.
+
+          Rotation Speed above is a motor: it asks for a speed and the plate
+          holds it. Most presets set it low, a turn every few minutes or hours,
+          and a few music looks turn visibly (acid-trip once every twenty
+          seconds) since the motor's stir in the middle became the dish's turn
+          (PLAN 22j). A flick is the other thing a
+          plate does — spun by hand and left to slow down — so it is a press
+          and not a value, and it goes to one plate at a time because the two
+          turn opposite ways and shearing them by hand is the point.
+
+          Both are on pads too, as Spin Front Plate and Spin Back Plate.
+        */}
+        <div className="flex gap-2 mt-1 mb-2">
+          {[0, 1].map((l) => (
+            <button
+              key={l}
+              onClick={() => onFlickPlate?.(l)}
+              disabled={!onFlickPlate || (settings.layerCount ?? 1) <= l}
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
+                         hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all
+                         disabled:opacity-35 disabled:hover:bg-white/5 disabled:cursor-not-allowed"
+              data-testid={`flick-plate-${l}`}
+              title={(settings.layerCount ?? 1) <= l
+                ? 'This look has one plate'
+                : 'Spin this plate up; it slows on its own'}
+            >
+              Flick {l === 0 ? 'Front' : 'Back'}
+            </button>
+          ))}
+        </div>
+        {/*
+          Auto Spin (PLAN §22): the dish turned by a motor of its own, at a
+          rate or at the tempo. Stepped like Spin Direction, since it is three
+          answers. The Rate is signed: its sign is the way round, and Reverse
+          flips it (a pad can too, as Reverse Spin), so reversing a dish in
+          the middle of a song is one press and not a trip to a slider.
+        */}
+        {/*
+          The platter's strobe rim (PLAN 35f): a ring of dots that drifts at
+          the dish's speed in Rate and stands still in Tempo once a tempo is
+          heard, because the dish then turns exactly one dot a beat.
+        */}
+        <div className="mb-1 flex items-center gap-3" data-testid="spin-strobe">
+          <StrobeRing mode={settings.spinAuto ?? 0} rpm={settings.spinRpm ?? 6} beats={settings.spinBeats ?? 16} bpm={spinBpm} />
+          <p className="text-[11px] leading-snug text-white/50" data-testid="spin-strobe-says">
+            {Math.round(settings.spinAuto ?? 0) === 2 && spinBpm > 0
+              ? `Locked to ${spinBpm} bpm: the dots stand still while the dish turns once in ${Math.round(settings.spinBeats ?? 16)} beats.`
+              : Math.round(settings.spinAuto ?? 0) === 0 ? 'Auto Spin is off.'
+              : `Turning at ${Math.abs(settings.spinRpm ?? 6).toFixed(1)} rpm${Math.round(settings.spinAuto ?? 0) === 2 ? ' until a tempo is heard' : ''}.`}
+          </p>
+        </div>
+        <Slider
+          label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
+          value={settings.spinAuto ?? 0}
+          min={0}
+          max={2}
+          step={1}
+          onChange={(v: number) => onUpdate({ spinAuto: Math.round(v) })}
+          settingKey="spinAuto"
+        />
+        <Slider
+          label={`Spin Rate — ${(settings.spinRpm ?? 6).toFixed(1)} rpm`}
+          value={settings.spinRpm ?? 6}
+          min={-45}
+          max={45}
+          step={0.5}
+          onChange={(v: number) => onUpdate({ spinRpm: v })}
+          settingKey="spinRpm"
+        />
+        <Slider
+          label={`Beats a Turn — ${Math.round(settings.spinBeats ?? 16)}`}
+          value={settings.spinBeats ?? 16}
+          min={1}
+          max={64}
+          step={1}
+          onChange={(v: number) => onUpdate({ spinBeats: Math.round(v) })}
+          settingKey="spinBeats"
+        />
+        <div className="flex gap-2 mt-1 mb-2">
+          <button
+            onClick={() => onUpdate({ spinRpm: -(settings.spinRpm ?? 6) })}
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
+                       hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all"
+            data-testid="spin-reverse"
+            title="Turn Auto Spin the other way round"
+          >
+            Reverse Spin
+          </button>
+        </div>
+        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+          The dish turns and the liquid follows it: water lags for a few seconds, oil goes at once,
+          and a fast dish flings the heavy colour outward. Tempo turns once every so many beats,
+          locked to the beat; with no beat heard yet it turns at the Rate.
+        </p>
+        {/*
+          Which way, how steadily, and what drives it.
+
+          Direction is stepped rather than swept because there are three
+          answers and none of them is "0.4 of the way anticlockwise". Opposed
+          is the default and is what every look did before there was a choice.
+        */}
+        <Slider
+          label={`Spin Direction — ${
+            (settings.spinDirection ?? 0) > 0.5 ? 'all clockwise'
+              : (settings.spinDirection ?? 0) < -0.5 ? 'all anticlockwise'
+              : 'plates opposed'}`}
+          value={settings.spinDirection ?? 0}
+          min={-1}
+          max={1}
+          step={1}
+          onChange={(v: number) => onUpdate({ spinDirection: Math.round(v) })}
+          settingKey="spinDirection"
+        />
+        <Slider
+          label="Spin Wander"
+          value={settings.spinWander ?? 0}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ spinWander: v })}
+          settingKey="spinWander"
+        />
+        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
+          Wander drifts the motor off its speed. Past about half it crosses zero and the plate
+          turns back on itself now and then, the way a dish nudged by hand does.
+        </p>
+        {/*
+          The audio route was reachable from a preset file and nowhere else.
+
+          `audioMappings.rotation` has accepted a feature since long before
+          this, and every shipped look sets it to 'none', so the one way to
+          turn a plate with the bass was to write a look by hand. That is the
+          same fault as a control hidden behind a mode: built, wired, and not
+          reachable by anyone using the app.
+        */}
+        <label className="mb-3 flex items-center gap-2 text-[12px] text-white/60">
+          <span className="w-28 shrink-0">Driven by</span>
+          <select
+            value={settings.audioMappings?.rotation ?? 'none'}
+            onChange={(e) => onUpdate({
+              audioMappings: { ...settings.audioMappings, rotation: e.target.value as AudioFeature },
+            })}
+            className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/85"
+            data-testid="spin-audio-route"
+            title="Turn the plates with the music: the chosen band adds to whatever the motor is already asking for"
+          >
+            {/* The one list, not a second copy of it: a feature added there
+                but not here is a route nobody can reach. */}
+            <option value="none">nothing — the motor only</option>
+            {AUDIO_FEATURES.map(([f, name]) => <option key={f} value={f}>{name}</option>)}
+          </select>
+        </label>
+        <Slider
+          label="Spin From Music"
+          value={settings.spinAudioDepth ?? 0}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ spinAudioDepth: v })}
+          settingKey="spinAudioDepth"
+        />
+        <Slider
+          label="Flick Strength"
+          value={settings.spinImpulse ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spinImpulse: v })}
+          settingKey="spinImpulse"
+        />
+        <Slider
+          label="Plate Drag"
+          value={settings.spinDrag ?? 0.25}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spinDrag: v })}
+          settingKey="spinDrag"
+        />
+      </section>
+      )}
+
       {/* Fluid Physics Section */}
       {keep('physics') && (
       <section id="settings-physics" className={`${CARD} ${shown('physics') ? GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('physics')} data-section="physics">
@@ -3687,182 +3944,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             The back plate is on {backLook}, so it stays on the stage until it follows the front again.
           </p>
         )}
-        <Slider
-          label="Rotation Speed"
-          value={settings.rotationSpeed}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ rotationSpeed: v })}
-          settingKey="rotationSpeed"
-        />
-        {/*
-          The plate as a flywheel.
-
-          Rotation Speed above is a motor: it asks for a speed and the plate
-          holds it. Most presets set it low, a turn every few minutes or hours,
-          and a few music looks turn visibly (acid-trip once every twenty
-          seconds) since the motor's stir in the middle became the dish's turn
-          (PLAN 22j). A flick is the other thing a
-          plate does — spun by hand and left to slow down — so it is a press
-          and not a value, and it goes to one plate at a time because the two
-          turn opposite ways and shearing them by hand is the point.
-
-          Both are on pads too, as Spin Front Plate and Spin Back Plate.
-        */}
-        <div className="flex gap-2 mt-1 mb-2">
-          {[0, 1].map((l) => (
-            <button
-              key={l}
-              onClick={() => onFlickPlate?.(l)}
-              disabled={!onFlickPlate || (settings.layerCount ?? 1) <= l}
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
-                         hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all
-                         disabled:opacity-35 disabled:hover:bg-white/5 disabled:cursor-not-allowed"
-              data-testid={`flick-plate-${l}`}
-              title={(settings.layerCount ?? 1) <= l
-                ? 'This look has one plate'
-                : 'Spin this plate up; it slows on its own'}
-            >
-              Flick {l === 0 ? 'Front' : 'Back'}
-            </button>
-          ))}
-        </div>
-        {/*
-          Auto Spin (PLAN §22): the dish turned by a motor of its own, at a
-          rate or at the tempo. Stepped like Spin Direction, since it is three
-          answers. The Rate is signed: its sign is the way round, and Reverse
-          flips it (a pad can too, as Reverse Spin), so reversing a dish in
-          the middle of a song is one press and not a trip to a slider.
-        */}
-        <Slider
-          label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
-          value={settings.spinAuto ?? 0}
-          min={0}
-          max={2}
-          step={1}
-          onChange={(v: number) => onUpdate({ spinAuto: Math.round(v) })}
-          settingKey="spinAuto"
-        />
-        <Slider
-          label={`Spin Rate — ${(settings.spinRpm ?? 6).toFixed(1)} rpm`}
-          value={settings.spinRpm ?? 6}
-          min={-45}
-          max={45}
-          step={0.5}
-          onChange={(v: number) => onUpdate({ spinRpm: v })}
-          settingKey="spinRpm"
-        />
-        <Slider
-          label={`Beats a Turn — ${Math.round(settings.spinBeats ?? 16)}`}
-          value={settings.spinBeats ?? 16}
-          min={1}
-          max={64}
-          step={1}
-          onChange={(v: number) => onUpdate({ spinBeats: Math.round(v) })}
-          settingKey="spinBeats"
-        />
-        <div className="flex gap-2 mt-1 mb-2">
-          <button
-            onClick={() => onUpdate({ spinRpm: -(settings.spinRpm ?? 6) })}
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-[12px] text-white/80
-                       hover:bg-white/10 hover:border-white/30 active:bg-white/20 transition-all"
-            data-testid="spin-reverse"
-            title="Turn Auto Spin the other way round"
-          >
-            Reverse Spin
-          </button>
-        </div>
-        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
-          The dish turns and the liquid follows it: water lags for a few seconds, oil goes at once,
-          and a fast dish flings the heavy colour outward. Tempo turns once every so many beats,
-          locked to the beat; with no beat heard yet it turns at the Rate.
-        </p>
-        {/*
-          Which way, how steadily, and what drives it.
-
-          Direction is stepped rather than swept because there are three
-          answers and none of them is "0.4 of the way anticlockwise". Opposed
-          is the default and is what every look did before there was a choice.
-        */}
-        <Slider
-          label={`Spin Direction — ${
-            (settings.spinDirection ?? 0) > 0.5 ? 'all clockwise'
-              : (settings.spinDirection ?? 0) < -0.5 ? 'all anticlockwise'
-              : 'plates opposed'}`}
-          value={settings.spinDirection ?? 0}
-          min={-1}
-          max={1}
-          step={1}
-          onChange={(v: number) => onUpdate({ spinDirection: Math.round(v) })}
-          settingKey="spinDirection"
-        />
-        <Slider
-          label="Spin Wander"
-          value={settings.spinWander ?? 0}
-          min={0}
-          max={1}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ spinWander: v })}
-          settingKey="spinWander"
-        />
-        <p className="mb-2 mt-1 text-[11px] leading-relaxed text-white/40">
-          Wander drifts the motor off its speed. Past about half it crosses zero and the plate
-          turns back on itself now and then, the way a dish nudged by hand does.
-        </p>
-        {/*
-          The audio route was reachable from a preset file and nowhere else.
-
-          `audioMappings.rotation` has accepted a feature since long before
-          this, and every shipped look sets it to 'none', so the one way to
-          turn a plate with the bass was to write a look by hand. That is the
-          same fault as a control hidden behind a mode: built, wired, and not
-          reachable by anyone using the app.
-        */}
-        <label className="mb-3 flex items-center gap-2 text-[12px] text-white/60">
-          <span className="w-28 shrink-0">Driven by</span>
-          <select
-            value={settings.audioMappings?.rotation ?? 'none'}
-            onChange={(e) => onUpdate({
-              audioMappings: { ...settings.audioMappings, rotation: e.target.value as AudioFeature },
-            })}
-            className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-white/85"
-            data-testid="spin-audio-route"
-            title="Turn the plates with the music: the chosen band adds to whatever the motor is already asking for"
-          >
-            {/* The one list, not a second copy of it: a feature added there
-                but not here is a route nobody can reach. */}
-            <option value="none">nothing — the motor only</option>
-            {AUDIO_FEATURES.map(([f, name]) => <option key={f} value={f}>{name}</option>)}
-          </select>
-        </label>
-        <Slider
-          label="Spin From Music"
-          value={settings.spinAudioDepth ?? 0}
-          min={0}
-          max={1}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ spinAudioDepth: v })}
-          settingKey="spinAudioDepth"
-        />
-        <Slider
-          label="Flick Strength"
-          value={settings.spinImpulse ?? 0.5}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ spinImpulse: v })}
-          settingKey="spinImpulse"
-        />
-        <Slider
-          label="Plate Drag"
-          value={settings.spinDrag ?? 0.25}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ spinDrag: v })}
-          settingKey="spinDrag"
-        />
         <div className="mb-4 mt-4">
           <Toggle
             label="LED Platform"
@@ -4037,9 +4118,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
           )}
           {railGroups.map(group => (
-            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
+            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`} data-group={group.id}>
               {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
               <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:pb-1.5 sm:pt-4" title={group.hint} data-testid={`rail-heading-${group.id}`}>
+                <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
                 {group.name}
               </div>
               <div className="flex gap-0.5 sm:flex-col">

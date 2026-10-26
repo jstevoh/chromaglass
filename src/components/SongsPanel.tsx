@@ -194,8 +194,13 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void readFile(f); e.target.value = ''; }} />
           </div>
           {fileError && <p className="mt-2 text-[10px] text-red-300" data-testid="songs-file-error">{fileError}</p>}
-          <button onClick={onOpenSequences} className="mt-3 text-left text-[10px] underline opacity-40 hover:opacity-70" data-testid="songs-open-sequences">
-            Stage sequences (the old sequencer)…
+          {/* A button like its neighbours, not a 10 px link at 40% opacity: the
+              sequencer is the other way to cue a set (a timeline of actions
+              against the clock rather than a show per song), and one that
+              cannot be seen cannot be chosen. */}
+          <button onClick={onOpenSequences} className={`${smallBtn} mt-3 w-full`} data-testid="songs-open-sequences"
+            title="Cue a set by the clock instead of by song: a timeline of actions">
+            <ListMusic size={12} /> Stage sequences…
           </button>
         </div>
 

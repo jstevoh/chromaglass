@@ -1611,7 +1611,7 @@ try {
       await settle(1200);
       /*
         Film Drive is the film's own section; Film Impact is a master over the
-        film's patches, so it sits with the other three under Patches. Each is
+        film's patches, so it sits beside Film Drive in the film's section (PLAN 35c-2). Each is
         read from the section it is in, and only while that section is the
         one on screen: every section is in the page at once, so a control
         found without looking there proves nothing about where it lives.
@@ -1627,9 +1627,7 @@ try {
       await clickOn('settings-nav-film');
       await settle(500);
       const drive = await sliderIn('film', 'filmDrive');
-      await clickOn('settings-nav-patches');
-      await settle(500);
-      const force = { drive, impact: await sliderIn('patches', 'filmImpact') };
+      const force = { drive, impact: await sliderIn('film', 'filmImpact') };
       check('the film can drive the plate as well as light it',
         !!force.drive && !!force.impact,
         `drive ${!!force.drive}, impact ${!!force.impact}`);
@@ -1675,14 +1673,28 @@ try {
         const at = pane.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
         return {
           at: at?.textContent?.trim() ?? null,
-          source: !!pane.querySelector('[data-testid="audio-source"]'),
+          source: !!pane.querySelector('[data-testid="audio-source-state"]'),
           device: !!pane.querySelector('[data-testid="audio-input"]'),
-          mic: !!pane.querySelector('[data-testid="audio-source-microphone"]'),
+          open: !!pane.querySelector('[data-testid="audio-source-open"]'),
         };
       });
       check('the Mic dot opens the sound settings', !!micDot && /sound/i.test(micDot.at ?? ''), micDot?.at ?? 'no panel');
-      check('and they can choose what is listening', !!micDot?.source && !!micDot?.mic);
+      check('and they say what is listening', !!micDot?.source);
       check('and which device it listens on', !!micDot?.device);
+      /*
+        The source is chosen in the Sound sheet, one home (PLAN 35c-3), so the
+        section's link has to get there and the sheet has to be able to choose
+        it: its Mic tile is the control the section used to draw a second copy
+        of. The link closes Settings, so it is the sheet that is closed after.
+      */
+      if (micDot?.open) {
+        await clickOn('audio-source-open');
+        check('and a way to the sheet that chooses it',
+          await appears('sound-source-microphone'));
+        await escapeCloses('sound-panel');
+      } else {
+        check('and a way to the sheet that chooses it', false, 'no audio-source-open');
+      }
       /*
         `escapeCloses`, not Escape and a fixed wait.
 
@@ -1693,6 +1705,7 @@ try {
         runner rasterises in software. The helper right above the suite exists
         for this and I should have reached for it the first time.
       */
+      // The link above closed Settings; this only matters if the link was missing.
       await escapeCloses('settings-panel');
 
       /*

@@ -63,8 +63,27 @@ const watch = (page) => {
     const started = await page.waitForFunction(() => window.chromaglassDebug?.().webgpu?.frames > 30 && window.chromaglassDebug().webgpu, null, { timeout: 30_000 })
       .then((h) => h.jsonValue()).catch(() => null);
     const failure = await page.evaluate(() => window.chromaglassDebug?.().gpuFailure ?? null);
+    /*
+      Three reds of 192 Mac runs in the week to 2026-10-25 (2 of them within
+      20 minutes on 10-25) read `no stage` with no gpuFailure, 30 s after the
+      page loaded, and every later page of the same run started at once. So
+      nothing says whether the first page never got an adapter, got one and
+      never a device, or had a stage that drew too few frames. When it does
+      not start, the line says which: the frames and the engine the page
+      reports, whether the page's errors say anything, and how long a fresh
+      adapter request takes now (PLAN 19aa-11).
+    */
+    const why = started ? '' : await page.evaluate(async () => {
+      const d = window.chromaglassDebug?.();
+      const t0 = performance.now();
+      const adapter = await Promise.race([
+        (async () => navigator.gpu.requestAdapter())().then((a) => (a ? 'an adapter' : 'null')).catch((e) => `threw ${String(e?.message ?? e).slice(0, 60)}`),
+        new Promise((r) => setTimeout(() => r('none in 5 s'), 5000)),
+      ]);
+      return ` (frames ${d?.webgpu?.frames ?? 'no webgpu'}, engine ${d?.engine ?? 'none'}, a request for an adapter now: ${adapter} after ${(performance.now() - t0).toFixed(0)} ms)`;
+    }).catch((e) => ` (the page could not be asked: ${String(e?.message ?? e).slice(0, 80)})`);
     check('the stage starts, with nothing asked for', !!started,
-      started ? `${started.label} (${started.gpuClass}${started.fallback ? ', software' : ''}), ${started.format}, timestamps ${started.timestamps}` : `no stage${failure ? `: ${failure.failure} — ${failure.detail}` : ''}`);
+      started ? `${started.label} (${started.gpuClass}${started.fallback ? ', software' : ''}), ${started.format}, timestamps ${started.timestamps}` : `no stage${failure ? `: ${failure.failure} — ${failure.detail}` : ''}${why}${errors.length ? `; page errors: ${errors.slice(0, 3).join(' | ')}` : ''}`);
     if (started) {
       const engine = await page.evaluate(() => window.chromaglassDebug().engine);
       check('the engine label says WebGPU', /^WebGPU · /.test(engine), engine);

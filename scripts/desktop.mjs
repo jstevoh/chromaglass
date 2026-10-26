@@ -42,8 +42,19 @@
  *                 is in the page's own full screen, so neither the wall nor
  *                 the laptop asks for a click to drop the title bar
  *                 and shows no pointer on any of its elements
+ *   updates       (packed only) the app's updater, electron-updater as
+ *                 shipped, reads a release feed (here a stand-in the check
+ *                 serves, at version 999.0.0, in place of GitHub's) a moment
+ *                 after the show opens, finds the new version, and offers it in
+ *                 the app's menu and to the page's profile sheet, unasked for
+ *                 nothing else (PLAN 13-update; `npm run updates` asks the
+ *                 rest of what desktop/updates.js promises, in plain Node)
  *   quits         closing the show window, with the projector open, quits
  *                 the app and frees the port
+ *   licence       the run above opened on a Pro key (signed for this run); the
+ *                 same app with no key shows its door, the sign-in, and no
+ *                 plate, and (built as it ships, VITE_MAC_APP=1) so does a
+ *                 plain browser opened on its server (PLAN.md 23.17d)
  *
  * The second screen is a stand-in: an init script adds one to what the real
  * `getScreenDetails` returns, so the real permission (granted by the app, not
@@ -58,10 +69,12 @@ import { spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { signLicenseKey } from '../server/license-key.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DESKTOP = join(REPO, 'desktop');
@@ -145,16 +158,77 @@ const profile = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-'));
 const PORT = await freePort('tcp');
 const OSC_PORT = await freePort('udp');
 const QUERY = '?debug&look=classic';
+
+/*
+  The licence (PLAN.md 23.17d). The app as it ships opens only on a Home or
+  Pro key, so the show this check opens is a licensed one, handed to it as
+  CHROMAGLASS_LICENSE_KEY, the way a terminal `npm run show` takes one.
+
+  From the repo, the key is signed with a pair made here, which the app is
+  told to trust (LICENSE_PUBLIC_KEY), and the app is told to ask for a
+  licence (CHROMAGLASS_REQUIRE_SIGNIN): both runs take the same door.
+
+  Packed, the app trusts no key from its environment (desktop/main.js). It
+  trusts its own build's `checkKey`, a pair desktop.yml made for that build;
+  the private half is in a file only that job has
+  (DESKTOP_CHECK_PRIVATE_KEY_FILE), and it signs the key here. And the
+  keyless launch below is handed a key signed with this run's own pair and
+  told to trust it, network refused, which is what a stranger could do: it
+  must still meet the door.
+*/
+const licPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+const LIC_PUBLIC = JSON.stringify(await crypto.subtle.exportKey('jwk', licPair.publicKey));
+const LIC_PAYLOAD = { id: 'desktop-check-pro', tier: 'pro', email: 'desktop-check@example.com' };
+const SELF_SIGNED = await signLicenseKey(LIC_PAYLOAD, await crypto.subtle.exportKey('jwk', licPair.privateKey));
+let LIC_KEY = SELF_SIGNED;
+if (PACKAGED) {
+  const file = process.env.DESKTOP_CHECK_PRIVATE_KEY_FILE;
+  if (!file || !existsSync(file)) {
+    console.error('FAIL  the packed app opens only on a key, and this check holds none it trusts: pack with CHROMAGLASS_BUILD_CHECK_KEY and pass its private half as DESKTOP_CHECK_PRIVATE_KEY_FILE (desktop.yml)');
+    process.exit(1);
+  }
+  LIC_KEY = await signLicenseKey(LIC_PAYLOAD, readFileSync(file, 'utf8'));
+}
 console.log(`The app ${app.label}; port ${PORT}, OSC ${OSC_PORT}, a new profile, the network off.\n`);
+
+/*
+  The release feed, for the packed app only (run from the repo there is no
+  app-update.yml, and updates.js says it is off). What GitHub would serve from
+  the newest release: latest-mac.yml naming a version above any real one. On
+  Linux electron-updater is the AppImage updater, which stays off unless it is
+  told the AppImage it would replace (APPIMAGE); it is given the packed binary
+  so the same check runs in a cloud session. Nothing downloads either way on
+  an ad hoc build; a signed one would try for the zip, which is not served.
+*/
+const feedAsked = [];
+let feed = null;
+// The feed holds its answer until the page is listening, so the push to the
+// page (what the profile card hears) is measured, not raced.
+let openFeed = () => {};
+const feedOpen = new Promise((r) => { openFeed = r; });
+if (PACKAGED) {
+  const yml = ['version: 999.0.0', 'files:', '  - url: ChromaGlass-999.0.0-arm64-mac.zip', '    sha512: AAAA', '    size: 1', '  - url: ChromaGlass-mac-arm64.dmg', '    sha512: AAAA', '    size: 1', 'path: ChromaGlass-999.0.0-arm64-mac.zip', 'sha512: AAAA', "releaseDate: '2026-10-25T00:00:00.000Z'", ''].join('\n');
+  feed = createHttpServer(async (req, res) => {
+    feedAsked.push(req.url);
+    await feedOpen;
+    if (/latest(-mac|-linux)?\.yml/.test(req.url ?? '')) { res.writeHead(200, { 'content-type': 'text/yaml' }); res.end(yml); return; }
+    res.writeHead(404); res.end();
+  });
+  await new Promise((r) => feed.listen(0, '127.0.0.1', r));
+}
 
 const env = {
   ...process.env,
+  ...(feed ? { CHROMAGLASS_UPDATE_FEED: `http://127.0.0.1:${feed.address().port}/`, ...(isMac ? {} : { APPIMAGE: app.executablePath }) } : {}),
   PORT: String(PORT),
   OSC_PORT: String(OSC_PORT),
   CHROMAGLASS_USER_DATA: profile,
   CHROMAGLASS_OFFLINE: '1',
   CHROMAGLASS_AUDIO_TAP: '1',
   CHROMAGLASS_QUERY: QUERY,
+  CHROMAGLASS_REQUIRE_SIGNIN: '1',
+  ...(PACKAGED ? {} : { LICENSE_PUBLIC_KEY: LIC_PUBLIC }),
+  CHROMAGLASS_LICENSE_KEY: LIC_KEY,
   ...(isMac ? {} : { CHROMAGLASS_SOFTWARE_WEBGPU: '1' }),
 };
 delete env.SHOW_KEY;   // the app's own key, the one it keeps, is what is checked
@@ -179,8 +253,30 @@ try {
   await page.waitForSelector('#liquid-canvas', { state: 'attached', timeout: 60_000 }).catch(() => null);
   const url = page.url();
   const canvas = await page.locator('#liquid-canvas').count();
-  check('opens: the show, from the server inside the app', url === `http://localhost:${PORT}/${QUERY}` && canvas === 1,
-    `${url}, ${canvas ? 'the plate canvas is there' : 'no plate canvas'}`);
+  // On its key (PLAN.md 23.17d): the door never drawn, and the key the app verified handed to the page.
+  const keyed = await page.evaluate(() => !document.querySelector('[data-cg-app-licence]') && !!window.__CHROMAGLASS_NATIVE__?.license?.valid).catch(() => false);
+  check('opens: the show, from the server inside the app, on its licence', url === `http://localhost:${PORT}/${QUERY}` && canvas === 1 && keyed,
+    `${url}, ${canvas ? 'the plate canvas is there' : 'no plate canvas'}, ${keyed ? 'on the key the app verified' : 'the door drawn or no key handed to the page'}`);
+
+  // The profile card's way of hearing the updater (desktop/preload.cjs), set
+  // up before the feed answers; read in the updates line below.
+  if (feed) {
+    await page.evaluate(() => {
+      window.__cgUpdatePushes = [];
+      window.__CHROMAGLASS_NATIVE__?.updates?.onChange((st) => window.__cgUpdatePushes.push(`${st.status} ${st.version ?? ''}`.trim()));
+    }).catch(() => {});
+  }
+  openFeed();
+  // Read here, before anything below reloads the page and its list with it.
+  let pushes = null;
+  if (feed) {
+    const until = Date.now() + 30_000;
+    while (Date.now() < until) {
+      pushes = await page.evaluate(() => window.__cgUpdatePushes ?? null).catch(() => null);
+      if (!Array.isArray(pushes) || pushes.some((p) => !/^(idle|checking)/.test(p))) break;
+      await sleep(250);
+    }
+  }
 
   // ── network off ───────────────────────────────────────────────────
   // `no-cors`: the website sends no CORS headers, so an ordinary cross-origin
@@ -498,7 +594,7 @@ try {
   // getDisplayMedia with no tab picker, and routes the System audio source's
   // pipeline to the ear (fed here through CHROMAGLASS_AUDIO_TAP=1, since
   // CHROMAGLASS_OFFLINE skips macOS TCC screen capture; the real
-  // ScreenCaptureKit path is docs/judging.md §75). Ambient TV mode caps the
+  // ScreenCaptureKit path is docs/judging.md §84). Ambient TV mode caps the
   // solver at 30 steps/s, caps frames drawn in the app at 60 Hz through
   // DrawGate, and holds the machine's opening rung.
   await page.locator('[data-testid=mode-segmented-sound]').click();
@@ -642,6 +738,28 @@ try {
     `governor up before the toggle ${governorUp}, in the page ${ambOn.hadGovernor}; on: ambient=${ambOn.ambient}, stepRate=${ambOn.stepRate}, rung=${ambOn.rungIndex}/${ambOn.start}, drawn=${ambOn.drawn}/s (frames=${ambOn.frames}/s, skipped=${ambOn.skipped} of 120 Hz offers), menu=${mainAmb}; off: ambient=${ambOff.ambient}, stepRate=${ambOff.stepRate}`,
   );
 
+  // ── updates ────────────────────────────────────────────────────────
+  if (!feed) {
+    skip('updates: the app finds a new release and offers it', 'run from the repo, where the app does not look (add --packaged)');
+  } else {
+    const deadline = Date.now() + 30_000;
+    let up = null;
+    while (Date.now() < deadline) {
+      up = await electronApp.evaluate(() => globalThis.__chromaglassUpdate ?? null).catch(() => null);
+      if (up && ['available', 'downloading', 'ready', 'none', 'error'].some((s) => up.history?.includes(s))) break;
+      await sleep(250);
+    }
+    const labels = await electronApp.evaluate(({ Menu }) => (Menu.getApplicationMenu()?.items ?? []).flatMap((i) => i.submenu?.items ?? []).map((i) => i.label)).catch(() => []);
+    const pageSees = await page.evaluate(() => window.__CHROMAGLASS_NATIVE__?.updates?.state?.().catch(() => null) ?? null).catch(() => null);
+    const pushed = Array.isArray(pushes) && pushes.some((p) => /^(available|downloading|ready) 999\.0\.0$/.test(p));
+    const found = !!up && up.version === '999.0.0' && (up.history.includes('available') || up.history.includes('downloading'));
+    const offered = up?.signed ? labels.some((l) => /ChromaGlass 999\.0\.0|Update to 999\.0\.0/.test(l)) : labels.includes('Download ChromaGlass 999.0.0…');
+    const asked = feedAsked.find((u) => /latest/.test(u));
+    check('updates: the app finds a new release and offers it, in the menu and to the page',
+      found && offered && !!asked && pageSees?.version === '999.0.0' && pageSees?.current === up?.current && pushed,
+      `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}, and was told ${pushes?.length ? pushes.join(' → ') : 'nothing'}`);
+  }
+
   // ── network off, the whole run ────────────────────────────────────
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
@@ -666,8 +784,72 @@ try {
   check('the run finished', false, err?.message ?? String(err));
   if (output) console.log(`\n  The app said:\n${output.split('\n').slice(-30).map((l) => `    ${l}`).join('\n')}`);
 } finally {
+  openFeed();
   await electronApp.close().catch(() => {});
+  feed?.close();
   rmSync(profile, { recursive: true, force: true });
+}
+
+/*
+  ── licence ──────────────────────────────────────────────────────────
+  The same app with no key, signed out, on a profile of its own: the door
+  (AppLicenceGate.tsx) and no plate behind it, which before 23.17d was the
+  whole show, free, for every download. And when the site was built as the app
+  ships it (VITE_MAC_APP=1, desktop.yml), a plain browser opened on the app's
+  server meets the same door: without that, Chrome at localhost:<port> was the
+  show for free beside a locked app. The licensed run above is the other half:
+  it opened on its key with the gate never drawn (`opens`).
+*/
+{
+  const bare = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-bare-'));
+  const barePort = await freePort('tcp');
+  const bareEnv = { ...env, PORT: String(barePort), OSC_PORT: String(await freePort('udp')), CHROMAGLASS_USER_DATA: bare };
+  delete bareEnv.CHROMAGLASS_LICENSE_KEY;
+  // Packed, the app must raise the door by itself: nothing tells it to. And
+  // it is handed a Pro key a stranger could sign, with the word to trust it.
+  if (PACKAGED) {
+    delete bareEnv.CHROMAGLASS_REQUIRE_SIGNIN;
+    bareEnv.LICENSE_PUBLIC_KEY = LIC_PUBLIC;
+    bareEnv.CHROMAGLASS_LICENSE_KEY = SELF_SIGNED;
+  }
+  delete bareEnv.CHROMAGLASS_UPDATE_FEED;
+  let second = null;
+  try {
+    second = await electron.launch({ executablePath: app.executablePath, args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], env: bareEnv, timeout: 60_000 });
+    const page = await second.firstWindow({ timeout: 60_000 });
+    const door = await page.waitForSelector('[data-cg-app-licence]', { state: 'visible', timeout: 60_000 }).then(() => true, () => false);
+    await sleep(3000);
+    const said = await page.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
+    const plate = await page.locator('#liquid-canvas').count().catch(() => 0);
+    const native = await page.evaluate(() => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function' })).catch(() => null);
+    check(`licence: with ${PACKAGED ? 'only a self-signed key, and the word to trust it,' : 'no key'} the app shows its door, asks for a sign-in, and starts no plate`, door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser,
+      `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser` : 'unread'}`);
+    if (process.env.VITE_MAC_APP !== '1') {
+      skip('licence: a browser on the app\'s server meets the same door', 'the site in dist/ was not built as the app ships it (VITE_MAC_APP=1, desktop.yml)');
+    } else {
+      // The browser is a window the app's own Chromium opens with none of
+      // the app's preload, in a session of its own: the page meets no shell,
+      // as in Chrome (the Mac runner has no Playwright browser of its own).
+      const plainUrl = `http://localhost:${barePort}/show?debug`;
+      await second.evaluate(({ BrowserWindow }, u) => {
+        const w = new BrowserWindow({ show: true, width: 1024, height: 700, webPreferences: { partition: 'cg-plain-browser', contextIsolation: true, sandbox: true } });
+        void w.loadURL(u);
+      }, plainUrl);
+      const bp = await second.waitForEvent('window', { predicate: (w) => w.url().startsWith(plainUrl), timeout: 30_000 }).catch(() => null)
+        ?? second.windows().find((w) => w.url().startsWith(plainUrl)) ?? null;
+      const shell = bp ? await bp.evaluate(() => !!window.__CHROMAGLASS_NATIVE__).catch(() => true) : true;
+      const browserDoor = !!bp && await bp.waitForSelector('[data-cg-app-licence]', { state: 'visible', timeout: 60_000 }).then(() => true, () => false);
+      await sleep(3000);
+      const browserPlate = bp ? await bp.locator('#liquid-canvas').count().catch(() => 0) : 0;
+      check('licence: a browser on the app\'s server meets the same door, and no plate', !!bp && !shell && browserDoor && browserPlate === 0,
+        !bp ? 'the plain window never opened' : `${shell ? 'the window had the app\'s shell, so it was no plain browser; ' : ''}door ${browserDoor}, plate canvas ${browserPlate ? 'THERE' : 'absent'}`);
+    }
+  } catch (err) {
+    check('licence: the keyless run finished', false, err?.message ?? String(err));
+  } finally {
+    await second?.close().catch(() => {});
+    rmSync(bare, { recursive: true, force: true });
+  }
 }
 
 const failed = results.filter((r) => !r.ok);

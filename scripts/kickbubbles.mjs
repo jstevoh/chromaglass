@@ -137,7 +137,8 @@ try {
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
     } else {
       await page.getByTestId('dot-sound').click();
-      await page.getByTestId('audio-source-simulated').click();
+      await page.getByTestId('audio-source-open').click();
+      await page.getByTestId('sound-source-simulated').click();
       await page.keyboard.press('Escape');
     }
     await page.waitForTimeout(500);

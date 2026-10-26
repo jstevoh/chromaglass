@@ -5,6 +5,9 @@ import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
 import { KNOB_PX, onRing, ringTravel } from '../../lib/knobDrag';
 import { helpFor } from '../../lib/controlHelp';
 import { useControlTip } from './ControlTip';
+import { groupOfSetting, paceOf } from '../../lib/settingsMap';
+import { Hare, PaceTrack, Snail } from './Pace';
+import { SlideMount } from './Playful';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -390,6 +393,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     and the desk was wrong, which is the hardest kind of wrong to notice.
   */
   const settingKey = settingKeyOf(midiKey);
+  const bareSettingKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
   const curve = settingKey ? curveOf(settingKey) : 1;
   const at = curve === 1 ? (value - min) / (max - min) : travelOf(value, min, max, curve);
   const pct = at * 100;
@@ -412,7 +416,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
   });
   return (
-    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} {...tip.bind}>
+    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
       {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
         {touch && line ? (
@@ -438,21 +442,23 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
           <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
         </span>
       </div>
-      <input
-        type="range"
-        min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
-        step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
-        value={curve === 1 ? value : at}
-        onChange={e => {
-          const raw = Number(e.target.value);
-          if (curve === 1) { onChange(raw); return; }
-          onChange(handValueAt(raw, min, max, curve));
-        }}
-        aria-label={label}
-        onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
-        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
-        style={{ '--fill': `${pct}%` } as CSSProperties}
-      />
+      <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
+        <input
+          type="range"
+          min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
+          step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
+          value={curve === 1 ? value : at}
+          onChange={e => {
+            const raw = Number(e.target.value);
+            if (curve === 1) { onChange(raw); return; }
+            onChange(handValueAt(raw, min, max, curve));
+          }}
+          aria-label={label}
+          onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
+          className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
+          style={{ '--fill': `${pct}%` } as CSSProperties}
+        />
+      </PaceTrack>
     </div>
   );
 }
@@ -561,6 +567,9 @@ const SWEEP = RING * 0.75;              // 75.4
 
 export function Knob({ label, value, min, max, step, onChange, display, mapping, resetTo, disabled, midiKey, testId, size = 40, help }: KnobProps) {
   const settingKey = settingKeyOf(midiKey);
+  // The setting's own name even where no controller can learn it (Gel Speed): its group and its pace are by name.
+  const bareKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
+  const pace = paceOf(bareKey);
   const curve = settingKey ? curveOf(settingKey) : 1;
   const travel = (v: number) => Math.max(0, Math.min(1, curve === 1 ? (v - min) / (max - min || 1) : travelOf(v, min, max, curve)));
   const valueAt = (t: number) => {
@@ -650,6 +659,7 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
       data-testid={testId}
       data-midi-hit={hit ? 'true' : undefined}
       data-knob
+      data-group={groupOfSetting(bareKey)}
       {...tip.bind}
     >
       {tip.card}
@@ -666,10 +676,22 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
           <circle cx="20" cy="20" r="16" fill="none" strokeWidth="3" strokeLinecap="round"
             style={{ stroke: drag ? 'var(--color-accent-text)' : 'var(--color-accent)' }}
             strokeDasharray={`${Math.max(0.01, SWEEP * at)} ${RING}`} transform="rotate(135 20 20)" />
-          <circle cx="20" cy="20" r="11" className="transition-colors group-hover:[fill:var(--color-knob-off)]" style={{ fill: 'var(--color-active)' }} />
-          <line x1="20" y1="15" x2="20" y2="10" stroke="#fff" strokeWidth="2" strokeLinecap="round"
+          {/* The cap wears its group's colour (index.css `--cap`): where the control lives, never whether it is on. */}
+          <circle cx="20" cy="20" r="11" className="transition-colors group-hover:[fill:var(--cap-hover,var(--color-knob-off))]" style={{ fill: 'var(--cap, var(--color-active))' }} />
+          <line x1="20" y1="15" x2="20" y2="10" strokeWidth="2" strokeLinecap="round" style={{ stroke: 'var(--cap-mark, #fff)' }}
             transform={`rotate(${-135 + 270 * at} 20 20)`} />
         </svg>
+        {pace && (
+          // At the two ends of the ring, in the margin the 58 px cell leaves either side of the 40 px knob.
+          <>
+            <span className={`pointer-events-none absolute transition-colors duration-[120ms] ${at < 0.06 ? 'text-text-2' : 'text-faint'}`} style={{ left: '-24%', top: '66%' }} data-pace-end={pace.bipolar ? 'hare' : 'snail'}>
+              {pace.bipolar ? <Hare size={size * 0.28} flip /> : <Snail size={size * 0.28} />}
+            </span>
+            <span className={`pointer-events-none absolute transition-colors duration-[120ms] ${at > 0.94 ? 'text-text-2' : 'text-faint'}`} style={{ right: '-24%', top: '66%' }} data-pace-end="hare">
+              <Hare size={size * 0.28} />
+            </span>
+          </>
+        )}
         {/*
           touch-none: on an iPad the browser would take a finger's drag as a
           page pan and cancel the pointer, so neither the ring nor the cap
@@ -759,12 +781,14 @@ export function Knob({ label, value, min, max, step, onChange, display, mapping,
   the fold.
 */
 export function PanelFrame({
-  id, title, meta, floating = false, collapsed = false, children, onFloat, onDock, onCollapse, onClose,
+  id, title, group, meta, floating = false, collapsed = false, children, onFloat, onDock, onCollapse, onClose,
   onPopOut, popped = false, onPopIn,
   onGripDown, onHeaderDown, onResizeDown, onTitleMenu, style, className = '', bodyClassName = '',
 }: {
   id: string;
   title: string;
+  /** The Settings group the panel belongs to (`SETTINGS_CATEGORIES`): its colour is the tick before the title and the cap of every knob inside. */
+  group?: string;
   meta?: ReactNode;
   floating?: boolean;
   collapsed?: boolean;
@@ -795,6 +819,7 @@ export function PanelFrame({
       style={style}
       data-testid={`panel-${id}`}
       data-panel={id}
+      data-group={group}
       data-floating={floating ? 'true' : undefined}
       data-popped={popped ? 'true' : undefined}
       data-collapsed={collapsed ? 'true' : undefined}
@@ -818,6 +843,7 @@ export function PanelFrame({
             </svg>
           </span>
         )}
+        {group && <span className="h-3 w-[3px] shrink-0 rounded-full" style={{ background: 'var(--cap)' }} data-group-tick aria-hidden />}
         <span className={`min-w-0 flex-1 truncate text-[13px] font-medium ${collapsed ? 'text-muted' : 'text-text'}`}>{title}</span>
         {floating && <span className="shrink-0 rounded-xs bg-accent-bg px-1.5 py-0.5 text-[11px] font-medium text-accent-text">floating</span>}
         {meta && <span className="min-w-0 shrink truncate font-mono text-[11px] text-faint">{meta}</span>}
@@ -919,7 +945,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       className={`group flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
-      <span className="h-6 w-6 shrink-0 rounded-sm" style={{ background: swatch }} />
+      <SlideMount swatch={swatch} size={28} />
       <span className={`flex-1 truncate text-[13px] font-medium ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
       {trailing}
     </button>

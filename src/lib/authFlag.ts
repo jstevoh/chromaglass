@@ -150,6 +150,24 @@ export async function verifyStoredLicenseOnLoad(): Promise<boolean> {
   return status.valid;
 }
 
+/**
+ * Does this page open only for a paid licence (PLAN.md 23.17d)?
+ *
+ * The owner, 2026-10-25: "The Mac app should check the license. The app won't
+ * work for free." Until then the Mac app was built with no sign-in and gated
+ * nothing, so every download read Pro. Now the app (its shell says
+ * `requireSignIn`, desktop/main.js) and any browser opened on the app's own
+ * server (the site built for the app, `VITE_MAC_APP=1`, desktop.yml) open the
+ * show only with a verified Home or Pro key: being signed in is no longer
+ * enough, as it was under 23.11, because a free account is not a licence. The
+ * browser on the app's server matters as much as the app's window: without it,
+ * `http://localhost:3000` in Chrome would be the whole show, free.
+ */
+export function requiresPaidLicenceSync(): boolean {
+  if (import.meta.env?.VITE_MAC_APP === '1') return true;
+  return requiresDesktopSignInSync();
+}
+
 export function requiresDesktopSignInSync(): boolean {
   if (typeof window === 'undefined') return false;
   const w = window as unknown as { __CHROMAGLASS_NATIVE__?: { requireSignIn?: boolean } };

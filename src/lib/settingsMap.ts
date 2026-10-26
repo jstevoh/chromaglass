@@ -13,7 +13,7 @@
  * checks the panel's own source against it.
  */
 
-import { PINNABLE } from './deskPins';
+import { PINNABLE, PIN_RANGE } from './deskPins';
 
 export interface SettingsCategory { id: string; name: string; hint: string }
 
@@ -88,7 +88,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     Video. `MERGED_SECTIONS` below sends its old id here.
   */
   { id: 'audio-input', name: 'Sound', category: 'feed',
-    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation' },
+    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation impact' },
   /*
     Called by what it does (PLAN 14ad, the owner 2026-10-24: "what the room
     control is vs. showing video on the plate"). "The Room" said where the
@@ -96,7 +96,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     one stirs and is never shown. Search still finds it by "room".
   */
   { id: 'room', name: 'Motion camera', category: 'feed',
-    terms: 'room camera video webcam people crowd dancers track tracking hands motion movement sensor floor deadzone smoothing mirror flip presence drive' },
+    terms: 'room camera video webcam people crowd dancers track tracking hands motion movement sensor floor deadzone smoothing mirror flip presence drive impact' },
   /*
     The film projector, out of Projectors.
 
@@ -108,7 +108,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     section to see it.
   */
   { id: 'film', name: 'Film', category: 'feed',
-    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive' },
+    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive impact' },
   /*
     The patch bay, with every master over it.
 
@@ -182,6 +182,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'tilt', name: 'Tilt & Rock', category: 'motion',
     terms: 'tilt rock rocking gravity slosh tip tipping dish upright direction downhill beat plate rock' },
+  /*
+    The plate turning, which was the first half of Plates & LED. That section
+    is Stage's, and Stage is the group that keeps a panel out of Build and Gig,
+    so the dish's spin could not be docked beside the set it is ridden in.
+    Same ids, same keys: only the section a pin is filed under changed.
+  */
+  { id: 'spin', name: 'Plate Spin', category: 'motion',
+    terms: 'spin rotation rotate turn flick auto spin turntable dish rpm tempo beats a turn reverse spin direction wander drag flywheel motor plate speed' },
   // The old names of Momentum, Updraft and Vibration stay findable, as Grain
   // Fineness's does under Light Show Look: someone who learned them as
   // Damping, Blow Velocity, Vibration Freq and Grain Size will type those.
@@ -224,7 +232,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'mark', name: 'Logo & Titles', category: 'stage',
     terms: 'logo mark brand branding title card watermark sponsor client name overlay still image png transparent credit' },
   { id: 'layers', name: 'Plates & LED', category: 'stage',
-    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform spin flick auto spin turntable dish rpm tempo beats a turn reverse spin' },
+    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform' },
   { id: 'simulation', name: 'Simulation', category: 'stage',
     terms: 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain' },
 ];
@@ -248,6 +256,32 @@ export const SECTION_BY_ID = new Map(SETTINGS_SECTIONS.map(s => [s.id, s]));
 
 /** The group a section sits in, for the markup's `data-group`. */
 export const groupOf = (id: string): string => SECTION_BY_ID.get(id)?.category ?? '';
+
+/**
+ * The group a *setting* lives in, by the section that draws it, so a knob in
+ * the Rides panel (a Play panel) carries the colour of the group its own
+ * section is in and not the panel's: one control, one colour, wherever it is
+ * pinned (PLAN 35d). Undefined for a key no section draws; the knob then
+ * takes the colour of whatever it sits inside.
+ */
+export const groupOfSetting = (key: string | null | undefined): string | undefined => {
+  const section = key ? PIN_RANGE.get(key)?.section : undefined;
+  return section ? SECTION_BY_ID.get(section)?.category : undefined;
+};
+
+/**
+ * The five controls that set a *pace*, which wear a snail at the slow end of
+ * the travel and a hare at the fast one (PLAN 35d). A pace is how fast
+ * something runs by itself, so Master Speed, Evolve Speed, the gel wheel's
+ * and the macro camera's chase, and the kaleidoscope's spin. A control that
+ * is a rate of something else (a Flow, a Rate of rain) is not one of them.
+ * `bipolar` is the spin that runs backwards below zero: the hare is at both
+ * ends, the snail at the stop in the middle.
+ */
+export const PACE_KEYS: Record<string, { bipolar?: boolean }> = {
+  globalSpeed: {}, automateRate: {}, gelSpeed: {}, macroChase: {}, kaleidoSpin: { bipolar: true },
+};
+export const paceOf = (key: string | null | undefined): { bipolar?: boolean } | undefined => (key ? PACE_KEYS[key] : undefined);
 
 /*
   Every control's own label, by the section it lives in.

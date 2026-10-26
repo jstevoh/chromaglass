@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom';
 import { LogIn, User } from 'lucide-react';
 import { Button, PanelFrame, Segmented, Tag } from '../ui';
+import { LensCap } from '../ui/Playful';
 import { PanelGuard } from '../PanelGuard';
 import { RecordControls } from './RecordControls';
 import { DeskHeader } from './DeskHeader';
@@ -252,6 +253,7 @@ export function Desk(p: DeskProps) {
           key={id}
           id={id}
           title={spec.name}
+          group={spec.category}
           floating={opts.floating}
           collapsed={false}
           className={opts.className}
@@ -276,6 +278,7 @@ export function Desk(p: DeskProps) {
         key={id}
         id={id}
         title={spec.name}
+        group={spec.category}
         meta={panelMeta(id, p)}
         floating={opts.floating}
         collapsed={collapsed}
@@ -388,6 +391,7 @@ export function Desk(p: DeskProps) {
             onClick={p.onBlackout}
             midiKey="action:blackout-toggle"
             testId="blackout-button"
+            icon={<LensCap capped={!!p.blackout} size={16} />}
           >
             {p.blackout ? 'Blacked out' : 'Blackout'}
           </Button>

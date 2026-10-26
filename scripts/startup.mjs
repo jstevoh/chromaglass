@@ -393,12 +393,12 @@ const openingGaps = (x, heldByMs = HELD_BY_S * 1000) => {
 function stillCases() {
   const span = (a, b, every) => Array.from({ length: Math.floor((b - a) / every) + 1 }, (_, i) => a + i * every);
   const without = (ts, gaps) => ts.filter((t) => !gaps.some(([a, b]) => t > a && t < b));
-  const opening = ({ gaps, stopped = [], tickEvery = 100, still = [[0, 9000]] }) => {
+  const opening = ({ gaps, stopped = [], tickEvery = 100, still = [[0, 9000]], heldSeen = { longOk: true, tickMedian: 100 } }) => {
     const frames = without(span(16, 12000, 16), gaps);
     const ticks = without(span(100, 12000, tickEvery), stopped);
     return {
       raw: { frames, frameRan: frames, ticks, long: [], marks: [], loaf: [] },
-      heldSeen: { longOk: true, tickMedian: 100 }, stepRaw: 9000, t0: 0, now: 12000,
+      heldSeen, stepRaw: 9000, t0: 0, now: 12000,
       intro: { still, out: 9000 },
     };
   };
@@ -409,6 +409,10 @@ function stillCases() {
     ['a gap of 3.5 s across the still\'s end at 5 s: its part after counts', { gaps: [[4000, 7504]], still: [[0, 5000]] }, 2.504],
     ['a still that never let go: counts whole', { gaps: [[3008, 6000]], still: [[0, null]] }, 2.992],
     ['three gaps of 2.5 s, all still: no more than 4.5 s taken out, so the third counts whole', { gaps: [[1008, 3504], [4000, 6496], [6496, 8992]] }, 2.496],
+    // 14v-8(b): the gate on seeing the page at all (`seenOk`). Without it the timer, with the same gap and the same on-time ticks as the first case, would excuse the gap.
+    ['the same as the first with long tasks not observable (the page\'s work cannot be told from a wait): counts whole', { gaps: [[3008, 6000]], heldSeen: { longOk: false, tickMedian: 100 } }, 2.992],
+    ['the same with the timer slow to begin with (its median over TICK_OK_MS, so a tick on time says nothing): counts whole', { gaps: [[3008, 6000]], heldSeen: { longOk: true, tickMedian: TICK_OK_MS + 50 } }, 2.992],
+    ['the same with no timer reading at all: counts whole', { gaps: [[3008, 6000]], heldSeen: { longOk: true, tickMedian: null } }, 2.992],
   ];
   const wrong = [];
   for (const [name, c, want] of cases) {
@@ -1248,12 +1252,15 @@ const waitOf = (x, oldWay) => {
   let chromium = 0, end = 0;
   for (const [a, b] of asks) { const from = Math.max(a, end); if (b > from) chromium += b - from; end = Math.max(end, b); }
   let compile = 0, count = 0, at = null, stops = null;
+  // Where the compile was, in the same seconds as `steady`, for `leftOver` below.
+  const priced = [];
   if (x.prepared) {
     const seen = new Set();
     for (const [key, at, ms] of x.prepared.builds ?? []) {
       if (!oldWay.includes(key) || seen.has(key) || at / 1000 >= steady) continue;
       seen.add(key);
       compile += Math.min(ms / 1000, steady - at / 1000);
+      priced.push([at / 1000, at / 1000 + Math.min(ms / 1000, steady - at / 1000)]);
       count++;
     }
   } else {
@@ -1389,12 +1396,40 @@ const waitOf = (x, oldWay) => {
       compile += st.len;
       count++;
       at ??= [st.from, st.len];
+      priced.push([st.from + t0, st.from + t0 + st.len]);
     }
   }
-  return { steady: steady - t0, chromium, compile, shared: count, at, what: x.prepared ? 'built ahead' : count === 1 ? 'stop' : 'stops', stops, own: steady - t0 - chromium - compile };
+  /*
+    What the wait is made of, besides the two priced parts, printed and not
+    judged (PLAN 19aa-7). `own` is what is left of the wait once Chromium's
+    asks and the compile are taken off, and on 192 Mac runs of the week to
+    2026-10-25 it ran from 0.40 to 3.25 s for the show with a median of 0.78,
+    and for the old way's control from 0.5 to 3.4 s: the same tail on both
+    sides (2.0 s or more on 8% of the shows and a like share of the controls),
+    which the check holds to the control's plus a second, so it goes red when
+    only the show's lands (7 of 192). A tail like that is the page waiting
+    on a process that is not the page, or the page's own thread held: the two
+    read differently on the page's own timer, which 14v-7 already uses for
+    the frame gaps. So here the stretches that are neither Chromium's nor the
+    compile, how long they are all told, and how much of that the timer
+    ticked on time in (TICK_FREE_MS), the page seen free; and the longest,
+    where it began. The two priced parts overlap a little, so this is not
+    `own` to the hundredth.
+  */
+  const cut = (spans, out) => out.reduce((parts, [c, d]) => parts.flatMap(([p, q]) => (d <= p || c >= q ? [[p, q]]
+    : [[p, Math.min(q, c)], [Math.max(p, d), q]].filter(([u, v]) => v > u))), spans);
+  const rest = cut([[t0, steady]], [...asks, ...priced]);
+  const tickTs = x.ticks ?? [];
+  const tickFree = [];
+  for (let i = 1; i < tickTs.length; i++) if (tickTs[i] - tickTs[i - 1] <= TICK_FREE_MS / 1000) tickFree.push([tickTs[i - 1], tickTs[i]]);
+  const inFree = (a, b) => tickFree.reduce((n, [u, v]) => n + Math.max(0, Math.min(b, v) - Math.max(a, u)), 0);
+  const longestRest = rest.reduce((m, [a, b]) => (!m || b - a > m[1] ? [a - t0, b - a] : m), null);
+  const leftOver = { total: rest.reduce((n, [a, b]) => n + b - a, 0), free: rest.reduce((n, [a, b]) => n + inFree(a, b), 0), longest: longestRest, pieces: rest.length };
+  return { steady: steady - t0, chromium, compile, shared: count, at, what: x.prepared ? 'built ahead' : count === 1 ? 'stop' : 'stops', stops, own: steady - t0 - chromium - compile, leftOver };
 };
 const sayWait = (w) => (w == null ? 'never moving for good'
   : `${w.steady.toFixed(2)} s from load, ${w.chromium.toFixed(2)} s of it Chromium's, ${w.compile.toFixed(2)} s compiling the old way's pipelines (${w.shared} ${w.what}${w.at ? ` from ${w.at[0].toFixed(2)} s` : ''}), ${w.own.toFixed(2)} s the page's own`
+    + (w.leftOver ? ` (neither Chromium's nor a build's: ${w.leftOver.total.toFixed(2)} s in ${w.leftOver.pieces} stretches, ${w.leftOver.free.toFixed(2)} s of it with the page's timer ticking on time${w.leftOver.longest ? `, the longest ${w.leftOver.longest[1].toFixed(2)} s from ${w.leftOver.longest[0].toFixed(2)} s` : ''})` : '')
     // Every stop its frames made, so a pick that is wrong reads off the log.
     + (w.stops ? ` [its frames stopped: ${w.stops.length ? w.stops.map((st) => `${st.from.toFixed(2)} s for ${st.len.toFixed(2)} s after Chromium's, ${st.builds} built in it, ${st.waited} first used before it and done as it ended (${st.last === undefined ? 'none out as it began' : st.last === null ? 'one out as it began never done' : `the last out as it began done ${st.last.toFixed(2)} s from its end`}, the page's timer silent at most ${st.silent.toFixed(2)} s)${st.taken ? `${st.follows ? ' (the compile going on from the stop before)' : ''}, priced` : ''}`).join('; ') : 'never'}]` : ''));
 const say = (g) => (g.first == null ? 'none at all' : `${g.gap.toFixed(2)} s${g.at != null ? ` from ${g.at.toFixed(2)} s` : ''}`);

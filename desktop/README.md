@@ -18,11 +18,44 @@ and:
   the display does not sleep.
 
 The site inside is the one from the day it was built. Every change still lands on
-the website first; a new download picks it up.
+the website first; a release (below) brings it to the app, and an installed app
+finds the release by itself.
+
+## What it opens on: a Home or Pro licence
+
+The app opens the show only with a ChromaGlass Home or Pro licence on the Mac
+(PLAN.md 23.17d); the website stays the free tier. The first start shows a door
+(`src/components/AppLicenceGate.tsx`):
+
+- **Sign in** with the account the licence was bought with. Email and password
+  finish in the app's window. Google, and the emailed link, finish in the real
+  browser on the app's own server (`http://localhost:3000/show?macSignIn=1`):
+  that tab fetches the account's key and files it with the app's server, and the
+  app's window, which watches the server, opens by itself.
+- A new password account is asked to **confirm its email** first (the licence
+  Worker hands keys only to a confirmed address).
+- An account with no licence gets **Buy Home** and **Buy Pro** (the store, in the
+  browser) and *I have bought it: check again*.
+- **Have a licence key?** takes a `cg1.` key typed in, checked offline.
+
+Once a key is on the Mac it is verified against its signature at every start, with
+no network and no time limit: a gig with no Wi-Fi opens like any other night. When
+the app is online and signed in it asks the account again; a key the account no
+longer holds (refunded) leaves the Mac at the next start, never in the middle of a
+show. Home and Pro unlock what they unlock on the website.
+
+The packed app always asks. From the repo (`npm run app`) it asks only with
+`CHROMAGLASS_REQUIRE_SIGNIN=1`, so working on the app needs no key. A key for a
+terminal show is still `CHROMAGLASS_LICENSE_KEY=cg1.… npm run show`.
 
 ## Getting the app
 
-**From CI (no Mac tools needed).** On GitHub: Actions → *Mac app* → *Run workflow*
+**The download.** The newest release is always at
+<https://github.com/jstevoh/chromaglass/releases/latest/download/ChromaGlass-mac-arm64.dmg>,
+which is what the site's Download for Mac (Profile & Store, for Pro, and the
+landing page) links to. Open it and drag ChromaGlass into Applications.
+
+**A build of any commit, from CI (no Mac tools needed).** On GitHub: Actions → *Mac app* → *Run workflow*
 on `main`. When it finishes, the run's *Artifacts* has `ChromaGlass-mac`: a zip
 holding `ChromaGlass-<version>-arm64.dmg` (and a `.zip` of the app). It is built for
 Apple silicon.
@@ -37,12 +70,44 @@ npm run mac-app    # build the .dmg into desktop/release/
 npm run desktop    # the check: the app, offline, on a lit plate (add -- --packaged for the built one)
 ```
 
+## Releases and updates
+
+**Making a release.** On GitHub: Actions → *Mac app* → *Run workflow* on `main`,
+with *release* ticked. The run builds the app, runs the check on the built app,
+and then publishes it as the repository's newest release, `desktop-v<version>`.
+The version is the site's major and minor (`package.json`) and the run's number,
+so each release is newer than the last with nothing to bump first. Pushing a tag
+`desktop-v<version>` does the same with that version. A release is never made by a
+merge or a pull request: the site changes several times a day, and each release
+tells every installed app to update.
+
+**How an installed app updates** (`updates.js`). Twenty seconds after it opens, and every
+six hours after, it reads `latest-mac.yml` from the newest release. When there is a
+newer version:
+
+- **Signed with a Developer ID** (below): it downloads in the background and
+  installs the next time ChromaGlass quits. *ChromaGlass → Restart to Update* does
+  it now.
+- **Ad hoc, as today:** macOS will not let an app replace itself unless it is
+  signed, so the app says the new version is out instead. *ChromaGlass → Download
+  ChromaGlass <version>…* (or the button in Profile & Store) opens the new download;
+  drag it over the old one in Applications.
+
+Either way it never restarts, opens a window or asks anything by itself during a
+show: one notification on the laptop at most, and none while a projector window is
+open. *ChromaGlass → Check for Updates…* looks now. `CHROMAGLASS_NO_UPDATES=1`
+switches it off.
+
 ## First launch
 
 Until it is signed with a Developer ID (below), macOS says it cannot check the app
 for malicious software. Open it once, let macOS refuse, then System Settings →
 Privacy & Security → *Open Anyway* (macOS 15 no longer offers this from the
-right-click menu). After that it opens like any app.
+right-click menu, and a double-click only says it may harm your Mac). After that
+it opens like any app. In Terminal, `xattr -dr com.apple.quarantine
+/Applications/ChromaGlass.app` does the same. The release notes and the profile
+sheet say this for every build Gatekeeper refuses (`spctl` asks the built app in
+`desktop.yml`); notarising (13.1-sign) is what takes the warning away.
 
 macOS then asks, each once:
 
@@ -75,7 +140,9 @@ as repository secrets (Settings → Secrets and variables → Actions):
 
 With them the workflow signs with the hardened runtime and notarizes; without them
 (and on every pull request from a fork) it signs ad hoc, which is what lets an Apple
-silicon Mac open it at all.
+silicon Mac open it at all. The first signed release is also the first that can
+update itself in place; apps installed from ad hoc releases keep offering the
+download, once more, and update in place from then on.
 
 ## How it is put together
 
@@ -84,6 +151,9 @@ silicon Mac open it at all.
   cameras, MIDI, screens) to its own pages only, opens the show window, and puts the
   projector window on the projector's screen in full screen. Why each of these, at
   length, is in its comments.
+- `updates.js`: finds new releases and offers or installs them (above), with
+  electron-updater; `npm run updates` checks it in plain Node, and `npm run
+  desktop -- --packaged` checks the packed app against a feed of its own.
 - `preload.cjs`: tells the page it is in the app (`isDesktopApp()` in
   `src/lib/platform.ts`), which is what lets `useProjector` send the show to a
   projector without waiting for a click.

@@ -42,6 +42,7 @@
 
 import { LEARNABLE_SETTINGS } from './midi.ts';
 import { MIX_CONTROLS } from './mixer.ts';
+import { LAMP_WARMTH_MAX } from './lampKelvin.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 import type { VisualizerSettings } from '../types.ts';
 
@@ -136,10 +137,10 @@ const SECTION_OF: Record<string, string> = {
   beatLead: 'audio-input',
   filmDrive: 'film',
   // The four masters, with the patch bay they pull down.
-  filmImpact: 'patches',
-  soundImpact: 'patches',
+  filmImpact: 'film',
+  soundImpact: 'audio-input',
   shapeImpact: 'patches',
-  sceneImpact: 'patches',
+  sceneImpact: 'room',
   sceneDrive: 'room',
   sceneHands: 'room',
   kaleidoscope: 'kaleidoscope',
@@ -150,14 +151,15 @@ const SECTION_OF: Record<string, string> = {
   filmPhysics: 'camera',
   phaseDisplace: 'ferro',
   oilBodies: 'oil',
+  filmHold: 'oil',
   clearFilm: 'oil',
   thinGap: 'squish',
   gapThickness: 'squish',
   pacing: 'automation',
   songFollow: 'automation',
-  spinRpm: 'layers',
-  spinAuto: 'layers',
-  spinBeats: 'layers',
+  spinRpm: 'spin',
+  spinAuto: 'spin',
+  spinBeats: 'spin',
   twoProjectors: 'layers',
   // The mixer's channel strips, all in its own section.
   ...Object.fromEntries(MIX_CONTROLS.map(c => [String(c.key), 'mixer'])),
@@ -190,7 +192,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'sceneDeadzone', label: "Deadzone", min: 0, max: 1, section: 'room' },
   { key: 'sceneSmooth', label: "Smoothing", min: 0, max: 1, section: 'room' },
   { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 3, section: 'lamp' },
-  { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: 1, section: 'lamp' },
+  { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: LAMP_WARMTH_MAX, section: 'lamp' },
   // Film stock (F1): what the whole show is photographed on, as against the
   // `film*` settings, which drive the projector that plays video through dye.
   { key: 'stock', label: "Film Stock", min: 0, max: 1, section: 'stock' },
@@ -278,12 +280,12 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'markX', label: "Logo Across", min: 0, max: 1, section: 'mark' },
   { key: 'markY', label: "Logo Up", min: 0, max: 1, section: 'mark' },
   { key: 'layerCount', label: "Layers", min: 1, max: 2, section: 'layers', step: 1 },
-  { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1, section: 'layers' },
-  { key: 'spinImpulse', label: "Flick Strength", min: 0, max: 1, section: 'layers' },
-  { key: 'spinDrag', label: "Plate Drag", min: 0, max: 1, section: 'layers' },
-  { key: 'spinDirection', label: "Spin Direction", min: -1, max: 1, section: 'layers', step: 1 },
-  { key: 'spinWander', label: "Spin Wander", min: 0, max: 1, section: 'layers' },
-  { key: 'spinAudioDepth', label: "Spin From Music", min: 0, max: 1, section: 'layers' },
+  { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1, section: 'spin' },
+  { key: 'spinImpulse', label: "Flick Strength", min: 0, max: 1, section: 'spin' },
+  { key: 'spinDrag', label: "Plate Drag", min: 0, max: 1, section: 'spin' },
+  { key: 'spinDirection', label: "Spin Direction", min: -1, max: 1, section: 'spin', step: 1 },
+  { key: 'spinWander', label: "Spin Wander", min: 0, max: 1, section: 'spin' },
+  { key: 'spinAudioDepth', label: "Spin From Music", min: 0, max: 1, section: 'spin' },
   { key: 'ledSpeed', label: "LED Rotation Speed", min: 0, max: 2, section: 'layers' },
   { key: 'centerGravity', label: "Center Gravity (Concave)", min: 0, max: 1, section: 'layers' },
   { key: 'cometSpeed', label: "Comet Flow", min: 0, max: 2, section: 'layers' },
