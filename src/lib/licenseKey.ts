@@ -257,19 +257,28 @@ export function clearCachedLicense(): void {
  * 23.10): nothing an account says takes a running show down, so a set that
  * started licensed finishes licensed, and the next start meets the gate.
  */
-export async function retireStoredLicenseKey(): Promise<void> {
-  const token = verifiedState.token;
-  try {
-    localStorage.removeItem(STORAGE_KEY_TOKEN);
-  } catch {
-    // ignore
+export async function retireStoredLicenseKey(id: string | null): Promise<void> {
+  if (!id) return;
+  // Each copy only if it is that key: the browser can hold one key and the
+  // server another, and the server's deactivate empties whatever is active,
+  // so it is asked only when its own active key is the one retired (the
+  // review of #494).
+  if (verifiedState.id === id) {
+    try {
+      localStorage.removeItem(STORAGE_KEY_TOKEN);
+    } catch {
+      // ignore
+    }
   }
   try {
-    await fetch('/license-deactivate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(token ? { key: token } : {}),
-    });
+    const info = (await (await fetch('/license-info.json', { cache: 'no-store' })).json()) as { id?: string | null; key?: string | null };
+    if (info?.id === id && info.key) {
+      await fetch('/license-deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: info.key }),
+      });
+    }
   } catch {
     // No show server (the website): the browser's copy was all there was.
   }

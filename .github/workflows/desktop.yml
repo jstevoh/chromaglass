@@ -122,6 +122,20 @@ jobs:
       # on a pull request unless told to, which would leave the app with
       # Electron's own signature, broken by the rename, and "damaged" on an
       # Apple silicon Mac.
+      # A key pair for this build alone (PLAN.md 23.17d). The packed app opens
+      # only on a key, so the check below must open it on one; the app trusts
+      # this public half (its `checkKey`, electron-builder.config.cjs) and the
+      # check signs with the private half, which lives in a file on this runner
+      # and is gone when the job ends. Nobody holds it after, so a download
+      # trusts it for nothing. Never uploaded, never printed.
+      - name: A one-time key for the check
+        run: |
+          node --input-type=module -e "
+            const { publicKey, privateKey } = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+            const fs = await import('node:fs');
+            fs.writeFileSync(process.env.RUNNER_TEMP + '/check-key.json', JSON.stringify(await crypto.subtle.exportKey('jwk', privateKey)), { mode: 0o600 });
+            fs.appendFileSync(process.env.GITHUB_ENV, 'CHROMAGLASS_BUILD_CHECK_KEY=' + JSON.stringify(await crypto.subtle.exportKey('jwk', publicKey)) + '\n');
+          "
       - name: Build the download
         id: build
         env:
@@ -156,6 +170,10 @@ jobs:
           # The site above was built as the app ships it: the check's licence
           # lines ask a plain browser on the app's server for the door too.
           VITE_MAC_APP: '1'
+          DESKTOP_CHECK_PRIVATE_KEY_FILE: ${{ runner.temp }}/check-key.json
+      - name: Throw the check's key away
+        if: always()
+        run: rm -f "$RUNNER_TEMP/check-key.json"
       - uses: actions/upload-artifact@v4
         with:
           name: ChromaGlass-mac

@@ -30,7 +30,15 @@ module.exports = {
   // a pull request first (electron-updater only offers a higher version). And
   // whether it was signed, which is what lets main.js install an update in place
   // (desktop/updates.js).
-  extraMetadata: { version: process.env.DESKTOP_VERSION || root.version, chromaglass: { signed } },
+  //
+  // And `checkKey`: the public half of a key pair desktop.yml makes for each
+  // build and throws away with the runner, so the check of the built app can
+  // open the show on a key it signs itself (PLAN.md 23.17d). Nobody holds the
+  // private half once the job ends, so the shipped app trusts it for nothing.
+  extraMetadata: {
+    version: process.env.DESKTOP_VERSION || root.version,
+    chromaglass: { signed, ...(process.env.CHROMAGLASS_BUILD_CHECK_KEY ? { checkKey: JSON.parse(process.env.CHROMAGLASS_BUILD_CHECK_KEY) } : {}) },
+  },
   directories: { output: 'release', buildResources: 'resources' },
   files: [
     'main.js',

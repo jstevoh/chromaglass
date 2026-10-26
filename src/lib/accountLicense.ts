@@ -19,7 +19,7 @@
  * here only on demand, so a build without it (every check, a fork) carries none.
  */
 
-import { activateLocalLicenseKey, retireStoredLicenseKey, verifyLicenseKey, type LicenseTier } from './licenseKey';
+import { activateLocalLicenseKey, getCachedLicenseStatus, retireStoredLicenseKey, verifyLicenseKey, type LicenseTier } from './licenseKey';
 import { getCachedEmail } from './authFlag';
 import { getActiveLicenseInfo, getMarketingOptIn, hasExplicitMarketingChoice, setMarketingOptIn, syncMarketingPreferenceToServer } from './tierGates';
 
@@ -123,10 +123,13 @@ async function run(): Promise<AccountLicenseResult> {
   const result = await pick(all);
   // After the pick, so a Home key the account upgraded is judged by the Pro
   // key that replaced it here, not before.
-  const held = getActiveLicenseInfo();
+  // Judged on the Worker's whole answer, not on `all`, which drops records it
+  // cannot use: a key the account still lists, whatever its shape, is not gone.
+  const held = { ...getActiveLicenseInfo(), token: getCachedLicenseStatus().token };
   const account = await auth?.getCurrentUserEmail().catch(() => null) ?? getCachedEmail();
-  if (heldKeyRefunded(held, account, all.map((k) => k.id ?? ''))) {
-    void retireStoredLicenseKey();
+  const listed = (data.keys ?? []).map((k) => ({ id: (k as { id?: string }).id ?? null, token: k.token || k.key || null }));
+  if (heldKeyRefunded(held, account, listed)) {
+    void retireStoredLicenseKey(held.id);
     return { state: 'none' };
   }
   return result;
@@ -144,17 +147,21 @@ async function run(): Promise<AccountLicenseResult> {
  * Only a key filed under this very account can be judged by this account's
  * list: one bought with another address, or typed in by hand from someone
  * else's email, is not this account's to take away, and is left alone. So: the
- * key's own email is the signed-in one, the Worker answered, and the key is not
- * in what it said.
+ * key's own email is the signed-in one, the Worker answered, and the key is in
+ * what it said neither by id nor by its token. And when any record the Worker
+ * listed has no id, nothing is judged at all: a key filed by hand (the owner's
+ * own, before the store) may not carry one, and a list that cannot be read
+ * whole is no evidence that a key left it (the review of #494).
  */
 export function heldKeyRefunded(
-  held: { valid: boolean; id: string | null; email: string | null },
+  held: { valid: boolean; id: string | null; email: string | null; token?: string | null },
   accountEmail: string | null,
-  accountKeyIds: string[],
+  listed: Array<{ id: string | null; token: string | null }>,
 ): boolean {
   if (!held.valid || !held.id || !held.email || !accountEmail) return false;
   if (held.email.trim().toLowerCase() !== accountEmail.trim().toLowerCase()) return false;
-  return !accountKeyIds.includes(held.id);
+  if (listed.some((k) => !k.id)) return false;
+  return !listed.some((k) => k.id === held.id || (!!held.token && k.token?.trim() === held.token.trim()));
 }
 
 async function pick(all: Array<{ id?: string; token: string; tier: LicenseTier }>): Promise<AccountLicenseResult> {

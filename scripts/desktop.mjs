@@ -161,16 +161,34 @@ const QUERY = '?debug&look=classic';
 
 /*
   The licence (PLAN.md 23.17d). The app as it ships opens only on a Home or
-  Pro key, so the show this check opens is a licensed one: a Pro key signed
-  with a key pair made for this run, which the app is told to trust
-  (LICENSE_PUBLIC_KEY; a packed app keeps that only with the network refused,
-  desktop/main.js) and handed as CHROMAGLASS_LICENSE_KEY, the way a terminal
-  `npm run show` takes one. From the repo the app asks for a licence only when
-  told to, so it is told to: both runs take the same door.
+  Pro key, so the show this check opens is a licensed one, handed to it as
+  CHROMAGLASS_LICENSE_KEY, the way a terminal `npm run show` takes one.
+
+  From the repo, the key is signed with a pair made here, which the app is
+  told to trust (LICENSE_PUBLIC_KEY), and the app is told to ask for a
+  licence (CHROMAGLASS_REQUIRE_SIGNIN): both runs take the same door.
+
+  Packed, the app trusts no key from its environment (desktop/main.js). It
+  trusts its own build's `checkKey`, a pair desktop.yml made for that build;
+  the private half is in a file only that job has
+  (DESKTOP_CHECK_PRIVATE_KEY_FILE), and it signs the key here. And the
+  keyless launch below is handed a key signed with this run's own pair and
+  told to trust it, network refused, which is what a stranger could do: it
+  must still meet the door.
 */
 const licPair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
 const LIC_PUBLIC = JSON.stringify(await crypto.subtle.exportKey('jwk', licPair.publicKey));
-const LIC_KEY = await signLicenseKey({ id: 'desktop-check-pro', tier: 'pro', email: 'desktop-check@example.com' }, await crypto.subtle.exportKey('jwk', licPair.privateKey));
+const LIC_PAYLOAD = { id: 'desktop-check-pro', tier: 'pro', email: 'desktop-check@example.com' };
+const SELF_SIGNED = await signLicenseKey(LIC_PAYLOAD, await crypto.subtle.exportKey('jwk', licPair.privateKey));
+let LIC_KEY = SELF_SIGNED;
+if (PACKAGED) {
+  const file = process.env.DESKTOP_CHECK_PRIVATE_KEY_FILE;
+  if (!file || !existsSync(file)) {
+    console.error('FAIL  the packed app opens only on a key, and this check holds none it trusts: pack with CHROMAGLASS_BUILD_CHECK_KEY and pass its private half as DESKTOP_CHECK_PRIVATE_KEY_FILE (desktop.yml)');
+    process.exit(1);
+  }
+  LIC_KEY = await signLicenseKey(LIC_PAYLOAD, readFileSync(file, 'utf8'));
+}
 console.log(`The app ${app.label}; port ${PORT}, OSC ${OSC_PORT}, a new profile, the network off.\n`);
 
 /*
@@ -208,7 +226,7 @@ const env = {
   CHROMAGLASS_OFFLINE: '1',
   CHROMAGLASS_QUERY: QUERY,
   CHROMAGLASS_REQUIRE_SIGNIN: '1',
-  LICENSE_PUBLIC_KEY: LIC_PUBLIC,
+  ...(PACKAGED ? {} : { LICENSE_PUBLIC_KEY: LIC_PUBLIC }),
   CHROMAGLASS_LICENSE_KEY: LIC_KEY,
   ...(isMac ? {} : { CHROMAGLASS_SOFTWARE_WEBGPU: '1' }),
 };
@@ -637,8 +655,13 @@ try {
   const barePort = await freePort('tcp');
   const bareEnv = { ...env, PORT: String(barePort), OSC_PORT: String(await freePort('udp')), CHROMAGLASS_USER_DATA: bare };
   delete bareEnv.CHROMAGLASS_LICENSE_KEY;
-  // Packed, the app must raise the door by itself: nothing tells it to.
-  if (PACKAGED) delete bareEnv.CHROMAGLASS_REQUIRE_SIGNIN;
+  // Packed, the app must raise the door by itself: nothing tells it to. And
+  // it is handed a Pro key a stranger could sign, with the word to trust it.
+  if (PACKAGED) {
+    delete bareEnv.CHROMAGLASS_REQUIRE_SIGNIN;
+    bareEnv.LICENSE_PUBLIC_KEY = LIC_PUBLIC;
+    bareEnv.CHROMAGLASS_LICENSE_KEY = SELF_SIGNED;
+  }
   delete bareEnv.CHROMAGLASS_UPDATE_FEED;
   let second = null;
   try {
@@ -649,7 +672,7 @@ try {
     const said = await page.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
     const plate = await page.locator('#liquid-canvas').count().catch(() => 0);
     const native = await page.evaluate(() => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function' })).catch(() => null);
-    check('licence: with no key the app shows its door, asks for a sign-in, and starts no plate', door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser,
+    check(`licence: with ${PACKAGED ? 'only a self-signed key, and the word to trust it,' : 'no key'} the app shows its door, asks for a sign-in, and starts no plate`, door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser,
       `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser` : 'unread'}`);
     if (process.env.VITE_MAC_APP !== '1') {
       skip('licence: a browser on the app\'s server meets the same door', 'the site in dist/ was not built as the app ships it (VITE_MAC_APP=1, desktop.yml)');
