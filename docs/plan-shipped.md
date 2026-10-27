@@ -3185,6 +3185,61 @@ beside the one before) gave 9 conflicts, in PLAN.md, `docs/judging.md`,
 conflict half of the claim is for 19k-2 to show over the next merges, not this PR.
 `deploygate --history 20` read the same 20 verdicts before and after.
 
+#### 19k-1, 19k-3, 19k-4 and the rest of 19k's follow-ups
+
+**Shipped** (the follow-up PR to #502). *19k-1:* `checkguard.mjs` reads `scripts/checks.json`: an
+entry removed (or renamed), or kept with another command, env or timeout, is a change to
+what a check measures and is named under `Check changes:` with the check's name and the
+numbers that differ (a timeout 15 to 20, a `--seed 3` to `--seed 4`) and a reason. A new
+entry, a move to another shard, a reorder and a reworded `why` are not. Before the manifest the
+same edit to a step in `checks.yml` was as invisible.
+
+*19k-3:* `scripts/actionlint.mjs` (`npm run actionlint`, an `always` entry in Measure's
+logic part) fetches actionlint 1.7.7 from its release page, holds it to the sha256 of the
+release's own checksums file, keeps it in `scratch/actionlint/`, proves on a workflow with
+three mistakes that it is red and names each, then lints `.github/workflows`. shellcheck and
+pyflakes are off: the Ubuntu runner has shellcheck and a session or a Mac does not, so the same
+file would be green in one place and red in another. The fetch that 19k's session was refused
+went through in this one (curl, with the session's proxy); what a cloud session still cannot do
+is run a binary it has just downloaded, so the first run of this check was CI's.
+
+*19k-4:* `reach.mjs --diff` also says which Measure parts and which checks a PR reaches
+(`parts`, `only`). A diff that is only check scripts (traced), manifest entries, the npm scripts
+checks run and documents (a root or `docs/` Markdown file, `.claude/`, `LICENSE`, which select
+the checks that read them, by the same trace) runs only those checks and the `always` ones (the
+typecheck, that every script parses, that the manifest agrees with the workflow, the workflows
+lint, and the panel and the plate, which walk all of `scripts/` at run time for a phantom `npm run` and a retired look, so the trace cannot name what they read; `npm run checks` finds any Measure check that walks `scripts/` and requires it `always`), in only the parts that have any; anything else, `src/`, `public/` (Markdown there too),
+a workflow, the lockfile, a shared helper or a script no check traces, and every deploy and run
+by hand, runs Measure in full as before. `checks.mjs --ci` reads `CHECKS_ONLY` and names the
+checks it left out in a notice. The reach job leaves a `measure` notice when it was partial and
+`deploygate.sh` does not take such a run as proof of a whole tree, as it does not one that
+skipped a Mac shard; it fails closed, so a run whose jobs or annotations cannot be read, or that has no reach job, counts as partial too, and a carried run is asked as well (a selftest runs the function against a stubbed `api`). The guard also names a check moved between the Mac and Measure. A document-only PR no longer waits twelve minutes for the browser part.
+
+*Reviewer nits on `checks.mjs` (#502's review).* The runner waits for the shell's `exit` and
+gives the pipes three seconds to drain, then lets go of them and ends the group, where it
+waited for `close` and a server a check started and never stopped held the shard until the
+check's timeout (a selftest runs `sleep 31.7 & echo started` and requires green in under five
+seconds and the sleep gone); the exit code is set, not `process.exit`, which can cut the last
+log lines on macOS; reordering the entries of a shard selects the shard (the order they run in
+is part of them); and the comment on what a manifest edit selects is exact (the shard lists
+select every shard, the prose `about` none).
+
+*Plate shard.* #498's review put it at 19.4 of 20 minutes; #502 had already moved the rides and
+the Ben-Day print to tools, and the last run of that PR read plate 15.2, show 15.3, fifth
+15.6, open 16.4, tools 16.6 minutes of checks (setup is another 1.3 to 1.5), so nothing more
+moved. tools is now the longest, at about 18 of its 20 minutes with setup.
+
+*19k-5, in part.* `scene` ("The room") was red in two seconds beside other checks and green alone
+because its bar, "analysis costs under 2 ms", was the sensor's own wall-clock timer averaged
+over thirty frames: 1.23 ms alone, 2.46 ms with twelve busy loops on 4 cores, one cold frame of
+12 ms among thirty. It now reads the process's CPU time over each push (0.2 to 0.5 ms for the
+median frame in either case), judges each room's median frame against the same 2 ms, and holds
+the costliest frame to its own bar of 20 ms (11 to 15.8 ms measured over twelve runs, alone and with twelve busy loops: always the first room's cold frame; a steady slowdown of the analysis goes red at about 1.4x on it where the old wall mean went red at 1.5x). Switches and
+The intro did not go red under CPU load alone: with eight busy loops on 4 cores (twice the
+cores) Switches read 992 of 992 and The intro 13 of 13, so what turned them red beside the
+others in the first run is not the cores; `quick` keeps their logs in `scratch/quick/` and
+19k-5 stays open for the next red one.
+
 ### 19r. Smaller, for the same pass: the open shard evened
 
 **Shipped** (the open shard's half). The open shard had gathered eight checks since #239
@@ -5171,6 +5226,56 @@ fringe (`d_eff ≈ 200` nm) shifts down from row 27 (`h = 206.7` nm) at `0°` to
 peak (`d_eff ≈ 320` nm) shifts down from row 71 (`h = 319.9` nm) at `0°` to row 78
 (`h = 353.1` nm) at `30°` to row 84 (`h = 393.2` nm) at `50°`.
 
+### 32c. The GPU solver (this PR, #505)
+
+Built `src/gpu/soapFilm.ts` (`createSoapFilmGpu(device, { nx, ny, dx })` with `write(h)`,
+`step(dt, { g, evap, zeta })`, `read() → { h, uf, vf }` and `destroy()`) and its compute
+shaders in `src/gpu/wgsl/soapFilm.ts` (`soapSetup`, `soapSorRed`, `soapSorBlack`, `soapProject`,
+`soapTransport`), implementing the CPU reference (`src/lib/soapFilm.ts`, `stepSoapFilm`) pass
+for pass on the GPU under the contract in `scripts/soapgpu-cpu.ts`:
+- `soapSetup`: marks cells with `h < 30` nm (`BLACK_THRESHOLD_NM`) as ruptured, reduces the
+  film's mean thickness `hbar` (and mean-centres `p` when warm-started so float32 gauge drift
+  cannot accumulate over thousands of steps), evaluates unprojected vertical Darcy buoyancy
+  `v* = (rho * g / zeta) * (h_face - hbar) * 1e-9` on the interior horizontal faces
+  (`j = 1 .. ny - 1`) with all four walls shut, reduces `maxStar = max |v*|`, and forms the
+  unprojected cell divergence `rhs_ij = vf*[j+1, i] - vf*[j, i]` (or zeroes `uf`, `vf`, `p`
+  and `rhs` when `maxStar <= 1e-18`).
+- `soapSorRed` / `soapSorBlack`: solves `deg_ij * p_ij - sum_neighbours(p) = -rhs_ij` on the
+  staggered MAC grid by red-black SOR with `omega = 2 / (1 + sin(pi / max(nx, ny)))`,
+  warm-started from the previous step's tension `p` (60 sweeps warm, 80 sweeps cold when `g`
+  changes or `write(h)` lays a fresh film).
+- `soapProject`: projects interior MAC face velocities `uf[i, j] = -(p[i, j] - p[i-1, j])`
+  and `vf[i, j] = vf*[i, j] - (p[i, j] - p[i, j-1])` with walls zero, reduces `uMax`, and
+  sets the CFL sub-step count `steps = max(1, ceil(uMax * dt / (0.45 * dx)))`.
+- `soapTransport`: advances `h` through `steps` conservative flux-form sub-steps using
+  second-order upwind reconstruction with the minmod limiter (`sx`, `sy`), computing each
+  shared face flux (`fx`, `fy`) once for both adjacent cells and blocking inflow into ruptured
+  cells when `evap > 0`, followed by uniform evaporation (`evap` nm/s) and exponential
+  relaxation (`BLACK_RELAX_TAU = 0.5` s) of ruptured cells (`< 30` nm) toward Newton black
+  (`8` nm).
+- Constants (`RHO_WATER = 1000`, `DEFAULT_ZETA = 1.5`, `BLACK_THRESHOLD_NM = 30`,
+  `NEWTON_BLACK_NM = 8`, `BLACK_RELAX_TAU = 0.5`) are copied under the same names rather than
+  imported from `src/lib/soapFilm.ts`, so the GPU solver's bundle carries 0 bytes of the CPU
+  reference.
+- Wired `npm run soapgpu` into `scripts/checks.json` on the Mac `plate` shard beside `sloshgpu`,
+  and `npm run soapgpu -- --selftest` into `Measure`'s `lab` shard beside `sloshgpu` (in `lab`
+  rather than `logic` because `scripts/soapgpu.mjs` calls `openLab` to launch Chromium and
+  request a WebGPU adapter even under `--selftest`, and `checks.yml` installs Chromium only on
+  the `browser` and `lab` shards).
+
+Measured: `npm run soapgpu` 29/29 on `apple metal-3` (first-step face flows RMS diff 0.195%
+within 2%, thickness change 1.116% within 5%; 1 s thickness RMS diff 0.065% at `dt = 0.05` s,
+0.022% at `dt = 1/60` s, and 0.884% at `zeta = 0.25, dt = 0.2` s across 4 CFL sub-steps; C1
+thick patch +29.41 vs +29.41 rows, thin patch −22.56 vs −22.55 rows; C4 excess 83%, mass 0.77,
+max `|div u|` 1.8e-4 /s against 1.9e-3 /s, 0.00% of cells outside face fluxes, wall flow 0; C2
+mass drift 7.0e-9, uniform film 0.0e+0 nm; C3 `g = 0` 0.0e+0 nm, half-gravity ratio 0.54,
+reversed −20.86 vs −20.85 rows; C6 quarter means ordered from 30 s, worst quarter mean diff
+0.08%, top 10% black at 115 s vs 115 s, 0 refilled on the drain or on the torn hole, black hole
+spread 160 vs 160 cells; 0 of 4785 steps idle, 0 of 514 reads idle; `src/lib/soapFilm.ts` not in
+bundle; 0 WebGPU errors; `cost: 2.44 ms a step at 256 × 256 on apple metal-3`); `npm run soapgpu
+-- --selftest` 29/29 (`cost: 189.18 ms a step at 256 × 256`); `npm run soapfilm` 23/23; `npm run
+wgsl` 142 shaders; `npm run physics` 20/20; `npm run derive` 4/4.
+
 
 ## 33. Bubbles and the closeup, per liquid
 
@@ -5549,6 +5654,18 @@ seeded plate, mean 0 to 255 per channel, old then new: 0.25 (64.4, 44.1, 55.9) t
 (68.8, 25.4, 6.0), against 6500 K's (63.5, 45.8, 61.4), a blue dye going nearly black as it does under a real
 tungsten lamp. The vignette is unchanged, blended as it was (a first version multiplied by a second blend and was 4 to 6% dark in the corners, which the review caught), and full from 1 on. `npm run panel` holds the shader to the uniforms, the
 kelvin to even mireds ending at 3200 K, the tint to the blackbody's ratios, and 0 to 1 to the old grade.
+
+### 35e-4. Home Movie at 3560 K, the warm end as bright as the white (shipped 2026-10-27)
+
+The owner left both open choices to the session. Home Movie went from Lamp Warmth 0.45 to 3 (3560 K): a Super 8
+projector's lamp is a 3200 to 3400 K halogen, and the end of the slider (3.75) is not used because the tint is the
+full blackbody ratio, which a camera records and a room-adapted eye sees less of. Brightness: colour temperature does
+not set a lamp's output. A lamp run cool on a dimmer does lose light (flux goes as the lamp voltage to the 3.4, its
+temperature as the voltage to the 0.42, so about the eighth power of temperature near 3000 K), but that is Exposure,
+not the colour. `lampTint` now scales the tint above 1 to keep the luminance it has at 1 (0.924), where it had fallen
+to 0.811 at 2, 0.718 at 3 and 0.660 at 3.75. Red rises to 1.36 at 3 and 1.48 at 3.75, so a full-red pigment clips:
+named, and the six-band lamp spectrum (35e-3) is its proper fix. 0 to 1 is untouched. `npm run panel` holds the
+luminance to 1e-9 from 1 to 3.75.
 
 ### 35f. Show hardware (shipped 2026-10-25)
 

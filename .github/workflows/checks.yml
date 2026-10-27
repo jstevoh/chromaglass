@@ -66,7 +66,8 @@ jobs:
   # queue the Mac shards: it proves
   # nothing new there, and on 2026-10-03 each such push still waited twenty
   # to thirty minutes for a Mac and then held one for forty-five runner-minutes
-  # in front of PRs that did change the plate. Measure always runs. A deploy
+  # in front of PRs that did change the plate. Measure runs, in full unless the
+  # diff is only check scripts and documents (19k-4, below). A deploy
   # (`workflow_call`) reaches the Mac unless its gate passed `mac: false`
   # (deploygate.sh rule 5), and the gate never trusts a run that skipped it.
   reach:
@@ -76,6 +77,8 @@ jobs:
     outputs:
       mac: ${{ steps.reach.outputs.mac }}
       shards: ${{ steps.reach.outputs.shards }}
+      parts: ${{ steps.reach.outputs.parts }}
+      only: ${{ steps.reach.outputs.only }}
     steps:
       # Two deep: the pull request's merge commit and the base it was merged
       # into, which is the whole of what the PR changes.
@@ -110,8 +113,16 @@ jobs:
   # look in two labs). Every check runs whatever failed before it in its part.
   # GitHub's ubuntu runners are not the queue the Mac's are, so four at once
   # cost the queue nothing.
+  #
+  # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
+  # manifest's entries, the npm scripts checks run and documents runs only the
+  # Measure checks it reaches, and only the parts that have any: `reach` says
+  # which (`parts`, and `only`, the names). Anything else, and every deploy and
+  # run by hand, runs every part in full. Four to twelve minutes off the wall
+  # time to green, none off any queue.
   measure-part:
     name: Measure · ${{ matrix.part }}
+    needs: reach
     runs-on: ubuntu-latest
     # The browser part ran 11:47 on main before the switches step (two to three
     # minutes in CI); 15 left it no headroom. 25 since PLAN 33b: the lab part ran
@@ -121,7 +132,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [logic, sound, browser, lab]
+        part: ${{ fromJSON(needs.reach.outputs.parts) }}
     steps:
       - uses: actions/checkout@v5
       # 22, not 20: `music`, `scene`, `liquids` and `wall` all run their
@@ -266,6 +277,8 @@ jobs:
       # here: `npm run checks` holds this file to it.
       - name: The checks
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          CHECKS_ONLY: ${{ needs.reach.outputs.only }}
         run: node scripts/checks.mjs --ci ${{ matrix.part }}
 
   # The WebGPU stage (docs/webgpu-plan.md), on macOS: GitHub's Apple Silicon

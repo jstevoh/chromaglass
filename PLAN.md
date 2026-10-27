@@ -83,8 +83,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   docs/plan-shipped.md 19r).
 - **0.5** ~~**19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
   only their shards, a new check edits no shared file, and `npm run quick` runs what
-  the diff needs, in parallel.~~ #502; open with it 19k-1 (the guard reads the
-  manifest) to 19k-4
+  the diff needs, in parallel.~~ #502; 19k-1, 19k-3, 19k-4 shipped, 19k-2 (measure it over
+  the next 25 merges) and the rest of 19k-5 open
 - **0.6** **19m** (F, M, at a quiet moment): fragment files for the shared documents, and this
   file as an index with one file per section; 23 of the last 25 merge conflicts were in
   `PLAN.md`, `docs/judging.md`, the changelog or `package.json`.
@@ -561,6 +561,7 @@ Where each batch stands, as of 2026-09-27:
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
 | 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
+| 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1295,6 +1296,18 @@ Open from Desk v2, each its own thread (the UI lane):
     whatever asked for it. Checks: `npm run layout` (two knobs with swallowed releases;
     a focused card replaced by a hovered one), `npm run phone` (a tap on another name
     swaps the card). Which gesture on the owner's Mac swallowed the release is not known.
+  - ~~**8j-3** Hover cards wait much longer~~ (the owner, 2026-10-27: "tool tips on
+    hover over are getting annoying"). **Shipped.** One constant, `TIP_DELAY_MS` (1.5 s,
+    `src/lib/tipDelay.ts`), was 380 ms for the knob and fader cards, and the browser's own
+    `title=` tips (about 240 of them, near a second, not slowable) came up on top. Both
+    now wait the one number, counted afresh on every control with no grace between
+    neighbours: `src/lib/titleTips.ts` lifts a `title` off the element under a mouse or
+    pen, draws its words on a card after the wait and puts it back when the hand goes,
+    presses, types or scrolls (also in a panel's own window). The phone is unchanged: a
+    touch never starts the wait and the name tap still opens its card at once. Checks:
+    `npm run layout` (a knob's card and a `title=` are each absent at 60% of the wait and
+    up after it; the title is back and the card gone after), `npm run phone`.
+    Not changed: the remote page and the cast page, which do not install it.
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
@@ -1990,9 +2003,10 @@ The steps, most visible first. Each is one PR with its own check, and every step
      first steps use. Oil poured before they are ready builds them on that frame.
      A check that pours oil at once in Oil & Water would say how long it stops.
 6. **A plate that lives on its own** (roadmap S2, heat and boiling). Blocked on heat
-   having a strength.
+   having a strength. The analog operators' accounts say to unblock it as a
+   performer's control (§36e).
 7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field
-   and a streak layer, each at its own speed, added as light.
+   and a streak layer, each at its own speed, added as light. Moved up by §36h.
 8. ~~**Evolve changes slowly with the song.**~~ Shipped: one move at a time (a few
    related dials, 30–90 s glides, about one a minute), steered by the song's sections
    and its level over half a minute, the palette turning at drops and breakdowns, the
@@ -3191,7 +3205,7 @@ the checks and the build §19.
 **Shipped, this PR** (`npm run showkey`: 11 of 33 on the old server, 33 of 33 now). Story in `docs/plan-shipped.md`.
 Left open from it:
 
-- **14m-guest** (*proposed*, M): a **guest key**, now that the server has roles: a key
+- **14m-guest** (*proposed*, M; moved up by §36f, with a plate per performer): a **guest key**, now that the server has roles: a key
   whose socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto
   a chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
   tablet, a second projectionist, or at a party the audience's phones through a QR code
@@ -3263,6 +3277,8 @@ in a scratch clone with a tag behind `main` builds the tag's tree; the cast hell
 version (14k) matches it.
 
 ### 14q. The room's lights do not follow the wall
+
+*Moved up by §36g (2026-10-27): the old light shows fought the band's own lighting.*
 
 **Read in the code** (the `lights` effect in `App.tsx`; `server/artnet.js`). Every
 50 ms the show sends each layer's mean colour and `master = blackout ? 0 : min(1, fill ×
@@ -5289,31 +5305,19 @@ like day (`npm run macqueue -- --hours 24` for the time).
 ### 19k. One manifest of checks
 **Shipped** (#502): `scripts/checks.json` holds every check CI runs (180 steps, in order, with their comments), `checks.yml` runs each Measure part and Mac shard from it (`node scripts/checks.mjs --ci <shard>`), a PR whose Mac-reaching change is only check scripts, manifest entries or their npm scripts runs only those checks' shards, and `npm run quick` runs the checks a diff reaches, side by side. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-Found with it, open:
+Found with it: **19k-1** (the guard reads the manifest), **19k-3** (`actionlint` runs in Measure
+from a pinned release) and **19k-4** (Measure runs only the checks a diff reaches) **shipped**, **19k-5** shipped in
+part (the stories are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
 
-- **19k-1** (E, S): `checkguard.mjs` does not read the manifest. A check whose entry is
-  removed, or whose command, env or timeout changes (`QA_GPU=mid`, a `--node` flag), stops
-  measuring what it did with nothing to name; it was as blind to a deleted step in
-  `checks.yml`. Hold a removed or changed entry to `Check changes:` as a removed check is.
-- **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs: Mac minutes on
-  check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), and
-  merge conflicts in `checks.json`, `checks.yml` and `package.json` (60 adjacent merges
-  replayed with `git merge-tree` before it: 9 conflicted, none in those files).
-- **19k-3** (E, S): `actionlint` is not in the repository and a cloud session cannot fetch
-  it (the download was refused in 19k's session), so CLAUDE.md asks for a check no session
-  can run. Run it in Measure from a pinned release, or drop it from the table.
-- **19k-5** (E, S): side by side, some Measure checks go red that are green alone. On a
-  4-core cloud session `npm run check` (93 checks, 40.8 minutes, their times summing to 103)
-  ran seven red together the first time, every one green alone: the shared `dist/` and the
-  fixed port 4197, which `quick` now holds one at a time. The second time The room (`scene`,
-  red in 2 s), Switches read on and off and The intro were red beside the others and green
-  alone, and The intro was red alone once (the opening's render compiles never logged).
-  `quick` now keeps such a check's log in `scratch/quick/`; find what each shares or
-  measures of the machine, and fix that, not the bar.
-- **19k-4** (E, S): the Measure parts still run in full on every push. With the manifest
-  they could run only the checks a diff reaches, as `quick` does; the logic part is about
-  four minutes and the browser part twelve, off no queue, so this is wall time to green,
-  not runner time.
+- **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
+  on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
+  wall time on the check-only and document-only ones (19k-4: before it, every PR waited for the
+  slowest part, 12 to 19 minutes), and merge conflicts in `checks.json`, `checks.yml` and
+  `package.json` (60 adjacent merges replayed with `git merge-tree` before it: 9 conflicted,
+  none in those files). `npm run macqueue -- --hours 24` and `npm run flakes` read the first two.
+- **19k-5** (E, S), what is left: see the story for which side-by-side reds were found and
+  fixed. Run `npm run check` on a 4-core session once more, with the logs `quick` keeps in
+  `scratch/quick/`, before closing it.
 
 ### 19l. App frames readable in a cloud session
 
@@ -8552,45 +8556,18 @@ model cannot reach one, the PR says what it reached and asks.
 
 - **32b-1. Replace the colour grade with the soft box's solid-angle integral and camera gamut mapping.** In 32b, the 4-point path spread (`spread = 0.025`) and dark ground (`ground = 0.0004`) move C7's `t = 120` s saturation by two points (79% → 77%), while the colour grade (`notchFloor = 0.0725`, `chromaRetention = 0.67`) accounts for the rest of the drop from 77% to 13% against the photograph's 15%. Replace that grade with the real phenomenon: integrate the film's Airy reflectance over the soft box's solid angle as a quadrature in `cosI` with s and p Fresnel reflection terms at each angle and the thickness's phase `4π n d cos θ_t / λ` at each angle (which also retires the Fresnel half of shortcut (f)), then map the integrated CIE XYZ tristimulus into the camera's sRGB gamut instead of clamping negative linear channels to zero. *Measure:* the same saturation and hue numbers `npm run soapfilm` C7 prints, with the grade removed (`notchFloor = 0`, `chromaRetention = 1`), showing how much of the 77% → 15% saturation drop the solid-angle integral and camera gamut mapping recover. Also note that check C7 in `scripts/soapfilm.mjs` has no upper bound on saturation (`sat > 0.10` only, so it would pass a film far more saturated than the photograph, such as main's 79% or the ungraded 77%), for a check session to add that bar.
 
-### 32c. The GPU solver
-
-The same model as compute passes in `src/gpu/wgsl/` (the thickness texture, a Jacobi or
-red-black projection, the limited advection), run on the plate's grid. A lab check,
-`npm run soapgpu` (`PW_WEBGPU=1`), runs the 32a scenarios on the GPU and holds C1–C4 and C6
-to the CPU reference within a stated tolerance, so the GPU is judged by the model and not
-by whatever it draws. *Measure:* `soapgpu` plus `wgsl`, `physics` and `derive` unchanged,
-and the pass's cost in ms at the plate's size.
-
-**The check is written first (this PR), and red on main for the one right reason:** with no
-`src/gpu/soapFilm.ts` it prints that and exits 1, as `soapfilm` did before 32a, so it is not
-in `checks.yml` yet; 32c wires it in. `scripts/soapgpu.mjs` runs soapfilm.mjs's C1–C4 and C6
-films, seeds, steps and bars through the GPU solver, and steps the same films on the CPU
-reference beside it: the first step's face flows within 2% and its change in thickness within
-5% (RMS, cell by cell), the thickness after one second within 5% of its change (at dt 0.05, at the frame's 1/60 s, and
-at zeta 0.25 and dt 0.2 s where the reference takes 4 CFL sub-steps), each patch's
-travel within 1.5 rows, every quarter's mean within 2% every 5 s of the drain, the top black
-within 5 s of the reference's, and a hole torn in the film never refilled, its black spreading
-within 15% of the reference's. Two float64 bars move for float32 storage, and only two:
-conservation to 1e-6 (not 1e-9; float32 storage of the whole reference measured 7.7e-9) and
-a still film to 1e-5 nm of the float32 film it was handed (not 1e-6 of the float64 one). The solver's contract
-(`createSoapFilmGpu(device, { nx, ny, dx })` with `write`, `step`, `read`) is written in
-`scripts/soapgpu-cpu.ts`, the reference dressed in it, which `npm run soapgpu -- --selftest`
-runs: 29/29. Look-alikes, each the reference with one thing changed (in a cloud session):
-first-order upwind fails 8 lines, an MC limiter 3 (first step 7.0%, one second 6.3%, drain
-9.6%), a projection stopped at 20 sweeps 4, Jacobi at 200 sweeps 1 (flows 2.8%), semi-Lagrangian
-advection 11 (conservation 8.9e-4), no rupture marks the 2 hole lines, a step that ignores dt
-2, one that ignores zeta 1, one with no sub-steps 1 (26% off); red-black SOR at 60
-sweeps and Jacobi at 1000 pass all 25, so a faithful float32 solver can. The flows' 2% bar
-is a convergence bar, cold, on the first step: plain Jacobi needs about 1000 sweeps on 32 × 64
-to meet it, red-black SOR 60, so 32c's projection is red-black SOR (or multigrid), warm-started.
-The check also asks that the work be the GPU's: the solver's bundle may not carry
-`src/lib/soapFilm.ts`'s code, every step submits to the queue and every read maps a buffer.
+### ~~32c. The GPU solver~~ — **Shipped, this PR (#505)** (`src/gpu/soapFilm.ts` exporting `createSoapFilmGpu`, `src/gpu/wgsl/soapFilm.ts` with `soapSetup`, `soapSorRed`, `soapSorBlack`, `soapProject` and `soapTransport`, and `scripts/checks.json` wiring `npm run soapgpu` on the Mac `plate` shard beside `sloshgpu` and `npm run soapgpu -- --selftest` on Measure's `lab` shard beside `sloshgpu`; `npm run soapgpu` 29/29 on `apple metal-3` — first-step flows 0.195%, first-step thickness 1.116%, 1 s thickness 0.065% at `dt = 0.05` s, 0.022% at `dt = 1/60` s, 0.884% at `zeta = 0.25, dt = 0.2` s with 4 CFL sub-steps, C1 thick +29.41 vs +29.41 and thin −22.56 vs −22.55 rows, C2 drift 7.0e-9, C3 reversed −20.86 vs −20.85 rows, C4 max `|div u|` 1.8e-4 /s, C6 worst quarter mean 0.08%, top black at 115 s vs 115 s, torn hole 0 refilled and 160 vs 160 black cells, 0 of 4785 steps idle, 0 of 514 reads idle, `src/lib/soapFilm.ts` absent from bundle, `cost: 2.44 ms a step at 256 × 256 on apple metal-3`; `npm run soapgpu -- --selftest` 29/29; `npm run soapfilm` 23/23; `npm run wgsl` 142 shaders; `npm run physics` 20/20; `npm run derive` 4/4; story in `docs/plan-shipped.md` §32c)
 
 - **32c-1. The drain's own "a ruptured cell stays black" never fires.** soapfilm.mjs C6 reads
   it on the drain, where measured, the reference with its rupture marks removed refills no cell
   either (thick film never presses on black there), so that line in `npm run soapfilm` would pass
   a solver with no marks. `soapgpu` asks it on a torn hole instead; soapfilm.mjs should get the
   same hole for the CPU reference (a check session; it moves an input, so `Check changes:`).
+- **32c-2. `soapgpu -- --selftest` opens Chromium before checking `selftest`.** `scripts/soapgpu.mjs`
+  calls `openLab` and `navigator.gpu.requestAdapter()` unconditionally, and `checks.yml` installs
+  Chromium only on `Measure`'s `browser` and `lab` shards (`logic` has no Chromium), so
+  `npm run soapgpu -- --selftest` sits in `Measure`'s `lab` shard beside `sloshgpu` until
+  `soapgpu.mjs` steps the `--selftest` control in Node without a browser.
 
 ### 32d. On the plate
 
@@ -8944,22 +8921,28 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   (the new tint is the old grade to 1.5% a channel there), so saved looks, the presets and Lucky keep their
   colour with no migration. The vignette is unchanged (full from 1 on). Held by `npm run panel`. Story in
   `docs/plan-shipped.md` §35; judging §80.
+- ~~**35e-4** Home Movie's lamp, and the warm end's brightness.~~ Shipped (2026-10-27, the owner left both to the
+  session): Home Movie sits at Lamp Warmth 3, 3560 K, and the warm end holds its brightness. A Super 8 projector's
+  lamp is a 3200 to 3400 K halogen, the lamp the film was balanced to be shown by; 3 and not the 3.75 end because the
+  tint is the full blackbody ratio, which a camera records and a room-adapted eye sees less of (35e-3), so the end
+  would over-state the orange. Brightness: colour temperature does not set output (a projector's halogen is as bright
+  as it was built to be, and the lens throws no less light for the lamp being amber); a lamp run cool on a dimmer does
+  lose light, steeply, about the eighth power of its temperature near 3000 K (flux as V^3.4, temperature as V^0.42),
+  but that is Exposure's knob, not the colour's. So `lampTint` keeps the luminance it has at 1 for 1 to 3.75 and 0 to 1
+  is untouched. Cost, named: the red channel rises to 1.48 at 3200 K (1.36 at 3560 K), so a pigment already at full
+  red clips on a multiply of the finished picture, which the six-band lamp spectrum (35e-3) would handle properly.
+  Held by `npm run panel`; judging §84.
 - **35e-3** What the readings left, none changed because each moves a look or waits on another step:
   - **The lamp's colour is a multiply on the finished picture,** which is the lamp's spectrum times a white
     surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
     Planck spectrum entering `spectralThrough`'s six bands before the eye sums them, so a deep blue dye under
     3200 K goes darker and more violet than a multiplied blue does (it already goes to a near black in the
-    lab picture). Named shortcut; replace it. The warm end is also about a third dimmer, which is a choice and not
-    physics (holding red still keeps 0 to 1 the old grade; a lamp's brightness is not set by its colour
-    temperature), and Exposure puts it back; if the owner wants the end held at the same brightness, that is one
-    normalisation in `lampTint`. Two more shortcuts: the neutral is the 6500 K blackbody, not D65 (sRGB's white,
+    lab picture). Named shortcut; replace it. (The warm end's brightness is settled: see 35e-4.) Two more shortcuts: the neutral is the 6500 K blackbody, not D65 (sRGB's white,
     which sits a little off the blackbody curve), so the figure is approximate; and the full blackbody ratio is
     what a camera or film balanced for daylight records, where an eye in the room would partly adapt to the warm
     light and see less orange.
-  - **Velvet Underground (0.25) and Home Movie (0.45) keep their colour** to under 2% in blue, because their
-    numbers kept their meaning. Home Movie is the look an old projector's lamp is for: the owner's eye on
-    whether it should now go to 2 or 3 (judging §80 item 4); Lucky still draws 0 to 0.8, so it never reaches
-    the halogen.
+  - **Velvet Underground (0.25) keeps its colour** to under 2% in blue, because its number kept its meaning. Lucky
+    still draws 0 to 0.8, so it never reaches the halogen. (Home Movie moved: 35e-4.)
   - **Evolve wanders Lamp Warmth by a fifth of its travel,** which is now a fifth of 3.75: from a look at 0.25 up
     to 1, from a look at 3 over the whole warm end. Pull it in (a per-dial span) if that reads as too much.
   - **The viscosity drip is slow motion at one factor.** The ratio between thin and thick is the
@@ -9017,6 +9000,91 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
   its hare at both ends but no snail at the stop in the middle (the slider has one under the track). Batches B
   (liquid in the controls) and C (show hardware) have shipped (35e, 35f), and item 12 (35g), the last.
+## 36. What the analog operators could not do (researched 2026-10-27)
+
+Asked 2026-10-27: what the analog liquid light shows could not do, and what the people
+who ran them wished they could. The research, in the operators' own words with a source
+for each quote, is the owner's page "Limits of the Wet Show" (its notes are in the
+project's shared files, `research/light-show/analog-limits.md`; the craft itself is in
+`craft-and-field.md` beside it). Of 22 pains and wishes it found, ChromaGlass already
+answers 12 (the heat that cracks glass, dishes that go muddy or dry, half a ton of gear,
+seven-operator crews, five-hour nights alone, nothing left on film), answers 7 in part,
+misses 2, and 1 (fog machines) is outside any app. The owner asked for all eight items
+below to be in the plan. 36a–36d are new; 36e–36h are open items elsewhere that the
+research says to move up, with the evidence, and each of those keeps its own number.
+
+What a fix must not take away, from the same operators: the plate's own surprises ("For
+me perfection equals a kind of death", Joshua White), no visible pixels, above all on
+people ("no one's body looks good with pixels on it", Drippy Eye), and the hand, not a
+button, making it look good. Every item here is held to those.
+
+- **36a. A lit-stage grade** (*proposed*, M). *The pain:* analog light "is not bright, and
+  it's hard for that light to live in a modern stage environment" (Mad Alchemy); one
+  operator pre-records when there is "too much competition from bright stage lights"
+  (Liquid Lights Bend). A video projector has the lumens, but every look is graded for a
+  dark room: under a stage wash the projector's black lifts to grey, and the looks that
+  lean on near-black scenes (the swells and darkness of §10) turn to a grey haze. *The
+  feature:* a **Lit stage** amount in Settings → Wall (load-in, never saved into a look):
+  as it rises, the dyes thicken and saturate and the bodies hold larger, so a look keeps
+  its contrast on a lifted floor instead of performing black the room cannot show. A
+  real projector's black under ambient light is light added to every pixel, so the
+  check models it that way. *Measure:* each look rendered in the lab over a raised black
+  floor (0, 5, 10 % of white added), its contrast between dye bodies and field held at 10 %
+  to within a set fraction of its dark-room value with the grade on, and byte for byte
+  unchanged at 0. Phone: the same amount in the phone's Wall sheet.
+- **36b. Span the wall** (*proposed*, L, the Mac app). *The pain:* "The light show, as
+  originally performed had no effect on large audiences" (Joshua White); "there wasn't any
+  money to rent the extra projectors I knew I'd need to make a difference in that big
+  hall" (Bill Ham); one operator built "a full 360-degree panorama with six projectors"
+  (Liquid Lights Bend). Today a show goes to one output: Two Projectors (18b-10) is two
+  lamps on one screen and §16 is two plates, and nothing in this plan blends projectors
+  edge to edge. *The feature:* several outputs from the Mac app, each with its own corner
+  pin and masks (the Wall's), soft-edge blending where neighbours overlap (a gamma-correct
+  ramp, so the overlap is not brighter), and one plate laid across all of them, up to a
+  closed ring. Read §16's open 16d and 16e first; this may belong there. *Measure:* a
+  two- and three-output render whose summed light across each overlap stays within a
+  few percent of the light beside it.
+- **36c. A practice plate** (*proposed*, M). *The pain:* "It requires practice, speed and
+  precision changing between effects live" (Heavy Light); "We struggled along for years
+  and we didn't figure out the chemistry … No one wanted to tell you how any of this stuff
+  was done" (Mad Alchemy). `docs/guide.md` explains every control, but nothing in the app
+  teaches the strokes, and no item in this plan does. *The feature:* a short guided set,
+  on the plate itself and against a song, that teaches the squash, the lift, the tilt,
+  the blow and the drop one at a time, each step done when the performer has made it
+  happen. Desk, iPad pad and phone alike. *Measure:* a harness that plays each step's
+  stroke and sees the step advance, and a step that cannot be passed without it.
+- **36d. Show the hands** (*proposed*, M). *The pain:* a lighter digital rig is "not as
+  fun for the audience to watch as the analog set up" (Heavy Light); of the Joshua Light
+  Show today, "part of the appeal is getting a chance to see the mechanics of how White
+  and team mix oils and colors in real time" (Time Out New York). A laptop on a table
+  looks like someone reading email. *The feature:* an optional audience-facing view of
+  the performance: the iPad pad drawn as a lit glass table with the touches and pours as
+  they happen, as a Mixer row or a corner of the wall or a second output, or a camera on
+  the performer through the film projector's live camera. Pairs with the hardware idea
+  of a touch table in a case. *Measure:* a pad stroke appears in the view on the same
+  frame it reaches the plate.
+- **36e. Heat the performer rides** (moves up the Running order's step 6, roadmap S2).
+  *The evidence:* heat was both the hazard and the instrument: "the heat was hard to
+  control, glass cracked" (Ultramarine), and a Danish crew turned it into a stroke: "we
+  deliberately blocked the air stream when we needed heat to propagate bubbles"
+  (Tezcatlipoca). Step 6 is blocked on heat having a strength; the research says to
+  unblock it as a performer's control: a Heat dial and a pad gesture, the lamp feeding
+  heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
+  bubbles while it is held and calming when released. Not a bubble sprite.
+- **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
+  her there to smooth transitions things would come to a halt, visually" (Heavy Light);
+  Glenn McKay's crew described it as "painting with three or four hands". Build the guest
+  key, and give each performer a plate of their own on the desk, so two people play one
+  show without fighting over one dial.
+- **36g. The room's lights follow the wall** (moves up 14q). *The evidence:* the old
+  shows fought the band's own lighting: "Their lighting man wanted his toy strobe to be
+  seen and kept telling us to get that crap off the screen" (Joshua White); "the bigger
+  bands were carrying their own lights" (Ultramarine). Lights that fade with the wall
+  turn the rival rig into part of the show.
+- **36h. Layers at their own speeds** (moves up the Running order's step 7, roadmap Stage
+  4). *The evidence:* Drippy Eye's dream rig "would consist of five slide projectors
+  doing their own thing … we will do it someday". Today two plates at most (§16).
+
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.

@@ -5,19 +5,23 @@
     "which shards a PR's diff selects from here; `npm run quick` runs, in parallel, the",
     "checks a diff reaches. A new check is one entry here (and its npm script, if it has",
     "one), never a new step in the workflow. `why` is the step's old comment: what the",
-    "check measures and why it is where it is. `scripts/checks.mjs` holds the rules."
+    "check measures and why it is where it is. `always`, on a Measure check, keeps it in",
+    "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
+    "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
   ],
   "shards": { "measure": ["logic","sound","browser","lab"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
       "shard": "logic",
-      "run": "npm run lint"
+      "run": "npm run lint",
+      "always": true
     },
     {
       "name": "The scripts parse",
       "shard": "logic",
       "run": "for f in scripts/*.mjs server/*.js dc.mjs; do node --check \"$f\" || exit 1; done",
+      "always": true,
       "why": [
         "Every script parses (PLAN.md 19b). `tsc` reads only a handful of the",
         "harnesses, so a syntax error in one that only a Mac shard runs used to",
@@ -28,12 +32,27 @@
       "name": "The manifest of checks",
       "shard": "logic",
       "run": "npm run checks",
+      "always": true,
       "why": [
         "This file, the workflow that runs it and the rules that pick a PR's",
         "shards from it (scripts/checks.mjs, PLAN.md 19k): every check's npm",
         "scripts and files exist, checks.yml runs each part and shard from here",
         "and no check beside it, the trace finds every script esbuild finds a",
         "check importing, and each selection rule beside its control."
+      ]
+    },
+    {
+      "name": "The workflows lint",
+      "shard": "logic",
+      "run": "npm run actionlint",
+      "always": true,
+      "why": [
+        "actionlint, a pinned release checked against its published sha256",
+        "(scripts/actionlint.mjs, PLAN.md 19k-3), over .github/workflows. CLAUDE.md",
+        "asked every session that touched a workflow for it, and none could run it:",
+        "nothing in the repository fetched it. A workflow that does not parse, an",
+        "expression on a context that is not there or a `needs` that names no job",
+        "is a deploy that never starts; here it is a red in four minutes."
       ]
     },
     {
@@ -49,6 +68,7 @@
       "name": "The plate",
       "shard": "logic",
       "run": "npm run plate",
+      "always": true,
       "why": [
         "Every preset's dish: that its dyes, injection styles and liquids all",
         "name things that exist. The cheapest check in the repo and the one that",
@@ -116,6 +136,7 @@
       "name": "The panel",
       "shard": "logic",
       "run": "npm run panel",
+      "always": true,
       "why": [
         "The two lists that have to agree about what a control is: the settings",
         "panel's own markup, and the registry the desks pin from."
@@ -703,6 +724,19 @@
         "a bore, held together to a ten-thousandth, cell by cell. `npm run slosh`",
         "holds the TypeScript to the physics; this holds the shader to it. It runs",
         "again on the Mac's plate shard, against Metal."
+      ]
+    },
+    {
+      "name": "The draining soap film on the GPU (control)",
+      "shard": "lab",
+      "run": "npm run soapgpu -- --selftest",
+      "why": [
+        "The draining soap film's GPU check against its CPU control (PLAN 32c,",
+        "scripts/soapgpu.mjs --selftest, scripts/soapgpu-cpu.ts): the CPU reference",
+        "in the GPU solver's contract through every scenario and bar of soapgpu.",
+        "In Measure's lab part rather than logic because soapgpu.mjs opens the lab",
+        "page in Chromium and requests a WebGPU adapter before running the solver,",
+        "and checks.yml installs Chromium only on the browser and lab parts."
       ]
     },
     {
@@ -1370,6 +1404,21 @@
       "why": [
         "The slosh dish's kernels against the TypeScript reference, on Metal",
         "(the same check runs on SwiftShader in Measure's lab part)."
+      ]
+    },
+    {
+      "name": "The draining soap film on Metal",
+      "shard": "plate",
+      "run": "npm run soapgpu",
+      "why": [
+        "The draining soap film's GPU solver (src/gpu/soapFilm.ts,",
+        "src/gpu/wgsl/soapFilm.ts) against the CPU reference (src/lib/soapFilm.ts),",
+        "on Metal (PLAN 32c, scripts/soapgpu.mjs): first-step face flows within 2%",
+        "and thickness change within 5%, 1 s thickness at dt 0.05, 1/60 s and",
+        "zeta 0.25 with dt 0.2 s (4 CFL sub-steps) within 5%, C1-C4 and C6,",
+        "ruptured hole unrefilled and black spreading within 15%, every step",
+        "submitting GPU work and every read mapping a buffer, and the CPU",
+        "reference absent from the solver's bundle."
       ]
     },
     {

@@ -1898,3 +1898,14 @@ Bad: the show visible for a frame before the sign-in screen, a Google sign-in th
 window and is refused, a browser tab that signs in but the app never notices, a licensed app that asks again
 with Wi-Fi off, or Chrome on localhost playing the show free. Decide too: offline, a refunded key keeps working
 until the app next goes online (no grace period, PLAN 23.17h).
+
+## 84. Home Movie on a Super 8 lamp, and the warm end as bright as the white (PLAN 35e-4)
+
+1. Open Home Movie. It should now be the amber of a home-movie projector, lamp reading 3560 K (Settings, Lamp &
+   Light), with orange and coral held and the teal gone dark and quiet, not a brown wash.
+2. Drag Lamp Warmth from 1 to the end on any look. The picture should change colour and not get darker; before, it
+   lost a third of its light by the end. Exposure still dims it if you want a dim lamp.
+3. Bad: a bright red or coral that goes flat and clipped at the warm end (the red is multiplied up to 1.36 at Home Movie, 1.48 at the end), a step
+   in brightness at 1, or Velvet Underground, Lucky or any look under 1 that changed.
+4. Decide: is 3 (3560 K) the right amber for Home Movie, or the full 3.75 (3200 K)? And is the red clipping on
+   hot reds acceptable, or should the end hold only half the brightness back?
