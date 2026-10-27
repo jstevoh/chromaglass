@@ -442,6 +442,17 @@
       ]
     },
     {
+      "name": "The dish that boils",
+      "shard": "logic",
+      "run": "npm run boil",
+      "why": [
+        "Heat the performer rides (PLAN 36e): the lamp's hot spot through the dye,",
+        "warm water rising by its real density on an upright plate and not at all on",
+        "a level one, a nucleation superheat per site, a boil where a hand blocks the",
+        "air that holds near 100 °C, and calm within seconds of letting go."
+      ]
+    },
+    {
       "name": "A row's fade",
       "shard": "logic",
       "run": "npm run rowfade",

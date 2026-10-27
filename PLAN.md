@@ -561,7 +561,7 @@ Where each batch stands, as of 2026-09-27:
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
 | 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
-| 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
+| 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**, the GPU build 36e-2 next), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -9098,6 +9098,63 @@ button, making it look good. Every item here is held to those.
   unblock it as a performer's control: a Heat dial and a pad gesture, the lamp feeding
   heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
   bubbles while it is held and calming when released. Not a bubble sprite.
+  - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the
+    reference the GPU build is held to, and `npm run boil` (30 lines, node only, about 40 s)
+    is its judge, the way 32a's soap film came before 32c. The roadmap's blocker for S2 ("heat
+    has no strength, every source saturates the buoyancy tanh") no longer holds: #352 took
+    the tanh out. What the GPU still lacks is heat in kelvin and watts (its `vel.z` has no
+    unit, and `currentForces` still caps it at `clamp(temp, 0, 50)` and the current at
+    `maxCurrent`), a dish whose glass and liquid set how fast it warms, and any boiling. The
+    model, per square metre in SI units: the lamp's infrared hot spot times the Heat dial
+    (how much of the heat filter is out), absorbed by water's depth and the dye's absorbance;
+    one temperature through the liquid and both glasses (Biot about 0.1), conducting
+    sideways, cooled by the fan's air at h = 50 W/m²K or by natural convection at 10 under a
+    hand that blocks it (the Danish crew's stroke), held at the room's at the open rim; a
+    Hele-Shaw flow driven by water's real density (Kell) and viscosity (Vogel), with
+    buoyancy only in the plate's plane (zero on a level plate, as 18f gates it), and volume
+    sources for warming water's expansion and for vapour; and boiling with a per-site
+    nucleation superheat from each cavity (Hsu, 2σT_sat/(ρ_v·L·r), 4 to 12 K), a nucleus as
+    wide as the gap, then heat exchanged at the bubble's rim both ways, so held heat boils
+    and let-go heat condenses. *Measured* (`npm run boil`): the first step's warming matches
+    lamp × absorbed fraction ÷ heat capacity to 1e-6 and the dial is linear; Newton's
+    cooling at both h to 0.5%; a 70 °C patch on an upright plate rises at the exact Darcy
+    inclusion speed within 1.6% (40 °C within 0.6%; the two 4.11× apart against an exact
+    4.07×: a constant expansion slope gives 3.0×, a saturated tanh 1.2×), and on a level
+    plate does not move; what leaves the rim over five minutes of warming is the water's
+    growth by Kell within 0.8%; at 98% of each site's superheat nothing boils and at 102%
+    every site does; a dish the lamp and fan warm to 88 °C never boils in five minutes,
+    boils 27 s after a hand blocks the air, only under the hand, held there under 103.5 °C
+    (100 plus the widest site's 15 K is the bar), and the vapour is under 1% of its peak
+    0.6 s after the hand lifts (0.4 s after the dial goes to 0; the flow under 2% of its
+    25 mm/s peak in 0.9 s).
+    Thirteen look-alikes each fail at least one line (each the reference with one thing
+    changed, `scratch/` in the build session): the old saturated buoyancy 2, a constant
+    expansion slope 3, a constant viscosity 3, buoyancy on a level plate 13, no nucleation
+    threshold 2, a bubble on a timer 4, no condensation 2, no latent heat 3, no vapour
+    volume 1, no expansion 1, a uniform lamp 2, the dye ignored 2, a hand that adds heat
+    instead of blocking the air 1.
+  - **36e-2. The GPU build** (*open*, Antigravity's brief in the project's shared files).
+    The model as passes on the plate's grid: the temperature in kelvin, the lamp in watts,
+    the Heat dial, the hand's held air, the threshold and the vapour as a field the bubbles'
+    shading reads (H6's air), the volume sources in the thin gap's projection (as 18c-1's
+    pours), and the `clamp(temp, 0, 50)` and the current's cap out of the heat's way. A lab
+    check, written first, holds the shader to this reference as `soapgpu` holds 32c. The
+    phone gets the dial and the gesture in the same PR.
+  - **36e-3. One pocket, not many bubbles, on a level dish** (*open*, found building 36e-1).
+    On the check's dish the first site's bubble grows across the superheated hot spot (its
+    rim moves at about h_i·ΔT/(ρ_v·L), 4 cm/s) before the next site warms to its threshold,
+    so the boil is one pocket that settles to a steady size, not separate bubbles that
+    pulse. Real dishes have more sites (10⁵–10⁷ per m²) and dissolved air that comes out
+    first; and a level dish's bubbles cannot leave. Measure what site density and spread
+    give separate bubbles before the GPU look is judged, and give the vapour its own slip
+    (18i's Bretherton speed) so an upright slide's bubbles rise through the liquid.
+  - **36e-4. The shortcuts the model names** (*open*): the gap's vertical cells (Rayleigh–
+    Bénard past Ra ≈ 1708, the Hadley shear on a level plate) and the Marangoni stress from
+    hot to cold, neither in the depth average (with 18f-2); the bubble's heat taken only at
+    its rim, not through the microlayer under it against the glass; T_sat fixed at 100 °C (no
+    Laplace pressure, no dissolved air); one broadband infrared coefficient; a nucleus born
+    whole in one step; and an upright dish warmer than its reservoir turns over through the
+    open rim (a slide is closed at its edges; S1 wants a closed rim).
 - **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
   her there to smooth transitions things would come to a halt, visually" (Heavy Light);
   Glenn McKay's crew described it as "painting with three or four hands". Build the guest
