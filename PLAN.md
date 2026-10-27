@@ -5538,7 +5538,7 @@ tries any of them headed. Each wants its own pass: its opening wait through `wai
 its waits through `settlePlate`, and a cloud run beside the Mac's to say which of its lines agree.
 *Size:* S each.
 
-*Built (2026-10-27):* nine more opted in, each run here at the same commit (`PW_WEBGPU=1`, three
+*Built (2026-10-27):* eight more opted in, each run here at the same commit (`PW_WEBGPU=1`, three
 at a time on 4 cores, 5% of the Mac's steps): `take` 9 of 9, `ferro` 7 of 7, `ferrodrift` 6 of 6,
 `finger` 2 of 2 (these agree with the Mac's), `bubbles` 26 of 30 and `depth` 8 of 10 (the
 failing lines wait on the plate having developed for nine of the Mac's seconds, 540 steps, here 27:
@@ -5572,6 +5572,57 @@ opening dye (`reseed` exists beside `seed`), or drop the call; then opt both in.
 Still to do, each its own pass: the lines above that differ want either `PW_STEP_SHARE` raised for the
 opening wait alone (a plate that has developed for nine seconds needs 540 steps; 27 are not it) or
 a named step count in place of nine seconds, so a Mac and a cloud run develop the same plate.
+*Done for `bubbles` and `depth` in 19l-4.*
+
+#### 19l-4. A software plate develops the Mac's steps, on a clock that steps with it (found with 19l-3)
+
+*What was found:* the step count was half of it. `bubbles`' "the plate holds nearly still while it is
+photographed" read 21.5% of its pixels moved across *one* step (7.4 s of wall clock), 26.8% across
+three (15 s), 34.3% across six (23 s), where the Mac moves 4 to 8% in its 72 steps: it tracked the
+wall clock, not the steps. The frame loop moves the lamp's wander, the gel wheel, the dish's turn and
+the phrasing by each frame's elapsed time (`realDt`), and a software frame is one step and two to
+fifteen seconds of it, so a software plate was the Mac's with its lamp and dish run fast. More steps
+alone would have made that worse, not better.
+
+*Built (2026-10-27):* `?lockstep=1` (`LOCKSTEP` in `LiquidVisualizer.tsx`): each frame's elapsed
+time is exactly the step it takes, so a software plate is the Mac's plate in slow motion. A harness
+asks for it with `engineQuery({ lockstep: true })`, which a GPU never sends. And `developPlate(page,
+ms)` in `scripts/frame.mjs`: on a GPU `waitForTimeout(ms)` exactly as before, in software every one
+of the Mac's `ms × 60 / 1000` steps, for the waits a line reads the plate's age through: `bubbles`'
+opening, its "let a look develop", its 1.2 s bracket and the 0.9 s in which a bubble opens its hole in
+the dye (at three steps, 14 of 850 bubble pixels were lit), `depth`'s opening. Slow by design: 540 steps
+took 62 to 80 minutes with two or three harnesses sharing four cores.
+Two lines were wrong for reasons the slow plate showed up, both fixed so a Mac reads them exactly as
+before: `bubbles`' floors on the pixels a bubble draws (3000, 800, 500) were counts in the Mac's
+742,000-pixel frame, and a cloud frame at `dpr=0.25` has 46,375, so they are now the same share of
+the frame read, never more than the Mac's (scale exactly 1 there); `depth`'s "the show is running"
+read the last nine rows of a load timeline that stops at 400 rows (100 s), and after a developed
+opening passed on rows from the page's first minute, so it now reads only while the timeline is
+still being written.
+*Measured, cloud (`PW_WEBGPU=1`, two harnesses sharing four cores):* `bubbles` 13 of 15 before (the
+still plate 23,338 of 46,375 pixels moved; the three colour lines never ran, gated on the Mac's pixel
+count), 16 of 18 after (the still plate 518 moved, 1.1%; drawn on 435 against a floor of 188); `depth`
+8 of 10 before, 9 of 10 after ("switching it off puts the plate back" 1.221 against 1.220, red before;
+"the show is running" red as the Mac-only line below, where a first run without the timeline's guard
+had passed on stale rows).
+
+*Still red in `bubbles`, open:* "it lets the lamp through rather than painting light on top" found 14
+and then 32 lit pixels (the line needs forty pairs and brighter thick dye) and the bubbles 0 to -4%
+brighter, where the Mac's are brighter: either the hole has not opened in the dye at 54 steps, or a
+bubble a dozen pixels across at `dpr=0.25` is mostly its rim. A `look` render of a developed bubble in
+the lab would say which. And "it is where the bubble was put" read 0.073 off (bar 0.06) on one run,
+passing on the one before: its half-second wait now also waits for two of the plate's steps, since
+the air field is drawn by the frame loop and half a second of software often holds no frame.
+
+*What still differs, and why it is the Mac's:* `depth`'s "the show is running" asks for a step in
+every quarter second of the wall clock, which a software frame loop never makes (the frame-rate
+claim `spin` and `flick` were left out for). `handpour` (its banks against a pour's rise, the slider's
+ordering) and `kickbubbles` (kicks heard per wall-clock window) were not moved: `handpour` opens every
+preset and lets each settle six of the Mac's seconds, and at a developed count that is hours a
+look; its lines are a pour's magnitudes at a twentieth of its steps. *Next:* try `lockstep` on the
+other opted-in harnesses one at a time (`tools`, `magnet`, `ferro`, `take`, ...: whatever they read
+of the lamp or the dish moved with the wall clock too), and whether `spin` and `flick` can be read
+in show seconds under it. *Size:* S each.
 
 ### 19m. Fragments for the shared documents, and this file as an index
 
