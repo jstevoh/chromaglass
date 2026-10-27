@@ -3651,6 +3651,14 @@ rebuilt (a lost device, a resolution change), where it used to go dark while the
 said it was playing. The story is in
 `docs/plan-shipped.md` under the same number. The owner's look at them is `docs/judging.md` §66.
 
+**Colour, shipped** (2026-10-27, the owner: "the out of copyright cartoons we added are all black
+and white - we need some color ones please"): five more, in colour, on the same shelf and the
+phone's dye sheet: *Fiddlesticks* (1930, two-colour), *Jack Frost* (1934) and *Balloon Land*
+(1935), both ComiColors in Cinecolor, *Somewhere in Dreamland* (1936, a Fleischer Color Classic) and
+the feature *Gulliver's Travels* (1939, Technicolor, 74 minutes, the whole film). Each one's status
+is in `SOURCES.md` with the catalogue it was checked in; the owner's look is `docs/judging.md` §85.
+`npm run cartoons` now decodes each file and holds its `colour` flag to its picture.
+
 The owner: "can we download a couple videos for inclusion into the app? things that can run
 in the background and be used for visualizations? like silly symphonies, skeleton dance? and
 other early animations?", then "I don't want a short loop, I want the extended cartoon looped."
@@ -3676,9 +3684,22 @@ Open, found building it:
   or a transfer whose source is known before they ship. Ub Iwerks' *Fiddlesticks* (1930)
   and the 1930 Silly Symphonies joined the US public domain in 2026, with the same check.
   Every addition gets a row in `SOURCES.md` first; `npm run cartoons` refuses one without.
-- **14ac-4** *The cartoons are grey.* The prints are black and white, so the pour lays only
-  greys and Film shows a grey picture. Whether the look's palette should tint them (Film's
-  grade already can, in the Mixer) is the owner's call in §66.
+  *2026-10-27:* Fiddlesticks (1930) is on the shelf, with four later colour films (see above).
+  Still open: Lichtspiel and *The Adventures of Prince Achmed* (1926, tinted), which are free by
+  date and need a print whose source is known; the 1930 Silly Symphonies (black and white);
+  and the Popeye colour specials, the Superman shorts and *Poor Cinderella*, left off for the
+  characters' trademarks, not their copyright (`SOURCES.md`, "Considered and left off").
+- **14ac-4** *The cartoons are grey.* **Shipped for colour** (2026-10-27): five are in colour,
+  and the pour lays each pixel's own colour, so no code changed. Whether the look's palette
+  should tint the grey four or the colour five (Film's grade already can, in the Mixer) is
+  still the owner's call in §66 and §85.
+- **14ac-5** *Colour that is two-strip or Cinecolor.* These prints have two colours (red-orange
+  and blue-green), not three: no true yellow, blue or purple. The pour lays what the print
+  has; judge in §85 whether a look's palette should fill in what a two-colour print cannot.
+- **14ac-6** *A feature on the shelf is a 27 MB file.* Gulliver's Travels is a quarter of the
+  shelf's weight, fetched only when someone picks it. If that proves a cost (a phone on mobile
+  data), cut it to a half hour of its best scenes as a separate entry, or serve it by a
+  lower bitrate; the check holds a feature under 30 MB.
 
 ### 14ae. One Record button (shipped, asked 2026-10-24)
 
