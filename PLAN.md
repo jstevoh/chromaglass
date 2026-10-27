@@ -561,7 +561,7 @@ Where each batch stands, as of 2026-09-27:
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
 | 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
-| 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**, the GPU build 36e-2 next), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
+| 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -9249,15 +9249,13 @@ button, making it look good. Every item here is held to those.
   field left as it is (b9: the plate with no dye moves by under 1 ΔE on average with Lit
   stage on; a first sketch that lifted the finished picture moved Velvet Underground's
   black by 55 and bought its contrast there). The amount is `OutputConfig.litStage` and
-  `PlateView.litStage`. CI runs `-- --controls` (6 lines, Measure's `browser` part: the
-  `lab` part already runs 23-24 of its 25 minutes on a slow runner) until the build drops
+  `PlateView.litStage`. CI runs `-- --controls` (6 lines, Measure's `browser` part) until the build drops
   the flag in `scripts/checks.json`. A reference sketch that grades only the dye where it
   is decoded passes 14 of the 15 lines (all but the Wall panel's control) and fails its
   mutants; it is in the project's files (`lit-stage-36a/`). The build is Antigravity's,
   from a brief written with the check.
-  - **36a-1.** Measure's `lab` part is at its time limit on main (23-24 minutes of 25 on
-    a slow runner, 13 on a fast one; `holeline` alone 10): split it, or give it room,
-    before the next lab check joins it.
+  - **36a-1.** ~~Measure's `lab` part is at its time limit~~ *shipped* by 19k-6 (#517), which
+    split it into `lab` and `lab2` the same hour. The lit-stage controls stay in `browser`.
 - **36b. Span the wall** (*proposed*, L, the Mac app). *The pain:* "The light show, as
   originally performed had no effect on large audiences" (Joshua White); "there wasn't any
   money to rent the extra projectors I knew I'd need to make a difference in that big
@@ -9344,15 +9342,37 @@ button, making it look good. Every item here is held to those.
     the infrared at its visible absorbance 7, the glass flowing with the liquid 2, heat
     carried in conservative form 8. The one that passes throws away the heat of a cell that
     has boiled dry: here a dried cell takes no lamp (its liquid and dye are gone, and the
-    glass absorbs none, 36e-4), so that branch carries almost nothing (the ledger reads
-    the same within 0.03%); it waits on the glass's own absorption.
+    glass absorbs none, 36e-4), so that branch carries little: the review measured it at
+    19 J of the 1127 J the lamp gave (1.7%), moving the ledger 0.16%, under its 3% bar
+    (this line first said 0.03%, too low). It becomes material once the glass absorbs the
+    infrared (36e-4), and that build adds a tighter dry-out ledger line. `boilgpu`'s
+    boiling second (36e-2) already fails it, by 13% and 16% of the reference's change.
   - **36e-2. The GPU build** (*open*, Antigravity's brief in the project's shared files).
     The model as passes on the plate's grid: the temperature in kelvin, the lamp in watts,
     the Heat dial, the hand's held air, the threshold and the vapour as a field the bubbles'
     shading reads (H6's air), the volume sources in the thin gap's projection (as 18c-1's
-    pours), and the `clamp(temp, 0, 50)` and the current's cap out of the heat's way. A lab
-    check, written first, holds the shader to this reference as `soapgpu` holds 32c. The
+    pours), and the `clamp(temp, 0, 50)` and the current's cap out of the heat's way. The
     phone gets the dial and the gesture in the same PR.
+    *Its check is written* (2026-10-27), red on main until the build, as `soapgpu` was
+    before 32c: `npm run boilgpu` (scripts/boilgpu.mjs, its dishes in
+    scripts/boilgpu-scenes.ts) asks the solver `src/gpu/lampBoil.ts`, in the contract
+    written in scripts/boilgpu-cpu.ts, for boil.mjs's lines on its own fields with boil.mjs's
+    bars, five moved to what float32 can read (each says why: H1 and H2 over 10 ms, the
+    dye's ratio 1e-2, the rim's heat over 1 ms at ±10 K, a site 1e-4 K over its superheat,
+    the volume's divergence 1e-3), plus a nucleus alone (gap-wide, paying its latent heat);
+    and holds its fields to the reference, stepped beside it in node, cell by cell: the
+    lamp's first step and second, a warm patch's upright second, a steam pocket's, a boiling
+    second with no sites, the dish after five minutes, and the hand's boil's start, cell,
+    peak and size at the lift. Every step must submit GPU work, every read map a buffer, and
+    the solver may not carry the reference. The control (`-- --selftest`, Measure's lab2
+    part) reads 54 of 54. Of ten look-alikes of the reference, the dry-out discard, a
+    first-order carry and an explicit rim pass boil.mjs and fail here on the model's lines;
+    a nucleus with no latent heat and one a tenth of a cell pass everything else and fail
+    the nucleus lines; a shortened pressure solve, a weaker rim, a non-conservative steam
+    carry and no vapour volume fail both. One passes: dropping the heat of a bubble's last
+    vapour when it vanishes (under a hundredth of a nucleus, about 0.05 mK), named in 36e-4.
+    `npm run boilgpu` itself joins the Mac's plate shard with the build, which prints its
+    cost a step at 768².
   - **36e-3. One pocket, not many bubbles, on a level dish** (*open*, found building 36e-1).
     On the check's dish the first site's bubble grows across the superheated hot spot (its
     rim moves at about h_i·ΔT/(ρ_v·L), 4 cm/s) before the next site warms to its threshold,
@@ -9370,7 +9390,9 @@ button, making it look good. Every item here is held to those.
     measure it again at the plate's grid); the glass absorbing none of the lamp (a dried
     spot should still heat, past 2.7 µm); T_sat fixed at 100 °C (no Laplace pressure, no
     dissolved air); one broadband infrared coefficient and one visible share; a nucleus
-    born whole in one step; and an upright dish warmer than its reservoir turns over
+    born whole in one step; the heat of a bubble's last vapour (under 1% of a nucleus)
+    given back when it vanishes, which no check can read in float32 and a solver could
+    drop unseen; and an upright dish warmer than its reservoir turns over
     through the open rim (a slide is closed at its edges; S1 wants a closed rim).
 - **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
   her there to smooth transitions things would come to a halt, visually" (Heavy Light);
