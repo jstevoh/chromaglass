@@ -126,8 +126,16 @@ export function areaWeight(d: number, r: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Has this cord a gate, or does it follow its reading? */
-export const gated = (m: SceneMapping): boolean => m.threshold !== undefined || m.attack !== undefined || m.release !== undefined;
+/**
+ * Has this cord a gate, or does it follow its reading?
+ *
+ * Explicit `mode: 'gate'` always gates and `mode: 'follow'` always follows
+ * (PLAN 30a). When `mode` is absent on an area cord (or in `CordGate.step`
+ * directly), any of `threshold`, `attack` or `release` turns the gate on, as
+ * PLAN 25h shipped it.
+ */
+export const gated = (m: SceneMapping): boolean =>
+  m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined));
 
 /**
  * One cord's gate and envelope (the least of PLAN 30a).
@@ -208,7 +216,8 @@ export function fluidSink(f: AreaFluid, gridScale: number): AreaSink {
 }
 
 interface CordState { gate: CordGate; angle: number; dir: number; seen: boolean }
-const keyOf = (m: SceneMapping): string => `${m.source ?? 'room'}|${m.feature}|${m.setting}|${m.area}`;
+const keyOf = (m: SceneMapping): string =>
+  `${m.source ?? 'room'}|${m.source === 'bands' && m.band ? `${m.band[0]}-${m.band[1]}` : m.feature}|${m.setting}|${m.area}`;
 
 /**
  * Every area cord of a look, stepped and laid.

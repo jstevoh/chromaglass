@@ -29,7 +29,8 @@
 import { ROOM_STALE_MS } from './roomStir.ts';
 import { getSceneValue, type SceneReading } from './sceneSense.ts';
 import { getAudioValue, type AudioFeatureKey } from '../constants.ts';
-import { SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures.ts';
+import { BandRange, SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures.ts';
+import { CordGate } from './areaCords.ts';
 import type { ModulatorFeature, Modulators } from './modulators';
 import type { HitSource } from './hitSource.ts';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
@@ -177,6 +178,19 @@ type SettingCord = SceneMapping & { setting: keyof VisualizerSettings };
 const NAMED: ReadonlySet<string> = new Set(SOURCE_NAMES);
 const layerOf = (m: SceneMapping): number | 'all' => m.layer ?? 'all';
 
+const validBand = (b: unknown): b is readonly [number, number] =>
+  Array.isArray(b) && b.length === 2 && Number.isFinite(b[0]) && Number.isFinite(b[1]) && b[0] > 0 && b[1] > b[0];
+
+const standaloneBands = new WeakMap<SceneMapping, BandRange>();
+function cordBandRange(m: SceneMapping): BandRange {
+  let b = standaloneBands.get(m);
+  if (!b) {
+    b = new BandRange();
+    standaloneBands.set(m, b);
+  }
+  return b;
+}
+
 /**
  * Is this source saying anything right now?
  *
@@ -187,22 +201,42 @@ const layerOf = (m: SceneMapping): number | 'all' => m.layer ?? 'all';
  */
 function liveValue(
   ctx: PatchContext,
-  source: PatchSource,
-  feature: string,
+  m: SceneMapping,
   now: number,
+  bandRange?: BandRange | null,
 ): { value: number; impact: number } | null {
+  const source = sourceOf(m);
+  const feature = m.feature;
   if (source === 'sound') {
     if (ctx.soundImpact <= 0 || !ctx.sound) return null;
-    return { value: getAudioValue(ctx.sound, feature as AudioFeatureKey), impact: ctx.soundImpact };
+    let value = getAudioValue(ctx.sound, feature as AudioFeatureKey);
+    if (m.gain !== undefined && Number.isFinite(m.gain)) {
+      value = Math.min(1, Math.max(0, value * m.gain));
+    }
+    return { value, impact: ctx.soundImpact };
   }
-  // The sound by name: read raw from the analyser's reading of this frame, no
-  // smoothing, because a mapping on the kick is meant to move with the kick.
-  // A producer of AudioData with no spectrum behind it (the cast display
-  // rebuilds one from the wire) has no reading, and that is nothing to say.
+  // The sound by name (or a dragged `[loHz, hiHz]` band, PLAN 30a): read raw
+  // from the analyser's reading of this frame, no smoothing, because a mapping
+  // on the kick or a band is meant to move with it. On the laptop's second
+  // screen (`StageMirror` in CastDisplay.tsx) the projector mirrors `#liquid-canvas`
+  // directly and shows the laptop's fold; a standalone network `CastReceiver`
+  // rebuilds `AudioData` from the wire (`CastAudio`) with no spectrum behind it,
+  // so `bands` cords (fixed or dragged) read nothing there while `sound` cords
+  // fold and gate from the wire levels (PLAN 30a-1).
   if (source === 'bands') {
     const reading = ctx.sound?.features;
-    if (ctx.soundImpact <= 0 || !reading || !NAMED.has(feature)) return null;
-    return { value: sourceValue(reading, feature as SourceName), impact: ctx.soundImpact };
+    if (ctx.soundImpact <= 0 || !reading) return null;
+    let value: number;
+    if (validBand(m.band)) {
+      value = (bandRange ?? cordBandRange(m)).read(reading, m.band);
+    } else {
+      if (!NAMED.has(feature)) return null;
+      value = sourceValue(reading, feature as SourceName);
+    }
+    if (m.gain !== undefined && Number.isFinite(m.gain)) {
+      value = Math.min(1, Math.max(0, value * m.gain));
+    }
+    return { value, impact: ctx.soundImpact };
   }
   // The hits, read as `bands` is: nothing to say with no reading this frame
   // (the source has let its values fall by then anyway).
@@ -231,13 +265,22 @@ function liveValue(
  */
 export function cordReading(ctx: PatchContext, m: SceneMapping, now: number = performance.now()): number | null {
   if (!m || m.feature === 'none') return null;
-  const got = liveValue(ctx, sourceOf(m), m.feature, now);
+  const got = liveValue(ctx, m, now);
   return got ? got.value * got.impact : null;
 }
 
 /** A cord the fold rides: aimed at a setting, not at an area (`AreaTarget`s are not settings). */
 const onSetting = (m: SceneMapping): m is SceneMapping & { setting: keyof VisualizerSettings } =>
   m.area === undefined && !!SETTING_TRAVEL[m.setting as keyof VisualizerSettings];
+
+interface BayCordState {
+  gate: CordGate;
+  band: BandRange | null;
+  seen: boolean;
+}
+
+const bayKeyOf = (m: SceneMapping): string =>
+  `${m.source ?? 'room'}|${m.source === 'bands' && validBand(m.band) ? `${m.band[0]}-${m.band[1]}` : m.feature}|${String(m.setting)}|${layerOf(m)}|${m.mode ?? 'follow'}`;
 
 /**
  * The patch bay, folded.
@@ -256,6 +299,9 @@ export class PatchBay {
   /** [global, layer 0, layer 1, …]. Entries alias `base` when nothing folded. */
   readonly out: VisualizerSettings[];
   private readonly scratch: VisualizerSettings[];
+  /** Per-cord gate envelope and dragged-band range (PLAN 30a), keyed by what the cord is. */
+  private readonly cords = new Map<string, BayCordState>();
+  private lastNow: number | null = null;
 
   constructor(base: VisualizerSettings, maxLayers = 3) {
     this.scratch = Array.from({ length: maxLayers + 1 }, () => ({ ...base }));
@@ -271,7 +317,7 @@ export class PatchBay {
     base: VisualizerSettings,
     ctx: PatchContext,
     layerCount: number,
-    /** Passed in rather than read here, so staleness can be tested without a clock. */
+    /** Passed in rather than read here, so staleness and gates can be tested without a clock. */
     now: number = performance.now(),
     /**
      * Patches that belong to the rig rather than the look: sound learn's
@@ -293,6 +339,8 @@ export class PatchBay {
      */
     plates?: readonly (VisualizerSettings | null | undefined)[],
   ): void {
+    const dt = this.lastNow === null ? 0 : Math.max(0, (now - this.lastNow) / 1000);
+    this.lastNow = now;
     const layers = Math.max(1, Math.min(this.scratch.length - 1, layerCount));
     for (let i = 0; i < this.out.length; i++) this.out[i] = base;
 
@@ -301,10 +349,15 @@ export class PatchBay {
 
     const own = base.sceneMappings;
     const maps = extra && extra.length > 0 ? (own && own.length > 0 ? [...own, ...extra] : extra) : (own ?? []);
-    if (maps.length === 0 && !anyOwn) return;
+    if (maps.length === 0 && !anyOwn) {
+      this.cords.clear();
+      return;
+    }
 
     // One pass to find what is actually live, so a patch list with nothing
     // plugged in on the other end costs a walk and no copying.
+    for (const s of this.cords.values()) s.seen = false;
+    const twins = new Map<string, number>();
     const live: { m: SettingCord; value: number; impact: number }[] = [];
     let anyGlobal = false;
     const touched = new Set<number>();
@@ -312,16 +365,44 @@ export class PatchBay {
       if (!m || m.feature === 'none' || !m.depth) continue;
       // A cord aimed at an area is a hand there (lib/areaCords.ts), not a setting.
       if (!onSetting(m)) continue;
-      const got = liveValue(ctx, sourceOf(m), m.feature, now);
-      if (!got) continue;
       const where = layerOf(m);
       // A patch aimed at a plate that is not on the stage tonight is simply
       // not applied. Silently, because layer count is a property of the look
       // and an operator who drops to one layer has not made a mistake.
       if (where !== 'all' && where >= layers) continue;
+      const src = sourceOf(m);
+      const isSoundOrBands = src === 'sound' || src === 'bands';
+      const isGated = isSoundOrBands && m.mode === 'gate';
+      const hasDragBand = src === 'bands' && validBand(m.band);
+      let state: BayCordState | undefined;
+      if (isGated || hasDragBand) {
+        const baseKey = bayKeyOf(m);
+        const turn = twins.get(baseKey) ?? 0;
+        twins.set(baseKey, turn + 1);
+        const k = turn ? `${baseKey}#${turn}` : baseKey;
+        state = this.cords.get(k);
+        if (!state) {
+          state = { gate: new CordGate(), band: hasDragBand ? new BandRange() : null, seen: true };
+          this.cords.set(k, state);
+        } else {
+          state.seen = true;
+          if (hasDragBand && !state.band) state.band = new BandRange();
+        }
+      }
+      const got = liveValue(ctx, m, now, state?.band);
+      if (isGated && state) {
+        const impact = got ? got.impact : ctx.soundImpact;
+        if (impact <= 0) continue;
+        const value = state.gate.step(got ? got.value : 0, dt, m);
+        if (where === 'all') anyGlobal = true; else touched.add(where);
+        live.push({ m, value, impact });
+        continue;
+      }
+      if (!got) continue;
       if (where === 'all') anyGlobal = true; else touched.add(where);
       live.push({ m, value: got.value, impact: got.impact });
     }
+    for (const [k, s] of this.cords) if (!s.seen) this.cords.delete(k);
     if (live.length === 0 && !anyOwn) return;
 
     // The picture first: the global fold is what a layer fold starts from, so

@@ -206,7 +206,7 @@ re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering
 music, explored as four directions the same day and all four taken, in this order:
 ~~**25h** areas that listen for themselves~~ (shipped), then **24.3-place** the melody walks across the plate (B, M), then **25i**
 colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
-14r read per area); then **30a**'s rest, shaped sound cords (M; its check `soundcords` written 2026-10-26, Antigravity's Brief 8), **14t-pc** Program Change (S), **24.3** notes as voices
+14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
@@ -7010,10 +7010,7 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     and until 18f-2 lands the ring there is the kick's own hand and the soap's. When 18f-2
     lands, `npm run areacords` should add a heat cord that opens the well's surface on a
     level plate, against the same cord with the heat off.
-  - **25h-2. The gate on every cord, and the rest of 30a.** The threshold, attack and
-    release are read on area cords only (lib/areaCords.ts CordGate); a whole-plate cord
-    still follows its reading. Folding the gate into the patch bay's fold (a state per cord,
-    by what the cord is), and 30a's curves, are 30a's.
+  - ~~**25h-2. The gate on every cord, and the rest of 30a.**~~ Shipped with 30a (`PatchBay.fold` holds a `CordGate` per whole-plate cord keyed by what the cord is and clocked from `fold`'s `now`, while area cords keep `CordGate` in `AreaHands`; `npm run soundcords`).
   - **25h-3. Area cords on the back plate.** They work on the plate the music plays, in its
     areas; a back plate with its own look has that look's areas (25d) but the front look's
     cords do not reach them, and the panel greys Plate for an area cord. With 25d.
@@ -8251,7 +8248,7 @@ The gap is in how a sound or a note is shaped before it reaches a setting.
 check written first and built by Antigravity. None moves the whole frame by default
 (the owner's rule), and every reading is a fast one (the owner's rule for sound patches).
 
-1. **30a**, below: shape each sound cord.
+1. ~~**30a**, below: shape each sound cord.~~ (Shipped; `npm run soundcords`.)
 2. **14t-pc**: Program Change picks a look or a set-list item.
 3. **24.3**, moved up: notes as voices, with an envelope per note and notes as a source.
 4. **13.5-link** before **13.5-osc**: Link first.
@@ -8274,39 +8271,30 @@ as before: the shader editor and imports, the feedback layer, and anything that 
 the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
 analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
 
-### 30a. A sound cord has only a depth
+### ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
 
-A patch whose source is `sound` or `bands` carries a depth and nothing else, so a kick
-patch that fires on every boom of a live room, or a swell too slow for a ballad, cannot
-be tuned at the gig except by moving the depth, which changes how far it goes and not
-when. Add to each such patch a mode (*follow*: the reading rides the setting, as today;
-*gate*: a crossing fires a shaped pulse), a threshold, a gain, an attack and a release;
-and let a `bands` patch take its edges from a drag across a live spectrum in the panel
-rather than the eight fixed bands (`BAND_EDGES_HZ`, `audioFeatures.ts`), heard against
-its own recent range as the named bands are. Absent fields read as today's patch (follow,
-no threshold, gain 1, no smoothing beyond the feature's own), so every saved look and
-preset loads unchanged. On the phone, the patch's view carries the same controls and
-the spectrum strip. *Measure:* a new check fed synthetic tone bursts in and out of a
-dragged band: crossings counted against the threshold (equal, none doubled, none from
-outside the band), and the patch's rise and fall timed within 10% of its attack and
-release.
-
-*Check written first (2026-10-26):* `npm run soundcords` (`scripts/soundcords.mjs`), red on
-main in its 30a lines and green on a sketch of the build. Its header is the contract: the
-cord's fields (`mode`, `threshold`, `gain` before the threshold, `attack`, `release`, `band`
-as `[loHz, hiHz]` winning over `feature`), read through `songAudioTrack` and `PatchBay.fold`
-with the gate's clock from `fold`'s `now`. Attack and release are the 2%-to-98% times of
-the cord's rise and fall, and a gate rises to the hit's height (the most the reading times
-the gain reached while open), as an area cord's does. A whole-plate cord with no `mode`
-follows even if it carries a threshold, attack or release (it ignores them today); an area
-cord keeps its own rule. CI runs it with `--controls` (the
-tape, the counter on today's `CordGate`, the judge rejecting three wrong gates, every saved
-cord folding as before) until the build's PR drops the flag. 31c's two lines join it when 31c is built.
-- **30a-1. The dragged band on the cast display and the phone remote.** The cast display
-  rebuilds `AudioData` from the wire with no spectrum behind it (`liveValue`, sceneMap.ts),
-  so a dragged-band cord there reads nothing, as a `bands` cord does today. Whether the
-  wire carries the cord's reading or the projector just shows the laptop's fold is the
-  build's to decide and say.
+Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Each `sound` or `bands`
+cord on `SceneMapping` (`src/types.ts`) now carries `mode` (`'follow' | 'gate'`, absent =
+`'follow'` on whole-plate cords even when `threshold`, `attack` or `release` are present;
+area cords keep `CordGate`'s rule), `gain` (absent = 1, applied to the reading before the
+threshold in both modes), `threshold`, `attack`, `release`, and on `bands` cords a custom
+dragged `band` (`[loHz, hiHz]`, winning over `feature` while the panel writes `feature` as
+the named band holding the drag's middle for fallback). `BandRange` (`src/lib/audioFeatures.ts`)
+hears `[loHz, hiHz]` from `AudioReading`'s spectrum with the same `binsFor`, reference floor
+and `AutoRange` (6 dB minimum, 30 dB cap) as `band1`..`band8`, and `PatchBay.fold`
+(`src/lib/sceneMap.ts`) steps a `CordGate` per gated whole-plate cord clocked from `fold`'s
+`now` (closing **25h-2**). The patch bay editor (`src/components/SettingsPanel.tsx`) and
+`src/components/phone/BandStrip.tsx` draw the mode, gain, threshold, rise and fall controls
+and the live log-frequency spectrum strip on both the desk and the phone. Story in
+`docs/plan-shipped.md` §30a.
+- **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
+  on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the
+  projector mirrors `#liquid-canvas` directly, so it shows the laptop's fold (including
+  dragged-band cords) frame for frame. A standalone network `CastReceiver` rebuilds
+  `AudioData` from `CastAudio` on the wire with no spectrum behind it (`liveValue`,
+  `sceneMap.ts`), so `sound` cords fold and gate there while `bands` cords (fixed or
+  dragged) read nothing, matching fixed `bands` cords today. Carrying evaluated `bands`
+  cord readings over `CastAudio` if standalone receivers need `bands` patches remains open here.
 
 ### 30b. The LFOs and envelopes are fixed
 

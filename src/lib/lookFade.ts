@@ -462,8 +462,9 @@ const WHOLE_STEPS: ReadonlySet<string> = new Set(['kaleidoscope', 'stockType', '
  * item in PLAN.md rather than faked here.
  */
 function crossfadePatches(a: SceneMapping[], b: SceneMapping[], k: number): SceneMapping[] {
-  // The area too (PLAN 25h): a kick on one pool and a kick on another are two aims.
-  const id = (m: SceneMapping) => `${m.source ?? 'room'}|${m.feature}|${String(m.setting)}|${m.layer ?? 'all'}|${m.area ?? ''}`;
+  // The area (PLAN 25h) and any dragged band / gate mode (PLAN 30a): two cords on different bands or modes are two aims.
+  const id = (m: SceneMapping) =>
+    `${m.source ?? 'room'}|${m.source === 'bands' && m.band ? `${m.band[0]}-${m.band[1]}` : m.feature}|${String(m.setting)}|${m.layer ?? 'all'}|${m.area ?? ''}|${m.mode ?? 'follow'}`;
   // Each patch of the new list claims at most one patch of the old, so a list
   // that names the same aim twice keeps both rather than losing one.
   const unclaimed = b.filter(Boolean);
