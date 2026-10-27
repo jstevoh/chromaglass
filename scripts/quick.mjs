@@ -21,7 +21,7 @@
 // A changed file selects the checks that read it; an entry of the manifest
 // that changed selects itself; package.json beyond its scripts selects all.
 //
-// What runs here: Measure's four parts, and the Mac shards' lab checks under
+// What runs here: Measure's five parts, and the Mac shards' lab checks under
 // `PW_WEBGPU=1` (software WebGPU, CLAUDE.md "What can be verified where").
 // A Mac check that serves the app is listed as Mac-only and not run: on
 // software WebGPU the app's frames read back empty (PLAN 19l), so its green

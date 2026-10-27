@@ -114,7 +114,7 @@ not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
 `.github/workflows/checks.yml`, on every PR and called by `deploy.yml` before a
 deploy:
 
-- **Measure** (ubuntu, four parts side by side, 4–12 min each): typecheck, every script
+- **Measure** (ubuntu, five parts side by side, 4–19 min each): typecheck, every script
   parsing, the workflows linted (`actionlint`), the shaders compiling on SwiftShader, and
   the node harnesses. A PR whose diff is only check scripts, manifest entries, the npm
   scripts checks run and documents runs only the Measure checks it reaches (PLAN 19k-4;

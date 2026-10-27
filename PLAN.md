@@ -5339,6 +5339,15 @@ part (the stories are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under t
 - **19k-5** (E, S), what is left: see the story for which side-by-side reds were found and
   fixed. Run `npm run check` on a 4-core session once more, with the logs `quick` keeps in
   `scratch/quick/`, before closing it.
+- **19k-6** (E, S): **shipped**, Measure's lab part split in two. A full lab part ran 22:10 of its
+  25 minutes on 2026-10-27 (main's deploys 24:52 and 23:29, a PR's full run cancelled at the
+  limit), so the next full deploy was likely to go red and not publish. `lab` keeps the slosh
+  dish, the soap film's control and `holeline` (about 12 min); the new `lab2` has `lampzero`,
+  `bubblelook` and the four account checks (about 10). Both install Chromium; the timeout stays
+  25; the required names `Measure` and `WebGPU (macOS)` are unchanged, since `reach`, `selectMeasure`,
+  `deploygate.sh` and the guard read the part names from `shards.measure`. Open: the browser part
+  is now the slowest of the five at 19:14, and holeline alone is 9.3 min; read both in `npm run flakes`
+  / the job summary over the next merges and split the browser part next if it passes 21.
 
 ### 19l. App frames readable in a cloud session
 
