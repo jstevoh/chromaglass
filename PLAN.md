@@ -9137,13 +9137,13 @@ button, making it look good. Every item here is held to those.
     lamp). Twenty-two look-alikes (each the reference with one thing changed, `scratch/` in
     the build session; four from the check-skeptic's pass and five from the review's) each
     fail at least one line but one: the old saturated buoyancy 2, a constant expansion
-    slope 3, a constant viscosity 3, buoyancy on a level plate 14, no nucleation threshold
-    2, a bubble on a timer 6, no condensation 4, no latent heat 6, no vapour volume 3, no
-    expansion 2, a uniform lamp 4, the dye ignored 2, a hand that adds heat instead of
-    blocking the air 6, no sideways conduction 3, every cavity the median one 1, a bubble
-    rim a fifth as strong 2, vapour absorbing as liquid 4, no radiation 9, the dye taking
-    the infrared at its visible absorbance 6, the glass flowing with the liquid 1, heat
-    carried in conservative form 7. The one that passes throws away the heat of a cell that
+    slope 3, a constant viscosity 3, buoyancy on a level plate 15, no nucleation threshold
+    3, a bubble on a timer 7, no condensation 5, no latent heat 7, no vapour volume 3, no
+    expansion 2, a uniform lamp 5, the dye ignored 2, a hand that adds heat instead of
+    blocking the air 6, no sideways conduction 4, every cavity the median one 1, a bubble
+    rim a fifth as strong 2, vapour absorbing as liquid 5, no radiation 10, the dye taking
+    the infrared at its visible absorbance 7, the glass flowing with the liquid 2, heat
+    carried in conservative form 8. The one that passes throws away the heat of a cell that
     has boiled dry: here a dried cell takes no lamp (its liquid and dye are gone, and the
     glass absorbs none, 36e-4), so that branch carries almost nothing (the ledger reads
     the same within 0.03%); it waits on the glass's own absorption.
