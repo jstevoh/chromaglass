@@ -9,7 +9,7 @@
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
     "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","lab"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","lab","lab2"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -706,7 +706,7 @@
     },
     {
       "name": "Lamp Ground 0 is the plate before the lamp",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run lampzero",
       "why": [
         "Lamp Ground 0 is the plate as it was before the lamp, byte for byte,",
@@ -720,7 +720,10 @@
         "Its own part: `logic` has no Chromium (this step's first run failed",
         "there on the launch, 2026-10-12), and `browser` already runs twelve of",
         "its fifteen minutes. About five minutes; the lamp's physics stay on",
-        "the open shard (`lamp`)."
+        "the open shard (`lamp`). Since the lab part split in two (below, `lab2`",
+        "is lampzero, bubblelook and the four account checks) it shares a runner",
+        "with those, about ten minutes, and `lab` keeps the slosh dish, the soap",
+        "film and holeline, about twelve."
       ]
     },
     {
@@ -747,7 +750,7 @@
         "in the GPU solver's contract through every scenario and bar of soapgpu.",
         "In Measure's lab part rather than logic because soapgpu.mjs opens the lab",
         "page in Chromium and requests a WebGPU adapter before running the solver,",
-        "and checks.yml installs Chromium only on the browser and lab parts."
+        "and checks.yml installs Chromium only on the browser, lab and lab2 parts."
       ]
     },
     {
@@ -770,7 +773,7 @@
     },
     {
       "name": "A bubble's middle is the plate",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run bubblelook",
       "why": [
         "A bubble's clear middle is the plate (PLAN.md 33e, scripts/bubblelook.mjs).",
@@ -785,7 +788,7 @@
     },
     {
       "name": "Sign-in",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run signin",
       "why": [
         "Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):",
@@ -795,7 +798,7 @@
     },
     {
       "name": "One address",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run onehost",
       "why": [
         "One address (PLAN.md 23.16, scripts/onehost.mjs): chromaglass.web.app and",
@@ -808,7 +811,7 @@
     },
     {
       "name": "Linking devices by account",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run accountlink",
       "why": [
         "Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):",
@@ -820,7 +823,7 @@
     },
     {
       "name": "Licensing and tiers",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run tiers",
       "why": [
         "Licensing and tiers (PLAN.md 23.2, 23.4, 23.5, 23.6, 23.11,",
