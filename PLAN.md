@@ -5327,8 +5327,9 @@ like day (`npm run macqueue -- --hours 24` for the time).
 **Shipped** (#502): `scripts/checks.json` holds every check CI runs (180 steps, in order, with their comments), `checks.yml` runs each Measure part and Mac shard from it (`node scripts/checks.mjs --ci <shard>`), a PR whose Mac-reaching change is only check scripts, manifest entries or their npm scripts runs only those checks' shards, and `npm run quick` runs the checks a diff reaches, side by side. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
 Found with it: **19k-1** (the guard reads the manifest), **19k-3** (`actionlint` runs in Measure
-from a pinned release) and **19k-4** (Measure runs only the checks a diff reaches) **shipped**, **19k-5** shipped in
-part (the stories are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
+from a pinned release), **19k-4** (Measure runs only the checks a diff reaches) and **19k-5** (the
+side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories are in
+[`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
 
 - **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
   on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
@@ -5336,9 +5337,21 @@ part (the stories are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under t
   slowest part, 12 to 19 minutes), and merge conflicts in `checks.json`, `checks.yml` and
   `package.json` (60 adjacent merges replayed with `git merge-tree` before it: 9 conflicted,
   none in those files). `npm run macqueue -- --hours 24` and `npm run flakes` read the first two.
-- **19k-5** (E, S), what is left: see the story for which side-by-side reds were found and
-  fixed. Run `npm run check` on a 4-core session once more, with the logs `quick` keeps in
-  `scratch/quick/`, before closing it.
+  **Interim, 2026-10-27, three PRs merged since #502 (#504, #506, #508): too few to say.** None was
+  a check-only PR that the rule could narrow: #504 changed `checks.yml` and `reach.mjs`, so it
+  rightly ran every shard (5 Mac jobs, 85 runner-minutes, slowest Measure part 23.3 min, the run
+  37 min wall with the queue); #506 changed the plate and ran every shard (80 runner-minutes,
+  slowest Measure part 22.1 min); #508 was one Markdown file and skipped the Mac (0 minutes, as
+  before 19k) but its run started at 02:24Z, seven minutes before #504 merged, so it ran all
+  four Measure parts (slowest 23.7 min) and says nothing yet of 19k-4. `macqueue` over the last 24
+  hours: 3,124 Mac runner-minutes, 175 PR shards waiting 7 minutes on average, 77% of the minutes
+  in green PR runs. No merge since #502 touched `checks.json`, `checks.yml` or `package.json`
+  except #504's own; no conflict in them has been reported. Leave this open until 25 PRs have merged;
+  the first check-only PR after #504 (the one that put these numbers here) is the first real
+  sample of the rule. The per-PR numbers above were read by hand over the API (a PR's head
+  commit's `Checks` run and its jobs' times); a `--prs` mode in `macqueue` would make the next
+  reading one command, if 19k-2 stays tedious. `npm run flakes` (2026-10-20 to now, 320 runs)
+  still has the startup check's first line red 22 of 203 attempts (11%), unchanged by 19k.
 
 ### 19l. App frames readable in a cloud session
 

@@ -3258,6 +3258,25 @@ cores) Switches read 992 of 992 and The intro 13 of 13, so what turned them red 
 others in the first run is not the cores; `quick` keeps their logs in `scratch/quick/` and
 19k-5 stays open for the next red one.
 
+*19k-5, closed (2026-10-27).* `npm run check` on a 4-core cloud session, all of Measure side by
+side: 95 of 95 green in 52 min 55 s, Switches (1:56) and The intro (42 s) among them, so the two
+reds seen beside others in the first `quick` run did not come back, and nothing was left to fix or
+file. With eight busy loops they had already read 992 of 992 and 13 of 13, so the cause was never
+the cores and is not known; it was not reproduced in this run or in the eight-loop run. If one
+goes red beside others again, `quick` writes its log to `scratch/quick/` and 19k-5 is reopened
+with that log.
+
+*The two nits on #504.* `checks.mjs`'s walk detector (which makes a Measure check that walks
+`scripts/` an `always` entry) knew `walk('scripts')` and `walk(join(root, 'scripts'))` only; a
+`walk(\`${ROOT}/scripts\`)` or `readdirSync(ROOT + '/scripts/')` slipped past, so it now takes any
+text after the call's open bracket on the same statement with `scripts` between quotes or slashes (nested brackets such as `join(process.cwd(), 'scripts')` too; a path built in a variable first is still not seen), and the
+selftest holds both new spellings and a `walk(join(root, 'src'))` followed by another walk, which
+must not borrow the later one. `deploygate.sh`'s `measurepartial` ran `jq | grep | head || true`
+over the reach job's annotations, so a body that was not JSON (a 502 page, a cut read) or was an
+error object (`{"message":"rate limited"}`) gave an empty answer, which reads as "ran in full";
+it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
+function (2 FAIL) and green on the new.
+
 ### 19r. Smaller, for the same pass: the open shard evened
 
 **Shipped** (the open shard's half). The open shard had gathered eight checks since #239
