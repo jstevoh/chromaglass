@@ -154,8 +154,10 @@ Then the rest of `docs/judging.md` in its own order, an area a sitting (the look
 Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet (0.13),
 with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-smoke**, the site on two Windows PCs, by hand (§13).
 The owner's account steps sit here too: **S8-on** (switch the crash reports on),
-**19g** (more Mac runners), **12.2** (the store accounts), **13.1-sign** (the Mac app's
-Developer ID and notarisation, which takes away the "may harm your Mac" refusal on first open).
+**19g** (more Mac runners), **12.2** (the store accounts). ~~**13.1-sign**~~ (the Mac app's
+Developer ID and notarisation) is in, 2026-10-27: the five secrets are set and a pull
+request's build came back "Notarized Developer ID"; what is left of it is
+**13-update-signed** (§13), from the first signed release.
 
 ### Wave 3. Seams in the two big files (one session, in a quiet week)
 
@@ -2788,7 +2790,11 @@ network):
   (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §75.
-  - **13-update-signed** *(after 13.1-sign)*: with the Developer ID secrets in, the
+  - **13-update-signed** *(13.1-sign is in, 2026-10-27: the secrets are set, and a PR's
+    build was notarised and accepted by Gatekeeper as "Notarized Developer ID"; the
+    build job's limit went from 40 to 75 minutes after a run was cancelled at 40 still
+    waiting on Apple's notary service. Next: the owner runs the first signed release)*:
+    with the Developer ID secrets in, the
     same code downloads in the background and installs on quit. Nothing to build;
     the first signed release is judged by installing the one before it and seeing it
     replace itself (§75's last step). Signing is also what takes away the first-open

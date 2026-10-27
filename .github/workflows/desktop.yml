@@ -68,7 +68,14 @@ jobs:
   build:
     name: Mac app (packed, checked, built)
     runs-on: macos-15
-    timeout-minutes: 40
+    # 75, not 40: the first signed builds (2026-10-27) spent most of their time
+    # waiting on Apple's notary service, not building. The pull request's run took
+    # 38 minutes, notarisation returning at minute 36, and a Run workflow started
+    # beside it was cancelled at 40 while still waiting for its answer. Apple's
+    # queue is outside this repo's control and a release that times out publishes
+    # nothing, so the limit leaves room for a slow day on top of the ~10-minute
+    # build; an unsigned run still finishes in about 10.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
