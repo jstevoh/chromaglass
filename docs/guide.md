@@ -44,6 +44,7 @@ ones.
 - **The wall, not the look** — rear-projection mirror, a four-corner keystone, feathered edge masks that stop the light before a face or a ceiling, and an output gain and gamma for the room. Kept on the machine rather than in the preset, because it describes the venue; measured by `npm run wall`
 - **Three flashes a second, and no more** — a probe reads back what actually reached the screen and holds the whole field under the clinical limit for photosensitive seizures, by counting flashes rather than smoothing fast changes, so a single hard hit on a kick is untouched
 - **A tempo you can hand it** — MIDI clock from the desk on the port the faders are already on, four taps, or a typed bpm; each sets the bar as well as the tempo, and the microphone can no longer drag it around while one of them is driving
+- **Tabs you make** — the chips across the top of the desk are sets of panels: Perform, Sequence and Setup ship as examples, and the pencil beside them renames, reorders, adds (empty, or a copy of the tab that is up) and deletes them; + Panel (⌘P) puts any panel on the tab that is up, and ⌘1 to ⌘9 go to the tabs in order. On the phone they are under More › Tabs. Measured by `npm run desklayout` and `npm run layout`
 - **Shift layers on the controller** — four banks, so nine faders reach forty settings; a binding on the base layer stays live on all of them, and changing layer drops every fader out of soft takeover so nothing jumps
 - **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, meniscus edge relief, trapped-air bubbles, plate rocking on the beat, a second layer at its own magnification, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
 - **The other projectors** — a Wilfred lumia layer (slow folded sheets of light under the plate), a rotating gel wheel over the lamp, a film projector that plays a video loop or a live camera through the dye, a reaction-diffusion "chemistry" mode that grows coral and cells on the plate the way Mark Boyle's Sensual Laboratory projected reactions, and a halogen grade for the sealed oil-wheel look — with presets Lumia, Sensual Laboratory and Oil Wheel
@@ -625,7 +626,7 @@ src/
     MidiPanel.tsx              # MIDI: devices, factory maps, learn, bindings, files
     ControllerSurface.tsx      # The controller drawn to scale: assign by touching, and the cheat sheet
     RunLocallyCard.tsx         # Hosted-build nudge to run the show locally
-    OutputPanel.tsx            # Load-in: drag the corners square, pull the masks in, grade for the room
+    OutputPanel.tsx            # Setup's Wall panel: drag the corners square, pull the masks in, grade for the room
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
   remote-server.js             # LAN static server + control relay + OSC in + Art-Net (npm run remote)

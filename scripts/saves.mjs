@@ -98,9 +98,9 @@ async function moveARecipeSlider(page) {
 const near = (a, b, span) => typeof a === 'number' && Math.abs(a - b) <= span * 0.03;
 
 try {
-  // ── The Design desk ───────────────────────────────────────────────
+  // ── The desk as it opens (Perform, where the Design desk's bench is now) ─
   {
-    const { ctx, page } = await open({ width: 1440, height: 900, ready: 'design-desk' });
+    const { ctx, page } = await open({ width: 1440, height: 900, ready: 'perform-desk' });
     check('design: nothing saved to begin with', (await stored(page))?.length === 0);
 
     const moved = await moveARecipeSlider(page);
@@ -177,17 +177,17 @@ try {
     await page.keyboard.press('Escape');
 
     await page.reload({ waitUntil: 'load' });
-    await page.getByTestId('design-desk').waitFor({ state: 'visible', timeout: 60_000 });
+    await page.getByTestId('perform-desk').waitFor({ state: 'visible', timeout: 60_000 });
     await page.getByTestId('doc-menu-button').click();
     const after = await page.getByTestId('doc-saved').innerText().catch(() => '');
     check('design: still listed after a reload', after.includes('Blue Friday'));
     await ctx.close();
   }
 
-  // ── The Perform desk ──────────────────────────────────────────────
+  // ── Another tab (Sequence): Save is the desk's, not one tab's ─────────
   {
-    const { ctx, page } = await open({ width: 1440, height: 900, deskMode: 'perform', ready: 'save-look' });
-    check('perform: the Perform desk is up', await count(page, 'design-desk') === 0);
+    const { ctx, page } = await open({ width: 1440, height: 900, deskMode: 'sequence', ready: 'save-look' });
+    check('sequence: the Sequence tab is up', await count(page, 'sequence-desk') === 1);
     // ⌘S first: it reached the browser here before.
     const prevented = await page.evaluate(() => new Promise((resolve) => {
       const e = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });
@@ -195,29 +195,29 @@ try {
       setTimeout(() => resolve(e.defaultPrevented), 50);
     }));
     await page.waitForTimeout(200);
-    check('perform: ⌘S asks for a name, and the browser does not get it', prevented && await count(page, 'save-sheet') === 1);
+    check('sequence: ⌘S asks for a name, and the browser does not get it', prevented && await count(page, 'save-sheet') === 1);
     await page.getByTestId('save-name').fill('Encore');
     await page.getByTestId('save-confirm').click();
     await page.waitForTimeout(300);
     const list = await stored(page);
-    check('perform: it is saved under that name', list?.length === 1 && list[0].name === 'Encore', JSON.stringify(list?.map(p => p.name)));
+    check('sequence: it is saved under that name', list?.length === 1 && list[0].name === 'Encore', JSON.stringify(list?.map(p => p.name)));
 
     // This desk's own list of them (QA-18a): it was in none before.
     const encore = list?.[0]?.id;
     const row = page.getByTestId(`perform-saved-${encore}`);
-    check('perform: listed under Your preset palettes on this desk', await row.count() === 1 && (await row.innerText()).includes('Encore'));
+    check('sequence: listed under Your preset palettes on this desk', await row.count() === 1 && (await row.innerText()).includes('Encore'));
     // A second, so a cue moves off the look that is live.
     await page.getByTestId('save-look').click();
     await page.getByTestId('save-name').fill('Last song');
     await page.getByTestId('save-confirm').click();
     await page.waitForTimeout(300);
     const last = (await stored(page))?.find(p => p.name === 'Last song')?.id;
-    check('perform: a second one joins the list', await count(page, `perform-saved-${last}`) === 1);
+    check('sequence: a second one joins the list', await count(page, `perform-saved-${last}`) === 1);
     const goBefore = (await page.getByTestId('go-button').innerText()).trim();
     await page.getByTestId(`perform-saved-${encore}`).click();
     await page.waitForTimeout(250);
     const go = page.getByTestId('go-button');
-    check('perform: a click cues it, and Go names it', (await go.innerText()).includes('Encore') && await go.isEnabled()
+    check('sequence: a click cues it, and Go names it', (await go.innerText()).includes('Encore') && await go.isEnabled()
       && await page.getByTestId(`perform-saved-${encore}`).getAttribute('data-state') === 'next', `Go read "${goBefore}", now "${(await go.innerText()).trim()}"`);
     const items = async () => Number((await page.getByTestId('set-count').innerText()).match(/\d+/)?.[0] ?? NaN);
     const n0 = await items();
@@ -225,9 +225,9 @@ try {
     await page.waitForTimeout(250);
     const n1 = await items();
     const inSet = await page.locator('[data-testid^="cue-"]').filter({ hasText: 'Encore' }).count();
-    check('perform: + puts it in the set', n1 === n0 + 1 && inSet >= 1, `${n0} → ${n1} items`);
+    check('sequence: + puts it in the set', n1 === n0 + 1 && inSet >= 1, `${n0} → ${n1} items`);
     await page.getByTestId('perform-saved-toggle').click();
-    check('perform: the list folds away to its heading', await count(page, 'perform-saved-list') === 0 && await count(page, 'perform-saved-toggle') === 1);
+    check('sequence: the list folds away to its heading', await count(page, 'perform-saved-list') === 0 && await count(page, 'perform-saved-toggle') === 1);
     await ctx.close();
   }
 

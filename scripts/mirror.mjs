@@ -110,7 +110,7 @@ try {
     */
     await page.addInitScript(() => {
       try {
-        localStorage.setItem('chromaglass-desk-mode', 'design');
+        localStorage.setItem('chromaglass-desk-mode', 'perform');
         sessionStorage.setItem('chromaglass-audio-source', 'none');
       } catch { /* none */ }
     });

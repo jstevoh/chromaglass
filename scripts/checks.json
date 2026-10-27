@@ -442,6 +442,17 @@
       ]
     },
     {
+      "name": "The dish that boils",
+      "shard": "logic",
+      "run": "npm run boil",
+      "why": [
+        "Heat the performer rides (PLAN 36e): the lamp's hot spot through the dye,",
+        "warm water rising by its real density on an upright plate and not at all on",
+        "a level one, a nucleation superheat per site, a boil where a hand blocks the",
+        "air that holds near 100 °C, and calm within seconds of letting go."
+      ]
+    },
+    {
       "name": "A row's fade",
       "shard": "logic",
       "run": "npm run rowfade",
@@ -743,6 +754,19 @@
         "a bore, held together to a ten-thousandth, cell by cell. `npm run slosh`",
         "holds the TypeScript to the physics; this holds the shader to it. It runs",
         "again on the Mac's plate shard, against Metal."
+      ]
+    },
+    {
+      "name": "The draining soap film on the GPU (control)",
+      "shard": "lab",
+      "run": "npm run soapgpu -- --selftest",
+      "why": [
+        "The draining soap film's GPU check against its CPU control (PLAN 32c,",
+        "scripts/soapgpu.mjs --selftest, scripts/soapgpu-cpu.ts): the CPU reference",
+        "in the GPU solver's contract through every scenario and bar of soapgpu.",
+        "In Measure's lab part rather than logic because soapgpu.mjs opens the lab",
+        "page in Chromium and requests a WebGPU adapter before running the solver,",
+        "and checks.yml installs Chromium only on the browser and lab parts."
       ]
     },
     {
@@ -1341,6 +1365,23 @@
       ]
     },
     {
+      "name": "The liquids on the GPU plate",
+      "shard": "plate",
+      "run": "npm run liquidsgpu",
+      "timeout": 6,
+      "why": [
+        "Soap, glycerine, milk and silicone on the GPU solver's own liquid fields",
+        "(PLAN 15e, scripts/liquidsgpu.mjs): the stand-in's four scenes from",
+        "`npm run liquids` laid on the thin gap the looks use, each held to the",
+        "stand-in's bar and to its size within a factor of two, with a fold of",
+        "the deltas every step and on a still plate, and soap's and silicone's",
+        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-1 to",
+        "15e-5 print and do not fail until they pass. Here on Metal, about a",
+        "minute: on the Linux lab part it took 4 min 26 s, and that part ran",
+        "24 of its 25 minutes before signin without it (#513's first run)."
+      ]
+    },
+    {
       "name": "The seed on the GPU, and in the app",
       "shard": "plate",
       "run": "npm run seed -- --lab --app",
@@ -1410,6 +1451,21 @@
       "why": [
         "The slosh dish's kernels against the TypeScript reference, on Metal",
         "(the same check runs on SwiftShader in Measure's lab part)."
+      ]
+    },
+    {
+      "name": "The draining soap film on Metal",
+      "shard": "plate",
+      "run": "npm run soapgpu",
+      "why": [
+        "The draining soap film's GPU solver (src/gpu/soapFilm.ts,",
+        "src/gpu/wgsl/soapFilm.ts) against the CPU reference (src/lib/soapFilm.ts),",
+        "on Metal (PLAN 32c, scripts/soapgpu.mjs): first-step face flows within 2%",
+        "and thickness change within 5%, 1 s thickness at dt 0.05, 1/60 s and",
+        "zeta 0.25 with dt 0.2 s (4 CFL sub-steps) within 5%, C1-C4 and C6,",
+        "ruptured hole unrefilled and black spreading within 15%, every step",
+        "submitting GPU work and every read mapping a buffer, and the CPU",
+        "reference absent from the solver's bundle."
       ]
     },
     {
