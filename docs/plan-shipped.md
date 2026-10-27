@@ -3806,6 +3806,15 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   plate, a hard-edged plate with its rim, and the glycerine drop. After 1, 31 and 121 steps,
   0 of 262,144 numbers differ. Control: with `dampGrid` stopped before its correction,
   21,104 to 173,518 of them differ (worst 3.42 units).
+- **Measured on Metal** (`npm run stages`, the owner's Mac, 768² + 512², 2 layers, 20 s, branch
+  `75e1dce` and main `6cf1ab1` run alternately). The two pairs ran at different loads (the whole
+  step 113–121 ms in the first, 76–77 ms in the second), so read each within its pair. `dye
+  grid` went from 10.08 ms (11.8% of L0's step) and 5.00 ms (13.0% of L1's) to 6.54 ms (6.8%)
+  and 2.59 ms (6.2%) in the first pair. In the second it went from 5.24 ms (8.9%) and 3.35 ms
+  (12.7%) to 3.43 ms (6.3%) and 2.60 ms (9.9%). That is a third to a half of the stage's time.
+  It is still above the one-pass filter's 1.4–3.8% from before 18m-5: the first pass's 25-tap
+  stencil and 3×3 bounds remain, now done once rather than three times.
+  `npm run slump` (14/14) and `npm run grating` (24/24) passed on the same Mac.
 
 ### 19aa-3. The API scripts never print the token
 
