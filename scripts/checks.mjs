@@ -56,7 +56,7 @@
 // to happen, and the deploy of a merge with any site file in it runs every
 // shard on main either way (`deploygate.sh`).
 
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -151,7 +151,7 @@ export function trace(files, root = ROOT) {
         const s = m[1].replace(/[?#].*$/, '');
         const cands = [];
         if (/^\.\.?\//.test(s)) cands.push(path.normalize(path.join(path.dirname(f), s)));
-        if (/^(scripts|src|public|docs|server)\//.test(s)) cands.push(path.normalize(s));
+        if (/^(scripts|src|public|docs|server|\.claude)\//.test(s) || /^[A-Z]+\.md$/.test(s)) cands.push(path.normalize(s));
         // A folder counts only below the top (scripts/fixtures, public/video):
         // a script that names `scripts/` or `../` is not reading all of it.
         for (const c of cands) {
@@ -511,7 +511,20 @@ async function selftest() {
   say(!m1.all && man.checks.filter((c) => c.name !== undefined && man.shards.measure.includes(c.shard) && entryFiles(c.run, scripts).has('scripts/desk.mjs')).every((c) => m1.names.includes(c.name)) && alwaysNames.every((n) => m1.names.includes(n)), `a Measure check's script selects that check and the always ones (${m1.names.length} of ${man.checks.filter((c) => man.shards.measure.includes(c.shard)).length}: ${m1.parts.join(', ')})`);
   say(m1.names.length < 20, 'and not the rest of Measure');
   say(alwaysNames.length >= 3 && alwaysNames.every((n) => man.checks.some((c) => c.name === n && man.shards.measure.includes(c.shard))), `the always checks are on Measure (${alwaysNames.join('; ')})`);
-  say(mpick(['PLAN.md']).names.join() === alwaysNames.join(), 'a document no check reads selects only the always checks');
+  const readSet = new Set(man.checks.flatMap((c) => [...trace(entryFiles(c.run, scripts))]));
+  const unread = fs.readdirSync(path.join(ROOT, 'docs')).map((f) => `docs/${f}`).find((f) => f.endsWith('.md') && !readSet.has(f));
+  say(unread && mpick([unread]).names.join() === alwaysNames.join(), `a document no check reads selects only the always checks (${unread})`);
+  // A check that walks a whole folder at run time reads files the trace
+  // cannot name, so a PR that changes one of them must still run it: those
+  // checks are `always`. The patterns find a walk of scripts/ (the panel's
+  // phantom `npm run`, the plate's retired look); a check that reads src/ the
+  // same way is reached by any diff that changes src/, which is Measure in full.
+  const WALKS = /\b(?:walk|readdirSync|readdir)\(\s*(?:join\(\s*\w+\s*,\s*)?['"]scripts['"]/;
+  say(WALKS.test("walk('scripts')") && WALKS.test("walk(join(root, 'scripts'))") && !WALKS.test("walk('src')") && !WALKS.test("path.join('scripts', 'x.mjs')"), 'the walk detector finds a walk of scripts/ in both spellings in use, and not a walk of src/ or a path');
+  const walkers = man.checks.filter((c) => man.shards.measure.includes(c.shard) && [...trace(entryFiles(c.run, scripts))].some((f) => /^scripts\//.test(f) && /\.(mjs|js)$/.test(f) && f !== 'scripts/checks.mjs' && WALKS.test(fs.readFileSync(path.join(ROOT, f), 'utf8'))));
+  say(walkers.length >= 2 && walkers.every((c) => c.always), `every Measure check that walks scripts/ is always (${walkers.map((c) => `${c.name}${c.always ? '' : ' NOT'}`).join('; ')})`);
+  say(mpick(['scripts/tools.mjs']).names.includes('The panel') && mpick(['scripts/tools.mjs']).names.includes('The plate'), 'so a Mac check\'s script still runs the panel (a phantom npm run) and the plate');
+  say(mpick(['CLAUDE.md']).names.includes('What a change reaches'), 'and a document a check names without a folder (CLAUDE.md, in what a change reaches) selects that check');
   const read = man.checks.find((c) => trace(entryFiles(c.run, scripts)).has('docs/handoff.md') && man.shards.measure.includes(c.shard));
   say(!read || mpick(['docs/handoff.md']).names.includes(read.name), `a document a check reads selects that check${read ? ` (docs/handoff.md: ${read.name})` : ''}`);
   say(mpick(['src/gpu/fluid.ts']).all, 'a source file runs Measure in full');
@@ -532,6 +545,29 @@ async function selftest() {
   say(pick(['package.json'], now, withScript('by-hand-only', 'node scripts/macqueue.mjs')) === allMac, 'a new npm script no check runs selects every shard');
   say(pick(['package.json'], now, { manifest: man, pkg: { ...pkg, dependencies: { ...pkg.dependencies, 'left-pad': '1.0.0' } } }) === allMac, 'a changed dependency selects every shard');
   say(pick(['package.json', 'scripts/checks.json'], now, (() => { const m = structuredClone(man); m.checks.push({ name: 'A new one', shard: mac2, run: ['npm', 'run', 'brand-new'].join(' ') }); return { manifest: m, pkg: { ...pkg, scripts: { ...pkg.scripts, 'brand-new': 'node scripts/tools.mjs' } } }; })()) === mac2, 'a new check with its new npm script selects its shard');
+
+  // The deploy gate's reading of a run that was only partly measured
+  // (19k-4) fails closed: its `api` replaced by a stub, the function itself
+  // taken out of deploygate.sh. A failed call or a run with no reach job is
+  // "partial", never "ran in full".
+  const gate = fs.readFileSync(path.join(ROOT, 'scripts/deploygate.sh'), 'utf8');
+  const fn = /^measurepartial\(\) \{[\s\S]*?^\}/m.exec(gate)?.[0];
+  const ask = (api) => {
+    const r = spawnSync('bash', ['-c', `${api}\n${fn}\nmeasurepartial 7`], { encoding: 'utf8' });
+    return r.stdout.trim();
+  };
+  const jobs = (extra = '') => `{"jobs":[{"name":"Measure · logic","id":1},{"name":"What the change reaches","id":2${extra}}]}`;
+  if (!fn) say(false, 'deploygate.sh has measurepartial, to be held to failing closed');
+  else {
+    const stub = (jobsOut, notesOut) => `api() { case "$1" in actions/runs/*) ${jobsOut};; check-runs/*) ${notesOut};; esac; }`;
+    const ok = jobs();
+    say(ask(stub(`echo '${ok}'`, `echo '[{"title":"measure","message":"partial: 6 checks in logic"}]'`)).startsWith('partial'), 'a run whose reach job said partial is partial');
+    say(ask(stub(`echo '${ok}'`, `echo '[{"title":"carried","message":"x"}]'`)) === '', 'a run whose reach job said nothing of it ran in full');
+    say(ask(stub('return 22', 'echo []')).startsWith('partial'), 'a run whose jobs cannot be read is partial (fails closed)');
+    say(ask(stub(`echo '${ok}'`, 'return 22')).startsWith('partial'), 'a run whose annotations cannot be read is partial');
+    say(ask(stub(`echo '{"jobs":[{"name":"Measure · logic","id":1}]}'`, 'echo []')).startsWith('partial'), 'a run with no reach job is partial');
+    say(ask(stub(`echo 'not json'`, 'echo []')).startsWith('partial'), 'a run whose jobs are not JSON is partial');
+  }
 
   // The runner: a green check, a red one with its FAIL line kept, a timeout
   // that ends a child the shell started, and the group header flakes.mjs reads.

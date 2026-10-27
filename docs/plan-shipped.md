@@ -3208,12 +3208,12 @@ is run a binary it has just downloaded, so the first run of this check was CI's.
 checks run and documents (a root or `docs/` Markdown file, `.claude/`, `LICENSE`, which select
 the checks that read them, by the same trace) runs only those checks and the `always` ones (the
 typecheck, that every script parses, that the manifest agrees with the workflow, the workflows
-lint), in only the parts that have any; anything else, `src/`, `public/` (Markdown there too),
+lint, and the panel and the plate, which walk all of `scripts/` at run time for a phantom `npm run` and a retired look, so the trace cannot name what they read; `npm run checks` finds any Measure check that walks `scripts/` and requires it `always`), in only the parts that have any; anything else, `src/`, `public/` (Markdown there too),
 a workflow, the lockfile, a shared helper or a script no check traces, and every deploy and run
 by hand, runs Measure in full as before. `checks.mjs --ci` reads `CHECKS_ONLY` and names the
 checks it left out in a notice. The reach job leaves a `measure` notice when it was partial and
 `deploygate.sh` does not take such a run as proof of a whole tree, as it does not one that
-skipped a Mac shard. A document-only PR no longer waits twelve minutes for the browser part.
+skipped a Mac shard; it fails closed, so a run whose jobs or annotations cannot be read, or that has no reach job, counts as partial too, and a carried run is asked as well (a selftest runs the function against a stubbed `api`). The guard also names a check moved between the Mac and Measure. A document-only PR no longer waits twelve minutes for the browser part.
 
 *Reviewer nits on `checks.mjs` (#502's review).* The runner waits for the shell's `exit` and
 gives the pipes three seconds to drain, then lets go of them and ends the group, where it
@@ -3234,7 +3234,7 @@ because its bar, "analysis costs under 2 ms", was the sensor's own wall-clock ti
 over thirty frames: 1.23 ms alone, 2.46 ms with twelve busy loops on 4 cores, one cold frame of
 12 ms among thirty. It now reads the process's CPU time over each push (0.2 to 0.5 ms for the
 median frame in either case), judges each room's median frame against the same 2 ms, and holds
-the costliest frame to its own bar of 25 ms (half a 20 Hz frame; 12 to 13 ms measured). Switches and
+the costliest frame to its own bar of 20 ms (11 to 15.8 ms measured over twelve runs, alone and with twelve busy loops: always the first room's cold frame; a steady slowdown of the analysis goes red at about 1.4x on it where the old wall mean went red at 1.5x). Switches and
 The intro did not go red under CPU load alone: with eight busy loops on 4 cores (twice the
 cores) Switches read 992 of 992 and The intro 13 of 13, so what turned them red beside the
 others in the first run is not the cores; `quick` keeps their logs in `scratch/quick/` and

@@ -158,17 +158,23 @@ macrun() {
 }
 
 # "partial: ..." when run $1's `reach` job said it ran only the Measure checks
-# its diff reached (PLAN.md 19k-4), empty for a run that ran all of Measure. Such
-# a run proved what its diff could move and nothing about the rest of the tree,
-# so it is never the evidence that a tree is safe to publish; the deploy runs
-# Measure in full. It is only a PR of check scripts, the manifest and documents
-# that gets one, which publishes nothing (PLAN.md 19j) unless package.json's
-# scripts moved with it.
+# its diff reached (PLAN.md 19k-4), empty only for a run that ran all of Measure.
+# Such a run proved what its diff could move and nothing about the rest of the
+# tree, so it is never the evidence that a tree is safe to publish; the deploy
+# runs Measure in full. It is only a PR of check scripts, the manifest and
+# documents that gets one, which publishes nothing (PLAN.md 19j) unless
+# package.json's scripts moved with it.
+#
+# It fails closed. `errexit` is not inherited inside `$(...)`, so a failed API
+# call used to leave an empty answer, which reads as "ran in full": a run that
+# could not be read, or one with no reach job to read, answers "partial" here.
 measurepartial() {
-  local job
-  job=$(api "actions/runs/$1/jobs?per_page=100&filter=latest" | jq -r '.jobs[] | select(.name == "What the change reaches") | .id // empty')
-  [ -n "$job" ] || return 0
-  api "check-runs/$job/annotations" | jq -r '.[] | select(.title == "measure") | .message // empty' | grep '^partial' | head -1 || true
+  local jobs job notes
+  jobs=$(api "actions/runs/$1/jobs?per_page=100&filter=latest") || { echo "partial: the jobs of run $1 could not be read"; return 0; }
+  job=$(jq -r '.jobs[] | select(.name == "What the change reaches") | .id // empty' <<<"$jobs") || { echo "partial: the jobs of run $1 could not be parsed"; return 0; }
+  [ -n "$job" ] || { echo "partial: run $1 has no reach job to say whether Measure ran in full"; return 0; }
+  notes=$(api "check-runs/$job/annotations") || { echo "partial: the reach job of run $1 has annotations that could not be read"; return 0; }
+  jq -r '.[] | select(.title == "measure") | .message // empty' <<<"$notes" | grep '^partial' | head -1 || true
 }
 
 # The paths whose blobs differ between two trees, one a line, sorted: added,
@@ -379,7 +385,10 @@ judge() {
       if [ "$shards" != ran ]; then
         echo "false #$pr's run $url did not run the Mac shards ($shards)"; continue
       fi
-      partial=$(measurepartial "${url##*/}")
+      # The run itself, and the run its Mac shards were carried from (url was
+      # reassigned to that one above): either may have been partial.
+      partial=$(measurepartial "$run_id")
+      [ -n "$partial" ] || [ "${url##*/}" = "$run_id" ] || partial=$(measurepartial "${url##*/}")
       if [ -n "$partial" ]; then
         echo "false #$pr's run $url ran only the Measure checks its diff reached ($partial)"; continue
       fi

@@ -68,6 +68,7 @@
       "name": "The plate",
       "shard": "logic",
       "run": "npm run plate",
+      "always": true,
       "why": [
         "Every preset's dish: that its dyes, injection styles and liquids all",
         "name things that exist. The cheapest check in the repo and the one that",
@@ -135,6 +136,7 @@
       "name": "The panel",
       "shard": "logic",
       "run": "npm run panel",
+      "always": true,
       "why": [
         "The two lists that have to agree about what a control is: the settings",
         "panel's own markup, and the registry the desks pin from."
