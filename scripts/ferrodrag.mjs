@@ -49,6 +49,7 @@
  * Lab only: software WebGPU in headless Chrome, or Metal on the Mac CI
  * runner (`WebGPU (macOS) · show`, `scripts/checks.json`).
  */
+import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
 
 const checks = [];
@@ -60,104 +61,134 @@ const check = (name, ok, detail = '') => {
 const N = 384;
 const R = 0.022; // drop radius, ~4.4 mm on 20 cm dish
 
-const { page, close } = await openLab();
-try {
-  const result = await page.evaluate(async ({ N, R }) => {
-    const getStats = async () => {
-      const p = await lab.phase();
-      // A plate with no phase field, or one read at another size, is not a drop at rest.
-      if (!p || p.n !== N) throw new Error(`phase: ${p ? `${p.n}² read for ${N}²` : 'no phase field'}`);
-      let halfCount = 0, n01 = 0;
-      let sumPhase = 0, sumX = 0, sumY = 0;
-      for (let j = 0; j < N; j++) {
-        for (let i = 0; i < N; i++) {
-          const val = p.data[j * N + i];
-          if (val > 0.5) halfCount++;
-          if (val > 0.01) n01++;
-          if (val > 0.05) {
-            sumPhase += val;
-            sumX += (i + 0.5) / N * val;
-            sumY += (j + 0.5) / N * val;
-          }
+/*
+  The fourth line's control, in the run (as ferrohold keeps its own): the lab
+  built again with runPhaseAdvect keyed off hsP alone, as #495's head was
+  before its review, so the deep plate rides the thin gap's last phaseVelT.
+  The edit is asserted, so a rename in fluid.ts fails here loudly rather than
+  leaving the control the same program as the real one.
+*/
+const RIDES_STALE = {
+  name: 'rides-stale-phasevel',
+  setup(b) {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]fluid\.ts$/ }, (args) => {
+      const src = readFileSync(args.path, 'utf8');
+      const key = 'this.phaseVel(thin && this.thinLive)';
+      if (!src.includes(key)) throw new Error('ferrodrag: the control could not find runPhaseAdvect\'s phaseVel(thin && this.thinLive) in fluid.ts');
+      return { contents: src.replace(key, 'this.phaseVel(thin)'), loader: 'ts' };
+    });
+  },
+};
+
+const scene = async ({ N, R, dragOnly }) => {
+  const getStats = async () => {
+    const p = await lab.phase();
+    // A plate with no phase field, or one read at another size, is not a drop at rest.
+    if (!p || p.n !== N) throw new Error(`phase: ${p ? `${p.n}² read for ${N}²` : 'no phase field'}`);
+    let halfCount = 0, n01 = 0;
+    let sumPhase = 0, sumX = 0, sumY = 0;
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const val = p.data[j * N + i];
+        if (val > 0.5) halfCount++;
+        if (val > 0.01) n01++;
+        if (val > 0.05) {
+          sumPhase += val;
+          sumX += (i + 0.5) / N * val;
+          sumY += (j + 0.5) / N * val;
         }
       }
-      return {
-        halfCount,
-        n01,
-        cx: sumPhase > 0 ? sumX / sumPhase : 0,
-        cy: sumPhase > 0 ? sumY / sumPhase : 0,
-      };
+    }
+    return {
+      halfCount,
+      n01,
+      cx: sumPhase > 0 ? sumX / sumPhase : 0,
+      cy: sumPhase > 0 ? sumY / sumPhase : 0,
     };
+  };
 
-    // 1. Drag test: settle 20 steps, then drag magnet 0.3 plate in 180 steps
-    await lab.create(N, N);
-    lab.addPhase(0.36, 0.5, R, 1);
-    for (let k = 0; k < 20; k++) {
-      await lab.step(1, {
-        phaseSharp: 0.75,
-        phaseDisplace: 0,
-        thinGap: 1,
-        magnetStrength: 0,
-      });
-    }
+  // 1. Drag test: settle 20 steps, then drag magnet 0.3 plate in 180 steps
+  await lab.create(N, N);
+  lab.addPhase(0.36, 0.5, R, 1);
+  for (let k = 0; k < 20; k++) {
+    await lab.step(1, {
+      phaseSharp: 0.75,
+      phaseDisplace: 0,
+      thinGap: 1,
+      magnetStrength: 0,
+    });
+  }
 
-    const s0 = await getStats();
+  const s0 = await getStats();
 
-    const steps = 180;
-    for (let k = 1; k <= steps; k++) {
-      const magX = 0.36 + 0.3 * (k / steps);
-      await lab.step(1, {
-        phaseSharp: 0.75,
-        phaseDisplace: 0,
-        thinGap: 1,
-        magnetX: magX,
-        magnetY: 0.5,
-        magnetHeight: 0.2,
-        magnetStrength: 0.4,
-        magnetSeconds: 1 / 60,
-      });
-    }
+  const steps = 180;
+  for (let k = 1; k <= steps; k++) {
+    const magX = 0.36 + 0.3 * (k / steps);
+    await lab.step(1, {
+      phaseSharp: 0.75,
+      phaseDisplace: 0,
+      thinGap: 1,
+      magnetX: magX,
+      magnetY: 0.5,
+      magnetHeight: 0.2,
+      magnetStrength: 0.4,
+      magnetSeconds: 1 / 60,
+    });
+  }
 
-    const s1 = await getStats();
+  const s1 = await getStats();
 
-    // 4. Thin Gap off, magnet gone: 120 steps of the deep plate.
-    for (let k = 1; k <= 120; k++) {
-      await lab.step(1, {
-        phaseSharp: 0.75,
-        phaseDisplace: 0,
-        thinGap: 0,
-        magnetStrength: 0,
-      });
-    }
-    const s2 = await getStats();
+  // 4. Thin Gap off, magnet gone: 120 steps of the deep plate, read every 30.
+  const tail = [];
+  for (let k = 1; k <= 120; k++) {
+    await lab.step(1, {
+      phaseSharp: 0.75,
+      phaseDisplace: 0,
+      thinGap: 0,
+      magnetStrength: 0,
+    });
+    if (k % 30 === 0) tail.push(await getStats());
+  }
+  const s2 = tail[tail.length - 1];
+  if (dragOnly) return { s0, s1, s2, tail };
 
-    // 2. Stationary control: settle 20 steps, then 180 steps with no magnet
-    await lab.create(N, N);
-    lab.addPhase(0.36, 0.5, R, 1);
-    for (let k = 0; k < 20; k++) {
-      await lab.step(1, {
-        phaseSharp: 0.75,
-        phaseDisplace: 0,
-        thinGap: 1,
-        magnetStrength: 0,
-      });
-    }
+  // 2. Stationary control: settle 20 steps, then 180 steps with no magnet
+  await lab.create(N, N);
+  lab.addPhase(0.36, 0.5, R, 1);
+  for (let k = 0; k < 20; k++) {
+    await lab.step(1, {
+      phaseSharp: 0.75,
+      phaseDisplace: 0,
+      thinGap: 1,
+      magnetStrength: 0,
+    });
+  }
 
-    const noMag0 = await getStats();
-    for (let k = 1; k <= steps; k++) {
-      await lab.step(1, {
-        phaseSharp: 0.75,
-        phaseDisplace: 0,
-        thinGap: 1,
-        magnetStrength: 0,
-      });
-    }
-    const noMag1 = await getStats();
+  const noMag0 = await getStats();
+  for (let k = 1; k <= steps; k++) {
+    await lab.step(1, {
+      phaseSharp: 0.75,
+      phaseDisplace: 0,
+      thinGap: 1,
+      magnetStrength: 0,
+    });
+  }
+  const noMag1 = await getStats();
 
-    return { s0, s1, s2, noMag0, noMag1 };
-  }, { N, R });
+  return { s0, s1, s2, tail, noMag0, noMag1 };
+};
 
-  const { s0, s1, s2, noMag0, noMag1 } = result;
+let control;
+{
+  const { page, close } = await openLab({ plugins: [RIDES_STALE], tag: 'ferrodrag-stale' });
+  try { control = await page.evaluate(scene, { N, R, dragOnly: true }); } finally { await close(); }
+}
+
+const { page, close } = await openLab();
+try {
+  const result = await page.evaluate(scene, { N, R, dragOnly: false });
+
+  const { s0, s1, s2, tail, noMag0, noMag1 } = result;
   const lag = Math.abs(s1.cx - 0.66);
   const twoR = 2 * R;
   const areaRatio = s1.halfCount / s0.halfCount;
@@ -191,11 +222,26 @@ try {
   // 4. Thin Gap off after the drag: the deep plate does not carry the drop on
   // the thin gap's last velocity. Read from where the drag left it (s1), so
   // the drop has to have been dragged and be there (line 1) to be read.
-  const offMoved = Math.hypot(s2.cx - s1.cx, s2.cy - s1.cy);
+  const stays = (r) => {
+    const moved = Math.hypot(r.s2.cx - r.s1.cx, r.s2.cy - r.s1.cy);
+    return {
+      moved,
+      ok: moved < R && r.s1.cx > 0.55 && r.s1.halfCount > 0 && r.s2.halfCount >= 0.5 * r.s1.halfCount,
+      text: `moved ${(moved / R).toFixed(2)}R in 120 deep steps (cx ${r.s1.cx.toFixed(4)} → ${r.tail.map((t) => t.cx.toFixed(4)).join(' ')}, limit 1R); half-full ${r.s1.halfCount} → ${r.tail.map((t) => t.halfCount).join(' ')} (limit half kept); ${r.s1.n01} → ${r.s2.n01} cells over 0.01`,
+    };
+  };
+  const off = stays(result), stale = stays(control);
   check(
     'with Thin Gap off after the drag and no magnet, the drop stays put and stays a drop',
-    offMoved < R && s1.cx > 0.55 && s1.halfCount > 0 && s2.halfCount >= 0.5 * s1.halfCount,
-    `moved ${(offMoved / R).toFixed(2)}R in 120 deep steps (cx ${s1.cx.toFixed(4)} → ${s2.cx.toFixed(4)}, limit 1R); ${s1.halfCount} → ${s2.halfCount} cells half full (limit half kept); ${s1.n01} → ${s2.n01} cells over 0.01`,
+    off.ok,
+    off.text,
+  );
+  // 5. The control: the same scene on the plate that rides the stale velocity
+  // fails line 4, by more than the real plate's movement again.
+  check(
+    'and it is the deep plate not riding the thin gap\'s last velocity: with it ridden, the same line is red',
+    !stale.ok && stale.moved - off.moved >= R / 2,
+    `${stale.text}; ${((stale.moved - off.moved) / R).toFixed(2)}R further than the real plate (bar >= 0.5R)`,
   );
 
 } finally {
