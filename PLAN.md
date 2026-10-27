@@ -561,6 +561,7 @@ Where each batch stands, as of 2026-09-27:
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
 | 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
+| 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -1990,9 +1991,10 @@ The steps, most visible first. Each is one PR with its own check, and every step
      first steps use. Oil poured before they are ready builds them on that frame.
      A check that pours oil at once in Oil & Water would say how long it stops.
 6. **A plate that lives on its own** (roadmap S2, heat and boiling). Blocked on heat
-   having a strength.
+   having a strength. The analog operators' accounts say to unblock it as a
+   performer's control (§36e).
 7. **Layers at their own speeds** (roadmap Stage 4, the rig). A slow wash, a drop field
-   and a streak layer, each at its own speed, added as light.
+   and a streak layer, each at its own speed, added as light. Moved up by §36h.
 8. ~~**Evolve changes slowly with the song.**~~ Shipped: one move at a time (a few
    related dials, 30–90 s glides, about one a minute), steered by the song's sections
    and its level over half a minute, the palette turning at drops and breakdowns, the
@@ -3191,7 +3193,7 @@ the checks and the build §19.
 **Shipped, this PR** (`npm run showkey`: 11 of 33 on the old server, 33 of 33 now). Story in `docs/plan-shipped.md`.
 Left open from it:
 
-- **14m-guest** (*proposed*, M): a **guest key**, now that the server has roles: a key
+- **14m-guest** (*proposed*, M; moved up by §36f, with a plate per performer): a **guest key**, now that the server has roles: a key
   whose socket may only drop, blow and finger, rate-limited, in the palette's dyes, onto
   a chosen plate, with a Guests level and a kill on the desk and the phone. A singer's
   tablet, a second projectionist, or at a party the audience's phones through a QR code
@@ -3263,6 +3265,8 @@ in a scratch clone with a tag behind `main` builds the tag's tree; the cast hell
 version (14k) matches it.
 
 ### 14q. The room's lights do not follow the wall
+
+*Moved up by §36g (2026-10-27): the old light shows fought the band's own lighting.*
 
 **Read in the code** (the `lights` effect in `App.tsx`; `server/artnet.js`). Every
 50 ms the show sends each layer's mean colour and `master = blackout ? 0 : min(1, fill ×
@@ -9017,6 +9021,91 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
   its hare at both ends but no snail at the stop in the middle (the slider has one under the track). Batches B
   (liquid in the controls) and C (show hardware) have shipped (35e, 35f), and item 12 (35g), the last.
+## 36. What the analog operators could not do (researched 2026-10-27)
+
+Asked 2026-10-27: what the analog liquid light shows could not do, and what the people
+who ran them wished they could. The research, in the operators' own words with a source
+for each quote, is the owner's page "Limits of the Wet Show" (its notes are in the
+project's shared files, `research/light-show/analog-limits.md`; the craft itself is in
+`craft-and-field.md` beside it). Of 22 pains and wishes it found, ChromaGlass already
+answers 12 (the heat that cracks glass, dishes that go muddy or dry, half a ton of gear,
+seven-operator crews, five-hour nights alone, nothing left on film), answers 7 in part,
+misses 2, and 1 (fog machines) is outside any app. The owner asked for all eight items
+below to be in the plan. 36a–36d are new; 36e–36h are open items elsewhere that the
+research says to move up, with the evidence, and each of those keeps its own number.
+
+What a fix must not take away, from the same operators: the plate's own surprises ("For
+me perfection equals a kind of death", Joshua White), no visible pixels, above all on
+people ("no one's body looks good with pixels on it", Drippy Eye), and the hand, not a
+button, making it look good. Every item here is held to those.
+
+- **36a. A lit-stage grade** (*proposed*, M). *The pain:* analog light "is not bright, and
+  it's hard for that light to live in a modern stage environment" (Mad Alchemy); one
+  operator pre-records when there is "too much competition from bright stage lights"
+  (Liquid Lights Bend). A video projector has the lumens, but every look is graded for a
+  dark room: under a stage wash the projector's black lifts to grey, and the looks that
+  lean on near-black scenes (the swells and darkness of §10) turn to a grey haze. *The
+  feature:* a **Lit stage** amount in Settings → Wall (load-in, never saved into a look):
+  as it rises, the dyes thicken and saturate and the bodies hold larger, so a look keeps
+  its contrast on a lifted floor instead of performing black the room cannot show. A
+  real projector's black under ambient light is light added to every pixel, so the
+  check models it that way. *Measure:* each look rendered in the lab over a raised black
+  floor (0, 5, 10 % of white added), its contrast between dye bodies and field held at 10 %
+  to within a set fraction of its dark-room value with the grade on, and byte for byte
+  unchanged at 0. Phone: the same amount in the phone's Wall sheet.
+- **36b. Span the wall** (*proposed*, L, the Mac app). *The pain:* "The light show, as
+  originally performed had no effect on large audiences" (Joshua White); "there wasn't any
+  money to rent the extra projectors I knew I'd need to make a difference in that big
+  hall" (Bill Ham); one operator built "a full 360-degree panorama with six projectors"
+  (Liquid Lights Bend). Today a show goes to one output: Two Projectors (18b-10) is two
+  lamps on one screen and §16 is two plates, and nothing in this plan blends projectors
+  edge to edge. *The feature:* several outputs from the Mac app, each with its own corner
+  pin and masks (the Wall's), soft-edge blending where neighbours overlap (a gamma-correct
+  ramp, so the overlap is not brighter), and one plate laid across all of them, up to a
+  closed ring. Read §16's open 16d and 16e first; this may belong there. *Measure:* a
+  two- and three-output render whose summed light across each overlap stays within a
+  few percent of the light beside it.
+- **36c. A practice plate** (*proposed*, M). *The pain:* "It requires practice, speed and
+  precision changing between effects live" (Heavy Light); "We struggled along for years
+  and we didn't figure out the chemistry … No one wanted to tell you how any of this stuff
+  was done" (Mad Alchemy). `docs/guide.md` explains every control, but nothing in the app
+  teaches the strokes, and no item in this plan does. *The feature:* a short guided set,
+  on the plate itself and against a song, that teaches the squash, the lift, the tilt,
+  the blow and the drop one at a time, each step done when the performer has made it
+  happen. Desk, iPad pad and phone alike. *Measure:* a harness that plays each step's
+  stroke and sees the step advance, and a step that cannot be passed without it.
+- **36d. Show the hands** (*proposed*, M). *The pain:* a lighter digital rig is "not as
+  fun for the audience to watch as the analog set up" (Heavy Light); of the Joshua Light
+  Show today, "part of the appeal is getting a chance to see the mechanics of how White
+  and team mix oils and colors in real time" (Time Out New York). A laptop on a table
+  looks like someone reading email. *The feature:* an optional audience-facing view of
+  the performance: the iPad pad drawn as a lit glass table with the touches and pours as
+  they happen, as a Mixer row or a corner of the wall or a second output, or a camera on
+  the performer through the film projector's live camera. Pairs with the hardware idea
+  of a touch table in a case. *Measure:* a pad stroke appears in the view on the same
+  frame it reaches the plate.
+- **36e. Heat the performer rides** (moves up the Running order's step 6, roadmap S2).
+  *The evidence:* heat was both the hazard and the instrument: "the heat was hard to
+  control, glass cracked" (Ultramarine), and a Danish crew turned it into a stroke: "we
+  deliberately blocked the air stream when we needed heat to propagate bubbles"
+  (Tezcatlipoca). Step 6 is blocked on heat having a strength; the research says to
+  unblock it as a performer's control: a Heat dial and a pad gesture, the lamp feeding
+  heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
+  bubbles while it is held and calming when released. Not a bubble sprite.
+- **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
+  her there to smooth transitions things would come to a halt, visually" (Heavy Light);
+  Glenn McKay's crew described it as "painting with three or four hands". Build the guest
+  key, and give each performer a plate of their own on the desk, so two people play one
+  show without fighting over one dial.
+- **36g. The room's lights follow the wall** (moves up 14q). *The evidence:* the old
+  shows fought the band's own lighting: "Their lighting man wanted his toy strobe to be
+  seen and kept telling us to get that crap off the screen" (Joshua White); "the bigger
+  bands were carrying their own lights" (Ultramarine). Lights that fade with the wall
+  turn the rival rig into part of the show.
+- **36h. Layers at their own speeds** (moves up the Running order's step 7, roadmap Stage
+  4). *The evidence:* Drippy Eye's dream rig "would consist of five slide projectors
+  doing their own thing … we will do it someday". Today two plates at most (§16).
+
 ## Business Plan: The PRO Desktop App
 Chroma Glass operates on a dual-tier business model to capture both casual users and professional touring VJs.
 * **LITE / Web (Free):** The browser-based version remains free and accessible. It functions as an interactive toy and an educational tool for students, hobbyists, and casual users.
