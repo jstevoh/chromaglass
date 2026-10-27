@@ -519,8 +519,16 @@ async function selftest() {
   // checks are `always`. The patterns find a walk of scripts/ (the panel's
   // phantom `npm run`, the plate's retired look); a check that reads src/ the
   // same way is reached by any diff that changes src/, which is Measure in full.
-  const WALKS = /\b(?:walk|readdirSync|readdir)\(\s*(?:join\(\s*\w+\s*,\s*)?['"]scripts['"]/;
-  say(WALKS.test("walk('scripts')") && WALKS.test("walk(join(root, 'scripts'))") && !WALKS.test("walk('src')") && !WALKS.test("path.join('scripts', 'x.mjs')"), 'the walk detector finds a walk of scripts/ in both spellings in use, and not a walk of src/ or a path');
+  // A walk names scripts/ as a quoted segment, or as the tail of a template or
+  // a concatenation (`${ROOT}/scripts`, ROOT + '/scripts'): any text after the
+  // call's open bracket on the same statement that has "scripts" between
+  // quotes or slashes, so nested brackets (join(process.cwd(), 'scripts'),
+  // join(dirname(x), '..', 'scripts')) count. It can over-match a later
+  // argument on the line, which only makes a check `always`; it cannot see a
+  // walk whose path is built in a variable first, so a walk of that kind is
+  // still for the reader of the check to name.
+  const WALKS = /\b(?:walk|readdirSync|readdir)\([^;\n]*?[\/'"`]scripts[\/'"`]/;
+  say(WALKS.test("walk('scripts')") && WALKS.test("walk(join(root, 'scripts'))") && WALKS.test("walk(`${ROOT}/scripts`)") && WALKS.test("readdirSync(ROOT + '/scripts/')") && !WALKS.test("walk('src')") && WALKS.test("walk(join(process.cwd(), 'scripts'))") && WALKS.test("readdirSync(join(dirname(x), '..', 'scripts'))") && !WALKS.test("walk(join(root, 'src')), walk(join(root, 'lib'))") && !WALKS.test("walk(join(root, 'src'));\nconst s = 'scripts/';") && !WALKS.test("path.join('scripts', 'x.mjs')"), 'the walk detector finds a walk of scripts/ in every spelling in use (nested brackets too), and not a walk of src/ or a path');
   const walkers = man.checks.filter((c) => man.shards.measure.includes(c.shard) && [...trace(entryFiles(c.run, scripts))].some((f) => /^scripts\//.test(f) && /\.(mjs|js)$/.test(f) && f !== 'scripts/checks.mjs' && WALKS.test(fs.readFileSync(path.join(ROOT, f), 'utf8'))));
   say(walkers.length >= 2 && walkers.every((c) => c.always), `every Measure check that walks scripts/ is always (${walkers.map((c) => `${c.name}${c.always ? '' : ' NOT'}`).join('; ')})`);
   say(mpick(['scripts/tools.mjs']).names.includes('The panel') && mpick(['scripts/tools.mjs']).names.includes('The plate'), 'so a Mac check\'s script still runs the panel (a phantom npm run) and the plate');
@@ -565,6 +573,9 @@ async function selftest() {
     say(ask(stub(`echo '${ok}'`, `echo '[{"title":"carried","message":"x"}]'`)) === '', 'a run whose reach job said nothing of it ran in full');
     say(ask(stub('return 22', 'echo []')).startsWith('partial'), 'a run whose jobs cannot be read is partial (fails closed)');
     say(ask(stub(`echo '${ok}'`, 'return 22')).startsWith('partial'), 'a run whose annotations cannot be read is partial');
+    say(ask(stub(`echo '${ok}'`, `echo '<html>502 Bad Gateway</html>'`)).startsWith('partial'), 'a run whose annotations are not JSON is partial, not a full run');
+    say(ask(stub(`echo '${ok}'`, `echo ''`)).startsWith('partial'), 'a run whose annotations body is empty is partial, not a full run');
+    say(ask(stub(`echo '${ok}'`, `echo '{"message":"rate limited"}'`)).startsWith('partial'), 'a run whose annotations are an error object is partial');
     say(ask(stub(`echo '{"jobs":[{"name":"Measure · logic","id":1}]}'`, 'echo []')).startsWith('partial'), 'a run with no reach job is partial');
     say(ask(stub(`echo 'not json'`, 'echo []')).startsWith('partial'), 'a run whose jobs are not JSON is partial');
   }
