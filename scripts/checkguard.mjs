@@ -876,7 +876,7 @@ function selftest() {
   t(manifestChanges(base, mf({ ...qa, shard: 'c' }, other)).length === 0, 'a check moved to another shard is not a change to what it measures');
   t(manifestChanges(base, mf(other, qa)).length === 0, 'a reorder is not');
   t(manifestChanges(base, mf({ ...qa, why: ['reworded'] }, other)).length === 0, 'nor is the prose');
-  t(manifestChanges(base, mf(qa, other, { name: 'A new one', shard: 'a', run: 'npm run new' })).length === 0, 'nor a new entry');
+  t(manifestChanges(base, mf(qa, other, { name: 'A new one', shard: 'a', run: 'npm run slosh' })).length === 0, 'nor a new entry');
   c = manifestChanges(base, mf(other));
   t(c.length === 1 && c[0].removed && c[0].words[0] === 'The app, every look', 'a removed entry is one change', c.map((x) => x.what).join('; '));
   t(names('The app, every look: removed, its looks are measured by gallery.yml now on the Mac', c[0]), 'named as removed with a reason, it passes');
