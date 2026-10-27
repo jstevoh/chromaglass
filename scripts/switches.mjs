@@ -625,10 +625,10 @@ try {
     await desk.waitForTimeout(500);
     return true;
   };
-  // Each layout of the desk, by its tab (the desk opens on Build, so the
-  // first is tapped like the rest rather than assumed).
-  for (const [mode, name] of [['design', 'Build'], ['perform', 'Gig'], ['loadin', 'Load-in'], ['sequence', 'Sequence'], ['sound', 'Sound']]) {
-    if (!await tap(desk, `mode-segmented-${mode}`)) { console.log(`      desk ${name}: no tab`); continue; }
+  // Each of the desk's tabs as it ships, by its chip (the desk opens on
+  // Perform, so the first is tapped like the rest rather than assumed).
+  for (const [mode, name] of [['perform', 'Perform'], ['sequence', 'Sequence'], ['setup', 'Setup']]) {
+    if (!await tap(desk, `mode-segmented-${mode}`)) { check(`the desk has its ${name} tab`, false, 'no chip'); continue; }
     await desk.waitForTimeout(400);
     await visit(desk, `desk ${name}`, 'desk');
   }

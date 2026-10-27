@@ -55,7 +55,7 @@ import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
 import { HALOGEN_KELVIN, LAMP_WARMTH_MAX, LEGACY_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, kelvinLabel, lampTint, warmthKelvin } from '../src/lib/lampKelvin.ts';
 import { dripFallSeconds, FALL_THIN_S } from '../src/lib/dripPace.ts';
 import { THICK_NU, WATER_NU } from '../src/lib/turntable.ts';
-import { dyeRoomOf } from '../src/lib/dyeTarget.ts';
+import { dyeRoomOf, shownRoom } from '../src/lib/dyeTarget.ts';
 import { FULL_CM, HUB_CM, TAPE_CM_PER_S, TAPE_SECONDS, reelsAt } from '../src/lib/tapeReels.ts';
 import { VU_FULL, needleAtRest, needleDeg, stepNeedle } from '../src/lib/vuMeter.ts';
 import { MAX_DOTS, strobeOf } from '../src/lib/strobeRing.ts';
@@ -1936,6 +1936,26 @@ check('and neither starts over the limit',
   check('the bottle is full on an empty plate, half at half the target, empty at it, and never past either',
     dyeRoomOf(0, 0.85) === 1 && Math.abs(dyeRoomOf(0.425, 0.85) - 0.5) < 1e-12 && dyeRoomOf(0.85, 0.85) === 0 &&
     dyeRoomOf(3, 0.85) === 0 && dyeRoomOf(NaN, 0.85) === 1);
+  /*
+    What the bottle re-renders for. A plate at rest reads a level that wobbles by
+    a few thousandths (the Mac's read-back mean); on a rounding boundary the
+    plain rounding the bottle had flipped it every other poll, and the Perform
+    desk's quiet line in `npm run renders` read the extra commits. Measured on
+    the rule itself: a wobble of 0.004 about 0.875, a boundary, over 100 polls,
+    and a drain from full to empty at a hundredth a poll.
+  */
+  {
+    const wobble = Array.from({ length: 100 }, (_, i) => 0.875 + 0.004 * Math.sin(i * 1.7));
+    const runs = (step) => { let shown = 1, n = 0; const seen = []; for (const r of wobble) { const v = step(shown, r); if (v !== shown) n++; shown = v; seen.push(v); } return { n, seen }; };
+    const rounded = runs((_, r) => Math.round(r * 20) / 20);
+    const held = runs(shownRoom);
+    let shown = 1, moves = 0;
+    for (let k = 100; k >= 0; k--) { const v = shownRoom(shown, k / 100); if (v !== shown) moves++; shown = v; }
+    check('a level wobbling on a boundary moves the bottle once, where rounding moved it on every crossing',
+      held.n === 1 && rounded.n > 10, `${held.n} moves held, ${rounded.n} rounded, over 100 polls`);
+    check('and a drain from full to empty moves it a twentieth at a time, to empty',
+      moves === 20 && shown === 0 && shownRoom(0, 1) === 1 && shownRoom(0.5, NaN) === 1, `${moves} moves, ending at ${shown}`);
+  }
   check('the visualizer answers it from the regulator\'s own target and the closeup\'s, and the desk and phone ask for it',
     /dyeRoom: \(\) => \{[\s\S]{0,420}dyeLookTarget\(f\.seedMean, st\.dyeBudget \?\? 0\.85, f\.seedBudget\)[\s\S]{0,200}macroAmountOf\(st\)/.test(panel0) &&
     (panel0app.match(/dyeRoom=\{readDyeRoom\}/g) ?? []).length === 2);

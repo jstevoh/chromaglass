@@ -41,6 +41,8 @@ interface SongsPanelProps {
   /** Saved looks that arrived in a songs file. */
   onImportLooks: (looks: unknown[]) => void;
   onClose: () => void;
+  /** Drawn in a desk panel rather than as a sheet (`Sheet embed`). */
+  embed?: boolean;
 }
 
 const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40';
@@ -88,7 +90,7 @@ function defaultWhat(d: ActionWhat['do'], looks: LookChoice[]): ActionWhat {
 const lookKey = (l: { kind: string; id: string }) => `${l.kind}:${l.id}`;
 
 export const SongsPanel: React.FC<SongsPanelProps> = ({
-  shows, onShows, sets, onSaveSet, onDeleteSet, looks, currentSong, follow, onFollow, status, onRun, onStop, onOpenSequences, exportShows, onImportLooks, onClose,
+  shows, onShows, sets, onSaveSet, onDeleteSet, looks, currentSong, follow, onFollow, status, onRun, onStop, onOpenSequences, exportShows, onImportLooks, onClose, embed = false,
 }) => {
   const [selectedId, setSelectedId] = useState<string | null>(shows[0]?.id ?? null);
   const selected = useMemo(() => shows.find((s) => s.id === selectedId) ?? null, [shows, selectedId]);
@@ -144,17 +146,22 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
   const set = sets.find((s) => s.id === chosenSet) ?? null;
 
   return (
-    <Sheet title={<><ListMusic size={16} /> Songs</>} onClose={onClose} width={960} height={680} testId="songs-panel">
-      <div className="flex min-h-0 flex-1">
+    <Sheet embed={embed} title={<><ListMusic size={16} /> Songs</>} onClose={onClose} width={960} height={680} testId="songs-panel">
+      {/*
+        Two columns at a sheet's width; one above the other in a panel a
+        third as wide (a tab's side column), the list kept short so the
+        song's editor is in reach under it.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-hide @[640px]:flex-row @[640px]:overflow-hidden">
         {/* ── The songs ─────────────────────────────────────────── */}
-        <div className="flex w-[300px] shrink-0 flex-col border-r border-white/10 p-4">
+        <div className="flex w-full shrink-0 flex-col border-b border-white/10 p-4 @[640px]:w-[300px] @[640px]:border-b-0 @[640px]:border-r">
           <p className="mb-3 text-[10px] leading-relaxed opacity-50">
             A look for each song and what happens while it plays. With Follow on, a song's show starts when the song is recognised.
           </p>
           <div className="mb-3">
             <Toggle label="Follow songs" on={follow} onChange={onFollow} testId="songs-follow" />
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide" data-testid="songs-list">
+          <div className="max-h-[220px] min-h-0 flex-1 overflow-y-auto scrollbar-hide @[640px]:max-h-none" data-testid="songs-list">
             {shows.length === 0 && <p className="text-[11px] opacity-40">No songs yet.</p>}
             {shows.map((s) => {
               const live = status.showId === s.id;
@@ -205,7 +212,7 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
         </div>
 
         {/* ── The song being set up ─────────────────────────────── */}
-        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-5">
+        <div className="shrink-0 p-5 @[640px]:min-h-0 @[640px]:flex-1 @[640px]:shrink @[640px]:overflow-y-auto @[640px]:scrollbar-hide">
           {!selected ? (
             <p className="text-[12px] opacity-40">Add a song, or pick one from the list.</p>
           ) : (

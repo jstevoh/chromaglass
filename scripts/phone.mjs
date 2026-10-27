@@ -1095,6 +1095,38 @@ try {
         gone && stillGone && (await visible(page, 'phone-dock')),
         !gone ? 'nothing was hidden' : !stillGone ? 'a drag brought them back' : '');
 
+      /*
+        The desk's tabs on the phone (PLAN 8-tabs): More › Tabs has the same
+        chips, each tab's panels stacked in the sheet. Setup's Wall is drawn in
+        place (its section, not a frame with nothing in it); Perform's bottles
+        are a button to the phone's own Dye sheet; a panel taken off goes, and
+        one put on from the list comes, and both are the desk's: the stored
+        tabs say so.
+      */
+      await tap(page, 'phone-open-more');
+      await tap(page, 'phone-tabs');
+      await page.waitForTimeout(400);
+      const chips = await page.locator('[data-testid="phone-sheet-tabs"] [data-testid^="mode-segmented-"]').count();
+      await tap(page, 'mode-segmented-setup');
+      await page.waitForTimeout(600);
+      const wallDrawn = await page.locator('[data-testid="phone-tab-panel-projectors"] [data-section="projectors"]').count();
+      await tap(page, 'phone-tab-remove-projectors');
+      const wallGone = !(await visible(page, 'phone-tab-panel-projectors'));
+      await tap(page, 'phone-tab-add');
+      await tap(page, 'phone-tab-add-projectors');
+      await page.waitForTimeout(400);
+      const wallBack = await visible(page, 'phone-tab-panel-projectors');
+      const stored = await page.evaluate(() => localStorage.getItem('chromaglass-desk-tabs'));
+      await tap(page, 'mode-segmented-perform');
+      await page.waitForTimeout(400);
+      const bottlesButton = await visible(page, 'phone-tab-open-bottles');
+      if (bottlesButton) await tap(page, 'phone-tab-open-bottles');
+      const dyeOpened = await visible(page, 'phone-sheet-dye');
+      if (dyeOpened) await tap(page, 'phone-sheet-scrim');
+      check('More › Tabs has the desk\'s three tabs; Setup draws its Wall in place, takes it off and puts it back; Perform\'s bottles open the Dye sheet',
+        chips === 3 && wallDrawn > 0 && wallGone && wallBack && (() => { try { return JSON.parse(stored).tabs.find(x => x.id === 'setup')?.layout?.deck?.includes('projectors') === true; } catch { return false; } })() && bottlesButton && dyeOpened,
+        `${chips} chips; Wall drawn ${wallDrawn}, off ${wallGone}, back ${wallBack}, stored ${!!stored}; bottles button ${bottlesButton}, Dye ${dyeOpened}`);
+
       // "Full layout" is the laptop's, for the visit.
       await tap(page, 'phone-open-more');
       await tap(page, 'phone-full-layout');

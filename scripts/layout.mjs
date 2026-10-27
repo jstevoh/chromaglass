@@ -84,9 +84,14 @@ const appears = async (testId) => {
   }
   return false;
 };
-/** Which layout the desk is drawing: a mode switch that did nothing re-measures the last one. */
-const LAYOUT_OF = { design: 'build', perform: 'gig', loadin: 'loadin' };
-const layoutIs = (mode) => page.evaluate((want) => document.querySelector('[data-desk]')?.getAttribute('data-layout') === want, LAYOUT_OF[mode]);
+/** Which tab the desk is drawing: a switch that did nothing re-measures the last one. */
+const layoutIs = (tab) => page.evaluate((want) => document.querySelector('[data-desk]')?.getAttribute('data-layout') === want, tab);
+/**
+ * The desk's tabs as stored (lib/deskTabs.ts), the three that ship with
+ * `layout` on the one named: how a check lays a tab out before the page loads.
+ */
+const tabsWith = (id, layout) => JSON.stringify({ v: 1, tabs: [['perform', 'Perform'], ['sequence', 'Sequence'], ['setup', 'Setup']]
+  .map(([i, name]) => (i === id ? { id: i, name, layout } : { id: i, name })) });
 /**
  * The desk's rules (11px, 60% opacity, 24px), asked only of what is inside
  * `sel`: a measure of the whole page passes a panel that drew nothing.
@@ -164,7 +169,7 @@ const alphaBadge = () => page.evaluate(() => {
 
 try {
   await page.goto(URL, { waitUntil: 'networkidle' });
-  const desk = await appears('design-desk') || await appears('perform-desk');
+  const desk = await appears('perform-desk');
   check('a desk lays out at laptop width', desk);
   if (!desk) throw new Error('no desk to measure');
 
@@ -172,7 +177,7 @@ try {
   await clickOn('mode-segmented-perform');
   await settle(1200);
   const inPerform = await modeSwitchX(page);
-  await clickOn('mode-segmented-design');
+  await clickOn('mode-segmented-setup');
   await settle(1200);
   const inDesign = await modeSwitchX(page);
   await clickOn('mode-segmented-perform');
@@ -181,13 +186,14 @@ try {
   const drift = Math.max(Math.abs(inDesign - inPerform), Math.abs(back - inPerform));
   check('the mode switch does not move when you use it',
     inPerform !== null && inDesign !== null && back !== null && drift <= 1,
-    `perform ${inPerform}, design ${inDesign}, back ${back} — ${drift}px`);
+    `perform ${inPerform}, setup ${inDesign}, back ${back} — ${drift}px`);
 
   // ── Readable in a dark room, on both desks and inside the panels ─
   await page.setViewportSize({ width: 1600, height: 900 });
-  // Load-in is the third layout of the one desk (Desk v2): the controller,
-  // the sound, the wall and its mapping as panels, held to the same rules.
-  for (const mode of ['perform', 'design', 'loadin']) {
+  // The three tabs that ship (lib/deskTabs.ts), each held to the same rules:
+  // Setup has the controller, the sound, the wall and its mapping as panels,
+  // Sequence the screens that were the Sequence chip's.
+  for (const mode of ['perform', 'sequence', 'setup']) {
     await clickOn(`mode-segmented-${mode}`);
     await settle(1000);
     await noteIds();
@@ -222,7 +228,7 @@ try {
     // from one desk once (panel.mjs, "the same actions on both"), so each is
     // looked for, once and visible, in all three.
     const ACTIONS = ['send-to-wall', 'save-look', 'plate-mode-segmented', 'blackout-button', 'panel-browser-button', 'layer-segmented'];
-    for (const mode of ['design', 'perform', 'loadin']) {
+    for (const mode of ['perform', 'sequence', 'setup']) {
       await clickOn(`mode-segmented-${mode}`);
       await settle(800);
       const counts = await Promise.all(ACTIONS.map(shown));
@@ -320,8 +326,7 @@ try {
       sheet, which this check never measured; as a desk panel it is on the
       desk, and held to the desk's rules. The first look found a 4px rail on
       the Wall's masks and two 20px switches in Audio Input. So every panel
-      the browser lists in Load-in (the one layout that takes the Stage
-      panels too) goes into its deck and is measured where it sits.
+      the browser lists goes into Setup's deck and is measured where it sits.
     */
     /*
       Load-in first, and known to be up before its browser is read. One run in
@@ -332,23 +337,25 @@ try {
       to be gone, and the switch has to have put Load-in up, or the check
       says that is what failed rather than blaming the panels.
     */
-    await clickOn('mode-segmented-loadin');
+    await clickOn('mode-segmented-setup');
     let onLoadin = false;
-    for (let i = 0; i < 20 && !onLoadin; i++) { await settle(300); onLoadin = await layoutIs('loadin'); }
+    for (let i = 0; i < 20 && !onLoadin; i++) { await settle(300); onLoadin = await layoutIs('setup'); }
     await clickOn('panel-browser-button');
     await appears('panel-browser');
     const ids = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="panel-browser-row-"]')]
       .map((el) => el.getAttribute('data-testid').slice('panel-browser-row-'.length)));
     await page.keyboard.press('Escape');
-    await page.evaluate((deck) => localStorage.setItem('chromaglass-desk-layout:loadin',
-      JSON.stringify({ left: [], right: [], deck, floating: [], collapsed: [], deckCollapsed: false, plateMode: 'live' })), ids);
+    await page.evaluate((v) => localStorage.setItem('chromaglass-desk-tabs', v),
+      tabsWith('setup', { left: [], right: [], deck: ids, floating: [], collapsed: [], deckCollapsed: false, plateMode: 'live' }));
     await page.reload({ waitUntil: 'networkidle' });
-    const reloaded = await appears('loadin-desk');
+    const reloaded = await appears('setup-desk');
     await settle(2500);
     const deck = await measureIn('[data-testid="desk-deck"]');
     // Each panel drew its own body, not just its frame: a section's knobs, the
     // section itself (with that section in it), or the desk panel's own list.
-    const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer', score: 'song-score' };
+    const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer', score: 'song-score',
+      // The screens that were the Sequence and Sound chips', drawn in a panel (`Sheet embed`).
+      songs: 'songs-panel-box', sequences: 'sequencer-panel-box', player: 'sound-panel-box' };
     // Why each one failed, so a red run says which of three things it was:
     // the panel never reached the deck, it did and drew no body, or the body
     // is there and has no height.
@@ -362,8 +369,9 @@ try {
       return h < 8 ? `${id} (${Math.round(h)}px tall)` : null;
     }).filter(Boolean), { ids, own: OWN_BODY });
     const failedPanels = await page.locator('[data-testid="desk-deck"] [data-testid="panel-failed"]').count();
-    // 32: the eight desk panels (the Score joined them, PLAN 28h) and the
-    // twenty-four settings sections. Before the Score it was 31, and it was
+    // 35: the eleven desk panels (the Score joined them, PLAN 28h, and Songs,
+    // Sequences and Music & Drone when the tabs became the owner's) and the
+    // twenty-four settings sections. Before those three it was 32, before the Score 31, and it was
     // 33 until Sound Mappings and Heat Slide were folded into Sound and Fluid
     // Physics (2026-10-10; `npm run desklayout` holds that), and a browser
     // listing fewer has lost a panel.
@@ -371,13 +379,13 @@ try {
     const bare = ids.filter(id => id !== 'phone' && !(deck.perPanel[id] > 0));
     await noteIds();
     check('every panel there is, docked, draws its own body, readable and big enough to use',
-      stageGone && onLoadin && reloaded && ids.length >= 32 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
-      [!stageGone && 'the Stage sheet never closed', !onLoadin && 'Load-in never came up', !reloaded && 'not on Load-in after the reload',
-        ids.length < 32 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
+      stageGone && onLoadin && reloaded && ids.length >= 35 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
+      [!stageGone && 'the Stage sheet never closed', !onLoadin && 'Setup never came up', !reloaded && 'not on Setup after the reload',
+        ids.length < 35 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
         || `${ids.length} panels, ${deck.n} controls`);
-    await page.evaluate(() => localStorage.removeItem('chromaglass-desk-layout:loadin'));
+    await page.evaluate(() => localStorage.removeItem('chromaglass-desk-tabs'));
     await page.reload({ waitUntil: 'networkidle' });
-    await appears('loadin-desk');
+    await appears('setup-desk');
     await clickOn('mode-segmented-perform');
     await settle(1200);
   }
@@ -438,7 +446,8 @@ try {
     and at the Magnet's Size slider (the Magnet's own option), is the
     panel. On main before the fix the middle landed on the plate's frame.
   */
-  for (const mode of ['design', 'perform']) {
+  // Perform is the shipped tab with the Tools panel (Build and Gig both had it).
+  for (const mode of ['perform']) {
     await clickOn(`mode-segmented-${mode}`);
     await settle(1000);
     const onTop = async (testId) => page.evaluate((id) => {
@@ -479,7 +488,7 @@ try {
   */
   for (const width of [1440, 1280, 1024]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const mode of ['design', 'perform']) {
+    for (const mode of ['perform', 'sequence']) {
       await clickOn(`mode-segmented-${mode}`);
       await page.evaluate(() => window.chromaglassSettings?.({ macroZoom: 3 }));
       await settle(800);
@@ -519,7 +528,7 @@ try {
     did nothing leaves the tabs as they were and fails.
   */
   {
-    await clickOn('mode-segmented-design');
+    await clickOn('mode-segmented-perform');
     await settle(800);
     const deskLayers = () => page.evaluate(() => ({
       tabs: document.querySelectorAll('[data-testid^="layer-segmented-"]').length,
@@ -535,7 +544,7 @@ try {
     if (taken.add) await clickOn('add-layer');
     await settle(500);
     const added = await deskLayers();
-    check('the Design desk takes a layer off a two-layer look and puts it back',
+    check('the desk takes a layer off a two-layer look and puts it back',
       opened.tabs === 2 && !opened.add && opened.off && opened.solvers === 2
       && taken.tabs === 1 && taken.add && !taken.off && taken.solvers === 1
       && added.tabs === 2 && !added.add && added.off && added.solvers === 2,
@@ -598,7 +607,7 @@ try {
     */
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const pg = await ctx.newPage();
-    await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* */ } });
+    await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'perform'); } catch { /* */ } });
     await pg.goto(URL, { waitUntil: 'networkidle' });
     for (let i = 0; i < 20 && !(await pg.getByTestId('desk-preview').count()); i++) await pg.waitForTimeout(300);
     await pg.waitForTimeout(1500);
@@ -619,7 +628,7 @@ try {
     const moved = (a, b) => (a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h)) : Infinity);
     const dp = moved(before.preview, after?.preview), ds = moved(before.save, after?.save);
     const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
-    check('at 1280 in Build, changing the look does not move the plate: its hole and Save keep their boxes, and Save shows the look has changed',
+    check('at 1280 in Perform (the bar Build had), changing the look does not move the plate: its hole and Save keep their boxes, and Save shows the look has changed',
       !before.marked && !!after?.marked && dp <= 0.5 && ds <= 0.5,
       `clean ${before.marked ? 'no (already marked)' : 'yes'}, marked after ${after?.marked ? 'yes' : 'no'}; plate ${fmt(before.preview)} → ${fmt(after?.preview)} (${dp.toFixed(1)} px); Save ${fmt(before.save)} → ${fmt(after?.save)} (${ds.toFixed(1)} px)`);
   }
@@ -637,7 +646,7 @@ try {
     */
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const pg = await ctx.newPage();
-    await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'design'); } catch { /* */ } });
+    await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'perform'); } catch { /* */ } });
     await pg.goto(URL, { waitUntil: 'networkidle' });
     for (let i = 0; i < 20 && !(await pg.getByTestId('desk-preview').count()); i++) await pg.waitForTimeout(300);
     await pg.waitForTimeout(1500);
@@ -683,7 +692,7 @@ try {
     const dr = Math.max(...states.map(s => moved(before.rec, s?.rec)));
     const ds = Math.max(...states.map(s => moved(before.save, s?.save)));
     const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
-    check('at 1280 in Build, starting and stopping a recording (video, take, both) does not move the plate: its hole, Record and Save keep their boxes',
+    check('at 1280 in Perform (the bar Build had), starting and stopping a recording (video, take, both) does not move the plate: its hole, Record and Save keep their boxes',
       !before.on && duringVideo?.what === 'Plate video' && duringTake?.what === 'Take' && duringBoth?.what === 'Plate video + Take' && !after?.on
         && dp <= 0.5 && dr <= 0.5 && ds <= 0.5,
       `states ${before.what ?? 'off'} → ${duringVideo?.what ?? 'off'} → ${duringTake?.what ?? 'off'} → ${duringBoth?.what ?? 'off'} → ${after?.what ?? 'off'}; `
@@ -694,7 +703,7 @@ try {
 
   // ── The rest of Desk v2 (PLAN.md 8c, 8e, 8f, 8h) ───────────────
   await page.setViewportSize({ width: 1440, height: 900 });
-  await clickOn('mode-segmented-design');
+  await clickOn('mode-segmented-perform');
   await settle(1000);
   {
     /*
@@ -912,11 +921,11 @@ try {
       the switch is there, turns on, and is never written into the stored
       output config, which a show reopens with.
     */
-    await clickOn('mode-segmented-loadin');
+    await clickOn('mode-segmented-setup');
     await settle(1200);
     const has = async (id) => (await page.getByTestId(id).count()) > 0;
     const parts = await Promise.all(['output-test-pattern', 'output-identify', 'output-gain', 'output-gamma'].map(has));
-    check('Load-in\'s Wall panel has the test pattern, Identify, and gain and gamma as knobs', parts.every(Boolean),
+    check('Setup\'s Wall panel has the test pattern, Identify, and gain and gamma as knobs', parts.every(Boolean),
       ['test pattern', 'identify', 'gain', 'gamma'].filter((_, i) => !parts[i]).map(x => `no ${x}`).join(', ') || 'all four');
     if (parts[0]) {
       await page.getByTestId('output-test-pattern').first().click();
@@ -946,10 +955,10 @@ try {
     */
     const info = { chromaglass: 'relay', port: 8787, hosts: ['192.168.1.23'], key: '3f9a27c1b4e8d6f0', displayKey: '0123456789abcdef0123456789abcdef' };
     await page.route('**/remote-info.json', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(info) }));
-    // Out of Load-in and back, so the panel mounts again and asks.
+    // Out of Setup and back, so the panel mounts again and asks.
     await clickOn('mode-segmented-perform');
     await settle(600);
-    await clickOn('mode-segmented-loadin');
+    await clickOn('mode-segmented-setup');
     await settle(1500);
     const drawn = await page.evaluate(() => {
       const svg = document.querySelector('[data-testid="phone-link-qr"]');
@@ -988,7 +997,9 @@ try {
     const cluster = () => page.evaluate(() => {
       const el = document.querySelector('[data-testid="header-cluster"]');
       const c = el.getBoundingClientRect();
-      const sw = document.querySelector('[data-testid="mode-segmented"]')?.getBoundingClientRect();
+      // The whole centred switch: the tabs' chips and the pencil that edits
+      // them (TabStrip), which is what the header keeps the cluster clear of.
+      const sw = document.querySelector('[data-testid="desk-tabs"]')?.getBoundingClientRect();
       return { fold: el.getAttribute('data-fold'), gap: sw ? Math.round(c.left - sw.right) : null, button: !!document.querySelector('[data-testid="dot-fold"]') };
     });
     const extra = (on, w = 60) => page.evaluate(([on, w]) => {
@@ -1009,7 +1020,7 @@ try {
       return { w: 1720, found: false };
     };
     const rows = [];
-    for (const mode of ['design', 'perform', 'loadin']) {
+    for (const mode of ['perform', 'sequence', 'setup']) {
       await clickOn(`mode-segmented-${mode}`);
       const roomy = await roomyWidth();
       const dotW = await page.evaluate(() => Math.round(document.querySelector('header [data-testid="dot-video"]')?.getBoundingClientRect().width ?? 0));
@@ -1104,7 +1115,7 @@ try {
          nothing.
     */
     await page.setViewportSize({ width: 1440, height: 900 });
-    await clickOn('mode-segmented-design');
+    await clickOn('mode-segmented-perform');
     await settle(900);
     const id = await page.evaluate(() => [...document.querySelectorAll('[data-testid="desk-deck"] [data-panel]')]
       .find(el => el.querySelector('[data-knob] input[type="range"]'))?.getAttribute('data-panel'));
@@ -1213,11 +1224,11 @@ try {
     section's source buttons running out of a 312px panel sideways.
   */
   {
-    // Every panel there is, from the panel browser on Load-in (the one layout that offers the Stage panels too).
+    // Every panel there is, from the panel browser (on Setup, as the desk was left on Load-in when only it offered the Stage panels).
     const panelIds = await (async () => {
       const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
       const pg = await ctx.newPage();
-      await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'loadin'); } catch { /* */ } });
+      await pg.addInitScript(() => { try { localStorage.setItem('chromaglass-desk-mode', 'setup'); } catch { /* */ } });
       await pg.goto(URL, { waitUntil: 'networkidle' });
       for (let i = 0; i < 20 && !(await pg.getByTestId('panel-browser-button').count()); i++) await pg.waitForTimeout(300);
       await clickAt(pg, 'panel-browser-button');
@@ -1229,15 +1240,15 @@ try {
     const L = (over) => ({ left: [], right: [], deck: [], floating: [], collapsed: [], deckCollapsed: false, plateMode: 'live', ...over });
     const runs = [];
     for (const [w, h] of [[1024, 700], [1280, 800], [1440, 900], [1920, 1080], [1180, 820]]) {
-      for (const [mode, name] of [['design', 'build'], ['perform', 'gig'], ['loadin', 'loadin']]) runs.push({ w, h, mode, name, label: name, layout: null });
+      for (const name of ['perform', 'sequence', 'setup']) runs.push({ w, h, mode: name, name, label: name, layout: null });
     }
     for (const [w, h] of [[1024, 700], [1920, 1080]]) {
-      runs.push({ w, h, mode: 'loadin', name: 'loadin', label: 'every panel in the deck', layout: L({ deck: panelIds }) });
-      runs.push({ w, h, mode: 'loadin', name: 'loadin', label: 'every panel in a column', layout: L({ right: panelIds }) });
+      runs.push({ w, h, mode: 'setup', name: 'setup', label: 'every panel in the deck', layout: L({ deck: panelIds }) });
+      runs.push({ w, h, mode: 'setup', name: 'setup', label: 'every panel in a column', layout: L({ right: panelIds }) });
     }
     for (let k = 0; k < panelIds.length; k += 10) {
       const ids = panelIds.slice(k, k + 10);
-      runs.push({ w: 1920, h: 1080, mode: 'loadin', name: 'loadin', label: `floating, ${ids[0]}…`, layout: L({ deckCollapsed: true, floating: ids.map((id, i) => ({ id, x: 8 + (i % 5) * 316, y: 56 + Math.floor(i / 5) * 400, w: 312, h: 360 })) }) });
+      runs.push({ w: 1920, h: 1080, mode: 'setup', name: 'setup', label: `floating, ${ids[0]}…`, layout: L({ deckCollapsed: true, floating: ids.map((id, i) => ({ id, x: 8 + (i % 5) * 316, y: 56 + Math.floor(i / 5) * 400, w: 312, h: 360 })) }) });
     }
     const out = [];
     let panelsSeen = 0, controlsSeen = 0;
@@ -1245,8 +1256,8 @@ try {
       const ctx = await browser.newContext({ viewport: { width: run.w, height: run.h } });
       const pg = await ctx.newPage();
       await pg.addInitScript(([m, n, l]) => {
-        try { localStorage.setItem('chromaglass-desk-mode', m); if (l) localStorage.setItem(`chromaglass-desk-layout:${n}`, JSON.stringify(l)); } catch { /* */ }
-      }, [run.mode, run.name, run.layout]);
+        try { localStorage.setItem('chromaglass-desk-mode', m); if (l) localStorage.setItem('chromaglass-desk-tabs', l); } catch { /* */ }
+      }, [run.mode, run.name, run.layout && tabsWith(run.name, run.layout)]);
       await pg.goto(URL, { waitUntil: 'networkidle' });
       for (let i = 0; i < 20 && !(await pg.locator('[data-panel]').count()); i++) await pg.waitForTimeout(300);
       await pg.waitForTimeout(1500);
@@ -1288,7 +1299,7 @@ try {
       if (run.layout ? r.panels !== asked : r.panels === 0) out.push(`${run.w}×${run.h} ${run.label}: ${r.panels} panels drawn${run.layout ? ` of ${asked}` : ''}`);
       if (r.bad.length) out.push(`${run.w}×${run.h} ${run.label}: ${r.bad.slice(0, 4).join(', ')}${r.bad.length > 4 ? ` +${r.bad.length - 4}` : ''}`);
       // The palette list opens where it can be read to its end, wherever its button is.
-      if (run.name === 'gig' && !run.layout) {
+      if (run.name === 'perform' && !run.layout) {
         const btn = pg.getByTestId('palette-button');
         if (await btn.count()) {
           await btn.scrollIntoViewIfNeeded();

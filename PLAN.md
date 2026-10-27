@@ -1140,6 +1140,23 @@ Gig, Load-in), every panel docked, floated, folded or closed, knobs for encoders
 panel browser (⌘P) and the Stage sheet (⌘,)~~ (shipped; story in `docs/plan-shipped.md`
 §8; checks `npm run desklayout` and `npm run layout`).
 
+~~**8-tabs** The tabs are the owner's (asked 2026-10-27): every chip across the top is a
+set of panels, renamed, reordered, added (empty or a copy) and deleted from the pencil
+beside them, with Perform, Sequence and Setup shipped as the three to start from. Build
+and Gig fold into Perform, Load-in and the Sound screen into Setup; the Sequence and
+Sound screens are panels (Songs, Sequences, Music & Drone); an older desk's rearranged
+layout is kept as a tab of its own; the phone has the same tabs in More › Tabs~~ (shipped;
+`src/lib/deskTabs.ts`; checks `npm run desklayout`, `npm run layout`, `npm run phone`).
+Open from it:
+
+- **8-tabs-a** (S) The tabs live in the browser's storage, so a phone and a laptop each
+  have their own. Carry them with the account (cloud sync, judging §72) so a venue's
+  Setup tab made on the laptop is the phone's too.
+- **8-tabs-b** (S) The phone draws a desk-own panel (bottles, set list, rides) as a
+  button to its own sheet, not the panel itself. Draw them in place once each has a
+  touch-sized body, so a tab on the phone is the whole tab.
+- **8-tabs-c** (S) A chip dragged along the strip to reorder, beside the editor's arrows.
+
 Open from Desk v2, each its own thread (the UI lane):
 
 - ~~**8-play** (M) Play, the design's screens 3a and 3b: a phone's own screen for

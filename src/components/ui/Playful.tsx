@@ -4,6 +4,7 @@ import { FORM_S, dripFallFor } from '../../lib/dripPace';
 import { HUB_CM, reelsAt } from '../../lib/tapeReels';
 import { VU_FULL, VU_RED_FROM, needleAtRest, needleDeg, stepNeedle } from '../../lib/vuMeter';
 import { strobeOf } from '../../lib/strobeRing';
+import { shownRoom } from '../../lib/dyeTarget';
 import { NOTCH_MM, MOUNT_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_W, stepOf, trayDeg } from '../../lib/slideTray';
 import type { TempoReading } from '../../lib/tempo';
 
@@ -69,17 +70,14 @@ export function Bottle({ colour, level, tipped = false, height = 20, testId }: {
 /**
  * The reading `read` gives, polled while mounted: how much of the Dye Budget is
  * left. Only the picked bottle asks, a few times a second, and it re-renders
- * only when the level moves a twentieth, so a plate at rest costs nothing and
- * nothing above it re-renders (`npm run renders`).
+ * only when the level moves a twentieth past a wobble (`shownRoom`), so a
+ * plate at rest costs nothing and nothing above it re-renders (`npm run renders`).
  */
 export function useDyeRoom(read: (() => number) | undefined): number {
   const [room, setRoom] = useState(1);
   useEffect(() => {
     if (!read) return;
-    const poll = () => {
-      const v = Math.round(Math.max(0, Math.min(1, read())) * 20) / 20;
-      setRoom(prev => (prev === v ? prev : v));
-    };
+    const poll = () => { const r = read(); setRoom(prev => shownRoom(prev, r)); };
     poll();
     const id = setInterval(poll, 400);
     return () => clearInterval(id);
