@@ -3185,6 +3185,61 @@ beside the one before) gave 9 conflicts, in PLAN.md, `docs/judging.md`,
 conflict half of the claim is for 19k-2 to show over the next merges, not this PR.
 `deploygate --history 20` read the same 20 verdicts before and after.
 
+#### 19k-1, 19k-3, 19k-4 and the rest of 19k's follow-ups
+
+**Shipped** (the follow-up PR to #502). *19k-1:* `checkguard.mjs` reads `scripts/checks.json`: an
+entry removed (or renamed), or kept with another command, env or timeout, is a change to
+what a check measures and is named under `Check changes:` with the check's name and the
+numbers that differ (a timeout 15 to 20, a `--seed 3` to `--seed 4`) and a reason. A new
+entry, a move to another shard, a reorder and a reworded `why` are not. Before the manifest the
+same edit to a step in `checks.yml` was as invisible.
+
+*19k-3:* `scripts/actionlint.mjs` (`npm run actionlint`, an `always` entry in Measure's
+logic part) fetches actionlint 1.7.7 from its release page, holds it to the sha256 of the
+release's own checksums file, keeps it in `scratch/actionlint/`, proves on a workflow with
+three mistakes that it is red and names each, then lints `.github/workflows`. shellcheck and
+pyflakes are off: the Ubuntu runner has shellcheck and a session or a Mac does not, so the same
+file would be green in one place and red in another. The fetch that 19k's session was refused
+went through in this one (curl, with the session's proxy); what a cloud session still cannot do
+is run a binary it has just downloaded, so the first run of this check was CI's.
+
+*19k-4:* `reach.mjs --diff` also says which Measure parts and which checks a PR reaches
+(`parts`, `only`). A diff that is only check scripts (traced), manifest entries, the npm scripts
+checks run and documents (a root or `docs/` Markdown file, `.claude/`, `LICENSE`, which select
+the checks that read them, by the same trace) runs only those checks and the `always` ones (the
+typecheck, that every script parses, that the manifest agrees with the workflow, the workflows
+lint, and the panel and the plate, which walk all of `scripts/` at run time for a phantom `npm run` and a retired look, so the trace cannot name what they read; `npm run checks` finds any Measure check that walks `scripts/` and requires it `always`), in only the parts that have any; anything else, `src/`, `public/` (Markdown there too),
+a workflow, the lockfile, a shared helper or a script no check traces, and every deploy and run
+by hand, runs Measure in full as before. `checks.mjs --ci` reads `CHECKS_ONLY` and names the
+checks it left out in a notice. The reach job leaves a `measure` notice when it was partial and
+`deploygate.sh` does not take such a run as proof of a whole tree, as it does not one that
+skipped a Mac shard; it fails closed, so a run whose jobs or annotations cannot be read, or that has no reach job, counts as partial too, and a carried run is asked as well (a selftest runs the function against a stubbed `api`). The guard also names a check moved between the Mac and Measure. A document-only PR no longer waits twelve minutes for the browser part.
+
+*Reviewer nits on `checks.mjs` (#502's review).* The runner waits for the shell's `exit` and
+gives the pipes three seconds to drain, then lets go of them and ends the group, where it
+waited for `close` and a server a check started and never stopped held the shard until the
+check's timeout (a selftest runs `sleep 31.7 & echo started` and requires green in under five
+seconds and the sleep gone); the exit code is set, not `process.exit`, which can cut the last
+log lines on macOS; reordering the entries of a shard selects the shard (the order they run in
+is part of them); and the comment on what a manifest edit selects is exact (the shard lists
+select every shard, the prose `about` none).
+
+*Plate shard.* #498's review put it at 19.4 of 20 minutes; #502 had already moved the rides and
+the Ben-Day print to tools, and the last run of that PR read plate 15.2, show 15.3, fifth
+15.6, open 16.4, tools 16.6 minutes of checks (setup is another 1.3 to 1.5), so nothing more
+moved. tools is now the longest, at about 18 of its 20 minutes with setup.
+
+*19k-5, in part.* `scene` ("The room") was red in two seconds beside other checks and green alone
+because its bar, "analysis costs under 2 ms", was the sensor's own wall-clock timer averaged
+over thirty frames: 1.23 ms alone, 2.46 ms with twelve busy loops on 4 cores, one cold frame of
+12 ms among thirty. It now reads the process's CPU time over each push (0.2 to 0.5 ms for the
+median frame in either case), judges each room's median frame against the same 2 ms, and holds
+the costliest frame to its own bar of 20 ms (11 to 15.8 ms measured over twelve runs, alone and with twelve busy loops: always the first room's cold frame; a steady slowdown of the analysis goes red at about 1.4x on it where the old wall mean went red at 1.5x). Switches and
+The intro did not go red under CPU load alone: with eight busy loops on 4 cores (twice the
+cores) Switches read 992 of 992 and The intro 13 of 13, so what turned them red beside the
+others in the first run is not the cores; `quick` keeps their logs in `scratch/quick/` and
+19k-5 stays open for the next red one.
+
 ### 19r. Smaller, for the same pass: the open shard evened
 
 **Shipped** (the open shard's half). The open shard had gathered eight checks since #239

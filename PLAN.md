@@ -83,8 +83,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   docs/plan-shipped.md 19r).
 - **0.5** ~~**19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
   only their shards, a new check edits no shared file, and `npm run quick` runs what
-  the diff needs, in parallel.~~ #502; open with it 19k-1 (the guard reads the
-  manifest) to 19k-4
+  the diff needs, in parallel.~~ #502; 19k-1, 19k-3, 19k-4 shipped, 19k-2 (measure it over
+  the next 25 merges) and the rest of 19k-5 open
 - **0.6** **19m** (F, M, at a quiet moment): fragment files for the shared documents, and this
   file as an index with one file per section; 23 of the last 25 merge conflicts were in
   `PLAN.md`, `docs/judging.md`, the changelog or `package.json`.
@@ -5289,31 +5289,19 @@ like day (`npm run macqueue -- --hours 24` for the time).
 ### 19k. One manifest of checks
 **Shipped** (#502): `scripts/checks.json` holds every check CI runs (180 steps, in order, with their comments), `checks.yml` runs each Measure part and Mac shard from it (`node scripts/checks.mjs --ci <shard>`), a PR whose Mac-reaching change is only check scripts, manifest entries or their npm scripts runs only those checks' shards, and `npm run quick` runs the checks a diff reaches, side by side. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-Found with it, open:
+Found with it: **19k-1** (the guard reads the manifest), **19k-3** (`actionlint` runs in Measure
+from a pinned release) and **19k-4** (Measure runs only the checks a diff reaches) **shipped**, **19k-5** shipped in
+part (the stories are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
 
-- **19k-1** (E, S): `checkguard.mjs` does not read the manifest. A check whose entry is
-  removed, or whose command, env or timeout changes (`QA_GPU=mid`, a `--node` flag), stops
-  measuring what it did with nothing to name; it was as blind to a deleted step in
-  `checks.yml`. Hold a removed or changed entry to `Check changes:` as a removed check is.
-- **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs: Mac minutes on
-  check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), and
-  merge conflicts in `checks.json`, `checks.yml` and `package.json` (60 adjacent merges
-  replayed with `git merge-tree` before it: 9 conflicted, none in those files).
-- **19k-3** (E, S): `actionlint` is not in the repository and a cloud session cannot fetch
-  it (the download was refused in 19k's session), so CLAUDE.md asks for a check no session
-  can run. Run it in Measure from a pinned release, or drop it from the table.
-- **19k-5** (E, S): side by side, some Measure checks go red that are green alone. On a
-  4-core cloud session `npm run check` (93 checks, 40.8 minutes, their times summing to 103)
-  ran seven red together the first time, every one green alone: the shared `dist/` and the
-  fixed port 4197, which `quick` now holds one at a time. The second time The room (`scene`,
-  red in 2 s), Switches read on and off and The intro were red beside the others and green
-  alone, and The intro was red alone once (the opening's render compiles never logged).
-  `quick` now keeps such a check's log in `scratch/quick/`; find what each shares or
-  measures of the machine, and fix that, not the bar.
-- **19k-4** (E, S): the Measure parts still run in full on every push. With the manifest
-  they could run only the checks a diff reaches, as `quick` does; the logic part is about
-  four minutes and the browser part twelve, off no queue, so this is wall time to green,
-  not runner time.
+- **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
+  on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
+  wall time on the check-only and document-only ones (19k-4: before it, every PR waited for the
+  slowest part, 12 to 19 minutes), and merge conflicts in `checks.json`, `checks.yml` and
+  `package.json` (60 adjacent merges replayed with `git merge-tree` before it: 9 conflicted,
+  none in those files). `npm run macqueue -- --hours 24` and `npm run flakes` read the first two.
+- **19k-5** (E, S), what is left: see the story for which side-by-side reds were found and
+  fixed. Run `npm run check` on a 4-core session once more, with the logs `quick` keeps in
+  `scratch/quick/`, before closing it.
 
 ### 19l. App frames readable in a cloud session
 
