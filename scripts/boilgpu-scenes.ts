@@ -145,7 +145,7 @@ export const scenes: Record<string, (make: Make, arg?: any) => Promise<any>> = {
       await P.step(LAMP_DT, { heat });
       const F = await P.read();
       P.destroy?.();
-      return { T: arr(F.T), fastest: fastest(F), u: arr(F.u), v: arr(F.v) };
+      return { T: arr(F.T), fastest: fastest(F), u: arr(F.u), v: arr(F.v), source: arr(F.source) };
     };
     const full = await one(1, true), half = await one(0.5, true), off = await one(0, true), clear = await one(1, false);
     const { P } = await plate(make, H1_DISH, { dye });
@@ -269,7 +269,7 @@ export const scenes: Record<string, (make: Make, arg?: any) => Promise<any>> = {
 
     const hold = { heat: 1, holds: [HAND] }, lift = { heat: 1, holds: [] };
     const E0 = dishEnergy(g, DISH, warm), book = ledger(g, DISH, warm);
-    let first = -1, peakV = 0, peakU = 0, hotLiquid = 0, overSite = -Infinity, divWorst = 0, divSteps = 0;
+    let first = -1, peakV = 0, peakU = 0, hotLiquid = 0, overSite = -Infinity, overSteps = 0, divWorst = 0, divSteps = 0;
     let firstStarts: number[] = [];
     const vap: number[] = [];
     const div = (F: Fields) => { const e = divergence(g, F); if (e >= 0) { divWorst = Math.max(divWorst, e); divSteps++; } };
@@ -280,6 +280,7 @@ export const scenes: Record<string, (make: Make, arg?: any) => Promise<any>> = {
       if (first < 0) return;
       peakV = Math.max(peakV, vapour(g, F)); peakU = Math.max(peakU, fastest(F));
       if (s * 0.1 - first <= 5) return;
+      overSteps++;
       for (let k = 0; k < n * n; k++) {
         if (!g.inside[k]) continue;
         if (F.alpha[k] === 0 && F.dTnuc[k] < NO_SITE) overSite = Math.max(overSite, F.T[k] - (100 + F.dTnuc[k]));
@@ -296,7 +297,7 @@ export const scenes: Record<string, (make: Make, arg?: any) => Promise<any>> = {
     });
     P.destroy?.();
     return {
-      fan, first, firstStarts, starts, startsHeld, startsAfter: started(last) - startsHeld, peakV, peakU, hotLiquid, overSite,
+      fan, first, firstStarts, starts, startsHeld, startsAfter: started(last) - startsHeld, peakV, peakU, hotLiquid, overSite, overSteps,
       calmV, calmU, vap, dE: dishEnergy(g, DISH, last) - E0, gained: book.L.gained, lost: book.L.lost, divWorst, divSteps,
     };
   },
@@ -352,9 +353,9 @@ export const scenes: Record<string, (make: Make, arg?: any) => Promise<any>> = {
     const T = field(g, (x, y, k) => (g.inside[k] ? 97 + 6 * Math.exp(-(near(x, y) ** 2) / (2 * 0.012 ** 2)) : 20));
     const alpha = field(g, (x, y, k) => (g.inside[k] && near(x, y) < 0.008 ? 0.3 : 0));
     const { P } = await plate(make, DISH, { T, alpha, dTnuc: field(g, () => Infinity) });
-    const out: Record<number, { T: number[]; alpha: number[]; u: number[]; v: number[] }> = {};
+    const out: Record<number, { T: number[]; alpha: number[]; u: number[]; v: number[]; source: number[] }> = {};
     await run(P, 1, 0.1, { heat: 1, holds: [HAND] }, (F, s) => {
-      if (s === 1 || s === 10) out[s] = { T: arr(F.T), alpha: arr(F.alpha), u: arr(F.u), v: arr(F.v) };
+      if (s === 1 || s === 10) out[s] = { T: arr(F.T), alpha: arr(F.alpha), u: arr(F.u), v: arr(F.v), source: arr(F.source) };
     });
     P.destroy?.();
     return { T0: arr(T), alpha0: arr(alpha), one: out[1], ten: out[10] };

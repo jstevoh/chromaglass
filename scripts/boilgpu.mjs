@@ -73,7 +73,12 @@
  *     conjugate gradients to 1e-10). A float32 pressure solve stops well short of
  *     1e-6 (as soapgpu's divergence-free line found), and 1e-3 still reads a solve
  *     that drops a source (an error of 1) or stops early.
- *   - Everything else is boil.mjs's bar, unchanged.
+ *   - Everything else is boil.mjs's bar, unchanged, but one: the hand's dish's heat
+ *     ledger is held to 1% of the lamp's heat, not 3% (the reference reads 0.35%;
+ *     the hotter dish keeps 3%, where it reads 1.0% through the dry-out 36e-4 names).
+ *     And the model's first steps hold the volume source the solver reports to the
+ *     reference's, so H5's divergence line cannot be met by reporting the flows'
+ *     own divergence as the source.
  *
  *   The model's bars, cell by cell, are RMS differences over the RMS of the
  *   reference's own change: 1% on the lamp's first step and second, 2% on its
@@ -233,9 +238,12 @@ try {
     check('H2 at 0 the dish does not warm and nothing moves', still < 1e-4 && G.off.fastest === 0, `${still.toExponential(2)} K, fastest face ${G.off.fastest} m/s`);
 
     const t1 = against(G.full.T, C.full.T, C.off.T);
-    const f1 = against([...G.full.u, ...G.full.v], [...C.full.u, ...C.full.v]);
+    const f1 = against([...G.full.u, ...G.full.v], [...C.full.u, ...C.full.v]), s1 = against(G.full.source, C.full.source);
     check('the model: the lamp\'s first step warms the dish cell by cell as the reference\'s (within 1%)', t1.ref > 0 && t1.err <= 0.01, `RMS difference ${pct(t1.err)} of the reference's ${(t1.ref * 1000).toFixed(3)} mK`);
-    check('the model: and its first flows (the warming water\'s expansion) are the reference\'s (within 2%)', f1.ref > 0 && f1.err <= 0.02, `RMS difference ${pct(f1.err)} of the reference's ${f1.ref.toExponential(2)} m/s`);
+    // The source too: H5 holds the flows' divergence to the source the solver reports, so a
+    // solver that reported its own flows' divergence as the source would pass H5 by itself.
+    check('the model: and its first flows (the warming water\'s expansion) and the volume source they were solved for are the reference\'s (within 2% each)', f1.ref > 0 && s1.ref > 0 && f1.err <= 0.02 && s1.err <= 0.02,
+      `flows ${pct(f1.err)} of the reference's ${f1.ref.toExponential(2)} m/s, source ${pct(s1.err)} of ${s1.ref.toExponential(2)} /s`);
     const t20 = against(G.second.T, C.second.T, C.off.T), f20 = against([...G.second.u, ...G.second.v], [...C.second.u, ...C.second.v]);
     check('the model: after a second (20 steps of 50 ms) the dish is the reference\'s, cell by cell (within 1% of its warming, 2% of its flows)', t20.ref > 0 && f20.ref > 0 && t20.err <= 0.01 && f20.err <= 0.02,
       `temperature ${pct(t20.err)} of ${(t20.ref * 1000).toFixed(2)} mK, flows ${pct(f20.err)} of ${f20.ref.toExponential(2)} m/s`);
@@ -405,12 +413,12 @@ try {
     });
     check('H8 a hand that blocks the air boils it within a minute', G.first > 0 && G.first < 60, G.first > 0 ? `first bubble ${G.first.toFixed(1)} s after the hand` : 'no bubble');
     check('H8 every bubble starts under the hand, none at the lamp\'s hot spot beside it', bubbles > 0 && strays === 0 && atLamp === 0, `${bubbles} started, ${strays} outside the hand, ${atLamp} at the lamp`);
-    check('H8 and no site without vapour is hotter than its own superheat allows', G.overSite <= 1e-4, `worst ${G.overSite.toFixed(5)} K over its threshold (bar 1e-4)`);
+    check('H8 and no site without vapour is hotter than its own superheat allows', G.overSteps > 0 && G.overSite <= 1e-4, G.overSteps ? `worst ${G.overSite.toFixed(5)} K over its threshold over ${G.overSteps} steps (bar 1e-4)` : 'never measured: the boil never ran 5 s');
     check('H8 so the boil holds the dish near 100 °C under the hand', G.hotLiquid > 99.5 && G.hotLiquid <= 100 + siteMax, `hottest under the hand ${G.hotLiquid.toFixed(2)} °C, the widest site's superheat ${siteMax.toFixed(2)} K`);
     check('H9 lift the hand and within 5 s the vapour is under 1% of its peak', G.calmV >= 0 && G.calmV <= 5, G.calmV >= 0 ? `${G.calmV.toFixed(1)} s` : 'never');
     check('H9 within 10 s the flow is under 2% of the boil\'s', G.calmU >= 0 && G.calmU <= 10, G.calmU >= 0 ? `${G.calmU.toFixed(1)} s (peak ${(G.peakU * 1000).toFixed(2)} mm/s)` : 'never');
     const wantE = G.gained - G.lost;
-    check('H5 the dish\'s heat over the boil and the calm is what the lamp gave less what left it', Math.abs(G.dE - wantE) < 0.03 * G.gained, `changed ${G.dE.toFixed(1)} J, the ledger ${wantE.toFixed(1)} J of ${G.gained.toFixed(1)} J the lamp gave (bar 3% of that)`);
+    check('H5 the dish\'s heat over the boil and the calm is what the lamp gave less what left it', Math.abs(G.dE - wantE) < 0.01 * G.gained, `changed ${G.dE.toFixed(1)} J, the ledger ${wantE.toFixed(1)} J of ${G.gained.toFixed(1)} J the lamp gave (bar 1% of that)`);
     check('H9 and no bubble starts again while the hand is off', G.startsAfter === 0, `${G.startsAfter} started`);
 
     // The course, against the reference's own.
@@ -450,9 +458,9 @@ try {
   {
     const [G, C] = await both('boil');
     const t1 = against(G.one.T, C.one.T, C.T0), a1 = against(G.one.alpha, C.one.alpha, C.alpha0);
-    const f1 = against([...G.one.u, ...G.one.v], [...C.one.u, ...C.one.v]);
-    check('the model: the first step of a boil under the hand is the reference\'s, cell by cell (temperature, steam and flows, within 5% of each)', [t1, a1, f1].every((m) => m.ref > 0 && m.err <= 0.05),
-      `temperature ${pct(t1.err)} of ${t1.ref.toFixed(3)} K, steam ${pct(a1.err)} of ${a1.ref.toFixed(4)}, flows ${pct(f1.err)} of ${f1.ref.toExponential(2)} m/s`);
+    const f1 = against([...G.one.u, ...G.one.v], [...C.one.u, ...C.one.v]), s1 = against(G.one.source, C.one.source);
+    check('the model: the first step of a boil under the hand is the reference\'s, cell by cell (temperature, steam, flows and the volume source, within 5% of each)', [t1, a1, f1, s1].every((m) => m.ref > 0 && m.err <= 0.05),
+      `temperature ${pct(t1.err)} of ${t1.ref.toFixed(3)} K, steam ${pct(a1.err)} of ${a1.ref.toFixed(4)}, flows ${pct(f1.err)} of ${f1.ref.toExponential(2)} m/s, source ${pct(s1.err)} of ${s1.ref.toExponential(2)} /s`);
     const t10 = against(G.ten.T, C.ten.T, C.T0), a10 = against(G.ten.alpha, C.ten.alpha, C.alpha0);
     check('the model: and its first second (temperature and steam, within 5% of each)', [t10, a10].every((m) => m.ref > 0 && m.err <= 0.05),
       `temperature ${pct(t10.err)} of ${t10.ref.toFixed(3)} K, steam ${pct(a10.err)} of ${a10.ref.toFixed(4)}`);
