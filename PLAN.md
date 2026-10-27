@@ -2856,6 +2856,16 @@ network):
   window still there and one projector window (the `check-skeptic`). Red on a build
   with no mirror canvas (missing at 8.02 s), on one whose hint ignores full screen,
   and on that one again with the projector reloading, or closing, 1 s after the mirror.
+- **desktop-cast-late** *(found 2026-10-27 on #507, which touched only the workflow's
+  timeout)*: the projector line went red again on CI's Mac, the mirror's canvas
+  "missing at 8.15 s" because the `CastDisplay` chunk itself arrived at 8.12 s (the
+  index scripts by 1.69 s, the page's longest frame 1.19 s with 0 ms of script). So
+  the 8 s wait was spent fetching one lazy chunk from the app's own server, not in
+  the page. The re-run, and every other Mac app run that day, passed. Find what held
+  that chunk (the server busy with the show's reload, or the runner's disk while the
+  notary upload ran beside it) before touching the 8 s: the bar is the app's own
+  loading bar, and a projector that takes eight seconds to appear at a gig is a fault.
+  *Measure:* `npm run desktop` printing when each chunk was asked for and answered.
   Keeping the solver's 668 kB chunk out of the mirror's page was tried and moved
   nothing in the cloud (0.42–0.63 s against 0.39–0.65 s), so it was left out. *Still
   open:* whether the Mac's 3 s is Chromium's GPU-start hold (`npm run startup` reads
