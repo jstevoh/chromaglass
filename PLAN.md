@@ -5478,6 +5478,9 @@ commit. *Size:* S.
 #### 19w-1. The deploy gate counts the fifth shard
 **Shipped** (2026-10-17): `deploygate.sh` wanted exactly four green shards by name, so after 19w it trusted no PR run and every deploy re-ran the whole Mac, about 55 minutes from merge to live. It now reads the shard names from `checks.yml`'s matrix; replayed on the last 20 merges, the deploys it trusts went from 0 (plus 2 by rule 5) to 4 (plus 1). The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
+#### 19w-2. The plate shard is at its timeout again
+Found 2026-10-26 on #498: plate was killed at its 20 minutes twice on one head (both times in `ferro.mjs`, its second-to-last step, every check before it passed), and after `npm run slump` (55 s) moved to tools it still took 19.4 minutes. Tools took 15.7 with slump, show 16.6, open 15.7, fifth 19.0. Replay the last two weeks of green runs' step times, as 19w did, and move plate's heaviest steps to the shards with room. #502 (one manifest of checks, `scripts/checks.json`) is where a step's shard is set if it has merged.
+
 ### 19x. A moved bar names itself
 **Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input, or turns a check to assert the opposite (also commit by commit, #357's case), without naming it in the body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the required `Measure`; the protocol in `docs/handoff.md`). Over the 50 merges before it, 9 would have had to name something, every one a real edit of a check. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19x.
 

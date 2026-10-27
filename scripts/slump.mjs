@@ -78,11 +78,12 @@
  *      where it was laid, against the bare run's 0.55) at 20 s, on Metal and
  *      on software WebGPU alike (#485's runs on main 7d77141, and this
  *      check's measure on a lab built from 7d77141's fluid sources). And the
- *      filter ran: the field with it is not the bare run's, its Σa² at 20 s
- *      at least FILTER_MOVED away (0.50% on Metal, 0.48% on software WebGPU;
- *      two runs of one program on one plate agree to the bit, so a filter
- *      that never ran reads 0). Not which way: at Grid Damp 0.05 the filter
- *      takes 0.5% out, at 0.5 the clamp's return puts 3.3% in.
+ *      filter ran: some cell of the field at 20 s is not the bare run's
+ *      (two runs of one program on one plate agree to the bit, so a filter
+ *      that never ran reads 0 cells). Not a moment of the field such as
+ *      Σa²: it moves 0.50% on Metal, but 0.048% under the filter before
+ *      18m-5, which certainly ran, and at Grid Damp 0.5 it goes the other
+ *      way (+3.3%), so no bar on it says the filter ran.
  *      The radius at 5% of the peak is printed, not held: the filter moves
  *      it out 0.18 mm in 20 s (before 18m-5, 0.35), the same at 0.05 and 0.5
  *      (PLAN 18m-5c)
@@ -128,8 +129,8 @@ function report(name, ok, detail) {
 }
 
 /** One drop, stepped to each of `times` (seconds): front radii in mm, the peak and the total. */
-async function drop(times, over, white = false, N = 256) {
-  return page.evaluate(async ({ N, times, over, white }) => {
+async function drop(times, over, white = false, N = 256, keep = false) {
+  return page.evaluate(async ({ N, times, over, white, keep }) => {
     await lab.create(N, N);
     // Full strength: the red band at the dye's floor, so its strength (wgsl/slump.ts) is 1.
     const rgb = white ? [0, 0, 0] : lab.dyeOf([0, 0.3, 0.9]);
@@ -151,10 +152,10 @@ async function drop(times, over, white = false, N = 256) {
         for (let k = 3; k < f.length; k += 4) if (f[k] > share * pk) c++;
         return Math.sqrt(c / Math.PI) * cell * 1000;
       };
-      rows.push({ T, total, peak: pk, front: radius(0.02), r05: radius(0.05), r50: radius(0.5), volume: total * cell * cell * lab.dyeLayer, square });
+      rows.push({ T, total, peak: pk, front: radius(0.02), r05: radius(0.05), r50: radius(0.5), volume: total * cell * cell * lab.dyeLayer, square, a: keep ? Array.from(f.filter((_, k) => k % 4 === 3)) : null });
     }
     return rows;
-  }, { N, times, over, white });
+  }, { N, times, over, white, keep });
 }
 
 /**
@@ -224,8 +225,8 @@ const g0 = 9.81 * 0.02, g1 = 9.81 * 0.15;
 
 const water = await drop([0, 5, 20, 30], { gapThickness: 0, solutalBuoyancy: 0 });
 const heavy = await drop([0, 20], { gapThickness: 0, solutalBuoyancy: 1 });
-const syrup = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0 });
-const syrupBare = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0, gridDamp: 0 });
+const syrup = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0 }, false, 256, true);
+const syrupBare = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0, gridDamp: 0 }, false, 256, true);
 const clear = await drop([0, 10], { gapThickness: 0, solutalBuoyancy: 0 }, true);
 // 18h calibrated diff: 0.0002 to physical molecular diffusion (Dm ≈ 4e-10 m²/s),
 // which in 30 s barely moves a drop. The blur control tests unphysical rapid diffusion
@@ -328,13 +329,13 @@ const rim = [2, 20].map((T) => {
   const on = at(syrup, T), bare = at(syrupBare, T);
   return { T, made: on.total / bare.total - 1, drift: bare.total / syrupBare[0].total - 1, moved: on.front - bare.front, moved05: on.r05 - bare.r05 };
 });
-// The filter changed the field: 0.50% on Metal, 0.48% on software WebGPU; a stage never run reads 0.
-const FILTER_MOVED = 0.001;
-const ran = Math.abs(1 - at(syrup, 20).square / at(syrupBare, 20).square);
+// The cells the filter changed at 20 s: 172 of 65,536 on software WebGPU, and two bare runs 0.
+const onA = at(syrup, 20).a, bareA = at(syrupBare, 20).a;
+const ran = onA.filter((x, k) => x !== bareA[k]).length;
 report('14. the grid filter makes no dye at a drop\'s rim and does not move its front',
-  rim.every((r) => Math.abs(r.made) <= 1e-4 && Math.abs(r.moved) <= 0.05) && ran >= FILTER_MOVED,
+  rim.every((r) => Math.abs(r.made) <= 1e-4 && Math.abs(r.moved) <= 0.05) && ran > 0,
   rim.map((r) => `${r.T} s: dye ${r.made >= 0 ? '+' : ''}${(r.made * 100).toFixed(4)}% of the bare run's (its own drift ${(r.drift * 100).toFixed(4)}%), front ${r.moved >= 0 ? '+' : ''}${r.moved.toFixed(3)} mm (at 5% of the peak ${r.moved05 >= 0 ? '+' : ''}${r.moved05.toFixed(3)} mm, not held)`).join('; ')
-    + `; Σa² ${(ran * 100).toFixed(3)}% from the bare run's at 20 s, at least ${(FILTER_MOVED * 100).toFixed(1)}% (before 18m-5: +0.93% and +0.19 mm at 2 s)`);
+    + `; ${ran} of ${onA.length} cells not the bare run's at 20 s, some wanted (before 18m-5: +0.93% and +0.19 mm at 2 s)`);
 
 console.log(failed.length ? `\n${failed.length} failed` : '\nall passed');
 process.exit(failed.length ? 1 : 0);

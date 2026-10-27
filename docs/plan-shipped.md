@@ -3775,8 +3775,9 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   dye at a drop's rim. Checks 1 to 11 now run with it on, as every look has it. Check 14 runs
   the glycerine drop of check 7 twice, with the filter and without. It holds the dye to 0.01%
   of the bare run's and the 2% front within 0.05 mm of it, at 2 s and 20 s. It also asks that
-  the filter changed the field (Σa² at 20 s at least 0.1% from the bare run's), so that it is
-  not comparing two bare runs. Checks 12 and 13 keep the filter off: they look for a
+  the filter changed some cell of the field at 20 s, so that it is not comparing two bare runs
+  (two runs of one program agree to the bit). It does not ask for a moment such as Σa²: the
+  filter before 18m-5, which certainly ran, moved Σa² by only 0.048%. Checks 12 and 13 keep the filter off: they look for a
   checkerboard growing out of the slump's own step, and the filter takes 5% of one out each
   step.
 - **Measured:** on Metal (CI plate shard, `b8cd33b`) all 14 pass with the filter on.
@@ -3785,7 +3786,7 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   on software WebGPU: dye +0.926% and +3.202%, front +0.192 and +0.170 mm, so it fails on all
   four. The same measure found what 18m-5c is now: the 5% contour moves out 0.18 mm in 20 s
   (before 18m-5, 0.35 mm), the same at Grid Damp 0.05 and 0.5. Σa² goes down 0.48% at 0.05
-  and up 3.3% at 0.5, which is why the guard asks for a change, not a direction.
+  and up 3.3% at 0.5, which is another reason the guard counts cells instead.
 
 #### 18m-5b. The grid filter's three passes each worked out the stencil again (shipped 2026-10-26)
 
