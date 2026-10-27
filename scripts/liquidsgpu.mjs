@@ -56,8 +56,20 @@
  *   An empty plate is left alone: a stirred pool with no liquid poured,
  *   stepped with a fold every step and without, must end the same to a
  *   ten-thousandth of its densest cell (it reads exactly the same on
- *   SwiftShader). Without this, "every step" could be measuring the fold
- *   itself, not the liquids.
+ *   SwiftShader). It says the rest of the fold (the dye's cap, the
+ *   velocity's guard) moves nothing, so what "every step" changes is the
+ *   liquid fields' doing. Which of their passes does it is the next line's
+ *   question.
+ *
+ *   Moved, not erased: of the dye that left soap's spot or silicone's
+ *   middle, how much is still on the plate. A push keeps it; soap's multiply
+ *   on the dye under it takes it away, and the spot's share cannot tell
+ *   them apart. On both plates today the answer is none (15e-5): soap's push
+ *   in liquidForces is a pure gradient, which the plate's projection takes
+ *   away whole, as marangoniFlux's comment in wgsl/fluid.ts found for the
+ *   mix's soap before it moved the surface in flux form. So the bars are met
+ *   by erasing, and "as strong as the stand-in" compares the GPU's erasing
+ *   with the stand-in's.
  *
  *   Each pour landed: the liquid field's total after the pour is more than
  *   nothing. A pour that never reached the field reads as a liquid with no
@@ -93,14 +105,16 @@
  * so the fix promotes it to a gating line rather than leaving it owed. On
  * SwiftShader (2026-10-27) soap, milk and silicone do nothing on a still
  * plate (15e-1: glycerine still crawls there, its thickness being the thin
- * gap's own drag, every step), and where they run they arrive at about a
- * fifth of the stand-in's push (15e-2): the GPU scales each force by the solver's step,
- * 0.004, where the stand-in, and the app's CPU before the GPU had the
- * liquids, scaled it by the frame's 1/60 s. Folded with 1/60 in place of
- * 0.004 (a copy of this check, every fold's dt changed and nothing else) the
- * same soap leaves 50% at two seconds, the stand-in 54%, and both of the
- * "every step" lines owed to 15e-2 pass: soap at half a second by a hair
- * (effect 0.288 against the 0.280 a factor of two allows), silicone 0.826.
+ * gap's own drag, every step); soap and silicone erase where they should
+ * push (15e-5); and where the passes run they arrive at about a fifth of
+ * the stand-in's (15e-2): the GPU scales each by the solver's step, 0.004,
+ * where the stand-in, and the app's CPU before the GPU had the liquids,
+ * scaled them by the frame's 1/60 s. Folded with 1/60 in place of 0.004 (a
+ * copy of this check, every fold's dt changed and nothing else) the same
+ * soap leaves 50% at two seconds, the stand-in 54%, and both of the "every
+ * step" lines owed to 15e-2 pass: soap at half a second by a hair (effect
+ * 0.288 against the 0.280 a factor of two allows), silicone 0.826. They pass
+ * by erasing faster; the "moved" lines stay owed.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal, a
  * Linux box's software WebGPU anywhere else (PW_WEBGPU=1).
@@ -114,29 +128,57 @@ const OWED = {
   'soap, a still plate: the disc stays open': '15e-1',
   'soap, a still plate: as strong as the stand-in at half a second': '15e-1, 15e-2',
   'soap, a still plate: as strong as the stand-in at two seconds': '15e-1',
+  'soap, a still plate: moves the dye rather than erasing it': '15e-5',
   'milk, a still plate: keeps its pool tighter than bare dye': '15e-1',
   'milk, a still plate: as strong as the stand-in': '15e-1, 15e-4',
   'silicone, a still plate: clears the middle': '15e-1',
   'silicone, a still plate: as strong as the stand-in': '15e-1, 15e-2',
+  'silicone, a still plate: moves the dye rather than erasing it': '15e-5',
   'soap, every step: as strong as the stand-in at half a second': '15e-2',
+  'soap, every step: moves the dye rather than erasing it': '15e-5',
   'silicone, every step: as strong as the stand-in': '15e-2',
+  'silicone, every step: moves the dye rather than erasing it': '15e-5',
   'milk, every step: as strong as the stand-in': '15e-4',
   'glycerine on the old plate, every step: crawls where the plate flows': '15e-3',
 };
 
 const checks = [];
-const check = (name, ok, detail = '') => {
+/*
+  `clear`, for an owed line: the day it counts as passing, which may ask a
+  margin past the bar so a reading that sits on it (milk on a still plate is
+  exactly 1.000 of bare dye, its bar under 1) cannot flip "passes now" on
+  one adapter's last bit. `value`, the line's reading: an owed line that
+  reads NaN or nothing fails, so a scene that broke cannot hide as owed.
+*/
+const check = (name, ok, detail = '', { clear = ok, value = 0 } = {}) => {
   const owed = OWED[name];
-  const failed = owed ? !!ok : !ok;
+  const broken = owed && !Number.isFinite(value);
+  const failed = owed ? !!clear || broken : !ok;
   checks.push({ name, failed });
-  const tag = owed ? (ok ? 'FAIL' : 'owed') : ok ? 'ok  ' : 'FAIL';
-  const why = owed ? (ok ? ` (passes now: take it out of OWED so it gates; PLAN ${owed})` : ` (PLAN ${owed})`) : '';
+  const tag = owed && !broken ? (clear ? 'FAIL' : 'owed') : !owed && ok ? 'ok  ' : 'FAIL';
+  const why = broken ? ' (an owed line that reads no number)'
+    : owed ? (clear ? ` (passes now: take it out of OWED so it gates; PLAN ${owed})` : ` (PLAN ${owed})`) : '';
   console.log(` ${tag} ${name}${detail ? ` — ${detail}` : ''}${why}`);
 };
 /** The GPU's effect against the stand-in's: within a factor of two either way. */
 const FACTOR = 2;
 const agrees = (gpu, standIn) => gpu > standIn / FACTOR && gpu < standIn * FACTOR;
 const f3 = (v) => v.toFixed(3);
+/*
+  How much of what left the spot is still on the plate: one when all of it
+  was moved, nothing when the plate lost as much as the spot did. A push
+  moves dye and keeps it; soap's multiply on the dye under it (the CPU's
+  `mul`, the GPU's `deltaDye`) takes it away, and the spot's share alone
+  cannot tell the two apart. Measured 2026-10-27 in two altered copies:
+  with liquidForces made a no-op every soap and silicone line below read as
+  it does (89.0%, 71.6%, 61.3%), and with the multiply made 1 the spot kept
+  all of its dye. The stand-in's own soap is the multiply too: its spot loses
+  exactly what its plate loses.
+*/
+const moved = (spot0, spot1, plate0, plate1) => {
+  const lost = spot0 - spot1;
+  return lost > 0 ? Math.max(0, lost - Math.max(0, plate0 - plate1)) / lost : 0;
+};
 
 const { page, close } = await openLab();
 const gpuErrors = [];
@@ -216,7 +258,7 @@ try {
         const d1 = await lab.field('dye');
         await go(every, 90);
         const d2 = await lab.field('dye');
-        out.soap = { before: within(d0, 48, 48, 8), early: within(d1, 48, 48, 8), late: within(d2, 48, 48, 8), laid: soapLaid, left: await landed(0), dye0: total(d0), dye2: total(d2) };
+        out.soap = { before: within(d0, 48, 48, 8), early: within(d1, 48, 48, 8), late: within(d2, 48, 48, 8), laid: soapLaid, left: await landed(0), dye0: total(d0), dye1: total(d1), dye2: total(d2) };
       }
       // Glycerine: a flat pool of colour under Rain Drip, with the bottle poured on it and without.
       for (const g of [false, true]) {
@@ -296,6 +338,8 @@ const std = {
   glycerine: 1 - sIn.glycerine.thickSpeed / sIn.glycerine.plainSpeed,
   milk: 1 - sIn.milk.tight / sIn.milk.loose,
   silicone: 1 - sIn.silicone.after / sIn.silicone.before,
+  soapMoved: moved(sIn.soap.before, sIn.soap.early, sIn.soap.plate0, sIn.soap.plate1),
+  siliconeMoved: moved(sIn.silicone.before, sIn.silicone.after, sIn.silicone.plate0, sIn.silicone.plate1),
 };
 console.log(`  adapter: ${r.adapter?.vendor ?? '?'} ${r.adapter?.architecture ?? ''}`.trimEnd());
 console.log(`  the stand-in's effects: soap ${f3(std.soapEarly)} at 0.5 s and ${f3(std.soapLate)} at 2 s, glycerine ${f3(std.glycerine)}, milk ${f3(std.milk)}, silicone ${f3(std.silicone)}`);
@@ -308,10 +352,13 @@ for (const [mode, m] of [['every step', r.every], ['a still plate', r.still]]) {
   const early = s.early / s.before, late = s.late / s.before;
   console.log(`  soap, ${mode}: dye within 8 cells ${s.before.toFixed(0)} → ${s.early.toFixed(0)} → ${s.late.toFixed(0)}; soap laid ${s.laid.toFixed(1)}, ${s.left.toFixed(1)} left at 2 s; the plate's dye ${s.dye0.toFixed(0)} → ${s.dye2.toFixed(0)}`);
   check(`soap, ${mode}: the pour landed`, s.laid > 1, `${s.laid.toFixed(1)} of soap in the field`);
-  check(`soap, ${mode}: drives dye out of the spot`, early < 0.92, `${(early * 100).toFixed(1)}% of it left at 0.5 s (the stand-in ${(sIn.soap.early / sIn.soap.before * 100).toFixed(1)}%, bar 92%)`);
-  check(`soap, ${mode}: the disc stays open`, late < 0.75, `${(late * 100).toFixed(1)}% at 2 s (the stand-in ${(sIn.soap.late / sIn.soap.before * 100).toFixed(1)}%, bar 75%)`);
-  check(`soap, ${mode}: as strong as the stand-in at half a second`, agrees(1 - early, std.soapEarly), `effect ${f3(1 - early)} against ${f3(std.soapEarly)}`);
-  check(`soap, ${mode}: as strong as the stand-in at two seconds`, agrees(1 - late, std.soapLate), `effect ${f3(1 - late)} against ${f3(std.soapLate)}`);
+  check(`soap, ${mode}: drives dye out of the spot`, early < 0.92, `${(early * 100).toFixed(1)}% of it left at 0.5 s (the stand-in ${(sIn.soap.early / sIn.soap.before * 100).toFixed(1)}%, bar 92%)`, { value: early });
+  check(`soap, ${mode}: the disc stays open`, late < 0.75, `${(late * 100).toFixed(1)}% at 2 s (the stand-in ${(sIn.soap.late / sIn.soap.before * 100).toFixed(1)}%, bar 75%)`, { value: late });
+  check(`soap, ${mode}: as strong as the stand-in at half a second`, agrees(1 - early, std.soapEarly), `effect ${f3(1 - early)} against ${f3(std.soapEarly)}`, { value: early });
+  check(`soap, ${mode}: as strong as the stand-in at two seconds`, agrees(1 - late, std.soapLate), `effect ${f3(1 - late)} against ${f3(std.soapLate)}`, { value: late });
+  const kept = moved(s.before, s.early, s.dye0, s.dye1);
+  check(`soap, ${mode}: moves the dye rather than erasing it`, kept > 0.5,
+    `${f3(kept)} of what left the spot by 0.5 s is still on the plate (the stand-in ${f3(std.soapMoved)}; asked over half)`, { value: kept });
 
   const g = m.glycerine.speed / m.plain.speed;
   console.log(`  glycerine, ${mode}: the pool falls at ${m.plain.speed.toFixed(4)} as colour, ${m.glycerine.speed.toFixed(4)} as glycerine`);
@@ -322,24 +369,28 @@ for (const [mode, m] of [['every step', r.every], ['a still plate', r.still]]) {
   const k = m.milk.spread / m.bare.spread;
   console.log(`  milk, ${mode}: spread about its centre ${m.bare.spread.toFixed(3)} bare, ${m.milk.spread.toFixed(3)} held`);
   check(`milk, ${mode}: the pour landed`, m.milk.laid > 1, `${m.milk.laid.toFixed(1)} of repel in the field`);
-  check(`milk, ${mode}: keeps its pool tighter than bare dye`, k < 1, `${f3(k)} of bare dye's spread (the stand-in ${f3(sIn.milk.tight / sIn.milk.loose)})`);
-  check(`milk, ${mode}: as strong as the stand-in`, agrees(1 - k, std.milk), `effect ${(1 - k).toFixed(4)} against ${std.milk.toFixed(4)}`);
+  // Owed on a still plate, where it reads exactly 1: it counts as passing there only past half the stand-in's effect.
+  check(`milk, ${mode}: keeps its pool tighter than bare dye`, k < 1, `${f3(k)} of bare dye's spread (the stand-in ${f3(sIn.milk.tight / sIn.milk.loose)})`, { clear: 1 - k > std.milk / 2, value: k });
+  check(`milk, ${mode}: as strong as the stand-in`, agrees(1 - k, std.milk), `effect ${(1 - k).toFixed(4)} against ${std.milk.toFixed(4)}`, { value: k });
 
   const c = m.silicone;
   const mid = c.after / c.before;
   console.log(`  silicone, ${mode}: middle ${c.before.toFixed(0)} → ${c.after.toFixed(0)}, the ring ${c.ringBefore.toFixed(0)} → ${c.ring.toFixed(0)}; the plate's dye ${c.dye0.toFixed(0)} → ${c.dye1.toFixed(0)}`);
   check(`silicone, ${mode}: the pour landed`, c.laid > 1, `${c.laid.toFixed(1)} of soap in the field`);
-  check(`silicone, ${mode}: clears the middle`, mid < 0.75, `${(mid * 100).toFixed(1)}% left (the stand-in ${(sIn.silicone.after / sIn.silicone.before * 100).toFixed(1)}%, bar 75%)`);
+  check(`silicone, ${mode}: clears the middle`, mid < 0.75, `${(mid * 100).toFixed(1)}% left (the stand-in ${(sIn.silicone.after / sIn.silicone.before * 100).toFixed(1)}%, bar 75%)`, { value: mid });
   check(`silicone, ${mode}: and more dye in the ring than the middle`, c.ring > c.after, `${c.ring.toFixed(0)} against ${c.after.toFixed(0)}`);
-  check(`silicone, ${mode}: as strong as the stand-in`, agrees(1 - mid, std.silicone), `effect ${f3(1 - mid)} against ${f3(std.silicone)}`);
+  check(`silicone, ${mode}: as strong as the stand-in`, agrees(1 - mid, std.silicone), `effect ${f3(1 - mid)} against ${f3(std.silicone)}`, { value: mid });
+  const keptC = moved(c.before, c.after, c.dye0, c.dye1);
+  check(`silicone, ${mode}: moves the dye rather than erasing it`, keptC > 0.5,
+    `${f3(keptC)} of what left the middle is still on the plate (the stand-in ${f3(std.siliconeMoved)}; asked over half)`, { value: keptC });
 }
 
 const og = r.old.glycerine / r.old.plain;
 check('glycerine on the old plate, every step: crawls where the plate flows', og < 0.7,
-  `${og.toFixed(4)} of the colour's speed (${r.old.glycerine.toFixed(5)} against ${r.old.plain.toFixed(5)})`);
+  `${og.toFixed(4)} of the colour's speed (${r.old.glycerine.toFixed(5)} against ${r.old.plain.toFixed(5)})`, { value: og });
 check('no GPU errors', gpuErrors.length === 0, gpuErrors[0] ?? '');
 
 const failed = checks.filter((c) => c.failed);
 const owed = checks.filter((c) => OWED[c.name]).length;
-console.log(`\n${checks.length - owed - failed.filter((c) => !OWED[c.name]).length}/${checks.length - owed} gating checks passed, ${owed} owed (PLAN 15e-1 to 15e-4)${failed.length ? `, ${failed.length} failed` : ''}`);
+console.log(`\n${checks.length - owed - failed.filter((c) => !OWED[c.name]).length}/${checks.length - owed} gating checks passed, ${owed} owed (PLAN 15e-1 to 15e-5)${failed.length ? `, ${failed.length} failed` : ''}`);
 process.exit(failed.length ? 1 : 0);

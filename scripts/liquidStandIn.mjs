@@ -115,18 +115,21 @@ export function spread(density) {
   return weighted / sum;
 }
 
-/** Soap: dye within 8 cells of a spot of soap, before, after half a second and after two. */
+/** The whole plate's dye: what soap moves stays in it, what it erases leaves it. */
+export const totalDye = (density) => density.reduce((a, v) => a + v, 0);
+
+/** Soap: dye within 8 cells of a spot of soap, before, after half a second and after two, and the plate's at each. */
 export function soapScene() {
   const ph = new LiquidPhase(N);
   const p = plate();
   pool(p.density, N / 2, N / 2, 22, 1);
-  const before = within(p.density, N / 2, N / 2, 8);
+  const before = within(p.density, N / 2, N / 2, 8), plate0 = totalDye(p.density);
   ph.deposit(N / 2, N / 2, 6, { soap: 1 }, 1);
   run(ph, p, 0.5);
-  const early = within(p.density, N / 2, N / 2, 8);
+  const early = within(p.density, N / 2, N / 2, 8), plate1 = totalDye(p.density);
   run(ph, p, 1.5);
-  const late = within(p.density, N / 2, N / 2, 8);
-  return { before, early, late };
+  const late = within(p.density, N / 2, N / 2, 8), plate2 = totalDye(p.density);
+  return { before, early, late, plate0, plate1, plate2 };
 }
 
 /** Glycerine: a plate set flowing, and its speed where a patch of body lies against a plate with none. */
@@ -173,11 +176,11 @@ export function siliconeScene() {
   const p = plate();
   pool(p.density, N / 2, N / 2, 20, 1);
   const before = within(p.density, N / 2, N / 2, 5);
-  const ringBefore = within(p.density, N / 2, N / 2, 16) - before;
+  const ringBefore = within(p.density, N / 2, N / 2, 16) - before, plate0 = totalDye(p.density);
   // Silicone is soap's displacement without soap's colour.
   ph.deposit(N / 2, N / 2, 7, { soap: 0.8, repel: 0.4 }, 1);
   run(ph, p, 1.2);
   const after = within(p.density, N / 2, N / 2, 5);
   const ring = within(p.density, N / 2, N / 2, 16) - after;
-  return { before, after, ring, ringBefore };
+  return { before, after, ring, ringBefore, plate0, plate1: totalDye(p.density) };
 }

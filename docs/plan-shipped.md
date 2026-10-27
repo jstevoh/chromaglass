@@ -2509,7 +2509,7 @@ use, the stand-in's pools cell for cell at its 96-cell logical grid. Two runs of
 the deltas folded every step, and folded only on the pour's frame, as the app folds them
 only on a frame something is laid in. A control (a stirred pool with no liquid, folded
 every step and not) reads the same to the bit, so the fold itself moves nothing. What it
-found is PLAN 15e-1 to 15e-5; the lines those items owe print as owed and fail the run
+found is PLAN 15e-1 to 15e-9; the lines those items owe print as owed and fail the run
 the day they pass.
 
 ## 16. Many plates: each projector its own source (rig-plan R1)
