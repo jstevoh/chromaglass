@@ -8236,7 +8236,15 @@ the code's entry points, the checks to add and the scenes to match, in
     with `phaseCompress` off, `+15.0` against `13`), `magnetgain` holds **5/5** (`+2%` weak, `+3%`
     strong against Darcy's), and `ferrorest` (`5/5`), `spikes` (`6/6`), `maze` (`4/4`), `fingers`
     (`4/4`), `domes` (`4/4`) and `ferrohands` (`4/4`) are unchanged. Per the 29c-8 brief, `ferrodrag`
-    was not added to `checks.yml` in #495.
+    was not added to `checks.yml` in #495. The review found the deep plate riding `phaseVelT` after
+    Thin Gap was switched off (`runPhaseAdvect` keyed off `hsP`, which outlives Thin Gap): the dragged
+    drop, magnet off, slid on another `0.0425` of the plate in 120 steps and smeared to `0` half-full
+    cells; keyed off the step's own `thinLive` it stays (`0.6206 → 0.6241`, `104 → 94` half-full).
+  - **29c-10. `ferrodrag` joins CI, with a Thin-Gap-off line.** Now 3/3 on Metal, `npm run ferrodrag`
+    goes into `scripts/checks.json` (Claude wires it, per the 29c-8 brief), with a line that turns
+    Thin Gap off after the drag and holds the drop still with no magnet (the stale `phaseVelT` above
+    moved it `1.9R`), and `ferrohold`'s two bars re-read against the whole drag (the compression
+    pass's margin is `15.0` against `13` since #495, from `25.7`).
   - **29c-9. Replace `phaseVelocity`'s local window reconstruction with a coupled two-fluid velocity
     solve.** `phaseVelocity` (29c-8) is a named shortcut: instead of solving two coupled momentum
     and Darcy-projection equations for `u_ff` and `u_oil` across the diffuse interface (with
@@ -8244,9 +8252,9 @@ the code's entry points, the checks to add and the scenes to match, in
     `u_ff` in the rim from the nearby half-full body (`φ >= 0.50`) over an 11-cell Gaussian window
     and gates the pass off on labyrinth and standing-spike scenes (`cohere`). Replace the window
     reconstruction with a two-fluid velocity or slip solve so the rim's ferrofluid velocity comes
-    from the momentum balance on every scene without a window or a labyrinth/spike gate, and wire
-    `npm run ferrodrag` into `scripts/checks.json` alongside re-reading `ferrohold`'s two
-    bars against the whole drag.
+    from the momentum balance on every scene without a window or a labyrinth/spike gate. The
+    leading toe's carry (`front = 0.72 · …` in `phaseVelocity`) is a tuned value, not a derived one;
+    the two-fluid solve replaces it too.
 - **29d. The drop's wake: the dye folding behind it, and the drop's own ripples.** In the
   gap the flow round a moving drop is the potential flow round a cylinder, so the dye
   parts at the bow, wraps the sides and closes behind as folds; and a drop jerked by the

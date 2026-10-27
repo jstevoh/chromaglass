@@ -1611,7 +1611,14 @@ export class WebGPUFluid {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
     if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
-    const ride = this.phaseVel(thin);
+    /*
+      The ferrofluid's own velocity only on a step that wrote it: hsP and
+      hsMob outlive Thin Gap, so keyed off them alone, a plate whose Thin Gap
+      was switched off kept carrying the ferrofluid on the last thin step's
+      phaseVelT, frozen (a dragged drop, magnet off, slid on 0.0425 of the
+      plate in 120 steps and smeared to no half-full cell; PLAN 29c-8).
+    */
+    const ride = this.phaseVel(thin && this.thinLive);
     const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}:${ride.label}`;
     let group = this.groups.get(key);
     if (!group) {

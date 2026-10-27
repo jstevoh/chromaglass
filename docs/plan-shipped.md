@@ -5205,6 +5205,11 @@ MUSCL shear (`ferrohold` 5/5: mean lead `1.69R` vs `1.93R` with `phaseMomentum` 
 GPU, `npm run ferrodrag` reaches **3/3** (lag `1.82R` against `2.0R`, half-full cells `100 → 106`,
 `106.0%` kept against `±15%`, cells over `0.01` `324 → 378` vs `1238` on `main`, stationary control
 `0.010` cells). Per the 29c-8 brief, `ferrodrag` was not added to `checks.yml` in #495.
+The review found one hole, fixed in the same PR: `runPhaseAdvect` chose `phaseVelT` whenever the thin
+solve's buffers existed, and they outlive Thin Gap, so with Thin Gap switched off after a drag the deep
+plate kept carrying the ferrofluid on the last thin step's velocity (magnet off, the drop slid `0.0425`
+of the plate in 120 steps and smeared to `0` half-full cells). It now asks the step's own `thinLive`
+(`0.6206 → 0.6241`, `104 → 94` half-full); the check for it is PLAN 29c-10.
 
 ## 32. The soap film: a draining film seen in reflection
 
