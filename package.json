@@ -199,6 +199,7 @@
     "musicforce": "node scripts/musicforce.mjs",
     "bassboost": "node scripts/bassboost.mjs",
     "thick": "node scripts/thick.mjs",
+    "liquidsgpu": "PW_WEBGPU=1 node scripts/liquidsgpu.mjs",
     "flush": "node scripts/flush.mjs",
     "squeeze": "npm run build && node scripts/squeeze.mjs",
     "grating": "node scripts/grating.mjs",

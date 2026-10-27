@@ -2515,6 +2515,21 @@ a press and lift; carrying the volume on the cells' filtered velocities emptied 
 solve's own face flux (the mean of two cells' h·u plus the second difference of
 M_f·ΔP) keeps both.
 
+### 15e. The liquids' own forces on the GPU plate (the check, shipped 2026-10-27)
+
+`npm run liquids` held soap, glycerine, milk and silicone to what each is for on a 96²
+stand-in, and nothing held the solver the app draws, which has carried the liquids in two
+textures of its own (`addLiquidDrop`, `liquidForces`) since they were ported. The stand-in
+and its four scenes moved into `scripts/liquidStandIn.mjs` (liquids.mjs prints the same
+lines to the digit, its ceiling and cost sections aside, which are random and timed), and
+`npm run liquidsgpu` lays those scenes on the lab's GPU solver on the thin gap the looks
+use, the stand-in's pools cell for cell at its 96-cell logical grid. Two runs of a scene:
+the deltas folded every step, and folded only on the pour's frame, as the app folds them
+only on a frame something is laid in. A control (a stirred pool with no liquid, folded
+every step and not) reads the same to the bit, so the fold itself moves nothing. What it
+found is PLAN 15e-1 to 15e-9; the lines those items owe print as owed and fail the run
+the day they pass.
+
 ## 16. Many plates: each projector its own source (rig-plan R1)
 
 - **16a · The back plate gets its own look. Shipped (#231).** A look can be sent to the
