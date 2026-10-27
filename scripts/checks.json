@@ -713,6 +713,22 @@
       ]
     },
     {
+      "name": "Looks on a lit stage",
+      "shard": "lab",
+      "run": "npm run litstage -- --controls",
+      "why": [
+        "A look keeps its contrast over a projector's black lifted by a stage",
+        "wash (PLAN 36a): every look over a floor of 5 and 10% of white added",
+        "as light, its dye against the field behind it held with Lit stage on,",
+        "and byte for byte the plate without the grade at 0. Written before",
+        "the build, so only its controls run until 36a lands (the measure, the",
+        "floor's cost with nothing done); the build's PR drops `--controls`.",
+        "Here beside lampzero for the same reason: b3 compares two compiled",
+        "programs, which is the CPU rasteriser's to judge. About a minute, two",
+        "and a half in full."
+      ]
+    },
+    {
       "name": "The slosh dish on the GPU",
       "shard": "lab",
       "run": "npm run sloshgpu",
