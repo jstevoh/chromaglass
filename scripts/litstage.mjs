@@ -61,14 +61,18 @@
  * Read on main with nothing done (SwiftShader, 2026-10-27), the looks keep
  * 47-76% at 10% (26 of 33 under two-thirds; Lace Run and Cell Bloom 47%,
  * Velvet Underground 51%, Roy and Ferro Paint 76%) and 59-86% at 5%. A
- * reference sketch (Colour Body raised to a third of the amount where a look
- * has less, and a lift of each pixel's luminance with its colour's ratios
- * kept, then a little saturation, about 20 lines; in the project's files,
- * `lit-stage-36a/`) kept 77-123% at 10% and 81-102% at 5%, passed b1-b7 (b8 is the UI),
- * and failed each of the mutants beside it. The bright-field looks (a lamp
- * behind the dye) are the hard ones: the floor barely touches their field and
- * lifts their dark bodies, and the best a per-pixel curve did for Poster 1969
- * and Milk Marble was 72-78%.
+ * reference sketch (in the project's files, `lit-stage-36a/`; about 30
+ * lines) grades the dye where it is decoded and nothing else: the dye's
+ * colour lifted in luminance (power 1 - 0.5·√amount, its channels' ratios
+ * kept, held under 0.7 so no channel clips into the look's tone curve), its
+ * thickness tripled at 1 (alpha), a little saturation, and over a lamp the
+ * light through the dye saturated. It kept 69-95% at 10% and 77-98% at 5%,
+ * 98% or more of the seen dye, turned hues 1.6-9.7, moved no field (b9,
+ * 0.00), passed every line but b8 (the Wall panel's control) and failed each
+ * of the mutants beside it. The bright-field looks (a lamp behind the dye)
+ * are the hard ones: a black body on a lamp keeps no more than white on
+ * black, so what they gain past 64% is colour, and Chemical Clock (69%) and
+ * Red Cabbage (69%) are the sketch's thinnest margins.
  *
  * The lines (c are the controls, which hold on main and run in CI until the
  * build; b are 36a's):
@@ -108,7 +112,7 @@
  *       (in ΔE's units; a dye of chroma 40 turned 15° is 10.4). Not the angle:
  *       a near-grey pixel turns through any angle for a step no one would see,
  *       and the angle read Home Movie's warm greys as recoloured. The floor
- *       alone turns them 0.6-2.4; the sketch 2.6-7.9. And the bodies keep at
+ *       alone turns them 0.6-2.4; the sketch 1.6-9.7. And the bodies keep at
  *       least the chroma the floor alone leaves them: ΔH goes to 0 as the
  *       colour does, so a grade that drained the colour into lightness would
  *       otherwise pass as turning nothing
@@ -118,6 +122,16 @@
  *       Wall's panel (OutputPanel.tsx) sets it. Read from the source: every
  *       line above draws through the lab's camera, and the app's own frames
  *       are the Mac's
+ *   b9  the field stays the field: the plate with no dye, drawn with Lit stage
+ *       on (1 at 10%, 0.5 at 5%) and off, under the same floor, moves by under
+ *       1 on average (ΔE) and under 1% of its pixels by 2.3 or more (about
+ *       the least difference an eye tells apart side by side). b4-b7 read the
+ *       dye against the field the grade draws, so without this line a grade
+ *       that brightened or recoloured the ground would buy its contrast there:
+ *       a first sketch that lifted every pixel moved Velvet Underground's
+ *       black field by 55 and Lace Run's by 51, and a navy field passed every
+ *       other line. The lamp, the ground and the black are the room's and the
+ *       look's; Lit stage draws the dye
  *
  * What the build hands this check (the contract):
  *
@@ -131,6 +145,9 @@
  *     the room does not change the liquid. Thicker dye is optical depth, which
  *     is what the eye sees of a stronger pour (Beer and Lambert), so a plate
  *     that draws the dye deeper is honest about what an operator would do.
+ *     It draws the dye and leaves the field (b9): a pass over the finished
+ *     picture lifts the ground with the bodies, so it belongs where the dye
+ *     is decoded, before the lamp and the ground are laid under it.
  *   - Every line that reads the amount, in WGSL or TypeScript, sits between
  *     two block comments, one reading `lit stage {` and one `} lit stage`
  *     (MARKED below; block comments, which WGSL and TypeScript both read the
@@ -170,6 +187,7 @@ const FLOORS = [0.05, 0.1];
 const AMOUNT = { 0.05: 0.5, 0.1: 1 };
 const BODY_DE = 10, SEEN_DE = 5;
 const HOLD = { 0.05: 0.75, 0.1: 2 / 3 }, SEEN_HOLD = 0.95, HUE_MAX = 10, MIN_BODY = 0.2, MIN_DARK = 20;
+const JND = 2.3, FIELD_MAX = 1, MOVED_MAX = 0.01;
 /** The looks that lean on near-black, which the floor must be seen to cost (with nothing done, 47-51% at 10%). */
 const BLACK = ['velvet-underground', 'cell-bloom', 'lace-run'];
 
@@ -328,6 +346,12 @@ for (const id of got.ids) {
       const dg = r[`dyed:${AMOUNT[f]}`];
       row[`lit${f}`] = measure(dg, r[`empty:${AMOUNT[f]}`], f, body, dark.seen);
       row[`hue${f}`] = hueShift(A, labPx(dg, f), body);
+      // The field behind the dye, graded against ungraded, both under the floor.
+      const E0 = labPx(empty0, f), Eg = labPx(r[`empty:${AMOUNT[f]}`], f);
+      let fm = 0, moved = 0;
+      for (let i = 0; i < P; i++) { const d = dE(Eg, E0, i); fm += d; if (d >= JND) moved++; }
+      row[`field${f}`] = fm / P;
+      row[`moved${f}`] = moved / P;
     }
   }
   if (ctl) {
@@ -342,7 +366,7 @@ for (const id of got.ids) {
   rows.push(row);
   const pc = (v) => (100 * v).toFixed(0).padStart(3);
   console.log(`  ${id.padEnd(20)} body ${pc(row.body)}%  dark ${dark.contrast.toFixed(1).padStart(5)}  ` +
-    FLOORS.map((f) => `${f * 100}%: ${pc(row[`none${f}`].contrast / dark.contrast)}%${row[`lit${f}`] ? ` lit ${pc(row[`lit${f}`].contrast / dark.contrast)}% kept ${pc(row[`none${f}`].kept)}/${pc(row[`lit${f}`].kept)}% ΔH ${row[`hueNone${f}`].dH.toFixed(1)}/${row[`hue${f}`].dH.toFixed(1)} C ${row[`hueNone${f}`].chroma.toFixed(0)}/${row[`hue${f}`].chroma.toFixed(0)}` : ''}`).join('  ') + (ctl ? `  zero ${row.zero}` : ''));
+    FLOORS.map((f) => `${f * 100}%: ${pc(row[`none${f}`].contrast / dark.contrast)}%${row[`lit${f}`] ? ` lit ${pc(row[`lit${f}`].contrast / dark.contrast)}% kept ${pc(row[`none${f}`].kept)}/${pc(row[`lit${f}`].kept)}% ΔH ${row[`hueNone${f}`].dH.toFixed(1)}/${row[`hue${f}`].dH.toFixed(1)} C ${row[`hueNone${f}`].chroma.toFixed(0)}/${row[`hue${f}`].chroma.toFixed(0)} field ${row[`field${f}`].toFixed(1)}` : ''}`).join('  ') + (ctl ? `  zero ${row.zero}` : ''));
 }
 
 // ---- the lines
@@ -451,6 +475,16 @@ if (CONTROLS_ONLY) {
     const offered = /\.litStage\b/.test(panel);
     check('b8. the app draws the Wall\'s amount: its plate view takes litStage from the output config, and the Wall\'s panel sets it',
       fed && offered, `${fed ? '' : 'LiquidVisualizer.tsx hands the plate no litStage from the Wall; '}${offered ? '' : 'OutputPanel.tsx has no litStage control'}` || 'both');
+  }
+  {
+    // The field: the empty plate, graded against ungraded, under each floor.
+    const fieldKeys = FLOORS.map((f) => [f, `field${f}`, `moved${f}`]);
+    const moved = rows.filter((r) => fieldKeys.some(([, fk, mk]) => !(r[fk] < FIELD_MAX && r[mk] < MOVED_MAX)));
+    const w = worst(rows, (r) => -Math.max(...fieldKeys.map(([, fk]) => r[fk])));
+    check(`b9. the field stays the field: with no dye on the plate, at 5% and 10% with Lit stage on, the picture moves by under ${FIELD_MAX} on average (ΔE) and under ${pc(MOVED_MAX)} of it by ${JND} or more, every look`,
+      !moved.length, moved.length
+        ? `moved: ${moved.map((r) => `${r.id} ${fieldKeys.map(([f, fk, mk]) => `${f * 100}% ${r[fk].toFixed(1)} (${pc(r[mk])} of it)`).join(', ')}`).join('; ')}`
+        : `most ${w.id} ${Math.max(...fieldKeys.map(([, fk]) => w[fk])).toFixed(2)}`);
   }
 }
 

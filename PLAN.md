@@ -9066,10 +9066,19 @@ button, making it look good. Every item here is held to those.
   two-thirds at 10% (amount 1), three-quarters at 5% (amount 0.5); with nothing done the
   looks keep 47-76% at 10%, 26 of 33 under the bar. Also: thin dye still seen (95%), hues
   kept (ΔH under 10, chroma no less than the floor leaves), at 0 byte for byte the lab with
-  the grade's marked lines taken out, and the app's plate view fed from the Wall. The amount is `OutputConfig.litStage` and `PlateView.litStage`. CI runs
-  `-- --controls` (6 lines) until the build drops the flag in `scripts/checks.json`. A
-  reference sketch that passes 13 of the 14 lines (all but the Wall panel's control) and fails its mutants is in the project's files
-  (`lit-stage-36a/`). The build is Antigravity's, from a brief written with the check.
+  the grade's marked lines taken out, the app's plate view fed from the Wall, and the
+  field left as it is (b9: the plate with no dye moves by under 1 ΔE on average with Lit
+  stage on; a first sketch that lifted the finished picture moved Velvet Underground's
+  black by 55 and bought its contrast there). The amount is `OutputConfig.litStage` and
+  `PlateView.litStage`. CI runs `-- --controls` (6 lines, Measure's `browser` part: the
+  `lab` part already runs 23-24 of its 25 minutes on a slow runner) until the build drops
+  the flag in `scripts/checks.json`. A reference sketch that grades only the dye where it
+  is decoded passes 14 of the 15 lines (all but the Wall panel's control) and fails its
+  mutants; it is in the project's files (`lit-stage-36a/`). The build is Antigravity's,
+  from a brief written with the check.
+  - **36a-1.** Measure's `lab` part is at its time limit on main (23-24 minutes of 25 on
+    a slow runner, 13 on a fast one; `holeline` alone 10): split it, or give it room,
+    before the next lab check joins it.
 - **36b. Span the wall** (*proposed*, L, the Mac app). *The pain:* "The light show, as
   originally performed had no effect on large audiences" (Joshua White); "there wasn't any
   money to rent the extra projectors I knew I'd need to make a difference in that big
