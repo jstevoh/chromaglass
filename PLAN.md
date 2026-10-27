@@ -9099,7 +9099,7 @@ button, making it look good. Every item here is held to those.
   heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
   bubbles while it is held and calming when released. Not a bubble sprite.
   - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the
-    reference the GPU build is held to, and `npm run boil` (30 lines, node only, about 40 s)
+    reference the GPU build is held to, and `npm run boil` (37 lines, node only, about 40 s)
     is its judge, the way 32a's soap film came before 32c. The roadmap's blocker for S2 ("heat
     has no strength, every source saturates the buoyancy tanh") no longer holds: #352 took
     the tanh out. What the GPU still lacks is heat in kelvin and watts (its `vel.z` has no
@@ -9117,22 +9117,28 @@ button, making it look good. Every item here is held to those.
     wide as the gap, then heat exchanged at the bubble's rim both ways, so held heat boils
     and let-go heat condenses. *Measured* (`npm run boil`): the first step's warming matches
     lamp × absorbed fraction ÷ heat capacity to 1e-6 and the dial is linear; Newton's
-    cooling at both h to 0.5%; a 70 °C patch on an upright plate rises at the exact Darcy
-    inclusion speed within 1.6% (40 °C within 0.6%; the two 4.11× apart against an exact
-    4.07×: a constant expansion slope gives 3.0×, a saturated tanh 1.2×), and on a level
-    plate does not move; what leaves the rim over five minutes of warming is the water's
-    growth by Kell within 0.8%; at 98% of each site's superheat nothing boils and at 102%
-    every site does; a dish the lamp and fan warm to 88 °C never boils in five minutes,
-    boils 27 s after a hand blocks the air, only under the hand, held there under 103.5 °C
-    (100 plus the widest site's 15 K is the bar), and the vapour is under 1% of its peak
-    0.6 s after the hand lifts (0.4 s after the dial goes to 0; the flow under 2% of its
-    25 mm/s peak in 0.9 s).
-    Thirteen look-alikes each fail at least one line (each the reference with one thing
-    changed, `scratch/` in the build session): the old saturated buoyancy 2, a constant
-    expansion slope 3, a constant viscosity 3, buoyancy on a level plate 13, no nucleation
-    threshold 2, a bubble on a timer 4, no condensation 2, no latent heat 3, no vapour
-    volume 1, no expansion 1, a uniform lamp 2, the dye ignored 2, a hand that adds heat
-    instead of blocking the air 1.
+    cooling at both h to 0.5%; a warm bump spreads as the heat equation within 0.6%, and
+    the dish's hottest point after five minutes of lamp is a radial heat balance's within
+    0.1% of the rise; a 70 °C patch on an upright plate rises at the exact Darcy inclusion
+    speed within 1.6% (40 °C within 0.6%; the two 4.11× apart against an exact 4.07×: a
+    constant expansion slope gives 3.0×, a saturated tanh 1.2×), and on a level plate does
+    not move; what leaves the rim over five minutes of warming is the water's growth by
+    Kell within 0.8%; the sites' superheats are Hsu's for the stated cavities (median,
+    log spread and share of cells); at 98% of each site's superheat nothing boils and at
+    102% every site does; a bubble's rim boils and condenses at its stated exchange to
+    1e-3; a dish the lamp and fan warm to 88 °C never boils in five minutes, boils 45 s
+    after a hand blocks the air off the lamp's centre, only under the hand, held under
+    104.1 °C there (100 plus the widest site's 15 K is the bar), and the vapour is under 1%
+    of its peak 0.8 s after the hand lifts (0.4 s after the dial goes to 0; the flow under
+    2% of its 18 mm/s peak in 1.2 s). Seventeen look-alikes each fail at least one line
+    (each the reference with one thing changed, `scratch/` in the build session; four of
+    them from the check-skeptic's pass, which three passed before its lines were added):
+    the old saturated buoyancy 2, a constant expansion slope 3, a constant viscosity 3,
+    buoyancy on a level plate 15, no nucleation threshold 2, a bubble on a timer 6, no
+    condensation 3, no latent heat 5, no vapour volume 4, no expansion 2, a uniform lamp 3,
+    the dye ignored 2, a hand that adds heat instead of blocking the air 6, no sideways
+    conduction 3, every cavity the median one 1, a bubble rim a fifth as strong 2, vapour
+    that absorbs the lamp as liquid would 4.
   - **36e-2. The GPU build** (*open*, Antigravity's brief in the project's shared files).
     The model as passes on the plate's grid: the temperature in kelvin, the lamp in watts,
     the Heat dial, the hand's held air, the threshold and the vapour as a field the bubbles'

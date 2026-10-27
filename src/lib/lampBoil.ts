@@ -272,7 +272,8 @@ function substep(P: BoilPlate, h: number, c: BoilControls) {
       cond += (kf * ((out ? Tamb : T0[m]) - T0[k])) / (dx * dx);
     }
     const G = a > 0 ? P.interfaceH * 2 * Math.sqrt(Math.PI * a) * (d / dx) : 0;
-    let Tn = (C * T0[k] + h * (q + cond + hl * Tamb + G * T_SAT)) / (C + h * (hl + G));
+    // Written as the change, so a cell in balance does not move by a rounding.
+    let Tn = T0[k] + (h * (q + cond + hl * (Tamb - T0[k]) + G * (T_SAT - T0[k]))) / (C + h * (hl + G));
     let an = a + (G * (Tn - T_SAT) * h) / latentPerAlpha;
     if (an > ALPHA_MAX) {                     // no liquid left to boil: the heat stays in the cell
       Tn += ((an - ALPHA_MAX) * latentPerAlpha) / C;
