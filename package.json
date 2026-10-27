@@ -211,6 +211,7 @@
     "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",
     "lampzero": "node scripts/lampzero.mjs",
+    "litstage": "node scripts/litstage.mjs",
     "milk": "node scripts/milk.mjs",
     "colours": "node scripts/colours.mjs",
     "lace": "node scripts/lace.mjs",

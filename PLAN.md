@@ -9238,6 +9238,26 @@ button, making it look good. Every item here is held to those.
   floor (0, 5, 10 % of white added), its contrast between dye bodies and field held at 10 %
   to within a set fraction of its dark-room value with the grade on, and byte for byte
   unchanged at 0. Phone: the same amount in the phone's Wall sheet.
+  *Check written first* (2026-10-27): `npm run litstage`, the contract the build is held
+  to (its header). The floor is light added in light and read in CIELAB against the
+  room's white; the contrast is each body pixel's ΔE from the field behind it (the same
+  look over the plate with no dye). Bars from what the floor leaves of white on black:
+  two-thirds at 10% (amount 1), three-quarters at 5% (amount 0.5); with nothing done the
+  looks keep 47-76% at 10%, 26 of 33 under the bar. Also: thin dye still seen (95%), hues
+  kept (ΔH under 10, chroma no less than the floor leaves), at 0 byte for byte the lab with
+  the grade's marked lines taken out, the app's plate view fed from the Wall, and the
+  field left as it is (b9: the plate with no dye moves by under 1 ΔE on average with Lit
+  stage on; a first sketch that lifted the finished picture moved Velvet Underground's
+  black by 55 and bought its contrast there). The amount is `OutputConfig.litStage` and
+  `PlateView.litStage`. CI runs `-- --controls` (6 lines, Measure's `browser` part: the
+  `lab` part already runs 23-24 of its 25 minutes on a slow runner) until the build drops
+  the flag in `scripts/checks.json`. A reference sketch that grades only the dye where it
+  is decoded passes 14 of the 15 lines (all but the Wall panel's control) and fails its
+  mutants; it is in the project's files (`lit-stage-36a/`). The build is Antigravity's,
+  from a brief written with the check.
+  - **36a-1.** Measure's `lab` part is at its time limit on main (23-24 minutes of 25 on
+    a slow runner, 13 on a fast one; `holeline` alone 10): split it, or give it room,
+    before the next lab check joins it.
 - **36b. Span the wall** (*proposed*, L, the Mac app). *The pain:* "The light show, as
   originally performed had no effect on large audiences" (Joshua White); "there wasn't any
   money to rent the extra projectors I knew I'd need to make a difference in that big
