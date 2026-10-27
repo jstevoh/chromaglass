@@ -588,7 +588,15 @@ async function selftest() {
   const write = process.stdout.write.bind(process.stdout);
   process.stdout.write = (b, ...r) => { log.push(String(b)); return true; };
   let code;
-  try { code = await runShard('m', fake); } finally { process.stdout.write = write; }
+  /*
+    `null` for the selection, not runShard's default. The default reads
+    CHECKS_ONLY, which CI sets on a PR whose diff reaches only some Measure
+    checks (19k-4), and then names this run's own checks, none of which is
+    `green` or `red`: the fake shard ran nothing and exited 0, so on a
+    check-only PR this self-test went red on six lines that say nothing about
+    the runner (#513's logic part, reproduced here with CHECKS_ONLY set).
+  */
+  try { code = await runShard('m', fake, null); } finally { process.stdout.write = write; }
   const text = log.join('');
   say(code === 1, `a shard with a red check is red (exit ${code})`);
   say(/::group::Run echo ok fine\n/.test(text) && /✓ green/.test(text), 'a check runs in a group headed "Run <command>", as a step\'s log is');
