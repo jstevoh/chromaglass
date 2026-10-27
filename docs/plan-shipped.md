@@ -2337,6 +2337,24 @@ plate and projector let go. It runs in CI's browser part.
 Measured: `npm run cartoons` 16/16 (no GPU and `PW_WEBGPU=1`), `layout` 77/77, `phone`
 357/357, `desk` 48/48, `panel` 197/197, `lint` clean.
 
+**Colour (2026-10-27).** The owner: "the out of copyright cartoons we added are all black and
+white - we need some color ones please." Five more, whole and looping, on the same shelf and the
+phone's dye sheet, each with a `colour` flag in `lib/cartoons.ts` and a "colour" tag in its row:
+*Fiddlesticks* (1930; two-colour), *Jack Frost* (1934) and *Balloon Land* (1935) (Ub Iwerks'
+ComiColors, Cinecolor), *Somewhere in Dreamland* (1936; a Fleischer Color Classic) and *Gulliver's
+Travels* (1939; the Fleischer feature in Technicolor, title and End cards cut, 74 minutes).
+Finding free ones took the renewal records, not the dates: a film from 1931 on is free only if
+nobody renewed it in its 28th year, and the Copyright Office's *Catalog of Copyright Entries*
+(on the Internet Archive as text) showed nine of the 1933 to 1934 ComiColors *were* renewed
+(Exclusive Pictures, 1961 to 1962), so those are not here, while Jack Frost, Balloon Land,
+Somewhere in Dreamland and Gulliver's Travels have none. Fiddlesticks is free by date: renewed in
+1959, which does not extend a 1930 film past 95 years. What was left off, and why, is in
+`SOURCES.md`. The colour cost bits: 4.2 to 7.3 MB a short against 1.5 to 8.1 grey, and the feature
+27 MB; the check's bars moved to match (a feature up to 30 MB, the shelf under 80). The pour
+already lays each pixel's own colour, so no drawing code changed; `npm run cartoons` now decodes
+each file in the browser and holds its flag to its picture (0.0 colourfulness for each grey one,
+30 to 82 for the colour ones).
+
 ### 15i. Picking a bottle pours nothing (shipped)
 
 **Shipped.** The owner, 2026-10-04: "when I pick the ferrofluid liquid - it deposits a
