@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Search as SearchIcon } from 'lucide-react';
-import { Segmented, StatusDot } from '../ui';
+import { StatusDot } from '../ui';
+import { TabStrip } from './TabStrip';
+import type { TabEdit } from '../../hooks/useDeskLayout';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
 import { AlphaBadge } from '../AlphaBadge';
 
@@ -13,13 +15,6 @@ import { AlphaBadge } from '../AlphaBadge';
  * show the same truth in the same place.
  */
 
-/*
-  The switch's values are the old desks' names, so everything that still asks
-  which desk is up (`deskMode` in App, the checks that click
-  `mode-segmented-perform`) keeps its meaning: `design` is the Build layout,
-  `perform` is Gig, and `loadin` is new.
-*/
-export type DeskMode = 'perform' | 'design' | 'loadin' | 'sequence' | 'sound';
 
 export interface DeskDots {
   sound?: boolean;
@@ -34,10 +29,14 @@ export interface DeskDots {
   recWhat?: string;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onSearch, leading, trailing }: {
+export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onSearch, leading, trailing }: {
   breadcrumb: ReactNode;
-  mode: DeskMode;
-  onMode: (m: DeskMode) => void;
+  /** The owner's tabs (lib/deskTabs.ts), the one up, and the editor's changes. */
+  tabs: { id: string; name: string }[];
+  tab: string;
+  onTab: (id: string) => void;
+  onTabEdit: (e: TabEdit) => void;
+  onAddPanel?: () => void;
   dots: DeskDots;
   midiName: string | null;
   /*
@@ -296,20 +295,12 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div ref={switchRef} className="pointer-events-auto">
           {/*
-            The layouts of the one desk, then the two screens of their own
-            (Desk v2). Sound stays, after Sequence: it is the only way to the
-            music player and the drone, and the design's switch has no other
-            door to them.
+            The owner's tabs, each a set of panels (lib/deskTabs.ts), and the
+            pencil that edits them. Sequence and Sound were screens of their
+            own here; they are panels now (Songs, Sequences, Music & Drone),
+            on Sequence and Setup as they ship.
           */}
-          <Segmented
-            value={mode}
-            options={[['design', 'Build'], ['perform', 'Gig'], ['loadin', 'Load-in'], ['sequence', 'Sequence'], ['sound', 'Sound']] as const}
-            onChange={onMode}
-            height={32}
-            divideBefore="sequence"
-            tight
-            testId="mode-segmented"
-          />
+          <TabStrip tabs={tabs} tab={tab} onTab={onTab} onEdit={onTabEdit} onAddPanel={onAddPanel} />
         </div>
       </div>
       <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`} data-testid="header-cluster" data-fold={level}>

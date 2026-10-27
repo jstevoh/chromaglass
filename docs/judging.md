@@ -1909,3 +1909,17 @@ until the app next goes online (no grace period, PLAN 23.17h).
    in brightness at 1, or Velvet Underground, Lucky or any look under 1 that changed.
 4. Decide: is 3 (3560 K) the right amber for Home Movie, or the full 3.75 (3200 K)? And is the red clipping on
    hot reds acceptable, or should the end hold only half the brightness back?
+
+## 85. The tabs across the top are yours (PLAN 8-tabs)
+
+1. Open the desk on a laptop. The chips should read Perform, Sequence, Setup, with a pencil beside them. Perform has
+   the set list, bottles, rides, dyes, tools and the knobs Build had; Sequence the set list, Songs, Sequences and the
+   score; Setup the controller, Sound, Music & Drone, the Wall and Mapping.
+2. Press the pencil. Rename Setup to the venue's name, move it first, add a New tab and put two panels on it with
+   + Panel, then reload: all of it should come back as you left it. Delete the new tab (two presses), and "Put the
+   shipped tabs back" puts the three back.
+3. On the phone: More › Tabs shows the same three, each tab's panels stacked; Setup's Wall and Sound draw in place,
+   Perform's bottles and set list are buttons to the phone's own Dye and Looks sheets.
+4. Bad: a control you used under Build, Gig, Load-in, Sequence or Sound that you cannot find now on any tab or in
+   + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
+5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?

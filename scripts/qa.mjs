@@ -1220,7 +1220,7 @@ try {
 
     const bench = await size();
     check('a desk lays out at laptop width',
-      (await page.getByTestId('design-desk').count()) === 1 || (await page.getByTestId('perform-desk').count()) === 1);
+      (await page.getByTestId('perform-desk').count()) === 1);
     /*
       A preview, not the window: framed inside the desk on every side and
       under half the window's area. This asked for under 75% of the width,
@@ -1252,7 +1252,8 @@ try {
     {
       const at = () => modeSwitchX(page);
       const inPerform = await at();
-      await clickOn('mode-segmented-design');
+      // Setup: the tab with the most different bar beside the switch.
+      await clickOn('mode-segmented-setup');
       await settle(1200);
       const inDesign = await at();
       await clickOn('mode-segmented-perform');
@@ -1260,7 +1261,7 @@ try {
       const back = await at();
       const drift = Math.max(Math.abs(inDesign - inPerform), Math.abs(back - inPerform));
       check('the mode switch does not move when you use it', drift <= 1,
-        `perform ${inPerform}, design ${inDesign}, back ${back} — ${drift}px`);
+        `perform ${inPerform}, setup ${inDesign}, back ${back} — ${drift}px`);
     }
 
     // ── Every setting is reachable ─────────────────────────────────
@@ -1271,7 +1272,7 @@ try {
     // there and none of them could be found. Three ways in, all checked: the
     // All tab, the search box, and a command-palette row per section.
     {
-      await clickOn('mode-segmented-design');
+      await clickOn('mode-segmented-setup');
       await settle(1200);
 
       // Both desks' own way in, and it has to be *on screen*. The first
@@ -1331,9 +1332,9 @@ try {
       await clickOn('mode-segmented-perform');
       await settle(1200);
       await entryOn('the desk');
-      await clickOn('mode-segmented-design');
+      await clickOn('mode-segmented-setup');
       await settle(1200);
-      await entryOn('the bench');
+      await entryOn('the Setup tab');
 
       await page.keyboard.press('Meta+k');
       await settle(700);
@@ -1449,8 +1450,9 @@ try {
 
       // The bench's recipe was a constant in a file: eight controls, and no
       // way to make it nine. Its Choose is the desk's picker over the same
-      // list, so this only has to prove the door opens and works.
-      await clickOn('mode-segmented-design');
+      // list, so this only has to prove the door opens and works. The recipe
+      // is in Perform's deck now that Build folded into it.
+      await clickOn('mode-segmented-perform');
       await settle(1200);
       const recipeBefore = await page.evaluate(() =>
         document.querySelectorAll('[data-testid="recipe"] [data-testid^="recipe-"]').length);
@@ -1957,7 +1959,7 @@ try {
     await noteDuplicates();
 
     /*
-      Design is the bench: the other half of the job, same grid.
+      The other tabs are the other halves of the job, on the same grid.
 
       Polled, not asserted after a fixed wait. This check failed once and read
       as the app refusing to switch back; driving the two modes directly,
@@ -1966,18 +1968,23 @@ try {
       rendering at six frames a second. A fixed delay is a guess about a
       machine's speed, and this one guessed wrong about its own.
     */
-    await clickOn('mode-segmented-design');
-    let benchUp = 0, bottles = 0, cuesGone = 1;
+    /*
+      Since the tabs became the owner's (2026-10-27) the bench is in Perform,
+      beside the cue list, and a tab is told apart by its panels: Sequence
+      has the set and the song shows, and no bottles.
+    */
+    await clickOn('mode-segmented-sequence');
+    let benchUp = 0, bottles = 1, songs = 0;
     for (let i = 0; i < 20; i++) {
-      benchUp = await page.getByTestId('design-desk').count();
+      benchUp = await page.getByTestId('sequence-desk').count();
       bottles = await page.getByTestId('bottle-silicone').count();
-      cuesGone = await page.getByTestId('cue-list').count();
-      if (benchUp === 1 && bottles === 1 && cuesGone === 0) break;
+      songs = await page.getByTestId('songs-panel-box').count();
+      if (benchUp === 1 && bottles === 0 && songs === 1) break;
       await settle(400);
     }
-    check('and Design shows the bench instead of the cue list',
-      benchUp === 1 && bottles === 1 && cuesGone === 0,
-      `design-desk ${benchUp}, bottles ${bottles}, cue list ${cuesGone}`);
+    check('and Sequence shows the song shows instead of the bottles',
+      benchUp === 1 && bottles === 0 && songs === 1,
+      `sequence-desk ${benchUp}, bottles ${bottles}, songs ${songs}`);
   }
 
   // ── The set: the operator's own cue list ──────────────────────────

@@ -8,7 +8,7 @@
  * it one desk whose cells are filled from a *layout*: every settings section
  * is a panel with the section's own id, and a panel can sit in the left
  * column, the right column or the deck under the plate, float over the plate,
- * fold to its header, or go away. Build, Gig and Load-in are three shipped
+ * fold to its header, or go away. The owner's tabs (lib/deskTabs.ts) are
  * layouts of the same panels, and switching between them never changes a
  * value: what changes is what is on the screen.
  *
@@ -26,7 +26,11 @@
 import { SETTINGS_SECTIONS, SECTION_BY_ID, resolveSection } from './settingsMap.ts';
 import { PINNABLE } from './deskPins.ts';
 
-/** The three shipped layouts. Stored under these names. */
+/**
+ * The three layouts that shipped before the tabs were the owner's to make
+ * (Desk v2, 2026-10). Only `deskTabs.ts` reads them now: a desk that had
+ * rearranged one keeps it as a tab of its own, under its old name.
+ */
 export type LayoutName = 'build' | 'gig' | 'loadin';
 export const LAYOUT_NAMES: LayoutName[] = ['build', 'gig', 'loadin'];
 export const LAYOUT_LABEL: Record<LayoutName, string> = { build: 'Build', gig: 'Gig', loadin: 'Load-in' };
@@ -89,6 +93,12 @@ export interface PanelSpec {
   kind: PanelKind;
   /** Its width in the deck. Four knobs fit 266. */
   deckWidth: number;
+  /**
+   * The width it wants in a side column, for the panels that were whole
+   * screens (the song shows, the sequences, the music player). A column is
+   * as wide as its widest panel asks; the rest take the column as it is.
+   */
+  columnWidth?: number;
 }
 
 /**
@@ -105,6 +115,16 @@ const OWN: PanelSpec[] = [
   { id: 'dyes',    name: 'Dyes',    category: 'pour', kind: 'own', deckWidth: 360 },
   { id: 'tools',   name: 'Tools',   category: 'pour', kind: 'own', deckWidth: 340 },
   { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 304 },
+  /*
+    The three that were screens of their own, behind the Sequence and Sound
+    chips, before every tab was a set of panels (2026-10-27): a tab can only
+    be built from panels, so a screen that was not one could not be put on a
+    tab, and taking its chip away would have lost it. Each is the screen's own
+    component drawn in a panel (`Sheet embed`), so nothing in it was rewritten.
+  */
+  { id: 'songs',     name: 'Songs',         category: 'play', kind: 'own', deckWidth: 400, columnWidth: 420 },
+  { id: 'sequences', name: 'Sequences',     category: 'play', kind: 'own', deckWidth: 400, columnWidth: 360 },
+  { id: 'player',    name: 'Music & Drone', category: 'feed', kind: 'own', deckWidth: 360, columnWidth: 340 },
 ];
 
 /**
@@ -128,16 +148,17 @@ export const PANELS: PanelSpec[] = [...OWN, ...FROM_SECTIONS];
 export const PANEL_BY_ID = new Map(PANELS.map(p => [p.id, p]));
 
 /**
- * The Stage sections are the room and the machine, not the look, and the
- * design keeps them out of the way: in Build and Gig they live in the Stage
- * sheet (⌘,), and only Load-in, the layout for setting up a room, opens them
- * as panels.
+ * The Stage sections are the room and the machine, not the look. They used
+ * to be panels only in Load-in, and in the Stage sheet (⌘,) everywhere else.
+ * With the tabs the owner's to make, a Stage panel goes on any tab it is put
+ * on: Setup ships with them, and the Stage sheet is still there for the rest.
  */
 export const isStagePanel = (id: string): boolean => PANEL_BY_ID.get(id)?.category === 'stage';
-export const panelAllowed = (layout: LayoutName, id: string): boolean =>
-  PANEL_BY_ID.has(id) && (layout === 'loadin' || !isStagePanel(id));
 
-// ── The shipped layouts ──────────────────────────────────────────────
+// ── The layouts that shipped before the tabs ─────────────────────────
+
+/** A layout with nothing out: a new tab's, before panels are put on it. */
+export const emptyLayout = (plateMode: PlateMode = 'live'): DeskLayout => ({ ...empty(), plateMode });
 
 const empty = (): Omit<DeskLayout, 'plateMode'> => ({ left: [], right: [], deck: [], floating: [], collapsed: [], deckCollapsed: false });
 
@@ -160,6 +181,9 @@ const empty = (): Omit<DeskLayout, 'plateMode'> => ({ left: [], right: [], deck:
   the dyes, tools and patches under the plate. Load-in is new: the controller
   and the sound on the left, the wall and its mapping on the right, the
   machine and the phone link in the deck.
+
+  Kept, as they were, for the desks that had changed one: `deskTabs.ts` turns
+  such a layout into a tab of its own. The tabs that ship now are there.
 */
 export const SHIPPED: Record<LayoutName, DeskLayout> = {
   build: { ...empty(), right: ['bottles', 'dyes', 'tools'], deck: ['recipe', 'physics', 'squish', 'camera', 'audio-input', 'macro', 'patches'], plateMode: 'preview' },
@@ -256,7 +280,6 @@ export function collapseAll(l: DeskLayout, on: boolean): DeskLayout {
 
 // ── Keeping it ───────────────────────────────────────────────────────
 
-const KEY = (name: LayoutName) => `chromaglass-desk-layout:${name}`;
 
 /** The same panels in the same places, which is all "unchanged" means. */
 export function sameLayout(a: DeskLayout, b: DeskLayout): boolean {
@@ -272,15 +295,14 @@ export function sameLayout(a: DeskLayout, b: DeskLayout): boolean {
  *
  * Read from storage, so it may come from an older build or a hand edit: a
  * panel id this build does not have is dropped, a panel in two places keeps
- * the first, a Stage panel outside Load-in goes back to the Stage sheet, a
- * floating rectangle is clamped to something that can be grabbed, and
- * anything that is not a layout at all is the shipped one. A panel whose
- * section was folded into another (Sound Mappings, Heat Slide) is the panel
- * it was folded into, in its place, unless that one is out already.
+ * the first, a floating rectangle is clamped to something that can be
+ * grabbed, and anything that is not a layout at all is `base`, the layout the
+ * tab ships with. A panel whose section was folded into another (Sound
+ * Mappings, Heat Slide) is the panel it was folded into, in its place, unless
+ * that one is out already.
  */
-export function sanitizeLayout(name: LayoutName, raw: unknown): DeskLayout {
-  const base = shippedLayout(name);
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base;
+export function sanitizeLayout(raw: unknown, base: DeskLayout): DeskLayout {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return structuredClone(base);
   const r = raw as Partial<Record<keyof DeskLayout, unknown>>;
   const seen = new Set<string>();
   // One pass, so a panel twice in the same list keeps its first place too.
@@ -288,7 +310,7 @@ export function sanitizeLayout(name: LayoutName, raw: unknown): DeskLayout {
     const out: string[] = [];
     for (const was of Array.isArray(v) ? v : []) {
       const id = typeof was === 'string' ? resolveSection(was) : was;
-      if (typeof id !== 'string' || !panelAllowed(name, id) || seen.has(id)) continue;
+      if (typeof id !== 'string' || !PANEL_BY_ID.has(id) || seen.has(id)) continue;
       seen.add(id);
       out.push(id);
     }
@@ -300,7 +322,7 @@ export function sanitizeLayout(name: LayoutName, raw: unknown): DeskLayout {
   for (const f of Array.isArray(r.floating) ? r.floating : []) {
     if (!f || typeof f !== 'object' || typeof f.id !== 'string') continue;
     const id = resolveSection(f.id);
-    if (!panelAllowed(name, id) || seen.has(id)) continue;
+    if (!PANEL_BY_ID.has(id) || seen.has(id)) continue;
     seen.add(id);
     floating.push({ id, x: num(f.x, 0, 4000, 120), y: num(f.y, 0, 3000, 120), w: num(f.w, 220, 1200, FLOAT_SIZE.w), h: num(f.h, 120, 1200, FLOAT_SIZE.h) });
   }
@@ -313,25 +335,8 @@ export function sanitizeLayout(name: LayoutName, raw: unknown): DeskLayout {
   };
 }
 
-export function loadLayout(name: LayoutName): DeskLayout {
-  try {
-    const raw = localStorage.getItem(KEY(name));
-    if (raw) return sanitizeLayout(name, JSON.parse(raw));
-  } catch { /* private window, or not JSON */ }
-  return shippedLayout(name);
-}
-
-/** Stored only when it is a choice: an untouched layout is not written, so a new shipped one reaches this desk. */
-export function saveLayout(name: LayoutName, l: DeskLayout): void {
-  try {
-    if (sameLayout(l, SHIPPED[name])) localStorage.removeItem(KEY(name));
-    else localStorage.setItem(KEY(name), JSON.stringify(l));
-  } catch { /* private window */ }
-}
-
-/** The old desk mode a layout stands for, for everything that still asks which desk is up. */
-export const DESK_MODE_OF: Record<LayoutName, 'design' | 'perform' | 'loadin'> = { build: 'design', gig: 'perform', loadin: 'loadin' };
-export const LAYOUT_OF_MODE = (m: string | null): LayoutName => (m === 'perform' ? 'gig' : m === 'loadin' ? 'loadin' : 'build');
+/** Where the old layouts were kept: one key each, written only once changed. */
+export const OLD_LAYOUT_KEY = (name: LayoutName) => `chromaglass-desk-layout:${name}`;
 
 /** For the browser: is this section one of the settings sections? (The desk's own panels are not.) */
 export const isSectionPanel = (id: string): boolean => SECTION_BY_ID.has(id);
