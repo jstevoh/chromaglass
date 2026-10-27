@@ -157,6 +157,20 @@ macrun() {
       | if . == $want then "ran" else (join(",") | if . == "" then "none" else . end) end'
 }
 
+# "partial: ..." when run $1's `reach` job said it ran only the Measure checks
+# its diff reached (PLAN.md 19k-4), empty for a run that ran all of Measure. Such
+# a run proved what its diff could move and nothing about the rest of the tree,
+# so it is never the evidence that a tree is safe to publish; the deploy runs
+# Measure in full. It is only a PR of check scripts, the manifest and documents
+# that gets one, which publishes nothing (PLAN.md 19j) unless package.json's
+# scripts moved with it.
+measurepartial() {
+  local job
+  job=$(api "actions/runs/$1/jobs?per_page=100&filter=latest" | jq -r '.jobs[] | select(.name == "What the change reaches") | .id // empty')
+  [ -n "$job" ] || return 0
+  api "check-runs/$job/annotations" | jq -r '.[] | select(.title == "measure") | .message // empty' | grep '^partial' | head -1 || true
+}
+
 # The paths whose blobs differ between two trees, one a line, sorted: added,
 # removed and changed alike. From the API's recursive listing, so the deploy
 # needs no history; a listing GitHub truncated is an error, never a short diff.
@@ -317,7 +331,7 @@ unchanged() {
 # one commit on main; $2 is main before it (defaults to the commit's first parent, which for
 # a squash merge is the same commit).
 judge() {
-  local sha="$1" before="${2:-}" commit tree heads entry pr head runs run url tested ttree htree status verdict shards newest
+  local sha="$1" before="${2:-}" commit tree heads entry pr head runs run url tested ttree htree status verdict shards newest partial
   commit=$(api "commits/$sha")
   sha=$(jq -r .sha <<<"$commit")
   tree=$(jq -r '.commit.tree.sha // empty' <<<"$commit")
@@ -364,6 +378,10 @@ judge() {
       fi
       if [ "$shards" != ran ]; then
         echo "false #$pr's run $url did not run the Mac shards ($shards)"; continue
+      fi
+      partial=$(measurepartial "${url##*/}")
+      if [ -n "$partial" ]; then
+        echo "false #$pr's run $url ran only the Measure checks its diff reached ($partial)"; continue
       fi
       if [ "$tested" != - ]; then
         ttree=$(treeof "$tested")

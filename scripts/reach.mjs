@@ -54,7 +54,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { selectShards, parseManifest, loadManifest } from './checks.mjs';
+import { selectShards, selectMeasure, parseManifest, loadManifest } from './checks.mjs';
 
 // Markdown only at the top, in docs/ and in .claude/: a `.md` under src/ or
 // public/ could be imported (`?raw`) or served, and would reach.
@@ -346,6 +346,7 @@ async function selftest() {
     w('scripts/b.mjs', "import './helper.mjs';\n");
     w('scripts/helper.mjs', 'export const h = 1;\n');
     w('scripts/c.mjs', 'export const c = 1;\n');
+    w('scripts/d.mjs', 'export const d = 1;\n');
     w('src/x.ts', 'export const x = 1;\n');
     w('scripts/checks.json', JSON.stringify({
       shards: { measure: ['m'], mac: ['x', 'y'] },
@@ -355,6 +356,7 @@ async function selftest() {
         // as a command to run, and `b` is a script only in this scratch tree.
         { name: 'B', shard: 'y', run: ['npm', 'run', 'b'].join(' ') },
         { name: 'C', shard: 'm', run: 'node scripts/c.mjs' },
+        { name: 'D', shard: 'm', run: 'node scripts/d.mjs', always: true },
       ],
     }));
   };
@@ -370,6 +372,22 @@ async function selftest() {
     [runDiff((git, dir) => { const p = path.join(dir, 'package.json'); const j = JSON.parse(fs.readFileSync(p, 'utf8')); j.scripts.b += ' --more'; fs.writeFileSync(p, JSON.stringify(j)); }, undefined, withManifest), 'mac=true shards=["y"]', '--diff: an npm script a check runs runs that check\'s shard'],
     [runDiff((git, dir) => fs.appendFileSync(path.join(dir, 'PLAN.md'), 'x\n'), 'f'.repeat(40)), 'refused', '--diff: a HEAD that is not the merge of PR_HEAD is refused'],
   ];
+  // Measure's selection rides the same output (PLAN.md 19k-4): a check
+  // script's own check and the `always` ones, the always ones alone for a
+  // document or another shard's script, every check for anything else.
+  const MEASURE = [
+    [touch('scripts/c.mjs'), 'parts=["m"] only=["C","D"]', 'a Measure check\'s script selects that check and the always ones'],
+    [touch('scripts/a.mjs'), 'parts=["m"] only=["D"]', 'a Mac check\'s script selects only the always ones in Measure'],
+    [(git, dir) => fs.appendFileSync(path.join(dir, 'PLAN.md'), 'shipped\n'), 'parts=["m"] only=["D"]', 'a document no check reads selects only the always ones'],
+    [touch('src/x.ts'), 'parts=["m"] only=', 'a source file runs Measure in full'],
+    [touch('scripts/c.mjs', 'src/x.ts'), 'parts=["m"] only=', 'a check script with a source file runs Measure in full'],
+    [touch('scripts/never-traced.mjs'), 'parts=["m"] only=', 'a script no check traces runs Measure in full'],
+  ];
+  for (const [mut, want, what] of MEASURE) {
+    const got = runDiff(mut, undefined, withManifest).replace(/^.* (parts=)/, '$1');
+    if (got !== want) bad++;
+    console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
+  }
   // The deploy's switch: only a call that is not a PR's run, with mac false.
   const call = (env) => {
     const out = path.join(os.tmpdir(), `reach-call-${process.pid}`);
@@ -385,7 +403,8 @@ async function selftest() {
     [call({ GITHUB_EVENT_NAME: 'workflow_dispatch', CALL_MAC: '' }), `mac=true ${ALL}`, 'a run by hand runs every shard'],
     [(() => { try { return call({ GITHUB_EVENT_NAME: 'pull_request', CALL_MAC: 'false', PR_HEAD: '' }); } catch { return 'refused'; } })(), 'refused', 'a PR run ignores the deploy\'s switch (and, outside a merge commit, is refused)'],
   );
-  for (const [got, want, what] of diffs) {
+  for (const [raw, want, what] of diffs) {
+    const got = raw.replace(/ parts=.*$/, '');
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}${got === want ? '' : ` — got ${got}`}`);
   }
@@ -491,6 +510,11 @@ if (!isMain) {
   let mac = true;
   let shards = MAC_SHARDS;
   let why = `a ${event || 'local'} run reaches the Mac without asking`;
+  // Measure's selection (PLAN.md 19k-4): every part in full, unless this is a
+  // pull request whose diff is only check scripts, manifest entries, npm
+  // scripts and documents. `only` empty is every check.
+  let parts = loadManifest().shards.measure;
+  let only = '';
   if (event !== 'pull_request' && process.env.CALL_MAC === 'false') {
     // The deploy, when its gate's rule 5 held: the PR's run passed the Mac
     // and the site files it changed are apart from main's newer ones.
@@ -504,6 +528,21 @@ if (!isMain) {
     }
     const files = git('diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD').split('\n').filter(Boolean);
     const reaching = files.filter(reachesMac);
+    {
+      const before = atCommit('HEAD^1', git), after = atCommit('HEAD', git);
+      if (after.manifest) {
+        parts = after.manifest.shards.measure;
+        const m = selectMeasure(files, { before, after, root: process.cwd() });
+        console.log(`Measure: ${m.all ? `every check (${m.why})` : m.why}`);
+        if (!m.all && m.parts.length) {
+          parts = m.parts;
+          only = JSON.stringify(m.names);
+          // For the deploy gate (deploygate.sh): such a run is not evidence
+          // for a tree's whole Measure.
+          console.log(`::notice title=measure::partial: ${m.names.length} checks in ${m.parts.join(', ')}`);
+        }
+      }
+    }
     mac = reaching.length > 0;
     why = mac
       ? `${reaching.length} of ${files.length} changed files reach a Mac shard, first ${reaching.slice(0, 5).join(', ')}`
@@ -542,7 +581,7 @@ if (!isMain) {
   console.log(why);
   // The matrix needs a list even when the shards are skipped (`mac=false`),
   // so then it is every shard, which nothing runs.
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `mac=${mac}\nshards=${JSON.stringify(mac ? shards : MAC_SHARDS)}\n`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `mac=${mac}\nshards=${JSON.stringify(mac ? shards : MAC_SHARDS)}\nparts=${JSON.stringify(parts)}\nonly=${only}\n`);
 } else {
   await selftest();
 }

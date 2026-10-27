@@ -5,19 +5,23 @@
     "which shards a PR's diff selects from here; `npm run quick` runs, in parallel, the",
     "checks a diff reaches. A new check is one entry here (and its npm script, if it has",
     "one), never a new step in the workflow. `why` is the step's old comment: what the",
-    "check measures and why it is where it is. `scripts/checks.mjs` holds the rules."
+    "check measures and why it is where it is. `always`, on a Measure check, keeps it in",
+    "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
+    "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
   ],
   "shards": { "measure": ["logic","sound","browser","lab"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
       "shard": "logic",
-      "run": "npm run lint"
+      "run": "npm run lint",
+      "always": true
     },
     {
       "name": "The scripts parse",
       "shard": "logic",
       "run": "for f in scripts/*.mjs server/*.js dc.mjs; do node --check \"$f\" || exit 1; done",
+      "always": true,
       "why": [
         "Every script parses (PLAN.md 19b). `tsc` reads only a handful of the",
         "harnesses, so a syntax error in one that only a Mac shard runs used to",
@@ -28,12 +32,27 @@
       "name": "The manifest of checks",
       "shard": "logic",
       "run": "npm run checks",
+      "always": true,
       "why": [
         "This file, the workflow that runs it and the rules that pick a PR's",
         "shards from it (scripts/checks.mjs, PLAN.md 19k): every check's npm",
         "scripts and files exist, checks.yml runs each part and shard from here",
         "and no check beside it, the trace finds every script esbuild finds a",
         "check importing, and each selection rule beside its control."
+      ]
+    },
+    {
+      "name": "The workflows lint",
+      "shard": "logic",
+      "run": "npm run actionlint",
+      "always": true,
+      "why": [
+        "actionlint, a pinned release checked against its published sha256",
+        "(scripts/actionlint.mjs, PLAN.md 19k-3), over .github/workflows. CLAUDE.md",
+        "asked every session that touched a workflow for it, and none could run it:",
+        "nothing in the repository fetched it. A workflow that does not parse, an",
+        "expression on a context that is not there or a `needs` that names no job",
+        "is a deploy that never starts; here it is a red in four minutes."
       ]
     },
     {

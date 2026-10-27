@@ -76,6 +76,7 @@
     "applink": "npm run build && esbuild scripts/applink.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/applink.mjs && node node_modules/.cache/applink.mjs",
     "ios": "npm run build && npx cap sync ios && npx cap open ios",
     "check": "node scripts/quick.mjs --measure",
+    "actionlint": "node scripts/actionlint.mjs",
     "checks": "node scripts/checks.mjs",
     "quick": "node scripts/quick.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:3000",
