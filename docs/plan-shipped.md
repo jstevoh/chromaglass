@@ -3251,12 +3251,12 @@ with that log.
 *The two nits on #504.* `checks.mjs`'s walk detector (which makes a Measure check that walks
 `scripts/` an `always` entry) knew `walk('scripts')` and `walk(join(root, 'scripts'))` only; a
 `walk(\`${ROOT}/scripts\`)` or `readdirSync(ROOT + '/scripts/')` slipped past, so it now takes any
-argument up to the call's first closing bracket with `scripts` between quotes or slashes, and the
+text after the call's open bracket on the same statement with `scripts` between quotes or slashes (nested brackets such as `join(process.cwd(), 'scripts')` too; a path built in a variable first is still not seen), and the
 selftest holds both new spellings and a `walk(join(root, 'src'))` followed by another walk, which
 must not borrow the later one. `deploygate.sh`'s `measurepartial` ran `jq | grep | head || true`
 over the reach job's annotations, so a body that was not JSON (a 502 page, a cut read) or was an
 error object (`{"message":"rate limited"}`) gave an empty answer, which reads as "ran in full";
-it now parses first and answers "partial" for either. Both selftest cases go red on the old
+it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
 function (2 FAIL) and green on the new.
 
 ### 19r. Smaller, for the same pass: the open shard evened
