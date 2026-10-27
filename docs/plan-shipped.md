@@ -5171,6 +5171,56 @@ fringe (`d_eff ≈ 200` nm) shifts down from row 27 (`h = 206.7` nm) at `0°` to
 peak (`d_eff ≈ 320` nm) shifts down from row 71 (`h = 319.9` nm) at `0°` to row 78
 (`h = 353.1` nm) at `30°` to row 84 (`h = 393.2` nm) at `50°`.
 
+### 32c. The GPU solver (this PR, #505)
+
+Built `src/gpu/soapFilm.ts` (`createSoapFilmGpu(device, { nx, ny, dx })` with `write(h)`,
+`step(dt, { g, evap, zeta })`, `read() → { h, uf, vf }` and `destroy()`) and its compute
+shaders in `src/gpu/wgsl/soapFilm.ts` (`soapSetup`, `soapSorRed`, `soapSorBlack`, `soapProject`,
+`soapTransport`), implementing the CPU reference (`src/lib/soapFilm.ts`, `stepSoapFilm`) pass
+for pass on the GPU under the contract in `scripts/soapgpu-cpu.ts`:
+- `soapSetup`: marks cells with `h < 30` nm (`BLACK_THRESHOLD_NM`) as ruptured, reduces the
+  film's mean thickness `hbar` (and mean-centres `p` when warm-started so float32 gauge drift
+  cannot accumulate over thousands of steps), evaluates unprojected vertical Darcy buoyancy
+  `v* = (rho * g / zeta) * (h_face - hbar) * 1e-9` on the interior horizontal faces
+  (`j = 1 .. ny - 1`) with all four walls shut, reduces `maxStar = max |v*|`, and forms the
+  unprojected cell divergence `rhs_ij = vf*[j+1, i] - vf*[j, i]` (or zeroes `uf`, `vf`, `p`
+  and `rhs` when `maxStar <= 1e-18`).
+- `soapSorRed` / `soapSorBlack`: solves `deg_ij * p_ij - sum_neighbours(p) = -rhs_ij` on the
+  staggered MAC grid by red-black SOR with `omega = 2 / (1 + sin(pi / max(nx, ny)))`,
+  warm-started from the previous step's tension `p` (60 sweeps warm, 80 sweeps cold when `g`
+  changes or `write(h)` lays a fresh film).
+- `soapProject`: projects interior MAC face velocities `uf[i, j] = -(p[i, j] - p[i-1, j])`
+  and `vf[i, j] = vf*[i, j] - (p[i, j] - p[i, j-1])` with walls zero, reduces `uMax`, and
+  sets the CFL sub-step count `steps = max(1, ceil(uMax * dt / (0.45 * dx)))`.
+- `soapTransport`: advances `h` through `steps` conservative flux-form sub-steps using
+  second-order upwind reconstruction with the minmod limiter (`sx`, `sy`), computing each
+  shared face flux (`fx`, `fy`) once for both adjacent cells and blocking inflow into ruptured
+  cells when `evap > 0`, followed by uniform evaporation (`evap` nm/s) and exponential
+  relaxation (`BLACK_RELAX_TAU = 0.5` s) of ruptured cells (`< 30` nm) toward Newton black
+  (`8` nm).
+- Constants (`RHO_WATER = 1000`, `DEFAULT_ZETA = 1.5`, `BLACK_THRESHOLD_NM = 30`,
+  `NEWTON_BLACK_NM = 8`, `BLACK_RELAX_TAU = 0.5`) are copied under the same names rather than
+  imported from `src/lib/soapFilm.ts`, so the GPU solver's bundle carries 0 bytes of the CPU
+  reference.
+- Wired `npm run soapgpu` into `scripts/checks.json` on the Mac `plate` shard beside `sloshgpu`,
+  and `npm run soapgpu -- --selftest` into `Measure`'s `lab` shard beside `sloshgpu` (in `lab`
+  rather than `logic` because `scripts/soapgpu.mjs` calls `openLab` to launch Chromium and
+  request a WebGPU adapter even under `--selftest`, and `checks.yml` installs Chromium only on
+  the `browser` and `lab` shards).
+
+Measured: `npm run soapgpu` 29/29 on `apple metal-3` (first-step face flows RMS diff 0.195%
+within 2%, thickness change 1.116% within 5%; 1 s thickness RMS diff 0.065% at `dt = 0.05` s,
+0.022% at `dt = 1/60` s, and 0.884% at `zeta = 0.25, dt = 0.2` s across 4 CFL sub-steps; C1
+thick patch +29.41 vs +29.41 rows, thin patch −22.56 vs −22.55 rows; C4 excess 83%, mass 0.77,
+max `|div u|` 1.8e-4 /s against 1.9e-3 /s, 0.00% of cells outside face fluxes, wall flow 0; C2
+mass drift 7.0e-9, uniform film 0.0e+0 nm; C3 `g = 0` 0.0e+0 nm, half-gravity ratio 0.54,
+reversed −20.86 vs −20.85 rows; C6 quarter means ordered from 30 s, worst quarter mean diff
+0.08%, top 10% black at 115 s vs 115 s, 0 refilled on the drain or on the torn hole, black hole
+spread 160 vs 160 cells; 0 of 4785 steps idle, 0 of 514 reads idle; `src/lib/soapFilm.ts` not in
+bundle; 0 WebGPU errors; `cost: 2.44 ms a step at 256 × 256 on apple metal-3`); `npm run soapgpu
+-- --selftest` 29/29 (`cost: 189.18 ms a step at 256 × 256`); `npm run soapfilm` 23/23; `npm run
+wgsl` 142 shaders; `npm run physics` 20/20; `npm run derive` 4/4.
+
 
 ## 33. Bubbles and the closeup, per liquid
 
