@@ -5599,7 +5599,20 @@ the frame read, never more than the Mac's (scale exactly 1 there); `depth`'s "th
 read the last nine rows of a load timeline that stops at 400 rows (100 s), and after a developed
 opening passed on rows from the page's first minute, so it now reads only while the timeline is
 still being written.
-*Measured, cloud, the same commit:* see the PR (`bubbles` and `depth` before and after).
+*Measured, cloud (`PW_WEBGPU=1`, two harnesses sharing four cores):* `bubbles` 13 of 15 before (the
+still plate 23,338 of 46,375 pixels moved; the three colour lines never ran, gated on the Mac's pixel
+count), 16 of 18 after (the still plate 518 moved, 1.1%; drawn on 435 against a floor of 188); `depth`
+8 of 10 before, 9 of 10 after ("switching it off puts the plate back" 1.221 against 1.220, red before;
+"the show is running" red as the Mac-only line below, where a first run without the timeline's guard
+had passed on stale rows).
+
+*Still red in `bubbles`, open:* "it lets the lamp through rather than painting light on top" found 14
+and then 32 lit pixels (the line needs forty pairs and brighter thick dye) and the bubbles 0 to -4%
+brighter, where the Mac's are brighter: either the hole has not opened in the dye at 54 steps, or a
+bubble a dozen pixels across at `dpr=0.25` is mostly its rim. A `look` render of a developed bubble in
+the lab would say which. And "it is where the bubble was put" read 0.073 off (bar 0.06) on one run,
+passing on the one before: its half-second wait now also waits for two of the plate's steps, since
+the air field is drawn by the frame loop and half a second of software often holds no frame.
 
 *What still differs, and why it is the Mac's:* `depth`'s "the show is running" asks for a step in
 every quarter second of the wall clock, which a software frame loop never makes (the frame-rate

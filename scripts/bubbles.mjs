@@ -654,6 +654,25 @@ try {
     "nowhere near the mirror of where I put it" are two different claims and
     only the pair of them rules out the trap.
   */
+  /*
+    Half a second, and at least two of the plate's steps. The air field is
+    drawn by the frame loop, so a read before a frame has run since the spawn
+    (or the clear) reads a field that does not have it yet. On a Mac half a
+    second is thirty frames and the steps change nothing; in a cloud session a
+    frame is seconds long and half a second often holds none, and the first
+    developed run there read "air at 0.32,0.13 against 0.33,0.20" (0.073 off,
+    the bar 0.06). Five minutes at most, for a plate that has stopped.
+  */
+  await page.evaluate(() => {
+    window.__airSettles = async (ms) => {
+      const steps = () => { const f = window.chromaglassDebug().fluids?.[0]; return f?.stepCount ?? f?.stepIndex; };
+      const s0 = steps(), t0 = performance.now();
+      while (performance.now() - t0 < ms
+        || (typeof s0 === 'number' && steps() - s0 < 2 && performance.now() - t0 < 300_000)) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    };
+  });
   {
     const air = await page.evaluate(async () => {
       const d = window.chromaglassDebug();
@@ -663,7 +682,7 @@ try {
       const bx = Math.round(N * 0.33), by = Math.round(N * 0.20);
       d.bubbles.spawn(bx, by, N * 0.05, 1, 0);
       d.bubbles.bubbles[d.bubbles.bubbles.length - 1].age = 1.0;
-      await new Promise((r) => setTimeout(r, 500));
+      await window.__airSettles(500);
       const field = await d.readAir();
       if (!field) return null;
       const { n, data } = field;
@@ -695,7 +714,7 @@ try {
     const empty = await page.evaluate(async () => {
       const d = window.chromaglassDebug();
       d.bubbles.clear();
-      await new Promise((r) => setTimeout(r, 500));
+      await window.__airSettles(500);
       const field = await d.readAir();
       if (!field) return null;
       let peak = 0;
