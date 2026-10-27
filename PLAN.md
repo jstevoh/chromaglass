@@ -9099,46 +9099,54 @@ button, making it look good. Every item here is held to those.
   heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
   bubbles while it is held and calming when released. Not a bubble sprite.
   - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the
-    reference the GPU build is held to, and `npm run boil` (37 lines, node only, about 40 s)
+    reference the GPU build is held to, and `npm run boil` (38 lines, node only, about 45 s)
     is its judge, the way 32a's soap film came before 32c. The roadmap's blocker for S2 ("heat
     has no strength, every source saturates the buoyancy tanh") no longer holds: #352 took
     the tanh out. What the GPU still lacks is heat in kelvin and watts (its `vel.z` has no
     unit, and `currentForces` still caps it at `clamp(temp, 0, 50)` and the current at
     `maxCurrent`), a dish whose glass and liquid set how fast it warms, and any boiling. The
-    model, per square metre in SI units: the lamp's infrared hot spot times the Heat dial
-    (how much of the heat filter is out), absorbed by water's depth and the dye's absorbance;
-    one temperature through the liquid and both glasses (Biot about 0.1), conducting
-    sideways, cooled by the fan's air at h = 50 W/m²K or by natural convection at 10 under a
-    hand that blocks it (the Danish crew's stroke), held at the room's at the open rim; a
+    model, per square metre in SI units: the lamp's hot spot times the Heat dial (how much
+    of the heat filter is out) in two bands, the visible share the dye absorbs and the
+    infrared the water absorbs through its depth; one temperature through the liquid and
+    both glasses (Biot about 0.1), conducting sideways, cooled by the fan's air at h = 50
+    W/m²K or by natural convection at 10 under a hand that blocks it (the Danish crew's
+    stroke), and by the glass faces' radiation (about 15 W/m²K at 100 °C), held at the
+    room's at the open rim, the liquid carrying its own share of the heat when it flows; a
     Hele-Shaw flow driven by water's real density (Kell) and viscosity (Vogel), with
     buoyancy only in the plate's plane (zero on a level plate, as 18f gates it), and volume
-    sources for warming water's expansion and for vapour; and boiling with a per-site
-    nucleation superheat from each cavity (Hsu, 2σT_sat/(ρ_v·L·r), 4 to 12 K), a nucleus as
-    wide as the gap, then heat exchanged at the bubble's rim both ways, so held heat boils
-    and let-go heat condenses. *Measured* (`npm run boil`): the first step's warming matches
-    lamp × absorbed fraction ÷ heat capacity to 1e-6 and the dial is linear; Newton's
-    cooling at both h to 0.5%; a warm bump spreads as the heat equation within 0.6%, and
-    the dish's hottest point after five minutes of lamp is a radial heat balance's within
-    0.1% of the rise; a 70 °C patch on an upright plate rises at the exact Darcy inclusion
-    speed within 1.6% (40 °C within 0.6%; the two 4.11× apart against an exact 4.07×: a
-    constant expansion slope gives 3.0×, a saturated tanh 1.2×), and on a level plate does
-    not move; what leaves the rim over five minutes of warming is the water's growth by
-    Kell within 0.8%; the sites' superheats are Hsu's for the stated cavities (median,
-    log spread and share of cells); at 98% of each site's superheat nothing boils and at
-    102% every site does; a bubble's rim boils and condenses at its stated exchange to
-    1e-3; a dish the lamp and fan warm to 88 °C never boils in five minutes, boils 45 s
-    after a hand blocks the air off the lamp's centre, only under the hand, held under
-    104.1 °C there (100 plus the widest site's 15 K is the bar), and the vapour is under 1%
-    of its peak 0.8 s after the hand lifts (0.4 s after the dial goes to 0; the flow under
-    2% of its 18 mm/s peak in 1.2 s). Seventeen look-alikes each fail at least one line
-    (each the reference with one thing changed, `scratch/` in the build session; four of
-    them from the check-skeptic's pass, which three passed before its lines were added):
-    the old saturated buoyancy 2, a constant expansion slope 3, a constant viscosity 3,
-    buoyancy on a level plate 15, no nucleation threshold 2, a bubble on a timer 6, no
-    condensation 3, no latent heat 5, no vapour volume 4, no expansion 2, a uniform lamp 3,
-    the dye ignored 2, a hand that adds heat instead of blocking the air 6, no sideways
-    conduction 3, every cavity the median one 1, a bubble rim a fifth as strong 2, vapour
-    that absorbs the lamp as liquid would 4.
+    sources for warming water's expansion and for vapour; and boiling from sites at a
+    density on the glass, each cell starting at its largest cavity's equilibrium-nucleus
+    superheat (2σT_sat/(ρ_v·L·r), 4 to 12 K), a nucleus as wide as the gap, then heat
+    exchanged at the bubble's rim both ways, so held heat boils and let-go heat condenses.
+    *Measured* (`npm run boil`): the first step's warming matches the two bands ÷ heat
+    capacity to 1.5e-8 and the dial is linear (dark dye at absorbance 1.5 warms 1.41× clear
+    water); cooling by air and radiation at both h to 0.5%; a warm bump spreads as the heat
+    equation within 0.6%, and the dish's hottest point after five minutes of lamp is a
+    radial heat balance's (with radiation) to 0.01 K; a 70 °C patch on an upright plate rises
+    at the exact Darcy inclusion speed within 1.6% (40 °C within 0.6%; the two 4.11× apart
+    against an exact 4.07×), and on a level plate does not move; what leaves the rim over
+    five minutes of warming is the water's growth by Kell within 0.5%; the dish's heat
+    over each boil and its calm is a ledger of the lamp, the air, the radiation and the rim
+    within 0.4% and 1.0% of the lamp's heat; the sites' share is the density's and their
+    superheats the nucleus's over the whole distribution (KS 0.027 against 0.056); at 98%
+    of each site's superheat nothing boils and at 102% every site does; a bubble's rim
+    boils and condenses at its stated exchange to 1e-3; a dish the lamp and fan warm to
+    93.8 °C never boils in five minutes, boils 28 s after a hand blocks the air off the
+    lamp's centre, only under the hand, held under 103 °C there, and the vapour is under 1%
+    of its peak 0.6 s after the hand lifts (0.3 s after the dial goes to 0 on a hotter
+    lamp). Twenty-two look-alikes (each the reference with one thing changed, `scratch/` in
+    the build session; four from the check-skeptic's pass and five from the review's) each
+    fail at least one line but one: the old saturated buoyancy 2, a constant expansion
+    slope 3, a constant viscosity 3, buoyancy on a level plate 14, no nucleation threshold
+    2, a bubble on a timer 6, no condensation 4, no latent heat 6, no vapour volume 3, no
+    expansion 2, a uniform lamp 4, the dye ignored 2, a hand that adds heat instead of
+    blocking the air 6, no sideways conduction 3, every cavity the median one 1, a bubble
+    rim a fifth as strong 2, vapour absorbing as liquid 4, no radiation 9, the dye taking
+    the infrared at its visible absorbance 6, the glass flowing with the liquid 1, heat
+    carried in conservative form 7. The one that passes throws away the heat of a cell that
+    has boiled dry: here a dried cell takes no lamp (its liquid and dye are gone, and the
+    glass absorbs none, 36e-4), so that branch carries almost nothing (the ledger reads
+    the same within 0.03%); it waits on the glass's own absorption.
   - **36e-2. The GPU build** (*open*, Antigravity's brief in the project's shared files).
     The model as passes on the plate's grid: the temperature in kelvin, the lamp in watts,
     the Heat dial, the hand's held air, the threshold and the vapour as a field the bubbles'
@@ -9157,10 +9165,14 @@ button, making it look good. Every item here is held to those.
   - **36e-4. The shortcuts the model names** (*open*): the gap's vertical cells (Rayleigh–
     Bénard past Ra ≈ 1708, the Hadley shear on a level plate) and the Marangoni stress from
     hot to cold, neither in the depth average (with 18f-2); the bubble's heat taken only at
-    its rim, not through the microlayer under it against the glass; T_sat fixed at 100 °C (no
-    Laplace pressure, no dissolved air); one broadband infrared coefficient; a nucleus born
-    whole in one step; and an upright dish warmer than its reservoir turns over through the
-    open rim (a slide is closed at its edges; S1 wants a closed rim).
+    its rim, not through the microlayer under it against the glass, and that rim as one
+    bubble per cell (its area 2√(πα)·d/dx, so the boil's pace depends on the grid: the
+    review measured n = 96 against 48 before the sites became a density, and 36e-2 must
+    measure it again at the plate's grid); the glass absorbing none of the lamp (a dried
+    spot should still heat, past 2.7 µm); T_sat fixed at 100 °C (no Laplace pressure, no
+    dissolved air); one broadband infrared coefficient and one visible share; a nucleus
+    born whole in one step; and an upright dish warmer than its reservoir turns over
+    through the open rim (a slide is closed at its edges; S1 wants a closed rim).
 - **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
   her there to smooth transitions things would come to a halt, visually" (Heavy Light);
   Glenn McKay's crew described it as "painting with three or four hands". Build the guest

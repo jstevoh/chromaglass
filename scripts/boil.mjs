@@ -19,19 +19,20 @@
  *
  *   H1  The lamp heats where it is hottest. The first microsecond's warming of
  *       every cell is the lamp's Gaussian hot spot (moved off the grid's centre)
- *       times the absorbed fraction 1 − exp(−(κ_IR·d + A_dye)), over the heat
- *       capacity of the liquid and both glasses, to 1e-6 of the hottest cell's;
- *       the hottest cell of a clear dish is the lamp's centre; a dye patch of
- *       absorbance 1.5 warms faster than clear water under the same light by
- *       the ratio of their absorbed fractions.
+ *       times what it absorbs in two bands, f_vis·(1 − e^(−A_dye)) of the
+ *       visible the dye takes and (1 − f_vis)·(1 − e^(−κ_IR·d)) of the infrared
+ *       the water takes, over the heat capacity of the liquid and both glasses,
+ *       to 1e-6 of the hottest cell's; the hottest cell of a clear dish is the
+ *       lamp's centre; a dye patch of absorbance 1.5 warms faster than clear
+ *       water under the same light by the ratio of what each absorbs (1.41).
  *   H2  Heat has a strength (S2's blocker). The Heat dial at 0.5 warms by half
  *       what it does at 1, and at 0 the dish does not warm at all and not one
  *       face moves.
  *   H3  The air cools it, a hand that blocks the air keeps it hot, and the heat
- *       spreads sideways. A uniformly warm dish with the lamp off cools as
- *       Newton's law with the fan's h over the dish's heat capacity (within
- *       0.5% at the middle over 10 s), and under a held hand as natural
- *       convection's h; a Gaussian warm bump with no air keeps its heat and its
+ *       spreads sideways. A uniformly warm dish with the lamp off cools by the
+ *       fan's h and the glass faces' radiation 2εσ(T⁴ − Ta⁴) over the dish's
+ *       heat capacity (integrated here, within 0.5% at the middle over 10 s),
+ *       and under a held hand by natural convection's h and the radiation; a Gaussian warm bump with no air keeps its heat and its
  *       peak falls as σ0²/(σ0² + 2Dt), D the water's and glasses' conduction
  *       over their heat capacity (within 3% over 40 s).
  *   H4  Warm liquid has no "up" on a level plate, and rises on an upright one
@@ -47,12 +48,18 @@
  *   H5  Volume is accounted. Every cell's face flows add up to the volume
  *       source the step asked for (warming water's expansion and boiling's
  *       vapour), to 1e-6 of the largest source, on every step of the boils;
- *       and over five minutes of warming, what flows out of the rim is the
- *       volume Kell's density says the dish's water grew by, within 2%.
- *   H6  A bubble needs its superheat. Every site's superheat is Hsu's
- *       2σT_sat/(ρ_v·L·r) for a cavity drawn from the stated log-normal (the
- *       median within 10%, the log spread within 10%, the share of cells with
- *       a site within three binomial σ); a dish held at 98% of each site's
+ *       over five minutes of warming, what flows out of the rim is the volume
+ *       Kell's density says the dish's water grew by, within 2%; and the
+ *       dish's heat (sensible in liquid and glass, latent in its steam) over
+ *       each boil and its calm changes by what the lamp gave less what the air,
+ *       the radiation, the rim's conduction and the rim's outflow took, each
+ *       written here, within 3% of what the lamp gave.
+ *   H6  A bubble needs its superheat. Sites are a density on the glass: the
+ *       share of cells with one is 1 − e^(−density·dx²) within three binomial
+ *       σ, and the cells' superheats are the equilibrium nucleus's
+ *       2σT_sat/(ρ_v·L·r) for the largest of a Poisson count of cavities from
+ *       the stated log-normal, held over the whole distribution (a
+ *       Kolmogorov–Smirnov distance under the 1% level); a dish held at 98% of each site's
  *       superheat makes no bubble, at 102% every site and no other cell makes
  *       one, and a cell with no site does not boil at 130 °C.
  *   H7  The fan alone keeps the dish under the boil. On a dish where the lamp
@@ -130,6 +137,7 @@ const { createBoilPlate, stepBoilPlate } = M;
 const kell = (t) => (999.83952 + 16.945176 * t - 7.9870401e-3 * t * t - 46.170461e-6 * t ** 3
   + 105.56302e-9 * t ** 4 - 280.54253e-12 * t ** 5) / (1 + 16.879850e-3 * t);
 const vogel = (t) => 2.414e-5 * 10 ** (247.8 / (t + 273.15 - 140));
+// The equilibrium nucleus: Clausius–Clapeyron with its Laplace pressure (Carey, ch. 6).
 const hsu = (r) => (2 * 0.0589 * 373.15) / (0.598 * 2.257e6 * r);
 const RHO_C = 4.18e6, RHO_C_GLASS = 2500 * 840;
 
@@ -143,7 +151,10 @@ const run = (P, seconds, ctl, dt = 0.1, each) => {
 // ── H1, H2: the lamp ─────────────────────────────────────────────────────
 {
   const opts = { n: 48, gap: 0.5e-3, glass: 1e-3, lampIrradiance: 20000, lampWidth: 0.015,
-    lampCentre: [0.012, -0.006], kappaIR: 600, hForced: 50 };
+    lampCentre: [0.012, -0.006], kappaIR: 600, visibleFraction: 0.12, hForced: 50 };
+  // Two bands: the visible share the dye absorbs and water passes, the infrared rest the
+  // water absorbs through its depth and the dye passes.
+  const absorbs = (A) => 0.12 * (1 - Math.exp(-A)) + 0.88 * (1 - Math.exp(-600 * opts.gap));
   const mk = () => {
     const P = createBoilPlate(opts);
     for (let k = 0; k < P.n * P.n; k++) {
@@ -160,7 +171,7 @@ const run = (P, seconds, ctl, dt = 0.1, each) => {
   const expect = (P, k, heat) => {
     const [x, y] = cellXY(P, k);
     const I = opts.lampIrradiance * Math.exp(-((x - opts.lampCentre[0]) ** 2 + (y - opts.lampCentre[1]) ** 2) / (2 * opts.lampWidth ** 2));
-    const a = 1 - Math.exp(-(opts.kappaIR * opts.gap + P.dye[k]));
+    const a = absorbs(P.dye[k]);
     return (dt * heat * I * a) / C;
   };
   const P1 = mk(); stepBoilPlate(P1, dt, { heat: 1 });
@@ -190,7 +201,7 @@ const run = (P, seconds, ctl, dt = 0.1, each) => {
     if (P1.dye[k] > 0 && Math.hypot(x + 0.02, y - 0.01) < P1.dx) kd = k;
   }
   const ratio = (P1.T[kd] - 20) / (Pc.T[kd] - 20);
-  const want = (1 - Math.exp(-(600 * opts.gap + 1.5))) / (1 - Math.exp(-(600 * opts.gap)));
+  const want = absorbs(1.5) / absorbs(0);
   check('H1 dark dye warms faster than clear water in the same light, by the ratio of what each absorbs', Math.abs(ratio / want - 1) < 1e-6, `${ratio.toFixed(4)}×, Beer–Lambert ${want.toFixed(4)}×`);
   check('H2 the Heat dial at 0.5 warms by half of what it does at 1', worstHalf < 1e-6, `worst ${worstHalf.toExponential(2)} off half (bar 1e-6)`);
   check('H2 at 0 the dish does not warm and nothing moves', still < 1e-12 && fastest(P0) === 0, `${still.toExponential(2)} K, fastest face ${fastest(P0)} m/s`);
@@ -206,15 +217,22 @@ const run = (P, seconds, ctl, dt = 0.1, each) => {
   run(P, 10, { heat: 0, holds: [hold] });
   const pick = (x, y) => Math.floor((y + P.width / 2) / P.dx) * P.n + Math.floor((x + P.width / 2) / P.dx);
   const fan = P.T[pick(-0.015, 0)] - 20, held = P.T[pick(0.015, 0)] - 20;
-  const wantFan = 40 * Math.exp((-opts.hForced * 10) / C), wantHeld = 40 * Math.exp((-opts.hNatural * 10) / C);
-  check('H3 with the lamp off a warm dish cools by Newton\'s law at the fan\'s h', Math.abs(fan / wantFan - 1) < 0.005, `${fan.toFixed(3)} K over the room, Newton ${wantFan.toFixed(3)}`);
-  check('H3 under a held hand it cools at natural convection\'s h', Math.abs(held / wantHeld - 1) < 0.005, `${held.toFixed(3)} K, Newton ${wantHeld.toFixed(3)}`);
+  // Newton's air and the glass faces' radiation, 2εσ(T⁴ − Ta⁴), integrated here (RK4).
+  const cool = (h) => {
+    const f = (T) => -(h * (T - 20) + 2 * 0.9 * 5.670374e-8 * ((T + 273.15) ** 4 - 293.15 ** 4)) / C;
+    let T = 60;
+    for (let i = 0; i < 1000; i++) { const d = 0.01, k1 = f(T), k2 = f(T + d * k1 / 2), k3 = f(T + d * k2 / 2), k4 = f(T + d * k3); T += (d / 6) * (k1 + 2 * k2 + 2 * k3 + k4); }
+    return T - 20;
+  };
+  const wantFan = cool(opts.hForced), wantHeld = cool(opts.hNatural);
+  check('H3 with the lamp off a warm dish cools by the fan\'s h and the glass\'s radiation', Math.abs(fan / wantFan - 1) < 0.005, `${fan.toFixed(3)} K over the room, integrated ${wantFan.toFixed(3)}`);
+  check('H3 under a held hand it cools by natural convection\'s h and the radiation', Math.abs(held / wantHeld - 1) < 0.005, `${held.toFixed(3)} K, integrated ${wantHeld.toFixed(3)}`);
 }
 {
   // H3: heat spreads sideways through the water and both glasses. A Gaussian warm bump
   // with no air and no lamp keeps its heat and spreads as the heat equation says: its
   // peak falls as σ0²/(σ0² + 2Dt), D = (k_w·d + k_g·t)/(ρc_w·d + ρc_g·t).
-  const opts = { n: 48, gap: 0.5e-3, glass: 1e-3, hForced: 0, hNatural: 0 };
+  const opts = { n: 48, gap: 0.5e-3, glass: 1e-3, hForced: 0, hNatural: 0, emissivity: 0 };
   const P = createBoilPlate(opts);
   const s0 = 3 * P.dx;
   const c = (P.n / 2) * P.n + P.n / 2;
@@ -254,7 +272,7 @@ const run = (P, seconds, ctl, dt = 0.1, each) => {
   const e40 = exact(40), e70 = exact(70);
   check('H4 a 40 °C patch on an upright plate rises at the exact inclusion speed', Math.abs(u40 / e40 - 1) < 0.05, `${(u40 * 1000).toFixed(3)} mm/s, exact ${(e40 * 1000).toFixed(3)}`);
   check('H4 a 70 °C patch rises at the exact inclusion speed', Math.abs(u70 / e70 - 1) < 0.05, `${(u70 * 1000).toFixed(3)} mm/s, exact ${(e70 * 1000).toFixed(3)}`);
-  check('H4 heat has a strength: 70 °C over 40 °C by water\'s real density and viscosity', Math.abs((u70 / u40) / (e70 / e40) - 1) < 0.03, `${(u70 / u40).toFixed(3)}×, exact ${(e70 / e40).toFixed(3)}× (a constant slope gives 2.5×, a saturated one 1×)`);
+  check('H4 heat has a strength: 70 °C over 40 °C by water\'s real density and viscosity', Math.abs((u70 / u40) / (e70 / e40) - 1) < 0.03, `${(u70 / u40).toFixed(3)}×, exact ${(e70 / e40).toFixed(3)}× (as look-alikes a constant expansion slope gave 3.0×, a saturated tanh 1.2×)`);
   const L = patch(70), U = patch(70);
   const [x0, y0] = centroid(L);
   run(L, 5, { heat: 0, tilt: 0 }, 0.05);
@@ -267,27 +285,33 @@ const run = (P, seconds, ctl, dt = 0.1, each) => {
 
 // ── H6: the threshold ───────────────────────────────────────────────────
 {
-  const rc = 5e-6;
+  const rc = 5e-6, density = 2e5;
   const mk = (frac) => {
-    const P = createBoilPlate({ n: 48, cavityRadius: rc, cavitySpread: 0.3, siteFraction: 0.3, hForced: 0, hNatural: 0, seed: 7 });
+    const P = createBoilPlate({ n: 48, cavityRadius: rc, cavitySpread: 0.3, siteDensity: density, hForced: 0, hNatural: 0, emissivity: 0, seed: 7 });
     for (let k = 0; k < P.n * P.n; k++) if (P.inside[k]) P.T[k] = Number.isFinite(P.dTnuc[k]) ? 100 + frac * P.dTnuc[k] : 130;
     return P;
   };
   const P = mk(1);
   const sup = [];
-  for (let k = 0; k < P.n * P.n; k++) if (Number.isFinite(P.dTnuc[k])) sup.push(P.dTnuc[k]);
-  sup.sort((x, y) => x - y);
-  const med = sup[sup.length >> 1];
   let cells = 0;
-  for (let k = 0; k < P.n * P.n; k++) cells += P.inside[k];
-  const lns = sup.map(Math.log), mln = lns.reduce((a, b) => a + b, 0) / lns.length;
-  const sdln = Math.sqrt(lns.reduce((a, b) => a + (b - mln) ** 2, 0) / (lns.length - 1));
-  const frac = sup.length / cells, fracSd = Math.sqrt((0.3 * 0.7) / cells);
-  check('H6 each site\'s superheat is Hsu\'s for its cavity: the median at the median cavity', Math.abs(med / hsu(rc) - 1) < 0.1, `${sup.length} sites, median ${med.toFixed(2)} K, Hsu at ${rc * 1e6} µm ${hsu(rc).toFixed(2)} K`);
-  // ln ΔT = const − ln r, so the superheats' log spread is the cavities' (a sample of
-  // ~450: its standard error about 3.4%).
-  check('H6 the sites\' superheats spread as the cavities do: the log spread is the stated one', Math.abs(sdln / 0.3 - 1) < 0.1, `σ(ln ΔT) ${sdln.toFixed(3)}, cavities' 0.3`);
-  check('H6 the share of cells with a site is the stated one, within three binomial σ', Math.abs(frac - 0.3) < 3 * fracSd, `${sup.length} of ${cells} cells, ${frac.toFixed(3)} (0.3 ± ${(3 * fracSd).toFixed(3)})`);
+  for (let k = 0; k < P.n * P.n; k++) { cells += P.inside[k]; if (Number.isFinite(P.dTnuc[k])) sup.push(P.dTnuc[k]); }
+  sup.sort((x, y) => x - y);
+  // Sites are a density on the glass: a cell of area dx² holds a Poisson count of mean
+  // λ = density·dx², and starts at its largest cavity. So the share of cells with a site
+  // is 1 − e^(−λ), and a site cell's superheat ΔT = A/r_max has, with F the cavities'
+  // log-normal CDF, P(ΔT ≤ y) = 1 − (e^(−λ(1 − F(A/y))) − e^(−λ)) / (1 − e^(−λ)).
+  // The whole distribution is held by a Kolmogorov–Smirnov distance, at the 1% level.
+  const lambda = density * P.dx * P.dx;
+  const erf = (x) => { const t = 1 / (1 + 0.3275911 * Math.abs(x)); const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; };
+  const F = (r) => 0.5 * (1 + erf(Math.log(r / rc) / (0.3 * Math.SQRT2)));
+  const A = hsu(1);
+  const cdf = (y) => 1 - (Math.exp(-lambda * (1 - F(A / y))) - Math.exp(-lambda)) / (1 - Math.exp(-lambda));
+  let ks = 0;
+  sup.forEach((y, i) => { const c = cdf(y); ks = Math.max(ks, Math.abs(c - i / sup.length), Math.abs(c - (i + 1) / sup.length)); });
+  const ksBar = 1.63 / Math.sqrt(sup.length);
+  const share = sup.length / cells, want = 1 - Math.exp(-lambda), sd = Math.sqrt(want * (1 - want) / cells);
+  check('H6 each site\'s superheat is the equilibrium nucleus\'s for its largest cavity, over the whole distribution', sup.length > 0 && ks < ksBar, `KS distance ${ks.toFixed(4)} over ${sup.length} sites (bar ${ksBar.toFixed(4)}, the 1% level); median ${sup[sup.length >> 1].toFixed(2)} K`);
+  check('H6 the share of cells with a site is the density\'s, within three binomial σ', Math.abs(share - want) < 3 * sd, `${sup.length} of ${cells} cells, ${share.toFixed(3)} (${want.toFixed(3)} ± ${(3 * sd).toFixed(3)})`);
   const under = mk(0.98); stepBoilPlate(under, 1e-4, {});
   const over = mk(1.02); stepBoilPlate(over, 1e-4, {});
   const born = new Set(over.nucleations.map((e) => e.cell));
@@ -328,8 +352,53 @@ const run = (P, seconds, ctl, dt = 0.1, each) => {
 }
 
 // ── H5, H7, H8, H9, H11: the dish the hand boils ────────────────────────
-const DISH = { n: 48, gap: 0.5e-3, glass: 1e-3, lampIrradiance: 15000, lampWidth: 0.02,
-  hForced: 50, hNatural: 10, cavityRadius: 5e-6, cavitySpread: 0.3, siteFraction: 0.3, interfaceH: 1e4, seed: 3 };
+const DISH = { n: 48, gap: 0.5e-3, glass: 1e-3, lampIrradiance: 22000, lampWidth: 0.03,
+  hForced: 50, hNatural: 10, cavityRadius: 5e-6, cavitySpread: 0.3, siteDensity: 7e4, interfaceH: 1e4, seed: 3 };
+// H5: the dish's heat, kept as a ledger beside the reference. Its heat is the liquid's
+// and the glasses' over the room plus the latent heat in its steam; it gains the lamp's
+// two bands and loses to the air, to radiation, by conduction into the rim and by what the
+// flow carries out of the rim (the liquid's heat and the steam's latent heat). Each term is
+// written here from the options and the fields between steps, so a reference that loses
+// or makes heat anywhere (a dry-out branch that throws its heat away) goes red.
+const LATENT_V = 0.598 * 2.257e6;
+const dishEnergy = (P, o) => {
+  let E = 0;
+  for (let k = 0; k < P.n * P.n; k++) {
+    if (!P.inside[k]) continue;
+    const a = P.alpha[k], C = (1 - a) * RHO_C * o.gap + RHO_C_GLASS * o.glass;
+    E += (C * (P.T[k] - 20) + a * LATENT_V * o.gap) * P.dx * P.dx;
+  }
+  return E;
+};
+const ledger = (P, o, ctl, dt) => {
+  const L = { gained: 0, lost: 0 };
+  let T0 = Float64Array.from(P.T), A0 = Float64Array.from(P.alpha);
+  const n = P.n, dx = P.dx, sb = 2 * 0.9 * 5.670374e-8;
+  L.each = (Q) => {
+    for (let k = 0; k < n * n; k++) {
+      if (!Q.inside[k]) continue;
+      const [x, y] = cellXY(Q, k);
+      const a = A0[k], Tm = 0.5 * (T0[k] + Q.T[k]);
+      const I = o.lampIrradiance * Math.exp(-(x * x + y * y) / (2 * o.lampWidth ** 2)) * (ctl.heat ?? 0);
+      L.gained += I * 0.88 * (1 - Math.exp(-600 * o.gap * (1 - a))) * dx * dx * dt;
+      const held = (ctl.holds ?? []).some((hd) => Math.hypot(x - hd.x, y - hd.y) < hd.r);
+      const air = (held ? o.hNatural : o.hForced) * (Tm - 20);
+      const rad = sb * 0.5 * ((T0[k] + 273.15) ** 4 + (Q.T[k] + 273.15) ** 4 - 2 * 293.15 ** 4);
+      L.lost += (air + rad) * dx * dx * dt;
+      const i = k % n, j = (k / n) | 0;
+      const Kk = 0.6 * o.gap * (1 - a) + 1.0 * o.glass, K0 = 0.6 * o.gap + 1.0 * o.glass;
+      const faces = [[i + 1, j, Q.u[j * (n + 1) + i + 1]], [i - 1, j, -Q.u[j * (n + 1) + i]], [i, j + 1, Q.v[(j + 1) * n + i]], [i, j - 1, -Q.v[j * n + i]]];
+      for (const [ii, jj, w] of faces) {
+        if (Q.inside[jj * n + ii]) continue;
+        L.lost += (2 * Kk * K0 / (Kk + K0)) * (T0[k] - 20) * dt;
+        if (w > 0) L.lost += w * dx * o.gap * (RHO_C * (1 - a) * (Tm - 20) + a * LATENT_V) * dt;
+      }
+    }
+    T0 = Float64Array.from(Q.T); A0 = Float64Array.from(Q.alpha);
+  };
+  return L;
+};
+
 // The hand off the lamp's centre, so that "under the hand" is not "at the hot spot".
 const HAND = { x: 0.015, y: 0, r: 0.012 };
 let divWorst = 0, divSteps = 0;
@@ -367,12 +436,12 @@ const divergence = (P) => {
   check('H7 the lamp at full with the fan blowing warms the dish for five minutes and never boils it', P.nucleations.length === 0 && tmax < 100, `${P.nucleations.length} bubbles, hottest ${tmax.toFixed(2)} °C`);
   check('H5 warming water pushes out of the rim the volume its density says it grew by', Math.abs(pushed / grew - 1) < 0.02, `${(pushed * 1e6).toFixed(3)} against ${(grew * 1e6).toFixed(3)} mm² per unit depth (bar 2%)`);
   // The same five minutes as a radial problem, written here: C ∂T/∂t = (1/r)∂r(K r ∂r T)
-  // − h(T − 20) + q(r), held at 20 °C at the rim, by finite volumes on 300 rings. The
+  // − h(T − 20) − 2εσ(T⁴ − Ta⁴) + q(r), held at 20 °C at the rim, by finite volumes on 300 rings. The
   // grid's hottest cells sit dx/√2 from the lamp's centre (a corner of four cells).
   {
     const R0 = 0.45 * 0.1, N = 300, dr = R0 / N;
     const K = 0.6 * DISH.gap + 1.0 * DISH.glass, C = RHO_C * DISH.gap + RHO_C_GLASS * DISH.glass;
-    const a = 1 - Math.exp(-600 * DISH.gap);
+    const a = 0.88 * (1 - Math.exp(-600 * DISH.gap));
     const T = new Float64Array(N).fill(20), q = new Float64Array(N);
     for (let i = 0; i < N; i++) { const r = (i + 0.5) * dr; q[i] = DISH.lampIrradiance * a * Math.exp(-(r * r) / (2 * DISH.lampWidth ** 2)); }
     const ddt = 0.2 * dr * dr * C / K;
@@ -381,7 +450,7 @@ const divergence = (P) => {
     for (let s = 0; s < steps; s++) {
       for (let i = 1; i < N; i++) F[i] = K * i * dr * (T[i] - T[i - 1]) / dr;
       F[N] = K * R0 * (20 - T[N - 1]) / (dr / 2);
-      for (let i = 0; i < N; i++) T[i] += (h / C) * ((F[i + 1] - F[i]) / ((i + 0.5) * dr * dr) - DISH.hForced * (T[i] - 20) + q[i]);
+      for (let i = 0; i < N; i++) T[i] += (h / C) * ((F[i + 1] - F[i]) / ((i + 0.5) * dr * dr) - DISH.hForced * (T[i] - 20) - 2 * 0.9 * 5.670374e-8 * ((T[i] + 273.15) ** 4 - 293.15 ** 4) + q[i]);
     }
     const rr = (P.dx / Math.SQRT2) / dr - 0.5, i0 = Math.floor(rr), fr = rr - i0;
     const want = T[i0] * (1 - fr) + T[i0 + 1] * fr;
@@ -391,10 +460,13 @@ const divergence = (P) => {
 
   // Hold the hand over the dish, off the lamp's centre.
   const t0 = P.time;
+  const ctl = { heat: 1, holds: [HAND] };
+  const E0 = dishEnergy(P, DISH), book = ledger(P, DISH, ctl, 0.1);
   let first = -1, peakV = 0, peakU = 0, hotLiquid = 0, overSite = -Infinity;
   const siteMax = Math.max(...Array.from(P.dTnuc).filter(Number.isFinite));
-  run(P, 60, { heat: 1, holds: [HAND] }, 0.1, (Q) => {
+  run(P, 60, ctl, 0.1, (Q) => {
     divergence(Q);
+    book.each(Q);
     if (first < 0 && Q.nucleations.length) { first = Q.time; }
     if (first >= 0) {
       peakV = Math.max(peakV, vapour(Q)); peakU = Math.max(peakU, fastest(Q));
@@ -419,13 +491,17 @@ const divergence = (P) => {
   // Lift the hand.
   const lift = P.time, starts = P.nucleations.length;
   let calmV = -1, calmU = -1;
-  run(P, 30, { heat: 1 }, 0.1, (Q) => {
+  ctl.holds = [];
+  run(P, 30, ctl, 0.1, (Q) => {
     divergence(Q);
+    book.each(Q);
     if (calmV < 0 && vapour(Q) < 0.01 * peakV) calmV = Q.time - lift;
     if (calmU < 0 && fastest(Q) < 0.02 * peakU) calmU = Q.time - lift;
   });
   check('H9 lift the hand and within 5 s the vapour is under 1% of its peak', calmV >= 0 && calmV <= 5, calmV >= 0 ? `${calmV.toFixed(1)} s` : 'never');
   check('H9 within 10 s the flow is under 2% of the boil\'s', calmU >= 0 && calmU <= 10, calmU >= 0 ? `${calmU.toFixed(1)} s (peak ${(peakU * 1000).toFixed(2)} mm/s)` : 'never');
+  const dE = dishEnergy(P, DISH) - E0, wantE = book.gained - book.lost;
+  check('H5 the dish\'s heat over the boil and the calm is what the lamp gave less what left it', Math.abs(dE - wantE) < 0.03 * book.gained, `changed ${dE.toFixed(1)} J, the ledger ${wantE.toFixed(1)} J of ${book.gained.toFixed(1)} J the lamp gave (bar 3% of that)`);
   check('H9 and no bubble starts again while the hand is off', P.nucleations.length === starts, `${P.nucleations.length - starts} started`);
 }
 {
@@ -447,15 +523,26 @@ const divergence = (P) => {
 }
 {
   // H10: the dial on a hotter lamp.
-  const P = createBoilPlate({ ...DISH, lampIrradiance: 30000 });
+  const P = createBoilPlate({ ...DISH, lampIrradiance: 40000 });
   run(P, 120, { heat: 0.5 }, 0.1);
   const half = P.nucleations.length;
   const t0 = P.time;
-  let first = -1, peak = 0;
-  run(P, 60, { heat: 1 }, 0.1, (Q) => { divergence(Q); if (first < 0 && Q.nucleations.length) first = Q.time - t0; peak = Math.max(peak, vapour(Q)); });
+  let first = -1, peak = 0, dry = 0;
+  const ctl = { heat: 1 }, o = { ...DISH, lampIrradiance: 40000 };
+  const E0 = dishEnergy(P, o), book = ledger(P, o, ctl, 0.1);
+  run(P, 60, ctl, 0.1, (Q) => {
+    divergence(Q); book.each(Q);
+    if (first < 0 && Q.nucleations.length) first = Q.time - t0;
+    peak = Math.max(peak, vapour(Q));
+    for (let k = 0; k < Q.n * Q.n; k++) if (Q.alpha[k] >= 0.9) dry++;
+  });
   const off = P.time;
   let calm = -1;
-  run(P, 10, { heat: 0 }, 0.1, (Q) => { if (calm < 0 && vapour(Q) < 0.01 * peak) calm = Q.time - off; });
+  ctl.heat = 0;
+  run(P, 10, ctl, 0.1, (Q) => { book.each(Q); if (calm < 0 && vapour(Q) < 0.01 * peak) calm = Q.time - off; });
+  const dE = dishEnergy(P, o) - E0, wantE = book.gained - book.lost;
+  // This boil dries cells out (no liquid left under the lamp): the ledger holds that branch too.
+  check('H5 the hotter boil\'s heat, through its dry-out, is what the lamp gave less what left it', dry > 0 && Math.abs(dE - wantE) < 0.03 * book.gained, `changed ${dE.toFixed(1)} J, the ledger ${wantE.toFixed(1)} J of ${book.gained.toFixed(1)} J (bar 3%); ${dry} dried-out cell-steps`);
   check('H10 the Heat dial at 0.5 makes no bubble in two minutes', half === 0, `${half} started`);
   check('H10 at 1 it boils within a minute', first >= 0 && first < 60, first >= 0 ? `${first.toFixed(1)} s` : 'no bubble');
   check('H10 back at 0 the vapour is under 1% of its peak within 5 s', calm >= 0 && calm <= 5, calm >= 0 ? `${calm.toFixed(1)} s` : 'never');

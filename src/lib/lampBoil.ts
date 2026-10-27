@@ -24,13 +24,16 @@
 
   The model, per square metre of plate, in SI units and degrees Celsius:
 
-  1. The lamp. Infrared irradiance I0·exp(−r²/2σ²) at the stage (the condenser
-     throws a hot spot, hottest in the middle), times the Heat dial (how much
-     of the heat filter is out, 0..1). The liquid absorbs a fraction
-     1 − exp(−(κ_IR·d·(1−α) + A_dye)) of it: water's own absorption of the
-     lamp's infrared through its depth, plus the dye's absorbance (Beer–Lambert,
-     as 18f). Vapour absorbs nothing, so a cell full of steam stops taking the
-     lamp's heat into liquid that is not there.
+  1. The lamp. Irradiance I0·exp(−r²/2σ²) at the stage (the condenser throws a
+     hot spot, hottest in the middle), times the Heat dial (how much of the
+     heat filter is out, 0..1), in two bands. The visible share f_vis (about
+     an eighth of a halogen's output at the stage) passes clear water and is
+     absorbed by the dye, 1 − exp(−A_dye·(1−α)) (Beer–Lambert, as 18f); the
+     infrared rest passes the dye and is absorbed by the water through its
+     depth, 1 − exp(−κ_IR·d·(1−α)). So dark dye warms faster than clear water,
+     by about 1.4 at an absorbance of 1.5, not by its visible absorbance alone.
+     Vapour displaces liquid and its dye, so a cell full of steam stops taking
+     the lamp's heat into liquid that is not there.
 
   2. One temperature through the glass and the liquid. Across a 1 mm gap water
      conducts k/d = 600 W/m²K, ten times the air's cooling, so the depth is
@@ -39,8 +42,12 @@
      the millimetre of water between them. Heat spreads sideways through both
      (k·d for the water, k_glass·t for the glass, which carries most of it),
      is lost to the air at h (W/m²K, both faces: the projector's fan when it
-     blows, natural convection under a hand that blocks it), and leaves at the
-     open rim, held at the room's temperature (the reservoir is large).
+     blows, natural convection under a hand that blocks it) and by radiation,
+     2εσ(T⁴ − T_room⁴) from the two glass faces (ε = 0.9: at 100 °C that is
+     about 15 W/m²K, more than the still air takes), and leaves at the open
+     rim, held at the room's temperature (the reservoir is large). The liquid
+     carries its own share of the heat with it, (1−α)ρc·d of the total; the
+     glass does not flow.
 
   3. The liquid's flow in the gap (Hele-Shaw, as the plate's thin gap):
        u = (d²/12μ(T)) (−∇p + (ρ_mix − ρ_room) g sinθ ŷ),   ∇·u = s,
@@ -60,10 +67,13 @@
      100 °C, but a cell with no vapour in it cannot start until it is
      superheated past what its nucleation site needs: a cavity of radius r_c
      in the glass holds a vapour nucleus once ΔT ≥ 2σT_sat/(ρ_v L r_c)
-     (Clausius–Clapeyron with the Laplace pressure of the nucleus; Hsu 1962).
-     Each cell draws a site or none from a seeded log-normal of cavity radii
-     (a few microns, so a superheat of 5 to 12 K), so bubbles start at
-     scattered sites under the hot spot rather than as a disc; a cell with no
+     (the equilibrium nucleus: Clausius–Clapeyron with its Laplace pressure;
+     Carey, Liquid-Vapor Phase-Change Phenomena, ch. 6).
+     Sites are a density per square metre of glass (a seeded Poisson count
+     per cell, each site a cavity from a log-normal of a few microns), and a
+     cell starts at its largest cavity's superheat (5 to 12 K), so bubbles
+     start at scattered sites under the hot spot rather than as a disc, and
+     the sites do not thin or crowd when the grid changes; a cell with no
      site superheats until water's homogeneous limit (about 300 °C), which
      the lamp never reaches. A nucleus is a bubble as wide as the gap. Once a
      cell holds vapour it needs no threshold: the interface exchanges heat
@@ -85,9 +95,15 @@
     faster than the liquid around it (Bretherton; 18i's 1.5U), and on an
     upright plate it would rise through it.
   - The interface's heat transfer is one coefficient (h_i = 10⁴ W/m²K) over
-    the bubble's rim (2√(πα)·d/dx of plate per plate area). Real confined
-    boiling takes most of its heat through the thin film of liquid under the
-    bubble against the glass (microlayer evaporation), faster than this.
+    the bubble's rim (2√(πα)·d/dx of plate per plate area: one bubble per
+    cell, so the rim's area, and with it the boil's pace, depends on the
+    grid). Real confined boiling takes most of its heat through the thin film
+    of liquid under the bubble against the glass (microlayer evaporation),
+    faster than this.
+  - The glass absorbs none of the lamp. Soda-lime glass takes the infrared
+    past about 2.7 µm, so a spot that has boiled dry still heats (the cracking
+    the operators feared); here a dried cell takes only what its neighbours
+    conduct into it.
   - T_sat is 100 °C: no Laplace pressure in the bubble, and no dissolved air
     (a real dish degasses into small air bubbles well before it boils).
   - The infrared is one broadband coefficient, κ_IR, not water's spectrum
@@ -134,7 +150,9 @@ export interface BoilPlateOptions {
   gap?: number;             // m, the liquid's depth (1 mm)
   glass?: number;           // m, both glasses together (2 mm)
   ambient?: number;         // °C (20)
-  lampIrradiance?: number;  // W/m² of infrared at the hot spot, filter fully out (8000)
+  lampIrradiance?: number;  // W/m² at the hot spot, filter fully out (8000)
+  visibleFraction?: number; // the lamp's share the dye absorbs and water passes (0.12)
+  emissivity?: number;      // the glass faces' (0.9)
   lampWidth?: number;       // m, the hot spot's σ (0.02)
   lampCentre?: [number, number]; // m from the grid's centre ([0, 0])
   kappaIR?: number;         // 1/m, water's broadband infrared absorption (600)
@@ -142,7 +160,7 @@ export interface BoilPlateOptions {
   hNatural?: number;        // W/m²K, both faces, the air blocked (10)
   cavityRadius?: number;    // m, the median nucleation cavity (4 µm)
   cavitySpread?: number;    // log-normal σ of the cavities (0.3)
-  siteFraction?: number;    // the share of cells with a site (0.15)
+  siteDensity?: number;     // nucleation sites per m² of glass (7e4)
   interfaceH?: number;      // W/m²K at a bubble's rim (1e4)
   seed?: number;
 }
@@ -160,6 +178,7 @@ export interface BoilPlate {
   n: number; dx: number; width: number; radius: number; gap: number; glass: number;
   ambient: number; I0: number; lampWidth: number; lampCentre: [number, number];
   kappaIR: number; hForced: number; hNatural: number; interfaceH: number;
+  visibleFraction: number; emissivity: number;
   alphaSeed: number; alphaMin: number;
   inside: Uint8Array;       // 1 a cell of the dish, 0 the rim
   T: Float64Array;          // °C, row-major, row 0 at the top, +y down
@@ -196,14 +215,18 @@ export function createBoilPlate(o: BoilPlateOptions = {}): BoilPlate {
   const gauss = () => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
   const inside = new Uint8Array(n * n);
   const dTnuc = new Float64Array(n * n).fill(Infinity);
-  const rc = o.cavityRadius ?? 4e-6, spread = o.cavitySpread ?? 0.3, sites = o.siteFraction ?? 0.15;
+  const rc = o.cavityRadius ?? 4e-6, spread = o.cavitySpread ?? 0.3, lambda = (o.siteDensity ?? 7e4) * dx * dx;
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const x = (i + 0.5) * dx - width / 2, y = (j + 0.5) * dx - width / 2;
     const k = j * n + i;
     inside[k] = Math.hypot(x, y) < radius ? 1 : 0;
-    // Both draws are made for every cell, so the sites do not move when the dish's size does.
-    const has = rng() < sites, r = rc * Math.exp(spread * gauss());
-    if (inside[k] && has) dTnuc[k] = nucleationSuperheat(r);
+    // A Poisson count of sites (by inversion), each a cavity; the largest starts first.
+    // Every cell draws, so the sites do not move when the dish's size does.
+    let count = 0;
+    for (let u = rng(), pk = Math.exp(-lambda), cdf = pk; u > cdf && count < 50; ) { count++; pk *= lambda / count; cdf += pk; }
+    let r = 0;
+    for (let c = 0; c < count; c++) r = Math.max(r, rc * Math.exp(spread * gauss()));
+    if (inside[k] && count > 0) dTnuc[k] = nucleationSuperheat(r);
   }
   // A nucleus is a sphere as wide as the gap: the bubble that first touches both glasses.
   const alphaSeed = Math.min(0.5, (Math.PI * gap * gap) / (6 * dx * dx));
@@ -211,6 +234,7 @@ export function createBoilPlate(o: BoilPlateOptions = {}): BoilPlate {
     n, dx, width, radius, gap, glass: o.glass ?? 2e-3, ambient,
     I0: o.lampIrradiance ?? 8000, lampWidth: o.lampWidth ?? 0.02, lampCentre: o.lampCentre ?? [0, 0],
     kappaIR: o.kappaIR ?? 600, hForced: o.hForced ?? 50, hNatural: o.hNatural ?? 10,
+    visibleFraction: o.visibleFraction ?? 0.12, emissivity: o.emissivity ?? 0.9,
     interfaceH: o.interfaceH ?? 1e4, alphaSeed, alphaMin: alphaSeed * 0.01,
     inside, T: new Float64Array(n * n).fill(ambient), alpha: new Float64Array(n * n),
     dye: new Float64Array(n * n), dTnuc,
@@ -255,11 +279,14 @@ function substep(P: BoilPlate, h: number, c: BoilControls) {
     if (!inside[k]) { P.source[k] = 0; continue; }
     const i = k % n, j = (k / n) | 0;
     const a = a0[k];
-    const absorbed = 1 - Math.exp(-(P.kappaIR * d * (1 - a) + P.dye[k]));
+    const fv = P.visibleFraction;
+    const absorbed = fv * (1 - Math.exp(-P.dye[k] * (1 - a))) + (1 - fv) * (1 - Math.exp(-P.kappaIR * d * (1 - a)));
     const q = heat * lampIrradiance(P, k) * absorbed;
     const x = (i + 0.5) * dx - P.width / 2, y = (j + 0.5) * dx - P.width / 2;
     const held = holds.some((hd) => Math.hypot(x - hd.x, y - hd.y) < hd.r);
-    const hl = held ? P.hNatural : P.hForced;
+    // Radiation from both faces, linearised about the step's start: 2εσ(T² + Ta²)(T + Ta) in kelvin.
+    const TK = T0[k] + 273.15, AK = Tamb + 273.15;
+    const hl = (held ? P.hNatural : P.hForced) + 2 * P.emissivity * 5.670374e-8 * (TK * TK + AK * AK) * (TK + AK);
     const C = heatCapacity(P, a);
     const kk = conductance(P, a);
     let cond = 0;
@@ -407,7 +434,8 @@ function advect(P: BoilPlate, h: number) {
   let vmax = 0;
   for (const w of u) vmax = Math.max(vmax, Math.abs(w));
   for (const w of v) vmax = Math.max(vmax, Math.abs(w));
-  const subs = Math.max(1, Math.ceil((vmax * h) / dx / 0.4));
+  // A quarter cell per face per sub-step: a cell's outflow over its four faces stays under a cell.
+  const subs = Math.max(1, Math.ceil((vmax * h) / dx / 0.25));
   const hs = h / subs;
   const get = (F: Float64Array, i: number, j: number, outside: number) => {
     if (i < 0 || j < 0 || i >= n || j >= n) return outside;
@@ -437,12 +465,14 @@ function advect(P: BoilPlate, h: number) {
         [-v[j * n + i], i, j - 1, 0, 1],         // above
       ];
       let dT = 0, dA = 0;
+      // The liquid carries its share of the cell's heat; the glass stays.
+      const share = ((1 - a0[k]) * RHO_C * P.gap) / heatCapacity(P, a0[k]);
       for (const [wOut, i0, j0, di, dj] of faces) {
         // velocity along +di/+dj for this face
         const wAlong = di + dj > 0 && (i0 === i && j0 === j) ? wOut : -wOut;
         const Tf = face(T0, P.ambient, i0, j0, di, dj, wAlong);
         const Af = face(a0, 0, i0, j0, di, dj, wAlong);
-        dT -= wOut * (Tf - T0[k]);              // u·∇T, written over the faces
+        dT -= share * wOut * (Tf - T0[k]);      // u·∇T, written over the faces
         dA -= wOut * Af;                         // the vapour, conservatively
       }
       T[k] = T0[k] + (hs / dx) * dT;
