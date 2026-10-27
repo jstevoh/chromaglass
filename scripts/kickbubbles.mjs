@@ -43,10 +43,15 @@
  *
  * The counts are `chromaglassDebug().musicBubbles()`, read beside the band's
  * own hook (window.__band) and the kicks the plate counted. Where no plate draws (a
- * cloud session, even with software WebGPU: it ran six frames a second and
- * heard one or two of the band's forty kicks) the loop barely hears the band
- * and the floors cannot be met, so the lines are printed as skipped there,
- * never passed; `KICKBUBBLES_PLATE=1` runs them anyway.
+ * Linux box without `PW_WEBGPU`) the loop barely hears the band and the floors
+ * cannot be met, so the lines are printed as skipped there, never passed;
+ * `KICKBUBBLES_PLATE=1` runs them anyway. With `PW_WEBGPU` a cloud session's
+ * plate does draw (headed into Xvfb, PLAN.md 19l), and the lines run and are
+ * red on their floors: the band plays its kicks on the wall clock, the frame
+ * loop hears a kick only on a frame, and software draws a frame every two or
+ * three seconds, so a listening window hears 1 to 3 of the band's kicks where
+ * the Mac's hears its 15 and more. That is the frame rate's shortfall, not
+ * the bubbles', and the Mac's run is the one that says.
  */
 import { chromium } from 'playwright';
 import { launchChromium, presentsInXvfb } from './chromium.mjs';
@@ -55,8 +60,9 @@ import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = Number(process.env.KICKBUBBLES_PORT ?? 4363);
 // A Linux box with PW_WEBGPU presents headed into Xvfb below (chromium.mjs, PLAN.md 19l), so its plate
-// draws too, a twentieth as often: the count of bubbles a kick drops is the same, the window it is
-// counted in is `settlePlate`'s steps there.
+// draws too, a frame every few seconds. The listening window is the wall clock's there as on a Mac
+// (`settlePlate` only ever adds steps to it), so the kicks heard in it are as few as its frames: see the
+// header for why its floors are red in software and are not lowered for it.
 const PLATE = process.platform === 'darwin' || !!process.env.KICKBUBBLES_PLATE
   || (process.platform === 'linux' && !!process.env.PW_WEBGPU);
 const checks = [];

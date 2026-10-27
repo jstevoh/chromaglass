@@ -675,6 +675,35 @@ const SIM_MAX_CATCHUP = (() => {
   const warp = Number(new URLSearchParams(window.location.search).get('warp'));
   return Number.isFinite(warp) && warp >= 1 ? Math.min(240, Math.round(warp)) : 4;
 })();
+/*
+  `?lockstep=1` (diagnostic, the checks' software runs only): a frame is one
+  solver step long, whatever the wall clock says.
+
+  Live, a frame's elapsed time is the wall clock's, and on a GPU that is a
+  sixtieth of a second and a step. On a cloud session's software WebGPU a
+  frame is one step and two to fifteen seconds (PLAN.md 19l), and everything
+  the frame loop moves by elapsed time moved all of it: the lamp's wander,
+  the gel wheel, the plate's rotation, the phrasing. Measured 2026-10-27 with
+  `npm run bubbles`' two photographs of a slowed plate: 21.5% of its pixels
+  moved across one step taking 7.4 s, 26.8% across three steps in 15 s, 34.3%
+  across six in 23 s; the Mac, in its 1.2 s and 72 steps, moves 4 to 8%. What
+  moved was the wall clock, not the liquid. So the software plate was a Mac
+  plate with every wall-clock thing on it run fast, and a check that read it
+  read neither.
+
+  With the flag each frame's elapsed time is exactly the step it takes, so a
+  software plate is the Mac's plate in slow motion: `npm run bubbles`' plate
+  developed for 540 steps is the plate the Mac develops in nine seconds. What
+  it does not reach: the show's own intervals (Evolve's six-second drift, the
+  sequencer) and whatever stamps `showNow()`, which stay the wall clock's,
+  and sound, which plays in real time. A harness asks for it through
+  `engineQuery({ lockstep: true })` (scripts/frame.mjs), which a GPU never
+  sends, so nothing a Mac measures moves.
+*/
+const LOCKSTEP = (() => {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('lockstep') === '1';
+})();
 
 /*
   The show's dice, one stream per purpose (lib/rng.ts).
@@ -7130,7 +7159,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // A render's frame is exactly 1/fps: the clock's own difference of two
         // large doubles is that to within a last bit, which would still be a
         // different last bit in every uniform downstream.
-        const realDt = rendering ? 1 / rendering.fps : now - lastTimeRef.current;
+        const realDt = rendering ? 1 / rendering.fps : LOCKSTEP ? simStepS : now - lastTimeRef.current;
         lastTimeRef.current = now;
         frameS = realDt;
         // One verdict per frame on whether this is a kick: from the beat

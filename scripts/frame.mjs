@@ -39,8 +39,16 @@ export const engineName = () => 'webgpu';
  * seconds lowers its step rate, and each step would stand for more plate
  * than the Mac's does; a check that counts steps would then measure a
  * different plate. Pinned, a step means the same thing on both.
+ *
+ * `lockstep=1`, for a harness that asks (`{ lockstep: true }`): each frame is
+ * exactly the one step it takes, so the lamp, the gel wheel and the dish's
+ * turn move by the step and not by the wall clock's two to fifteen seconds a
+ * software frame lasts (`LOCKSTEP` in LiquidVisualizer.tsx has the
+ * measurement). Asked for, not the default, the way `present` is: each
+ * harness that takes it is run in a session first (PLAN.md 19l-4).
  */
-export const engineQuery = () => (presentsInXvfb() ? '&dpr=0.25&steps=60' : '');
+export const engineQuery = ({ lockstep = false } = {}) =>
+  (presentsInXvfb() ? `&dpr=0.25&steps=60${lockstep ? '&lockstep=1' : ''}` : '');
 
 /**
  * Is this label a GPU solver's?
@@ -286,6 +294,51 @@ export async function settlePlate(page, ms) {
     const n = await stepsNow(page);
     if (n === null || n - from >= want || n < from || Date.now() > by) return;
     await page.waitForTimeout(100);
+  }
+}
+
+/**
+ * `page.waitForTimeout(ms)` on a GPU, exactly as before; in software, until
+ * the plate has taken every step the Mac's sixty a second would in `ms`, not
+ * `settlePlate`'s share of them.
+ *
+ * For the waits a check's line reads the plate's *age* through: "let a look
+ * develop" before a bubble is photographed on it, the opening before a shape
+ * is measured. At `settlePlate`'s twentieth, `npm run bubbles` and `npm run
+ * depth` photographed a plate 27 steps old where the Mac's was 540, and their
+ * lines that read how far it had come were red on a plate that had not come
+ * there (PLAN.md 19l-3). This is slow in software by design, about 0.4 steps
+ * a second: nine of the Mac's seconds are twenty-odd minutes. Paired with
+ * `engineQuery({ lockstep: true })`, or the wall clock runs a software plate's
+ * lamp and dish for all those minutes while its liquid develops for nine
+ * seconds. A plate that stops stepping returns after a minute without a step,
+ * for the harness to report.
+ */
+export async function developPlate(page, ms) {
+  if (!presentsInXvfb()) return page.waitForTimeout(ms);
+  const want = Math.round(ms / 1000 * 60);
+  let from = await stepsNow(page);
+  for (let tries = 0; from === null && tries < 600; tries++) {
+    await page.waitForTimeout(100);
+    from = await stepsNow(page);
+  }
+  if (from === null) return;
+  let last = from, at = Date.now(), said = Date.now();
+  const t0 = Date.now();
+  for (;;) {
+    await page.waitForTimeout(250);
+    const n = await stepsNow(page);
+    if (n === null || n < last) return;
+    if (n - from >= want) {
+      console.log(`     (developed ${n - from} steps, the Mac's ${(ms / 1000).toFixed(1)} s, in ${((Date.now() - t0) / 1000).toFixed(0)} s of software)`);
+      return;
+    }
+    if (n > last) { last = n; at = Date.now(); }
+    else if (Date.now() - at > 60_000) {
+      console.log(`     (the plate stopped stepping at ${n - from} of ${want} steps; nothing waited for past that)`);
+      return;
+    }
+    if (Date.now() - said > 120_000) { console.log(`     (developing: ${n - from} of ${want} steps)`); said = Date.now(); }
   }
 }
 

@@ -25,7 +25,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery, installFrameReader, settlePlate, waitForEngine } from './frame.mjs';
+import { engineQuery, installFrameReader, settlePlate, waitForEngine, developPlate } from './frame.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -89,9 +89,10 @@ try {
     };
     setTimeout(sample, 250);
   });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
-  await settlePlate(page, 9000);
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery({ lockstep: true })}`, { waitUntil: 'load' });
+  // In software, the opening's first step first (25 to 100 s), then the Mac's nine seconds in steps (frame.mjs).
   await waitForEngine(page);
+  await developPlate(page, 9000);
 
   /*
     And then until the show is actually running.
@@ -115,18 +116,30 @@ try {
     measured until the plate has stepped in every quarter second for two
     seconds running. A freeze after that is still a red line.
   */
+  /*
+    And only while the timeline is still being written. It keeps 400 rows,
+    a hundred seconds, which on a Mac is long past this line (nine seconds
+    and at most 45 more). In a cloud session the opening is the Mac's 540
+    steps, twenty minutes to over an hour of software (frame.mjs's
+    `developPlate`), and the first run of it read this line from the last
+    nine rows of a timeline that had stopped an hour before, and passed: two
+    "steady seconds" from the page's first minute. Rows that stopped are not
+    the last two seconds, so they are not read as them.
+  */
   const running = await page.evaluate(async () => {
     const t0 = performance.now();
     const rows = () => window.__depthLoad ?? [];
+    const recording = () => rows().length < 400;
     const steady = () => {
       const r = rows().slice(-9);
-      return r.length === 9 && r.every((row, i) => i === 0 || row[3] > r[i - 1][3]);
+      return recording() && r.length === 9 && r.every((row, i) => i === 0 || row[3] > r[i - 1][3]);
     };
     while (!steady() && performance.now() - t0 < 45000) await new Promise((r) => setTimeout(r, 250));
-    return { ok: steady(), waited: (performance.now() - t0) / 1000 };
+    return { ok: steady(), waited: (performance.now() - t0) / 1000, recording: recording(), rows: rows().length };
   });
   check('the show is running before anything is measured', running.ok,
-    `${running.waited.toFixed(1)} s after the first nine to see two steady seconds`);
+    `${running.waited.toFixed(1)} s after the first nine to see two steady seconds (timeline row ${running.rows})`
+    + (running.recording ? '' : '; the quarter-second timeline had ended (400 rows), so nothing said the last two seconds'));
 
   // A plate that is not being poured on or evolved, so what moves is the flow
   // already there and not the next drop landing.

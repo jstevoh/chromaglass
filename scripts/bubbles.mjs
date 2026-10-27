@@ -32,7 +32,7 @@ import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
-import { engineQuery, installFrameReader, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
+import { engineQuery, installFrameReader, isGpuEngine, settlePlate, waitForEngine, developPlate } from './frame.mjs';
 
 const PORT = 4321;
 const checks = [];
@@ -89,9 +89,10 @@ const browser = await launchChromium(chromium, { present: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
-  await settlePlate(page, 9000);
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery({ lockstep: true })}`, { waitUntil: 'load' });
+  // In software, the opening's first step first (25 to 100 s), then the Mac's nine seconds in steps (frame.mjs).
   await waitForEngine(page);
+  await developPlate(page, 9000);
 
   // The bundle the page loaded must be the one just built. `bubbleUniforms`
   // was added alongside the change under test, so its absence means the page
@@ -191,7 +192,8 @@ try {
 
   // Let a look develop on the plate first — a bubble over bare glass has
   // nothing to blend into and would flatter any version of this shader.
-  await settlePlate(page, 9000);
+  // Developed, not settled: the age of the plate is what this wait is for.
+  await developPlate(page, 9000);
   const slowed = await setSlider('recipe-globalSpeed', 0.005) && await setSlider('recipe-automateRate', 0);
   check('the plate can be slowed down to be photographed', slowed, slowed ? 'Speed and Evolve on the bench' : 'no recipe sliders found');
   await page.evaluate(() => window.chromaglassDebug().bubbles.clear());
@@ -214,7 +216,9 @@ try {
     construction rather than by tolerance.
   */
   await grab('bareBefore');
-  await settlePlate(page, 1200);
+  // The Mac's 1.2 s in its 72 steps, not a twentieth of them: how far a slowed
+  // plate moves in that window is the line below's whole question.
+  await developPlate(page, 1200);
   await grab('bareAgain');
   const still = await movedBetween('bareBefore', 'bareAgain');
   // A slowed plate is not a stopped one: the lamp wanders, the gel wheel
@@ -267,7 +271,10 @@ try {
   });
   check('the bubbles are on dye, not on bare glass', placed >= 8, `${placed} placed on the thickest cells`);
 
-  await settlePlate(page, 900);
+  // Developed too: a bubble is a hole the air opens in the dye over steps, and
+  // the lines below read how far it has opened (in software, at settlePlate's
+  // three steps against the Mac's 54, 14 of 850 bubble pixels were lit).
+  await developPlate(page, 900);
   const told = await page.evaluate(() => window.chromaglassDebug().bubbleUniforms());
   check('and the shader is told about them',
     told.count >= 8 && told.strength > 0.05,
@@ -594,11 +601,25 @@ try {
     what a hole *is*, and each measurable where the bubble is rather than
     where it was:
   */
-  check('the bubbles are actually drawn', report.changed > 3000 && report.n > 800,
+  /*
+    Pixels of the Mac's frame. The two floors were set on a 1060×700 page at
+    one device pixel a pixel, 742,000 of them, which is every Mac run's frame.
+    A cloud session draws the same page at `dpr=0.25` (frame.mjs's
+    `engineQuery`), 46,375 pixels, so the same bubbles there are a sixteenth
+    of the count: the first run with a developed plate read 347 drawn on, 0.75%
+    of its frame, against the Mac's floor of 0.40%, and was red on arithmetic.
+    So the floors are the same share of whatever frame was read, never more
+    than the Mac's own: on a Mac the scale is exactly 1 and nothing moves.
+  */
+  const MAC_FRAME = 1060 * 700;
+  const ofFrame = (px) => px * Math.min(1, report.total / MAC_FRAME);
+  const drawnFloor = ofFrame(3000), onLiquidFloor = ofFrame(800);
+  check('the bubbles are actually drawn', report.changed > drawnFloor && report.n > onLiquidFloor,
     `${report.changed} pixels drawn on, ${report.n} of them over coloured liquid ` +
-    `(${report.drifted} excluded as drift; biggest change ${report.biggest.toFixed(3)})`);
+    `(${report.drifted} excluded as drift; biggest change ${report.biggest.toFixed(3)})` +
+    (report.total < MAC_FRAME ? `; floors ${Math.round(drawnFloor)} and ${Math.round(onLiquidFloor)} of this ${report.total}-pixel frame` : ''));
 
-  if (report.n > 800) {
+  if (report.n > onLiquidFloor) {
     check('a bubble keeps the colour of the liquid it is in',
       report.satLost <= 1 / 3,
       `${Math.round(report.satLost * 100)}% of the local saturation lost at the rim, ` +
@@ -608,7 +629,7 @@ try {
       report.hueShift <= 12,
       `${report.hueShift.toFixed(1)}° mean (worst ${report.worstHue.toFixed(1)}°)`);
     check('and it lets the lamp through rather than painting light on top',
-      report.lit > 500 && report.thickGain > report.thinGain * 1.15,
+      report.lit > ofFrame(500) && report.thickGain > report.thinGain * 1.15,
       `brightens the thick dye by ${report.thickGain.toFixed(3)} and the thin by ` +
       `${report.thinGain.toFixed(3)} over ${report.lit} lit pixels — paint would brighten both alike`);
     console.log(`     and it is brighter, as a lens should be: ${Math.round(report.lumGain * 100)}% more light`);
