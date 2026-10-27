@@ -32,7 +32,7 @@ import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
-import { engineQuery, installFrameReader, isGpuEngine } from './frame.mjs';
+import { engineQuery, installFrameReader, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4321;
 const checks = [];
@@ -83,13 +83,15 @@ for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { stop(
 
 await new Promise(r => setTimeout(r, 2500));
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
-  await page.waitForTimeout(9000);
+  await settlePlate(page, 9000);
+  await waitForEngine(page);
 
   // The bundle the page loaded must be the one just built. `bubbleUniforms`
   // was added alongside the change under test, so its absence means the page
@@ -189,11 +191,11 @@ try {
 
   // Let a look develop on the plate first — a bubble over bare glass has
   // nothing to blend into and would flatter any version of this shader.
-  await page.waitForTimeout(9000);
+  await settlePlate(page, 9000);
   const slowed = await setSlider('recipe-globalSpeed', 0.005) && await setSlider('recipe-automateRate', 0);
   check('the plate can be slowed down to be photographed', slowed, slowed ? 'Speed and Evolve on the bench' : 'no recipe sliders found');
   await page.evaluate(() => window.chromaglassDebug().bubbles.clear());
-  await page.waitForTimeout(1500);
+  await settlePlate(page, 1500);
 
   /*
     Three photographs, bracketing the bubbles.
@@ -212,7 +214,7 @@ try {
     construction rather than by tolerance.
   */
   await grab('bareBefore');
-  await page.waitForTimeout(1200);
+  await settlePlate(page, 1200);
   await grab('bareAgain');
   const still = await movedBetween('bareBefore', 'bareAgain');
   // A slowed plate is not a stopped one: the lamp wanders, the gel wheel
@@ -265,7 +267,7 @@ try {
   });
   check('the bubbles are on dye, not on bare glass', placed >= 8, `${placed} placed on the thickest cells`);
 
-  await page.waitForTimeout(900);
+  await settlePlate(page, 900);
   const told = await page.evaluate(() => window.chromaglassDebug().bubbleUniforms());
   check('and the shader is told about them',
     told.count >= 8 && told.strength > 0.05,
@@ -355,7 +357,7 @@ try {
   // …and straight back off again, so the "after" is as close in time as the
   // machine allows.
   await page.evaluate(() => window.chromaglassDebug().bubbles.clear());
-  await page.waitForTimeout(400);
+  await settlePlate(page, 400);
   await grab('bareAfter');
   /*
     And then however long it takes, which is the number worth having.
@@ -420,7 +422,7 @@ try {
     let flat = await refill(), took = 0;
     for (const t of [2, 4, 6, 8, 10, 12, 15, 18, 21, 24]) {
       if (flat && flat.inD > flat.outD * 0.5) break;
-      await page.waitForTimeout((t - took) * 1000);
+      await settlePlate(page, (t - took) * 1000);
       took = t;
       flat = await refill();
     }

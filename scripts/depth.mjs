@@ -25,7 +25,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery, installFrameReader } from './frame.mjs';
+import { engineQuery, installFrameReader, settlePlate, waitForEngine } from './frame.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -61,7 +61,8 @@ for (const s of ['SIGTERM','SIGINT','SIGHUP']) process.on(s, () => { stop(); pro
 await new Promise(r => setTimeout(r, 2500));
 if (!up) process.exit(2);
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
@@ -89,7 +90,8 @@ try {
     setTimeout(sample, 250);
   });
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
-  await page.waitForTimeout(9000);
+  await settlePlate(page, 9000);
+  await waitForEngine(page);
 
   /*
     And then until the show is actually running.
@@ -243,7 +245,7 @@ try {
 
   await mark();
   await set({ automateRate: 0, plateCurve: CURVE, depthDrag: 0 });
-  await page.waitForTimeout(6000);
+  await settlePlate(page, 6000);
   const shaped = await settled(STEPPED_CURVE);
   /*
     Waiting must not turn a frozen plate green. The same solver taking no
@@ -399,10 +401,10 @@ try {
   const off = [], on = [];
   for (let i = 0; i < 3; i++) {
     await set({ depthDrag: 0 });
-    await page.waitForTimeout(4000);
+    await settlePlate(page, 4000);
     off.push(await speeds());
     await set({ depthDrag: DRAG });
-    await page.waitForTimeout(4000);
+    await settlePlate(page, 4000);
     on.push(await speeds());
   }
   const mean = (a, k) => a.reduce((s, x) => s + x[k], 0) / a.length;
@@ -456,14 +458,14 @@ try {
     sixteen seconds.
   */
   await set({ plateCurve: 0, depthDrag: 0 });
-  await page.waitForTimeout(5000);
+  await settlePlate(page, 5000);
   const flatOffs = [], flatOns = [];
   for (let i = 0; i < 5; i++) {
     await set({ depthDrag: 0 });
-    await page.waitForTimeout(4000);
+    await settlePlate(page, 4000);
     flatOffs.push(await speeds());
     await set({ depthDrag: DRAG });
-    await page.waitForTimeout(4000);
+    await settlePlate(page, 4000);
     flatOns.push(await speeds());
   }
   const pairRatios = flatOns.map((o, i) => o.inner / flatOffs[i].inner);
@@ -487,10 +489,10 @@ try {
   const thinDome = [], thinFlat = [];
   for (let i = 0; i < 3; i++) {
     await set({ plateCurve: CURVE, depthDrag: 0 });
-    await page.waitForTimeout(5000);
+    await settlePlate(page, 5000);
     thinDome.push(await speeds());
     await set({ plateCurve: 0, depthDrag: 0 });
-    await page.waitForTimeout(5000);
+    await settlePlate(page, 5000);
     thinFlat.push(await speeds());
   }
   const rDome = mean(thinDome, 'outer') / mean(thinDome, 'inner');
@@ -513,7 +515,7 @@ try {
     from rest stays pushed.
   */
   await set({ plateCurve: 0, depthDrag: 0 });
-  await page.waitForTimeout(4000);
+  await settlePlate(page, 4000);
   const gapAt = () => page.evaluate(async () => {
     const sq = await window.chromaglassDebug().readSqueeze?.();
     if (!sq) return null;
@@ -536,7 +538,7 @@ try {
   const pressed = await gapAt();
   await mark();
   await set({ plateCurve: 1 });
-  await page.waitForTimeout(250);
+  await settlePlate(page, 250);
   /*
     And the same wait here, for the opposite reason: a plate that has not
     stepped since the change still holds the dent exactly as it was pressed,
