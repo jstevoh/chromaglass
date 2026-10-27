@@ -740,6 +740,22 @@
       ]
     },
     {
+      "name": "The liquids on the GPU plate",
+      "shard": "lab",
+      "run": "npm run liquidsgpu",
+      "env": {"PW_WEBGPU":"1"},
+      "timeout": 12,
+      "why": [
+        "Soap, glycerine, milk and silicone on the GPU solver's own liquid fields",
+        "(PLAN 15e, scripts/liquidsgpu.mjs): the stand-in's four scenes from",
+        "`npm run liquids` laid on the thin gap the looks use, each held to the",
+        "stand-in's bar and to its size within a factor of two, with a fold of",
+        "the deltas every step and on a still plate. Lines owed to PLAN",
+        "15e-1 to 15e-4 print and do not fail until they pass. About 3.5 minutes",
+        "on SwiftShader."
+      ]
+    },
+    {
       "name": "No line round a bubble's hole",
       "shard": "lab",
       "run": "npm run holeline",
