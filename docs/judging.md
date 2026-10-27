@@ -1910,7 +1910,24 @@ until the app next goes online (no grace period, PLAN 23.17h).
 4. Decide: is 3 (3560 K) the right amber for Home Movie, or the full 3.75 (3200 K)? And is the red clipping on
    hot reds acceptable, or should the end hold only half the brightness back?
 
-## 85. The tabs across the top are yours (PLAN 8-tabs)
+## 85. The colour cartoons (PLAN 14ac, 14ac-4)
+
+Five cartoons in colour on the Cartoons shelf (the desk's Dye panel, the phone's dye sheet), marked "colour":
+Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Travels.
+
+1. **Pour** Jack Frost on Classic, then on a pale look. The dye should be the picture's own colours (the blues of
+   the winter forest, the orange of the autumn), not grey.
+2. **Film** Balloon Land and Fiddlesticks with Film Mix at its default and at full. Fiddlesticks is a two-colour
+   print, orange and teal with no true blue or yellow; say whether it reads as a feature of the plate or as a
+   brown wash (14ac-5).
+3. **Gulliver's Travels** is 74 minutes. Pick it on the phone over mobile data: it should start within a few
+   seconds and not stall, since the file streams. Say whether a feature is wanted on the shelf at all (14ac-6).
+4. Bad: a colour cartoon that pours grey, Pour or Film that does not start on a colour one, or a picture so
+   muddy at 384 px that you cannot tell what it is.
+5. Decide: do you want the palette to tint them (Film's grade can already), and is there a colour cartoon you
+   expected that is not here?
+
+## 86. The tabs across the top are yours (PLAN 8-tabs)
 
 1. Open the desk on a laptop. The chips should read Perform, Sequence, Setup, with a pencil beside them. Perform has
    the set list, bottles, rides, dyes, tools and the knobs Build had; Sequence the set list, Songs, Sequences and the

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { PortalBody } from '../portalBody';
+import { installTitleTips } from '../../lib/titleTips';
 
 /**
  * A desk panel in a window of its own (PLAN.md 8g), for a laptop and a
@@ -82,11 +83,13 @@ export function PanelWindow({ win, onGone, children }: { win: Window; onGone: ()
     el.replaceChildren();
     el.style.cssText = 'position:fixed;inset:0;display:flex;flex-direction:column;padding:8px;box-sizing:border-box';
     setHost(el);
+    // A window of its own is another document: its titles wait the same (PLAN 8j-3).
+    const offTips = installTitleTips(d);
     const left = () => gone.current();
     win.addEventListener('pagehide', left);
     // pagehide is not promised for a window the system closes; its `closed` is.
     const poll = window.setInterval(() => { if (win.closed) left(); }, 500);
-    return () => { win.removeEventListener('pagehide', left); window.clearInterval(poll); };
+    return () => { win.removeEventListener('pagehide', left); window.clearInterval(poll); offTips(); };
   }, [win]);
   return host ? createPortal(<PortalBody.Provider value={host.ownerDocument.body}>{children}</PortalBody.Provider>, host) : null;
 }

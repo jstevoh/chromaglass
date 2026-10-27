@@ -1313,6 +1313,18 @@ Open from Desk v2, each its own thread (the UI lane):
     whatever asked for it. Checks: `npm run layout` (two knobs with swallowed releases;
     a focused card replaced by a hovered one), `npm run phone` (a tap on another name
     swaps the card). Which gesture on the owner's Mac swallowed the release is not known.
+  - ~~**8j-3** Hover cards wait much longer~~ (the owner, 2026-10-27: "tool tips on
+    hover over are getting annoying"). **Shipped.** One constant, `TIP_DELAY_MS` (1.5 s,
+    `src/lib/tipDelay.ts`), was 380 ms for the knob and fader cards, and the browser's own
+    `title=` tips (about 240 of them, near a second, not slowable) came up on top. Both
+    now wait the one number, counted afresh on every control with no grace between
+    neighbours: `src/lib/titleTips.ts` lifts a `title` off the element under a mouse or
+    pen, draws its words on a card after the wait and puts it back when the hand goes,
+    presses, types or scrolls (also in a panel's own window). The phone is unchanged: a
+    touch never starts the wait and the name tap still opens its card at once. Checks:
+    `npm run layout` (a knob's card and a `title=` are each absent at 60% of the wait and
+    up after it; the title is back and the card gone after), `npm run phone`.
+    Not changed: the remote page and the cast page, which do not install it.
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's
@@ -3656,6 +3668,14 @@ rebuilt (a lost device, a resolution change), where it used to go dark while the
 said it was playing. The story is in
 `docs/plan-shipped.md` under the same number. The owner's look at them is `docs/judging.md` §66.
 
+**Colour, shipped** (2026-10-27, the owner: "the out of copyright cartoons we added are all black
+and white - we need some color ones please"): five more, in colour, on the same shelf and the
+phone's dye sheet: *Fiddlesticks* (1930, two-colour), *Jack Frost* (1934) and *Balloon Land*
+(1935), both ComiColors in Cinecolor, *Somewhere in Dreamland* (1936, a Fleischer Color Classic) and
+the feature *Gulliver's Travels* (1939, Technicolor, 74 minutes, the whole film). Each one's status
+is in `SOURCES.md` with the catalogue it was checked in; the owner's look is `docs/judging.md` §85.
+`npm run cartoons` now decodes each file and holds its `colour` flag to its picture.
+
 The owner: "can we download a couple videos for inclusion into the app? things that can run
 in the background and be used for visualizations? like silly symphonies, skeleton dance? and
 other early animations?", then "I don't want a short loop, I want the extended cartoon looped."
@@ -3681,9 +3701,22 @@ Open, found building it:
   or a transfer whose source is known before they ship. Ub Iwerks' *Fiddlesticks* (1930)
   and the 1930 Silly Symphonies joined the US public domain in 2026, with the same check.
   Every addition gets a row in `SOURCES.md` first; `npm run cartoons` refuses one without.
-- **14ac-4** *The cartoons are grey.* The prints are black and white, so the pour lays only
-  greys and Film shows a grey picture. Whether the look's palette should tint them (Film's
-  grade already can, in the Mixer) is the owner's call in §66.
+  *2026-10-27:* Fiddlesticks (1930) is on the shelf, with four later colour films (see above).
+  Still open: Lichtspiel and *The Adventures of Prince Achmed* (1926, tinted), which are free by
+  date and need a print whose source is known; the 1930 Silly Symphonies (black and white);
+  and the Popeye colour specials, the Superman shorts and *Poor Cinderella*, left off for the
+  characters' trademarks, not their copyright (`SOURCES.md`, "Considered and left off").
+- **14ac-4** *The cartoons are grey.* **Shipped for colour** (2026-10-27): five are in colour,
+  and the pour lays each pixel's own colour, so no code changed. Whether the look's palette
+  should tint the grey four or the colour five (Film's grade already can, in the Mixer) is
+  still the owner's call in §66 and §85.
+- **14ac-5** *Colour that is two-strip or Cinecolor.* These prints have two colours (red-orange
+  and blue-green), not three: no true yellow, blue or purple. The pour lays what the print
+  has; judge in §85 whether a look's palette should fill in what a two-colour print cannot.
+- **14ac-6** *A feature on the shelf is a 27 MB file.* Gulliver's Travels is a quarter of the
+  shelf's weight, fetched only when someone picks it. If that proves a cost (a phone on mobile
+  data), cut it to a half hour of its best scenes as a separate entry, or serve it by a
+  lower bitrate; the check holds a feature under 30 MB.
 
 ### 14ae. One Record button (shipped, asked 2026-10-24)
 
@@ -8573,45 +8606,18 @@ model cannot reach one, the PR says what it reached and asks.
 
 - **32b-1. Replace the colour grade with the soft box's solid-angle integral and camera gamut mapping.** In 32b, the 4-point path spread (`spread = 0.025`) and dark ground (`ground = 0.0004`) move C7's `t = 120` s saturation by two points (79% → 77%), while the colour grade (`notchFloor = 0.0725`, `chromaRetention = 0.67`) accounts for the rest of the drop from 77% to 13% against the photograph's 15%. Replace that grade with the real phenomenon: integrate the film's Airy reflectance over the soft box's solid angle as a quadrature in `cosI` with s and p Fresnel reflection terms at each angle and the thickness's phase `4π n d cos θ_t / λ` at each angle (which also retires the Fresnel half of shortcut (f)), then map the integrated CIE XYZ tristimulus into the camera's sRGB gamut instead of clamping negative linear channels to zero. *Measure:* the same saturation and hue numbers `npm run soapfilm` C7 prints, with the grade removed (`notchFloor = 0`, `chromaRetention = 1`), showing how much of the 77% → 15% saturation drop the solid-angle integral and camera gamut mapping recover. Also note that check C7 in `scripts/soapfilm.mjs` has no upper bound on saturation (`sat > 0.10` only, so it would pass a film far more saturated than the photograph, such as main's 79% or the ungraded 77%), for a check session to add that bar.
 
-### 32c. The GPU solver
-
-The same model as compute passes in `src/gpu/wgsl/` (the thickness texture, a Jacobi or
-red-black projection, the limited advection), run on the plate's grid. A lab check,
-`npm run soapgpu` (`PW_WEBGPU=1`), runs the 32a scenarios on the GPU and holds C1–C4 and C6
-to the CPU reference within a stated tolerance, so the GPU is judged by the model and not
-by whatever it draws. *Measure:* `soapgpu` plus `wgsl`, `physics` and `derive` unchanged,
-and the pass's cost in ms at the plate's size.
-
-**The check is written first (this PR), and red on main for the one right reason:** with no
-`src/gpu/soapFilm.ts` it prints that and exits 1, as `soapfilm` did before 32a, so it is not
-in `checks.yml` yet; 32c wires it in. `scripts/soapgpu.mjs` runs soapfilm.mjs's C1–C4 and C6
-films, seeds, steps and bars through the GPU solver, and steps the same films on the CPU
-reference beside it: the first step's face flows within 2% and its change in thickness within
-5% (RMS, cell by cell), the thickness after one second within 5% of its change (at dt 0.05, at the frame's 1/60 s, and
-at zeta 0.25 and dt 0.2 s where the reference takes 4 CFL sub-steps), each patch's
-travel within 1.5 rows, every quarter's mean within 2% every 5 s of the drain, the top black
-within 5 s of the reference's, and a hole torn in the film never refilled, its black spreading
-within 15% of the reference's. Two float64 bars move for float32 storage, and only two:
-conservation to 1e-6 (not 1e-9; float32 storage of the whole reference measured 7.7e-9) and
-a still film to 1e-5 nm of the float32 film it was handed (not 1e-6 of the float64 one). The solver's contract
-(`createSoapFilmGpu(device, { nx, ny, dx })` with `write`, `step`, `read`) is written in
-`scripts/soapgpu-cpu.ts`, the reference dressed in it, which `npm run soapgpu -- --selftest`
-runs: 29/29. Look-alikes, each the reference with one thing changed (in a cloud session):
-first-order upwind fails 8 lines, an MC limiter 3 (first step 7.0%, one second 6.3%, drain
-9.6%), a projection stopped at 20 sweeps 4, Jacobi at 200 sweeps 1 (flows 2.8%), semi-Lagrangian
-advection 11 (conservation 8.9e-4), no rupture marks the 2 hole lines, a step that ignores dt
-2, one that ignores zeta 1, one with no sub-steps 1 (26% off); red-black SOR at 60
-sweeps and Jacobi at 1000 pass all 25, so a faithful float32 solver can. The flows' 2% bar
-is a convergence bar, cold, on the first step: plain Jacobi needs about 1000 sweeps on 32 × 64
-to meet it, red-black SOR 60, so 32c's projection is red-black SOR (or multigrid), warm-started.
-The check also asks that the work be the GPU's: the solver's bundle may not carry
-`src/lib/soapFilm.ts`'s code, every step submits to the queue and every read maps a buffer.
+### ~~32c. The GPU solver~~ — **Shipped, this PR (#505)** (`src/gpu/soapFilm.ts` exporting `createSoapFilmGpu`, `src/gpu/wgsl/soapFilm.ts` with `soapSetup`, `soapSorRed`, `soapSorBlack`, `soapProject` and `soapTransport`, and `scripts/checks.json` wiring `npm run soapgpu` on the Mac `plate` shard beside `sloshgpu` and `npm run soapgpu -- --selftest` on Measure's `lab` shard beside `sloshgpu`; `npm run soapgpu` 29/29 on `apple metal-3` — first-step flows 0.195%, first-step thickness 1.116%, 1 s thickness 0.065% at `dt = 0.05` s, 0.022% at `dt = 1/60` s, 0.884% at `zeta = 0.25, dt = 0.2` s with 4 CFL sub-steps, C1 thick +29.41 vs +29.41 and thin −22.56 vs −22.55 rows, C2 drift 7.0e-9, C3 reversed −20.86 vs −20.85 rows, C4 max `|div u|` 1.8e-4 /s, C6 worst quarter mean 0.08%, top black at 115 s vs 115 s, torn hole 0 refilled and 160 vs 160 black cells, 0 of 4785 steps idle, 0 of 514 reads idle, `src/lib/soapFilm.ts` absent from bundle, `cost: 2.44 ms a step at 256 × 256 on apple metal-3`; `npm run soapgpu -- --selftest` 29/29; `npm run soapfilm` 23/23; `npm run wgsl` 142 shaders; `npm run physics` 20/20; `npm run derive` 4/4; story in `docs/plan-shipped.md` §32c)
 
 - **32c-1. The drain's own "a ruptured cell stays black" never fires.** soapfilm.mjs C6 reads
   it on the drain, where measured, the reference with its rupture marks removed refills no cell
   either (thick film never presses on black there), so that line in `npm run soapfilm` would pass
   a solver with no marks. `soapgpu` asks it on a torn hole instead; soapfilm.mjs should get the
   same hole for the CPU reference (a check session; it moves an input, so `Check changes:`).
+- **32c-2. `soapgpu -- --selftest` opens Chromium before checking `selftest`.** `scripts/soapgpu.mjs`
+  calls `openLab` and `navigator.gpu.requestAdapter()` unconditionally, and `checks.yml` installs
+  Chromium only on `Measure`'s `browser` and `lab` shards (`logic` has no Chromium), so
+  `npm run soapgpu -- --selftest` sits in `Measure`'s `lab` shard beside `sloshgpu` until
+  `soapgpu.mjs` steps the `--selftest` control in Node without a browser.
 
 ### 32d. On the plate
 
