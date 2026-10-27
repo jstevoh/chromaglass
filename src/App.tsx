@@ -2702,11 +2702,16 @@ export default function App() {
   const lookSince = useRef(Date.now());
   const [lookFor, setLookFor] = useState(0);
   useEffect(() => { lookSince.current = Date.now(); setLookFor(0); }, [pinnedPresetId]);
+  const clockLive = deskLayout.plateMode === 'live';
   useEffect(() => {
-    if (!performing) return;
+    // On the tab's plate being Live, as it ran on the Gig desk being chosen:
+    // not on `performing`, which is also a window wide enough for the desk,
+    // so a phone (never a desk) lost the clock and `npm run renders` read 0
+    // renders a second where its clock is asked for (0.6 to 1.5).
+    if (!clockLive) return;
     const id = setInterval(() => setLookFor((Date.now() - lookSince.current) / 1000), 1000);
     return () => clearInterval(id);
-  }, [performing]);
+  }, [clockLive]);
 
   /*
     "Edited" is the document's own flag now.
