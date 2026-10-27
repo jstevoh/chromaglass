@@ -8956,22 +8956,28 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   (the new tint is the old grade to 1.5% a channel there), so saved looks, the presets and Lucky keep their
   colour with no migration. The vignette is unchanged (full from 1 on). Held by `npm run panel`. Story in
   `docs/plan-shipped.md` §35; judging §80.
+- ~~**35e-4** Home Movie's lamp, and the warm end's brightness.~~ Shipped (2026-10-27, the owner left both to the
+  session): Home Movie sits at Lamp Warmth 3, 3560 K, and the warm end holds its brightness. A Super 8 projector's
+  lamp is a 3200 to 3400 K halogen, the lamp the film was balanced to be shown by; 3 and not the 3.75 end because the
+  tint is the full blackbody ratio, which a camera records and a room-adapted eye sees less of (35e-3), so the end
+  would over-state the orange. Brightness: colour temperature does not set output (a projector's halogen is as bright
+  as it was built to be, and the lens throws no less light for the lamp being amber); a lamp run cool on a dimmer does
+  lose light, steeply, about the eighth power of its temperature near 3000 K (flux as V^3.4, temperature as V^0.42),
+  but that is Exposure's knob, not the colour's. So `lampTint` keeps the luminance it has at 1 for 1 to 3.75 and 0 to 1
+  is untouched. Cost, named: the red channel rises to 1.48 at 3200 K (1.36 at 3560 K), so a pigment already at full
+  red clips on a multiply of the finished picture, which the six-band lamp spectrum (35e-3) would handle properly.
+  Held by `npm run panel`; judging §84.
 - **35e-3** What the readings left, none changed because each moves a look or waits on another step:
   - **The lamp's colour is a multiply on the finished picture,** which is the lamp's spectrum times a white
     surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
     Planck spectrum entering `spectralThrough`'s six bands before the eye sums them, so a deep blue dye under
     3200 K goes darker and more violet than a multiplied blue does (it already goes to a near black in the
-    lab picture). Named shortcut; replace it. The warm end is also about a third dimmer, which is a choice and not
-    physics (holding red still keeps 0 to 1 the old grade; a lamp's brightness is not set by its colour
-    temperature), and Exposure puts it back; if the owner wants the end held at the same brightness, that is one
-    normalisation in `lampTint`. Two more shortcuts: the neutral is the 6500 K blackbody, not D65 (sRGB's white,
+    lab picture). Named shortcut; replace it. (The warm end's brightness is settled: see 35e-4.) Two more shortcuts: the neutral is the 6500 K blackbody, not D65 (sRGB's white,
     which sits a little off the blackbody curve), so the figure is approximate; and the full blackbody ratio is
     what a camera or film balanced for daylight records, where an eye in the room would partly adapt to the warm
     light and see less orange.
-  - **Velvet Underground (0.25) and Home Movie (0.45) keep their colour** to under 2% in blue, because their
-    numbers kept their meaning. Home Movie is the look an old projector's lamp is for: the owner's eye on
-    whether it should now go to 2 or 3 (judging §80 item 4); Lucky still draws 0 to 0.8, so it never reaches
-    the halogen.
+  - **Velvet Underground (0.25) keeps its colour** to under 2% in blue, because its number kept its meaning. Lucky
+    still draws 0 to 0.8, so it never reaches the halogen. (Home Movie moved: 35e-4.)
   - **Evolve wanders Lamp Warmth by a fifth of its travel,** which is now a fifth of 3.75: from a look at 0.25 up
     to 1, from a look at 3 over the whole warm end. Pull it in (a per-dial span) if that reads as too much.
   - **The viscosity drip is slow motion at one factor.** The ratio between thin and thick is the

@@ -1895,6 +1895,13 @@ check('and neither starts over the limit',
   }
   check('from 0 to 1 the tint is the old grade to 1.5% a channel, so every saved look keeps its colour',
     worstLegacy < 0.015, `worst ${(worstLegacy * 100).toFixed(2)}% over 21 notches`);
+  // A lamp's colour does not set its brightness: past the old end the tint keeps the luminance it has at 1, and
+  // 0 to 1 (the saved looks) is left alone.
+  const lum = t => 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2];
+  let worstHold = 0;
+  for (const w of steps.filter(w => w >= 1)) worstHold = Math.max(worstHold, Math.abs(lum(lampTint(w)) / lum(lampTint(1)) - 1));
+  check('past the old end of the travel the lamp keeps the picture\'s brightness, so the halogen end is not a third dimmer',
+    worstHold < 1e-9 && lum(lampTint(LAMP_WARMTH_MAX)) > 0.9, `luminance ${lum(lampTint(1)).toFixed(3)} at 1, ${lum(lampTint(2)).toFixed(3)} at 2, ${lum(lampTint(LAMP_WARMTH_MAX)).toFixed(3)} at ${LAMP_WARMTH_MAX}, worst drift ${worstHold.toExponential(1)}`);
   // The vignette blends as it always did (1 - w + w*g*vig), not tint times a second blend: the review found 6% in the corners.
   const shaderForm = /tint - \(tint - vec3f\(1\.0 - min\(U\.lampWarmth, 1\.0\)\)\) \* \(1\.0 - vig\)/.test(plateWgsl);
   let worstCorner = 0;
