@@ -99,6 +99,9 @@
  * body's is 94, midway between 105.8 and 82.0. The momentum pass's
  * differential is 0.16R, half its gap of 0.33R (it was 0.13R, half of 0.27R);
  * the compression pass's stays 13 cells, more than half its gap of 23.8.
+ * On Metal (#521's fifth shard, run 40592589582) the same: lead 1.74R on and
+ * 2.07R with phaseMomentum off, half-full 105.8 on and 82.2 with
+ * phaseCompress off.
  *
  * Lab only (software WebGPU in headless Chrome, or Metal on the Mac).
  */
