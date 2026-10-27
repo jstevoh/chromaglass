@@ -124,7 +124,7 @@ api() {
 
 treeof() { api "git/commits/$1" | jq -r '.tree.sha // empty'; }
 
-# The Mac shards, read from checks.yml's matrix rather than written out here.
+# The Mac shards, read from the manifest rather than written out here.
 # The list used to be written here by hand, four names, and when PLAN.md 19w
 # gave checks.yml a fifth shard (`fifth`, 2026-10-11) nothing told this file:
 # from then on every PR run had five green shards, "five" is not "these four",
@@ -133,19 +133,21 @@ treeof() { api "git/commits/$1" | jq -r '.tree.sha // empty'; }
 # the Mac shards (fifth=success,open=success,plate=success,show=success,
 # tools=success)", so each of those deploys re-ran the whole Mac, about 55
 # minutes from merge to live, on a tree that had just passed it. Reading the
-# names from the workflow makes the next shard count without anyone
-# remembering this file. It is the checked-out tree's checks.yml, the one being
-# deployed: a run whose own matrix was different (rule 5, a run on an older
-# main before a shard was added or renamed) does not match it and is not
-# trusted, which costs that one deploy the Mac and never trusts a run that
-# skipped a shard. No shard line, or more than one, stops the script, which in
-# deploy.yml runs the checks in full.
-MACSHARDS=$(sed -n 's/^[[:space:]]*shard:[[:space:]]*\[\(.*\)\][[:space:]]*$/\1/p' \
-  "$(dirname "$0")/../.github/workflows/checks.yml")
-[ -n "$MACSHARDS" ] && [ "$(printf '%s\n' "$MACSHARDS" | wc -l)" -eq 1 ] \
-  || { echo "checks.yml has no single 'shard: [...]' line to read the Mac shards from" >&2; exit 1; }
-MACSHARDS=$(printf '%s\n' "$MACSHARDS" | tr ',' '\n' | tr -d ' "'"'"'' | grep -v '^$' | sort \
-  | jq -Rnc '[inputs | "\(.)=success"]')
+# names from the tree makes the next shard count without anyone remembering
+# this file. It is the checked-out tree's list, the one being deployed: a run
+# whose own matrix was different (rule 5, a run on an older main before a
+# shard was added or renamed) does not match it and is not trusted, which
+# costs that one deploy the Mac and never trusts a run that skipped a shard.
+# No list stops the script, which in deploy.yml runs the checks in full.
+#
+# Since PLAN.md 19k the list is the manifest's (scripts/checks.json), which
+# checks.yml's matrix runs through `reach`: a PR whose change was only check
+# scripts runs the shards those checks are on, and such a run is not a Mac run
+# here, since it skipped the rest. Its merge changes no site file, so the
+# deploy publishes nothing (19j) and never asks.
+MACSHARDS=$(jq -c '.shards.mac // empty | map(select(type == "string")) | sort | map("\(.)=success")' \
+  "$(dirname "$0")/checks.json") && [ -n "$MACSHARDS" ] && [ "$MACSHARDS" != "[]" ] \
+  || { echo "scripts/checks.json has no shards.mac list to read the Mac shards from" >&2; exit 1; }
 
 # "ran" when run $1's Mac jobs are exactly the shards above and every one is
 # green; otherwise what it ran, joined ("none" for a run that skipped them).
@@ -153,6 +155,26 @@ macrun() {
   api "actions/runs/$1/jobs?per_page=100&filter=latest" \
     | jq -r --argjson want "$MACSHARDS" '[.jobs[] | select(.name | startswith("WebGPU (macOS) ·")) | "\(.name | ltrimstr("WebGPU (macOS) · "))=\(.conclusion)"] | sort
       | if . == $want then "ran" else (join(",") | if . == "" then "none" else . end) end'
+}
+
+# "partial: ..." when run $1's `reach` job said it ran only the Measure checks
+# its diff reached (PLAN.md 19k-4), empty only for a run that ran all of Measure.
+# Such a run proved what its diff could move and nothing about the rest of the
+# tree, so it is never the evidence that a tree is safe to publish; the deploy
+# runs Measure in full. It is only a PR of check scripts, the manifest and
+# documents that gets one, which publishes nothing (PLAN.md 19j) unless
+# package.json's scripts moved with it.
+#
+# It fails closed. `errexit` is not inherited inside `$(...)`, so a failed API
+# call used to leave an empty answer, which reads as "ran in full": a run that
+# could not be read, or one with no reach job to read, answers "partial" here.
+measurepartial() {
+  local jobs job notes
+  jobs=$(api "actions/runs/$1/jobs?per_page=100&filter=latest") || { echo "partial: the jobs of run $1 could not be read"; return 0; }
+  job=$(jq -r '.jobs[] | select(.name == "What the change reaches") | .id // empty' <<<"$jobs") || { echo "partial: the jobs of run $1 could not be parsed"; return 0; }
+  [ -n "$job" ] || { echo "partial: run $1 has no reach job to say whether Measure ran in full"; return 0; }
+  notes=$(api "check-runs/$job/annotations") || { echo "partial: the reach job of run $1 has annotations that could not be read"; return 0; }
+  jq -r '.[] | select(.title == "measure") | .message // empty' <<<"$notes" | grep '^partial' | head -1 || true
 }
 
 # The paths whose blobs differ between two trees, one a line, sorted: added,
@@ -315,7 +337,7 @@ unchanged() {
 # one commit on main; $2 is main before it (defaults to the commit's first parent, which for
 # a squash merge is the same commit).
 judge() {
-  local sha="$1" before="${2:-}" commit tree heads entry pr head runs run url tested ttree htree status verdict shards newest
+  local sha="$1" before="${2:-}" commit tree heads entry pr head runs run url tested ttree htree status verdict shards newest partial
   commit=$(api "commits/$sha")
   sha=$(jq -r .sha <<<"$commit")
   tree=$(jq -r '.commit.tree.sha // empty' <<<"$commit")
@@ -362,6 +384,13 @@ judge() {
       fi
       if [ "$shards" != ran ]; then
         echo "false #$pr's run $url did not run the Mac shards ($shards)"; continue
+      fi
+      # The run itself, and the run its Mac shards were carried from (url was
+      # reassigned to that one above): either may have been partial.
+      partial=$(measurepartial "$run_id")
+      [ -n "$partial" ] || [ "${url##*/}" = "$run_id" ] || partial=$(measurepartial "${url##*/}")
+      if [ -n "$partial" ]; then
+        echo "false #$pr's run $url ran only the Measure checks its diff reached ($partial)"; continue
       fi
       if [ "$tested" != - ]; then
         ttree=$(treeof "$tested")

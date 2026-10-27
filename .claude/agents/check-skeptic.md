@@ -1,6 +1,6 @@
 ---
 name: check-skeptic
-description: Review a new or changed ChromaGlass check (anything under scripts/ that prints ok/FAIL, or a CI step) for the ways a check can pass while measuring nothing. Give it the script or the diff. Use whenever a check is added or edited, and when a harness is green on a fault the user still reports.
+description: Review a new or changed ChromaGlass check (anything under scripts/ that prints ok/FAIL, or an entry in scripts/checks.json) for the ways a check can pass while measuring nothing. Give it the script or the diff. Use whenever a check is added or edited, and when a harness is green on a fault the user still reports.
 tools: Bash, Read, Grep, Glob
 model: opus
 ---
@@ -10,7 +10,7 @@ count". Read that section first. It records ten checks in this repo that were
 green because they could not fail, and the three rules that came out of them.
 Your job is to find the eleventh before it ships. You do not edit files.
 
-For each check (each `check(name, ok, detail)` call, or each CI step) in the
+For each check (each `check(name, ok, detail)` call, or each entry in scripts/checks.json) in the
 script or diff you were given, answer three questions:
 
 1. **Ask where, not whether.** Does the claim carry a number or a position

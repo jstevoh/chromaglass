@@ -59,7 +59,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { isGpuEngine } from './frame.mjs';
+import { engineQuery, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4351;
 const checks = [];
@@ -75,19 +75,21 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise((r) => setTimeout(r, 2500));
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   // The grid pinned: a governor that moved it would lay a new solver under the listeners.
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256`, { waitUntil: 'load' });
-  await page.waitForTimeout(8000);
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });
+  await settlePlate(page, 8000);
+  await waitForEngine(page);
 
   // A slow adapter takes longer than a runner to open the stage.
   let engine = null;
   for (let k = 0; k < 10 && !isGpuEngine(engine); k++) {
     engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
-    if (!isGpuEngine(engine)) await page.waitForTimeout(2000);
+    if (!isGpuEngine(engine)) await settlePlate(page, 2000);
   }
   check('the GPU solver is the one being measured', isGpuEngine(engine), engine ?? 'no debug hook');
   if (!isGpuEngine(engine)) process.exit(1);
@@ -99,7 +101,7 @@ try {
   let solver = false;
   for (let k = 0; k < 15 && !solver; k++) {
     solver = await page.evaluate(() => !!window.chromaglassDebug().fluids?.[0]?.gpu);
-    if (!solver) await page.waitForTimeout(1000);
+    if (!solver) await settlePlate(page, 1000);
   }
   /*
     And it steps. Software WebGPU opens the stage and attaches a solver but
@@ -107,7 +109,7 @@ try {
     nothing: say so and stop, rather than print a column of zeros.
   */
   const stepAt = () => page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.stepIndex ?? -1);
-  const s0 = await stepAt(); await page.waitForTimeout(1500); const s1 = await stepAt();
+  const s0 = await stepAt(); await settlePlate(page, 1500); const s1 = await stepAt();
   const steps = solver && s1 > s0 && s0 >= 0;
   check('the lead plate has its GPU solver, and it steps', steps,
     !solver ? 'no solver after 15 s' : steps ? `${s1 - s0} steps in 1.5 s` : `stepIndex ${s0} → ${s1}: this adapter cannot run the app, use the Mac`);
@@ -125,7 +127,7 @@ try {
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
   const screen = (fx, fy) => [box.x + box.width * fx, box.y + box.height * fy];
-  const settle = (ms) => page.waitForTimeout(ms);
+  const settle = (ms) => settlePlate(page, ms);
 
   /*
     The listeners, on the lead plate's solver and on the plate. Every call is
