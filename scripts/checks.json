@@ -852,6 +852,23 @@
       ]
     },
     {
+      "name": "The dish that boils on the GPU (control)",
+      "shard": "lab2",
+      "run": "npm run boilgpu -- --selftest",
+      "timeout": 6,
+      "why": [
+        "The dish that boils, the GPU check against its CPU control (PLAN 36e-2,",
+        "scripts/boilgpu.mjs --selftest, scripts/boilgpu-cpu.ts): the CPU reference",
+        "in the GPU solver's contract, its fields stored in float32, through every",
+        "dish and bar of boilgpu, so each bar is shown to be one the model meets.",
+        "In a Measure lab part because boilgpu.mjs opens the lab page in Chromium",
+        "and asks for a WebGPU adapter before it runs the solver; lab2, the lighter",
+        "of the two since #517 (10:55 against 14:22). About 80 s in a cloud session.",
+        "`npm run boilgpu` itself, on Metal, joins the plate shard with the GPU",
+        "build (36e-2): until then it is red by design, as soapgpu was before 32c."
+      ]
+    },
+    {
       "name": "The layout",
       "shard": "browser",
       "run": "npm run layout",

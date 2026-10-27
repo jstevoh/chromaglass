@@ -177,6 +177,7 @@
     "soapfilm": "node scripts/soapfilm.mjs",
     "boil": "node scripts/boil.mjs",
     "soapgpu": "PW_WEBGPU=1 node scripts/soapgpu.mjs",
+    "boilgpu": "PW_WEBGPU=1 node scripts/boilgpu.mjs",
     "particles": "node scripts/particles.mjs",
     "finite": "node scripts/finite.mjs",
     "derive": "node scripts/derive.mjs",
