@@ -174,7 +174,11 @@ measurepartial() {
   job=$(jq -r '.jobs[] | select(.name == "What the change reaches") | .id // empty' <<<"$jobs") || { echo "partial: the jobs of run $1 could not be parsed"; return 0; }
   [ -n "$job" ] || { echo "partial: run $1 has no reach job to say whether Measure ran in full"; return 0; }
   notes=$(api "check-runs/$job/annotations") || { echo "partial: the reach job of run $1 has annotations that could not be read"; return 0; }
-  jq -r '.[] | select(.title == "measure") | .message // empty' <<<"$notes" | grep '^partial' | head -1 || true
+  # Parse before filtering: `jq | grep | head || true` turned a body that was not
+  # JSON (an error page, a truncated read) into an empty answer, which reads as
+  # "ran in full". A body that is not an array of annotations is partial.
+  notes=$(jq -r 'if type == "array" then .[] | select(.title == "measure") | .message // empty else error("not a list") end' <<<"$notes") || { echo "partial: the reach job of run $1 has annotations that are not JSON"; return 0; }
+  grep '^partial' <<<"$notes" | head -1 || true
 }
 
 # The paths whose blobs differ between two trees, one a line, sorted: added,
