@@ -49,12 +49,16 @@
  * never passed; `KICKBUBBLES_PLATE=1` runs them anyway.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, presentsInXvfb } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery } from './frame.mjs';
+import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = Number(process.env.KICKBUBBLES_PORT ?? 4363);
-const PLATE = process.platform === 'darwin' || !!process.env.KICKBUBBLES_PLATE;
+// A Linux box with PW_WEBGPU presents headed into Xvfb below (chromium.mjs, PLAN.md 19l), so its plate
+// draws too, a twentieth as often: the count of bubbles a kick drops is the same, the window it is
+// counted in is `settlePlate`'s steps there.
+const PLATE = process.platform === 'darwin' || !!process.env.KICKBUBBLES_PLATE
+  || (process.platform === 'linux' && !!process.env.PW_WEBGPU);
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
@@ -111,7 +115,8 @@ const read = (page) => page.evaluate(() => {
   };
 });
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 let failed = 0;
 try {
   for (const c of CASES) {
@@ -119,14 +124,19 @@ try {
       viewport: c.screen.viewport, isMobile: c.screen.touch, hasTouch: c.screen.touch, deviceScaleFactor: c.screen.touch ? 2 : 1,
     });
     const page = await ctx.newPage();
+    // Every click waits its turn behind the plate's first step in software (PLAN.md 19l): 25 to 100 s.
+    if (presentsInXvfb()) page.setDefaultTimeout(300_000);
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&play=0${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForFunction(() => typeof window.chromaglassSettings === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
-    await page.waitForTimeout(6000);
+    await settlePlate(page, 6000);
+    await waitForEngine(page);
     await page.evaluate((impact) => window.chromaglassSettings(impact === null ? { bubbles: 1 } : { audioImpact: impact, bubbles: 1 }), c.impact);
-    await page.waitForTimeout(1000);
+    await settlePlate(page, 1000);
     const before = await read(page);
-    const plate = await page.locator('canvas').first().boundingBox();
+    // Bubbles to full can lay the plate again, and in software a new plate's first step is 25 to 100 s.
+    const plate = await page.locator('canvas').first().boundingBox({ timeout: presentsInXvfb() ? 300_000 : 30_000 });
+    await waitForEngine(page);
     const at = plate ? { x: plate.x + plate.width / 2, y: plate.y + plate.height / 2 } : { x: c.screen.viewport.width / 2, y: c.screen.viewport.height / 3 };
     // The app opens on Source Off (PLAN.md 14y), so the band is chosen the way a
     // hand does, by its control, after the dials above are set and before the
@@ -141,10 +151,10 @@ try {
       await page.getByTestId('sound-source-simulated').click();
       await page.keyboard.press('Escape');
     }
-    await page.waitForTimeout(500);
+    await settlePlate(page, 500);
     if (c.screen.touch) await page.touchscreen.tap(at.x, at.y);
     else await page.mouse.click(at.x, at.y);
-    await page.waitForTimeout(c.listenMs ?? LISTEN_MS);
+    await settlePlate(page, c.listenMs ?? LISTEN_MS);
     const after = await read(page);
     const kicks = (after.kicks ?? 0) - (before.kicks ?? 0);
     const m0 = before.music ?? {}, m1 = after.music ?? {};

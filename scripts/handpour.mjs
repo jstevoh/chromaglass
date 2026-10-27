@@ -66,10 +66,10 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, presentsInXvfb } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { lookTarget } from '../src/lib/dyeTarget.ts';
-import { engineQuery, installFrameReader, frameOf, waitForShow } from './frame.mjs';
+import { engineQuery, installFrameReader, frameOf, waitForShow, settlePlate } from './frame.mjs';
 
 const PORT = Number(process.env.HANDPOUR_PORT ?? 4346);
 const ONLY = process.env.HANDPOUR_ONLY ? process.env.HANDPOUR_ONLY.split(',').map((s) => s.trim()).filter(Boolean) : null;
@@ -131,14 +131,15 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise((r) => setTimeout(r, 2500));
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 
 /** A fresh page on one look, the show open; null (page closed) if it never opened. */
 const open = async (id, dyeBudget) => {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${id}${engineQuery()}`, { waitUntil: 'load' });
-  const waited = await waitForShow(page);
+  const waited = await waitForShow(page, presentsInXvfb() ? 300_000 : 60_000);
   if (waited === null) { await page.close(); return null; }
   if (dyeBudget !== undefined) await page.evaluate((v) => { window.chromaglassDebug().settings.dyeBudget = v; }, dyeBudget);
   return page;
@@ -193,7 +194,7 @@ const pourByHook = async (page, base) => {
       for (const at of [[0.3, 0.3], [0.7, 0.35], [0.5, 0.7]]) for (let k = 0; k < 4; k++) d.gesture({ tool: 'pour', x: at[0], y: at[1], layer: 0 });
     });
     n += 12;
-    await page.waitForTimeout(400);
+    await settlePlate(page, 400);
     rise = (await mean(page)) - base;
   }
   return { rise, n };
@@ -216,7 +217,7 @@ const pourByMouse = async (page, base) => {
     }
     await page.mouse.up();
     n++;
-    await page.waitForTimeout(300);
+    await settlePlate(page, 300);
     rise = (await mean(page)) - base;
   }
   return { rise, n };
@@ -225,7 +226,7 @@ const pourByMouse = async (page, base) => {
 /** One pour, then the share of it still on the plate at each of POUR_AT seconds. */
 const pourRun = async (page, on, how) => {
   await fix(page, on);
-  await page.waitForTimeout(6000);
+  await settlePlate(page, 6000);
   const before = await state(page);
   const base = await mean(page);
   const { rise, n } = await (how === 'mouse' ? pourByMouse : pourByHook)(page, base);
@@ -233,7 +234,7 @@ const pourRun = async (page, on, how) => {
   const left = {};
   let t = 0;
   for (const at of POUR_AT) {
-    await page.waitForTimeout((at - t) * 1000);
+    await settlePlate(page, (at - t) * 1000);
     t = at;
     left[at] = rise > 1e-4 ? ((await mean(page)) - base) / rise : NaN;
   }
@@ -247,7 +248,7 @@ try {
   for (const id of ids) {
     const page = await open(id);
     if (!page) { report.looks.push({ id, error: 'the show never opened' }); console.log(`     ${id}: the show never opened`); continue; }
-    await page.waitForTimeout(6000);
+    await settlePlate(page, 6000);
     const s = await state(page);
     const m = await mean(page);
     const preset = PRESETS.find((p) => p.id === id);
@@ -293,7 +294,7 @@ try {
     const settle = async (b) => {
       const page = await open('jellyfish-bloom', b);
       if (!page) return NaN;
-      await page.waitForTimeout(25000);
+      await settlePlate(page, 25000);
       const m = await mean(page);
       await page.close();
       return m;
@@ -315,7 +316,7 @@ try {
   for (const id of pourLooks) {
     const page = await open(id);
     if (!page) { check(`${id}: the show opened for the pour`, false); continue; }
-    await page.waitForTimeout(10000);
+    await settlePlate(page, 10000);
     const runs = [];
     for (const on of [false, true, true, false]) runs.push(await pourRun(page, on, 'hook'));
     const byMouse = await pourRun(page, true, 'mouse');
@@ -383,7 +384,7 @@ try {
         await fix(page, on);
         let t = 0;
         for (const at of TIMES) {
-          await page.waitForTimeout((at - t) * 1000);
+          await settlePlate(page, (at - t) * 1000);
           t = at;
           const v = await black(page);
           frames++;

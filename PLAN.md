@@ -5523,11 +5523,46 @@ first step's GPU time apart from the prepare's, would say. *Size:* S to measure.
 
 #### 19l-3. The other app checks, asked one at a time (found with 19l)
 
-Four harnesses present (`present: true`) and wait in steps (`settlePlate`). The other
-twenty-five that read the app's frames (`engineQuery()` in `qa`, `bubbles`, `finger`, `press`,
-`spin`, `startup`, ...) still launch headless on Linux; `PW_PRESENT=1` tries any of them headed.
-Each wants its own pass: its opening wait through `waitForEngine`, its waits through
-`settlePlate`, and a cloud run beside the Mac's to say which of its lines agree. *Size:* S each.
+Four harnesses presented (`present: true`) and waited in steps (`settlePlate`) after 19l. The
+twenty-five others that read the app's frames still launched headless on Linux; `PW_PRESENT=1`
+tries any of them headed. Each wants its own pass: its opening wait through `waitForEngine`,
+its waits through `settlePlate`, and a cloud run beside the Mac's to say which of its lines agree.
+*Size:* S each.
+
+*Built (2026-10-27):* nine more opted in, each run here at the same commit (`PW_WEBGPU=1`, three
+at a time on 4 cores, 5% of the Mac's steps): `take` 9 of 9, `ferro` 7 of 7, `ferrodrift` 6 of 6,
+`finger` 2 of 2 (these agree with the Mac's), `bubbles` 26 of 30 and `depth` 8 of 10 (the
+failing lines wait on the plate having developed for nine of the Mac's seconds, 540 steps, here 27:
+"the plate holds nearly still while it is photographed" read 61% of pixels moved, "the show is
+running" wants two steady seconds, "switching it off puts the plate back" is a magnitude),
+`handpour` 26 of 31 (the bank's size against what a pour raised the mean by, and the slider's
+ordering, are magnitudes of a pour at a twentieth of its steps), `kickbubbles` 8 of 12 (all its
+"releases no bubbles" and layout lines agree; the four that count kicks reaching the bubbles
+"at least 15" in a listening window read 1 to 3, the window being the wall clock's).
+What it took: `take` read a toast that goes in a few seconds, so its wait after the first stop is the
+wall clock, its note waits 30 s in software, and it waits for the engine again after its reload;
+`kickbubbles` skipped itself unless a Mac drew, and its clicks and canvas lookup waited out
+Playwright's 30 s behind the plate's first step; `handpour`'s `waitForShow` has five minutes in
+software, not one.
+
+*Left out, and why:*
+- `spin`, `flick`: they read the dish's angular velocity in radians a *wall* second after a flick,
+  and the flick's impulse is gone before the first step lands (front plate 0.000 rad/s for 17
+  readings, `flick` 6 of 8 red). Their claim is the frame loop's time, which software does not run.
+- `swirlcost`: it is a frame's cost, which software cannot say.
+- `render-app`: it records the whole song in real time, three renders in five hours here with no end.
+- `startup`, `intro`: they measure the page's opening, which headed does not (19l's trap).
+- `gallery`, `plates`, `shots`, `showreel`, `looks`, `film`, `moving`, `wall`, `evolve`, `controls`,
+  `press`, `drain`: photographs, films or the Mac's own (CLAUDE.md), or not asked for.
+
+*Found on the way:* `press` and `drain` have never run: both call `chromaglassDebug().seed?.()`,
+and `seed` is the show's seed number (a number, so `?.()` throws), so each stops at its first line
+that matters, on the Mac too. Neither is in CI. *Fix:* give the hook a function that pours the
+opening dye (`reseed` exists beside `seed`), or drop the call; then opt both in. *Size:* S.
+
+Still to do, each its own pass: the lines above that differ want either `PW_STEP_SHARE` raised for the
+opening wait alone (a plate that has developed for nine seconds needs 540 steps; 27 are not it) or
+a named step count in place of nine seconds, so a Mac and a cloud run develop the same plate.
 
 ### 19m. Fragments for the shared documents, and this file as an index
 
