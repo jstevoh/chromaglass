@@ -18,6 +18,7 @@
  * cannot drift apart. What is not here is anything that reads the plate.
  */
 import { chromium } from 'playwright';
+import { TIP_DELAY_MS } from '../src/lib/tipDelay.ts';
 import { spawn } from 'node:child_process';
 import { launchChromium } from './chromium.mjs';
 import { clickAt, modeSwitchX, legibility, coveredControls, statusDots, COVER_WIDTHS } from './layoutProbe.mjs';
@@ -773,8 +774,17 @@ try {
       });
       const none = await readTip();
       await page.mouse.move(kcx, kcy);
-      await settle(700);
+      /*
+        8j-3: the wait. The owner found the cards in the way, so a card comes up
+        only after TIP_DELAY_MS (1.5 s) on the control. Read at 0.6 of it, so a
+        card that came up at the old 380 ms fails, then after the delay.
+      */
+      await settle(Math.round(TIP_DELAY_MS * 0.6));
+      const early = await readTip();
+      await settle(Math.round(TIP_DELAY_MS * 0.4) + 400);
       const tipped = await readTip();
+      check('a knob\'s card waits the hover delay: not up at 60% of it, up after it',
+        !early && !!tipped, `${TIP_DELAY_MS} ms: ${early ? 'up early' : 'none at 60%'}, ${tipped ? 'up after' : 'none after'}`);
       const apart = tipped && (tipped.r.y + tipped.r.h <= knobBox.y + 1 || tipped.r.y >= knobBox.y + knobBox.h - 1);
       check('hovering a knob names it in full and says what it does, clear of the knob itself',
         !none && !!tipped && tipped.name === name && tipped.help.length > 20 && !!tipped.value && apart,
@@ -795,6 +805,34 @@ try {
       await settle(300);
       const gone = await readTip();
       check('the card goes when the hand does', !gone, gone ? 'still up' : 'gone');
+      /*
+        8j-3: the browser's own tip. A `title=` cannot be slowed, so while the
+        pointer is on one it is lifted off the element (nothing for the browser
+        to show), drawn on a card after the same TIP_DELAY_MS, and put back when
+        the pointer goes. Read on the first visible titled button, against its
+        own title, so a renamed control cannot pass by matching a literal.
+      */
+      // A handle, not a locator: a locator by [title] stops matching the moment the title is lifted.
+      const titled = await page.locator('button[title]:visible').first().elementHandle();
+      if (titled) {
+        const title = await titled.getAttribute('title');
+        const tb = await titled.boundingBox();
+        const tipCard = () => page.evaluate(() => document.querySelector('[data-title-tip]')?.textContent ?? null);
+        await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2);
+        await settle(150);
+        const lifted = await titled.evaluate(el => !el.hasAttribute('title'));
+        await settle(Math.round(TIP_DELAY_MS * 0.5));
+        const titleEarly = await tipCard();
+        await settle(Math.round(TIP_DELAY_MS * 0.5) + 400);
+        const titleLate = await tipCard();
+        await page.mouse.move(5, 5);
+        await settle(200);
+        const back = await titled.getAttribute('title');
+        const goneAfter = await tipCard();
+        check('a title= waits the hover delay too, on a card of its own, and is put back when the hand goes',
+          lifted && titleEarly === null && titleLate === title && back === title && goneAfter === null,
+          `"${title}": browser tip ${lifted ? 'lifted' : 'NOT lifted'}, card ${titleEarly === null ? 'none' : 'up'} at 50%, ${titleLate === null ? 'none' : titleLate === title ? 'its words' : 'wrong words'} after, title ${back === title ? 'back' : 'LOST'}, card ${goneAfter === null ? 'gone' : 'stuck'}`);
+      }
       // Put the value back for what follows.
       await knob.dblclick();
       await settle(200);
@@ -851,11 +889,11 @@ try {
       */
       await page.keyboard.press('Tab');
       await pair[0].focus();
-      await settle(700);
+      await settle(TIP_DELAY_MS + 300);
       const byFocus = await tipNames();
       const b1 = await pair[1].boundingBox();
       await page.mouse.move(b1.x + b1.width / 2, b1.y + b1.height / 2);
-      await settle(800);
+      await settle(TIP_DELAY_MS + 300);
       const byHand = await tipNames();
       await page.mouse.move(5, 5);
       await settle(400);

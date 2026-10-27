@@ -7,6 +7,7 @@ import { SHOW_PATH, isLandingAddress } from './lib/showPath';
 import { macAppLicensed } from './lib/macApp';
 import { requestGpuEarly } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
+import { installTitleTips } from './lib/titleTips';
 import {
   isSignedInCached,
   hasEmailSignInLink,
@@ -35,6 +36,10 @@ if (show) requestGpuEarly();
 // The intro `index.html` painted, listened to from here on: a key or a press
 // on it takes it away, and the plate's first frame does (lib/intro.ts).
 installIntro(show);
+// Every `title=` waits the app's hover delay, not the browser's (PLAN.md 8j-3);
+// here rather than in App so the landing page and sign-in get it too. The
+// remote and the cast page are for a phone or a wall and keep what they have.
+if (show) installTitleTips(document);
 // The phone loads only the control surface — no visualizer, no solver.
 const Root = params.has('remote')
   ? lazy(() => import('./components/RemoteControl'))
