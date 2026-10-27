@@ -1278,7 +1278,7 @@ try {
       // Both desks' own way in, and it has to be *on screen*. The first
       // version of this button sat at the end of the recipe, which scrolls —
       // so the one control whose entire job is to be findable was itself
-      // below the fold. It is in the pinned footer of each now, and this
+      // below the fold. It is in the status bar of every tab now, and this
       // checks the property rather than the existence.
       //
       // And it has to open on *all* of them, from either desk. A button that

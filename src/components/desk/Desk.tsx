@@ -593,6 +593,24 @@ export function Desk(p: DeskProps) {
               )}
             </button>
           )}
+          {/*
+            The desk's way into every setting, on every tab. It was in the
+            Rides panel's pinned footer (and the bench's, without the rides),
+            which a tab of the owner's may not have, or may stack under
+            another panel in a column that scrolls: on Perform, the first
+            tabs measured it 1,201 px down a 900 px window, and on Setup it
+            was not there at all (the Mac's `qa`). The status bar is on every
+            tab and never scrolls.
+          */}
+          <button
+            type="button"
+            onClick={p.onOpenSettings}
+            className="inline-flex h-6 shrink-0 items-center rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+            title="Every setting, by group (the Settings sheet)"
+            data-testid="open-all-settings"
+          >
+            All settings…
+          </button>
           <span className="truncate" data-testid="status-hearing">
             {p.status.audio}
             {p.status.sequence && ` · ${p.status.sequence}`}
