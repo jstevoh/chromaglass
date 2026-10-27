@@ -5605,6 +5605,18 @@ seeded plate, mean 0 to 255 per channel, old then new: 0.25 (64.4, 44.1, 55.9) t
 tungsten lamp. The vignette is unchanged, blended as it was (a first version multiplied by a second blend and was 4 to 6% dark in the corners, which the review caught), and full from 1 on. `npm run panel` holds the shader to the uniforms, the
 kelvin to even mireds ending at 3200 K, the tint to the blackbody's ratios, and 0 to 1 to the old grade.
 
+### 35e-4. Home Movie at 3560 K, the warm end as bright as the white (shipped 2026-10-27)
+
+The owner left both open choices to the session. Home Movie went from Lamp Warmth 0.45 to 3 (3560 K): a Super 8
+projector's lamp is a 3200 to 3400 K halogen, and the end of the slider (3.75) is not used because the tint is the
+full blackbody ratio, which a camera records and a room-adapted eye sees less of. Brightness: colour temperature does
+not set a lamp's output. A lamp run cool on a dimmer does lose light (flux goes as the lamp voltage to the 3.4, its
+temperature as the voltage to the 0.42, so about the eighth power of temperature near 3000 K), but that is Exposure,
+not the colour. `lampTint` now scales the tint above 1 to keep the luminance it has at 1 (0.924), where it had fallen
+to 0.811 at 2, 0.718 at 3 and 0.660 at 3.75. Red rises to 1.36 at 3 and 1.48 at 3.75, so a full-red pigment clips:
+named, and the six-band lamp spectrum (35e-3) is its proper fix. 0 to 1 is untouched. `npm run panel` holds the
+luminance to 1e-9 from 1 to 3.75.
+
 ### 35f. Show hardware (shipped 2026-10-25)
 
 Batch C of the owner's playful-controls choice, items 7 to 11 (the slide carousel, 12, is its own piece): five
