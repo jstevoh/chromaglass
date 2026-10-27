@@ -175,6 +175,7 @@
     "filmtable": "node scripts/filmtable.mjs",
     "filmlook": "node scripts/filmlook.mjs",
     "soapfilm": "node scripts/soapfilm.mjs",
+    "boil": "node scripts/boil.mjs",
     "soapgpu": "PW_WEBGPU=1 node scripts/soapgpu.mjs",
     "particles": "node scripts/particles.mjs",
     "finite": "node scripts/finite.mjs",

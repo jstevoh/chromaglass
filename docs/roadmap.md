@@ -236,9 +236,12 @@ and it is a decision rather than a task.
 
 ### Stage 3 — The European school
 
-6. **S2 · Heat and boiling** ([`slide-plan.md`](slide-plan.md)) — blocked on one
-   small thing: heat has no *strength*, because every source saturates the
-   buoyancy tanh, so a plume has a position and nothing else. The temperature
+6. **S2 · Heat and boiling** ([`slide-plan.md`](slide-plan.md)) — was blocked on one
+   small thing: heat had no *strength*, because every source saturated the
+   buoyancy tanh, so a plume had a position and nothing else. #352 took the tanh
+   out; the model of the rest (heat in watts and kelvin, a nucleation threshold,
+   boiling held and let go) is `src/lib/lampBoil.ts`, judged by `npm run boil`
+   (PLAN 36e-1), and the GPU build is 36e-2. The temperature
    field, its decay, the buoyancy and H6's air field are all built and waiting.
    *And it is not only the European rig that wants this.* The deep dive found
    that bubbles are spawned by the pointer, by a blow and by bass, and by
