@@ -4085,7 +4085,7 @@ plate across the Blow.
 
 ### 15e. The liquids' own forces on the GPU plate
 
-**The check shipped** (`npm run liquidsgpu`, the lab shard, 2026-10-27). The GPU has
+**The check shipped** (`npm run liquidsgpu`, the Mac plate shard, about a minute on Metal; 4 min 26 s on SwiftShader, 2026-10-27). The GPU has
 carried the liquids in fields of its own since the liquids were ported (every pour goes to
 `WebGPUFluid.addLiquidDrop` through onDeposit, `liquidPhase` stands aside as `gpuNative`,
 and `liquidForces` in `wgsl/fluid.ts` pushes the flow with liquidPhase.ts's constants), and

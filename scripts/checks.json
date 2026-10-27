@@ -740,22 +740,6 @@
       ]
     },
     {
-      "name": "The liquids on the GPU plate",
-      "shard": "lab",
-      "run": "npm run liquidsgpu",
-      "env": {"PW_WEBGPU":"1"},
-      "timeout": 12,
-      "why": [
-        "Soap, glycerine, milk and silicone on the GPU solver's own liquid fields",
-        "(PLAN 15e, scripts/liquidsgpu.mjs): the stand-in's four scenes from",
-        "`npm run liquids` laid on the thin gap the looks use, each held to the",
-        "stand-in's bar and to its size within a factor of two, with a fold of",
-        "the deltas every step and on a still plate. Lines owed to PLAN",
-        "15e-1 to 15e-4 print and do not fail until they pass. About 3.5 minutes",
-        "on SwiftShader."
-      ]
-    },
-    {
       "name": "No line round a bubble's hole",
       "shard": "lab",
       "run": "npm run holeline",
@@ -1348,6 +1332,23 @@
         "colour, syrup in a thick look runs ahead of it, a liquid as thin as",
         "the plate's moves as colour alone, and the poured liquid is carried",
         "with its colour and kept: nothing fades it (PLAN 18d-2)."
+      ]
+    },
+    {
+      "name": "The liquids on the GPU plate",
+      "shard": "plate",
+      "run": "npm run liquidsgpu",
+      "timeout": 6,
+      "why": [
+        "Soap, glycerine, milk and silicone on the GPU solver's own liquid fields",
+        "(PLAN 15e, scripts/liquidsgpu.mjs): the stand-in's four scenes from",
+        "`npm run liquids` laid on the thin gap the looks use, each held to the",
+        "stand-in's bar and to its size within a factor of two, with a fold of",
+        "the deltas every step and on a still plate, and soap's and silicone's",
+        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-1 to",
+        "15e-5 print and do not fail until they pass. Here on Metal, about a",
+        "minute: on the Linux lab part it took 4 min 26 s, and that part ran",
+        "24 of its 25 minutes before signin without it (#513's first run)."
       ]
     },
     {
