@@ -588,7 +588,11 @@ async function selftest() {
   const write = process.stdout.write.bind(process.stdout);
   process.stdout.write = (b, ...r) => { log.push(String(b)); return true; };
   let code;
-  try { code = await runShard('m', fake); } finally { process.stdout.write = write; }
+  // `only` is passed, not read: on a run whose Measure runs only what the diff
+  // reaches (19k-4), CHECKS_ONLY names that run's checks, and none of this
+  // fake shard's, so the default filtered every one out and the shard came
+  // back green with nothing run (first seen on #516, a check-only PR).
+  try { code = await runShard('m', fake, null); } finally { process.stdout.write = write; }
   const text = log.join('');
   say(code === 1, `a shard with a red check is red (exit ${code})`);
   say(/::group::Run echo ok fine\n/.test(text) && /✓ green/.test(text), 'a check runs in a group headed "Run <command>", as a step\'s log is');
