@@ -18,8 +18,36 @@
  *     within 15% of its start.
  *  3. With no magnet, the drop does not move: its centroid stays within half
  *     a cell of rest over the same 180 steps, and the drop is still there.
+ *  4. With Thin Gap switched off after the drag, and the magnet gone, the
+ *     dragged drop stays where it was put down and stays a drop: over 120
+ *     steps on the deep plate its centroid moves less than one drop radius
+ *     and it keeps at least half its half-full cells.
  *
- * Lab only (software WebGPU in headless Chrome).
+ * Why the fourth (PLAN 29c-8's review, 29c-10). The trailing rim is carried
+ * on the ferrofluid's own velocity (`phaseVelocity`, written to phaseVelT)
+ * only on a step that ran the thin gap. The review of #495 found
+ * runPhaseAdvect choosing phaseVelT whenever the thin solve's buffers existed,
+ * and those outlive Thin Gap: switched off after a drag, the deep plate went
+ * on carrying the ferrofluid on the last thin step's velocity, frozen, and
+ * the drop slid on with no force on it and smeared. Measured on this scene
+ * (software WebGPU, the cloud lab), 120 deep steps after the drag:
+ *
+ *                                  moved            half-full cells
+ *   keyed off the step's thinLive  0.0035 (0.16R)   104 → 94
+ *   keyed off hsP alone (#495's    0.0425 (1.93R)   104 → 0
+ *   head before the review)
+ *
+ * (read every 30 steps: keyed off thinLive, cx 0.6235 0.6237 0.6239 0.6241,
+ * half-full 102 96 96 94; off hsP alone, cx 0.6491 0.6556 0.6594 0.6631,
+ * half-full 100 78 8 0), so the bar of one radius sits between them with
+ * room on both sides, and the half-full line catches the smear even where a
+ * drop that spread evenly would keep its centroid. Physically the deep
+ * plate, with no magnet, only coasts the drop on what is left of the oil's
+ * motion from the drag, and viscosity takes that away: 0.0029 of the 0.0035
+ * moved in the first 30 steps (half a second), 0.0002 in the last 30.
+ *
+ * Lab only: software WebGPU in headless Chrome, or Metal on the Mac CI
+ * runner (`WebGPU (macOS) · show`, `scripts/checks.json`).
  */
 import { openLab } from './lab.mjs';
 
@@ -92,6 +120,17 @@ try {
 
     const s1 = await getStats();
 
+    // 4. Thin Gap off, magnet gone: 120 steps of the deep plate.
+    for (let k = 1; k <= 120; k++) {
+      await lab.step(1, {
+        phaseSharp: 0.75,
+        phaseDisplace: 0,
+        thinGap: 0,
+        magnetStrength: 0,
+      });
+    }
+    const s2 = await getStats();
+
     // 2. Stationary control: settle 20 steps, then 180 steps with no magnet
     await lab.create(N, N);
     lab.addPhase(0.36, 0.5, R, 1);
@@ -115,10 +154,10 @@ try {
     }
     const noMag1 = await getStats();
 
-    return { s0, s1, noMag0, noMag1 };
+    return { s0, s1, s2, noMag0, noMag1 };
   }, { N, R });
 
-  const { s0, s1, noMag0, noMag1 } = result;
+  const { s0, s1, s2, noMag0, noMag1 } = result;
   const lag = Math.abs(s1.cx - 0.66);
   const twoR = 2 * R;
   const areaRatio = s1.halfCount / s0.halfCount;
@@ -147,6 +186,16 @@ try {
     'with no magnet, the drop does not move',
     noMagMoved < 0.5 / N && noMag0.halfCount > 0 && noMag1.halfCount > 0,
     `moved ${(noMagMoved * N).toFixed(3)} cells (${(noMagMoved).toFixed(6)} plate widths, limit half a cell); ${noMag0.halfCount} → ${noMag1.halfCount} cells half full`,
+  );
+
+  // 4. Thin Gap off after the drag: the deep plate does not carry the drop on
+  // the thin gap's last velocity. Read from where the drag left it (s1), so
+  // the drop has to have been dragged and be there (line 1) to be read.
+  const offMoved = Math.hypot(s2.cx - s1.cx, s2.cy - s1.cy);
+  check(
+    'with Thin Gap off after the drag and no magnet, the drop stays put and stays a drop',
+    offMoved < R && s1.cx > 0.55 && s1.halfCount > 0 && s2.halfCount >= 0.5 * s1.halfCount,
+    `moved ${(offMoved / R).toFixed(2)}R in 120 deep steps (cx ${s1.cx.toFixed(4)} → ${s2.cx.toFixed(4)}, limit 1R); ${s1.halfCount} → ${s2.halfCount} cells half full (limit half kept); ${s1.n01} → ${s2.n01} cells over 0.01`,
   );
 
 } finally {

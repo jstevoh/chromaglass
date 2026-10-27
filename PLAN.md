@@ -8335,8 +8335,8 @@ the code's entry points, the checks to add and the scenes to match, in
   resting-drop check `npm run ferrorest` (5/5, with a second window), the dragged drop held
   while it is dragged by `npm run ferrohold` (each pass switched off by hand turns its own line red;
   `phaseCompress` is a lab-only step option, 1 by default), and two-phase carry of a coherent drop's
-  trailing rim on the thin gap (`phaseVelocity`, 29c-8; `npm run ferrodrag` 3/3 on the Mac GPU,
-  `ferrohold` 5/5). If the closeup's camera ever follows the drop, it follows smoothly and never with the
+  trailing rim on the thin gap (`phaseVelocity`, 29c-8; `npm run ferrodrag` 4/4 and in CI since
+  29c-10, with a Thin-Gap-off line; `ferrohold` 5/5 over the whole drag). If the closeup's camera ever follows the drop, it follows smoothly and never with the
   sound (the sway work's `frameSway`, default 0, stays the only way sound moves the frame). Still
   open:
   - **29c-1. The moving edge is compressed back to the grid's width, and the deep plate keeps
@@ -8464,11 +8464,14 @@ the code's entry points, the checks to add and the scenes to match, in
     Thin Gap was switched off (`runPhaseAdvect` keyed off `hsP`, which outlives Thin Gap): the dragged
     drop, magnet off, slid on another `0.0425` of the plate in 120 steps and smeared to `0` half-full
     cells; keyed off the step's own `thinLive` it stays (`0.6206 → 0.6241`, `104 → 94` half-full).
-  - **29c-10. `ferrodrag` joins CI, with a Thin-Gap-off line.** Now 3/3 on Metal, `npm run ferrodrag`
-    goes into `scripts/checks.json` (Claude wires it, per the 29c-8 brief), with a line that turns
-    Thin Gap off after the drag and holds the drop still with no magnet (the stale `phaseVelT` above
-    moved it `1.9R`), and `ferrohold`'s two bars re-read against the whole drag (the compression
-    pass's margin is `15.0` against `13` since #495, from `25.7`).
+  - ~~**29c-10. `ferrodrag` joins CI, with a Thin-Gap-off line.**~~ **Shipped** (this PR; story in
+    `docs/plan-shipped.md` §29c): `npm run ferrodrag` on the show shard, 4/4, its fourth line Thin Gap
+    off after the drag (moved `0.16R`, `104 → 94` half-full; `1.93R` and `104 → 0` with #495's
+    pre-review carry), and `ferrohold` read over the whole drag (steps 60 to 180) with its bars between
+    the runs again.
+    Left for whoever moves `phaseCompress` onto the deep plate (29c-1): `phaseVel()` defaults to
+    `thin = true` and its other two callers rely on running only on thin steps; key it off `thinLive`
+    itself then, or the stale `phaseVelT` comes back there (ferrodrag's fourth line would see it).
   - **29c-9. Replace `phaseVelocity`'s local window reconstruction with a coupled two-fluid velocity
     solve.** `phaseVelocity` (29c-8) is a named shortcut: instead of solving two coupled momentum
     and Darcy-projection equations for `u_ff` and `u_oil` across the diffuse interface (with
