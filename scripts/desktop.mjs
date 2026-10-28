@@ -795,6 +795,44 @@ try {
       `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}, and was told ${pushes?.length ? pushes.join(' → ') : 'nothing'}`);
   }
 
+  // ── the two Workers the app's site is built to reach (PLAN 23.17e) ──
+  // desktop.yml built the app's site without VITE_FINGERPRINT_PROXY_URL or
+  // VITE_CRASH_REPORT_URL until 23.17e, so Home's song ID (sold as "in the
+  // ChromaGlass app") could not run in the app and its crash sheet had only
+  // Save and Copy. The line reads both addresses out of the bundles the app's
+  // own page loaded, not out of the environment, so a build that dropped them
+  // fails here whatever this run's env says, and then asks each Worker, as the
+  // page's origin, whether it answers the app. The addresses come from the same
+  // secrets deploy.yml uses, so a run with none (a fork's, or a session's) has
+  // nothing to look for and skips; CI on this repository has them.
+  {
+    const want = { song: process.env.VITE_FINGERPRINT_PROXY_URL, crash: process.env.VITE_CRASH_REPORT_URL };
+    if (!want.song && !want.crash) {
+      skip("workers: the app's build carries the song ID and crash-report addresses, and each Worker answers the app's origin", 'this run has neither VITE_FINGERPRINT_PROXY_URL nor VITE_CRASH_REPORT_URL (desktop.yml passes both from the repository secrets)');
+    } else {
+      const bundles = await page.evaluate(async () => {
+        const urls = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => /\.js(\?|$)/.test(u));
+        const out = [];
+        for (const u of urls) out.push(await fetch(u).then((r) => r.text()).catch(() => ''));
+        return out;
+      }).catch(() => []);
+      const origin = `http://localhost:${PORT}`;
+      const rows = [];
+      let all = bundles.length > 0;
+      for (const [name, url] of Object.entries(want)) {
+        if (!url) { rows.push(`${name}: no address in this run's env`); continue; }
+        const carried = bundles.some((t) => t.includes(url));
+        const reply = await fetch(url, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' } }).catch(() => null);
+        const allowed = reply?.headers.get('access-control-allow-origin');
+        const answers = !!reply && reply.status < 300 && (allowed === origin || allowed === '*');
+        rows.push(`${name}: ${carried ? 'in the build' : 'MISSING from the build'}, preflight from ${origin} ${reply ? `${reply.status}, allows ${allowed ?? 'nothing'}` : 'got no answer'}`);
+        all = all && carried && answers;
+      }
+      check("workers: the app's build carries the song ID and crash-report addresses, and each Worker answers the app's origin", all,
+        `${bundles.length} bundles read; ${rows.join('; ')}`);
+    }
+  }
+
   // ── network off, the whole run ────────────────────────────────────
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
