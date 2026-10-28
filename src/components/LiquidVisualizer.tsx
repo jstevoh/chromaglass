@@ -10858,7 +10858,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,
         /** Of those, the ones the plate took on a step and the ones let go (lib/plateKick.ts). */
-        plateKicks: () => ({ taken: plateKickRef.current.taken, lost: plateKickRef.current.lost }),
+        plateKicks: () => plateKickRef.current.counts(),
         /** Kick onsets the ear handed the beat clock, each once: what it heard, before the clock's own beats. */
         heardKicks: () => heardKicksRef.current.n,
         /** The music's chances to release air and what it did with them (see `musicBubblesRef`): none released at Audio Impact 0. */

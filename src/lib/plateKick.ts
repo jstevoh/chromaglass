@@ -41,6 +41,18 @@ export class PlateKick {
   /** Kicks the plate took on a step, and kicks let go untaken (`npm run squeeze` asks every kick is one or the other). */
   taken = 0;
   lost = 0;
+  /*
+    Gaps between frames that stepped longer than KICK_OWED_MS: the stalls a
+    kick can be let go in. A kick let go because no step came for it lies in
+    one of these by construction, so `npm run squeeze` asks that no more were
+    let go than the runner stalled (it saw 2 of 40 on its first Metal run, each
+    a gap like that), rather than guessing how often a runner stalls. Counted
+    the moment a gap passes the line, not when it ends, so a window that closes
+    inside a stall has counted the stall its kick was let go in.
+  */
+  stalls = 0;
+  private lastStep = -1;
+  private stalled = false;
 
   /** The clock decided a kick this frame, at song time `at` and page time `ms`. */
   decide(at: number, predicted: boolean, ms: number): void {
@@ -55,6 +67,8 @@ export class PlateKick {
 
   /** Whether this frame's first step lays the kick: once a frame, `steps` whether it takes any, `now` the page's clock. */
   take(steps: boolean, now: number): boolean {
+    if (!this.stalled && this.lastStep >= 0 && now - this.lastStep > KICK_OWED_MS) { this.stalls++; this.stalled = true; }
+    if (steps) { this.lastStep = now; this.stalled = false; }
     const late = this.owed && !this.fresh && now - this.ms > KICK_OWED_MS;
     this.fresh = false;
     const take = this.owed && !late && steps;
@@ -79,6 +93,11 @@ export class PlateKick {
     return this.at + (this.predicted ? Math.max(0, beatLead ?? 0) / 1000 : 0);
   }
 
+  /** The ledger, for the debug handle (`npm run squeeze`). */
+  counts(): { taken: number; lost: number; stalls: number } {
+    return { taken: this.taken, lost: this.lost, stalls: this.stalls };
+  }
+
   reset(): void {
     this.owed = false;
     this.fresh = false;
@@ -86,5 +105,8 @@ export class PlateKick {
     this.predicted = false;
     this.taken = 0;
     this.lost = 0;
+    this.stalls = 0;
+    this.lastStep = -1;
+    this.stalled = false;
   }
 }

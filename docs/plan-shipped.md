@@ -6060,7 +6060,9 @@ was dropped; on a 120 Hz screen at thirty steps a second, three in four. The kic
 (`plateKickRef`) with the song time and lead it was decided at, the accent read there, until
 the next frame that steps, and let go after `KICK_OWED_MS` (0.1 s) on a stalled plate, counted
 from the frame after the one that decided it, so a slow frame never drops a kick it steps for. The
-squeeze check counts every kick in its windows as taken or let go, and at most one let go.
+squeeze check counts every kick in its windows as taken or let go, and no more let go than the
+plate stalled (gaps between stepping frames past `KICK_OWED_MS`, which the hold counts): its first
+Metal run let 2 of 40 go at 0.8, each in a runner stall.
 
 ## 14ab-7, 14ab-8. The ear's detectors and the gamepad ring (shipped 2026-10-28, #533)
 

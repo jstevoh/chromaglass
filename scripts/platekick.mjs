@@ -79,6 +79,21 @@ const check = (name, ok, detail = '') => {
     `${ahead.toFixed(3)} and ${k.meant(80).toFixed(3)} s for kicks decided at 10 s with an 80 ms lead`);
 }
 
+{
+  // The stall counter the squeeze check sets the kicks let go against: a gap between stepping frames past KICK_OWED_MS.
+  const over = new PlateKick(), under = new PlateKick();
+  for (const t of [0, 50, 50 + KICK_OWED_MS + 1, 200]) over.take(true, t);
+  for (const t of [0, 50, 50 + KICK_OWED_MS - 1, 200]) under.take(true, t);
+  const quiet = new PlateKick();
+  for (let t = 0; t < 1000; t += 10) quiet.take(t % 500 < 300 || t % 500 > 380, t);   // an 80 ms gap: under the line
+  check('a gap between stepping frames past the kick\'s wait is one stall, and one under it is none',
+    over.stalls === 1 && under.stalls === 0 && quiet.stalls === 0, `${over.stalls} at ${KICK_OWED_MS + 1} ms, ${under.stalls} at ${KICK_OWED_MS - 1} ms, ${quiet.stalls} over 80 ms gaps`);
+  // And a kick let go in a stall is counted beside it.
+  const k = new PlateKick();
+  k.take(true, 0); k.decide(1, false, 10); k.take(false, 10); k.take(false, 10 + KICK_OWED_MS + 5); k.take(true, 10 + KICK_OWED_MS + 20);
+  check('a kick let go for want of a step lies in a stall', k.lost === 1 && k.stalls === 1, `${k.lost} let go, ${k.stalls} stalls`);
+}
+
 const vis = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
 const loop = vis.indexOf('for (let simStep = 0; simStep < simSteps; simStep++)');
 const ASK = 'const kickNow = plateKick.take(simSteps > 0, showNow());';
