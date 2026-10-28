@@ -35,6 +35,15 @@
  *  11. a record stamped a day ahead cannot win for ever;
  *  13. a look too large for the cloud is reported, not re-sent every manifest,
  *      and goes once it is edited down; an item with the id `toString` syncs;
+ *  14. the desk's tabs (PLAN 8-tabs-a): a renamed, reordered and added tab on A
+ *      is the same list on B, and a reset to the shipped three travels too; which
+ *      tab is up stays each machine's own;
+ *  14d-f. two devices that each already had tabs of their own before either synced
+ *      keep both's tabs on both (the review of #531 lost one device's whole list);
+ *      the same holds on an account whose list was once put back to shipped, and
+ *      a tab arranged on both is kept as two, not one;
+ *  14h. the rollout order: a device still on the build before `deskTabs` syncs after
+ *      another has pushed its tabs, then updates; both devices' tabs survive on both;
  *  12. every synced key is still the key its module saves under, every store the
  *      device sends is one the server takes, and every key held in React state
  *      is read again when the cloud writes it (cloudSync.ts says why that matters).
@@ -49,6 +58,7 @@ import { loadSetList, saveSetList, SETLIST_KEY } from '../src/lib/setList.ts';
 import { loadUserSequences, saveUserSequences } from '../src/lib/sequencer.ts';
 import { loadMidiMap, saveMidiMap, MIDI_FORMAT } from '../src/lib/midi.ts';
 import { loadToolAmounts, saveToolAmounts } from '../src/lib/toolAmount.ts';
+import { loadTabs, saveTabs, renameTab, mergeStoredTabs, moveTab, addTab, defaultTabs, TABS_KEY, TAB_KEY } from '../src/lib/deskTabs.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
 const results = [];
@@ -355,13 +365,139 @@ check(
   );
 }
 
+// ── 14. The desk's tabs travel with the account ───────────────────────────
+
+{
+  const C = device('laptop');
+  const D = device('phone');
+  C.use();
+  let t = renameTab(loadTabs(), 'setup', 'Venue');
+  t = moveTab(t, 'setup', -2);
+  t = addTab(t, { name: 'Late set', copyOf: 'perform' }).tabs;
+  saveTabs(t);
+  C.storage.setItem(TAB_KEY, 'sequence');
+  D.use();
+  D.storage.setItem(TAB_KEY, 'perform');
+  await C.sync.sync(true);
+  await D.sync.sync(true);
+  D.use();
+  const onD = loadTabs();
+  const shape = (l) => l.map((x) => `${x.id.startsWith('tab-') ? 'new' : x.id}:${x.name}`).join(' | ');
+  const copied = onD.find((x) => x.name === 'Late set');
+  const arrived = shape(onD) === shape(t) && JSON.stringify(copied?.layout) === JSON.stringify(t.find((x) => x.name === 'Late set').layout);
+  check(
+    "14a. tabs renamed, moved and added on A are the same list, in the same order, with the same panels, on B; which tab is up stays B's own",
+    arrived && D.storage.getItem(TAB_KEY) === 'perform' && C.storage.getItem(TAB_KEY) === 'sequence',
+    `A ${shape(t)}; B ${shape(onD)}; B up ${D.storage.getItem(TAB_KEY)}`,
+  );
+  // Back to the shipped three on A: storage holds nothing, and that goes to B.
+  C.use();
+  saveTabs(defaultTabs());
+  await sleep(5);
+  await C.sync.sync(true);
+  await D.sync.sync(true);
+  D.use();
+  check(
+    '14b. putting the tabs back to the shipped three on A puts them back on B',
+    C.storage.getItem(TABS_KEY) === null && D.storage.getItem(TABS_KEY) === null && shape(loadTabs()) === shape(defaultTabs()),
+    `B ${shape(loadTabs())}, B stored ${D.storage.getItem(TABS_KEY)}`,
+  );
+  // A list the cloud holds that is not a list of tabs is read as the shipped three, not a crash.
+  D.storage.setItem(TABS_KEY, '{"v":1,"tabs":"junk"}');
+  check('14c. a tabs value that is not tabs loads as the shipped three', shape(loadTabs()) === shape(defaultTabs()));
+}
+
+// ── 14d-f. Two devices that each had tabs before either synced ────────────
+
+{
+  const shape = (l) => l.map((x) => `${x.id.startsWith('tab-') ? 'new' : x.id}:${x.name}`).join(' | ');
+  const has = (d, ...want) => { d.use(); const n = loadTabs().map((x) => x.name); return want.every((w) => n.includes(w)); };
+  const sameOn = (a, b) => { a.use(); const x = shape(loadTabs()); b.use(); return x === shape(loadTabs()); };
+  const round = async (...ds) => { for (const d of ds) await d.sync.sync(true); };
+
+  for (const e of ['tabs-d', 'tabs-e', 'tabs-f']) await fileKey(`${e}@example.com`, 'pro');
+  // The laptop renames Perform and the Mac app renames Sequence, neither having synced.
+  const E = device('laptop', 'tabs-d@example.com');
+  const F = device('mac app', 'tabs-d@example.com');
+  E.use(); saveTabs(renameTab(loadTabs(), 'perform', 'MacOnly'));
+  F.use(); saveTabs(renameTab(loadTabs(), 'sequence', 'ChromeOnly'));
+  await round(E, F, E, F, E);
+  check(
+    '14d. each device renamed a different shipped tab before either synced: both renames are on both',
+    has(E, 'MacOnly', 'ChromeOnly') && has(F, 'MacOnly', 'ChromeOnly') && sameOn(E, F),
+    `E ${(E.use(), shape(loadTabs()))}; F ${(F.use(), shape(loadTabs()))}`,
+  );
+
+  // The account's list was once put back to shipped, so the cloud holds a deletion with a real time.
+  const G = device('laptop 2', 'tabs-e@example.com');
+  const H = device('phone 2', 'tabs-e@example.com');
+  G.use(); saveTabs(renameTab(loadTabs(), 'setup', 'Venue'));
+  await round(G);
+  G.use(); saveTabs(defaultTabs());
+  await sleep(5);
+  await round(G);
+  H.use(); saveTabs(addTab(loadTabs(), { name: 'Late set' }).tabs);
+  await round(H, G, H, G);
+  check(
+    '14e. a device joining an account whose list was once put back to shipped keeps its own tabs, and they reach the other',
+    has(H, 'Late set') && has(G, 'Late set') && sameOn(G, H),
+    `G ${(G.use(), shape(loadTabs()))}; H ${(H.use(), shape(loadTabs()))}`,
+  );
+
+  // The same tab arranged on both: the cloud's stays in place and this device's is kept beside it.
+  const I = device('laptop 3', 'tabs-f@example.com');
+  const J = device('phone 3', 'tabs-f@example.com');
+  I.use(); saveTabs(renameTab(loadTabs(), 'setup', 'Venue A'));
+  J.use(); saveTabs(renameTab(loadTabs(), 'setup', 'Venue B'));
+  await round(I, J, I, J, I);
+  check(
+    '14f. one tab arranged on both before either synced is kept as two, in the same order on both',
+    has(I, 'Venue A', 'Venue B (here)') && has(J, 'Venue A', 'Venue B (here)') && sameOn(I, J),
+    `I ${(I.use(), shape(loadTabs()))}; J ${(J.use(), shape(loadTabs()))}`,
+  );
+
+  // The site updates before the Mac app: B pushes its tabs, A (the old build, which has
+  // no `deskTabs`) syncs and moves its rev past B's record, then A updates.
+  await fileKey('tabs-g@example.com', 'pro');
+  const K = device('old mac app', 'tabs-g@example.com');
+  const N = device('new site', 'tabs-g@example.com');
+  K.use(); saveTabs(renameTab(loadTabs(), 'perform', 'OnK'));
+  N.use(); saveTabs(renameTab(loadTabs(), 'setup', 'OnN'));
+  await round(N);
+  const at = SYNC_STORES.findIndex((x) => x.name === 'deskTabs');
+  const [gone] = SYNC_STORES.splice(at, 1);
+  await round(K);
+  SYNC_STORES.splice(at, 0, gone);
+  // The routine scan, not the round, is what first sees the store when sign-in finishes after it.
+  K.sync.scan();
+  await round(K, N, K, N, K);
+  check(
+    '14h. a device that synced on the build before desk tabs, after another pushed its tabs, and then updated: both devices\' tabs are on both',
+    has(K, 'OnK', 'OnN') && has(N, 'OnK', 'OnN') && sameOn(K, N),
+    `K ${(K.use(), shape(loadTabs()))}; N ${(N.use(), shape(loadTabs()))}`,
+  );
+
+  // And the merge itself, unit by unit, so a lost tab is named.
+  const raw = (tabs) => JSON.stringify({ v: 1, tabs });
+  const merged = JSON.parse(mergeStoredTabs(
+    raw([{ id: 'perform', name: 'P' }, { id: 'tab-a', name: 'A' }]),
+    raw([{ id: 'perform', name: 'Perform' }, { id: 'sequence', name: 'Sequence' }, { id: 'setup', name: 'Setup' }]),
+  )).tabs.map((x) => `${x.id}:${x.name}`).join(' | ');
+  check(
+    '14g. merging: a tab arranged here replaces the shipped one it stands for, a tab made here is added, shipped tabs never touched are not brought back',
+    merged === 'perform:P | sequence:Sequence | setup:Setup | tab-a:A' &&
+      JSON.parse(mergeStoredTabs(raw([{ id: 'perform', name: 'Perform' }, { id: 'sequence', name: 'Sequence' }]), raw([{ id: 'perform', name: 'Perform' }]))).tabs.length === 1,
+    merged,
+  );
+}
+
 // ── 12. The wiring ────────────────────────────────────────────────────────
 
 {
   // Bundled into node_modules/.cache, so paths are from the repository root, where npm runs it.
   const read = (p) => readFileSync(p, 'utf8');
   const app = read('src/App.tsx');
-  const sources = ['src/App.tsx', 'src/hooks/useUserPresets.ts', 'src/hooks/useShowSequencer.ts', 'src/hooks/useMidi.ts'].map(read).join('\n');
+  const sources = ['src/App.tsx', 'src/hooks/useUserPresets.ts', 'src/hooks/useShowSequencer.ts', 'src/hooks/useMidi.ts', 'src/hooks/useDeskLayout.ts'].map(read).join('\n');
   const reloadBlocks = [...sources.matchAll(/useCloudSyncReload\(\{([\s\S]*?)\}\);/g)].map((m) => m[1]).join('\n');
   // The keys App.tsx keeps to itself are still the keys it saves under.
   const appKeys = ['chromaglass-music-settings', 'chromaglass-follow-songs'].filter((k) => app.includes(`'${k}'`));
@@ -369,7 +505,7 @@ check(
   const keyNames = {
     presets: 'USER_PRESETS_KEY', sequences: 'SEQUENCES_KEY', sets: 'SAVED_SETS_KEY', setlist: 'SETLIST_KEY',
     songShows: 'SHOWS_KEY', actionSets: 'SETS_KEY', liquids: 'CUSTOM_LIQUIDS_KEY', midiMap: 'MIDI_MAP_KEY',
-    toolAmounts: 'TOOL_AMOUNTS_KEY', musicSettings: 'MUSIC_SETTINGS_KEY', followSongs: "'chromaglass-follow-songs'",
+    toolAmounts: 'TOOL_AMOUNTS_KEY', musicSettings: 'MUSIC_SETTINGS_KEY', followSongs: "'chromaglass-follow-songs'", deskTabs: 'TABS_KEY',
   };
   const unreloaded = SYNC_STORES.filter((s) => !reloadBlocks.includes(`[${keyNames[s.name]}]`) && !reloadBlocks.includes(`${keyNames[s.name]}:`)).map((s) => s.name);
   const notServed = SYNC_STORES.map((s) => s.name).filter((n) => !SERVER_STORES.includes(n));

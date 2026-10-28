@@ -1090,6 +1090,42 @@ follows a source at a depth through the patch bay (`sceneMap.ts`), and an action
 on a source's onset, on the predicted beat once the clock is locked (64 ms ahead of the
 heard kick on the test song; `npm run learn`, 30/30). A beat cannot press a toggle.
 
+#### 8-tabs-a. The tabs go with the account (2026-10-28)
+
+The desk's tab list (`chromaglass-desk-tabs`) is a synced store, `deskTabs`, in
+`src/lib/cloudSync.ts` and `server/cloud-sync.js`, so a Setup tab made for a venue on
+the laptop is the phone's and the Mac app's. Nothing in the desk learned about the
+cloud: the sync scan stamps the key like any other and `useDeskTabs` reads it again
+when the cloud writes it (`useCloudSyncReload`), because a list held in state and
+saved over the new one would read, to the next scan, as this device overruling it.
+It is kept whole, as one value, not a list by tab id: the order of the chips is part
+of it, and a list by id would lose the order. The price is that two tab lists edited
+on two devices before either syncs leave the later one (8-tabs-a-1). The tab that is
+up (`chromaglass-desk-mode`) stays each machine's own: the phone is on Perform while
+the laptop is on Setup. The shipped three are stored as nothing, so "Put the shipped
+tabs back" removes the key and that is a deletion the cloud takes and the other
+devices follow. `npm run cloudsync` 14a to 14c: renamed, moved and added tabs arrive
+on a second device in order and with the same panels, which tab is up does not
+travel, the reset travels, and a value that is not tabs loads as the shipped three.
+The first time a device meets the account's list it joins it, not loses to it
+(`mergeFirst` on the store, `mergeStoredTabs` in `src/lib/deskTabs.ts`): a device that
+held its own tabs before it ever synced is stamped the oldest there is, and with the
+tabs kept whole the cloud's list won that tie and took every tab the device had made;
+the review of #531 measured it with the laptop and the Mac app each renaming a different
+tab, and on an account whose list had once been put back to shipped (the cloud then holds
+a deletion with a real time). The cloud's list is the base and its order stands; a tab
+only this device has is added, a shipped tab arranged here that the cloud holds as
+shipped takes the cloud's place for it, a tab arranged on both is the cloud's with this
+device's kept beside it as "(here)", and a shipped tab never touched and absent from the
+cloud is not brought back. `npm run cloudsync` 14d to 14g (the first three fail without it). The rollout order is
+covered too (14h): the site updates before the Mac app, so a device on the build before
+`deskTabs` syncs after another pushed its tabs, its `rev` moves past that record, and
+when it updates its seeding tied with the cloud and the answer held nothing to merge;
+the next edit there then wiped the other's tabs. A store seeded on a device that has
+synced before sets `refetch` in its meta, and the next answer is asked for from `since
+0` (one full download, kept until an answer arrives, so offline does not lose it).
+Judging §89.
+
 #### 8-v2. Desk v2: one desk, three layouts (2026-10-10)
 
 `src/components/desk/Desk.tsx`, `DeskPanels.tsx`, `PanelBrowser.tsx` (new),

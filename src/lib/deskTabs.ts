@@ -210,6 +210,64 @@ export function tabForStored(tabs: DeskTab[], stored: string | null): string {
   return tabs.some(t => t.id === into) ? into : tabs[0].id;
 }
 
+/** A stored tab that is a shipped tab exactly as it shipped: nobody's arrangement. */
+function pristine(r: StoredTab): boolean {
+  const d = DEFAULT_BY_ID.get(r.id);
+  return !!d && r.name === d.name && (r.layout === undefined || sameLayout(sanitizeLayout(r.layout, d.layout), d.layout));
+}
+
+/**
+ * Two stored tab lists made into one, for the first time a device meets the
+ * account's list (lib/cloudSync.ts `mergeFirst`).
+ *
+ * Why not newest-wins like every other store: a device that held its own tabs
+ * before it ever synced is stamped the oldest there is, so the cloud's list
+ * wins, and with the tabs kept whole that was every tab this device had made
+ * (the review of #531 measured it, with the laptop and the Mac app each
+ * renaming a different tab). The cloud's list is the base and its order stands.
+ * A tab only this device has, one it made or a shipped tab it arranged that the
+ * cloud's list still holds as shipped, is added to it. A tab arranged on both is
+ * the cloud's, and this device's copy is kept beside it under its own id and
+ * name, to be deleted once it is not wanted: nothing is lost, and the cost is
+ * a tab to delete once. A shipped tab this device never touched and the cloud
+ * lacks was deleted there on purpose and stays deleted. Past nine tabs the
+ * extras are dropped, last first, since a strip holds no more (TABS_MAX).
+ */
+export function mergeStoredTabs(localRaw: string, incomingRaw: string): string {
+  const list = (raw: string): StoredTab[] | null => {
+    try {
+      const v = JSON.parse(raw);
+      const l = v && typeof v === 'object' && !Array.isArray(v) ? v.tabs : v;
+      return Array.isArray(l) ? l.filter((r: unknown): r is StoredTab => !!r && typeof r === 'object' && typeof (r as StoredTab).id === 'string' && !!(r as StoredTab).id) : null;
+    } catch { return null; }
+  };
+  const local = list(localRaw); const incoming = list(incomingRaw);
+  if (!local || !incoming) return incomingRaw;
+  const out = [...incoming];
+  const taken = new Set(incoming.map(r => r.id));
+  const names = new Set(incoming.map(r => String(r.name).toLowerCase()));
+  for (const mine of local) {
+    if (out.length >= TABS_MAX) break;
+    const there = incoming.findIndex(r => r.id === mine.id);
+    if (there < 0) {
+      if (!pristine(mine)) out.push(mine);
+    } else if (!pristine(mine) && JSON.stringify(mine) !== JSON.stringify(incoming[there])) {
+      if (pristine(incoming[there])) {
+        // Arranged here, still as shipped there: this device's arrangement keeps the tab's place.
+        out[there] = mine;
+      } else {
+        let id = `${mine.id}-here`;
+        while (taken.has(id)) id += 'x';
+        let name = cleanName(`${mine.name} (here)`).slice(0, TAB_NAME_MAX);
+        for (let n = 2; names.has(name.toLowerCase()); n++) name = `${cleanName(mine.name).slice(0, TAB_NAME_MAX - 4)} (${n})`;
+        taken.add(id); names.add(name.toLowerCase());
+        out.push({ ...mine, id, name });
+      }
+    }
+  }
+  return JSON.stringify({ v: 1, tabs: out });
+}
+
 export function loadTabs(): DeskTab[] {
   try {
     const raw = localStorage.getItem(TABS_KEY);
