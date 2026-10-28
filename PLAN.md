@@ -8817,6 +8817,7 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   second); this is the settings panel's own. Find what it re-renders on and hold it to the
   ten-a-second tick the sound already keeps (14f). *Measure:* a DOM-write count over 10 s on
   Bass Drop with the band, before and after, in `npm run renders`.
+
 ### 30b. The LFOs and envelopes are fixed
 
 `modulators.ts` has four LFOs locked to bars and two envelopes, all fixed: an eight-bar
