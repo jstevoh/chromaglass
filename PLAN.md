@@ -3766,12 +3766,20 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   caches its own (H2c-11).
 - **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
   gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
-- **14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
+- ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort
-  on their history. A ring and a selection median.
-- **14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
+  on their history. A ring and a selection median.~~ **Shipped** (#533, 2026-10-28): the
+  detectors keep two rings and take the median and its deviation by partial sort, to the
+  same number to the bit; the live ear stopped copying its byte arrays; the fifteen-frame
+  median's scratch is kept. `AudioFeatures.update` 0.5–0.6 → 0.30 ms, 227.65 → 5.7 KB an
+  update, readings identical (`npm run eargc`). Story in `docs/plan-shipped.md`. What is
+  left (5.7 KB an update) is the reading itself: seventeen onset objects, three arrays and
+  the chroma; not worth a ring of readings until a Mac profile asks.
+- ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
   object each tick) and sets `connected` on every poll through a stale closure (with
-  14j's timer line).
+  14j's timer line).~~ **Shipped** (#533): the ring (`GamepadRing`) listens to a store in
+  the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
+  (`npm run renders`' gamepad phase), and the poll sets `connected` once.
 - **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
   sixty steps (`speciesShare`); a ring like the readback's.
 - **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
@@ -6229,6 +6237,17 @@ Not a gate and no bar: a rate depends on what was pushed.
   tap now prints it ("handled N ms apart"); the old red implied up to about 400 ms on a
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
   measurement on the Mac, not from this line.
+
+- **19ac-3. `bottles` counts the look's own pours as the hand's, and goes red on one at the
+  mirror.** `WebGPU (macOS) · tools` failed `bottles` twice on one head (#533, which changes
+  neither the bottle nor the tools), on two different lines: "splatter with the Oil bottle"
+  (39 pours, 1 at the mirror) and "splatter with the Ferrofluid bottle" (37 pours, 1 at the
+  mirror; the hand's flings 0.13 from the hand, nothing near the mirror), and passed on the
+  third run. The stroke's mirror is 0.4 of the plate from it and a splatter's fling reaches
+  about 0.07, so the pour is not the hand's: read it from `__bottleLog` with the call's
+  `auto` flag and the look's lays, and count the hand's alone. Until then a lone pour at
+  the mirror is this, not a flipped coordinate (that puts every pour there). Not yet shown
+  from the log.
 
 ### 19ad. The `open` shard flakes on four unrelated faults
 
@@ -8798,12 +8817,6 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   second); this is the settings panel's own. Find what it re-renders on and hold it to the
   ten-a-second tick the sound already keeps (14f). *Measure:* a DOM-write count over 10 s on
   Bass Drop with the band, before and after, in `npm run renders`.
-- **30a-5. A kick owed to the plate is timed by the wall clock.** `KICK_OWED_MS` lets a kick go
-  a tenth of a second after it was decided by `showNow()`. In a render (`useSongRender`) a
-  frame can take longer than that on the wall, so a render whose step rate is under its frame
-  rate can still lose a kick. Time it in the song's seconds in a render. *Measure:* a render
-  at 30 steps over 60 fps on the band, every kick taken.
-
 ### 30b. The LFOs and envelopes are fixed
 
 `modulators.ts` has four LFOs locked to bars and two envelopes, all fixed: an eight-bar

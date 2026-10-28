@@ -706,8 +706,10 @@ const SIM_MAX_CATCHUP = (() => {
   (`plateKickRef`): a tenth of a second, past one step's interval at the
   governor's floor of thirty steps a second (33 ms) and at the nineteen a
   second the Mac runner reached under the squeeze (53 ms), and short enough
-  that a press laid after it would be the beat's ghost, not the beat. A software plate's one step takes seconds, so there a kick lands only
-  on a frame that steps as it is decided, as before.
+  that a press laid after it would be the beat's ghost, not the beat. It is
+  counted from the frame after the one that decided the kick, so a slow frame
+  never drops a kick it steps for, and in a render, where `showNow()` is the
+  render's own frame clock, a kick waits a tenth of the song's seconds.
 */
 const KICK_OWED_MS = 100;
 const LOCKSTEP = (() => {
@@ -5725,7 +5727,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     (a stalled or paused plate, where a press laid a second late is not the
     beat's).
   */
-  const plateKickRef = useRef<{ owed: boolean; at: number; predicted: boolean; ms: number }>({ owed: false, at: 0, predicted: false, ms: 0 });
+  const plateKickRef = useRef<{ owed: boolean; fresh: boolean; at: number; predicted: boolean; ms: number }>({ owed: false, fresh: false, at: 0, predicted: false, ms: 0 });
   /** Kicks the plate took on a step, and kicks let go untaken (`npm run squeeze` asks every kick is one or the other). */
   const plateKicksRef = useRef({ taken: 0, lost: 0 });
   /**
@@ -7442,7 +7444,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (kickRef.current.kick) {
             // A kick still owed when the next is decided is one the plate never stepped for.
             if (plateKickRef.current.owed) plateKicksRef.current.lost++;
-            plateKickRef.current = { owed: true, at: songClockRef.current, predicted: kickRef.current.predicted, ms: nowMs };
+            plateKickRef.current = { owed: true, fresh: true, at: songClockRef.current, predicted: kickRef.current.predicted, ms: nowMs };
           }
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
@@ -8179,7 +8181,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         // The kick this frame's first step lays, if it has one (`plateKickRef`).
         const plateKick = plateKickRef.current;
-        const kickLate = plateKick.owed && showNow() - plateKick.ms > KICK_OWED_MS;
+        // Never late on the frame that decided it: that frame's own work (a slow
+        // frame, a software plate's seconds-long step) is not a stall between kicks.
+        const kickLate = plateKick.owed && !plateKick.fresh && showNow() - plateKick.ms > KICK_OWED_MS;
+        plateKick.fresh = false;
         const kickNow = plateKick.owed && !kickLate && simSteps > 0;
         if (kickNow) plateKicksRef.current.taken++;
         if (kickLate) plateKicksRef.current.lost++;
@@ -10510,6 +10515,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       tempoMulRef.current = 1;
       kickRef.current = { kick: false, predicted: false };
       kickCountRef.current = 0;
+      plateKickRef.current = { owed: false, fresh: false, at: 0, predicted: false, ms: 0 };
       magnetWalkRef.current = 0;
       phrasingRef.current.reset();
       phraseRef.current = { drive: 1, gust: 0, drift: 0.5 };
