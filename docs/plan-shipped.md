@@ -2268,6 +2268,69 @@ playing, the beat clock fired 303 kicks for the band's 258 and fires 257; in the
 on the Perform desk 10 kicks for 10 presses and none, on the phone 9 for 9 taps and
 none, while knocks with no hand on anything are still all heard.
 
+### 14aa. The plate stutters in bursts on a machine with room to spare (shipped 2026-10-24)
+
+Asked: "things are a little jittery sometimes", and the GPU used across the code. No GPU
+in the session that did it, so what was measurable without one was measured, and what
+needs the owner's eyes is `docs/judging.md` §64.
+
+**The step count.** The loop turned time into solver steps with an accumulator,
+`floor(acc / step)`, and read the time from `Date.now()`: whole milliseconds, part way
+into the frame, after a varying amount of work. On a display whose refresh matches the
+step, the remainder sits wherever the frame's work puts its clock read, and when that
+is near a step's edge the scatter carries it back and forth: a frame with no step, then
+one with two. On a 59.94 Hz panel the remainder drifts through the edge every so often,
+so it comes in bursts. `npm run cadence` models both loops on seeded displays (a refresh
+stamp a few microseconds either side of the refresh, 3.5 ± 1.5 ms of work before the old
+loop's clock read, 0.4 % of refreshes missed): the old loop's median over nine seeds
+left 40 % of a 60 Hz display's runs uneven (1.7 to 51 % by seed: where the remainder
+sits is luck), 7 % at 59.94 Hz, 19 % at 120 Hz with sixty steps, 18 % at thirty; the
+new one none. It is a model, not a GPU run (14aa-2). `src/lib/stepClock.ts` now takes
+the refresh's own stamp (the draw gate's `lastDraw`, whichever window's refresh drew),
+judges the refresh from a median of the last 32 intervals, and when the step is a whole
+ratio of it (to half a percent) and this interval is a whole number of refreshes (to 6 %),
+takes the interval as exactly that many refreshes of the step's rate, so one accumulator
+holds whole and half steps exactly, as the film render's integer count always has. A
+missed refresh is the refreshes it was, so steps are still caught up within the old
+cap. Everything else, a 90 or 144 Hz panel, a 61 Hz monitor, an interval from the
+laptop's refresh to the projector's, keeps its own time in the same accumulator. The
+check-skeptic's pass found the first version, which kept two clocks and reset one when
+the other ran, running a 60 Hz show beside a 50 Hz wall at 50 steps a second; the
+cadence check now draws two clocks through the real DrawGate (60 beside 48, 50, 60, 75
+and 120 Hz) and holds each to the wall clock within 0.5 %. Every other per-frame
+integrator in the loop gets the steadier interval too.
+
+**The step's garbage (Wave 4.1, H2c-4).** `npm run encode` steps the real solver in the
+lab, 512² on a thin gap, and reads the page's allocations with Chromium's sampling heap
+profiler (collected objects included). Before: 506 KB a step, 1,939 B a dispatch, 249
+`writeBuffer` calls for 267 dispatches, 3.4 ms median of main thread in `step()`. Where
+it went: `kernel()`'s `replaceAll` over the source on every dispatch, re-hashed by the
+pipeline cache's map (`get`, 207 KB); the failure check's `split` and template strings
+(65 KB); the bind group keys spelled from labels; `arg()`'s array and write. Now: kernel
+sources made once per format; the pipeline cache answers a name it answered a moment
+ago from a hot map (dropped whenever any pipeline fails, and bypassed while a harness
+listens, so `npm run startup`'s ledger still sees every ask); `arg()` writes only when
+its eight numbers changed (what a buffer holds when the step runs is the last write, so
+skipping an equal one changes nothing the GPU sees); the multigrids' names made once;
+bind groups found by the objects they bind. After: 31 to 36 KB a step, 120 to 140 B a
+dispatch, 2 writes a step and none a repeat, no bind group made, 0.4 to 0.5 ms. The
+remainder is the array literals the dispatches are written with.
+
+**The governor's hunting (14j's governor line).** A machine that holds one rung and not
+the one above was retried every ninety seconds for ever: in `npm run rungs`'s model, 38
+rung changes in half an hour, each retry a grid rebuilt twice and four seconds of
+stutter. The wait now doubles each time the same rung, post level or step rate fails
+with no tool held, up to sixteen times: 10 changes, retries 191, 367 and 727 s apart,
+the first still at 99 s, and a machine that cools gets its rung back. And it forgets:
+ten minutes held with no move clears the counts for what it holds and everything easier,
+so a show that hunted early and then held its rung for an hour gets it back 92 s after a
+four-second burst, not 24 minutes (the check-skeptic's case).
+
+Found along the way and written in as 14ab: the video pour's pause and play every frame,
+its CPU optical flow, the CPU field means, the whole-grid delta upload, per-frame bind
+groups outside the solver, the beads' canvas, the ear's allocations, the gamepad, the
+thick liquid's share.
+
 
 ### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped 2026-10-24)
 
@@ -2297,6 +2360,46 @@ Measured (`npm run cameras`, two stand-in cameras behind `navigator.mediaDevices
 31, desk and phone. The film opens `cam-usb` by id when picked (main could only ask for
 `environment`), switches live, comes off on unplug and back on replug, and each camera's
 choice survives a reload apart.
+
+### 14aa-3. The governor climbs back to sixty steps into a stutter (shipped 2026-10-25)
+
+Found by Antigravity on the owner's Mac (Metal, main at fd20c71, Poster, 1969 run 3 × 180 s;
+`?steps=30` and Classic clean as controls), after 14aa-2 put Poster's 136 two-step frames in
+the 14 s the governor tried sixty steps. Three causes, each in the governor:
+
+1. **The budget was read off a frame, not a step.** At thirty steps on a 60 Hz display half the
+   frames take no step, and `gpuFrameMs(0)` leaves the solver out, so the work the governor
+   averaged was 7.6–8.7 ms, under the 9 ms it climbs on. That was a fair average of what was
+   spent, and no guide at all to what sixty would spend.
+2. **A climb was not priced.** Sixty steps adds half a step to every frame, and 768² roughly
+   triples a step (8.2 → 25.1 ms). After the climb the GPU spent 15.6–16 ms a frame, or about
+   27.6 at 768².
+3. **Stepping down read only the average frame.** It needed the average over 22 ms for a second
+   and a half, and the average of one 33 ms frame in five sat either side of 22, each dip
+   starting the second and a half over.
+
+**Changed** (`src/lib/governor.ts`): the loop hands the governor what one step costs (every
+layer, from the solver's own timestamps, `gpuStepMs`) and how many steps the frame took, so it
+keeps a step's cost and the drawing's apart; `workAt` predicts a state's cost from them (the
+step scaled by the cells, the drawing by the pixels, never less than now), and every climb,
+rung or rate, must be predicted under the budget. And a share of frames missing a refresh (over
+25 ms, followed over about forty frames), with the GPU over its budget, gives the step rate up
+after a second and a half; once begun the verdict holds to half its line, and it is judged
+ahead of the average's own, which could otherwise start it over. Only the rate: at thirty a
+missed refresh takes no second step, and the rungs, which cost a picture, keep the average's
+line. The governor logs its moves (`moveLog`: why, and the predicted cost of a climb), and the
+loop counts live frames by their steps (`solver().stepFrames`).
+
+**Measured**: `npm run rungs` replays Poster's measured costs (drawing 4.0 ms, a step 8.2 at
+thirty and 9.8 at sixty, 25.1 at 768²; frames over 13 ms miss one refresh in eight, five or
+three) through the loop's own accumulator, three seeds a share. Old governor: 57 to 1136
+two-step frames after the opening, sixty held 6.5 to 26.9 s or never given up, a climb to
+sixty and to two pixels undone every ninety seconds. New: none, sixty given up at 4.0 s every
+time, no climb undone. Controls: a light plate keeps sixty and climbs to the sharpest rung its
+costs fit; a busy tab takes sixty and the plate has back as much or better within 100 s; a
+plate over the climb budget with every frame on time (Classic's costs) keeps sixty and does not
+move. On the GPU, `npm run stutter` counts two-step frames per look and climbs undone within
+10 s, from the governor's own log.
 
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped 2026-10-24)
 

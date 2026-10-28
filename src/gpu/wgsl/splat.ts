@@ -151,9 +151,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 };
 
+/** `splatKernel`'s answers, kept: the reason is `kernel`'s, in wgsl/fluid.ts. */
+const formatted = new Map<string, Map<string, { src: string; out: string }>>();
+
 /** A splat kernel's source, with its storage format filled in. */
 export function splatKernel(name: string, dstFormat = 'rgba32float'): string {
   const src = SPLAT_KERNELS[name];
   if (!src) throw new Error(`no such splat kernel: ${name}`);
-  return src.replaceAll('DST_FORMAT', dstFormat);
+  let byFormat = formatted.get(name);
+  if (!byFormat) { byFormat = new Map(); formatted.set(name, byFormat); }
+  const hit = byFormat.get(dstFormat);
+  if (hit && hit.src === src) return hit.out;
+  const out = src.replaceAll('DST_FORMAT', dstFormat);
+  byFormat.set(dstFormat, { src, out });
+  return out;
 }
