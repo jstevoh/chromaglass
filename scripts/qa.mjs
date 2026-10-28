@@ -991,7 +991,10 @@ try {
   // device.
   const band = firstVisible('simulated-audio-button');
   const beforeBand = await page.evaluate(() => window.__media.length);
-  const bandLit = async () => (await band.getAttribute('class')).includes('fuchsia');
+  // Read by what the button says, not by its colour: it was fuchsia while
+  // playing and is the shared lit look now (PLAN 35a), and the next look
+  // would break a class match again. aria-pressed is the state itself.
+  const bandLit = async () => (await band.getAttribute('aria-pressed')) === 'true';
   const wasLit = await bandLit();
   await clickOn(band);
   await settle(2000);
@@ -1217,7 +1220,7 @@ try {
 
     const bench = await size();
     check('a desk lays out at laptop width',
-      (await page.getByTestId('design-desk').count()) === 1 || (await page.getByTestId('perform-desk').count()) === 1);
+      (await page.getByTestId('perform-desk').count()) === 1);
     /*
       A preview, not the window: framed inside the desk on every side and
       under half the window's area. This asked for under 75% of the width,
@@ -1249,7 +1252,8 @@ try {
     {
       const at = () => modeSwitchX(page);
       const inPerform = await at();
-      await clickOn('mode-segmented-design');
+      // Setup: the tab with the most different bar beside the switch.
+      await clickOn('mode-segmented-setup');
       await settle(1200);
       const inDesign = await at();
       await clickOn('mode-segmented-perform');
@@ -1257,7 +1261,7 @@ try {
       const back = await at();
       const drift = Math.max(Math.abs(inDesign - inPerform), Math.abs(back - inPerform));
       check('the mode switch does not move when you use it', drift <= 1,
-        `perform ${inPerform}, design ${inDesign}, back ${back} — ${drift}px`);
+        `perform ${inPerform}, setup ${inDesign}, back ${back} — ${drift}px`);
     }
 
     // ── Every setting is reachable ─────────────────────────────────
@@ -1268,13 +1272,13 @@ try {
     // there and none of them could be found. Three ways in, all checked: the
     // All tab, the search box, and a command-palette row per section.
     {
-      await clickOn('mode-segmented-design');
+      await clickOn('mode-segmented-setup');
       await settle(1200);
 
       // Both desks' own way in, and it has to be *on screen*. The first
       // version of this button sat at the end of the recipe, which scrolls —
       // so the one control whose entire job is to be findable was itself
-      // below the fold. It is in the pinned footer of each now, and this
+      // below the fold. It is in the status bar of every tab now, and this
       // checks the property rather than the existence.
       //
       // And it has to open on *all* of them, from either desk. A button that
@@ -1328,13 +1332,13 @@ try {
       await clickOn('mode-segmented-perform');
       await settle(1200);
       await entryOn('the desk');
-      await clickOn('mode-segmented-design');
+      await clickOn('mode-segmented-setup');
       await settle(1200);
-      await entryOn('the bench');
+      await entryOn('the Setup tab');
 
       await page.keyboard.press('Meta+k');
       await settle(700);
-      await page.keyboard.type('Settings: The Room');
+      await page.keyboard.type('Settings: Motion camera');
       await settle(600);
       await page.keyboard.press('Enter');
       await settle(1500);
@@ -1356,11 +1360,11 @@ try {
         !!panel && panel.visible.length === 1 && panel.visible[0] === 'room',
         panel ? `showing ${panel.visible.join(', ') || 'nothing'}` : 'no settings panel');
       check('and the rail says where you are',
-        !!panel && panel.railSays === 'The Room', panel ? String(panel.railSays) : '');
+        !!panel && panel.railSays === 'Motion camera', panel ? String(panel.railSays) : '');
       check('and the room camera is on it', !!panel && panel.reachedRoom);
 
       // The search reaches a section by what it is about, not by its heading:
-      // "people" is the word someone types, and it is nowhere in "The Room".
+      // "people" is the word someone types, and it is nowhere in "Motion camera".
       const found = await page.evaluate(() => {
         const input = document.querySelector('[data-testid="settings-search"]');
         if (!input) return null;
@@ -1446,8 +1450,9 @@ try {
 
       // The bench's recipe was a constant in a file: eight controls, and no
       // way to make it nine. Its Choose is the desk's picker over the same
-      // list, so this only has to prove the door opens and works.
-      await clickOn('mode-segmented-design');
+      // list, so this only has to prove the door opens and works. The recipe
+      // is in Perform's deck now that Build folded into it.
+      await clickOn('mode-segmented-perform');
       await settle(1200);
       const recipeBefore = await page.evaluate(() =>
         document.querySelectorAll('[data-testid="recipe"] [data-testid^="recipe-"]').length);
@@ -1496,8 +1501,8 @@ try {
           const el = document.querySelector(`[data-testid="${id}"]`);
           return el ? { ...el.getBoundingClientRect().toJSON(), title: el.getAttribute('title') ?? '' } : null;
         };
-        const w = box('film-window'), cam = box('film-camera'), off = box('film-off');
-        if (!w || !cam || !off) return null;
+        const w = box('film-window'), cam = box('film-camera'), off = box('film-off'), file = box('film-file');
+        if (!w || !cam || !off || !file) return null;
         return {
           title: w.title,
           width: Math.round(w.width),
@@ -1507,14 +1512,17 @@ try {
           // as far down it. The pinned way *into* settings has to be above
           // the fold and is checked for that; a control inside a section
           // does not.
-          inRow: Math.abs(w.top - cam.top) < 4 && Math.abs(w.top - off.top) < 4,
-          between: cam.right <= w.left + 1 && w.right <= off.left + 1,
+          inRow: [cam, off, file].every(b => Math.abs(w.top - b.top) < 4),
+          // Beside Webcam, the other live source. The row was Camera, Window,
+          // Off; it is one pick-one now (PLAN 35a), Off, Video file, Webcam,
+          // Window, with Off first as the one that means none.
+          between: off.right <= file.left + 1 && file.right <= cam.left + 1 && cam.right <= w.left + 1,
           wide: w.width > 40,
         };
       });
       check('the film projector can be fed from a window',
         !!film && film.wide, film ? `${film.width}px button` : 'no window button');
-      check('and it sits in the row with the other two sources',
+      check('and it sits in the row with the other three sources',
         !!film && film.inRow && film.between && /window|tab|screen/i.test(film.title),
         film ? `in row ${film.inRow}, between ${film.between}, “${film.title.slice(0, 40)}…”` : '');
       /*
@@ -1605,7 +1613,7 @@ try {
       await settle(1200);
       /*
         Film Drive is the film's own section; Film Impact is a master over the
-        film's patches, so it sits with the other three under Patches. Each is
+        film's patches, so it sits beside Film Drive in the film's section (PLAN 35c-2). Each is
         read from the section it is in, and only while that section is the
         one on screen: every section is in the page at once, so a control
         found without looking there proves nothing about where it lives.
@@ -1621,9 +1629,7 @@ try {
       await clickOn('settings-nav-film');
       await settle(500);
       const drive = await sliderIn('film', 'filmDrive');
-      await clickOn('settings-nav-patches');
-      await settle(500);
-      const force = { drive, impact: await sliderIn('patches', 'filmImpact') };
+      const force = { drive, impact: await sliderIn('film', 'filmImpact') };
       check('the film can drive the plate as well as light it',
         !!force.drive && !!force.impact,
         `drive ${!!force.drive}, impact ${!!force.impact}`);
@@ -1669,14 +1675,28 @@ try {
         const at = pane.querySelector('[data-testid="settings-rail"] [aria-current="page"]');
         return {
           at: at?.textContent?.trim() ?? null,
-          source: !!pane.querySelector('[data-testid="audio-source"]'),
+          source: !!pane.querySelector('[data-testid="audio-source-state"]'),
           device: !!pane.querySelector('[data-testid="audio-input"]'),
-          mic: !!pane.querySelector('[data-testid="audio-source-microphone"]'),
+          open: !!pane.querySelector('[data-testid="audio-source-open"]'),
         };
       });
       check('the Mic dot opens the sound settings', !!micDot && /sound/i.test(micDot.at ?? ''), micDot?.at ?? 'no panel');
-      check('and they can choose what is listening', !!micDot?.source && !!micDot?.mic);
+      check('and they say what is listening', !!micDot?.source);
       check('and which device it listens on', !!micDot?.device);
+      /*
+        The source is chosen in the Sound sheet, one home (PLAN 35c-3), so the
+        section's link has to get there and the sheet has to be able to choose
+        it: its Mic tile is the control the section used to draw a second copy
+        of. The link closes Settings, so it is the sheet that is closed after.
+      */
+      if (micDot?.open) {
+        await clickOn('audio-source-open');
+        check('and a way to the sheet that chooses it',
+          await appears('sound-source-microphone'));
+        await escapeCloses('sound-panel');
+      } else {
+        check('and a way to the sheet that chooses it', false, 'no audio-source-open');
+      }
       /*
         `escapeCloses`, not Escape and a fixed wait.
 
@@ -1687,6 +1707,7 @@ try {
         runner rasterises in software. The helper right above the suite exists
         for this and I should have reached for it the first time.
       */
+      // The link above closed Settings; this only matters if the link was missing.
       await escapeCloses('settings-panel');
 
       /*
@@ -1938,7 +1959,7 @@ try {
     await noteDuplicates();
 
     /*
-      Design is the bench: the other half of the job, same grid.
+      The other tabs are the other halves of the job, on the same grid.
 
       Polled, not asserted after a fixed wait. This check failed once and read
       as the app refusing to switch back; driving the two modes directly,
@@ -1947,18 +1968,23 @@ try {
       rendering at six frames a second. A fixed delay is a guess about a
       machine's speed, and this one guessed wrong about its own.
     */
-    await clickOn('mode-segmented-design');
-    let benchUp = 0, bottles = 0, cuesGone = 1;
+    /*
+      Since the tabs became the owner's (2026-10-27) the bench is in Perform,
+      beside the cue list, and a tab is told apart by its panels: Sequence
+      has the set and the song shows, and no bottles.
+    */
+    await clickOn('mode-segmented-sequence');
+    let benchUp = 0, bottles = 1, songs = 0;
     for (let i = 0; i < 20; i++) {
-      benchUp = await page.getByTestId('design-desk').count();
+      benchUp = await page.getByTestId('sequence-desk').count();
       bottles = await page.getByTestId('bottle-silicone').count();
-      cuesGone = await page.getByTestId('cue-list').count();
-      if (benchUp === 1 && bottles === 1 && cuesGone === 0) break;
+      songs = await page.getByTestId('songs-panel-box').count();
+      if (benchUp === 1 && bottles === 0 && songs === 1) break;
       await settle(400);
     }
-    check('and Design shows the bench instead of the cue list',
-      benchUp === 1 && bottles === 1 && cuesGone === 0,
-      `design-desk ${benchUp}, bottles ${bottles}, cue list ${cuesGone}`);
+    check('and Sequence shows the song shows instead of the bottles',
+      benchUp === 1 && bottles === 0 && songs === 1,
+      `sequence-desk ${benchUp}, bottles ${bottles}, songs ${songs}`);
   }
 
   // ── The set: the operator's own cue list ──────────────────────────

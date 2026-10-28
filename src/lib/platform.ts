@@ -10,6 +10,7 @@
  */
 
 import { isPhoneApp } from './appLink';
+import { canUseProFeature } from './tierGates';
 
 export type PlatformTier = 'hosted' | 'local' | 'native';
 
@@ -60,6 +61,47 @@ export function detectTier(): PlatformTier {
   if (isPhoneApp()) return 'hosted';
   if (PRIVATE_HOST.test(window.location.hostname)) return 'local';
   return 'hosted';
+}
+
+/**
+ * True when this machine is on the Pro tier, by the one answer the Account pill
+ * reads: `getEffectiveTier()` (tierGates.ts), which is a verified licence in
+ * browser storage or the native bridge (PLAN.md §23.17), or, where nothing is
+ * gated (the Mac app and a local show, which enforce nothing), Pro.
+ *
+ * Reported by the owner, 2026-10-25: the Mac app's Account pill said PRO and
+ * the Simulation panel beside it asked him to buy Pro. This function used to
+ * read the licence alone, so on a build that gates nothing the pill took the
+ * "nothing is gated, so everything is open" answer and the upsell, the 1024²
+ * option and the ladder took "no key, so Free". One tier, one reader: a gate
+ * that wants to know whether Pro is open asks this, and the pill, the card and
+ * the ladder cannot disagree again (`npm run tiers` 13, `npm run rungs`).
+ */
+export function isProLicenseUnlocked(): boolean {
+  return canUseProFeature();
+}
+
+/**
+ * The ladder tier used by the quality governor (PLAN.md §23.17).
+ *
+ * A verified Pro licence on a desktop or laptop browser promotes `'hosted'` to
+ * `'local'`, letting the automatic quality ladder climb to `768²` at `2x`/`3x`
+ * native Retina display pixel ratios and `1024²` at `1x`, alongside projector
+ * stage rungs. Explicit `?tier=hosted` diagnostic runs (`npm run pixels`) and
+ * phone apps remain on `'hosted'` unless `proUnlocked` is explicitly passed as
+ * `true`.
+ */
+export function effectiveLadderTier(
+  tier: PlatformTier = detectTier(),
+  proUnlocked?: boolean,
+): PlatformTier {
+  if (tier !== 'hosted') return tier;
+  if (proUnlocked === undefined) {
+    if (override('tier') === 'hosted') return 'hosted';
+    if (typeof window !== 'undefined' && isPhoneApp()) return 'hosted';
+    return isProLicenseUnlocked() ? 'local' : 'hosted';
+  }
+  return proUnlocked ? 'local' : 'hosted';
 }
 
 /**

@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { X, Music, Disc3, History, Fingerprint, Mic2, Play, Square, FileAudio, Hourglass, Circle, Trash2 } from 'lucide-react';
+import { X, Music, Disc3, History, Fingerprint, Mic2, Play, Square, FileAudio, Hourglass, Circle } from 'lucide-react';
 import { MusicIntelState, PerformanceState } from '../hooks/useMusicIntelligence';
-import { clockText } from '../lib/performanceTake';
 import { MusicSettings } from '../lib/musicTypes';
 import { followLine } from '../lib/followedPlace';
-import { Toggle } from './ui';
+import { Toggle, LIT } from './ui';
 
 interface TrackPanelProps {
   state: MusicIntelState;
@@ -18,10 +17,8 @@ interface TrackPanelProps {
   performance: PerformanceState;
   /** The live one's clock, "1:23", or null. */
   performanceClock: string | null;
-  onTogglePerformance: () => void;
-  onReplayPerformance: (id: string) => void;
-  onStopPerformanceReplay: () => void;
-  onDeletePerformance: (id: string) => void;
+  /** Where takes are started, replayed and deleted: the Record panel. */
+  onOpenRecord: () => void;
   onClose: () => void;
 }
 
@@ -39,7 +36,7 @@ function fmtTime(sec: number): string {
 
 export const TrackPanel: React.FC<TrackPanelProps> = ({
   state, musicSettings, onUpdateMusicSettings, onManualTag, onReplayListen, onStopReplay,
-  performance, performanceClock, onTogglePerformance, onReplayPerformance, onStopPerformanceReplay, onDeletePerformance, onClose,
+  performance, performanceClock, onOpenRecord, onClose,
 }) => {
   const [tagArtist, setTagArtist] = useState('');
   const [tagTitle, setTagTitle] = useState('');
@@ -137,7 +134,7 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
         {/* Status row */}
         <div className="flex gap-2 mt-3 text-[9px] uppercase tracking-wider">
           {state.identifying && <span className="flex items-center gap-1 text-blue-300"><Fingerprint size={10} /> identifying…</span>}
-          {state.recording && <span className="flex items-center gap-1 text-red-300"><Mic2 size={10} /> mapping this listen</span>}
+          {state.recording && <span className="flex items-center gap-1 text-blue-300"><Mic2 size={10} /> learning this song</span>}
           {state.analyzing && <span className="flex items-center gap-1 text-yellow-300"><FileAudio size={10} /> analyzing structure…</span>}
         </div>
       </section>
@@ -193,70 +190,28 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
         </section>
       )}
 
-      {/* ── Performances ─────────────────────────────────────────── */}
+      {/* ── Takes ────────────────────────────────────────────────── */}
+      {/*
+        Not a second place to record and replay them. This panel had its own
+        Start a take button and its own list with replay and delete, beside the
+        Record panel's (PLAN 35c-2: record and replay were in two places, one
+        keeping its own idea of what was running). The Record panel is the
+        home; this is the way to it from the track.
+      */}
       <section className="mb-8" data-testid="performances">
         <h3 className="text-[10px] uppercase tracking-[0.3em] opacity-30 mb-4 flex items-center gap-2">
-          <Circle size={12} /> Performances
+          <Circle size={12} /> Takes
         </h3>
         <button
-          onClick={onTogglePerformance}
-          data-testid="performance-toggle"
-          className={`flex items-center justify-center gap-2 w-full mb-2 px-3 py-2.5 rounded-lg border text-[12px] font-bold uppercase tracking-widest transition-colors ${
-            performance.live
-              ? 'bg-red-500/25 border-red-400/50 text-red-100 hover:bg-red-500/35'
-              : 'bg-white/5 border-white/15 hover:bg-white/10'
-          }`}
+          onClick={onOpenRecord}
+          data-testid="track-open-takes"
+          className="flex items-center justify-center gap-2 w-full mb-2 px-3 py-2.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-[12px] font-medium transition-colors"
         >
-          {performance.live
-            ? <><Square size={11} /> Stop and keep · {performanceClock ?? '0:00'}</>
-            : <><Circle size={11} className="text-red-400" fill="currentColor" /> Start a performance</>}
+          {performance.live ? `Take running · ${performanceClock ?? '0:00'} — open Record` : `Takes: ${performance.saved.length} kept — open Record`}
         </button>
         <p className="text-[9px] opacity-40 mb-3 leading-relaxed">
-          {performance.live
-            ? (performance.live.title ? `With “${performance.live.title}”. ` : 'No song identified yet; one that is by the time you stop is attached. ')
-              + 'Everything you paint until you stop is kept.'
-            : 'Start, paint, stop: what you painted is kept with the song that is playing, and replays at the same moments in it. T on the desks.'}
+          Start, replay and delete takes in the Record panel. A take keeps what you painted with the song that is playing, and replays at the same moments in it. T on the desks.
         </p>
-        {performance.saved.length > 0 && (
-          <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto">
-            {performance.saved.map(perf => {
-              const replaying = performance.replayingId === perf.id;
-              return (
-                <div
-                  key={perf.id}
-                  className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border ${
-                    replaying ? 'bg-purple-500/20 border-purple-400/40' : 'bg-white/5 border-white/10'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold truncate">{perf.title ?? 'No song'}{perf.artist ? ` — ${perf.artist}` : ''}</div>
-                    <div className="text-[9px] opacity-50">
-                      {new Date(perf.date).toLocaleString()} · {clockText(perf.durationSec)} · {perf.gestures.length} gestures
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => (replaying ? onStopPerformanceReplay() : onReplayPerformance(perf.id))}
-                      title={replaying ? 'Stop the replay' : perf.clock === 'song'
-                        ? 'Replay it: with its song playing it follows the song, otherwise it plays on its own'
-                        : 'Replay it on its own clock'}
-                      className="p-1.5 rounded-md hover:bg-white/10"
-                    >
-                      {replaying ? <Square size={11} /> : <Play size={11} />}
-                    </button>
-                    <button
-                      onClick={() => onDeletePerformance(perf.id)}
-                      title="Delete this performance"
-                      className="p-1.5 rounded-md hover:bg-white/10 opacity-60 hover:opacity-100"
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </section>
 
       {/* ── History / Replay ─────────────────────────────────────── */}
@@ -276,11 +231,12 @@ export const TrackPanel: React.FC<TrackPanelProps> = ({
           <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
             {[...trackState.listens].reverse().map(listen => (
               <button
+                aria-pressed={state.replayListenNumber === listen.listenNumber}
                 key={listen.listenNumber}
                 onClick={() => onReplayListen(listen.listenNumber)}
                 className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-all text-left ${
                   state.replayListenNumber === listen.listenNumber
-                    ? 'bg-purple-500/20 border-purple-400/40'
+                    ? LIT
                     : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
               >

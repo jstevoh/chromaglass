@@ -13,6 +13,8 @@
  * the difference rather than one per harness.
  */
 
+import { presentsInXvfb } from './chromium.mjs';
+
 /**
  * There is one engine (docs/webgpu-plan.md, P7), so a harness no longer
  * chooses: these two are kept as the seam where a second one would arrive,
@@ -20,8 +22,33 @@
  */
 export const engineName = () => 'webgpu';
 
-/** Nothing: the app has no renderer flag any more. */
-export const engineQuery = () => '';
+/**
+ * What a harness adds to the app's URL for the engine it runs on: nothing on
+ * a GPU, and on a Linux box's software WebGPU presenting into Xvfb
+ * (`scripts/chromium.mjs`, PLAN.md 19l) two diagnostic overrides that only
+ * the query string can reach.
+ *
+ * `dpr=0.25`: on SwiftShader the plate's drawing is pixel-bound, and at a
+ * 1280×800 viewport a frame took about 36 s after warm-up and 98 s before
+ * its first reading; at a quarter of the pixels, 2 to 3 s, with the frame
+ * still read back (mean 0.40 on classic). `renderScale()` in
+ * `src/lib/platform.ts` says why nothing a harness measures moves with it.
+ *
+ * `steps=60`: one solver step is a sixtieth of a second of plate, as on a
+ * Mac that keeps up. Left to the governor, a plate making a step every few
+ * seconds lowers its step rate, and each step would stand for more plate
+ * than the Mac's does; a check that counts steps would then measure a
+ * different plate. Pinned, a step means the same thing on both.
+ *
+ * `lockstep=1`, for a harness that asks (`{ lockstep: true }`): each frame is
+ * exactly the one step it takes, so the lamp, the gel wheel and the dish's
+ * turn move by the step and not by the wall clock's two to fifteen seconds a
+ * software frame lasts (`LOCKSTEP` in LiquidVisualizer.tsx has the
+ * measurement). Asked for, not the default, the way `present` is: each
+ * harness that takes it is run in a session first (PLAN.md 19l-4).
+ */
+export const engineQuery = ({ lockstep = false } = {}) =>
+  (presentsInXvfb() ? `&dpr=0.25&steps=60${lockstep ? '&lockstep=1' : ''}` : '');
 
 /**
  * Is this label a GPU solver's?
@@ -211,3 +238,124 @@ export const waitForShow = (page, timeout = 60_000) => page.evaluate(async (ms) 
   while (!open() && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 100));
   return open() ? (performance.now() - t0) / 1000 : null;
 }, timeout);
+
+/*
+  Waits that mean the same plate on a GPU and in software (PLAN.md 19l).
+
+  The app's harnesses wait by the wall clock: eight seconds for the show to
+  open, a second and a half for a hold, forty milliseconds between the moves
+  of a stroke. On a Mac that keeps sixty steps a second those are the plate's
+  seconds too. On a cloud session's SwiftShader they are not: measured
+  2026-10-26, the first step lands 25 to 100 s after load (the opening's
+  first dispatches), and after it the plate makes about 0.4 steps a second
+  at 256² or 128² alike, a step's few hundred dispatches being the cost and
+  not its cells. A one-second hold there spans no step at all, and the first
+  tools run in a session read "the plate did not step through every window
+  (steps 9, 9, 9, 50, 50)": a check whose logic was fine, measuring a plate
+  that had not moved.
+
+  So in software each wait also waits for steps, and on a GPU it is the wall
+  clock exactly as before: nothing a Mac shard measures moves. How many: a
+  share of what the Mac's sixty a second would have taken in the same time,
+  `PW_STEP_SHARE` (default 0.05, three steps for each of the Mac's seconds,
+  at least one a wait). All of them would be fidelity at 150 times the Mac's
+  run time: tools alone would take most of a day. A twentieth keeps every
+  window stepping, so a check's logic is exercised on a moving plate, and
+  the lines that count what a window did per step (the hover check, Blow's
+  wind steps) read like the Mac's; the lines that need the plate's full
+  seconds (how far a pool spreads in two of them) do not, and are not meant
+  to (PLAN.md 19l: "the lines that do not depend on the step rate agree").
+*/
+
+/** What `settlePlate` asks of software, as a share of the Mac's steps in the same wall time. */
+export const STEP_SHARE = Number(process.env.PW_STEP_SHARE) > 0 ? Math.min(1, Number(process.env.PW_STEP_SHARE)) : 0.05;
+
+/** The lead plate's solver steps so far, or null with no solver (yet, or any more). */
+export const stepsNow = (page) => page.evaluate(() => {
+  const f = window.chromaglassDebug?.().fluids?.[0];
+  const n = f?.stepCount ?? f?.stepIndex;
+  return typeof n === 'number' ? n : null;
+}).catch(() => null);
+
+/**
+ * `page.waitForTimeout(ms)`, and in software also until the plate has taken
+ * its share of the steps a GPU would have in that time. Never longer than a
+ * plate making a step every ten seconds would need, plus half a minute: a
+ * stalled plate is the harness's to report, not this wait's to hang on.
+ */
+export async function settlePlate(page, ms) {
+  if (!presentsInXvfb()) return page.waitForTimeout(ms);
+  const from = await stepsNow(page);
+  await page.waitForTimeout(ms);
+  if (from === null) return;
+  const want = Math.max(1, Math.ceil(ms / 1000 * 60 * STEP_SHARE));
+  const by = Date.now() + want * 10_000 + 30_000;
+  for (;;) {
+    const n = await stepsNow(page);
+    if (n === null || n - from >= want || n < from || Date.now() > by) return;
+    await page.waitForTimeout(100);
+  }
+}
+
+/**
+ * `page.waitForTimeout(ms)` on a GPU, exactly as before; in software, until
+ * the plate has taken every step the Mac's sixty a second would in `ms`, not
+ * `settlePlate`'s share of them.
+ *
+ * For the waits a check's line reads the plate's *age* through: "let a look
+ * develop" before a bubble is photographed on it, the opening before a shape
+ * is measured. At `settlePlate`'s twentieth, `npm run bubbles` and `npm run
+ * depth` photographed a plate 27 steps old where the Mac's was 540, and their
+ * lines that read how far it had come were red on a plate that had not come
+ * there (PLAN.md 19l-3). This is slow in software by design, about 0.4 steps
+ * a second: nine of the Mac's seconds are twenty-odd minutes. Paired with
+ * `engineQuery({ lockstep: true })`, or the wall clock runs a software plate's
+ * lamp and dish for all those minutes while its liquid develops for nine
+ * seconds. A plate that stops stepping returns after a minute without a step,
+ * for the harness to report.
+ */
+export async function developPlate(page, ms) {
+  if (!presentsInXvfb()) return page.waitForTimeout(ms);
+  const want = Math.round(ms / 1000 * 60);
+  let from = await stepsNow(page);
+  for (let tries = 0; from === null && tries < 600; tries++) {
+    await page.waitForTimeout(100);
+    from = await stepsNow(page);
+  }
+  if (from === null) return;
+  let last = from, at = Date.now(), said = Date.now();
+  const t0 = Date.now();
+  for (;;) {
+    await page.waitForTimeout(250);
+    const n = await stepsNow(page);
+    if (n === null || n < last) return;
+    if (n - from >= want) {
+      console.log(`     (developed ${n - from} steps, the Mac's ${(ms / 1000).toFixed(1)} s, in ${((Date.now() - t0) / 1000).toFixed(0)} s of software)`);
+      return;
+    }
+    if (n > last) { last = n; at = Date.now(); }
+    else if (Date.now() - at > 60_000) {
+      console.log(`     (the plate stopped stepping at ${n - from} of ${want} steps; nothing waited for past that)`);
+      return;
+    }
+    if (Date.now() - said > 120_000) { console.log(`     (developing: ${n - from} of ${want} steps)`); said = Date.now(); }
+  }
+}
+
+/**
+ * After a harness's opening wait: on a GPU nothing (the plate has long been
+ * stepping by then), in software until the solver has stepped and is still
+ * stepping, which is 25 to 100 s from load there. Four minutes at most.
+ */
+export async function waitForEngine(page) {
+  if (!presentsInXvfb()) return;
+  const by = Date.now() + 240_000;
+  let last = await stepsNow(page);
+  while (Date.now() < by) {
+    await page.waitForTimeout(500);
+    const n = await stepsNow(page);
+    if (n !== null && last !== null && n > last && n >= 3) return;
+    last = n;
+  }
+  console.log(' --   the plate had not started stepping four minutes after load (software WebGPU)');
+}

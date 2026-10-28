@@ -89,7 +89,10 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'kaleidoPhase', type: 'f32', note: 'where the rig has turned to, accumulated on the CPU' },
   { name: 'kaleidoZoom', type: 'f32', note: 'how much plate feeds each wedge' },
   { name: 'lacing', type: 'f32' },
-  { name: 'lampWarmth', type: 'f32', note: 'halogen grade' },
+  { name: 'lampWarmth', type: 'f32', note: 'halogen grade: the slider, 0 to LAMP_WARMTH_MAX; the vignette reads it up to 1' },
+  { name: 'lampTintR', type: 'f32', note: "the lamp's blackbody colour against the neutral's (lib/lampKelvin.ts)" },
+  { name: 'lampTintG', type: 'f32' },
+  { name: 'lampTintB', type: 'f32' },
   { name: 'layerCount', type: 'i32' },
   { name: 'twoProjectors', type: 'f32' },
   { name: 'layerZoom1', type: 'f32', note: 'second layer viewed magnified about the centre' },
@@ -145,6 +148,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'spectral', type: 'f32', note: 'dyes mixed across six bands of the spectrum rather than three' },
   { name: 'benDay', type: 'f32', note: 'the finished picture printed as a comic: flat inks, Ben-Day dots in the tints (the Roy look)' },
   { name: 'lampGround', type: 'f32', note: 'the lamp shining up through the dye (PLAN 18b): 0 the dye painted as light on black, 1 the lamp filtered by it' },
+  { name: 'projectorFocus', type: 'f32', note: 'projector lens focus plane (0..1, 0.5 = in-focus, defocus shifts Becke lines)' },
 ];
 
 export const PLATE_LAYOUT = layOut(PLATE_FIELDS);

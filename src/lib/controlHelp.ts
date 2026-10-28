@@ -35,7 +35,7 @@ export const CONTROL_HELP: Record<string, string> = {
   beatLead: 'How far ahead of a heard beat a predicted kick fires, to make up for the sound\'s trip through the room and the mic.',
 
   // Look
-  dyeBudget: 'How full the plate runs. Low is mostly clear glass with the dye on it, high is wall to wall colour.',
+  dyeBudget: 'How full the plate runs, from mostly clear glass to wall to wall colour. The picked bottle shows what is left.',
   turbulenceScale: 'Adds stirring to the flow: swirls at many sizes, from lazy to churning.',
   turbulenceDetail: 'How many sizes of swirl are stirred in, from broad eddies only to fine curls on top.',
   plateRock: 'A hand tips the dish with the beat, and the heavier colour runs downhill each way.',
@@ -44,6 +44,7 @@ export const CONTROL_HELP: Record<string, string> = {
   bubbles: 'Trapped air bubbles on the plate. A few go a long way.',
   saturationBoost: 'Colour strength of the finished picture, from washed out to vivid.',
   edgeRelief: 'The curved rim where a blob of liquid meets the glass: a dark edge and a bright refracted highlight.',
+  projectorFocus: 'Moves the projector lens\'s focus through the liquid, turning edges into bright and dark Becke lines.',
   lacing: 'Pale threads along the line where two colours meet, finer where the flow pulls them apart.',
   benDay: 'Prints the picture as a comic: flat inks with the tones laid down as even dots.',
   sharpness: 'How crisp the edge of a colour stays. Low lets the solver smear it soft, high holds it hard.',
@@ -76,7 +77,7 @@ export const CONTROL_HELP: Record<string, string> = {
   secondLamp: 'A second, cooler lamp from the other side, so two lights play across every bubble and edge.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
   iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
-  lampWarmth: 'A halogen lamp\'s warm tint with a soft vignette.',
+  lampWarmth: 'The lamp\'s colour: neutral 6500 K down to a 3200 K halogen, with a soft vignette. Warmer is dimmer; lift Exposure.',
   transmission: 'How light passes through the dye: thin pale, thick deep. Zero is a flat glow.',
   exposure: 'Plate-wide exposure. Dye thinner than the plate\'s own floor reads as bare glass.',
   lumia: 'Slow folded sheets of light, in the manner of Wilfred\'s lumia, with no beat and no dye.',
@@ -90,12 +91,12 @@ export const CONTROL_HELP: Record<string, string> = {
   turingDrift: 'How far the print\'s feed and kill rates wander over a minute or so, so the pattern keeps changing.',
 
   // Camera
-  camera: 'The lens as a whole: refraction, depth of field, bloom and the sensor\'s roll-off. Zero is off.',
+  camera: 'The sensor\'s look: highlight roll-off, vignette and grain. The four optics below work without it.',
   focus: 'Where the focal plane sits, from the glass at zero to the top of the thickest domes at one.',
   aperture: 'How quickly things go soft away from the focal plane. Wide is a shallow focus.',
   bloom: 'Glow spilling out around the brightest highlights.',
   chromaticAberration: 'Colour fringing at refracting edges and the corners of the frame.',
-  refraction: 'How much the dye and the bubbles bend what is under them.',
+  refraction: 'How far the liquid\'s sloped surface bends the picture under it, as a thin prism does.',
   microDroplets: 'Satellite droplets on the glass, hundreds of tiny lenses.',
   thinFilm: 'Interference colour where the dye runs thinnest.',
   filmPhysics: 'The thin-film colours, from a plain rainbow at zero to a real soap film\'s at one.',
@@ -158,6 +159,7 @@ export const CONTROL_HELP: Record<string, string> = {
   phaseDisplace: 'How much the ferrofluid shoves the dye aside, so colour packs along its edge instead of hiding under it.',
   ferroLabyrinth: 'Under a strong field the ferrofluid\'s particles repel and it breaks into a maze of stripes (Ohta-Kawasaki).',
   oilBodies: 'Oil and water each keep their own colour, and an oil body\'s colour travels with it. Needs Oil Tension.',
+  filmHold: 'The water film between two oil drops holds them apart, so they crowd without merging until pressed. Needs Oil Tension.',
   oilTension: 'Surface tension between oil and water: oil rounds into drops, threads break into beads, drops merge.',
   clearFilm: 'Pours a clear oil film over the dish. Thin spots and dust tear it open into a lace of holes (dewetting).',
   thinGap: 'Treats the plate as a thin gap between two glasses, so a push coasts and viscosity matters.',

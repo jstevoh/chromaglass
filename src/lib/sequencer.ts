@@ -285,11 +285,11 @@ export function builtInSequences(): ShowSequence[] {
   ];
 }
 
-const STORAGE_KEY = 'chromaglass-sequences';
+export const SEQUENCES_KEY = 'chromaglass-sequences';
 
 export function loadUserSequences(): ShowSequence[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(SEQUENCES_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as ShowSequence[];
     return Array.isArray(parsed) ? parsed.filter(q => q && Array.isArray(q.stages)) : [];
@@ -300,7 +300,7 @@ export function loadUserSequences(): ShowSequence[] {
 
 export function saveUserSequences(seqs: ShowSequence[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seqs.filter(q => !q.builtIn)));
+    localStorage.setItem(SEQUENCES_KEY, JSON.stringify(seqs.filter(q => !q.builtIn)));
   } catch { /* private mode, full storage: the show still runs */ }
 }
 

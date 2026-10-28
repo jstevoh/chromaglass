@@ -160,7 +160,10 @@ check('every shipped look and show stage not named to move the frame holds it st
   room's own checks, and is not counted.
 */
 const SOUND = new Set(['sound', 'bands', 'hits']);
-const frameRoutes = (S) => (S.sceneMappings ?? []).filter((m) => m && SOUND.has(m.source ?? 'room') && L.FRAME_MOTION.has(m.setting)).map((m) => `${m.source}:${m.feature} on ${m.setting}`);
+const frameRoutes = (S) => [
+  ...(S.sceneMappings ?? []).filter((m) => m && SOUND.has(m.source ?? 'room') && L.FRAME_MOTION.has(m.setting)).map((m) => `${m.source}:${m.feature} on ${m.setting}`),
+  ...(S.audioMappings?.rotation && S.audioMappings.rotation !== 'none' ? [`audioMappings.rotation:${S.audioMappings.rotation}`] : []),
+];
 const outside = [];
 for (const l of looks) {
   if (named(l)) continue;

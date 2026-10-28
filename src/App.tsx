@@ -22,8 +22,8 @@ import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
 import { DEFAULT_RIDES } from './components/desk/DeskPanels';
 import type { Cue, SetAction, SetItemAction, ControlKind } from './components/desk/deskProps';
-import { useDeskLayouts } from './hooks/useDeskLayout';
-import { LAYOUT_OF_MODE } from './lib/deskLayout';
+import { useDeskTabs } from './hooks/useDeskLayout';
+import { closePanel, isSectionPanel, openPanel, openPanels } from './lib/deskLayout';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { luckyLook } from './lib/lucky';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
@@ -36,13 +36,13 @@ import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
 import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
 import { SettingRide, rideSlot } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User } from 'lucide-react';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
-import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
+import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid, CUSTOM_LIQUIDS_KEY } from './lib/liquidFile';
 import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
-import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
+import { loadToolAmounts, saveToolAmounts, clampAmount, TOOL_AMOUNTS_KEY } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
 import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
@@ -64,7 +64,7 @@ import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
 import { useSongShows } from './hooks/useSongShows';
-import { BUILT_IN_SETS, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, newId, type ActionSet, type ActionWhat, type ActionWhen, type SongAction, type SongShow } from './lib/songShows';
+import { BUILT_IN_SETS, SETS_KEY, SHOWS_KEY, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, newId, type ActionSet, type ActionWhat, type ActionWhen, type SongAction, type SongShow } from './lib/songShows';
 import type { SongScoreProps } from './components/SongScore';
 import { songDuration } from './lib/songScore';
 import { MidiPanel } from './components/MidiPanel';
@@ -72,6 +72,8 @@ import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
 import { useSceneCamera } from './hooks/useSceneCamera';
+import { useCameras } from './hooks/useCameras';
+import { cameraPresent } from './lib/cameras';
 import { useFilmSense } from './hooks/useFilmSense';
 import { touch } from './lib/midiTouch';
 import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
@@ -89,18 +91,20 @@ import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, ser
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
 import { exportShowKit, importShowKit, SHOW_KIT_FORMAT } from './lib/showKit';
-import { loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
+import { SAVED_SETS_KEY, SETLIST_KEY, loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { clockText } from './lib/performanceTake';
+import { loadRecordChoice, saveRecordChoice, normalizeChoice, recordMove, makesText, runningText, type RecordChoice } from './lib/recordChoice';
 import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
-import { isFreeTierGated } from './lib/tierGates';
+import { getEffectiveTier, isFreeTierGated } from './lib/tierGates';
 import { syncServerLicense } from './lib/licenseKey';
 import { usePublishAccountShow } from './lib/accountShows';
+import { startCloudSync, useCloudSyncReload } from './lib/cloudSyncApp';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
 import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
@@ -111,6 +115,7 @@ import { parseSeed, showSeed, stream } from './lib/rng';
 import { blendKey, nextBlend, raiseInMix, MIX_SOURCE_INFO, type MixMover, type MixSource } from './lib/mixer';
 import { RowFades, barsToMs, fadeBarsOf, fadeTempo, LOOK_LEVEL_KEYS, FADE_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
 import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
+import { SHOW_PATH } from './lib/showPath';
 
 const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
 
@@ -147,7 +152,6 @@ const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'str
   d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet', n: 'spin',
 };
 
-const DESK_MODE_KEY = 'chromaglass-desk-mode';
 /** How often Evolve listens and steps its glides (lib/slowEvolve.ts). */
 const DRIFT_STEP_MS = 500;
 /**
@@ -185,6 +189,8 @@ async function micAlreadyAllowed(): Promise<boolean> {
  */
 const SCENE_ON_KEY = 'chromaglass-scene-on';
 const SCENE_DEVICE_KEY = 'chromaglass-scene-device';
+/** The film's Webcam has a camera of its own, remembered apart from the motion camera's (PLAN 14ad). */
+const FILM_DEVICE_KEY = 'chromaglass-film-camera';
 
 // Detect which preset (if any) matches the current settings. Only the look is
 // compared: a look does not set the room (see RIG_KEYS).
@@ -283,6 +289,10 @@ interface ArmedLook {
 }
 
 import AccountSheet from './components/AccountSheet';
+import { LIT, LIVE } from './components/ui';
+import { ACCOUNTS_ON, useSignedIn } from './lib/useSignedIn';
+import { isSignedInCached, onAuthFlagChange } from './lib/authFlag';
+import { syncAccountLicense } from './lib/accountLicense';
 
 const hasAccountOrLicenseUI =
   Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
@@ -305,6 +315,10 @@ const isProfileRoute = () =>
 export default function App() {
   const [isActive, setIsActive] = useState(true);
   const [showAccount, setShowAccount] = useState(() => hasAccountOrLicenseUI && isProfileRoute());
+  // Signed out with the show up: every account button turns into a lit
+  // "Sign in" that opens the sheet's sign-in (the owner, 2026-10-24).
+  const signedIn = useSignedIn();
+  const signedOut = ACCOUNTS_ON && !signedIn;
 
   const openProfileSheet = useCallback(() => {
     if (!hasAccountOrLicenseUI) return;
@@ -324,7 +338,8 @@ export default function App() {
         params.delete('profile');
         params.delete('unsubscribe');
         const qs = params.toString();
-        window.history.replaceState(null, '', `/${qs ? `?${qs}` : ''}${window.location.hash}`);
+        // Back to the show's own address, not `/`: a reload there is the webpage (lib/showPath.ts).
+        window.history.replaceState(null, '', `${SHOW_PATH}${qs ? `?${qs}` : ''}${window.location.hash}`);
       }
     } catch { /* ignore history errors */ }
   }, []);
@@ -414,6 +429,8 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
   const tapTempo = useCallback(() => tempoRef.current?.tap(performance.now()), []);
+  /** The source's reading, for the tap pad's beat light, which polls it itself so the App never re-renders for a beat (PLAN 35f). */
+  const readTempo = useCallback(() => tempoRef.current?.read(performance.now()) ?? null, []);
   const clearTempo = useCallback(() => tempoRef.current?.clear(), []);
   const setTempoBpm = useCallback((bpm: number) => tempoRef.current?.setBpm(bpm), []);
   /*
@@ -645,36 +662,21 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   /** Which guide topic to open at, when something sent you there to read one. */
   const [helpFocus, setHelpFocus] = useState<string | null>(null);
-  /**
-   * Perform, or Design.
-   *
-   * Design is what this has always been: the plate fills the window, which is
-   * the right shape for *building* a look. Perform is the desk — the plate
-   * becomes a preview and the controls get the room, because during a show the
-   * plate is already on a wall behind you, larger, and the thing you cannot
-   * see is the desk. Nothing is taken away; it is a different arrangement of
-   * the same controls, and the toggle is one click.
-   */
-  const [deskMode, setDeskMode] = useState<'design' | 'perform' | 'loadin'>(() => {
-    try {
-      const m = localStorage.getItem(DESK_MODE_KEY);
-      return m === 'perform' || m === 'loadin' ? m : 'design';
-    } catch { return 'design'; }
-  });
-  useEffect(() => { try { localStorage.setItem(DESK_MODE_KEY, deskMode); } catch { /* private window */ } }, [deskMode]);
   /*
-    Desk v2: the two desks are one, and Design, Perform and the new Load-in
-    are its three layouts, Build, Gig and Load-in (lib/deskLayout.ts). The
-    stored mode keeps the old words, so a laptop that was left on Perform
-    opens on Gig. Each layout remembers where its panels were.
+    The desk's tabs (lib/deskTabs.ts): the owner's to make since 2026-10-27,
+    each a set of panels, with Perform, Sequence and Setup shipped as the
+    three to start from. The tab that is up is kept under the old desk mode's
+    key, so a laptop left on Gig or Build opens on Perform and one left on
+    Load-in opens on Setup. Each tab remembers where its panels were.
   */
-  const deskLayouts = useDeskLayouts();
-  const layoutName = LAYOUT_OF_MODE(deskMode);
-  const deskLayout = deskLayouts.layouts[layoutName];
-  const { update: updateLayout, reset: resetLayout } = deskLayouts;
+  const deskTabs = useDeskTabs();
+  const deskTab = deskTabs.tab;
+  const setDeskTab = deskTabs.setTab;
+  const deskLayout = deskTabs.layout;
+  const { update: updateLayout, reset: resetLayout } = deskTabs;
   // Stable, so the desk's drag and key listeners are not rebuilt on every render the sound causes.
-  const onDeskLayout = useCallback((change: (l: typeof deskLayout) => typeof deskLayout) => updateLayout(layoutName, change), [updateLayout, layoutName]);
-  const onDeskReset = useCallback(() => resetLayout(layoutName), [resetLayout, layoutName]);
+  const onDeskLayout = useCallback((change: (l: typeof deskLayout) => typeof deskLayout) => updateLayout(deskTab, change), [updateLayout, deskTab]);
+  const onDeskReset = useCallback(() => resetLayout(deskTab), [resetLayout, deskTab]);
   /** The Stage sheet (⌘,): the room and the machine, the sections no look saves. */
   const [showStage, setShowStage] = useState(false);
   /*
@@ -887,7 +889,9 @@ export default function App() {
   const [songLine, setSongLine] = useState('');
   /** What the bar grid knows (lib/barGrid.ts barLine), for Accent the One on the phone. */
   const [barKnown, setBarKnown] = useState('');
-  const shownShape = useRef({ line: '', bar: '' });
+  /** The tempo the beat grid hears, bpm rounded, or 0: what the strobe ring on Auto Spin is lit by when nothing was tapped or clocked in. */
+  const [heardBpm, setHeardBpm] = useState(0);
+  const shownShape = useRef({ line: '', bar: '', heard: 0 });
   /** The last song-shape event the sequencer has been handed, by its number. */
   const songCueSeqRef = useRef(0);
   useEffect(() => {
@@ -898,6 +902,9 @@ export default function App() {
       if (next !== shownShape.current.line) { shownShape.current.line = next; setSongLine(next); }
       const bar = report ? barLine(report.bar) : '';
       if (bar !== shownShape.current.bar) { shownShape.current.bar = bar; setBarKnown(bar); }
+      const heard = report && report.bar.period > 0 && report.bar.beatConfidence >= 0.3 ? Math.round(60 / report.bar.period) : 0;
+      // Compared here, not in an updater that hands back the old value (the tempo label's note above): that still renders the App.
+      if (heard !== shownShape.current.heard) { shownShape.current.heard = heard; setHeardBpm(heard); }
     }, 250);
     return () => clearInterval(timer);
   }, []);
@@ -931,6 +938,8 @@ export default function App() {
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   /** The shelf's cartoon pouring as dye (lib/cartoons.ts), or null for a file or nothing. */
   const [pouringCartoon, setPouringCartoon] = useState<string | null>(null);
+  /** The file pouring as dye, by its name, so a row that poured it can say it is (Settings' demo loops). */
+  const [pourName, setPourName] = useState<string | null>(null);
   /*
     The video pour: one hidden, muted, looping <video>, handed to the plate
     once when it starts playing. It used to be handed over again on every
@@ -957,10 +966,12 @@ export default function App() {
     if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
     setIsVideoPlaying(false);
     setPouringCartoon(null);
+    setPourName(null);
   }, []);
   const pourFile = useCallback((file: File) => {
     pourVideoFrom(URL.createObjectURL(file), true);
     setPouringCartoon(null);
+    setPourName(file.name);
   }, [pourVideoFrom]);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1371,20 +1382,68 @@ export default function App() {
   const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
   /** The shelf's cartoon playing as the film; read only while the film is a file (a camera or window replaces it). */
   const [filmCartoon, setFilmCartoon] = useState<string | null>(null);
+  /** The file playing as the film, by its name; read only while the film is a file. */
+  const [filmName, setFilmName] = useState<string | null>(null);
   const loadFilm = async (file: File) => {
     await wallRef.current?.loadFilmFile(file);
     setFilmSource('file');
     setFilmCartoon(null);
+    setFilmName(file.name);
+    setFilmCameraLost(false);
   };
-  const startFilmCamera = async () => {
+  /*
+    Which camera the film shows (PLAN 14ad).
+
+    It used to be whichever one the browser called "environment", with no
+    say: a second webcam, a capture card or a virtual camera (the way a VJ
+    app's output arrives today, PLAN §13) could not be put on the plate. Now
+    the film's picker chooses, the choice is remembered apart from the motion
+    camera's (one camera usually watches the room while another looks down at
+    a dish), and an unplugged camera takes the film off, says so, and puts it
+    back when the same camera is plugged in again.
+  */
+  const cameras = useCameras();
+  const [filmCameraId, setFilmCameraId] = useState<string>(() => { try { return localStorage.getItem(FILM_DEVICE_KEY) ?? ''; } catch { return ''; } });
+  const filmCameraIdRef = useRef(filmCameraId);
+  filmCameraIdRef.current = filmCameraId;
+  /** What the film's camera opened as: its name, and whether the chosen one was missing. */
+  const [filmCamera, setFilmCamera] = useState<{ label: string | null; fellBack: boolean } | null>(null);
+  /** The film's camera was unplugged while it showed; it comes back when that camera does. */
+  const [filmCameraLost, setFilmCameraLost] = useState(false);
+  const startFilmCamera = async (id: string = filmCameraIdRef.current) => {
     try {
-      await wallRef.current?.startFilmCamera();
+      const got = await wallRef.current?.startFilmCamera(id, () => {
+        setFilmSource('none');
+        setFilmCamera(null);
+        setFilmCameraLost(true);
+        setToast('The film\u2019s camera was unplugged');
+      });
       setFilmSource('camera');
+      setFilmCartoon(null);
+      setFilmCamera(got ?? null);
+      setFilmCameraLost(false);
+      void cameras.refresh();
     } catch (err) {
       console.warn('ChromaGlass: camera unavailable for the film projector.', err);
       setFilmSource('none');
+      setFilmCamera(null);
     }
   };
+  const chooseFilmCamera = (id: string) => {
+    setFilmCameraId(id);
+    try { localStorage.setItem(FILM_DEVICE_KEY, id); } catch { /* private */ }
+    // Showing a camera already: the new one takes over at once, which is
+    // what choosing a camera while it is on the plate means.
+    if (filmSource === 'camera') void startFilmCamera(id);
+  };
+  useEffect(() => {
+    const id = filmCameraIdRef.current;
+    const back = filmCameraLost && cameraPresent(cameras.devices, id);
+    const arrived = filmSource === 'camera' && !!filmCamera?.fellBack && id !== '' && cameraPresent(cameras.devices, id);
+    if (back || arrived) void startFilmCamera(id);
+    // startFilmCamera is a fresh closure each render; the list is what changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameras.devices]);
   /*
     Film from a window.
 
@@ -1405,6 +1464,7 @@ export default function App() {
         () => setToast('That window is coming through black — share the tab instead'),
       );
       setFilmSource('window');
+      setFilmCameraLost(false);
     } catch (err) {
       if ((err as DOMException)?.name === 'NotAllowedError') return;   // picker cancelled
       console.warn('ChromaGlass: could not capture a window for the film projector.', err);
@@ -1414,6 +1474,7 @@ export default function App() {
     wallRef.current?.clearFilm();
     setFilmSource('none');
     setFilmCartoon(null);
+    setFilmCameraLost(false);
   };
   const filmCartoonNow = async (id: string) => {
     const c = CARTOON_BY_ID.get(id);
@@ -1421,6 +1482,8 @@ export default function App() {
     await wallRef.current?.loadFilmUrl(c.src);
     setFilmSource('file');
     setFilmCartoon(id);
+    setFilmName(c.title);
+    setFilmCameraLost(false);
   };
   /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
   const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
@@ -1432,6 +1495,7 @@ export default function App() {
       if (!c) return;
       pourVideoFrom(c.src, false);
       setPouringCartoon(id);
+      setPourName(c.title);
     },
     onFilm: (id) => { if (filmingCartoon === id) clearFilm(); else void filmCartoonNow(id); },
     onStopPour: stopPour,
@@ -1471,6 +1535,8 @@ export default function App() {
     enabled: sceneOn,
     userAsked: sceneAskedRef.current,
     deviceId: sceneDeviceId,
+    cameras: cameras.devices,
+    onOpened: cameras.refresh,
     mirror: settings.sceneMirror !== false,
     deadzone: settings.sceneDeadzone ?? 0.25,
     smooth: settings.sceneSmooth ?? 0.35,
@@ -1527,6 +1593,8 @@ export default function App() {
   */
   const earLive = ear.live;
   const hear = useCallback(() => renderAudioRef.current ?? earLive.current, [earLive]);
+  /** The plate's volume, 0 to 100, for the VU needle (it polls this on its own frame; nothing renders for it). */
+  const readLevel = useCallback(() => hear()?.volume ?? null, [hear]);
   const [renderHold, setRenderHold] = useState(false);
   const renderHoldRef = useRef(false);
   const audioData = renderAudio ?? liveAudio;
@@ -1903,17 +1971,19 @@ export default function App() {
    * layer is does not need sixty looks a second at the cost of a re-render
    * each.
    */
+  /** What is left of the Dye Budget, for the picked bottle on the desk and the phone (PLAN 35e); a stable function, so asking re-renders nothing here. */
+  const readDyeRoom = useCallback(() => visualizerRef.current?.dyeRoom?.() ?? 1, []);
   const [layerReport, setLayerReport] = useState<{ index: number; fill: number; colour: string }[]>([]);
   const layerReportKey = useRef('');
-  /** Which desk is up, for the poll below, which is armed once and never re-armed. */
-  const deskModeRef = useRef(deskMode);
-  deskModeRef.current = deskMode;
+  /** Whether the plate is in Preview, for the poll below, which is armed once and never re-armed. */
+  const buildingRef = useRef(false);
+  buildingRef.current = deskLayout.plateMode === 'preview';
   useEffect(() => {
     const id = setInterval(() => {
-      // Only the bench draws them, and only when there is more than one layer
-      // to tell apart — otherwise this is a re-render for a badge nobody is
-      // looking at.
-      if (deskModeRef.current !== 'design') return;
+      // Only a tab building a look in Preview draws them (Build's bench did),
+      // and only when there is more than one layer to tell apart — otherwise
+      // this is a re-render for a badge nobody is looking at.
+      if (!buildingRef.current) return;
       const r = visualizerRef.current?.layerReport?.();
       if (!r || r.length < 2) return;
       // Only when the badge would change: a fresh array every poll re-rendered
@@ -2013,7 +2083,6 @@ export default function App() {
     setDocId(null);
     setDocDirty(false);
     setCued(null);
-    setDeskMode('design');
     setToast('Empty plate');
   };
   /** The song playing now, as a file would remember it. */
@@ -2404,7 +2473,13 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   // A phone is never a desk, whatever its width turned sideways.
-  const performing = deskMode === 'perform' && roomForDesk && !phone;
+  /*
+    "Performing" was the Gig desk being up: Space is Go, a look picked from
+    the palette is cued rather than put up, and the look's clock runs. With
+    the tabs the owner's to make, it is the tab's plate being Live: the show,
+    whichever panels are round it. Preview is building (below).
+  */
+  const performing = deskLayout.plateMode === 'live' && roomForDesk && !phone;
   /*
     "Designing" was the Design desk being up. It is now the plate in Preview,
     which is what it always meant to the show: while a look is being built
@@ -2627,11 +2702,16 @@ export default function App() {
   const lookSince = useRef(Date.now());
   const [lookFor, setLookFor] = useState(0);
   useEffect(() => { lookSince.current = Date.now(); setLookFor(0); }, [pinnedPresetId]);
+  const clockLive = deskLayout.plateMode === 'live';
   useEffect(() => {
-    if (deskMode !== 'perform') return;
+    // On the tab's plate being Live, as it ran on the Gig desk being chosen:
+    // not on `performing`, which is also a window wide enough for the desk,
+    // so a phone (never a desk) lost the clock and `npm run renders` read 0
+    // renders a second where its clock is asked for (0.6 to 1.5).
+    if (!clockLive) return;
     const id = setInterval(() => setLookFor((Date.now() - lookSince.current) / 1000), 1000);
     return () => clearInterval(id);
-  }, [deskMode]);
+  }, [clockLive]);
 
   /*
     "Edited" is the document's own flag now.
@@ -2755,6 +2835,16 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   []);
 
+  // The stage look's place in each list, for the slide tray's click (PLAN 35g):
+  // the desk's is among all the presets, the phone's among its grouped list.
+  const deskLookSlot = useMemo(() => {
+    const i = pinnedPresetId ? allPresets.findIndex(p => p.id === pinnedPresetId) : -1;
+    return i < 0 ? null : i;
+  }, [allPresets, pinnedPresetId]);
+  const phoneLookSlot = useMemo(() => {
+    const i = pinnedPresetId ? phoneLooks.findIndex(l => l.id === pinnedPresetId) : -1;
+    return i < 0 ? null : i;
+  }, [phoneLooks, pinnedPresetId]);
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
@@ -3021,6 +3111,26 @@ export default function App() {
     setFollowSongsState(on);
     try { localStorage.setItem('chromaglass-follow-songs', on ? '1' : '0'); } catch { /* private */ }
   }, []);
+  /*
+    Cloud sync (PLAN 23.18, lib/cloudSync.ts): a Pro account's saved work kept in
+    step across its browsers and Mac apps. What the cloud writes into a store held
+    here in state is read again at once: a stale list saved over it would read as
+    the player deleting what had just arrived, on every device. The saved looks,
+    sequences and MIDI map reload in their own hooks.
+  */
+  useCloudSyncReload({
+    [CUSTOM_LIQUIDS_KEY]: () => setLiquidTypes([...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]),
+    [TOOL_AMOUNTS_KEY]: () => setToolAmounts(loadToolAmounts()),
+    [MUSIC_SETTINGS_KEY]: () => setMusicSettings(loadMusicSettings()),
+    [SETLIST_KEY]: () => setSetList(loadSetList(() => starterSet(PRESETS.map(p => p.id)))),
+    [SAVED_SETS_KEY]: () => setSavedSets(loadSavedSets()),
+    [SHOWS_KEY]: () => setSongShowsState(loadShows()),
+    [SETS_KEY]: () => setUserActionSets(loadSets()),
+    'chromaglass-follow-songs': () => {
+      try { setFollowSongsState(localStorage.getItem('chromaglass-follow-songs') !== '0'); } catch { /* private */ }
+    },
+  });
+  useEffect(() => startCloudSync(), []);
   const [showSongs, setShowSongs] = useState(false);
 
   const sequencer = useShowSequencer({
@@ -3442,6 +3552,16 @@ export default function App() {
     return () => window.removeEventListener('cg-license-changed', onLicense);
   }, []);
 
+  // The account's licence key, brought here once the app is up signed in and
+  // again on any later sign-in (lib/accountLicense.ts): a Pro account read Free
+  // while this lived only in the profile sheet (the owner, 2026-10-24).
+  useEffect(() => {
+    if (!ACCOUNTS_ON) return;
+    const ask = () => { if (isSignedInCached()) void syncAccountLicense(); };
+    ask();
+    return onAuthFlagChange(ask);
+  }, []);
+
   const loadMark = useCallback((file: File) => {
     const effectiveFile = isFreeTierGated()
       ? new File(
@@ -3655,9 +3775,34 @@ export default function App() {
   // ── Recording ──
   const recorder = useRecorder();
   const [showRecordPanel, setShowRecordPanel] = useState(false);
-  const toggleRecording = useCallback(() => {
+  /*
+    The one Record button (lib/recordChoice.ts). R, the desk's button, the
+    phone's, MIDI and the remote all land here: nothing running, it starts
+    what the Record panel says it makes (the Plate video, a Take, or both);
+    anything running, it stops all of it. `toggleVideo` is the video alone.
+  */
+  const toggleVideo = useCallback(() => {
     recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
   }, [recorder, audioStream]);
+  const [recordChoice, setRecordChoiceState] = useState<RecordChoice>(loadRecordChoice);
+  const setRecordChoice = useCallback((c: RecordChoice) => {
+    const next = normalizeChoice(c);
+    setRecordChoiceState(next);
+    saveRecordChoice(next);
+  }, []);
+  const toggleRecording = useCallback(() => {
+    const m = recordMove(recordChoice, { videoOn: recorder.recording, takeOn: perfLive, videoSupported: recorder.supported });
+    if (m.stopVideo || m.startVideo) toggleVideo();
+    if (m.stopTake) stopPerformance();
+    if (m.startTake) startPerformance();
+  }, [recordChoice, recorder.recording, recorder.supported, perfLive, toggleVideo, stopPerformance, startPerformance]);
+  // Whatever Record is making, one clock for the phone and the overlay bar: the video's when it runs, else the take's.
+  const recordingAny = recorder.recording || perfLive;
+  const recordSeconds = recorder.recording
+    ? recorder.seconds
+    : musicIntel.performance.live
+      ? Math.max(0, Math.floor((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000))
+      : 0;
 
   // ── The phone's own hands: a pinch on the closeup, and Tilt ──
   /*
@@ -4577,9 +4722,9 @@ export default function App() {
       { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
       { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
-      { id: 'record-video',       name: recorder.recording ? 'Stop recording' : 'Record the plate', kind: 'Actions', kbd: 'R', run: toggleRecording },
-      { id: 'record-performance', name: perfLive ? 'Stop performance' : 'Record performance (strokes & gestures)', kind: 'Actions', kbd: 'T', run: togglePerformance },
-      { id: 'record-studio',      name: 'Recording studio options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
+      { id: 'record-video',       name: recordingAny ? 'Stop recording' : `Record: ${makesText(recordChoice)}`, kind: 'Actions', kbd: 'R', run: toggleRecording },
+      { id: 'record-performance', name: perfLive ? 'Stop the take' : 'Record a take (your strokes and drops, replayable)', kind: 'Actions', kbd: 'T', run: togglePerformance },
+      { id: 'record-studio',      name: 'Record options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
       { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
       { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
@@ -4616,15 +4761,14 @@ export default function App() {
       { id: 'open-seq',      name: 'Stage sequences', kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
       { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
-      { id: 'open-design',   name: deskMode === 'perform' ? 'Build layout' : 'Gig layout', kind: 'Open',
-        run: () => setDeskMode(m => (m === 'perform' ? 'design' : 'perform')) },
-      { id: 'open-loadin',   name: 'Load-in layout', kind: 'Open', run: () => setDeskMode('loadin') },
+      // A command for each of the desk's tabs, by the name it has now.
+      ...deskTabs.tabs.map(t => ({ id: `open-tab-${t.id}`, name: `${t.name} tab`, kind: 'Open' as const, run: () => setDeskTab(t.id) })),
       { id: 'open-stage',    name: 'Stage: the room and the machine', kind: 'Open', run: () => { setShowStage(true); setShowSettings(false); } },
     ];
 
     return [...looks, ...doing, ...opening, ...sections];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskMode, docId, docName,
+  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskTabs.tabs, setDeskTab, docId, docName,
       cueLook, cuePreset, goLook, goLookNow, revertLook, toggleBlackout, toggleRecording, hideOverlays]);
 
   useEffect(() => {
@@ -4712,14 +4856,16 @@ export default function App() {
 
   const deskDots = useMemo(() => ({
     sound: audioSource !== 'none',
-    video: isVideoPlaying,
+    // The film under the dye, which is what the dot opens (Film, in Settings).
+    // It was lit by the poured video, a different thing, and opened the film.
+    video: filmSource !== 'none',
     mic: audioSource !== 'none',
     wall: isCasting,
     midi: midi.enabled,
     phone: livePhoneCount > 0,
-    rec: recorder.recording ? String(recorder.seconds) : null,
-    perf: perfClock,
-  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, livePhoneCount, recorder.recording, recorder.seconds, perfClock]);
+    rec: recordingAny ? clockText(recordSeconds) : null,
+    recWhat: runningText({ videoOn: recorder.recording, takeOn: perfLive }),
+  }), [audioSource, isVideoPlaying, isCasting, midi.enabled, livePhoneCount, recordingAny, recordSeconds, recorder.recording, perfLive]);
 
   /*
     Where each status dot goes.
@@ -4795,6 +4941,84 @@ export default function App() {
     sheet (the room and the machine, `scope="stage"`). One list, so a
     control cannot be wired one way in the sheet and another on the desk.
   */
+  /*
+    The three screens that were behind the Sequence and Sound chips, each
+    drawn either as the sheet it was (from a status dot, the palette or a
+    link inside another sheet) or, embedded, as a panel on any tab
+    (lib/deskLayout.ts: songs, sequences, player).
+  */
+  const soundScreen = (embed: boolean) => (
+    <SoundPanel
+      source={audioSource}
+      onSource={(x) => { void handleSourceChange(x); }}
+      inputs={audioInputs}
+      inputId={audioInputId}
+      onInput={chooseAudioInput}
+      playing={musicPlaying}
+      time={musicTime}
+      loop={musicLoop}
+      onLoop={setMusicLoop}
+      onToggle={toggleMusic}
+      onSeek={(t) => { const el = musicElRef.current; if (el) el.currentTime = t; }}
+      nowPlaying={musicFile ? { name: musicFile.name, track: musicFile.track } : null}
+      onPickFile={playMusicFile}
+      onPickTrack={playTrack}
+      drone={droneParams}
+      onDrone={changeDrone}
+      droneRunning={droneRunning}
+      onDroneToggle={toggleDrone}
+      readLevel={readLevel}
+      deaf={earDeaf}
+      embed={embed}
+      onClose={() => setShowSound(false)}
+    />
+  );
+  const songsScreen = (embed: boolean) => (
+    <SongsPanel
+      shows={songShows}
+      onShows={setSongShows}
+      sets={actionSets}
+      onSaveSet={saveActionSet}
+      onDeleteSet={deleteActionSet}
+      looks={lookChoices}
+      currentSong={currentSong}
+      follow={followSongs}
+      onFollow={setFollowSongs}
+      status={songRuntime.status}
+      onRun={songRuntime.start}
+      onStop={songRuntime.stop}
+      onOpenSequences={() => { setShowSongs(false); setShowSequencer(true); }}
+      exportShows={() => { const used = savedLooksUsed(songShows); return showsFile(songShows, userPresets.presets.filter(p => used.has(p.id))); }}
+      onImportLooks={(looks) => { for (const raw of looks) { try { userPresets.upsert(parsePresetFile(JSON.stringify(raw))); } catch { /* not a look: skipped */ } } }}
+      embed={embed}
+      onClose={() => setShowSongs(false)}
+    />
+  );
+  const sequencesScreen = (embed: boolean) => (
+    <SequencerPanel
+      sequences={sequencer.sequences}
+      selectedId={sequencer.selectedId}
+      onSelect={sequencer.setSelectedId}
+      status={sequencer.status}
+      onPlay={sequencer.play}
+      onPause={sequencer.pause}
+      onStop={sequencer.stop}
+      onNext={sequencer.next}
+      onPrev={sequencer.prev}
+      onGoTo={sequencer.goTo}
+      onSave={sequencer.upsertSequence}
+      onRemove={sequencer.removeSequence}
+      hasSections={musicIntel.state.section !== null}
+      presets={allPresets}
+      onExport={exportSequence}
+      onImportFile={importSequenceFile}
+      currentSong={currentSong}
+      onBindSong={bindSequenceToSong}
+      embed={embed}
+      onClose={() => setShowSequencer(false)}
+    />
+  );
+
   const settingsPanel = (over: Partial<ComponentProps<typeof SettingsPanel>> & { onClose: () => void }) => (
     <SettingsPanel
       mixTakes={mixTakes}
@@ -4828,6 +5052,8 @@ export default function App() {
       wallTest={wallTest}
       onWallTest={setWallTest}
       tempo={tempoLabel}
+      readTempo={readTempo}
+      spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
       onTap={tapTempo}
       onTempoClear={clearTempo}
       onTempoBpm={setTempoBpm}
@@ -4844,17 +5070,25 @@ export default function App() {
       pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
       midi={midi}
       onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
+      onOpenSound={() => { setShowSettings(false); setShowSound(true); setShowSongs(false); setShowMidi(false); }}
       sceneOn={sceneOn}
       onSceneToggle={toggleScene}
       sceneState={scene.state}
-      sceneDevices={scene.devices}
+      cameras={cameras.devices}
       sceneDeviceId={sceneDeviceId}
       onSceneDevice={chooseSceneDevice}
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
+      filmName={filmSource === 'file' ? filmName : null}
+      pourName={isVideoPlaying ? pourName : null}
       onFilmFile={loadFilm}
       onPourVideo={pourFile}
-      onFilmCamera={startFilmCamera}
+      onStopPourVideo={stopPour}
+      onFilmCamera={() => void startFilmCamera()}
+      filmCameraId={filmCameraId}
+      onFilmCameraDevice={chooseFilmCamera}
+      filmCamera={filmSource === 'camera' ? filmCamera : null}
+      filmCameraLost={filmCameraLost}
       onFilmWindow={startFilmWindow}
       onFilmClear={clearFilm}
       markLoaded={markLoaded}
@@ -4970,10 +5204,11 @@ export default function App() {
           </div>
           {LIBRARY.map(t => (
             <button
+              aria-pressed={musicFile?.track?.src === t.src}
               key={t.src}
               onClick={() => playTrack(t)}
               className={`flex w-full items-baseline gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${
-                musicFile?.track?.src === t.src ? 'bg-amber-400/10 text-amber-200' : 'text-white/70 hover:bg-white/5'
+                musicFile?.track?.src === t.src ? LIT : 'text-white/70 hover:bg-white/5'
               }`}
               data-testid={`music-track-${t.src.split('/').pop()?.replace('.mp3', '')}`}
             >
@@ -5013,9 +5248,10 @@ export default function App() {
             className="w-40 h-6 accent-white cursor-pointer" aria-label="Seek" data-testid="music-seek" />
           <span className="font-mono text-[9px] text-white/40">{Math.floor(musicTime.d / 60)}:{String(Math.floor(musicTime.d % 60)).padStart(2, '0')}</span>
           <button
+            aria-pressed={musicLoop}
             onClick={() => setMusicLoop(v => !v)}
             className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
-              musicLoop ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100' : 'border-white/15 text-white/40 hover:text-white/70'
+              musicLoop ? LIT : 'border-white/15 text-white/40 hover:text-white/70'
             }`}
             title={musicFile?.track
               ? 'Hand over to the next track on the shelf when this one ends, and round again'
@@ -5025,10 +5261,11 @@ export default function App() {
             {musicFile?.track ? 'rolls on' : 'repeats'}
           </button>
           <button
+            aria-pressed={renderOpen || songRender.running}
             onClick={() => { setRenderOpen(v => !v); setLibraryOpen(false); }}
             // 24 px and 70% white: the floor for a control a person has to find in a dark room.
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${renderOpen || songRender.running ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/70'}`}
-            aria-label="Render this song to a video file" title="Render this song to a video file, every frame, none dropped"
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${renderOpen || songRender.running ? LIT : 'hover:bg-white/10 text-white/70'}`}
+            aria-label="Song film: render this song to a video file" title="Song film: render this song to a video file, every frame, none dropped"
             data-testid="render-song"
           >
             <Film size={13} />
@@ -5059,8 +5296,9 @@ export default function App() {
             <Projector size={13} /> {projector.projector.label} connected · {projector.armed ? 'sending on your next click' : 'send the show there'}
           </button>
           <button
+            aria-pressed={projector.mode === 'auto'}
             onClick={() => projector.setMode(projector.mode === 'auto' ? 'ask' : 'auto')}
-            className={`ml-2 rounded-full border px-2 py-0.5 text-[9px] ${projector.mode === 'auto' ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-100' : 'border-white/15 text-white/50 hover:text-white'}`}
+            className={`ml-2 rounded-full border px-2 py-0.5 text-[9px] ${projector.mode === 'auto' ? LIT : 'border-white/15 text-white/50 hover:text-white'}`}
             title="Always send the show to a projector the moment it is connected"
             data-testid="projector-auto"
           >
@@ -5108,7 +5346,7 @@ export default function App() {
           ] as const).map(([mode, label, title]) => (
             <button key={mode} onClick={() => updateSettings({ macroCamera: mode })} title={title}
               aria-pressed={(settings.macroCamera ?? 'hold') === mode} data-testid={`macro-camera-${mode}`}
-              className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? 'bg-white/20 text-white' : 'hover:bg-white/15 text-white/60'}`}>
+              className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${(settings.macroCamera ?? 'hold') === mode ? LIT : 'hover:bg-white/15 text-white/60'}`}>
               {mode === 'follow' && <Crosshair size={11} aria-hidden />}
               {label}
               {mode === 'auto' && <span className="font-normal normal-case tracking-normal opacity-70">cuts {shotLabel(settings.macroHold)}</span>}
@@ -5148,10 +5386,10 @@ export default function App() {
             className={`absolute ${phone ? 'bottom-44' : 'bottom-20'} left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 whitespace-nowrap rounded-full border border-white/15 bg-black/80 px-4 py-2 text-[13px] text-white/80 backdrop-blur-xl`}
             data-testid="scene-resume"
             role="dialog"
-            aria-label="Room camera"
+            aria-label="Motion camera"
           >
             <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-live)]" />
-            <span>The room camera was on last time. Turn it back on?</span>
+            <span>The motion camera was on last time. Turn it back on?</span>
             <button
               onClick={() => toggleScene(true)}
               className="font-medium text-white hover:underline"
@@ -5237,17 +5475,15 @@ export default function App() {
                       const isSelected = liq.id === selectedLiquidId;
                       return (
                         <button
+                          aria-pressed={isSelected}
                           key={liq.id}
                           onClick={() => { setSelectedLiquidId(liq.id); }}
                           title={liq.description}
                           data-testid={`liquid-${liq.id}`}
                           className={`flex items-center gap-2 w-full px-2 py-2.5 rounded-xl border-2 transition-all text-left ${
-                            isSelected ? 'text-white' : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'
+                            isSelected ? LIT : 'border-transparent text-white/50 hover:text-white hover:bg-white/5'
                           }`}
-                          style={isSelected ? {
-                            borderColor: liq.color,
-                            backgroundColor: `${liq.color}28`,
-                          } : {}}
+
                         >
                           <span
                             className="w-4 h-4 rounded-full flex-shrink-0 border-2 border-white/30"
@@ -5302,10 +5538,11 @@ export default function App() {
                       const isCurrent = !isNatural(selectedLiquid) && selectedLiquid?.color.toLowerCase() === hex.toLowerCase();
                       return (
                         <button
+                          aria-pressed={isCurrent}
                           key={hex}
                           onClick={() => updateLiquidColor(selectedLiquidId, hex)}
                           className={`w-[26px] h-[26px] rounded-full border transition-transform hover:scale-110 ${
-                            isCurrent ? 'border-white scale-110 shadow-[0_0_6px_rgba(255,255,255,0.6)]' : 'border-white/20'
+                            isCurrent ? 'border-white ring-2 ring-white ring-offset-2 ring-offset-black scale-110' : 'border-white/20'
                           }`}
                           style={{ backgroundColor: hex }}
                           title={PALETTE.find(p => p.hex === hex)?.name ?? hex}
@@ -5322,9 +5559,10 @@ export default function App() {
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/60">Palette</span>
                   <div className="flex flex-col gap-1 max-h-40 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
                     <button
+                      aria-pressed={paletteLock == null}
                       onClick={() => selectPalette(null)}
                       className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all ${
-                        paletteLock == null ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
+                        paletteLock == null ? LIT : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
                       }`}
                     >
                       <span className="text-[11px] font-bold uppercase tracking-wider flex-1">Auto</span>
@@ -5332,10 +5570,11 @@ export default function App() {
                     </button>
                     {COLOR_HARMONIES.map((harmony, idx) => (
                       <button
+                        aria-pressed={paletteLock === idx}
                         key={idx}
                         onClick={() => selectPalette(idx)}
                         className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left transition-all ${
-                          paletteLock === idx ? 'border-white/40 bg-white/15 text-white' : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
+                          paletteLock === idx ? LIT : 'border-white/10 bg-white/5 text-white/50 hover:text-white'
                         }`}
                         title={COLOR_HARMONY_NAMES[idx]}
                       >
@@ -5369,11 +5608,12 @@ export default function App() {
                       { id: 'spin' as const, icon: RotateCw, label: 'Spin' },
                     ]).map(({ id, icon: Icon, label }) => (
                       <button
+                        aria-pressed={activeTool === id}
                         key={id}
                         onClick={() => setActiveTool(id)}
                         className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg border transition-all ${
                           activeTool === id
-                            ? 'border-white/40 bg-white/15 text-white'
+                            ? LIT
                             : 'border-white/10 bg-white/5 text-white/40 hover:text-white'
                         }`}
                       >
@@ -5418,11 +5658,12 @@ export default function App() {
 
                 {/* Play/Pause */}
                 <button
+                  aria-pressed={!isActive}
                   onClick={() => setIsActive(!isActive)}
                   className={`p-3 rounded-full transition-all duration-300 ${
-                    isActive
-                      ? 'bg-white/15 hover:bg-white/25 text-white shadow-[0_0_15px_rgba(255,255,255,0.15)]'
-                      : 'bg-white hover:bg-gray-200 text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]'
+                    !isActive
+                      ? `border ${LIT}`
+                      : 'border border-transparent bg-white/15 hover:bg-white/25 text-white'
                   }`}
                   title={isActive ? "Pause" : "Play"}
                 >
@@ -5463,9 +5704,11 @@ export default function App() {
                 <div className="flex flex-col items-center gap-1.5 w-full">
                   <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Random Evolve</span>
                   <button
+                    role="switch"
+                    aria-checked={isAutomated}
                     onClick={() => setIsAutomated(!isAutomated)}
                     data-testid="evolve-toggle"
-                    className={`relative w-[52px] h-[26px] rounded-full transition-colors duration-300 ${isAutomated ? 'bg-purple-500' : 'bg-white/20'}`}
+                    className={`relative w-[52px] h-[26px] rounded-full transition-colors duration-300 ${isAutomated ? 'bg-accent' : 'bg-track'}`}
                     title="Works the plate on its own: drops and air from the music, dye lifted off again, a finger drawn through it, and the dials wandering slowly around the look"
                   >
                     <motion.div
@@ -5500,9 +5743,10 @@ export default function App() {
 
                 {/* Macro closeup */}
                 <button
+                  aria-pressed={!!settings.macroMode}
                   onClick={() => updateSettings({ macroMode: !settings.macroMode })}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    settings.macroMode ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    settings.macroMode ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title="Macro closeup — magnify the plate and chase a single bead of liquid"
                 >
@@ -5512,9 +5756,10 @@ export default function App() {
 
                 {/* Settings */}
                 <button
+                  aria-pressed={showSettings}
                   onClick={() => { setSettingsSection(null); setShowSettings(!showSettings); setShowHelp(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showSettings ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    showSettings ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title="Open settings"
                 >
@@ -5522,28 +5767,28 @@ export default function App() {
                   <span className="text-[7px] font-bold uppercase tracking-widest">Settings</span>
                 </button>
 
-                {/* Perform or Design */}
+                {/*
+                  The desk's tab, for when the window is wide enough for the
+                  desk again: it was Perform or Design, and is now whichever
+                  of the owner's tabs is next. Not a toggle, so not lit: it
+                  names the tab the desk will open on.
+                */}
                 <button
-                  onClick={() => setDeskMode(m => (m === 'perform' ? 'design' : 'perform'))}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    deskMode === 'perform' ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title={deskMode === 'perform'
-                    ? (roomForDesk
-                      ? 'Perform: the plate is a preview and the controls have the room. Click for Design.'
-                      : 'Perform needs a wider window — showing Design until there is room for both columns.')
-                    : 'Design: the plate fills the window, for building a look. Click for Perform.'}
+                  onClick={() => { const t = deskTabs.tabs; const i = t.findIndex(x => x.id === deskTab); setDeskTab(t[(i + 1) % t.length].id); }}
+                  className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full bg-white/5 hover:bg-white/10 border-white/10"
+                  title={`The desk opens on ${deskTabs.tabs.find(t => t.id === deskTab)?.name ?? ''} once the window is wide enough. Click for the next tab.`}
                   data-testid="desk-mode-button"
                 >
-                  <LayoutGrid size={16} className={deskMode === 'perform' ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">{deskMode === 'perform' ? 'Perform' : 'Design'}</span>
+                  <LayoutGrid size={16} className="opacity-60 group-hover:opacity-100" />
+                  <span className="max-w-full truncate text-[7px] font-bold uppercase tracking-widest">{deskTabs.tabs.find(t => t.id === deskTab)?.name}</span>
                 </button>
 
                 {/* Songs: a look for each song and what happens while it plays */}
                 <button
+                  aria-pressed={showSongs || songRuntime.status.showId !== null || sequencer.status.running}
                   onClick={() => { setShowSongs(!showSongs); setShowTrackPanel(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showSongs || songRuntime.status.showId !== null || sequencer.status.running ? 'bg-white text-black border-white' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    showSongs || songRuntime.status.showId !== null || sequencer.status.running ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title="Songs — a look for each song, and what happens while it plays"
                   data-testid="songs-button"
@@ -5554,9 +5799,10 @@ export default function App() {
 
                 {/* MIDI controller */}
                 <button
+                  aria-pressed={showMidi}
                   onClick={() => { setShowMidi(!showMidi); setShowSequencer(false); setShowTrackPanel(false); }}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    showMidi ? 'bg-white text-black border-white' : midi.enabled ? 'bg-emerald-500/20 border-emerald-400/40' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    showMidi ? LIT : midi.enabled ? 'border-ok/50 text-ok' : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title={midi.enabled ? `MIDI on${midi.activeInputName ? `: ${midi.activeInputName}` : ''}${gamepad.connected ? ` · gamepad: ${gamepad.connected}` : ''}` : 'MIDI controller — faders, pads and buttons for the show'}
                   data-testid="midi-button"
@@ -5567,6 +5813,7 @@ export default function App() {
 
                 {/* Randomize */}
                 <button
+                  aria-pressed={luckyArmed}
                   onClick={() => {
                     if (performing && !luckyArmed) { setLuckyArmed(true); return; }
                     setLuckyArmed(false);
@@ -5574,7 +5821,8 @@ export default function App() {
                   }}
                   data-testid="lucky-button"
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    luckyArmed ? 'bg-amber-400 text-black border-amber-400' : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    // Armed to confirm is pressed, not live: red is only blackout and recording (PLAN 35a).
+                    luckyArmed ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title={luckyArmed
                     ? 'Click again to replace every setting with a random one. Revert brings this look back.'
@@ -5595,10 +5843,11 @@ export default function App() {
                   <div className="flex flex-col gap-1.5">
                     {Array.from({ length: stageLayers }).map((_, idx) => (
                       <button
+                        aria-pressed={activeLayer === idx}
                         key={idx}
                         onClick={() => setActiveLayer(idx)}
                         className={`w-7 h-7 rounded-full border-2 transition-all flex items-center justify-center text-[11px] font-bold ${
-                          activeLayer === idx ? 'border-white bg-white text-black scale-110 shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'border-white/20 text-white/50 hover:border-white/50'
+                          activeLayer === idx ? `${LIT} scale-110` : 'border-white/20 text-white/50 hover:border-white/50'
                         }`}
                       >
                         {idx + 1}
@@ -5620,10 +5869,11 @@ export default function App() {
                 <div className="flex flex-col items-center gap-1.5 w-full">
                   <span className="text-[7px] uppercase tracking-widest font-bold opacity-30">Audio</span>
                   <button
+                    aria-pressed={audioSource === 'microphone'}
                     onClick={() => handleSourceChange(audioSource === 'microphone' ? 'none' : 'microphone')}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'microphone'
-                        ? 'text-green-400 bg-green-400/10 border border-green-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title={audioSource === 'microphone' ? "Mic is active — click to mute" : "Enable microphone input"}
@@ -5632,10 +5882,11 @@ export default function App() {
                     <span>Mic</span>
                   </button>
                   <button
+                    aria-pressed={audioSource === 'system'}
                     onClick={() => handleSourceChange(audioSource === 'system' ? 'none' : 'system')}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'system'
-                        ? 'text-blue-400 bg-blue-400/10 border border-blue-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title={audioSource === 'system' ? "System audio active — click to stop" : "Capture system/tab audio"}
@@ -5644,10 +5895,11 @@ export default function App() {
                     <span>System</span>
                   </button>
                   <button
+                    aria-pressed={audioSource === 'file'}
                     onClick={() => musicInputRef.current?.click()}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'file'
-                        ? 'text-amber-300 bg-amber-400/10 border border-amber-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title="Play a music file here and drive the show from it — no microphone, no loopback"
@@ -5657,10 +5909,11 @@ export default function App() {
                     <span>File</span>
                   </button>
                   <button
+                    aria-pressed={!!musicFile?.track}
                     onClick={() => setLibraryOpen(v => !v)}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       musicFile?.track
-                        ? 'text-amber-300 bg-amber-400/10 border border-amber-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title={`Ambient music that ships with the show — ${clock(librarySeconds())} of it, licensed for a room like this one, and played from this tab so a shared tab carries the sound too`}
@@ -5670,10 +5923,11 @@ export default function App() {
                     <span>Shelf</span>
                   </button>
                   <button
+                    aria-pressed={audioSource === 'simulated'}
                     onClick={() => handleSourceChange(audioSource === 'simulated' ? 'none' : 'simulated')}
                     className={`flex items-center gap-1.5 px-2 py-1.5 rounded-full transition-all duration-300 text-[11px] font-bold uppercase tracking-wider w-full justify-center ${
                       audioSource === 'simulated'
-                        ? 'text-fuchsia-300 bg-fuchsia-400/10 border border-fuchsia-400/30'
+                        ? `border ${LIT}`
                         : 'text-white/30 hover:text-white/60 hover:bg-white/5 border border-transparent'
                     }`}
                     title="A synthesised band, played silently into the show: kick, snare, hats, bass and a pad, in verses and choruses. No microphone, no permission, nothing to be asked for"
@@ -5700,6 +5954,7 @@ export default function App() {
           edited={!activePresetName && fading <= 0 && !!pinnedLookName}
           looks={phoneLooks}
           activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+          lookSlot={phoneLookSlot}
           onLook={(id) => goLookNow(id)}
           onShuffle={triggerLucky}
           onSave={(name) => saveCurrentPreset(name, '', false)}
@@ -5728,7 +5983,7 @@ export default function App() {
           wandering={isAutomated}
           onWander={setIsAutomated}
           onClear={() => setClearTrigger(n => n + 1)}
-          recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording, take: recorder.lastTake }}
+          recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, take: recorder.lastTake }}
           onAllControls={() => choosePhoneScreen('stage')}
           onOpenAccount={openAccount}
         />
@@ -5739,6 +5994,17 @@ export default function App() {
           {phoneScreenUp === 'stage' && (
           <PanelGuard name="The phone controls">
           <PhoneStage
+            deskTabs={{
+              tabs: deskTabs.tabs,
+              tab: deskTab,
+              onTab: setDeskTab,
+              onEdit: deskTabs.edit,
+              panels: openPanels(deskLayout),
+              onAdd: (id) => onDeskLayout(l => openPanel(l, id, 'deck')),
+              onRemove: (id) => onDeskLayout(l => closePanel(l, id)),
+              render: (id) => (id === 'songs' ? songsScreen(true) : id === 'sequences' ? sequencesScreen(true) : id === 'player' ? soundScreen(true)
+                : isSectionPanel(id) && id !== 'mixer' ? settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} }) : null),
+            }}
             // Mid-fade the settings are between two looks and match neither,
             // so the look is named by where it is going: the name a thumb
             // just picked, not "Custom" for the two seconds of the crossfade.
@@ -5746,6 +6012,7 @@ export default function App() {
             lookSwatch={swatchOf((activePresetId ?? (fading > 0 ? pinnedPresetId : null)) ?? undefined)}
             looks={phoneLooks}
             activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+            lookSlot={phoneLookSlot}
             // A look from the phone crossfades in, as Go does on the desk: a
             // thumb in front of a room should never cut the plate to clean glass.
             onLook={(id) => goLookNow(id)}
@@ -5765,6 +6032,7 @@ export default function App() {
             onAmount={(v) => setToolAmount(activeTool, v)}
             liquids={liquidTypes}
             selectedLiquidId={selectedLiquidId}
+            dyeRoom={readDyeRoom}
             onLiquid={setSelectedLiquidId}
             dyeColors={DROPPER_COLORS}
             onDyeColor={(hex) => updateLiquidColor(selectedLiquidId, hex)}
@@ -5788,7 +6056,7 @@ export default function App() {
             onClear={() => setClearTrigger(n => n + 1)}
             onDrain={() => setDrainTrigger(n => n + 1)}
             onSpin={() => flickPlate(activeLayer)}
-            spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, onChange: updateSettings }}
+            spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, bpm: tempoLabel.source ? tempoLabel.bpm : heardBpm, onChange: updateSettings }}
             onLucky={triggerLucky}
             zoom={settings.macroZoom ?? 1}
             onZoom={() => runAction('macro-toggle')}
@@ -5809,6 +6077,10 @@ export default function App() {
             score={scoreProps}
             mapLine={followLine(musicIntel.state.follow, musicIntel.state.track?.title)}
             deaf={earDeaf}
+            readLevel={readLevel}
+            tempo={tempoLabel}
+            onTap={tapTempo}
+            readTempo={readTempo}
             show={{
               running: sequencer.status.running,
               paused: !!sequencer.status.sequenceId && !sequencer.status.running,
@@ -5851,6 +6123,8 @@ export default function App() {
             onLampGround={(v) => updateSettings({ lampGround: v })}
             twoProjectors={settings.twoProjectors ?? 0}
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
+            projectorFocus={settings.projectorFocus ?? 0.5}
+            onProjectorFocus={(v) => updateSettings({ projectorFocus: v })}
             clearFilm={settings.clearFilm ?? 0}
             onClearFilm={(v) => updateSettings({ clearFilm: v })}
             slosh={settings.slosh ?? 0}
@@ -5861,7 +6135,7 @@ export default function App() {
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
-            recording={{ supported: recorder.supported, on: recorder.recording, seconds: recorder.seconds, onToggle: toggleRecording }}
+            recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, choice: recordChoice, onChoice: setRecordChoice }}
             onHide={hideOverlays}
             onFullLayout={() => {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
@@ -5961,6 +6235,7 @@ export default function App() {
             presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
             activity={showActivity}
             onActivity={setShowActivity}
+            onSetup={() => openSettingsAt('midi')}
             onClose={() => setShowMidi(false)}
           />
           </PanelGuard>
@@ -5971,49 +6246,12 @@ export default function App() {
       <AnimatePresence>
         {showSound && (
           <PanelGuard name="Sound" onClose={() => setShowSound(false)}>
-          <SoundPanel
-            source={audioSource}
-            onSource={(x) => { void handleSourceChange(x); }}
-            inputs={audioInputs}
-            inputId={audioInputId}
-            onInput={chooseAudioInput}
-            playing={musicPlaying}
-            time={musicTime}
-            loop={musicLoop}
-            onLoop={setMusicLoop}
-            onToggle={toggleMusic}
-            onSeek={(t) => { const el = musicElRef.current; if (el) el.currentTime = t; }}
-            nowPlaying={musicFile ? { name: musicFile.name, track: musicFile.track } : null}
-            onPickFile={playMusicFile}
-            onPickTrack={playTrack}
-            drone={droneParams}
-            onDrone={changeDrone}
-            droneRunning={droneRunning}
-            onDroneToggle={toggleDrone}
-            onClose={() => setShowSound(false)}
-          />
+          {soundScreen(false)}
           </PanelGuard>
         )}
         {showSongs && (
           <PanelGuard name="Songs" onClose={() => setShowSongs(false)}>
-          <SongsPanel
-            shows={songShows}
-            onShows={setSongShows}
-            sets={actionSets}
-            onSaveSet={saveActionSet}
-            onDeleteSet={deleteActionSet}
-            looks={lookChoices}
-            currentSong={currentSong}
-            follow={followSongs}
-            onFollow={setFollowSongs}
-            status={songRuntime.status}
-            onRun={songRuntime.start}
-            onStop={songRuntime.stop}
-            onOpenSequences={() => { setShowSongs(false); setShowSequencer(true); }}
-            exportShows={() => { const used = savedLooksUsed(songShows); return showsFile(songShows, userPresets.presets.filter(p => used.has(p.id))); }}
-            onImportLooks={(looks) => { for (const raw of looks) { try { userPresets.upsert(parsePresetFile(JSON.stringify(raw))); } catch { /* not a look: skipped */ } } }}
-            onClose={() => setShowSongs(false)}
-          />
+          {songsScreen(false)}
           </PanelGuard>
         )}
       </AnimatePresence>
@@ -6022,27 +6260,7 @@ export default function App() {
       <AnimatePresence>
         {showSequencer && (
           <PanelGuard name="The sequencer" onClose={() => setShowSequencer(false)}>
-          <SequencerPanel
-            sequences={sequencer.sequences}
-            selectedId={sequencer.selectedId}
-            onSelect={sequencer.setSelectedId}
-            status={sequencer.status}
-            onPlay={sequencer.play}
-            onPause={sequencer.pause}
-            onStop={sequencer.stop}
-            onNext={sequencer.next}
-            onPrev={sequencer.prev}
-            onGoTo={sequencer.goTo}
-            onSave={sequencer.upsertSequence}
-            onRemove={sequencer.removeSequence}
-            hasSections={musicIntel.state.section !== null}
-            presets={allPresets}
-            onExport={exportSequence}
-            onImportFile={importSequenceFile}
-            currentSong={currentSong}
-            onBindSong={bindSequenceToSong}
-            onClose={() => setShowSequencer(false)}
-          />
+          {sequencesScreen(false)}
           </PanelGuard>
         )}
       </AnimatePresence>
@@ -6060,26 +6278,25 @@ export default function App() {
             onStopReplay={musicIntel.stopReplay}
             performance={musicIntel.performance}
             performanceClock={perfClock}
-            onTogglePerformance={togglePerformance}
-            onReplayPerformance={musicIntel.replayPerformance}
-            onStopPerformanceReplay={musicIntel.stopPerformanceReplay}
-            onDeletePerformance={musicIntel.deletePerformance}
+            onOpenRecord={() => { setShowTrackPanel(false); setShowRecordPanel(true); }}
             onClose={() => setShowTrackPanel(false)}
           />
           </PanelGuard>
         )}
       </AnimatePresence>
 
-      {/* ── Recording Studio Panel (Canvas Video & Performance) ─ */}
+      {/* ── The Record panel: what Record makes (Plate video, Take), and Song film ─ */}
       {showRecordPanel && (
         <PanelGuard name="Record" onClose={() => setShowRecordPanel(false)}>
         <RecordPanel
           onClose={() => setShowRecordPanel(false)}
           recorder={recorder}
-          onToggleVideo={toggleRecording}
+          onToggleRecord={toggleRecording}
+          choice={recordChoice}
+          onChoice={setRecordChoice}
           performanceLive={musicIntel.performance.live}
           perfClock={perfClock}
-          onTogglePerformance={togglePerformance}
+          songFilm={musicFile ? { name: musicFile.name, running: songRender.running, onOpen: () => { setShowRecordPanel(false); setLibraryOpen(false); setRenderOpen(true); } } : null}
           savedPerformances={musicIntel.performance.saved}
           replayingPerformanceId={musicIntel.performance.replayingId}
           onReplayPerformance={musicIntel.replayPerformance}
@@ -6164,7 +6381,7 @@ export default function App() {
           </button>
           {presetMenu === 'title' && (
             <PanelGuard name="The look menu" onClose={() => setPresetMenu('none')}>
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} swatchOf={swatchOf} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
             </PanelGuard>
           )}
         </div>
@@ -6184,24 +6401,24 @@ export default function App() {
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-400" />
             )}
           </button>
-          {recorder.supported && (
-            <button
-              onClick={toggleRecording}
-              className={`p-2 rounded-full transition-all flex items-center gap-1 ${recorder.recording ? 'bg-red-600 text-white' : 'hover:bg-white/10 text-white/60'}`}
-              title={recorder.recording ? 'Stop recording and save the video' : 'Record the show to a video file'}
-              data-testid="record-button"
-            >
-              {recorder.recording ? <Square size={12} fill="currentColor" /> : <Circle size={14} />}
-              {recorder.recording && <span className="text-[11px] font-mono" data-testid="record-time">{Math.floor(recorder.seconds / 60)}:{String(recorder.seconds % 60).padStart(2, '0')}</span>}
-            </button>
-          )}
+          <button
+            aria-pressed={recordingAny}
+            onClick={toggleRecording}
+            className={`p-2 rounded-full transition-all flex items-center gap-1 ${recordingAny ? LIVE : 'hover:bg-white/10 text-white/60'}`}
+            title={recordingAny ? 'Stop recording and keep it' : `Record: ${makesText(recordChoice)} (R)`}
+            data-testid="record-button"
+          >
+            {recordingAny ? <Square size={12} fill="currentColor" /> : <Circle size={14} />}
+            {recordingAny && <span className="text-[11px] font-mono" data-testid="record-time">{clockText(recordSeconds)}</span>}
+          </button>
           <div className="relative">
             <button
               onClick={() => { if (isCasting) { stopCast(); setCastMenu(false); } else setCastMenu(!castMenu); }}
               className={`p-2 rounded-full transition-all ${
-                isCasting ? 'bg-blue-500 text-white' : castMenu ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-white/60'
+                isCasting ? 'bg-ok text-bg' : castMenu ? LIT : 'hover:bg-white/10 text-white/60'
               }`}
               title={isCasting ? "Stop casting" : "Cast to display"}
+              aria-pressed={isCasting}
               aria-haspopup="menu"
               aria-expanded={castMenu}
               data-testid="cast-button"
@@ -6295,9 +6512,10 @@ export default function App() {
           <CrashReportButton />
           </PanelGuard>
           <button
+            aria-pressed={showHelp}
             onClick={() => setShowHelp(!showHelp)}
             className={`min-w-[34px] min-h-[34px] rounded-full transition-all text-[12px] font-bold ${
-              showHelp ? 'bg-white text-black' : 'hover:bg-white/10 text-white/60'
+              showHelp ? LIT : 'hover:bg-white/10 text-white/60'
             }`}
             title="About ChromaGlass — getting started, every control, and how they interact (?)"
             data-testid="guide-button"
@@ -6328,10 +6546,14 @@ export default function App() {
         can be a panel in any of them.
       */}
       {deskUp && (
-        <PanelGuard name="The desk" onClose={() => deskLayouts.reset(layoutName)} closeLabel="Put this layout back as it shipped">
+        <PanelGuard name="The desk" onClose={() => deskTabs.reset(deskTab)} closeLabel="Put this tab's panels back as it shipped">
         <Desk
           bare={!overlaysVisible}
-          layoutName={layoutName}
+          tabs={deskTabs.tabs}
+          tab={deskTab}
+          onTab={(id) => { setShowSound(false); setShowSongs(false); setShowSequencer(false); setDeskTab(id); }}
+          onTabEdit={deskTabs.edit}
+          screens={{ songs: songsScreen(true), sequences: sequencesScreen(true), player: soundScreen(true) }}
           layout={deskLayout}
           onLayout={onDeskLayout}
           onResetLayout={onDeskReset}
@@ -6340,15 +6562,6 @@ export default function App() {
           onOpenSection={openSettingsAt}
           onStage={() => { setShowStage(true); setShowSettings(false); setShowHelp(false); }}
           onRelayout={preview.remeasure}
-          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : deskMode}
-          onMode={(m) => {
-            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
-            setShowSound(false);
-            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
-            setShowSongs(false);
-            setShowSequencer(false);
-            setDeskMode(m);
-          }}
           dots={deskDots}
           midiName={midi.activeInputName ?? null}
           onSound={deskOpen.sound}
@@ -6357,13 +6570,6 @@ export default function App() {
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
           onOpenAccount={openAccount}
-          showCrumb={
-            <>
-              <span className="text-muted">Show</span>
-              <span className="text-faint">/</span>
-              <span>{liveLookName ?? 'Untitled'}</span>
-            </>
-          }
           status={{
             audio: deskAudioLine,
             engine: engineStatus?.label ?? '',
@@ -6371,7 +6577,7 @@ export default function App() {
               ? `${sequencer.status.name ?? 'sequence'}${sequencer.status.stageName ? ` · ${sequencer.status.stageName}` : ''}`
               : null,
             phone: livePhoneCount,
-            rec: recorder.recording ? `${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, '0')}` : null,
+            rec: recordingAny ? clockText(recordSeconds) : null,
             song: audioSource === 'none' ? null : followLine(musicIntel.state.follow, musicIntel.state.track?.title),
           }}
           onBlackout={toggleBlackout}
@@ -6393,9 +6599,9 @@ export default function App() {
           onDeleteSaved={deleteSavedLook}
           videoRecording={recorder.recording}
           videoSeconds={recorder.seconds}
-          onToggleVideo={toggleRecording}
+          onToggleRecord={toggleRecording}
+          recordChoice={recordChoice}
           onRecordOptions={() => setShowRecordPanel(true)}
-          onPerformance={togglePerformance}
           performance={musicIntel.performance.live ? { clock: perfClock ?? '0:00', title: musicIntel.performance.live.title } : null}
           layer={activeLayer}
           layers={stageLayers}
@@ -6454,6 +6660,7 @@ export default function App() {
           dyeBottles={liquidTypes.filter(l => !l.behaviour)}
           behaviourBottles={liquidTypes.filter(l => !!l.behaviour)}
           bottleId={selectedLiquidId}
+          dyeRoom={readDyeRoom}
           onBottle={(id) => { setSelectedLiquidId(id); }}
           swatches={PALETTE.map(c => ({ hex: c.hex, name: c.name }))}
           dye={selectedLiquid?.color ?? null}
@@ -6487,13 +6694,7 @@ export default function App() {
       )}
 
       {showAccount && hasAccountOrLicenseUI && (
-        <AccountSheet
-          onClose={closeProfileSheet}
-          onOpenSettings={() => {
-            closeProfileSheet();
-            openAllSettings();
-          }}
-        />
+        <AccountSheet onClose={closeProfileSheet} />
       )}
 
       {/* The file input the bench's Image dye button reaches for. It lives
@@ -6553,6 +6754,9 @@ export default function App() {
           <CueBar
             cued={cued}
             liveName={liveLookName}
+            liveSwatch={swatchOf(activePresetId ?? (fading > 0 ? pinnedPresetId : null) ?? undefined)}
+            cuedSwatch={cued ? swatchOf(cued.id) : undefined}
+            liveAt={deskLookSlot}
             fading={fading}
             fadeSeconds={fadeSeconds}
             onFadeSeconds={setFadeSeconds}
@@ -6582,12 +6786,18 @@ export default function App() {
           type="button"
           data-cg-account-open=""
           onClick={openAccount}
-          title="Profile, Settings & Store"
-          aria-label="Account"
-          className="fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full border border-amber-400/40 bg-black/75 px-3.5 py-1.5 text-[12px] font-semibold text-amber-100 shadow-xl backdrop-blur-xl transition-all hover:border-amber-400/70 hover:bg-black/90"
+          data-cg-account-signin={signedOut ? '' : undefined}
+          data-cg-tier={getEffectiveTier()}
+          title={signedOut ? 'Sign in' : 'Account, licence and store'}
+          aria-label={signedOut ? 'Sign in' : 'Account'}
+          className={`fixed bottom-6 left-6 z-30 flex min-h-[36px] items-center gap-2 rounded-full px-3.5 py-1.5 text-[12px] font-medium shadow-xl backdrop-blur-xl transition-all ${
+            signedOut
+              ? 'bg-primary text-on-primary hover:opacity-90'
+              : 'border border-border-strong bg-black/75 text-text-2 hover:bg-black/90 hover:text-text'
+          }`}
         >
-          <User size={14} className="shrink-0 text-amber-300" />
-          <span>Profile &amp; Store</span>
+          {signedOut ? <LogIn size={14} className="shrink-0" /> : <User size={14} className="shrink-0 text-muted" />}
+          <span>{signedOut ? 'Sign in' : 'Account'}</span>
         </button>
       )}
 

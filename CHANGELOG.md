@@ -11,6 +11,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Refraction, Aperture, Bloom and Chromatic Aberration** (Settings → Camera) work with Lens at 0 and are no longer greyed until it is up; Lens is now only the sensor's look (roll-off, vignette, grain). The optics are rebuilt on the physics (a thin prism's refraction, a thin lens's blur circle with Focus, a power-law glow, dispersion) and at a full dial move the frame two to nine times as much as before (`npm run lens`). The four default to 0; saved looks and set lists from before read as they looked (with Lens up, within two to four levels of the old picture), Lucky rolls them only with the lens on, and Refraction and Chromatic Aberration are MIDI-learnable. Nothing driven by sound moves the frame.
 
+### Added — the Splodascope, and Film Hold (PLAN 28k)
+
+- A new look, **Splodascope**, after a photograph of one: a crowd of yellow, green, red and
+  pink oil drops packed edge to edge in cobalt water, a few holding a drop of another colour.
+- A new **Film Hold** control (`filmHold`, Settings → Oil & Soap under Oil Bodies, MIDI, the
+  desks, the remote and the phone; 0 by default, which is the plate as it was): the water
+  film between two drops of oil pushes back as it thins (the disjoining pressure), so drops
+  crowd without merging until a press breaks the film. `npm run filmhold` measures it.
+
+### Changed — edges from refraction, and Projector Focus (PLAN 18e)
+
+- On projected looks, dye and oil edges now come from refraction through the liquid
+  layer rather than painted surface-normal shading: hairline dark rims where steep
+  optical path length gradients ($\text{OPL} = n\cdot h$) bend light outside the
+  projector lens's aperture, and bright-and-dark shadowgraph Becke doublets where the
+  focal plane sits off the layer ($\Delta I / I \approx -\Delta z \cdot \nabla^2\text{OPL}/\text{OPL}$).
+  Painted specular highlights stay on camera and closeup looks only.
+- A new **Projector Focus** control (`projectorFocus`, Settings → Look, MIDI, the
+  desks, a sequence's stages, the remote and the phone's Looks sheet; 0.5 by default)
+  moves the projector lens's focal plane across the liquid layer, strengthening or
+  inverting the Becke line doublets at dye and oil fronts. A poured liquid's own
+  refractive index (glycerine 1.4746, syrup 1.452, from the shelf) enters the optical
+  path; `npm run derive` checks it against the shelf's numbers, and the Laplacian doublet.
+- On projected looks the oil's painted rim is gone; a clear oil drop or a clear pour with no
+  dye across its edge draws no rim line until PLAN 18e-2 deflects light by the optical path.
+
 ### Added — Slosh (PLAN 18a-13)
 
 - **Slosh** (`slosh`, Settings → Physics beside Tilt Direction; MIDI, the desks, the remote and the phone's Play sheet): tip the plate one way and then the other and the liquid slops across it and back, piles on the low side and reflects off the rim, mixing the colour. A shallow-water dish on the CPU (`src/lib/slosh.ts`) fed only by the tilt (Gravity and Tilt Direction, the remote's tilt), its flow added to the thin solve's velocity. Default 0, the plate exactly as before; the dial itself is never moved by sound, a look or Evolve; the frame does not move. At the default Thickness the liquid flows to its new level and barely overshoots; it rings at Thickness 0.3 and thinner. `npm run slosh`.

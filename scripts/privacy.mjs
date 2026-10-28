@@ -56,6 +56,7 @@ const page = visible(text(PRIVACY));
  * cannot hide a request to it added later.
  */
 const LINK_ONLY = {
+  'securetoken.google.com': "the issuer a Firebase ID token must name (server/license-worker.js compares the token's `iss` to it); a string, never fetched",
   'archive.org': 'the music library credits each track with a link to its page',
   'creativecommons.org': "each track's licence, as a link",
   'github.com': 'links to the source, and the name LRCLIB asks clients to send',
@@ -69,6 +70,14 @@ const SERVICES = {
   VITE_CRASH_REPORT_URL: 'Crash reports',
   VITE_FIREBASE_: 'Firebase Authentication',
 };
+/**
+ * Build-time switches that reach no service and send nothing anywhere, each
+ * with why: a key here is a choice of what the build does, not a place data goes.
+ * `VITE_MAC_APP` (PLAN.md 23.17d) says the site is the Mac app's, so its show
+ * opens only on a licence; it adds no host (the accounts it uses are
+ * VITE_FIREBASE_, above).
+ */
+const SWITCHES = { VITE_MAC_APP: 'the Mac app opens its show only on a licence' };
 /** A server's host or URL from its environment → the words the page uses for it. */
 const ENV_HOSTS = {
   ACR_HOST: 'ACRCloud', // the song identification Worker's second service
@@ -162,7 +171,7 @@ check('the page names the site\'s own hosts and its fonts', missing.length === 0
 
 // 2. Build-time services.
 const serviceFor = (k) => Object.keys(SERVICES).find((s) => (s.endsWith('_') ? k.startsWith(s) : k === s));
-const unknown = [...envKeys].filter(([k]) => !serviceFor(k));
+const unknown = [...envKeys].filter(([k]) => !serviceFor(k) && !(k in SWITCHES));
 check('every VITE_ service the app is built with has an entry', unknown.length === 0,
   unknown.length ? unknown.map(([k, at]) => `${k} (${at})`).join(', ') : [...envKeys.keys()].join(', '));
 const undescribed = [...new Set([...envKeys.keys()].map(serviceFor).filter(Boolean))].filter((s) => !page.includes(SERVICES[s]));

@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Segmented, StatusDot } from '../ui';
+import { Search as SearchIcon } from 'lucide-react';
+import { StatusDot } from '../ui';
+import { TabStrip } from './TabStrip';
+import type { TabEdit } from '../../hooks/useDeskLayout';
 import { LOCKUP_URL, MARK_URL } from '../../brand';
 import { AlphaBadge } from '../AlphaBadge';
 
@@ -12,13 +15,6 @@ import { AlphaBadge } from '../AlphaBadge';
  * show the same truth in the same place.
  */
 
-/*
-  The switch's values are the old desks' names, so everything that still asks
-  which desk is up (`deskMode` in App, the checks that click
-  `mode-segmented-perform`) keeps its meaning: `design` is the Build layout,
-  `perform` is Gig, and `loadin` is new.
-*/
-export type DeskMode = 'perform' | 'design' | 'loadin' | 'sequence' | 'sound';
 
 export interface DeskDots {
   sound?: boolean;
@@ -27,15 +23,20 @@ export interface DeskDots {
   wall?: boolean;
   midi: boolean;
   phone?: boolean;
+  /** The clock ("1:23") of whatever Record is making, or null. */
   rec?: string | null;
-  /** The performance being recorded, as its clock ("1:23"), or null. */
-  perf?: string | null;
+  /** What it is making, in the words the Record button uses ("Plate video + Take"). */
+  recWhat?: string;
 }
 
-export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onPerformance, onSearch, leading, trailing }: {
+export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onSearch, leading, trailing }: {
   breadcrumb: ReactNode;
-  mode: DeskMode;
-  onMode: (m: DeskMode) => void;
+  /** The owner's tabs (lib/deskTabs.ts), the one up, and the editor's changes. */
+  tabs: { id: string; name: string }[];
+  tab: string;
+  onTab: (id: string) => void;
+  onTabEdit: (e: TabEdit) => void;
+  onAddPanel?: () => void;
   dots: DeskDots;
   midiName: string | null;
   /*
@@ -53,10 +54,8 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
   /** The controller panel. The dot is the only thing on either desk that names MIDI. */
   onMidi?: () => void;
   onPhone?: () => void;
-  /** Start, stop or manage canvas video recording. */
+  /** Open the Record panel (what Record makes, and what it made). */
   onRecord?: () => void;
-  /** Start or stop a performance (T). */
-  onPerformance?: () => void;
   onSearch: () => void;
   /** Before the dots: the desk's + Panel. */
   leading?: ReactNode;
@@ -178,9 +177,9 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
       />
       <StatusDot
         on={!!dots.video}
-        label="Video" tight={t}
+        label="Film" tight={t}
         onClick={onVideo}
-        title={dots.video ? 'Video is playing — click to pick a different video' : 'Click to pick a video file'}
+        title={dots.video ? 'A film is playing under the dye. Click for the Film section.' : 'No film under the dye. Click for the Film section.'}
         testId="dot-video"
       />
       {onWall && (
@@ -208,6 +207,12 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
           testId="dot-phone"
         />
       )}
+      {/*
+        One dot for everything Record is making, with the clock. It used to be
+        two: Rec for the video, and a Perf dot that was always there, off or on.
+        It appears only while recording, so the header folds for it (npm run
+        layout) as it did for the video's.
+      */}
       {dots.rec && (
         <StatusDot
           on
@@ -216,31 +221,13 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
           short="Rec"
           tight={t}
           onClick={onRecord}
-          title={`Recording canvas video (${dots.rec}). Click to manage recording options or press R to stop.`}
+          title={`Recording ${dots.recWhat ?? 'Plate video'} (${dots.rec}). Click for the Record panel, or press R to stop.`}
           testId="dot-rec"
         />
       )}
-      {/*
-        Performances start and stop here, by hand (T). They used to follow
-        the song detection, which started late and ran on into the next
-        song; the song that is playing is still attached, on its own.
-        A short word, with the clock in its tooltip: "Performance 0:42"
-        beside it pushed Mic and Wall under the centred mode switch at 1440
-        (npm run qa), and with no word at all nobody could tell what it was.
-      */}
-      <StatusDot
-        on={!!dots.perf}
-        tone="live"
-        label="Perf" tight={t}
-        onClick={onPerformance}
-        title={dots.perf
-          ? `Recording a performance (${dots.perf}). Click or press T to stop and keep it, with the song that is playing.`
-          : 'Start recording a performance: what you paint, replayable later at the same moments in the song. Click or press T.'}
-        testId="dot-performance"
-      />
     </>
   );
-  const recording = !!dots.rec || !!dots.perf;
+  const recording = !!dots.rec;
   const connected = [dots.sound ?? dots.mic, dots.video, dots.wall, dots.midi, dots.phone].filter(Boolean).length;
 
   return (
@@ -308,20 +295,12 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
       <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
         <div ref={switchRef} className="pointer-events-auto">
           {/*
-            The layouts of the one desk, then the two screens of their own
-            (Desk v2). Sound stays, after Sequence: it is the only way to the
-            music player and the drone, and the design's switch has no other
-            door to them.
+            The owner's tabs, each a set of panels (lib/deskTabs.ts), and the
+            pencil that edits them. Sequence and Sound were screens of their
+            own here; they are panels now (Songs, Sequences, Music & Drone),
+            on Sequence and Setup as they ship.
           */}
-          <Segmented
-            value={mode}
-            options={[['design', 'Build'], ['perform', 'Gig'], ['loadin', 'Load-in'], ['sequence', 'Sequence'], ['sound', 'Sound']] as const}
-            onChange={onMode}
-            height={32}
-            divideBefore="sequence"
-            tight
-            testId="mode-segmented"
-          />
+          <TabStrip tabs={tabs} tab={tab} onTab={onTab} onEdit={onTabEdit} onAddPanel={onAddPanel} />
         </div>
       </div>
       <div ref={clusterRef} className={`flex shrink-0 items-center whitespace-nowrap ${tight ? 'gap-1.5' : 'gap-3'}`} data-testid="header-cluster" data-fold={level}>
@@ -353,6 +332,9 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
         ) : dotsAt(tight)}
         <button
           onClick={onSearch}
+          title="Search every setting, look and action (⌘K)"
+          aria-label="Search"
+          aria-keyshortcuts="Meta+K"
           className={`ml-1 inline-flex h-8 items-center gap-2 rounded-md border border-border-strong ${tight ? 'px-2' : 'px-3'} text-[13px] text-muted transition-colors hover:bg-hover hover:text-text`}
           data-testid="search-chip"
         >
@@ -362,11 +344,12 @@ export function DeskHeader({ breadcrumb, mode, onMode, dots, midiName, onSound, 
             At 1024 the right-hand cluster was still about twenty pixels too
             wide and the leftmost thing in it — the Mic dot — sat under the
             centred switch. "Search" is the most expendable word in the header:
-            the shortcut beside it says what the button is, and ⌘K is the one
-            convention every app this sits beside already uses.
+            the magnifier says what the button is, and ⌘K, the one convention
+            every app this sits beside already uses, is in its hover title
+            with every other shortcut (PLAN 35a).
           */}
-          <span className="hidden xl:inline">Search </span>
-          <span className="font-mono text-[11px] text-faint">⌘K</span>
+          <SearchIcon size={13} aria-hidden />
+          <span className="hidden xl:inline">Search</span>
         </button>
         {trailing}
       </div>

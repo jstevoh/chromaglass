@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MixTakes } from '../lib/mixFade';
-import { X, FlaskConical, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical } from 'lucide-react';
+import { X, FlaskConical, Magnet, Waves, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Droplets, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye, RotateCw } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
 import { SOURCE_NAMES } from '../lib/audioFeatures';
@@ -13,19 +13,23 @@ import { plateAreas, areaFamily, areaDye } from '../lib/plateAreas';
 import { PRESET_CONTRACTS } from '../presetPlate';
 import { PALETTE } from '../constants';
 import { AreaPicker } from './phone/AreaPicker';
-import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches } from '../lib/settingsMap';
+import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches, groupOf } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
 import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
-import { Segmented, Sheet, SwitchPill, Toggle } from './ui';
+import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
+import { PaceTrack } from './ui/Pace';
+import { LensCap, StrobeRing, TapPad, ViscosityDrip } from './ui/Playful';
+import type { TempoReading } from '../lib/tempo';
+import { CameraPicker } from './CameraPicker';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
-import type { EngineStatus } from '../lib/platform';
+import { isProLicenseUnlocked, type EngineStatus } from '../lib/platform';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
-import { APP_FEATURE_TILES, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
+import { APP_FEATURE_TILES, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../lib/tierGates';
 import { helpFor } from '../lib/controlHelp';
 import { useControlTip } from './ui/ControlTip';
 
@@ -67,7 +71,7 @@ function PinChips({ settingKey }: { settingKey: keyof VisualizerSettings }) {
         data-testid={`pin-${desk}-${String(settingKey)}`}
         className={`h-[22px] w-[22px] shrink-0 rounded-[4px] border text-[11px] font-bold leading-none transition-colors ${
           on
-            ? 'border-white bg-white text-black'
+            ? LIT
             : 'border-white/15 text-white/25 hover:border-white/40 hover:text-white/70'
         }`}
       >
@@ -104,19 +108,29 @@ interface SettingsPanelProps {
   engineStatus?: EngineStatus | null;
   /** The live reading (frame time), polled while the panel is open. */
   getLiveEngineStatus?: () => EngineStatus | null;
-  /** The room camera: whether it is watching, which one, and what it is seeing. */
+  /** The motion camera: whether it is watching, which one, and what it is seeing. */
   sceneOn?: boolean;
   onSceneToggle?: (on: boolean) => void;
-  sceneState?: { active: boolean; error: string | null; device: string | null; ms: number; energy: number; raw: number; people: number } | null;
-  sceneDevices?: MediaDeviceInfo[];
+  sceneState?: { active: boolean; error: string | null; device: string | null; fellBack?: boolean; lost?: boolean; ms: number; energy: number; raw: number; people: number } | null;
+  /** The cameras plugged in (`useCameras`), for both cameras' pickers. */
+  cameras?: readonly MediaDeviceInfo[];
   sceneDeviceId?: string;
   onSceneDevice?: (id: string) => void;
   /** Where the sensor draws what it sees, so the camera can be aimed. */
   scenePreviewRef?: React.RefObject<HTMLCanvasElement | null>;
   /** The film projector: what's playing, and how to change it. */
   filmSource?: 'none' | 'file' | 'camera' | 'window';
+  /** The file playing as the film (its name), while the source is a file. */
+  filmName?: string | null;
+  /** The file pouring as dye (its name), or null. */
+  pourName?: string | null;
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
+  /** The film's Webcam: which camera it shows, what opened, and whether it was unplugged. */
+  filmCameraId?: string;
+  onFilmCameraDevice?: (id: string) => void;
+  filmCamera?: { label: string | null; fellBack: boolean } | null;
+  filmCameraLost?: boolean;
   /** Another tab, window or screen, through the browser's own picker. */
   onFilmWindow?: () => void;
   onFilmClear?: () => void;
@@ -173,9 +187,15 @@ interface SettingsPanelProps {
   midi?: MidiController;
   /** The full MIDI panel, for the things this panel's section does not hold. */
   onOpenMidi?: () => void;
+  /** Open the Sound sheet, where the source is chosen. */
+  onOpenSound?: () => void;
   /** Where the tempo is coming from, and the three ways to say it by hand. */
   tempo?: { source: string | null; bpm: number; taps: number };
   onTap?: () => void;
+  /** The tempo source's reading, for the tap pad's beat light (it polls this itself). */
+  readTempo?: () => TempoReading | null;
+  /** The tempo the dish's Tempo mode is lit by (tapped, clocked or heard), bpm, or 0. */
+  spinBpm?: number;
   onTempoClear?: () => void;
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
@@ -343,23 +363,25 @@ const Slider = ({ label, value, min, max, step, onChange, icon: Icon, disabled, 
           </span>
         </div>
       </div>
-      <input
-        type="range"
-        min={curve === 1 ? min : 0}
-        max={curve === 1 ? max : 1}
-        step={curve === 1 ? step : 0.001}
-        value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
-        disabled={!!disabled}
-        aria-label={label}
-        onChange={(e) => {
-          const raw = parseFloat(e.target.value);
-          if (curve === 1) { onChange(raw); return; }
-          // Three figures, not the setting's step: see handValueAt.
-          onChange(handValueAt(raw, min, max, curve));
-        }}
-        className="set-range"
-        style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
-      />
+      <PaceTrack settingKey={settingKey} at={Math.max(0, Math.min(1, (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve))))}>
+        <input
+          type="range"
+          min={curve === 1 ? min : 0}
+          max={curve === 1 ? max : 1}
+          step={curve === 1 ? step : 0.001}
+          value={curve === 1 ? safeValue : travelOf(safeValue, min, max, curve)}
+          disabled={!!disabled}
+          aria-label={label}
+          onChange={(e) => {
+            const raw = parseFloat(e.target.value);
+            if (curve === 1) { onChange(raw); return; }
+            // Three figures, not the setting's step: see handValueAt.
+            onChange(handValueAt(raw, min, max, curve));
+          }}
+          className="set-range"
+          style={{ '--fill': `${Math.round(100 * (curve === 1 ? (safeValue - min) / Math.max(1e-9, max - min) : travelOf(safeValue, min, max, curve)))}%` } as React.CSSProperties}
+        />
+      </PaceTrack>
     </div>
   );
 };
@@ -386,7 +408,14 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, sceneDevices = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+/** The loops that ship in public/video, for the Film section's demo rows. A loop is known by its title, which is the name of the File it is handed over as. */
+const DEMO_LOOPS = [
+  { id: 'ring', src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
+  { id: 'particles', src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
+  { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
+] as const;
+
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -503,12 +532,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
   /*
     On a desk panel the section is the only one drawn, so a link to another
     goes where that one is: the sheet, opened at it (`onGoTo`). It is a
-    24px target there, inline in the sentence, which is the desk's rule.
+    24px target there, inline in the sentence, which is the desk's rule:
+    both ways, because "Film" in a 12px sentence is 23.6px wide and the
+    layout check found it ("room: Film 24×24") once the section was named
+    Film rather than Video (PLAN 35a).
   */
   const goTo = (id: string, from: string) => (
     <button
       onClick={() => { if (embed && onGoTo) { onGoTo(id); return; } setSection(id); setQuery(''); }}
-      className={`font-medium text-white/70 underline decoration-white/25 underline-offset-2 hover:text-white ${embed ? 'inline-flex min-h-6 items-center' : ''}`}
+      className={`font-medium text-white/70 underline decoration-white/25 underline-offset-2 hover:text-white ${embed ? 'inline-flex min-h-6 min-w-6 items-center justify-center' : ''}`}
       data-testid={`goto-${id}-from-${from}`}
     >
       {SECTION_BY_ID.get(id)?.name ?? id}
@@ -569,7 +601,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         and the sheet opened on the microphone's sensitivity. It opens here now.
       */}
       {keep('master') && (
-      <section id="settings-master" className={`${CARD} ${shown('master') ? GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="master">
+      <section id="settings-master" className={`${CARD} ${shown('master') ? GRID : 'hidden'} ${focusSection === 'master' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('master')} data-section="master">
         <h3 className={TITLE}>
           <Lightbulb size={12} /> Master
         </h3>
@@ -586,11 +618,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         {/* Not on a desk panel: the desk's header has Blackout, in every layout. */}
         {onBlackout && !embed && (
           <button
+            aria-pressed={blackout}
             onClick={onBlackout}
-            className={`w-full mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? 'bg-red-500/20 border-red-400/40 text-red-100' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex w-full items-center justify-center gap-2 mb-4 -mt-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${blackout ? LIVE : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             title="Fade the plate to black and back (B on the keyboard)"
             data-testid="blackout-button"
           >
+            <LensCap capped={blackout} size={16} />
             {blackout ? 'Lights up' : 'Blackout'}
           </button>
         )}
@@ -641,7 +675,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         slider here to read.
       */}
       {keep('mixer') && (
-      <section id="settings-mixer" className={`${CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="mixer">
+      <section id="settings-mixer" className={`${CARD} ${shown('mixer') ? '' : 'hidden'} ${focusSection === 'mixer' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mixer')} data-section="mixer">
         <h3 className={TITLE}>
           <SlidersVertical size={12} /> Mixer
         </h3>
@@ -661,7 +695,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Sound Section */}
       {keep('audio-input') && (
-      <section id="settings-audio-input" className={`${CARD} ${shown('audio-input') ? GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="audio-input">
+      <section id="settings-audio-input" className={`${CARD} ${shown('audio-input') ? GRID : 'hidden'} ${focusSection === 'audio-input' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('audio-input')} data-section="audio-input">
         <h3 className={TITLE}>
           <Activity size={12} /> Audio Input
         </h3>
@@ -687,6 +721,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="audioImpact"
         />
         <Slider
+          label="Sound Impact"
+          disabled={!listens('sound') && !listens('bands') && !listens('hits') && !midi?.map.sound?.some(isMapping) && 'no patch reads the sound'}
+          value={settings.soundImpact ?? 1}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ soundImpact: v })}
+          settingKey="soundImpact"
+        />
+        <Slider
           label="Sensitivity"
           value={settings.sensitivity}
           min={0.1}
@@ -705,24 +749,38 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="bassBoost"
         />
 
-        {/* What is listening at all */}
+        {/*
+          What is listening, said here and chosen in the Sound sheet.
+
+          The five-way switch that stood here was the second drawing of the
+          sheet's six, which also has the plate as an instrument; two homes
+          meant one could be changed while the other was read. The sheet is
+          the superset, so it is the home, and this row is the state and the
+          way there. The device below stays: it is where the Mic dot lands.
+        */}
         {onAudioSource && (
           <div className="mb-3.5 flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <Segmented
-              value={audioSource === 'file' ? 'file' : audioSource}
-              options={[
-                ['none', 'Off'],
-                ['microphone', 'Mic'],
-                ['system', 'System'],
-                ['file', 'File'],
-                ['simulated', 'Band'],
-              ] as const}
-              onChange={(v) => { if (v === 'file') onAudioFile?.(); else onAudioSource(v); }}
-              height={32}
-              fill
-              testId="audio-source"
-            />
+            <div className="flex items-center gap-2">
+              <div
+                className={`flex h-8 flex-1 items-center rounded-lg border px-3 text-[13px] font-medium ${audioSource === 'none' ? 'border-white/10 bg-white/5 text-white/60' : LIT}`}
+                role="status"
+                data-testid="audio-source-state"
+                data-source={audioSource}
+              >
+                {({ none: 'Off', microphone: 'Mic', system: 'System', file: 'File', simulated: 'Band', drone: 'Instrument' } as const)[audioSource]}
+              </div>
+              {onOpenSound && (
+                <button
+                  onClick={onOpenSound}
+                  className="h-8 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-medium transition-colors hover:bg-white/10"
+                  title="Choose what the plate listens to: the mic, a tab, a file, the band or the plate as an instrument"
+                  data-testid="audio-source-open"
+                >
+                  Change in Sound…
+                </button>
+              )}
+            </div>
             <Info>
               <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
             </Info>
@@ -793,22 +851,13 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </span>
             </div>
             <div className="flex gap-1.5">
-              <button
-                onClick={onTap}
-                data-testid="tempo-tap"
-                title="Tap the beat — two taps give a tempo, four give a good one. Also on any pad, as the Tap Tempo action."
-                className="min-h-9 flex-1 rounded-lg border border-white/10 bg-white/5 text-[13px] font-medium transition-all hover:bg-white/10"
-              >
-                Tap{tempo && tempo.taps > 0 && tempo.source !== 'clock' ? ` \u00b7 ${tempo.taps}` : ''}
-              </button>
+              <TapPad tempo={tempo} read={readTempo} onTap={onTap} />
               <button
                 onClick={onTempoClear}
                 disabled={!tempo?.source}
                 data-testid="tempo-listen"
                 title="Back to working the tempo out from what it can hear"
-                className={`min-h-9 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
-                  tempo?.source ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'cursor-not-allowed border-white/5 opacity-30'
-                }`}
+                className="min-h-9 flex-none rounded-lg border border-white/10 bg-white/5 px-3 text-[13px] font-medium transition-all hover:bg-white/10 disabled:cursor-not-allowed disabled:border-white/5 disabled:opacity-30"
               >
                 Listen
               </button>
@@ -884,10 +933,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-3 gap-1">
             {([['off', 'Keep'], ['preset', 'New preset'], ['random', 'Random']] as const).map(([mode, label]) => (
               <button
+                aria-pressed={(settings.onNewSong ?? 'off') === mode}
                 key={mode}
                 onClick={() => onUpdate({ onNewSong: mode })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  (settings.onNewSong ?? 'off') === mode ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.onNewSong ?? 'off') === mode ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={mode === 'off' ? 'Keep the look across songs' : mode === 'preset' ? 'Switch to another preset when a new song starts' : 'Roll a random look when a new song starts'}
                 data-testid={`new-song-${mode}`}
@@ -968,7 +1018,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Light Show Look Section */}
       {keep('look') && (
-      <section id="settings-look" className={`${CARD} ${shown('look') ? GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="look">
+      <section id="settings-look" className={`${CARD} ${shown('look') ? GRID : 'hidden'} ${focusSection === 'look' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('look')} data-section="look">
         <h3 className={TITLE}>
           <Palette size={12} /> Light Show Look
         </h3>
@@ -1074,6 +1124,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="edgeRelief"
         />
         <Slider
+          label="Projector Focus"
+          value={settings.projectorFocus ?? 0.5}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ projectorFocus: v })}
+          settingKey="projectorFocus"
+        />
+        <Slider
           label="Lacing"
           value={settings.lacing ?? 0}
           min={0}
@@ -1090,15 +1149,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           step={0.05}
           onChange={(v: number) => onUpdate({ bubbles: v })}
           settingKey="bubbles"
-        />
-        <Slider
-          label="Plate Rock"
-          value={settings.plateRock ?? 0.45}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ plateRock: v })}
-          settingKey="plateRock"
         />
         <Slider
           label="Frame Sway"
@@ -1180,7 +1230,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Show Section */}
       {keep('show') && (
-      <section id="settings-show" className={`${CARD} ${shown('show') ? GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="show">
+      <section id="settings-show" className={`${CARD} ${shown('show') ? GRID : 'hidden'} ${focusSection === 'show' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('show')} data-section="show">
         <h3 className={TITLE}>
           <Clapperboard size={12} /> Show
         </h3>
@@ -1308,9 +1358,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Camera Section */}
       {keep('camera') && (
-      <section id="settings-camera" className={`${CARD} ${shown('camera') ? GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="camera">
+      <section id="settings-camera" className={`${CARD} ${shown('camera') ? GRID : 'hidden'} ${focusSection === 'camera' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('camera')} data-section="camera">
         <h3 className={TITLE}>
-          <Aperture size={12} /> Camera
+          <Aperture size={12} /> Lens
         </h3>
         <Info>
           The macro photograph instead of the projected show: a lit paper backdrop, dye as transmission, every drop a dome with a softbox in it, then a real lens over the picture — refraction, a focal plane, bloom, colour fringing, the sensor's roll-off.
@@ -1320,10 +1370,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-2 gap-1">
             {(['show', 'photo'] as const).map((style) => (
               <button
+                aria-pressed={(settings.renderStyle ?? 'show') === style}
                 key={style}
                 onClick={() => onUpdate({ renderStyle: style })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  (settings.renderStyle ?? 'show') === style ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.renderStyle ?? 'show') === style ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={style === 'show' ? 'The projected light show: dye as light on black' : 'The photograph: dye over lit paper'}
                 data-testid={`render-${style}`}
@@ -1394,7 +1445,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Film stock — what the whole show is photographed on (F1). */}
       {keep('stock') && (
-      <section id="settings-stock" className={`${CARD} ${shown('stock') ? GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="look" data-section="stock">
+      <section id="settings-stock" className={`${CARD} ${shown('stock') ? GRID : 'hidden'} ${focusSection === 'stock' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('stock')} data-section="stock">
         <h3 className={TITLE}>
           <Film size={12} /> Film Stock
         </h3>
@@ -1415,10 +1466,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-5 gap-1">
             {['16mm', 'Slide', 'Faded', 'Super 8', 'Mono'].map((name, i) => (
               <button
+                aria-pressed={(settings.stockType ?? 0) === i}
                 key={name}
                 onClick={() => onUpdate({ stockType: i })}
                 className={`py-2 rounded-lg text-[9px] uppercase tracking-wider font-bold border transition-colors ${
-                  (settings.stockType ?? 0) === i ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  (settings.stockType ?? 0) === i ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={[
                   '16mm reversal: cool and saturated, with a hard shoulder',
@@ -1483,7 +1535,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         each wedge, together, and all three on the MIDI list.
       */}
       {keep('kaleidoscope') && (
-      <section id="settings-kaleidoscope" className={`${CARD} ${shown('kaleidoscope') ? GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="kaleidoscope">
+      <section id="settings-kaleidoscope" className={`${CARD} ${shown('kaleidoscope') ? GRID : 'hidden'} ${focusSection === 'kaleidoscope' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('kaleidoscope')} data-section="kaleidoscope">
         <h3 className={TITLE}>
           <Aperture size={12} /> Kaleidoscope
         </h3>
@@ -1498,10 +1550,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           <div className="grid grid-cols-5 gap-1" data-testid="kaleido-folds">
             {[0, 2, 4, 6, 8].map((k) => (
               <button
+                aria-pressed={Math.round(settings.kaleidoscope ?? 0) === k}
                 key={k}
                 onClick={() => onUpdate({ kaleidoscope: k })}
                 className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${
-                  Math.round(settings.kaleidoscope ?? 0) === k ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'
+                  Math.round(settings.kaleidoscope ?? 0) === k ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'
                 }`}
                 title={k === 0 ? 'No mirror rig' : `${k} mirrored wedges`}
                 data-testid={`kaleido-folds-${k}`}
@@ -1536,7 +1589,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Lamp & Light Section */}
       {keep('lamp') && (
-      <section id="settings-lamp" className={`${CARD} ${shown('lamp') ? GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="lamp">
+      <section id="settings-lamp" className={`${CARD} ${shown('lamp') ? GRID : 'hidden'} ${focusSection === 'lamp' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('lamp')} data-section="lamp">
         <h3 className={TITLE}>
           <Lightbulb size={12} /> Lamp &amp; Light
         </h3>
@@ -1620,60 +1673,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="lumia"
         />
         <Slider
-          label="Chemistry"
-          value={settings.chemistry ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ chemistry: v })}
-          settingKey="chemistry"
-        />
-        <Slider
-          label="↳ Pattern (Spots to Labyrinth)"
-          value={settings.chemistryPattern ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ chemistryPattern: v })}
-          settingKey="chemistryPattern"
-        />
-        <Slider
-          label="↳ Pattern Width"
-          value={settings.chemistryWidth ?? 0.5}
-          min={0.1}
-          max={1.0}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ chemistryWidth: v })}
-          settingKey="chemistryWidth"
-        />
-        <Slider
-          label="↳ Turing Print"
-          value={settings.turingPrint ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ turingPrint: v })}
-          settingKey="turingPrint"
-        />
-        <Slider
-          label="↳ Print Ink (0 is Starch)"
-          value={settings.turingInk ?? 0}
-          min={0}
-          max={1.0}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ turingInk: v })}
-          settingKey="turingInk"
-        />
-        <Slider
-          label="↳ Print Drift (0 is Still)"
-          value={settings.turingDrift ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ turingDrift: v })}
-          settingKey="turingDrift"
-        />
-        <Slider
           label="Gel Wheel"
           value={settings.gelWheel ?? 0}
           min={0}
@@ -1696,7 +1695,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           label="Lamp Warmth"
           value={settings.lampWarmth ?? 0}
           min={0}
-          max={1.0}
+          max={3.75}
           step={0.05}
           onChange={(v: number) => onUpdate({ lampWarmth: v })}
           settingKey="lampWarmth"
@@ -1714,6 +1713,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="transmission"
         />
         <Slider
+          label="Layer Depth"
+          value={settings.thicknessOptics ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ thicknessOptics: v })}
+          settingKey="thicknessOptics"
+        />
+        <Slider
+          label="Spectral Mix"
+          value={settings.spectralOptics ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ spectralOptics: v })}
+          settingKey="spectralOptics"
+        />
+        <Slider
           label="Exposure"
           value={settings.exposure ?? 0}
           min={0}
@@ -1727,35 +1744,44 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* The Room Section */}
       {keep('room') && (
-      <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="room">
+      <section id="settings-room" className={`${CARD} ${shown('room') ? GRID : 'hidden'} ${focusSection === 'room' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('room')} data-section="room">
+        {/*
+          Two cameras, two jobs, and the owner could not tell them apart
+          (2026-10-24): "what the room control is vs. showing video on the
+          plate". This one is a sensor. Its picture is never drawn; movement
+          in front of it stirs the liquid. The film's Webcam is the other
+          one, a picture on the plate. So the heading says what it does
+          rather than where it points ("The Room"), the first line says the
+          picture is never shown and where to go to show one, and the switch
+          is the shared Toggle, so on and off read the way every other
+          switch does. (PLAN 14ad.)
+        */}
         <h3 className={TITLE}>
-          <Camera size={12} /> The Room
+          <ScanEye size={12} /> Motion camera
         </h3>
+        <p className="mb-2 text-[12px] leading-relaxed text-text-2" data-testid="scene-what">
+          Movement in front of a camera stirs the liquid. Its picture is never shown. To put a camera&rsquo;s picture on the plate, use Webcam in {goTo('film', 'room')}.
+        </p>
         <Info>
-          The camera pointed at the room, read back rather than shown: movement in front of the lens becomes movement in the liquid. Aim it at the floor, not at the screen — a camera that can see the projection makes the plate drive itself.
+          Aim it at the floor or the crowd, not at the screen: a camera that can see the projection makes the plate drive itself. Hold people below is what tracks each person and puts their hands on the glass.
         </Info>
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={() => onSceneToggle?.(!sceneOn)}
-            className={`flex-1 py-2 rounded-lg text-[13px] font-medium border transition-all ${sceneOn ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-            data-testid="scene-toggle"
-          >
-            {sceneOn ? 'Watching' : 'Watch the room'}
-          </button>
+        <div className="mb-2">
+          <Toggle
+            label="Watch for movement"
+            on={sceneOn}
+            onChange={(v) => onSceneToggle?.(v)}
+            testId="scene-toggle"
+          />
         </div>
-        {sceneOn && sceneDevices.length > 1 && (
-          <select
-            value={sceneDeviceId}
-            onChange={(e) => onSceneDevice?.(e.target.value)}
-            aria-label="Room camera"
-            className="w-full mb-3 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[11px] outline-none"
-          >
-            <option value="">Default camera</option>
-            {sceneDevices.map((d, i) => (
-              <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>
-            ))}
-          </select>
-        )}
+        <CameraPicker
+          cameras={cameras}
+          value={sceneDeviceId}
+          onChange={(id) => onSceneDevice?.(id)}
+          label="Motion camera"
+          testId="scene-device"
+          inUse={sceneState?.device}
+          fellBack={sceneOn && !!sceneState?.fellBack}
+        />
         {sceneOn && (
           <div className="mb-4">
             <canvas
@@ -1766,7 +1792,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               data-testid="scene-preview"
             />
             {sceneState?.error ? (
-              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/80">{sceneState.error}</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-amber-300/80" data-testid="scene-error">{sceneState.error}</p>
             ) : (
               <>
                 <div className="mt-2 h-1 rounded-full bg-white/10 overflow-hidden">
@@ -1792,6 +1818,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ sceneDrive: v })}
           disabled={!sceneOn && 'off'}
           settingKey="sceneDrive"
+        />
+        <Slider
+          label="Room Impact"
+          value={settings.sceneImpact ?? 0.5}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ sceneImpact: v })}
+          disabled={!sceneOn ? 'needs the room camera on' : !listens('room') && 'no patch reads the room'}
+          settingKey="sceneImpact"
         />
         <Slider
           label="Hands"
@@ -1825,15 +1861,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         />
         <div className="flex items-center gap-2 mb-2">
           <button
+            aria-pressed={settings.scenePeople !== false}
             onClick={() => onUpdate({ scenePeople: !(settings.scenePeople !== false) })}
-            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.scenePeople !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.scenePeople !== false ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-people"
           >
             Hold people
           </button>
           <button
+            aria-pressed={settings.sceneMirror !== false}
             onClick={() => onUpdate({ sceneMirror: !(settings.sceneMirror !== false) })}
-            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.sceneMirror !== false ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+            className={`flex-1 py-1.5 rounded-lg text-[13px] font-medium border transition-all ${settings.sceneMirror !== false ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid="scene-mirror"
             title="Flip the camera's view left for right, for a camera facing the room"
           >
@@ -1863,105 +1901,142 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         dish or another window, how it shows, and what it does to the liquid.
       */}
       {keep('film') && (
-      <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="film">
+      <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('film')} data-section="film">
         <h3 className={TITLE}>
-          <Video size={12} /> Video
+          <Video size={12} /> Film
         </h3>
         <div className="mt-2 mb-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-[13px] font-medium text-text">Source</span>
-            <span className="text-[12px] font-mono opacity-50">
-              {filmSource === 'file' ? 'loop playing'
-                : filmSource === 'camera' ? 'camera live'
+            <span className="min-w-0 truncate text-[12px] text-muted" data-testid="film-source-status">
+              {filmSource === 'file' ? `playing ${filmName ?? 'a video file'}`
+                : filmSource === 'camera' ? (filmCamera?.label ? `camera live: ${filmCamera.label}` : 'camera live')
                 : filmSource === 'window' ? 'window live'
                 : 'off'}
             </span>
           </div>
-          {/* Wraps: as a 312px desk panel its four sources ran past the frame, and Off was cut off. */}
-          <div className="flex flex-wrap gap-2">
-            <input
-              ref={filmInputRef}
-              id="film-loop-file"
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
-            />
-            <button
-              onClick={() => filmInputRef.current?.click()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-              title="Play a video file through the dye, looping"
-            >
-              <Film size={13} /> Load loop
-            </button>
-            <button
-              onClick={() => onFilmCamera?.()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10"
-              title="Point a camera at a real dish of oil and composite it through the solver"
-              data-testid="film-camera"
-            >
-              <Camera size={13} /> Camera
-            </button>
-            {/*
-              Disabled rather than silently doing nothing where the browser
-              has no screen capture — which is every phone. A button that
-              looks pressable and answers with a console warning is the kind
-              of control that makes someone doubt the rest of the panel.
-            */}
-            <button
-              onClick={() => onFilmWindow?.()}
-              disabled={!canCaptureWindow}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[13px] font-medium hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-30"
-              title={canCaptureWindow
-                ? 'Play another tab, window or screen through the dye — a film from the Internet Archive, a media player, anything on this machine'
-                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.'}
-              data-testid="film-window"
-            >
-              <MonitorPlay size={13} /> Window
-            </button>
-            <button
-              onClick={() => onFilmClear?.()}
-              disabled={filmSource === 'none'}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] font-medium hover:bg-white/10 disabled:opacity-30"
-              data-testid="film-off"
-            >
-              Off
-            </button>
-          </div>
-          
-          {/* Demo Videos */}
-          <div className="mt-3 flex flex-col gap-1">
-            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo Loops</span>
-            {[
-              { src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
-              { src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
-              { src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
-            ].map(v => (
+          <input
+            ref={filmInputRef}
+            id="film-loop-file"
+            type="file"
+            accept="video/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onFilmFile?.(f); e.target.value = ''; }}
+          />
+          {/*
+            One pick-one, the source lit (PLAN 35a). The owner, a loop
+            playing: "I really can't tell what buttons are turned on/off."
+            These were four grey buttons alike and Off was the only one that
+            changed, by greying out, so the row said what was not playing and
+            never what was. Video file opens the chooser even when it is the
+            one lit, which is how a second file replaces the first.
+
+            Wraps: as a 312px desk panel its four sources ran past the frame,
+            and Off was cut off. Window is disabled rather than silently doing
+            nothing where the browser has no screen capture, which is every
+            phone: a button that looks pressable and answers with a console
+            warning is the kind of control that makes someone doubt the rest
+            of the panel.
+          */}
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Film source" data-testid="film-source">
+            {([
+              ['none', 'Off', null, 'film-off', 'No film under the dye', () => onFilmClear?.()],
+              ['file', 'Video file', Film, 'film-file', 'Play a video file from this machine through the dye, looping', () => filmInputRef.current?.click()],
+              ['camera', 'Webcam', Camera, 'film-camera', 'Point a camera at a real dish of oil and composite it through the solver', () => onFilmCamera?.()],
+              ['window', 'Window', MonitorPlay, 'film-window', canCaptureWindow
+                ? 'Play another tab, window or screen through the dye: a film from the Internet Archive, a media player, anything on this machine'
+                : 'This browser cannot capture a window. Desktop Chrome, Edge, Firefox and Safari can; phones cannot.', () => onFilmWindow?.()],
+            ] as const).map(([id, label, Icon, testId, title, go]) => (
               <button
-                key={v.src}
-                className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
-                onClick={async () => {
-                  try {
-                    const res = await fetch(v.src);
-                    const blob = await res.blob();
-                    if (onFilmFile) onFilmFile(new File([blob], v.title, { type: 'video/webm' }));
-                  } catch (e) { console.error('Failed to load demo video', e); }
-                }}
+                key={id}
+                aria-pressed={filmSource === id}
+                onClick={go}
+                disabled={id === 'window' && !canCaptureWindow}
+                className={`flex ${id === 'none' ? '' : 'flex-1'} items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+                  filmSource === id ? LIT : 'border-white/15 bg-white/5 text-text-2 hover:bg-white/10'
+                }`}
+                title={title}
+                data-testid={testId}
               >
-                <span className="text-[12px] font-medium">{v.title}</span>
-                <div className="flex gap-3">
-                  <span className="text-[10px] text-white/40 hover:text-white px-1" onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      const res = await fetch(v.src);
-                      const blob = await res.blob();
-                      if (onPourVideo) onPourVideo(new File([blob], v.title, { type: 'video/webm' }));
-                    } catch (e) { console.error('Failed to load demo video', e); }
-                  }}>Pour as Dye</span>
-                  <span className="text-[10px] text-white/40 hover:text-white px-1">Load Film</span>
-                </div>
+                {Icon && <Icon size={13} />} {label}
               </button>
             ))}
+          </div>
+
+          {/*
+            Which camera the film shows, and what the film's camera is for
+            (PLAN 14ad). It had no picker: the browser's "environment" camera
+            or nothing. The line says the other camera's job too, because the
+            owner could not tell this from the motion camera, and the two are
+            two sections apart.
+          */}
+          <div className="mt-1" data-testid="film-camera-pick">
+            <p className="mb-2 text-[12px] leading-relaxed text-text-2" data-testid="film-camera-what">
+              Webcam shows a camera&rsquo;s picture on the plate, through the dye. To stir the liquid with movement instead, use the {goTo('room', 'film')}.
+            </p>
+            <CameraPicker
+              cameras={cameras}
+              value={filmCameraId}
+              onChange={(id) => onFilmCameraDevice?.(id)}
+              label="Webcam"
+              testId="film-device"
+              inUse={filmCamera?.label}
+              fellBack={!!filmCamera?.fellBack}
+            />
+            {filmCameraLost && (
+              <p className="-mt-1 mb-2 text-[12px] leading-relaxed text-amber-300/80" data-testid="film-camera-lost">
+                The camera was unplugged. The film comes back on when it is plugged in again.
+              </p>
+            )}
+          </div>
+
+          {/*
+            The demo loops, each with its two uses as the cartoon shelf has
+            them: Film plays it as the source above, Pour lays it into the
+            dish as dye. The whole row was a button that filmed it, with Pour
+            as Dye a span inside it and Load Film a span that did nothing of
+            its own (a click on it fell through to the row), and nothing said
+            which loop was playing. Now each use is its own button, lit while
+            that loop is doing it, and the one filming says so.
+          */}
+          <div className="mt-3 flex flex-col gap-1" data-testid="film-demos">
+            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo loops</span>
+            {DEMO_LOOPS.map(v => {
+              const filming = filmSource === 'file' && filmName === v.title;
+              const pouring = pourName === v.title;
+              const fetchAs = async (use: (f: File) => void) => {
+                try {
+                  const blob = await (await fetch(v.src)).blob();
+                  use(new File([blob], v.title, { type: 'video/webm' }));
+                } catch (e) { console.error('Failed to load demo video', e); }
+              };
+              const btn = 'flex h-8 shrink-0 items-center gap-1 rounded-md border px-2.5 text-[12px] font-medium transition-colors';
+              const off = 'border-white/15 text-text-2 hover:bg-white/10';
+              return (
+                <div key={v.src} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5" data-testid={`film-demo-${v.id}`}>
+                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{v.title}</span>
+                  {filming && <Tag tone="next">playing as film</Tag>}
+                  <button
+                    aria-pressed={filming}
+                    onClick={() => (filming ? onFilmClear?.() : fetchAs(f => onFilmFile?.(f)))}
+                    className={`${btn} ${filming ? LIT : off}`}
+                    title={filming ? 'Playing as the film. Click to take it off.' : 'Play it through the projector as the film, looping (Film Mix sets how much shows)'}
+                    data-testid={`film-demo-film-${v.id}`}
+                  >
+                    <Clapperboard size={11} /> Film
+                  </button>
+                  <button
+                    aria-pressed={pouring}
+                    onClick={() => (pouring ? onStopPourVideo?.() : fetchAs(f => onPourVideo?.(f)))}
+                    className={`${btn} ${pouring ? LIT : off}`}
+                    title={pouring ? 'Pouring into the dish. Click to stop.' : 'Pour it into the dish as dye, looping'}
+                    data-testid={`film-demo-pour-${v.id}`}
+                  >
+                    <Droplets size={11} /> Pour
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           <Info>
@@ -2016,8 +2091,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ filmDrive: v })}
           settingKey="filmDrive"
         />
+        <Slider
+          label="Film Impact"
+          disabled={(filmSource ?? 'none') === 'none'
+            ? 'needs a loop, the camera or a window'
+            : !listens('film') && 'no patch reads the film'}
+          value={settings.filmImpact ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmImpact: v })}
+          settingKey="filmImpact"
+        />
         <p className="mb-3 text-[12px] leading-relaxed text-white/40">
-          Any feature of the film onto any control is a patch, in {goTo('patches', 'film')}, where Film Impact is its master.
+          Any feature of the film onto any control is a patch, in {goTo('patches', 'film')}, where Film Impact, just above, is its master.
         </p>
         {filmSource !== 'none' && (
           <Info>
@@ -2048,7 +2135,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         over it are one place now, after the sources it reads.
       */}
       {keep('patches') && (
-      <section id="settings-patches" className={`${CARD} ${shown('patches') ? GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="patches">
+      <section id="settings-patches" className={`${CARD} ${shown('patches') ? GRID : 'hidden'} ${focusSection === 'patches' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('patches')} data-section="patches">
         <h3 className={TITLE}>
           <Cable size={12} /> Patches
         </h3>
@@ -2100,7 +2187,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, source, feature: (keep ? m.feature : options[0][0]) as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-source-${i}`}
                     >
                       {PATCH_SOURCES.map(([value, label]) => (
@@ -2115,7 +2202,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, feature: e.target.value as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-feature-${i}`}
                     >
                       {featuresFor(m.source ?? 'room').map(([value, label]) => (
@@ -2136,7 +2223,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, setting: e.target.value as SceneMapping['setting'] };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
+                      className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-control-${i}`}
                     >
                       {m.area !== undefined ? AREA_TARGETS.map(t => (
@@ -2151,7 +2238,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     </select>
                     <button
                       onClick={() => onUpdate({ sceneMappings: (settings.sceneMappings ?? []).filter((_, j) => j !== i) })}
-                      className="p-1 rounded hover:bg-white/10 opacity-50 hover:opacity-100"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-white/10 opacity-50 hover:opacity-100"
                       aria-label="Remove mapping"
                     >
                       <X size={12} />
@@ -2183,7 +2270,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, layer: v === 'all' ? 'all' : Number(v) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
+                      className="min-h-6 w-[76px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none disabled:opacity-30"
                       data-testid={`patch-layer-${i}`}
                     >
                       <option value="all">All plates</option>
@@ -2203,7 +2290,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         next[i] = { ...m, depth: parseFloat(e.target.value) };
                         onUpdate({ sceneMappings: next });
                       }}
-                      className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                      className="set-range flex-1"
+                      style={{ '--fill': `${Math.round(50 * (m.depth + 1))}%` } as React.CSSProperties}
                     />
                     <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
@@ -2252,6 +2340,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                             next[i] = e.target.checked ? { ...rest, threshold: 0.3, attack: 0.02, release: 0.4 } : rest;
                             onUpdate({ sceneMappings: next });
                           }}
+                          className="h-6 w-6 shrink-0 accent-white cursor-pointer"
                           data-testid={`patch-gate-on-${i}`}
                         />
                         Fire on a hit, not the room
@@ -2272,7 +2361,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                               next[i] = { ...m, [key]: parseFloat(e.target.value) };
                               onUpdate({ sceneMappings: next });
                             }}
-                            className="flex-1 h-1 bg-white/10 rounded-full appearance-none accent-white cursor-pointer"
+                            className="set-range flex-1"
+                            style={{ '--fill': `${Math.round(100 * ((m[key] ?? 0) - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
                             data-testid={`patch-${key}-${i}`}
                           />
                           <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
@@ -2286,7 +2376,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           )}
         </div>
         {/*
-          The masters, one per source, in the order the Source menu lists them.
+          The masters, one per source. Three of them sit beside the Drive of
+          the source they scale (Room Impact under Room Drive, Film Impact
+          under Film Drive, Sound Impact under Sound Drive): the owner found
+          two strengths for one input in two sections (PLAN 35c-2). Shapes
+          have no input section, a wave or an envelope being the bay's own, so
+          their master stays here.
 
           Each is greyed until a patch actually reads its source, rather than
           until any patch exists. With one room patch in the bay the old rule
@@ -2294,38 +2389,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           panel keeps being fixed for.
         */}
         <div className="mt-6 mb-3 text-[13px] font-medium text-text">Masters</div>
-        <Slider
-          label="Room Impact"
-          value={settings.sceneImpact ?? 0.5}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ sceneImpact: v })}
-          disabled={!sceneOn ? 'needs the room camera on' : !listens('room') && 'no patch reads the room'}
-          settingKey="sceneImpact"
-        />
-        <Slider
-          label="Film Impact"
-          disabled={(filmSource ?? 'none') === 'none'
-            ? 'needs a loop, the camera or a window'
-            : !listens('film') && 'no patch reads the film'}
-          value={settings.filmImpact ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ filmImpact: v })}
-          settingKey="filmImpact"
-        />
-        <Slider
-          label="Sound Impact"
-          disabled={!listens('sound') && !listens('bands') && !listens('hits') && !midi?.map.sound?.some(isMapping) && 'no patch reads the sound'}
-          value={settings.soundImpact ?? 1}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ soundImpact: v })}
-          settingKey="soundImpact"
-        />
         <Slider
           label="Shapes Impact"
           disabled={!listens('shape') && 'no patch reads a shape'}
@@ -2337,7 +2400,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="shapeImpact"
         />
         <Info>
-          Each source has one master over every patch that reads it, so a whole source can be pulled down on one fader without touching the patches themselves: the room out of a quiet song, the film under the band, the sound off while the reel carries it. <span className="text-white/70">Film Impact</span> starts at zero, so a look saved before the film could ride anything does exactly what it did.
+          Each source has one master over every patch that reads it, so a whole source can be pulled down on one fader without touching the patches themselves: the room out of a quiet song, the film under the band, the sound off while the reel carries it. <span className="text-white/70">Room Impact</span> is in {goTo('room', 'patches')}, <span className="text-white/70">Film Impact</span> in {goTo('film', 'patches')} and <span className="text-white/70">Sound Impact</span> in {goTo('audio-input', 'patches')}, each under the Drive of the same source; Shapes Impact is the one here. Film Impact starts at zero, so a look saved before the film could ride anything does exactly what it did.
         </Info>
       </section>
       )}
@@ -2359,7 +2422,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         the picture) is still the panel, one click away.
       */}
       {keep('midi') && (
-      <section id="settings-midi" className={`${CARD} ${shown('midi') ? GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="inputs" data-section="midi">
+      <section id="settings-midi" className={`${CARD} ${shown('midi') ? GRID : 'hidden'} ${focusSection === 'midi' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('midi')} data-section="midi">
         <h3 className={TITLE}>
           <Sliders size={12} /> Controller
         </h3>
@@ -2372,9 +2435,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         ) : (
           <>
             <button
+              aria-pressed={midi.enabled}
               onClick={() => (midi.enabled ? midi.disable() : midi.enable())}
               className={`mb-3 w-full rounded-lg py-2.5 text-[13px] font-medium transition-colors ${
-                midi.enabled ? 'bg-white text-black' : 'bg-white/10 border border-white/10 hover:bg-white/15'
+                midi.enabled ? `border ${LIT}` : 'border border-white/10 hover:bg-white/10'
               }`}
               data-testid="settings-midi-enable"
             >
@@ -2400,6 +2464,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       Nothing plugged in yet. Connect the controller by USB — it appears here by itself.
                     </p>
                   )}
+                </div>
+                {/* The port out, for the pads' LEDs: the MIDI sheet used to draw this next to the port in. */}
+                <div className="mb-3 flex flex-col gap-1.5">
+                  <span className="text-[13px] font-medium text-text">LEDs</span>
+                  <select
+                    value={midi.ports.output}
+                    onChange={e => midi.choosePorts({ output: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/40"
+                    data-testid="settings-midi-output"
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="off">Off</option>
+                    {midi.outputs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
                 </div>
 
                 {/*
@@ -2512,7 +2590,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         is an input of its own.
       */}
       {keep('projectors') && (
-      <section id="settings-projectors" className={`${CARD} ${shown('projectors') ? GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="projectors">
+      <section id="settings-projectors" className={`${CARD} ${shown('projectors') ? GRID : 'hidden'} ${focusSection === 'projectors' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('projectors')} data-section="projectors">
         <h3 className={TITLE}>
           <Projector size={12} /> Wall
         </h3>
@@ -2522,9 +2600,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <div className="grid grid-cols-3 gap-1">
               {([['ask', 'Ask'], ['auto', 'Automatic'], ['off', 'Off']] as const).map(([m, label]) => (
                 <button
+                  aria-pressed={projectorMode === m}
                   key={m}
                   onClick={() => onProjectorMode(m)}
-                  className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${projectorMode === m ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                  className={`py-1.5 rounded-lg text-[13px] font-medium border transition-all ${projectorMode === m ? LIT : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                   data-testid={`projector-mode-${m}`}
                 >
                   {label}
@@ -2544,7 +2623,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Mapping Section */}
       {keep('mapping') && (
-      <section id="settings-mapping" className={`${CARD} ${shown('mapping') ? GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="mapping">
+      <section id="settings-mapping" className={`${CARD} ${shown('mapping') ? GRID : 'hidden'} ${focusSection === 'mapping' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mapping')} data-section="mapping">
         <h3 className={TITLE}>
           <Shapes size={12} /> Mapping
         </h3>
@@ -2563,7 +2642,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
         This one sits over the top and stays put for three hours.
       */}
       {keep('mark') && (
-      <section id="settings-mark" className={`${CARD} ${shown('mark') ? GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="stage" data-section="mark">
+      <section id="settings-mark" className={`${CARD} ${shown('mark') ? GRID : 'hidden'} ${focusSection === 'mark' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('mark')} data-section="mark">
         <h3 className={TITLE}>
           <Image size={12} /> Logo &amp; Titles
         </h3>
@@ -2653,7 +2732,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       )}
 
       {keep('simulation') && (
-      <section id="settings-simulation" className={`${CARD} ${shown('simulation') ? GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="simulation">
+      <section id="settings-simulation" className={`${CARD} ${shown('simulation') ? GRID : 'hidden'} ${focusSection === 'simulation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('simulation')} data-section="simulation">
         <h3 className={TITLE}>
           <Zap size={12} /> Simulation
         </h3>
@@ -2708,6 +2787,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             value={String(settings.simResolution ?? 'auto')}
             onChange={(e) => {
               const v = e.target.value;
+              if (v === '1024' && isTierGatingEnforced() && !isProLicenseUnlocked()) return;
               onUpdate({ simResolution: (v === 'auto' ? v : Number(v)) as SimResolution });
             }}
             className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm focus:outline-none focus:border-white/50"
@@ -2718,6 +2798,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <option value="384">GPU · 384²</option>
             <option value="512">GPU · 512²</option>
             <option value="768">GPU · 768² (heavy)</option>
+            <option value="1024" disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}>GPU · 1024² (Pro · ultra)</option>
           </select>
           <Info>
             Finer grids let the physics form the filaments and cells itself instead of the closeup synthesising them.
@@ -2725,13 +2806,43 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             {engineStatus?.governed && engineStatus.steppedDown ? ' — it has stepped down on this machine.' : '.'}
             {engineStatus && ` Running ${engineStatus.tier === 'hosted' ? 'from the web' : engineStatus.tier === 'native' ? 'natively' : 'locally'}; ${engineStatus.gpu === 'software' ? 'software GL' : `${engineStatus.gpu} GPU`}.`}
           </Info>
+          {((engineStatus?.governed && engineStatus.steppedDown) || engineStatus?.gpuUnavailable) && !isProLicenseUnlocked() && (
+            <div
+              data-cg-grid-upgrade-pro=""
+              className="mt-1 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] p-3 text-[12px] leading-snug text-amber-100/90"
+            >
+              <div className="font-semibold text-amber-200">
+                Upgrade to ChromaGlass Pro for full GPU &amp; CPU headroom
+              </div>
+              <p className="mt-1 text-[11px] text-white/75">
+                Pro lets the automatic quality ladder climb to <span className="font-mono text-white/90">768²</span> at <span className="font-mono text-white/90">2x</span> and <span className="font-mono text-white/90">1024²</span> at <span className="font-mono text-white/90">1x</span>, and unlocks the <span className="font-mono text-white/90">1024²</span> grid pin on your machine.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <a
+                  href={getEffectiveTier() === 'home' ? CHECKOUT_UPGRADE_URL : CHECKOUT_PRO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center rounded-md bg-amber-400 px-2.5 py-1 text-[11px] font-semibold text-black hover:bg-amber-300"
+                >
+                  {getEffectiveTier() === 'home' ? 'Upgrade to Pro — $164' : 'Get Pro — $199'}
+                </a>
+                <button
+                  type="button"
+                  onClick={openAccountSheet}
+                  className="rounded-md border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] font-medium text-white/85 hover:bg-white/[0.12]"
+                >
+                  Enter licence key
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
       )}
 
       {/* Macro Closeup Section */}
       {keep('macro') && (
-      <section id="settings-macro" className={`${CARD} ${shown('macro') ? GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="macro">
+      <section id="settings-macro" className={`${CARD} ${shown('macro') ? GRID : 'hidden'} ${focusSection === 'macro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('macro')} data-section="macro">
         <h3 className={TITLE}>
           <Microscope size={12} /> Macro Closeup
         </h3>
@@ -2893,12 +3004,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
       )}
 
-      {/* Squish Plate Section */}
       {keep('squish') && (
-      <section id="settings-squish" className={`${CARD} ${shown('squish') ? GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="squish">
+      <section id="settings-squish" className={`${CARD} ${shown('squish') ? GRID : 'hidden'} ${focusSection === 'squish' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('squish')} data-section="squish">
         <h3 className={TITLE}>
           <Sliders size={12} /> Squish Plate
         </h3>
+        {/*
+          The two glasses and the film between them (PLAN 35c). What used to be
+          one section of forty controls is five: this is the cell itself, how
+          hard it is pressed, how it is shaped and how thin the gap is, and the
+          liquid's own behaviour in it; the oil, the ferrofluid and the
+          reactions each have a section beside it, and the tilt is Motion's.
+        */}
         <Slider
           label="Plate Pressure"
           value={settings.platePressure}
@@ -2922,6 +3039,177 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           at a twelfth of a second, faster than a hand can move, which is
           most of why pressing did not feel like it did anything.
         */}
+        <Slider
+          label="Plate Shape"
+          value={settings.plateCurve ?? 0}
+          min={-1}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateCurve: v })}
+          settingKey="plateCurve"
+        />
+        <Slider
+          label="Depth Drag"
+          value={settings.depthDrag ?? 0}
+          min={0}
+          max={3}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ depthDrag: v })}
+          settingKey="depthDrag"
+        />
+        {/*
+          The plate as a Hele-Shaw cell (PLAN §18a): a switch on a slider's
+          two stops, as Layers is, so a MIDI button and a desk can hold it
+          too. Thickness is how long a push lasts in it, so it only shows
+          while it is on.
+        */}
+        <Slider
+          label="Thin Gap"
+          value={settings.thinGap ?? 1}
+          min={0}
+          max={1}
+          step={1}
+          onChange={(v: number) => onUpdate({ thinGap: v })}
+          settingKey="thinGap"
+        />
+        {(settings.thinGap ?? 1) > 0.5 && (
+          <Slider
+            label="Thickness"
+            value={settings.gapThickness ?? 0.45}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(v: number) => onUpdate({ gapThickness: v })}
+            settingKey="gapThickness"
+          />
+        )}
+        <Slider
+          label="Press Lift"
+          value={settings.plateSpring ?? 0.35}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateSpring: v })}
+          settingKey="plateSpring"
+        />
+        <Slider
+          label="Glass Smear"
+          value={settings.glassSmear}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ glassSmear: v })}
+          settingKey="glassSmear"
+        />
+        <Slider
+          label="Rain Drip"
+          value={settings.rainDrip}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ rainDrip: v })}
+          settingKey="rainDrip"
+        />
+        <div className="flex flex-col gap-2 mb-4">
+          <span className="text-[13px] font-medium text-text">Viscosity</span>
+          <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
+            {(['thick', 'thin'] as const).map((v) => (
+              <button
+                aria-pressed={settings.viscosity === v}
+                key={v}
+                onClick={() => onUpdate({ viscosity: v })}
+                title={v === 'thick' ? 'A light oil, 20 times water\'s viscosity. Hover to watch a drop fall through it.' : 'Water. Hover to watch a drop fall through it.'}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-1 text-[12px] rounded-md transition-all ${
+                  settings.viscosity === v ? `${LIT} font-bold` : 'text-muted hover:bg-hover'
+                }`}
+              >
+                {/* A drop that lets go at the pace of this viscosity (PLAN 35e, lib/dripPace.ts). */}
+                <ViscosityDrip mode={v} />
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+      )}
+
+      {/* Oil & Soap Section */}
+      {keep('oil') && (
+      <section id="settings-oil" className={`${CARD} ${shown('oil') ? GRID : 'hidden'} ${focusSection === 'oil' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('oil')} data-section="oil">
+        <h3 className={TITLE}>
+          <Droplets size={12} /> Oil & Soap
+        </h3>
+        {/* What keeps one liquid out of another: surface tension, soap, and how polar each liquid is (PLAN 35c). */}
+        <Slider
+          label="Oil Tension"
+          value={settings.oilTension ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilTension: v })}
+          settingKey="oilTension"
+        />
+        {/* Each liquid keeps its own colour: needs Oil Tension, which is what puts oil on the plate. */}
+        <Slider
+          label="Oil Bodies"
+          value={settings.oilBodies ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ oilBodies: v })}
+          settingKey="oilBodies"
+        />
+        {/* The water film between two drops holds them apart (FILM_WGSL): needs Oil Tension too. */}
+        <Slider
+          label="Film Hold"
+          value={settings.filmHold ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmHold: v })}
+          settingKey="filmHold"
+        />
+        <Slider
+          label="Soap Bursts"
+          value={settings.surfactantFlow ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ surfactantFlow: v })}
+          settingKey="surfactantFlow"
+        />
+        {/*
+          A clear oil film against the glass that tears into lace (PLAN §20b):
+          how thick it is laid. Thin tears at once over the dish's dust, thick
+          holds until alcohol or soap lands on it. White only on Lamp Ground.
+        */}
+        <Slider
+          label="Clear Film"
+          value={settings.clearFilm ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ clearFilm: v })}
+          settingKey="clearFilm"
+        />
+        <Slider
+          label="Polarity (Repulsion)"
+          value={settings.polarity}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ polarity: v })}
+          settingKey="polarity"
+        />
+      </section>
+      )}
+
+      {/* Ferrofluid Section */}
+      {keep('ferro') && (
+      <section id="settings-ferro" className={`${CARD} ${shown('ferro') ? GRID : 'hidden'} ${focusSection === 'ferro' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('ferro')} data-section="ferro">
+        <h3 className={TITLE}>
+          <Magnet size={12} /> Ferrofluid
+        </h3>
         {/*
           The second phase and the magnet under the glass (H7).
 
@@ -3034,106 +3322,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ magnetWalk: v })}
           settingKey="magnetWalk"
         />
-
-        {/* The liquids' own physics and chemistry (docs/physics-plan.md): each
-            one off until it is turned up. */}
-        <div className="mt-2 mb-2 text-[11px] uppercase tracking-wider text-muted">Physics &amp; chemistry</div>
-        <Slider
-          label="Swirl"
-          value={settings.vorticityConfinement ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ vorticityConfinement: v })}
-          settingKey="vorticityConfinement"
-        />
-        <Slider
-          label="Oil Tension"
-          value={settings.oilTension ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ oilTension: v })}
-          settingKey="oilTension"
-        />
-        {/* Each liquid keeps its own colour: needs Oil Tension, which is what puts oil on the plate. */}
-        <Slider
-          label="Oil Bodies"
-          value={settings.oilBodies ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ oilBodies: v })}
-          settingKey="oilBodies"
-        />
-        <Slider
-          label="Soap Bursts"
-          value={settings.surfactantFlow ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ surfactantFlow: v })}
-          settingKey="surfactantFlow"
-        />
-        {/*
-          A clear oil film against the glass that tears into lace (PLAN §20b):
-          how thick it is laid. Thin tears at once over the dish's dust, thick
-          holds until alcohol or soap lands on it. White only on Lamp Ground.
-        */}
-        <Slider
-          label="Clear Film"
-          value={settings.clearFilm ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ clearFilm: v })}
-          settingKey="clearFilm"
-        />
-        <Slider
-          label="Dye Weight"
-          value={settings.solutalBuoyancy ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ solutalBuoyancy: v })}
-          settingKey="solutalBuoyancy"
-        />
-        <Slider
-          label="Gravity"
-          value={settings.plateUpright ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ plateUpright: v })}
-          settingKey="plateUpright"
-        />
-        <Slider
-          label="Tilt Direction"
-          value={settings.tiltDirection ?? 180}
-          min={0}
-          max={360}
-          step={5}
-          onChange={(v: number) => onUpdate({ tiltDirection: v })}
-          settingKey="tiltDirection"
-        />
-        <Slider
-          label="Slosh"
-          value={settings.slosh ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ slosh: v })}
-          settingKey="slosh"
-        />
-        <Slider
-          label="Heat Spread"
-          value={settings.doubleDiffusion ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ doubleDiffusion: v })}
-          settingKey="doubleDiffusion"
-        />
         <Slider
           label="Labyrinth"
           value={settings.ferroLabyrinth ?? 0}
@@ -3153,6 +3341,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ mazeDetail: v })}
           settingKey="mazeDetail"
         />
+      </section>
+      )}
+
+      {/* Reactions Section */}
+      {keep('reactions') && (
+      <section id="settings-reactions" className={`${CARD} ${shown('reactions') ? GRID : 'hidden'} ${focusSection === 'reactions' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('reactions')} data-section="reactions">
+        <h3 className={TITLE}>
+          <FlaskConical size={12} /> Reactions
+        </h3>
+        {/*
+          The chemistry that draws by itself on the plate: the indicator that
+          changes colour with the acid, the oscillating reaction, the rings a
+          reagent leaves in a gel, and the Turing pattern (spots to labyrinth)
+          and its print. The last six were in Lamp & Light, under the lamp
+          they were thought to colour, and are in the group they belong to now
+          (PLAN 35c).
+        */}
         <Slider
           label="pH Indicator"
           value={settings.phIndicator ?? 0}
@@ -3181,125 +3386,65 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           settingKey="liesegang"
         />
         <Slider
-          label="Layer Depth"
-          value={settings.thicknessOptics ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ thicknessOptics: v })}
-          settingKey="thicknessOptics"
-        />
-        <Slider
-          label="Spectral Mix"
-          value={settings.spectralOptics ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ spectralOptics: v })}
-          settingKey="spectralOptics"
-        />
-        <Slider
-          label="Plate Shape"
-          value={settings.plateCurve ?? 0}
-          min={-1}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ plateCurve: v })}
-          settingKey="plateCurve"
-        />
-        <Slider
-          label="Depth Drag"
-          value={settings.depthDrag ?? 0}
-          min={0}
-          max={3}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ depthDrag: v })}
-          settingKey="depthDrag"
-        />
-        {/*
-          The plate as a Hele-Shaw cell (PLAN §18a): a switch on a slider's
-          two stops, as Layers is, so a MIDI button and a desk can hold it
-          too. Thickness is how long a push lasts in it, so it only shows
-          while it is on.
-        */}
-        <Slider
-          label="Thin Gap"
-          value={settings.thinGap ?? 1}
-          min={0}
-          max={1}
-          step={1}
-          onChange={(v: number) => onUpdate({ thinGap: v })}
-          settingKey="thinGap"
-        />
-        {(settings.thinGap ?? 1) > 0.5 && (
-          <Slider
-            label="Thickness"
-            value={settings.gapThickness ?? 0.45}
-            min={0}
-            max={1}
-            step={0.05}
-            onChange={(v: number) => onUpdate({ gapThickness: v })}
-            settingKey="gapThickness"
-          />
-        )}
-        <Slider
-          label="Press Lift"
-          value={settings.plateSpring ?? 0.35}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ plateSpring: v })}
-          settingKey="plateSpring"
-        />
-        <Slider
-          label="Glass Smear"
-          value={settings.glassSmear}
+          label="Chemistry"
+          value={settings.chemistry ?? 0}
           min={0}
           max={1.0}
           step={0.05}
-          onChange={(v: number) => onUpdate({ glassSmear: v })}
-          settingKey="glassSmear"
+          onChange={(v: number) => onUpdate({ chemistry: v })}
+          settingKey="chemistry"
         />
         <Slider
-          label="Rain Drip"
-          value={settings.rainDrip}
+          label="↳ Pattern (Spots to Labyrinth)"
+          value={settings.chemistryPattern ?? 0}
           min={0}
           max={1.0}
           step={0.05}
-          onChange={(v: number) => onUpdate({ rainDrip: v })}
-          settingKey="rainDrip"
+          onChange={(v: number) => onUpdate({ chemistryPattern: v })}
+          settingKey="chemistryPattern"
         />
-        <div className="flex flex-col gap-2 mb-4">
-          <span className="text-[13px] font-medium text-text">Viscosity</span>
-          <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
-            {(['thick', 'thin'] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => onUpdate({ viscosity: v })}
-                className={`flex-1 py-1 text-[12px] rounded-md transition-all ${
-                  settings.viscosity === v ? 'bg-white text-black font-bold' : 'hover:bg-white/5 opacity-50'
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
         <Slider
-          label="Polarity (Repulsion)"
-          value={settings.polarity}
+          label="↳ Pattern Width"
+          value={settings.chemistryWidth ?? 0.5}
+          min={0.1}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ chemistryWidth: v })}
+          settingKey="chemistryWidth"
+        />
+        <Slider
+          label="↳ Turing Print"
+          value={settings.turingPrint ?? 0}
           min={0}
           max={1.0}
           step={0.05}
-          onChange={(v: number) => onUpdate({ polarity: v })}
-          settingKey="polarity"
+          onChange={(v: number) => onUpdate({ turingPrint: v })}
+          settingKey="turingPrint"
+        />
+        <Slider
+          label="↳ Print Ink (0 is Starch)"
+          value={settings.turingInk ?? 0}
+          min={0}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ turingInk: v })}
+          settingKey="turingInk"
+        />
+        <Slider
+          label="↳ Print Drift (0 is Still)"
+          value={settings.turingDrift ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ turingDrift: v })}
+          settingKey="turingDrift"
         />
       </section>
       )}
 
       {/* Manual Interaction Section */}
       {keep('interaction') && (
-      <section id="settings-interaction" className={`${CARD} ${shown('interaction') ? GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="interaction">
+      <section id="settings-interaction" className={`${CARD} ${shown('interaction') ? GRID : 'hidden'} ${focusSection === 'interaction' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('interaction')} data-section="interaction">
         <h3 className={TITLE}>
           <Wind size={12} /> Manual Interaction
         </h3>
@@ -3342,7 +3487,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
 
       {/* Liquids anyone can make, load from a file and save to one (lib/liquidFile.ts). */}
       {keep('liquids') && (
-      <section id="settings-liquids" className={`${CARD} ${shown('liquids') ? GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="liquids">
+      <section id="settings-liquids" className={`${CARD} ${shown('liquids') ? GRID : 'hidden'} ${focusSection === 'liquids' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('liquids')} data-section="liquids">
         <h3 className={TITLE}>
           <FlaskConical size={12} /> Liquids
         </h3>
@@ -3350,180 +3495,65 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       </section>
       )}
 
-      {/* Fluid Physics Section */}
-      {keep('physics') && (
-      <section id="settings-physics" className={`${CARD} ${shown('physics') ? GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="setup" data-section="physics">
+      {/* Tilt & Rock Section */}
+      {keep('tilt') && (
+      <section id="settings-tilt" className={`${CARD} ${shown('tilt') ? GRID : 'hidden'} ${focusSection === 'tilt' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('tilt')} data-section="tilt">
         <h3 className={TITLE}>
-          <Zap size={12} /> Fluid Physics
+          <Waves size={12} /> Tilt & Rock
         </h3>
-        {/*
-          0.0002, not 0.001. Dye diffusion costs 1.34 ms of a solver step and
-          takes structure out of the plate — measured on one running plate,
-          switching it off moved hard edges from 11.1% of pixels to 13.1% and
-          the frame from 36.8 ms to 32.9 (docs/webgpu-plan.md). Above the new
-          ceiling it was buying nothing anybody wanted. A ceiling rather than
-          a switch, because some looks do lean on a little of it.
-        */}
+        {/* The dish tipped: held by a hand (Gravity, Tilt Direction), sloshed by the music (Slosh) and rocked on the beat (Plate Rock). PLAN 35c. */}
         <Slider
-          label="Diffusion Rate"
-          value={settings.diffusionRate}
+          label="Gravity"
+          value={settings.plateUpright ?? 0}
           min={0}
-          max={0.0002}
-          step={0.00001}
-          onChange={(v: number) => onUpdate({ diffusionRate: v })}
-          settingKey="diffusionRate"
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateUpright: v })}
+          settingKey="plateUpright"
         />
         <Slider
-          label="Buoyancy"
-          value={settings.buoyancy}
+          label="Tilt Direction"
+          value={settings.tiltDirection ?? 180}
           min={0}
-          max={2.0}
-          step={0.1}
-          onChange={(v: number) => onUpdate({ buoyancy: v })}
-          settingKey="buoyancy"
+          max={360}
+          step={5}
+          onChange={(v: number) => onUpdate({ tiltDirection: v })}
+          settingKey="tiltDirection"
         />
         <Slider
-          label="Advection"
-          value={settings.advection}
+          label="Slosh"
+          value={settings.slosh ?? 0}
           min={0}
-          max={2.0}
-          step={0.1}
-          onChange={(v: number) => onUpdate({ advection: v })}
-          settingKey="advection"
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ slosh: v })}
+          settingKey="slosh"
         />
-        {/*
-          "Momentum", not "Damping (Friction)": this is how much velocity
-          survives each step, so up means more of the motion is kept — less
-          friction, the opposite of what the old label promised.
-        */}
         <Slider
-          label="Momentum"
-          value={settings.damping}
-          min={0.8}
+          label="Plate Rock"
+          value={settings.plateRock ?? 0.45}
+          min={0}
           max={1.0}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ damping: v })}
-          settingKey="damping"
-        />
-        {/*
-          Heat Slide, as was: two knobs on a panel of their own until the owner
-          asked for no setting to sit alone (2026-10-10). The heat they set is
-          the heat Heat Spread spreads and Buoyancy lifts.
-        */}
-        {/* Heat Intensity and Boiling Point were here: nothing in either solver
-            read them. The keys stay in saved looks; the sliders are gone. */}
-        {/* 0–0.08: the looks run from 0.0015 to 0.06, and the old 0–1 slider's
-            first step (0.05) was seventeen times the default. */}
-        <Slider
-          label="Evaporation Rate"
-          value={settings.evaporationRate}
-          min={0}
-          max={0.08}
-          step={0.0005}
-          onChange={(v: number) => onUpdate({ evaporationRate: v })}
-          settingKey="evaporationRate"
-        />
-        <Slider
-          label="Heat Decay"
-          value={settings.heatDecay}
-          min={0.8}
-          max={1.0}
-          step={0.01}
-          onChange={(v: number) => onUpdate({ heatDecay: v })}
-          settingKey="heatDecay"
+          step={0.05}
+          onChange={(v: number) => onUpdate({ plateRock: v })}
+          settingKey="plateRock"
         />
       </section>
       )}
 
-      {/* Automation Section */}
-      {keep('automation') && (
-      <section id="settings-automation" className={`${CARD} ${shown('automation') ? GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="automation">
+      {/*
+        The plate turning. Rotation Speed, the flick, Auto Spin and everything
+        that steers them were the first half of Plates & LED, a Stage panel,
+        which keeps a panel out of Build and Gig: the dish's spin is a motion
+        the hand rides in a set, so it is Motion's and findable there (PLAN
+        35c-2). Plates & LED keeps what is the rig's: how many plates, how
+        they blend, and the LED platform under them.
+      */}
+      {keep('spin') && (
+      <section id="settings-spin" className={`${CARD} ${shown('spin') ? GRID : 'hidden'} ${focusSection === 'spin' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('spin')} data-section="spin">
         <h3 className={TITLE}>
-          <Hourglass size={12} /> Automation
+          <RotateCw size={12} /> Plate Spin
         </h3>
-        <Slider
-          label="Evolve Speed"
-          value={settings.automateRate}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ automateRate: v })}
-          settingKey="automateRate"
-        />
-        {/*
-          Surge shapes the automation into gusts with quiet between, which is
-          what a dish being worked on actually looks like — a pour, twenty
-          seconds of watching it spread, then a press. Every preset sets it,
-          between 0.12 and 0.95, and until now nothing on any surface could.
-        */}
-        <Slider
-          label="Surge"
-          value={settings.surge ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ surge: v })}
-          settingKey="surge"
-        />
-        {/*
-          Pacing is Surge's big brother, and lives beside it. Surge bunches the
-          automation's small events into gusts; Pacing makes a running
-          sequence's stages into scenes, with whole-plate moments, real rests
-          and the light going down between them. It does nothing until a
-          sequence is playing, so its 0 is today's show.
-        */}
-        <Slider
-          label="Pacing"
-          value={settings.pacing ?? 0}
-          min={0}
-          max={1.0}
-          step={0.05}
-          onChange={(v: number) => onUpdate({ pacing: v })}
-          settingKey="pacing"
-        />
-        {/*
-          Follow the Song lives under Pacing because it shapes Pacing's
-          scenes: the drops open the big swells, builds and breakdowns hold
-          them back (lib/scenePacing.ts). With Pacing at 0 there is no scene,
-          so it is dimmed there rather than hidden: the pair reads as one.
-        */}
-        <div className={(settings.pacing ?? 0) > 0.001 ? '' : 'opacity-50'}>
-          <Slider
-            label="Follow the Song"
-            value={settings.songFollow ?? 0}
-            min={0}
-            max={1.0}
-            step={0.05}
-            onChange={(v: number) => onUpdate({ songFollow: v })}
-            settingKey="songFollow"
-          />
-        </div>
-      </section>
-      )}
-
-      {/* Mixer Section */}
-      {keep('layers') && (
-      <section id="settings-layers" className={`${CARD} ${shown('layers') ? GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group="perform" data-section="layers">
-        <h3 className={TITLE}>
-          <Layers size={12} /> Plates &amp; LED
-        </h3>
-        <Slider
-          label="Layers"
-          value={settings.layerCount}
-          min={1}
-          max={2}
-          step={1}
-          onChange={(v: number) => onUpdate({ layerCount: Math.round(v) })}
-          settingKey="layerCount"
-        />
-        {/* The look's own count, which a back plate with a look of its own
-            (PLAN.md §16a) keeps at two on the stage whatever it says, so the
-            slider at 1 with two plates showing is explained, not a fault. */}
-        {backLook && (settings.layerCount ?? 1) < 2 && (
-          <p className="col-span-full text-[12px] text-dim" data-testid="settings-back-plate-on">
-            The back plate is on {backLook}, so it stays on the stage until it follows the front again.
-          </p>
-        )}
         <Slider
           label="Rotation Speed"
           value={settings.rotationSpeed}
@@ -3572,6 +3602,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           flips it (a pad can too, as Reverse Spin), so reversing a dish in
           the middle of a song is one press and not a trip to a slider.
         */}
+        {/*
+          The platter's strobe rim (PLAN 35f): a ring of dots that drifts at
+          the dish's speed in Rate and stands still in Tempo once a tempo is
+          heard, because the dish then turns exactly one dot a beat.
+        */}
+        <div className="mb-1 flex items-center gap-3" data-testid="spin-strobe">
+          <StrobeRing mode={settings.spinAuto ?? 0} rpm={settings.spinRpm ?? 6} beats={settings.spinBeats ?? 16} bpm={spinBpm} />
+          <p className="text-[11px] leading-snug text-white/50" data-testid="spin-strobe-says">
+            {Math.round(settings.spinAuto ?? 0) === 2 && spinBpm > 0
+              ? `Locked to ${spinBpm} bpm: the dots stand still while the dish turns once in ${Math.round(settings.spinBeats ?? 16)} beats.`
+              : Math.round(settings.spinAuto ?? 0) === 0 ? 'Auto Spin is off.'
+              : `Turning at ${Math.abs(settings.spinRpm ?? 6).toFixed(1)} rpm${Math.round(settings.spinAuto ?? 0) === 2 ? ' until a tempo is heard' : ''}.`}
+          </p>
+        </div>
         <Slider
           label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
           value={settings.spinAuto ?? 0}
@@ -3700,6 +3744,210 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           onChange={(v: number) => onUpdate({ spinDrag: v })}
           settingKey="spinDrag"
         />
+      </section>
+      )}
+
+      {/* Fluid Physics Section */}
+      {keep('physics') && (
+      <section id="settings-physics" className={`${CARD} ${shown('physics') ? GRID : 'hidden'} ${focusSection === 'physics' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('physics')} data-section="physics">
+        <h3 className={TITLE}>
+          <Zap size={12} /> Fluid Physics
+        </h3>
+        {/*
+          0.0002, not 0.001. Dye diffusion costs 1.34 ms of a solver step and
+          takes structure out of the plate — measured on one running plate,
+          switching it off moved hard edges from 11.1% of pixels to 13.1% and
+          the frame from 36.8 ms to 32.9 (docs/webgpu-plan.md). Above the new
+          ceiling it was buying nothing anybody wanted. A ceiling rather than
+          a switch, because some looks do lean on a little of it.
+        */}
+        <Slider
+          label="Diffusion Rate"
+          value={settings.diffusionRate}
+          min={0}
+          max={0.0002}
+          step={0.00001}
+          onChange={(v: number) => onUpdate({ diffusionRate: v })}
+          settingKey="diffusionRate"
+        />
+        <Slider
+          label="Buoyancy"
+          value={settings.buoyancy}
+          min={0}
+          max={2.0}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ buoyancy: v })}
+          settingKey="buoyancy"
+        />
+        <Slider
+          label="Advection"
+          value={settings.advection}
+          min={0}
+          max={2.0}
+          step={0.1}
+          onChange={(v: number) => onUpdate({ advection: v })}
+          settingKey="advection"
+        />
+        {/*
+          "Momentum", not "Damping (Friction)": this is how much velocity
+          survives each step, so up means more of the motion is kept — less
+          friction, the opposite of what the old label promised.
+        */}
+        <Slider
+          label="Momentum"
+          value={settings.damping}
+          min={0.8}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ damping: v })}
+          settingKey="damping"
+        />
+        {/*
+          Heat Slide, as was: two knobs on a panel of their own until the owner
+          asked for no setting to sit alone (2026-10-10). The heat they set is
+          the heat Heat Spread spreads and Buoyancy lifts.
+        */}
+        {/* Heat Intensity and Boiling Point were here: nothing in either solver
+            read them. The keys stay in saved looks; the sliders are gone. */}
+        {/* 0–0.08: the looks run from 0.0015 to 0.06, and the old 0–1 slider's
+            first step (0.05) was seventeen times the default. */}
+        <Slider
+          label="Evaporation Rate"
+          value={settings.evaporationRate}
+          min={0}
+          max={0.08}
+          step={0.0005}
+          onChange={(v: number) => onUpdate({ evaporationRate: v })}
+          settingKey="evaporationRate"
+        />
+        <Slider
+          label="Heat Decay"
+          value={settings.heatDecay}
+          min={0.8}
+          max={1.0}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ heatDecay: v })}
+          settingKey="heatDecay"
+        />
+        <Slider
+          label="Swirl"
+          value={settings.vorticityConfinement ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ vorticityConfinement: v })}
+          settingKey="vorticityConfinement"
+        />
+        <Slider
+          label="Dye Weight"
+          value={settings.solutalBuoyancy ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ solutalBuoyancy: v })}
+          settingKey="solutalBuoyancy"
+        />
+        <Slider
+          label="Heat Spread"
+          value={settings.doubleDiffusion ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ doubleDiffusion: v })}
+          settingKey="doubleDiffusion"
+        />
+      </section>
+      )}
+
+      {/* Automation Section */}
+      {keep('automation') && (
+      <section id="settings-automation" className={`${CARD} ${shown('automation') ? GRID : 'hidden'} ${focusSection === 'automation' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('automation')} data-section="automation">
+        <h3 className={TITLE}>
+          <Hourglass size={12} /> Automation
+        </h3>
+        <Slider
+          label="Evolve Speed"
+          value={settings.automateRate}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ automateRate: v })}
+          settingKey="automateRate"
+        />
+        {/*
+          Surge shapes the automation into gusts with quiet between, which is
+          what a dish being worked on actually looks like — a pour, twenty
+          seconds of watching it spread, then a press. Every preset sets it,
+          between 0.12 and 0.95, and until now nothing on any surface could.
+        */}
+        <Slider
+          label="Surge"
+          value={settings.surge ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ surge: v })}
+          settingKey="surge"
+        />
+        {/*
+          Pacing is Surge's big brother, and lives beside it. Surge bunches the
+          automation's small events into gusts; Pacing makes a running
+          sequence's stages into scenes, with whole-plate moments, real rests
+          and the light going down between them. It does nothing until a
+          sequence is playing, so its 0 is today's show.
+        */}
+        <Slider
+          label="Pacing"
+          value={settings.pacing ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ pacing: v })}
+          settingKey="pacing"
+        />
+        {/*
+          Follow the Song lives under Pacing because it shapes Pacing's
+          scenes: the drops open the big swells, builds and breakdowns hold
+          them back (lib/scenePacing.ts). With Pacing at 0 there is no scene,
+          so it is dimmed there rather than hidden: the pair reads as one.
+        */}
+        <div className={(settings.pacing ?? 0) > 0.001 ? '' : 'opacity-50'}>
+          <Slider
+            label="Follow the Song"
+            value={settings.songFollow ?? 0}
+            min={0}
+            max={1.0}
+            step={0.05}
+            onChange={(v: number) => onUpdate({ songFollow: v })}
+            settingKey="songFollow"
+          />
+        </div>
+      </section>
+      )}
+
+      {/* Mixer Section */}
+      {keep('layers') && (
+      <section id="settings-layers" className={`${CARD} ${shown('layers') ? GRID : 'hidden'} ${focusSection === 'layers' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('layers')} data-section="layers">
+        <h3 className={TITLE}>
+          <Layers size={12} /> Plates &amp; LED
+        </h3>
+        <Slider
+          label="Layers"
+          value={settings.layerCount}
+          min={1}
+          max={2}
+          step={1}
+          onChange={(v: number) => onUpdate({ layerCount: Math.round(v) })}
+          settingKey="layerCount"
+        />
+        {/* The look's own count, which a back plate with a look of its own
+            (PLAN.md §16a) keeps at two on the stage whatever it says, so the
+            slider at 1 with two plates showing is explained, not a fault. */}
+        {backLook && (settings.layerCount ?? 1) < 2 && (
+          <p className="col-span-full text-[12px] text-dim" data-testid="settings-back-plate-on">
+            The back plate is on {backLook}, so it stays on the stage until it follows the front again.
+          </p>
+        )}
         <div className="mb-4 mt-4">
           <Toggle
             label="LED Platform"
@@ -3874,8 +4122,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             <p className="p-2 text-[11px] text-white/35">Nothing matches.</p>
           )}
           {railGroups.map(group => (
-            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`}>
-              <div className="hidden px-3 pb-1.5 pt-4 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:block" title={group.hint}>
+            <div key={group.id} className="shrink-0 sm:shrink" data-testid={`rail-group-${group.id}`} data-group={group.id}>
+              {/* The seven headings are drawn on a phone too (PLAN 35b): the strip was one flat run of 26 tabs with these hidden, so the phone had no way to see that Squish Plate is chemistry or that Film is a feed. */}
+              <div className="whitespace-nowrap px-3 pb-1 pt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/40 sm:pb-1.5 sm:pt-4" title={group.hint} data-testid={`rail-heading-${group.id}`}>
+                <span className="mr-1.5 inline-block h-[7px] w-[7px] rounded-full align-[0.5px]" style={{ background: 'var(--cap)' }} aria-hidden />
                 {group.name}
               </div>
               <div className="flex gap-0.5 sm:flex-col">

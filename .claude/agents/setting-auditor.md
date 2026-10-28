@@ -24,7 +24,7 @@ Find the settings the diff touches: keys added to or changed in
 | The phone shows it | `src/components/RemoteControl.tsx`, and the `patch` message in `src/lib/remoteProtocol.ts` |
 | The room and automation can drive it, if it should | `src/lib/sceneMap.ts` (`PATCH_TARGETS`, `PER_LAYER`) |
 | Something renders it | a read in `LiquidVisualizer.tsx` or `src/gpu/**` that changes the output. A setting nothing reads is a dead slider. |
-| It is documented | a line in `README.md` "Controls", and an entry under `[Unreleased]` in `CHANGELOG.md` |
+| It is documented | a line in `docs/guide.md` "Controls", and an entry under `[Unreleased]` in `CHANGELOG.md` |
 
 Run `npm run lint`, `npm run panel` and `npm run desk`, and report their last
 lines.

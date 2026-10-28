@@ -3,8 +3,11 @@ import {createRoot} from 'react-dom/client';
 import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
 import { isPhoneApp } from './lib/appLink';
+import { SHOW_PATH, isLandingAddress } from './lib/showPath';
+import { macAppLicensed } from './lib/macApp';
 import { requestGpuEarly } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
+import { installTitleTips } from './lib/titleTips';
 import {
   isSignedInCached,
   hasEmailSignInLink,
@@ -13,6 +16,9 @@ import {
   hasStoredLicenseCandidateSync,
   verifyStoredLicenseOnLoad,
   requiresDesktopSignInSync,
+  requiresPaidLicenceSync,
+  stripEmailSignInParams,
+  clearPendingEmail,
 } from './lib/authFlag';
 
 // The black box, first: whatever goes wrong from here on has a line
@@ -30,6 +36,10 @@ if (show) requestGpuEarly();
 // The intro `index.html` painted, listened to from here on: a key or a press
 // on it takes it away, and the plate's first frame does (lib/intro.ts).
 installIntro(show);
+// Every `title=` waits the app's hover delay, not the browser's (PLAN.md 8j-3);
+// here rather than in App so the landing page and sign-in get it too. The
+// remote and the cast page are for a phone or a wall and keep what they have.
+if (show) installTitleTips(document);
 // The phone loads only the control surface — no visualizer, no solver.
 const Root = params.has('remote')
   ? lazy(() => import('./components/RemoteControl'))
@@ -41,25 +51,34 @@ const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./components/SignInScreen'))
   : null;
 const LazyLicenseGate = lazy(() => import('./components/LicenseGate'));
+const LazyAppLicenceGate = lazy(() => import('./components/AppLicenceGate'));
 // The page a first visit meets before the sign-in (PLAN.md 34a). Its own chunk,
 // with no Firebase and no engine in it.
 const LazyLanding = lazy(() => import('./components/Landing'));
-const LANDING_SEEN_KEY = 'chromaglass-landing-seen';
-
 /**
- * Does this visit meet the landing page before the sign-in?
+ * Does this visit meet the landing page?
  *
- * Only the hosted site's own sign-in, on a first visit: not the iPhone app
- * (whose first screen is the plate), nor a desktop launch that asks for a
- * licence, nor a visit that is already part way through signing in. Google and
- * Apple sign in by a redirect that reloads the page, and the sign-in screen is
- * what collects it; the emailed link opens the page with its code in the
- * address. Both go straight to the sign-in. The tab remembers that the page
- * has been seen (sessionStorage), so the reload after a redirect does.
+ * A visitor who must sign in meets it first wherever they arrive (PLAN.md
+ * 34a), except at the show's own address, `/show`, which asks at once. One
+ * who need not sign in meets it at the site's own address, `/` with no app
+ * word in its query (lib/showPath.ts): the owner's choice, 2026-10-24, after
+ * the page came up only for a signed-out visit and the owner, signed in,
+ * kept getting the plate at chromaglass.art. A shared look, the profile or
+ * the remote still open the app for them.
+ *
+ * Never the iPhone app (whose first screen is the plate), a desktop launch
+ * that asks for a licence, a build with no sign-in (the Mac app's show
+ * server, the harnesses), or a visit part way through signing in. Play moves
+ * the address from `/` to `/show` before the sign-in opens, so Google's and
+ * Apple's redirect and the emailed link come back to the show; a redirect
+ * still pending (one started before this change) skips the page too.
  */
-function landingFirst(): boolean {
+function landingFirst(mustSignIn: boolean): boolean {
   if (!LazySignIn || isPhoneApp() || requiresDesktopSignInSync() || hasEmailSignInLink()) return false;
-  try { return sessionStorage.getItem(LANDING_SEEN_KEY) !== '1'; } catch { return true; }
+  try { if (sessionStorage.getItem('chromaglass-redirect-pending') === '1') return false; } catch { /* no session storage: the page is shown */ }
+  const { pathname, search } = window.location;
+  if (pathname.replace(/\/$/, '') === SHOW_PATH) return false;
+  return mustSignIn || isLandingAddress(pathname, search);
 }
 
 // Installable: the service worker is what lets Chrome and Edge offer
@@ -203,24 +222,79 @@ function Loading() {
   );
 }
 
+const orSignIn = () => (hasValidLicenseSync() || isSignedInCached() ? 'app' : 'signin');
+
+/**
+ * The Mac app, and a browser on its server: the show opens on a Home or Pro
+ * key and on nothing less (PLAN.md 23.17d, components/AppLicenceGate.tsx). A
+ * licensed launch never sees the gate, not even for a frame: the key the app's
+ * shell verified at launch is read here, synchronously.
+ */
+function PaidGate() {
+  const [phase, setPhase] = useState<'app' | 'verifying-license' | 'gate'>(() =>
+    macAppLicensed() ? 'app' : hasStoredLicenseCandidateSync() ? 'verifying-license' : 'gate');
+  // A key in this browser's storage is checked against its signature before
+  // anything is drawn, so a licensed start shows the loading screen for that
+  // moment and never the gate (`npm run tiers` 7).
+  useEffect(() => {
+    if (phase !== 'verifying-license') return;
+    let cancelled = false;
+    void verifyStoredLicenseOnLoad()
+      .then(() => { if (!cancelled) setPhase(macAppLicensed() ? 'app' : 'gate'); })
+      .catch(() => { if (!cancelled) setPhase('gate'); });
+    return () => { cancelled = true; };
+  }, [phase]);
+  if (phase === 'app') return <Root />;
+  if (phase === 'verifying-license') return <Loading />;
+  return <LazyAppLicenceGate onUnlocked={() => setPhase('app')} />;
+}
+
 function Gate() {
+  return show && requiresPaidLicenceSync() ? <PaidGate /> : <SiteGate />;
+}
+
+function SiteGate() {
   const gateActive =
     show && (Boolean(import.meta.env.VITE_FIREBASE_API_KEY) || requiresDesktopSignInSync());
   const [phase, setPhase] = useState<'app' | 'verifying-license' | 'completing-link' | 'signin'>(() => {
     if (!gateActive) return 'app';
+    // An emailed sign-in link is finished before anything else: a browser that
+    // holds a licence used to go straight to the app with the link's code left
+    // unused, so signing in by email from the profile sheet, on a licensed
+    // machine, came back still signed out (`npm run signin` 16).
+    // Offline, a browser already let in goes to the show rather than wait on
+    // Firebase's network timeout; the link is still in the address for later.
+    if (hasEmailSignInLink() && getPendingEmail() && (navigator.onLine || orSignIn() === 'signin')) return 'completing-link';
     if (hasValidLicenseSync() || isSignedInCached()) return 'app';
-    if (hasEmailSignInLink() && getPendingEmail()) return 'completing-link';
     if (hasStoredLicenseCandidateSync()) return 'verifying-license';
     return 'signin';
   });
 
-  // The landing page is up behind the sign-in; the sign-in opens over it.
-  const [landing] = useState(landingFirst);
+  // The landing page is up at `/`; for a visitor who must sign in, the
+  // sign-in opens over it, and for one who need not, Play opens the show.
+  const [landing, setLanding] = useState(() => landingFirst(phase !== 'app'));
   const [asking, setAsking] = useState(!landing);
   const play = () => {
-    try { sessionStorage.setItem(LANDING_SEEN_KEY, '1'); } catch { /* the page is simply shown again */ }
-    setAsking(true);
+    try {
+      if (window.location.pathname === '/') {
+        window.history.pushState(window.history.state, '', `${SHOW_PATH}${window.location.search}${window.location.hash}`);
+      }
+    } catch { /* a sandboxed frame: the address stays, the show still opens */ }
+    if (phase === 'app') setLanding(false); else setAsking(true);
   };
+  const signedIn = () => { setLanding(false); setPhase('app'); };
+
+  // Back from the sign-in to the webpage uncovers it. Once the plate is up,
+  // back changes the address and nothing else: no auth or address change
+  // takes a running show down (the never-lock-out rule, PLAN.md 23.10).
+  useEffect(() => {
+    if (!landing) return;
+    const onPop = () => {
+      if (window.location.pathname === '/') setAsking(false);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [landing]);
 
   useEffect(() => {
     if (!gateActive) return;
@@ -250,10 +324,20 @@ function Gate() {
           .then((m) => m.completeEmailLinkSignIn())
           .then((res) => {
             if (cancelled) return;
-            setPhase(res.needsEmail ? 'signin' : 'app');
+            setPhase(res.needsEmail ? orSignIn() : 'app');
           })
           .catch(() => {
-            if (!cancelled) setPhase('signin');
+            // A spent or broken link never locks out a browser that was let in
+            // before it (a licence, or a session): it goes on to the show. And it
+            // is dropped, address and pending email both: left there, every load
+            // tried it again, and the sheet's sign-in offered only "Complete
+            // sign-in" on a dead link (the review of #460).
+            if (cancelled) return;
+            if (navigator.onLine) {
+              stripEmailSignInParams();
+              clearPendingEmail();
+            }
+            setPhase(orSignIn());
           });
         return () => {
           cancelled = true;
@@ -270,12 +354,13 @@ function Gate() {
       return (
         <>
           {landing && <LazyLanding onPlay={play} covered={asking} />}
-          {asking && <LazySignIn onSignedIn={() => setPhase('app')} />}
+          {asking && <LazySignIn onSignedIn={signedIn} />}
         </>
       );
     }
     return <LazyLicenseGate onUnlocked={() => setPhase('app')} />;
   }
+  if (landing && !asking) return <LazyLanding onPlay={play} covered={false} />;
   return <Root />;
 }
 

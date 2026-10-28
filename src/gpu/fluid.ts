@@ -192,6 +192,21 @@ const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 const CH_SUBSTEPS = 4;
 /*
+  Film Hold at 1, as a chemical potential: what the water in a film one
+  cell thick costs the oil, against the double well's own height (1/16)
+  and its steepest pull (0.19 at a fifth full). Set in the lab against
+  the packed splodascope plate (npm run filmhold): see there.
+*/
+const FILM_MU = 0.6;
+/*
+  Film Hold at 1, as a push (mixFilm): the force on an edge with another
+  edge touching it across the water, as a curvature, in the capillary
+  force's own units (σκ∇c̃), so it scales with Oil Tension as the pull it
+  answers does. The spurious pull across a film is the curvature of the
+  waist the blur reads, up to about one over a cell.
+*/
+const FILM_PUSH = 1.5;
+/*
   The clear film (PLAN §20b, wgsl/film.ts), on a grid of its own.
 
   FILM_GRID is the prototype's (lace.py, 384²), whose numbers the kernels
@@ -546,13 +561,18 @@ export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * (REST_GAP * PLATE_METRES) ** 2 /
 */
 export const DYE_LAYER = 3.55e-4;
 /*
-  The explicit slump's limits (wgsl/slump.ts, "The one shortcut"): a face
-  moves at most SLUMP_FACE of the difference across it in a substep (¼ is
-  the edge of stability on a square grid), in at most SLUMP_SUBSTEPS
-  substeps a step. Six passes of five reads each at 768² is the price.
+  The explicit slump's limits (wgsl/slump.ts, "The shortcuts (PLAN 18m-1,
+  18m-1a)"): a face moves at most SLUMP_FACE of the difference across it in
+  a substep (¼ is the edge of stability on a square grid), in at most
+  SLUMP_SUBSTEPS substeps a step. At 1024² with Heavy dye at 1 (g′ = 1.47 m/s²)
+  a cell at DYE_CAP (2.13 mm in a 6 mm gap) has an inertial bound of 4.57 a
+  frame at 60 Hz, which asks for ceil(4.57 / 0.24) = 20 substeps (15 at 768²;
+  6 in water at Dye Weight 0 on 768²; 2 on the default light-oil Thickness).
 */
 const SLUMP_FACE = 0.24;
-const SLUMP_SUBSTEPS = 6;
+const SLUMP_SUBSTEPS = 20;
+/** The Froude number for a gravity current front in the slumping regime (Huppert and Simpson 1980). */
+const FROUDE_FRONT = 1.19;
 /** The dye's cap per cell (decayDye), the deepest layer the slump has to be ready for. */
 const DYE_CAP = 6;
 /*
@@ -1041,6 +1061,8 @@ export class WebGPUFluid {
   private phaseMuT: GPUTexture | null = null;
   /** The ferrofluid blurred once a step (phaseBlur), for phaseCompress's edge normal. */
   private phaseBlurT: GPUTexture | null = null;
+  /** The ferrofluid's own phase velocity (phaseVelocity), for phaseAdvect and phaseCompress on a thin gap. */
+  private phaseVelT: GPUTexture | null = null;
   /*
     The ferrofluid standing up under a close magnet (standing.ts, PLAN §9t):
     the film, made the first time a magnet is that close, and the window the
@@ -1135,6 +1157,8 @@ export class WebGPUFluid {
       // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
       ['addSlosh', [VEL], false],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
+      ['dampGridCurv', [dye], true],
+      ['dampGridLimit', [dye], true],
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
       ['jacobi', [VEL, dye], true],
@@ -1244,6 +1268,7 @@ export class WebGPUFluid {
       ['phaseMu', [RG32], open.phase],
       ['phaseCH', [R32], open.phase],
       ['phaseCHVolume', [R32], open.phase && open.thinGap],
+      ['phaseVelocity', [VEL], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
       ['phaseMomentum', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
@@ -1255,6 +1280,10 @@ export class WebGPUFluid {
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
       ['mixForce', [VEL], open.gravity],
+      // Film Hold's push: built behind the show, as the oil's other kernels
+      // are (no look opens with it in its first steps' set; startup fails one
+      // waited for and never run).
+      ['mixFilm', [VEL], false],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
@@ -1570,6 +1599,9 @@ export class WebGPUFluid {
     return this.phaseGap;
   }
 
+  /** The ferrofluid's carry velocity on a thin gap (phaseVelocity), or the mixture's off it. */
+  private phaseVel(thin = true): GPUTexture { return thin && this.phaseVelT ? this.phaseVelT : this.ride(); }
+
   /**
    * phaseAdvect: runPressed's bindings, then the gap, the gap the phase last
    * saw, and the thin solve's pressure and mobility (a stand-in for each until
@@ -1579,7 +1611,14 @@ export class WebGPUFluid {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
     if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
-    const ride = this.ride();
+    /*
+      The ferrofluid's own velocity only on a step that wrote it: hsP and
+      hsMob outlive Thin Gap, so keyed off them alone, a plate whose Thin Gap
+      was switched off kept carrying the ferrofluid on the last thin step's
+      phaseVelT, frozen (a dragged drop, magnet off, slid on 0.0425 of the
+      plate in 120 steps and smeared to no half-full cell; PLAN 29c-8).
+    */
+    const ride = this.phaseVel(thin && this.thinLive);
     const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}:${ride.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1602,7 +1641,7 @@ export class WebGPUFluid {
   private runPhaseCompress(pass: GPUComputePassEncoder, stand: GPUTexture, args: GPUBuffer): void {
     const pipe = this.pipeline('phaseCompress', this.phase.write.format);
     if (!pipe) return;
-    const reads = [this.phase.read, this.phaseBlurT!, this.ride(), this.squeeze.read, stand];
+    const reads = [this.phase.read, this.phaseBlurT!, this.phaseVel(), this.squeeze.read, stand];
     const key = `phaseCompress:${this.phase.write.label}:${reads.map((r) => r.label).join(',')}:${args.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1639,13 +1678,13 @@ export class WebGPUFluid {
     pass.setBindGroup(0, group);
     pass.dispatchWorkgroups(1);
     const gap = this.ensurePhaseGap();
-    const there = this.phase.read, back = this.phase.write;
+    const there = this.phase.read, back = this.phase.write, ride = this.phaseVel();
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
       const a = this.arg(`phase advect plan ${j}`, [1, j, 0, REST_GAP, 0, disp, 1, 0]);
-      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.ride().label}`;
+      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${ride.label}`;
       let ga = this.groups.get(ka);
       if (!ga) {
-        ga = bindGroup(this.device, adv, [this.sim, a, there, this.ride(), back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
+        ga = bindGroup(this.device, adv, [this.sim, a, there, ride, back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
         this.groups.set(ka, ga);
       }
       pass.setPipeline(adv);
@@ -2551,6 +2590,13 @@ export class WebGPUFluid {
       if (thin) this.run(pass, 'rimLaplace', rim, [smooth], args, 1);
       this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth, rim], args);
       this.vel.swap();
+      // Film Hold's push: the film between two drops holds them apart (mixFilm).
+      const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
+      if (hold > 0.001 && oil > 0.001) {
+        this.run(pass, 'mixFilm', this.vel.write, [this.vel.read, mix!.read, smooth],
+          this.arg('mix film', [oil * OIL_TENSION * perSecond * N * N * FILM_PUSH * hold, OIL_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
+        this.vel.swap();
+      }
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
     /*
       On a thin gap, Rain Drip's heavy dye, Plate Rock's tilt, Updraft's
@@ -2949,13 +2995,15 @@ export class WebGPUFluid {
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
-      this.run(pass, 'dampGrid', this.dye.write, [this.dye.read], k);
-      this.dye.swap();
+      const damp = (field: PingPong) => {
+        this.run(pass, 'dampGridCurv', this.scratchA, [field.read], k);
+        this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
+        this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
+        field.swap();
+      };
+      damp(this.dye);
       // The oil's share has the same grid in it, from the same faces.
-      if (bodiesOn) {
-        this.run(pass, 'dampGrid', this.oilDye!.write, [this.oilDye!.read], k);
-        this.oilDye!.swap();
-      }
+      if (bodiesOn) damp(this.oilDye!);
     }, gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
@@ -3033,6 +3081,23 @@ export class WebGPUFluid {
         as lines every other cell through the black.
       */
       const grid = this.arg('phase grid', [0, 0, 0, 0]);
+      /*
+        Two-phase carry on the thin gap (phaseVelocity in wgsl/fluid.ts,
+        PLAN 29c-8): reconstructs the coherent drop's ferrofluid velocity
+        at the trailing rim so the oil's dipole return flow cannot sweep it
+        backward into the wake, while stepping aside when a labyrinth or
+        standing-spike field parts the pool into narrow valleys.
+      */
+      if (thin) {
+        if (!this.phaseVelT) {
+          this.phaseVelT = this.disposer.track(this.device.createTexture({
+            label: 'phase vel', size: [this.N, this.N], format: VEL,
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+          }));
+        }
+        const cohere = !this.filmHeld ? Math.max(0, 1 - 2 * maze) * (1 - spikeAmt) : 0;
+        this.run(pass, 'phaseVelocity', this.phaseVelT, [this.ride(), this.phase.read], this.arg('phase vel', [cohere, 0, 0, 0]));
+      }
       /*
         Carried as a volume, in as many substeps as the step's flow needs,
         never fewer than these (phasePlan in wgsl/fluid.ts, and why: a kick's
@@ -3184,8 +3249,10 @@ export class WebGPUFluid {
           many the oil takes.
         */
         const subs = oil > 0 ? CH_SUBSTEPS : 1;
+        // Film Hold: the water film between two drops pushes back (FILM_WGSL).
+        const film = oil > 0 ? this.arg('mix mu', [FILM_MU * Math.max(0, Math.min(1, p.filmHold ?? 0)), 0, 0, 0]) : none;
         for (let k = 0; k < subs; k++) {
-          this.run(pass, 'mixMu', m.write, [m.read], none);
+          this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
             ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), 0.08, Math.pow(0.1, (p.magnetSeconds ?? 1 / 60) / 10), 0.04])
@@ -3370,7 +3437,7 @@ export class WebGPUFluid {
       const rate = this.ensureSlump();
       const oilMix = mix && this.mixLive ? mix.read : this.blank('rgba');
       this.run(pass, 'slumpRate', rate, [this.dye.read, this.squeeze.read, oilMix],
-        this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), 0, 0, 0, 0]));
+        this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), slump!.inertRate, 0, 0, 0]));
       const args = this.arg('slump', [SLUMP_FACE, 0, 0, 0]);
       for (let k = 0; k < slump!.substeps; k++) {
         this.run(pass, 'slump', this.dye.write, [this.dye.read, rate], args);
@@ -3785,7 +3852,8 @@ export class WebGPUFluid {
     this.run(pass, 'mixSplat', m.write, [m.read],
       this.arg('mix splat', [x, y, radius, 1, what.oil ?? 0, what.soap ?? 0, what.acid ?? 0, 0]));
     // Flat to its edge (mixSplat), so a disc's worth; the clamp at full is not counted.
-    this.oilPoured += Math.max(0, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius;
+    // A negative oil cuts a hole (a compound drop's, oilLay.ts), and is taken off.
+    this.oilPoured = Math.max(0, this.oilPoured + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
     m.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
@@ -3907,7 +3975,7 @@ export class WebGPUFluid {
    * glycerine a pool takes minutes to spread a millimetre), and the pass is
    * skipped.
    */
-  private slumpPlan(p: GpuStepParams): { rate: number; substeps: number } | null {
+  private slumpPlan(p: GpuStepParams): { rate: number; substeps: number; inertRate: number } | null {
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
     const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
     // Stood up by θ (Gravity, 0 flat to 1 upright), only cos θ of g is through the glass.
@@ -3920,10 +3988,16 @@ export class WebGPUFluid {
     const b = REST_GAP * PLATE_METRES;
     // η³(1 − η/b)³ rises to its peak at half the gap.
     const e = Math.min(eta, b / 2);
-    const most = perStep * e * e * e * Math.pow(1 - e / b, 3);
+    const open = 1 - e / b;
+    const mostVisc = perStep * e * e * e * open * open * open;
+    // The inertial Froude current's maximum speed √(g′e(1 - e/b)) (Huppert and Simpson 1980).
+    const mostInert = FROUDE_FRONT * (seconds / dx) * Math.sqrt(gPrime * e * open);
+    const most = Math.min(mostVisc, mostInert);
     if (most < 1e-4) return null;
     const substeps = Math.max(1, Math.min(SLUMP_SUBSTEPS, Math.ceil(most / SLUMP_FACE)));
-    return { rate: perStep / substeps, substeps };
+    const dtSub = seconds / substeps;
+    const inertRate = FROUDE_FRONT * (dtSub / dx) * Math.sqrt(gPrime);
+    return { rate: perStep / substeps, substeps, inertRate };
   }
 
   private ensureOilDye(): PingPong {

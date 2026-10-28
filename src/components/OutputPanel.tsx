@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Info } from './Info';
-import { Knob } from './ui';
+import { Knob, LIT } from './ui';
 import {
   DEFAULT_OUTPUT, IDENTIFY_MS, IDENTITY_CORNERS, MAX_SURFACES, SURFACE_BLENDS, SURFACE_SHAPES, SURFACE_SOURCES,
   makeCube, makeSurface, outputIsIdentity, surfaceOutline,
@@ -340,7 +340,7 @@ const Switch = ({ label, on, onChange, hint, testId }: {
     title={hint}
     data-testid={testId}
     className={`flex min-h-11 flex-1 items-center justify-center rounded-lg border px-3 text-[13px] font-medium transition-all ${
-      on ? 'border-white bg-white text-black' : 'border-white/10 bg-white/5 hover:bg-white/10'
+      on ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'
     }`}
   >
     {label}
@@ -463,15 +463,11 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
           onChange={v => set({ gamma: v })} resetTo={1} size={56} testId="output-gamma" />
       </div>
 
-      <div className="mb-3 mt-1 flex gap-1.5">
-        <Switch
-          label={output.flashGuard ? 'Flash Limit On' : 'Flash Limit Off'}
-          on={output.flashGuard}
-          onChange={v => set({ flashGuard: v })}
-          hint="Hold the whole screen below three flashes a second"
-          testId="output-flash-guard"
-        />
-      </div>
+      {/* Not a switch: the one Flash Limit switch is in Master. A state line only,
+          because the wall is where someone checking the safety is standing. */}
+      <p className={`mb-3 mt-1 text-[12px] ${output.flashGuard ? 'text-white/50' : 'text-amber-200/90'}`} data-testid="output-flash-guard-state">
+        {output.flashGuard ? 'Flash Limit is on.' : 'Flash Limit is off.'} Its switch is in Master.
+      </p>
 
       <Info>
         Set this once, at load-in, with the projector on and from where the audience will be — none of it belongs to a look, so nothing here is saved into a preset and no fader can reach it mid-song.
@@ -479,7 +475,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
         {' '}<span className="text-white/70">The corners</span> square up a projector that could not be hung on axis: drag them until the grid’s lines are straight on the wall, or nudge with the arrow keys.
         {' '}<span className="text-white/70">The masks</span> are tape on the light: pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, and <span className="text-white/70">Mask Edge</span> decides whether that stop is a hard line or a fade.
         {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift the gamma when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
-        {' '}<span className="text-white/70">Flash Limit</span> watches what actually reaches the screen and holds the whole field below three flashes a second, which is the clinical line for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left alone and only a sustained strobe is pulled back — and it is here, not in the settings, because no preset should be able to switch off a safety and no fader should be able to knock it off in the dark. Turning it off is for a screen nobody is standing in front of.
+        {' '}<span className="text-white/70">Flash Limit</span> watches what actually reaches the screen and holds the whole field below three flashes a second, which is the clinical line for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left alone and only a sustained strobe is pulled back — and its switch is in Master (the one place it is, so there is never a second copy to leave in the other state), and like everything on this panel it is not saved in a preset, so no look can switch off a safety and no fader can knock it off in the dark. Turning it off is for a screen nobody is standing in front of.
         {wakeLock && (
           wakeLock.supported
             ? ` The screen is being kept awake${wakeLock.held ? '' : ' while the plate is running'}, so nothing dims or sleeps mid-set.`
@@ -620,7 +616,7 @@ export function MappingPanel({ output, onChange }: {
                   role="radio"
                   aria-checked={active.source === k}
                   onClick={() => patchSurface(active.id, { source: k })}
-                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.source === k ? 'border-white/60 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:bg-white/10'}`}
+                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.source === k ? LIT : 'border-white/20 text-white/70 hover:bg-white/10'}`}
                   title={SOURCE_HINTS[k]}
                   data-testid={`surface-source-${k}`}
                 >
@@ -639,7 +635,7 @@ export function MappingPanel({ output, onChange }: {
                   role="radio"
                   aria-checked={active.blend === k}
                   onClick={() => patchSurface(active.id, { blend: k })}
-                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.blend === k ? 'border-white/60 bg-white/15 text-white' : 'border-white/20 text-white/70 hover:bg-white/10'}`}
+                  className={`min-h-[28px] pointer-coarse:min-h-[48px] flex-1 rounded border px-1 text-[12px] ${active.blend === k ? LIT : 'border-white/20 text-white/70 hover:bg-white/10'}`}
                   title={BLEND_HINTS[k]}
                   data-testid={`surface-blend-${k}`}
                 >
@@ -683,10 +679,11 @@ export function MappingPanel({ output, onChange }: {
         <div className="mb-4 flex flex-col gap-1" data-testid="surface-list">
           {surfaces.map((s, i) => (
             <button
+              aria-pressed={s.id === selected}
               key={s.id}
               onClick={() => setSelected(s.id)}
               className={`flex items-center gap-2 rounded px-2 py-1 text-left text-[12px] ${
-                s.id === selected ? 'bg-white/15' : 'hover:bg-white/5'
+                s.id === selected ? LIT : 'hover:bg-white/5'
               }`}
               data-testid={`surface-row-${i}`}
             >
