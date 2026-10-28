@@ -470,6 +470,22 @@ const watch = (page) => {
           window.chromaglassOutput?.({ ...base, ...cfg });
           await settle(6);
         };
+        /*
+          What is under the mapping is the LED floor, not the weather. This
+          read the top rows of whichever dish the opening look had grown, and
+          asked that more than half of them be lit before the pin; Classic's
+          opening was made darker on purpose (PLAN 28i-2: dark space between
+          its blobs, near black at the 5th percentile of the film), and the
+          Mac read 49% of its top rows lit, one point under a bar that was
+          about the projector. The bar is the same; the picture beneath it is
+          now one that fills the frame by construction, so the pin, the
+          blackout and the "top rows are lit" precondition each ask the
+          mapping a question the plate cannot answer for it. (Measured in a
+          cloud session, software WebGPU, Classic's opening: 83-88% of the
+          top rows lit as it comes, 100% with the floor on.)
+        */
+        const floorWas = dbg().settings.ledPlatform;
+        dbg().settings.ledPlatform = true;
         await apply({});
         const plain = { middle: await lit(0.4, 0.6, 0.4, 0.6), edge: await lit(0, 1, 0, 0.04) };
         // Pinned inside the frame: the picture moves off the top rows.
@@ -485,6 +501,7 @@ const watch = (page) => {
         });
         const dark = await lit(0, 1, 0, 1);
         await apply({});
+        dbg().settings.ledPlatform = floorWas;
         return { plain, pinned, dark, timed };
       });
       check('the projector places the picture on the wall',

@@ -1941,7 +1941,16 @@ Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Tr
    + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
 5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?
 
-## 87. The plate does not stutter now and then (PLAN 14aa)
+## 87. System audio and Ambient TV mode in the Mac app (PLAN 23.8)
+
+`npm run desktop` verifies that clicking **System audio** in the Mac app intercepts `getDisplayMedia` with no tab picker and routes the System audio pipeline to the ear (using `CHROMAGLASS_AUDIO_TAP=1`, since `CHROMAGLASS_OFFLINE` skips macOS's TCC screen-capture prompt). The real ScreenCaptureKit loopback path needs macOS permission and a streaming app playing on the Mac:
+
+1. Open the Mac app, open **Sound**, and pick **System audio** (where the browser shows **Another tab**). No browser tab picker should appear; on the first run macOS asks once for Screen & System Audio Recording permission.
+2. Play an album in a streaming app (Apple Music, Spotify, or another app on the Mac). The sound bar in the Sound panel and the plate's motion (kicks, bass, swell) should follow the album in stereo with no microphone bleed from the room.
+3. Quit and reopen the Mac app while the album is still playing: **System audio** is remembered across launches in the Mac app and resumes without asking for a tab.
+4. Turn on **Ambient TV mode (cool & quiet)** from the Sound panel, from **Show → Ambient TV Mode (Cool & Quiet)** (`Cmd+Shift+A`), or from the phone's Play sheet tile: the plate steps at 30 Hz, caps display draws at 60 Hz (`DrawGate`), and stays at or below the opening rung so the Mac stays cool and quiet over a long listening session.
+
+## 88. The plate does not stutter now and then (PLAN 14aa)
 
 Play any look for five minutes on the laptop, then with the wall up, the way a show runs. Watch
 the liquid's own motion, not the music's: before this, a plate on a machine with room to spare

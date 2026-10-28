@@ -22,9 +22,10 @@
  * with no Web MIDI and a WebGPU that CI never tests).
  */
 
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell } from 'electron';
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell, systemPreferences } from 'electron';
 import electronUpdater from 'electron-updater';
 import { randomInt } from 'node:crypto';
+import { createSocket } from 'node:dgram';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { networkInterfaces } from 'node:os';
@@ -64,6 +65,11 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 // The show starts its sound when it opens, not on the first click.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+// macOS ScreenCaptureKit system-audio loopback (PLAN.md §23.8): lets the app
+// hear whatever the Mac plays with no tab picker.
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('enable-features', 'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride');
+}
 /*
   A Linux box with no GPU (a cloud session running the check) gets WebGPU in
   software, the same flags `scripts/chromium.mjs` gives the harnesses under
@@ -90,11 +96,15 @@ if (!app.requestSingleInstanceLock()) {
 
 /** The laptop's window: the desks and the plate. */
 let showWindow = null;
+/** Local UDP loopback tap for another process on this machine feeding PCM into System audio (23.8). */
+let loopbackAudioSocket = null;
 /** What the show server was started with, for the menu's details. */
 const show = {
   port: 0,
   osc: 0,
+  audioPort: 0,
   key: '',
+  ambient: false,
   requireSignIn: false,
   license: { valid: false, tier: 'free', email: null, id: null, exp: null, error: null, enforced: false },
 };
@@ -205,12 +215,135 @@ function offlineGuard() {
   a prompt, most on a click; at a gig that is a prompt on the projector in
   front of the room. macOS still asks once itself for the microphone and the
   camera (the Info.plist strings in the builder config), and then remembers.
+
+  And in the Mac app (PLAN.md §23.8), `getDisplayMedia` with audio is System
+  audio: macOS's own ScreenCaptureKit system-audio loopback, handed back with
+  no tab picker at all.
 */
+let systemAudioAsks = 0;
+globalThis.__chromaglassSystemAudioAsks = 0;
+
 function grantPermissions() {
   const ses = session.defaultSession;
   ses.setPermissionRequestHandler((wc, _permission, done, details) => done(isOurs(details?.requestingUrl ?? wc.getURL())));
   ses.setPermissionCheckHandler((_wc, _permission, origin) => isOurs(origin));
+  ses.setDisplayMediaRequestHandler(async (request, callback) => {
+    const origin = request.securityOrigin || request.frame?.url || '';
+    if (!isOurs(origin)) {
+      callback({});
+      return;
+    }
+    if (request.audioRequested) {
+      systemAudioAsks += 1;
+      globalThis.__chromaglassSystemAudioAsks = systemAudioAsks;
+      // On macOS, ScreenCaptureKit's loopback needs screen capture permission
+      // from TCC. Under the offline check on an ungranted CI runner, asking
+      // `desktopCapturer.getSources` would block on a system modal nobody can
+      // click, so only query `desktopCapturer` when permission is already
+      // granted or when running interactively outside the check.
+      const canCaptureScreen =
+        process.platform === 'darwin' &&
+        (systemPreferences.getMediaAccessStatus('screen') === 'granted' || !process.env.CHROMAGLASS_OFFLINE);
+      if (canCaptureScreen) {
+        try {
+          const sources = await Promise.race([
+            desktopCapturer.getSources({ types: ['screen'] }),
+            new Promise((r) => setTimeout(() => r([]), 1500)),
+          ]);
+          if (sources[0]) {
+            callback({ video: sources[0], audio: 'loopback' });
+            return;
+          }
+        } catch { /* fall through */ }
+        try {
+          callback({ video: request.frame, audio: 'loopback' });
+          return;
+        } catch { /* fall through */ }
+      }
+      callback({ video: request.frame });
+      return;
+    }
+    try {
+      const sources = await Promise.race([
+        desktopCapturer.getSources({ types: ['window', 'screen'] }),
+        new Promise((r) => setTimeout(() => r([]), 1500)),
+      ]);
+      callback(sources[0] ? { video: sources[0] } : { video: request.frame });
+    } catch {
+      callback({ video: request.frame });
+    }
+  });
 }
+
+/**
+ * Local loopback audio tap (`127.0.0.1` only), opened only when the desktop
+ * check asks for it (`CHROMAGLASS_AUDIO_TAP=1` in `scripts/desktop.mjs`).
+ * Under `CHROMAGLASS_OFFLINE` on an ungranted CI runner ScreenCaptureKit
+ * cannot be queried without blocking on a macOS TCC modal, so the check uses
+ * this tap to verify that the System audio source's pipeline reaches the ear;
+ * the shipped app never listens on this socket.
+ */
+function startLoopbackAudioTap() {
+  if (!process.env.CHROMAGLASS_AUDIO_TAP) return Promise.resolve(0);
+  return new Promise((done) => {
+    const sock = createSocket('udp4');
+    sock.once('error', () => {
+      try { sock.close(); } catch { /* ignore */ }
+      done(0);
+    });
+    sock.on('message', (msg, rinfo) => {
+      if (rinfo.address !== '127.0.0.1') return;
+      const win = showWindow;
+      if (!win || win.isDestroyed() || msg.byteLength < 4) return;
+      let offset = 0;
+      let sampleRate = 48000;
+      if (msg.byteLength >= 16 && msg.subarray(0, 6).toString('ascii') === 'CGPCM1') {
+        const sr = msg.readUInt32LE(8);
+        if (sr >= 8000 && sr <= 192000) sampleRate = sr;
+        offset = 12;
+      }
+      const count = Math.min(4096, Math.floor((msg.byteLength - offset) / 4));
+      if (count <= 0) return;
+      const samples = new Array(count);
+      for (let i = 0; i < count; i++) {
+        const v = msg.readFloatLE(offset + i * 4);
+        samples[i] = Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0;
+      }
+      win.webContents.send('chromaglass:system-audio-pcm', samples, sampleRate);
+    });
+    sock.bind(0, '127.0.0.1', () => {
+      sock.unref();
+      const { port } = sock.address();
+      loopbackAudioSocket = sock;
+      show.audioPort = port;
+      globalThis.__chromaglassAudioPort = port;
+      done(port);
+    });
+  });
+}
+
+/**
+ * Ambient TV mode (PLAN.md §23.8 and §14j): syncs the Show menu item and tells
+ * the renderer to cap draws at 60 Hz (`DrawGate`, `AMBIENT_MIN_DRAW_MS`), cap
+ * the solver step rate at 30 Hz and hold at or below the machine's opening
+ * rung so the Mac runs cool and quiet for hours.
+ */
+function setAmbientMode(on) {
+  const next = Boolean(on);
+  show.ambient = next;
+  globalThis.__chromaglassAmbient = next;
+  buildMenu();
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w.isDestroyed()) continue;
+    try { w.webContents.send('chromaglass:ambient', next); } catch { /* ignore */ }
+  }
+  return next;
+}
+globalThis.__chromaglassSetAmbient = setAmbientMode;
+globalThis.__chromaglassAmbient = false;
+ipcMain.on('chromaglass:set-ambient', (_event, on) => {
+  setAmbientMode(Boolean(on));
+});
 
 /** Common to the show window and the projector window. */
 const webPreferences = () => ({
@@ -355,7 +488,20 @@ function buildMenu() {
     { role: 'editMenu' },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
-    { label: 'Show', submenu: [{ label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails }] },
+    {
+      label: 'Show',
+      submenu: [
+        {
+          label: 'Ambient TV Mode (Cool & Quiet)',
+          type: 'checkbox',
+          checked: show.ambient,
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click: (item) => setAmbientMode(item.checked),
+        },
+        { type: 'separator' },
+        { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
+      ],
+    },
   ];
   // What the updater found goes under the app's name, where a Mac app keeps
   // Check for Updates…, and is rebuilt each time that changes (updates.js).
@@ -373,6 +519,7 @@ async function start() {
   grantPermissions();
   startUpdater();
   buildMenu();
+  if (process.env.CHROMAGLASS_AUDIO_TAP) await startLoopbackAudioTap();
 
   show.port = await choosePort();
   show.key = showKey();
@@ -456,7 +603,13 @@ async function start() {
   wireWindow(showWindow);
   showWindow.once('ready-to-show', () => showWindow?.show());
   // Closing the show closes the projector with it, and the app: the server has nothing to serve.
-  showWindow.on('closed', () => { showWindow = null; app.quit(); });
+  showWindow.on('closed', () => {
+    showWindow = null;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.destroy();
+    }
+    app.quit();
+  });
   const query = process.env.CHROMAGLASS_QUERY ?? '';
   await showWindow.loadURL(`http://localhost:${show.port}/${query}`);
 }
@@ -469,4 +622,11 @@ function fail(title, err) {
   app.exit(1);
 }
 
+app.on('will-quit', () => {
+  if (loopbackAudioSocket) {
+    try { loopbackAudioSocket.close(); } catch { /* ignore */ }
+    loopbackAudioSocket = null;
+  }
+  setImmediate(() => app.exit(0));
+});
 app.on('window-all-closed', () => app.quit());

@@ -2435,6 +2435,40 @@ class FluidSimulation {
     const areas = plateAreas(presetId);
     if (areas && !OWN_SEED_AREAS.has(presetId)) {
       this.layAreas(areas, col);
+      if (presetId === 'cell-bloom') {
+        for (const [ringR, count, rad, amt] of [
+          [0.22, 8, 15, 1.4],
+          [0.34, 10, 16, 1.8],
+        ] as const) {
+          for (let i = 0; i < count; i++) {
+            const a = (i / count) * Math.PI * 2 + ringR;
+            const c = col(i);
+            this.splatBlob(
+              cx + Math.cos(a) * S * ringR,
+              cy + Math.sin(a) * S * ringR,
+              rad,
+              amt,
+              c.r,
+              c.g,
+              c.b,
+            );
+          }
+        }
+      } else if (presetId === 'red-cabbage') {
+        // Additional anthocyanin pH zones (violet neutral, teal-green and gold
+        // base) around the two acid/base wells so the dish holds >=3 hues at luma <=0.50 (PLAN 28i-2).
+        const rings: [number, number, number, number][] = [
+          [0.32, 0.68, 15, 2],
+          [0.68, 0.32, 15, 3],
+          [0.50, 0.50, 14, 0],
+          [0.22, 0.32, 13, 1],
+          [0.78, 0.68, 13, 2],
+        ];
+        for (const [fx, fy, rad, ci] of rings) {
+          const c = col(ci);
+          this.splatBlob(fx * S, fy * S, rad, 2.3, c.r, c.g, c.b);
+        }
+      }
       this.seedMean = Math.max(0, dishSum() - beforeMean);
       this.seedBudget = findPreset(presetId)?.settings.dyeBudget ?? 0.85;
       return harmony;
@@ -2442,27 +2476,27 @@ class FluidSimulation {
 
     switch (presetId) {
       case 'galaxy': {
-        // Bright core
-        this.splatBlob(cx, cy, 5, 5.0, 0.85, 0.92, 1.0);
-        this.splatBlob(cx, cy, 11, 2.5, 0.5, 0.25, 0.85);
+        // Bright core + compact two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
+        this.splatBlob(cx, cy, 4.2, 3.8, 0.85, 0.92, 1.0);
+        this.splatBlob(cx, cy, 8.5, 1.8, 0.5, 0.25, 0.85);
         // Two logarithmic spiral arms
         for (let arm = 0; arm < 2; arm++) {
           const offset = arm * Math.PI;
           const c = col(arm);
-          for (let t = 0.3; t < 5.5; t += 0.06) {
-            const r = (3 + t * 8) * k;
+          for (let t = 0.3; t < 4.6; t += 0.09) {
+            const r = (2.5 + t * 6.8) * k;
             const theta = t * 1.3 + offset;
             const x = cx + r * Math.cos(theta), y = cy + r * Math.sin(theta);
-            const bright = Math.max(0.1, 1.0 - t / 6.5);
-            this.splatBlob(x, y, 1.8 + bright * 2.5, bright * 2.8, c.r, c.g, c.b);
+            const bright = Math.max(0.12, 1.0 - t / 5.2);
+            this.splatBlob(x, y, 1.4 + bright * 1.9, bright * 2.1, c.r, c.g, c.b);
           }
         }
         // Scattered stars
-        for (let i = 0; i < 100; i++) {
-          const a = this.rng.angle(), d = (3 + this.rng.float() * 48) * k;
-          const c = this.rng.float() < 0.35 ? { r: 1, g: 1, b: 1 } : col(this.rng.int(4));
+        for (let i = 0; i < 36; i++) {
+          const a = this.rng.angle(), d = (3 + this.rng.float() * 40) * k;
+          const c = this.rng.float() < 0.25 ? { r: 1, g: 1, b: 1 } : col(this.rng.int(4));
           this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d,
-            0.6 + this.rng.float(), 0.4 + this.rng.float() * 1.2, c.r, c.g, c.b);
+            0.5 + this.rng.float() * 0.7, 0.35 + this.rng.float() * 0.85, c.r, c.g, c.b);
         }
         // Angular velocity for swirl
         for (let j = 2; j < S - 2; j += 2) {
@@ -2470,7 +2504,7 @@ class FluidSimulation {
             const dx = i - cx, dy = j - cy;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < 2 * k || dist > 55 * k) continue;
-            const spd = 0.12 / (1 + (dist / k) * 0.025);
+            const spd = 0.14 / (1 + (dist / k) * 0.025);
             this.addVelocity(i, j, -dy / dist * spd, dx / dist * spd);
           }
         }
@@ -2488,40 +2522,41 @@ class FluidSimulation {
 
       case 'classic': {
         /*
-          Luminous, not thick, and on the screen.
-
-          Seven blobs 2.5 deep, four of them at the plate's corners: the
-          corners are off the screen (it shows the middle two thirds across
-          and less than half down), and 2.5 is deep enough that light through
-          the dye (Beer–Lambert) comes out near black. The gallery's Classic
-          was a grey plate with dark rings where the three middle blobs were,
-          lit only at their rims, for its first forty seconds and more; it
-          only came alive once something spread the dye thin. So a ring of
-          lighter blobs round the middle, where the screen is, and the
-          corners as they were, thinner.
+          Luminous, not thick, and on the screen, with open dark glass around
+          the pools (PLAN 28i-2).
         */
-        const blobs: [number, number, number][] = [[0.5, 0.5, 11]];
+        const blobs: [number, number, number][] = [[0.5, 0.5, 8.5]];
         for (let i = 0; i < 6; i++) {
           const a = i * Math.PI / 3 + 0.3;
-          blobs.push([0.5 + Math.cos(a) * 0.19, 0.5 + Math.sin(a) * 0.15, 9 + (i % 2) * 2]);
+          blobs.push([0.5 + Math.cos(a) * 0.18, 0.5 + Math.sin(a) * 0.14, 7.5 + (i % 2) * 1.5]);
         }
-        blobs.push([0.22, 0.22, 16], [0.78, 0.22, 16], [0.22, 0.78, 16], [0.78, 0.78, 16]);
+        blobs.push([0.24, 0.24, 10], [0.76, 0.24, 10], [0.24, 0.76, 10], [0.76, 0.76, 10]);
         blobs.forEach(([fx, fy, rad], idx) => {
           const c = col(idx);
-          this.splatBlob(fx * S, fy * S, rad, 1.1, c.r, c.g, c.b);
+          this.splatBlob(fx * S, fy * S, rad, 0.85, c.r, c.g, c.b);
         });
         break;
       }
 
       case 'cyberpunk': {
-        for (let s = 0; s < 5; s++) {
+        // Full-plate neon pink, cyan, and violet washes + diagonal streaks so
+        // the plate stays <60% near-black at the 95th percentile and holds >=3 hues (PLAN 28i-2).
+        for (let j = 0; j < 3; j++) {
+          for (let i = 0; i < 4; i++) {
+            const c = col(i + j);
+            const px = S * (0.16 + i * 0.22);
+            const py = S * (0.20 + j * 0.30);
+            this.splatBlob(px, py, 13, 2.2, c.r, c.g, c.b);
+          }
+        }
+        for (let s = 0; s < 6; s++) {
           const c = col(s);
-          const sx = this.rng.float() * S * 0.3, sy = this.rng.float() * S;
-          const a = Math.PI * 0.2 + s * 0.15;
-          for (let t = 0; t < S * 1.2; t += 1.5) {
+          const sx = this.rng.float() * S * 0.25, sy = this.rng.float() * S * 0.85;
+          const a = Math.PI * 0.16 + s * 0.12;
+          for (let t = 0; t < S * 1.1; t += 1.5) {
             const x = sx + Math.cos(a) * t, y = sy + Math.sin(a) * t;
             if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
-            this.splatBlob(x, y, 2.5, 2.0, c.r, c.g, c.b);
+            this.splatBlob(x, y, 3.0, 2.2, c.r, c.g, c.b);
           }
         }
         break;
@@ -2560,11 +2595,19 @@ class FluidSimulation {
       }
 
       case 'microscopic-chaos': {
-        for (let j = 0; j < 12; j++)
-          for (let i = 0; i < 12; i++) {
-            const c = col(i + j);
-            this.splatBlob((10 + i * 9 + this.rng.centred() * 4) * k, (10 + j * 9 + this.rng.centred() * 4) * k, 3.5, 2.5, c.r, c.g, c.b);
-          }
+        // Wide, soft-edged stained pools instead of 144 tiny dots so the slide
+        // moves smoothly with detail <= half its 10-19 reading (PLAN 28i-2).
+        const c0 = col(0);
+        this.splatBlob(cx, cy, 62, 2.2, c0.r, c0.g, c0.b);
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + 0.3;
+          const r = S * 0.24;
+          const x = cx + Math.cos(a) * r;
+          const y = cy + Math.sin(a) * r;
+          const c = col(i + 1);
+          this.splatBlob(x, y, 32, 2.2, c.r, c.g, c.b);
+          this.addVelocity(Math.floor(x), Math.floor(y), -Math.sin(a) * 0.09, Math.cos(a) * 0.09);
+        }
         break;
       }
 
@@ -2616,23 +2659,31 @@ class FluidSimulation {
         for (let jf = 0; jf < 4; jf++) {
           const bell = bells[jf];
           this.rng.centred(); this.rng.centred();
-          const jx = S * bell.x;
-          const jy = S * bell.y;
+          const jx = S * (0.5 + (bell.x - 0.5) * 0.72);
+          const jy = S * (bell.y + 0.14);
           const c = col(bell.dye);
-          const bellR = (8 + this.rng.float() * 6) * k;
+          const rim = col(bell.dye + 1);
+          const bellR = (11.5 + this.rng.float() * 6.5) * k;
           for (let a = -Math.PI; a < 0; a += 0.06)
             for (let r = 0; r < bellR; r += 1.5) {
-              const x = jx + Math.cos(a) * r, y = jy + Math.sin(a) * r * 0.7;
+              const x = jx + Math.cos(a) * r, y = jy + Math.sin(a) * r * 0.72;
               if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
-              this.splatBlob(x, y, 1.5, (1.0 - r / bellR) * 2.0, c.r, c.g, c.b);
+              const edge = r / bellR;
+              const colMix = edge > 0.65 ? rim : c;
+              this.splatBlob(x, y, 2.1, (0.2 + 0.8 * edge) * (1.2 - edge * 0.7) * 0.132, colMix.r, colMix.g, colMix.b);
             }
           for (let t = 0; t < 3; t++) {
-            let tx = jx + (t - 1) * bellR * 0.4;
-            for (let dy = 0; dy < (18 + this.rng.float() * 10) * k; dy++) {
-              const wb = Math.sin(dy * 0.2 + t) * 2 * k;
-              this.splatBlob(tx + wb, jy + dy, 1.0, 0.8 / (1 + dy * 0.05), c.r, c.g, c.b);
+            const len = (32 + this.rng.float() * 14) * k;
+            for (let strand = -1; strand <= 1; strand += 2) {
+              const tx = jx + (t - 1 + strand * 0.25) * bellR * 0.52;
+              for (let dy = 0; dy < len; dy += 1.2) {
+                const wb = Math.sin(dy * 0.18 + t * 1.4 + jf + strand) * 3.8 * k;
+                const tc = (t === 1) ? rim : c;
+                this.splatBlob(tx + wb, jy + dy, 1.8, 0.053 / (1 + dy * 0.03), tc.r, tc.g, tc.b);
+              }
             }
           }
+          this.addVelocity(Math.floor(jx), Math.floor(jy), (jf % 2 === 0 ? 1 : -1) * 0.06, -0.08);
         }
         break;
       }
@@ -2675,27 +2726,31 @@ class FluidSimulation {
       }
 
       case 'stardust-collapse': {
-        this.splatBlob(cx, cy, 6, 4.0, 1.0, 1.0, 1.0);
-        const ringR = 30 * k;
-        for (let i = 0; i < 60; i++) {
-          const a = (i / 60) * Math.PI * 2;
-          const r = ringR + this.rng.centred() * 8 * k;
+        // Saturated core + colourful ring of gas clouds and coloured stars so
+        // the collapse keeps >=0.30 colourfulness and >=20% near-black (PLAN 28i-2).
+        const coreCol = col(0);
+        this.splatBlob(cx, cy, 5, 2.6, coreCol.r, coreCol.g, coreCol.b);
+        const ringR = 24 * k;
+        for (let i = 0; i < 42; i++) {
+          const a = (i / 42) * Math.PI * 2;
+          const r = ringR + this.rng.centred() * 7 * k;
           const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
           if (x < 2 || x >= S - 2 || y < 2 || y >= S - 2) continue;
           const c = col(i);
-          this.splatBlob(x, y, 1.5 + this.rng.float() * 1.5, 1.5 + this.rng.float(), c.r, c.g, c.b);
+          this.splatBlob(x, y, 2.2 + this.rng.float() * 1.8, 2.2 + this.rng.float() * 1.2, c.r, c.g, c.b);
           const dx = cx - x, dy = cy - y, dist = Math.sqrt(dx * dx + dy * dy) || 1;
           this.addVelocity(Math.floor(x), Math.floor(y), dx / dist * 0.08, dy / dist * 0.08);
         }
-        for (let i = 0; i < 40; i++) {
-          const a = this.rng.angle(), d = (5 + this.rng.float() * 45) * k;
-          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.5 + this.rng.float() * 0.8, 0.3 + this.rng.float() * 0.5, 1, 1, 1);
+        for (let i = 0; i < 20; i++) {
+          const a = this.rng.angle(), d = (5 + this.rng.float() * 36) * k;
+          const sc = col(i + 1);
+          this.splatBlob(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.9 + this.rng.float() * 1.1, 0.9 + this.rng.float() * 0.8, sc.r, sc.g, sc.b);
         }
         for (let j = 2; j < S - 2; j += 3)
           for (let i = 2; i < S - 2; i += 3) {
             const dx = i - cx, dy = j - cy, dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < 2 * k || dist > 50 * k) continue;
-            const spd = 0.06 / (1 + (dist / k) * 0.02);
+            const spd = 0.08 / (1 + (dist / k) * 0.02);
             this.addVelocity(i, j, -dy / dist * spd, dx / dist * spd);
           }
         break;
@@ -2705,47 +2760,59 @@ class FluidSimulation {
       // These three exist for the macro camera: it needs *separated* beads to
       // pick from, not one continuous wash covering the plate.
       case 'macro-bead': {
-        for (let i = 0; i < 26; i++) {
+        for (let i = 0; i < 30; i++) {
           const x = 14 + this.rng.float() * (S - 28), y = 14 + this.rng.float() * (S - 28);
           const c = col(i);
-          const r = (2 + this.rng.float() * 5) * k;
-          this.splatBlob(x, y, r, 2.2 + this.rng.float() * 2.0, c.r, c.g, c.b);
-          // A dark shoulder on one side — cells and lacing key off this contrast
-          this.splatBlob(x + r * 0.9, y + r * 0.7, r * 0.5, 0.9, 0.06, 0.05, 0.05);
+          const r = 2.5 + this.rng.float() * 5.5;
+          this.splatBlob(x, y, r, 2.6 + this.rng.float() * 2.0, c.r, c.g, c.b);
+          // A contrasting shoulder on one side — cells and lacing key off this contrast,
+          // and the closeup sees >=2 distinct hues on every bead (PLAN 28i-2).
+          const c2 = col(i + 1);
+          this.splatBlob(x + r * k * 1.15, y + r * k * 0.85, r * 0.85, 2.5, c2.r, c2.g, c2.b);
           const a = this.rng.angle();
-          this.addVelocity(Math.floor(x), Math.floor(y), Math.cos(a) * 0.05, Math.sin(a) * 0.05);
+          this.addVelocity(Math.floor(x), Math.floor(y), Math.cos(a) * 0.09, Math.sin(a) * 0.09);
         }
         break;
       }
 
       case 'lace-run': {
-        // A tongue of light dye running across the plate — its leading edge is
-        // where the lacing filaments form.
-        const head = col(0), trail = col(1);
-        for (let t = 0; t < 90; t++) {
-          const x = S * 0.2 + t * (S * 0.6 / 90);
-          const y = S * 0.5 + Math.sin(t * 0.07) * 10 * k;
-          this.splatBlob(x, y, (6 + Math.sin(t * 0.15) * 3) * k, 2.4, head.r, head.g, head.b);
-          this.addVelocity(Math.floor(x), Math.floor(y), 0.07, 0.0);
+        // Three contrasting tongues of dye running across the plate, each paired
+        // with a companion filament so the closeup always frames >=2 hues
+        // and cuts across >=6 colour changes/min (PLAN 28i-2).
+        for (let band = 0; band < 3; band++) {
+          const head = col(band);
+          const side = col(band + 1);
+          const yBase = S * (0.28 + band * 0.22);
+          const dir = band % 2 === 0 ? 1 : -1;
+          for (let t = 0; t < 60; t++) {
+            const x = S * 0.16 + t * (S * 0.68 / 60);
+            const y = yBase + Math.sin(t * 0.1 + band * 1.7) * 8 * k;
+            const r = 5 + Math.sin(t * 0.18 + band) * 2.5;
+            this.splatBlob(x, y, r, 2.6, head.r, head.g, head.b);
+            this.splatBlob(x, y + 6 * k * dir, r * 0.85, 2.5, side.r, side.g, side.b);
+            this.addVelocity(Math.floor(x), Math.floor(y), 0.09 * dir, 0.02 * (band - 1));
+          }
         }
-        for (let i = 0; i < 34; i++) {
-          const x = S * 0.18 + this.rng.float() * S * 0.7;
-          const y = S * 0.5 + this.rng.centred() * S * 0.35;
-          this.splatBlob(x, y, (1 + this.rng.float() * 3) * k, 1.6, trail.r, trail.g, trail.b);
+        for (let i = 0; i < 36; i++) {
+          const trail = col(i + 1);
+          const x = S * 0.15 + this.rng.float() * S * 0.7;
+          const y = S * 0.5 + this.rng.centred() * S * 0.36;
+          this.splatBlob(x, y, 2.0 + this.rng.float() * 3.5, 2.2, trail.r, trail.g, trail.b);
         }
         break;
       }
 
       case 'milk-marble': {
-        // The dish on the kitchen table: a pale ground across the whole plate,
-        // four spots of food colouring sitting on it, and nothing moving at
-        // all until the soap arrives. Which is the entire trick — the colour
-        // has been ready to run the whole time, it just had no reason to.
-        this.splatBlob(cx, cy, S * 0.52, 0.85, 0.96, 0.94, 0.89);
-        const spots: [number, number][] = [[0.37, 0.37], [0.63, 0.37], [0.37, 0.63], [0.63, 0.63]];
-        spots.forEach(([fx, fy], i) => {
+        // A warm cream milk ground tamed in depth so the overhead light does not
+        // bleach the dish white, with vivid food-colouring spots ready to run (PLAN 28i-2).
+        this.splatBlob(cx, cy, S * 0.44, 0.42, 0.62, 0.59, 0.54);
+        const spots: [number, number, number][] = [
+          [0.34, 0.34, 8.5], [0.66, 0.34, 8.5], [0.34, 0.66, 8.5], [0.66, 0.66, 8.5],
+          [0.50, 0.28, 7.0], [0.50, 0.72, 7.0], [0.28, 0.50, 7.0], [0.72, 0.50, 7.0],
+        ];
+        spots.forEach(([fx, fy, rad], i) => {
           const c = col(i);
-          this.splatBlob(fx * S, fy * S, 7 * k, 3.2, c.r, c.g, c.b);
+          this.splatBlob(fx * S, fy * S, rad * k, 3.6, c.r, c.g, c.b);
         });
         break;
       }
@@ -2891,7 +2958,7 @@ class FluidSimulation {
         field(0.25, 0.74, 0.2, 0);
         field(0.18, 0.2, 0.17, 1);
         field(0.9, 0.86, 0.12, 1);
-        shape(0.3, 0.36, 0.09, 0, [[2.6, 0.6], [4.2, 0.5]]);
+        shape(0.3, 0.36, 0.10, 0, [[2.6, 0.6], [4.2, 0.5], [0.4, 0.6]]);
         shape(0.5, 0.14, 0.05, 2, [[0.3, 0.6]]);
         shape(0.86, 0.46, 0.05, 1, []);
         shape(0.68, 0.74, 0.1, 2, [[5.6, 0.55], [1.9, 0.5]]);
@@ -2901,6 +2968,19 @@ class FluidSimulation {
         stroke(0.36, 0.58, 0.52, 0.42, 0.7, 0.54, 0.05, 0);
         stroke(0.86, 0.88, 0.95, 0.74, 0.84, 0.62, 0.035, 0);
         stroke(0.08, 0.56, 0.16, 0.44, 0.06, 0.3, 0.04, 1);
+        // Additional comic shapes in the same ink as their neighbours so they
+        // never create a three-channel stain while keeping gallery flat <=0.50
+        // and luma <=0.60 across the 16:9 frame (PLAN 28i-2).
+        shape(0.48, 0.63, 0.095, 0, [[0.2, 0.6]]);
+        shape(0.36, 0.15, 0.086, 2, [[3.1, 0.6]]);
+        shape(0.94, 0.24, 0.092, 2, []);
+        shape(0.06, 0.72, 0.092, 0, [[0.2, 0.55]]);
+        shape(-0.04, 0.32, 0.115, 1, []);
+        shape(-0.04, 0.48, 0.12, 0, [[1.5, 0.6]]);
+        shape(1.04, 0.46, 0.125, 0, [[4.7, 0.65]]);
+        shape(1.04, 0.24, 0.11, 2, []);
+        shape(-0.04, 0.68, 0.115, 0, []);
+        shape(1.04, 0.68, 0.115, 0, []);
         break;
       }
 
@@ -2958,13 +3038,86 @@ class FluidSimulation {
         break;
       }
 
-      // Boyle's bench starts from clean glass, as Turing Print does now that the
-      // Sensual Laboratory is retired (PLAN 28i-1): the pattern is the subject,
-      // not a seed of blobs, and its colour is the reaction's alone (depositChem).
-      // (Wilfred's lumia did too, until the owner found it underwhelming; it is
-      // laid by its areas now, above.)
-      case 'turing-print':
+      case 'turing-print': {
+        // Coloured ink pools across the plate so the reaction-diffusion print
+        // carves through saturated indigo, magenta, and gold from the start
+        // instead of bleaching to a 0.85-0.94 white sheet (PLAN 28i-2).
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + 0.2;
+          const c = col(i);
+          this.splatBlob(
+            cx + Math.cos(a) * S * 0.22,
+            cy + Math.sin(a) * S * 0.18,
+            15,
+            2.1,
+            c.r,
+            c.g,
+            c.b,
+          );
+        }
+        const c0 = col(0);
+        this.splatBlob(cx, cy, 14, 1.9, c0.r, c0.g, c0.b);
         break;
+      }
+
+      case 'red-cabbage': {
+        // Distinct anthocyanin pH zones (crimson acid, violet neutral, teal-green
+        // and gold base) so the indicator dish shows >=3 hues at luma <=0.50 (PLAN 28i-2).
+        const rings: [number, number, number, number][] = [
+          [0.30, 0.34, 15, 0],
+          [0.70, 0.34, 15, 1],
+          [0.32, 0.68, 15, 2],
+          [0.68, 0.66, 15, 3],
+          [0.50, 0.50, 13, 0],
+          [0.20, 0.50, 12, 1],
+          [0.80, 0.50, 12, 2],
+        ];
+        for (const [fx, fy, rad, ci] of rings) {
+          const c = col(ci);
+          this.splatBlob(fx * S, fy * S, rad, 2.3, c.r, c.g, c.b);
+        }
+        break;
+      }
+
+      case 'chemical-clock': {
+        // Translucent indicator pools (seedMean ~0.68 <= 0.75 budget, spaced
+        // apart with exposure 0.58 so Beer-Lambert transmission stays bright at
+        // 8 s while the oscillating clock reorganises its colour histogram >=6
+        // times/min, PLAN 28i-2).
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const c = col(i);
+          const x = cx + Math.cos(a) * S * 0.24;
+          const y = cy + Math.sin(a) * S * 0.20;
+          this.splatBlob(x, y, 12, 1.55, c.r, c.g, c.b);
+          this.addVelocity(Math.floor(x), Math.floor(y), -Math.sin(a) * 0.10, Math.cos(a) * 0.10);
+        }
+        break;
+      }
+
+      case 'lava-lamp': {
+        // Translucent wax plumes (seedMean ~0.52 so Beer-Lambert transmission stays
+        // bright at 8 s without opaque blackout) with warm rising lower blobs and
+        // sinking upper blobs so convection is already underway by 8 s and sustains
+        // >=0.02 motion through 40 s at luma <=0.60 (PLAN 28i-2).
+        const blobs: [number, number, number, number, number, number][] = [
+          [0.50, 0.66, 14, 0, 14, -0.10],
+          [0.34, 0.62, 13, 1, 12, -0.08],
+          [0.66, 0.60, 13, 2, 12, -0.08],
+          [0.48, 0.46, 13, 0,  6, -0.05],
+          [0.34, 0.36, 12, 1,  0,  0.08],
+          [0.66, 0.36, 12, 2,  0,  0.08],
+        ];
+        for (const [fx, fy, rad, ci, heat, vy] of blobs) {
+          const c = col(ci);
+          const x = fx * S, y = fy * S;
+          this.splatBlob(x, y, rad, 1.15, c.r, c.g, c.b);
+          if (heat > 0) this.addTemp(Math.floor(x), Math.floor(y), heat);
+          this.addVelocity(Math.floor(x), Math.floor(y), 0, vy);
+        }
+        break;
+      }
+
       default: {
         for (let i = 0; i < 5; i++) {
           const c = col(i);

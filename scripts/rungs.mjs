@@ -40,6 +40,7 @@ import { getEffectiveTier } from '../src/lib/tierGates';
 import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf, handValueAt } from '../src/lib/midi';
 import { readSetting } from '../src/lib/readout';
 import { QualityGovernor, STEP_RATES } from '../src/lib/governor';
+import { DrawGate } from '../src/lib/drawGate';
 
 const checks = [];
 const check = (what, ok, detail = '') => checks.push([what, ok, detail]);
@@ -796,6 +797,47 @@ for (const devicePx of [1, 1.5, 2, 3]) {
     const held = replay(busy, { seconds: 120 });
     check('a plate over the climb budget with every frame on time keeps sixty, and moves nowhere',
       held.moves.length === 0 && held.g.stepRate === 60, `${held.moves.length} moves, at ${held.g.stepRate}/s`);
+  }
+
+  {
+    // ── Ambient TV mode (PLAN.md 23.8 / 14j): cool & quiet ──────────────
+    // Caps physics at 30 Hz and holds at or below the opening rung so a MacBook
+    // Air or Apple TV running a living-room show for hours stays cool and quiet.
+    const g = new QualityGovernor(rungs, 2, 0);
+    g.setAmbient(true);
+    const rateInAmbient = g.stepRate;
+    const rungBefore = g.rungIndex;
+    feed(g, 8.33, 2, 120, 0);
+    const rungAfterFast = g.rungIndex;
+    const rateAfterFast = g.stepRate;
+    g.setAmbient(false);
+    const rateRestored = g.stepRate;
+    // On a 120 Hz screen (8.333 ms/frame), DrawGate in ambient mode halves the draws to 60/s.
+    const gate = new DrawGate();
+    const normalGate = new DrawGate();
+    gate.ambient = true;
+    let ambientDraws = 0, normalDraws = 0;
+    for (let i = 1; i <= 120; i++) {
+      const t = i * (1000 / 120);
+      if (gate.offer('frame', t)) ambientDraws++;
+      if (normalGate.offer('frame', t)) normalDraws++;
+    }
+    // The opening rung is a ceiling for ambient mode, not only a floor on how
+    // far it climbs: a governor that has already climbed above it before the
+    // switch is thrown is brought back to it, and stays.
+    const c = new QualityGovernor(rungs, 2, 0);
+    const climbed = feed(c, 8.33, 2, 300, 0);
+    const climbedTo = c.rungIndex;
+    c.setAmbient(true);
+    const cameBackTo = c.rungIndex;
+    feed(c, 8.33, 2, 300, climbed.now);
+    const heldAt = c.rungIndex;
+    check('ambient TV mode brings a climbed governor back to the opening rung and holds it there',
+      climbedTo < 2 && cameBackTo === 2 && heldAt === 2 && c.stepRate === 30,
+      `opened on 2, climbed to ${climbedTo} with the switch off, ${cameBackTo} on throwing it, ${heldAt} after 300 s more of fast frames, ${c.stepRate}/s`);
+    check('ambient TV mode caps the solver step rate at 30 Hz, holds the opening rung, and caps a 120 Hz display at 60 draws/s',
+      rateInAmbient === 30 && rateAfterFast === 30 && rungAfterFast >= 2 && rateRestored === 60 && ambientDraws === 60 && normalDraws === 120,
+      `ambient stepRate=${rateInAmbient} → ${rateAfterFast}/s, rung ${rungBefore} → ${rungAfterFast} (start=2), restored=${rateRestored}/s, draws on 120 Hz=${ambientDraws}/s vs ${normalDraws}/s`);
   }
 }
 
