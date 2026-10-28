@@ -18,7 +18,7 @@ import { HEAD, W } from './shared';
   capillary force's own size at an edge four cells wide, and the band is
   still a twentieth of a 192 plate's radius.
 */
-export const RIM_BAND = 8;
+const RIM_BAND = 8;
 /** The most samples rimLaplace takes round the ring (its workgroup arrays' length; fluid.ts sizes the ring). */
 export const RIM_SAMPLES = 1024;
 /*
@@ -55,7 +55,7 @@ export const RIM_SAMPLES = 1024;
   the solve's p' = p − Φ held at zero on the rim is p held at φ there.
   Everywhere short of the band the force is untouched, to the bit.
 */
-export const CAPILLARY = /* wgsl */ `
+const CAPILLARY = /* wgsl */ `
 fn cs(p: vec2i, n: f32) -> f32 { return textureLoad(soft, clampP(p, n), 0).r; }
 fn grad(p: vec2i, n: f32) -> vec2f {
   return 0.5 * vec2f(cs(p + vec2i(1, 0), n) - cs(p - vec2i(1, 0), n), cs(p + vec2i(0, 1), n) - cs(p - vec2i(0, 1), n));
@@ -131,7 +131,7 @@ fn rimRamp(r: f32, n: f32) -> f32 { return smoothstep(${OPEN_RIM.toFixed(2)} - (
 */
 export const FILM_REACH = 6;
 export const FILM_DECAY = 2.5;
-export const FILM_WGSL = /* wgsl */ `
+const FILM_WGSL = /* wgsl */ `
 fn filmReach(p: vec2i, e: vec2i, n: f32) -> f32 {
   let len = length(vec2f(e));
   var m = 0.0;
