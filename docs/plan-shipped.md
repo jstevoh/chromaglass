@@ -2073,6 +2073,25 @@ compiles of the app's shaders) is no longer counted here; its length is held by 
 and 1b and the first step's cap. Weighed and not taken: one automatic re-run (about 4%
 red instead of 21%, and it hides a real one-in-five), warming Chromium's GPU in a page
 before the measured one (untested, and #396's warm in the same page did not help).
+- **Shipped, 14v-9: the webpage loads only itself first, and leaves the GPU for Play**
+  (2026-10-28, asked by the owner the same day: "speed up the first load"). Measured
+  against the live site from a cloud browser: chromaglass.art fetched 811 kB, 590 kB of
+  it the show's own chunks (App, castProtocol and four more, preloaded by the page for a
+  show the visitor had not opened), while the webpage's own chunk (4 kB) was asked only
+  once the entry had arrived and run, at 1.40 s, and its pictures at 1.67 s; and
+  `main.tsx` asked for the GPU at once, whose start holds the page's thread (0.6 to
+  4.5 s on CI's Mac, `npm run startup`'s "held" line) while a visitor reads. Now the
+  page's preload script (vite.config.ts) tells the webpage's address the way
+  `landingFirst` does and preloads the webpage's chunk there; `main.tsx` asks for the
+  app once the webpage's eager pictures are in (4 s at most) and for the GPU when a
+  pointer or the keyboard reaches Play, or at Play itself. `npm run loadtime` 4a to 4d,
+  on a second build with a demo sign-in (on today's code 4a, 4b and 4c are red; on a
+  10 Mb/s, 100 ms line the first picture is in at 0.46 s, from 0.83 s). Also: the
+  webpage's pictures, the intro's drawings and `/video/` were served `no-store`, so
+  every visit fetched them again; they are now cached for an hour (firebase.json).
+  Named cost: a visitor who presses Play without the pointer resting on it first waits
+  for Chromium's GPU start (1.8 to 4.3 s cold on CI's Mac) inside the intro, where
+  before the webpage had paid it while being read.
 
 ### 14m. Anyone on the venue's network can drive the show
 
