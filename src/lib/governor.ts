@@ -1,3 +1,4 @@
+import { isGlobalAmbientMode } from './ambient.ts';
 import type { QualityRung } from './platform';
 
 /**
@@ -104,6 +105,10 @@ export class QualityGovernor {
   private steps = 0;
   /** Step-rate index → when it last failed (seconds). */
   private readonly stepsFailed = new Map<number, number>();
+  /** This governor's own ambient switch; the page-wide one (`lib/ambient.ts`) counts too. */
+  private ambientOwn = false;
+  /** What `ambient` last answered, so a change in either switch is seen once, when it happens. */
+  private ambientSeen: boolean | null = null;
   /** Set each frame by the renderer: whether a heavy post pass is on. */
   heavyPost = false;
 
@@ -132,11 +137,49 @@ export class QualityGovernor {
   }
 
   get rung(): QualityRung {
-    return this.rungs[this.index];
+    return this.rungs[this.rungIndex];
   }
 
   get rungIndex(): number {
-    return this.index;
+    return this.ambient ? Math.max(this.start, this.index) : this.index;
+  }
+
+  /**
+   * Ambient TV mode (PLAN.md 23.8 / 14j): a living-room show left running for
+   * hours on a laptop or a TV box, where cool and quiet matter more than the
+   * last rung of resolution. Two things change and nothing else does: the
+   * solver asks for thirty steps a second (the floor of `STEP_RATES`, the same
+   * motion for half the work), and the ladder never climbs above the rung the
+   * show opened on. A machine that cannot hold the opening rung still steps
+   * down, as ever.
+   *
+   * It is on when this governor was told (`setAmbient`) or when the page-wide
+   * switch is. Reading it is also where a change is noticed: coming in, a rung
+   * above the opening one is given up; going out, the step rate goes back to
+   * sixty and the failed step rates are forgotten. That forgets that a machine
+   * which had honestly stepped down to thirty before ambient mode must find
+   * out again; restoring what it had would be kinder, but the Mac app's check
+   * saw the governor step down during the window's full-screen transition and
+   * then leave ambient mode stuck at thirty, so the exit starts clean.
+   */
+  get ambient(): boolean {
+    const on = this.ambientOwn || isGlobalAmbientMode();
+    if (this.ambientSeen === null) this.ambientSeen = on;
+    if (on !== this.ambientSeen) {
+      this.ambientSeen = on;
+      if (on) {
+        if (this.index < this.start) this.index = this.start;
+      } else {
+        this.steps = 0;
+        this.stepsFailed.clear();
+      }
+    }
+    return on;
+  }
+
+  setAmbient(on: boolean): void {
+    this.ambientOwn = Boolean(on);
+    void this.ambient;
   }
 
   get failedCount(): number {
@@ -203,12 +246,12 @@ export class QualityGovernor {
 
   /** Solver steps a second to ask the loop for. */
   get stepRate(): number {
-    return STEP_RATES[this.steps];
+    return this.ambient ? STEP_RATES[STEP_RATES.length - 1] : STEP_RATES[this.steps];
   }
 
   /** Below where this machine started — the signal that it has less room than it looked. */
   get steppedDown(): boolean {
-    return this.everSteppedDown && this.index > this.start;
+    return this.everSteppedDown && this.rungIndex > this.start;
   }
 
   /**
@@ -230,6 +273,22 @@ export class QualityGovernor {
    * the real number it does not set off.
    */
   sample(frameS: number, workMs: number, now: number, held = false, gpuMs = 0): boolean {
+    if (!this.ambient) return this.judge(frameS, workMs, now, held, gpuMs);
+    // Ambient: judged as if already at the floor step rate, so it neither
+    // gives up a step rate nor climbs one, and the step rate it had is put
+    // back untouched. The ladder may not end above the opening rung.
+    const rung = this.rungIndex;
+    const post = this.postLevel;
+    const rate = this.stepRate;
+    const steps = this.steps;
+    this.steps = STEP_RATES.length - 1;
+    this.judge(frameS, workMs, now, held, gpuMs);
+    this.steps = steps;
+    if (this.index < this.start) this.index = this.start;
+    return this.rungIndex !== rung || this.postLevel !== post || this.stepRate !== rate;
+  }
+
+  private judge(frameS: number, workMs: number, now: number, held: boolean, gpuMs: number): boolean {
     let frameMs = frameS * 1000;
     if (frameMs <= 0) return false;
     this.fedCount++;

@@ -94,11 +94,26 @@ export type BandSource = typeof BAND_SOURCES[number];
 export const SOURCE_NAMES = [...SOUND_SOURCES, ...BAND_SOURCES] as const;
 export type SourceName = typeof SOURCE_NAMES[number];
 
-const BAND_LOW_HZ = 40;
-const BAND_HIGH_HZ = 16000;
+export const BAND_LOW_HZ = 40;
+export const BAND_HIGH_HZ = 16000;
 /** The nine edges of the eight bands, in Hz (40, 84.6, 179, 378, 800, 1692, 3578, 7566, 16000). */
 export const BAND_EDGES_HZ: readonly number[] = Array.from({ length: BAND_COUNT + 1 },
   (_, i) => BAND_LOW_HZ * Math.pow(BAND_HIGH_HZ / BAND_LOW_HZ, i / BAND_COUNT));
+
+/** Which of `band1`..`band8` holds `hz` (for writing `feature` as a fallback when a band is dragged; PLAN 30a). */
+export function bandForHz(hz: number): BandSource {
+  for (let i = 0; i < BAND_COUNT - 1; i++) {
+    if (hz < BAND_EDGES_HZ[i + 1]) return BAND_SOURCES[i];
+  }
+  return BAND_SOURCES[BAND_COUNT - 1];
+}
+
+/** The `[loHz, hiHz]` edges of a named band (`band1`..`band8`), or `band5` if unknown. */
+export function bandEdgesFor(feature: string): [number, number] {
+  const idx = (BAND_SOURCES as readonly string[]).indexOf(feature);
+  const i = idx >= 0 ? idx : 4;
+  return [BAND_EDGES_HZ[i], BAND_EDGES_HZ[i + 1]];
+}
 
 type Range = readonly [number, number];
 
@@ -203,6 +218,17 @@ export interface AudioReading {
    * keeps its own references, over the length of a song.
    */
   db: number[];
+  /**
+   * The frame's spectrum in dBFS (bins `0..top`), bin spacing (`hzPerBin`),
+   * reference floor (`this.ref - FLOOR_BELOW_REF_DB`) and silence flag, so a
+   * dragged band (`BandRange`, PLAN 30a) hears its `[loHz, hiHz]` bins through
+   * the exact same floor and `AutoRange` arithmetic as `band1`..`band8`, and
+   * the panel's spectrum strip can draw the live spectrum.
+   */
+  spectrum?: Float64Array;
+  hzPerBin?: number;
+  floor?: number;
+  silent?: boolean;
 }
 
 /** A reading's value for a source name, so a binding can be stored as a string. */
@@ -814,7 +840,65 @@ export class AudioFeatures {
       brightness: this.brightness,
       timbre: this.timbre,
       complexity: this.complexity,
+      spectrum: db.slice(0, this.top + 1),
+      hzPerBin: this.hzPerBin,
+      floor,
+      silent,
     };
+  }
+}
+
+/**
+ * One dragged band's ear (PLAN 30a): hears `[loHz, hiHz]` against its own
+ * recent range using the same `binsFor`, reference floor (`FLOOR_BELOW_REF_DB`),
+ * silence gate (`SILENCE_DB`) and `AutoRange` (6 dB minimum span, 30 dB cap)
+ * as the eight named bands in `AudioFeatures.update`, so a drag set to
+ * `band5`'s edges reads identically to `band5`.
+ */
+export class BandRange {
+  private readonly range = new AutoRange({ minSpan: LEVEL_MIN_SPAN_DB });
+  private heard = false;
+  private lastTime: number | null = null;
+  private binsKey = '';
+  private bins: number[] = [];
+
+  reset(): void {
+    this.range.reset();
+    this.heard = false;
+    this.lastTime = null;
+    this.binsKey = '';
+    this.bins = [];
+  }
+
+  read(reading: AudioReading, [lo, hi]: readonly [number, number]): number {
+    const spec = reading.spectrum;
+    const hzPerBin = reading.hzPerBin;
+    if (!spec || !hzPerBin || spec.length < 2) {
+      return sourceValue(reading, bandForHz(Math.sqrt(Math.max(1, lo) * Math.max(1, hi))));
+    }
+    const top = spec.length - 1;
+    const key = `${lo}|${hi}|${hzPerBin}|${top}`;
+    if (key !== this.binsKey) {
+      this.binsKey = key;
+      this.bins = binsFor([lo, hi], hzPerBin, top);
+    }
+    const floor = reading.floor ?? (ABS_FLOOR_DB - FLOOR_BELOW_REF_DB);
+    let power = 0;
+    for (const k of this.bins) {
+      const now = Math.max(spec[k], floor);
+      power += Math.pow(10, now / 10);
+    }
+    const levelDb = toDb(power / this.bins.length);
+    const dt = this.lastTime === null ? 0 : Math.max(0, reading.time - this.lastTime);
+    this.lastTime = reading.time;
+    if (!reading.silent) {
+      this.range.update(this.heard ? Math.max(levelDb, this.range.ceiling - LEVEL_MAX_SPAN_DB) : levelDb, dt);
+      if (this.range.floor < this.range.ceiling - LEVEL_MAX_SPAN_DB) {
+        this.range.floor = this.range.ceiling - LEVEL_MAX_SPAN_DB;
+      }
+      this.heard = true;
+    }
+    return this.range.normalize(levelDb);
   }
 }
 

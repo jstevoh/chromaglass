@@ -345,6 +345,13 @@ export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape'
  */
 export type AreaTarget = 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue';
 
+/**
+ * How a sound or band cord shapes its reading before it moves a setting or an
+ * area (PLAN 30a): `follow` rides the reading directly (with `gain` applied),
+ * while `gate` fires a shaped pulse when the gained reading crosses `threshold`.
+ */
+export type CordMode = 'follow' | 'gate';
+
 export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
@@ -373,11 +380,31 @@ export interface SceneMapping {
    */
   area?: number;
   /**
-   * The cord's gate (the least of PLAN 30a): it opens when the reading
+   * Whether the cord rides its reading continuously (`'follow'`) or fires a
+   * shaped pulse when the reading crosses `threshold` (`'gate'`, PLAN 30a).
+   * Absent on a whole-plate cord reads as `'follow'` even if `threshold`,
+   * `attack` or `release` are present; an area cord keeps `CordGate`'s rule.
+   */
+  mode?: CordMode;
+  /**
+   * Multiplier on the cord's reading before the threshold and before it rides
+   * the setting (`0..1` after clamping, absent = 1; PLAN 30a). Lets a quiet
+   * band or room hit cross its gate without moving the whole app's sensitivity.
+   */
+  gain?: number;
+  /**
+   * Custom frequency edges `[loHz, hiHz]` dragged on the live spectrum strip
+   * for a `bands` cord (PLAN 30a). When present on a `bands` cord it wins over
+   * `feature`; the panel still writes `feature` as the named band holding the
+   * drag's middle so an older build falls back cleanly.
+   */
+  band?: [number, number];
+  /**
+   * The cord's gate (PLAN 25h / 30a): it opens when the gained reading
    * crosses `threshold` (0..1), rises to the hit's height over `attack`
-   * seconds while open and falls over `release` once the reading drops back.
-   * All three absent, the cord follows its reading as it always has. Read on
-   * area cords (lib/areaCords.ts CordGate).
+   * seconds (2%–98% rise time) while open and falls over `release` (98%–2%
+   * fall time) once the reading drops back. Read on whole-plate cords when
+   * `mode === 'gate'` and on area cords (`CordGate`, lib/areaCords.ts).
    */
   threshold?: number;
   attack?: number;

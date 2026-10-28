@@ -61,7 +61,9 @@ export function trackSeed(isrc: string): TrackSeed {
 // deterministic per ISRC (a song keeps its preset across listens) but the
 // bucket comes from the live audio profile at identification time.
 const PRESET_BUCKETS = {
-  calm:   ['classic', 'jellyfish-bloom', 'velvet-underground', 'jellyfish-bloom', 'clock-glass', 'home-movie', 'lava-lamp'],
+  calm:   ['classic', 'jellyfish-bloom', 'velvet-underground', 'clock-glass', 'home-movie', 'lava-lamp'],
+  // Microscopic Chaos sits in both dreamy and heavy on purpose: soft cellular
+  // drift on quiet bright tracks, turbulent beads when bass drives the mix.
   dreamy: ['galaxy', 'aurora-borealis', 'fractal-dream', 'microscopic-chaos', 'soap-film'],
   bright: ['cyberpunk', 'neon-coral-reef', 'stardust-collapse', 'acid-trip', 'crowd-plate'],
   heavy:  ['bass-drop', 'solar-flare', 'comet', 'microscopic-chaos', 'magnet-garden'],

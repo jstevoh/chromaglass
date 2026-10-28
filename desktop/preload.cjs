@@ -43,6 +43,25 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   platform: process.platform,
   requireSignIn,
   license,
+  onSystemAudioPcm(fn) {
+    if (typeof fn !== 'function') return () => {};
+    const listener = (_event, samples, sampleRate) => {
+      try { fn(samples, sampleRate); } catch { /* ignore */ }
+    };
+    ipcRenderer.on('chromaglass:system-audio-pcm', listener);
+    return () => ipcRenderer.removeListener('chromaglass:system-audio-pcm', listener);
+  },
+  onAmbientChange(fn) {
+    if (typeof fn !== 'function') return () => {};
+    const listener = (_event, on) => {
+      try { fn(Boolean(on)); } catch { /* ignore */ }
+    };
+    ipcRenderer.on('chromaglass:ambient', listener);
+    return () => ipcRenderer.removeListener('chromaglass:ambient', listener);
+  },
+  setAmbient(on) {
+    ipcRenderer.send('chromaglass:set-ambient', Boolean(on));
+  },
   // A sign-in that must finish in the real browser (PLAN.md 23.17d): main.js
   // opens only this app's own address.
   openInBrowser: (url) => ipcRenderer.invoke('chromaglass:open-browser', String(url)),

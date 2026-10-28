@@ -158,8 +158,8 @@ with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-
 The owner's account steps sit here too: **S8-on** (switch the crash reports on),
 **19g** (more Mac runners), **12.2** (the store accounts). ~~**13.1-sign**~~ (the Mac app's
 Developer ID and notarisation) is in, 2026-10-27: the five secrets are set and a pull
-request's build came back "Notarized Developer ID"; what is left of it is
-**13-update-signed** (§13), from the first signed release.
+request's build came back "Notarized Developer ID"; it shipped with the
+first signed release, 1.3.692 (**13-update-signed**, §13); judging §75 is owed.
 
 ### Wave 3. Seams in the two big files (one session, in a quiet week)
 
@@ -208,7 +208,7 @@ re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering
 music, explored as four directions the same day and all four taken, in this order:
 ~~**25h** areas that listen for themselves~~ (shipped), then **24.3-place** the melody walks across the plate (B, M), then **25i**
 colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
-14r read per area); then **30a**'s rest, shaped sound cords (M; its check `soundcords` written 2026-10-26, Antigravity's Brief 8), **14t-pc** Program Change (S), **24.3** notes as voices
+14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
@@ -261,7 +261,7 @@ style (§31).
   **12.7**, **12.8**; **12.4a**; later **12.9**.
 - **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13-win-app** then
   **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out and Link,
-  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, **13-update-signed** (after signing; 13-update shipped ad hoc), then **13.2**
+  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
@@ -562,7 +562,7 @@ Where each batch stands, as of 2026-09-27:
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
-| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
+| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-5's words shipped; 34a-2 to 34a-4 and the share card open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 | 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -2823,17 +2823,16 @@ network):
   (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §75.
-  - **13-update-signed** *(13.1-sign is in, 2026-10-27: the secrets are set, and a PR's
-    build was notarised and accepted by Gatekeeper as "Notarized Developer ID"; the
-    build job's limit went from 40 to 75 minutes after a run was cancelled at 40 still
-    waiting on Apple's notary service. Next: the owner runs the first signed release)*:
-    with the Developer ID secrets in, the
-    same code downloads in the background and installs on quit. Nothing to build;
-    the first signed release is judged by installing the one before it and seeing it
-    replace itself (§75's last step). Signing is also what takes away the first-open
-    warning: set `MAC_APP_NOTARISED` true in `src/lib/macApp.ts` then, and the profile
-    sheet and landing page stop telling the way round (the release notes stop by
-    themselves, from what `spctl` says of the built app).
+  - **13-update-signed** *(shipped 2026-10-27: the first signed and notarised release,
+    1.3.692, went live at 7:12 PM PT; `MAC_APP_NOTARISED` is now true in
+    `src/lib/macApp.ts`, so the profile sheet's Mac app card and the landing page stop
+    telling the Open Anyway way round, and `npm run updates` asserts the flag and that
+    both pages still gate the words on it. The build job's limit went from 40 to 75
+    minutes after a run was cancelled at 40 still waiting on Apple's notary service.
+    Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces
+    it in place)*: with the Developer ID secrets in, the same code downloads in the
+    background and installs on quit. Nothing else to build. The release notes stopped
+    by themselves, from what `spctl` says of the built app.
   - **13-first-open** *(shipped)*: the first release, 1.3.622 (2026-10-25), was refused on
     the owner's Mac ("may harm your Mac"), and the reply sent then said right-click →
     Open, which macOS 15 no longer offers for an app it cannot check. The release notes
@@ -3561,6 +3560,15 @@ for, and the GPU was asked for only after they had arrived and drawn.
   week's `stillIdle` on the line before deciding whether the cap should be per gap; in the 37
   Mac runs since 14v-7 merged the longest wait for a frame was 0.8 to 1.6 s and the still
   intro took nothing out on any of them, so there is nothing to read yet.
+- **Shipped, 14v-9: the webpage loads only itself first, and leaves the GPU for Play**
+  (2026-10-28). `npm run loadtime` 4a to 4d; the story is in `docs/plan-shipped.md` §14v.
+- **14v-10. The plate's opening is 8.75 s of compiling on a cold Mac.** CI's Mac, PR
+  #511's run 40619521397 (2026-10-28): first step 13.44 s, the device given at 4.33 s,
+  56 pipelines built ahead from 4.34 to 13.09 s (25.5 s of compiles over three lanes,
+  median 0.32 s; `fluid/deltaVel:rgba16float` 2.67 s, `fluid/liquidForces:rgba16float`
+  2.66 s, `fluid/squeezeUpdate` 1.40 s, `plate/display` 1.03 s). The two slowest are
+  the next thing to read: why each takes eight times the median, and whether the
+  opening needs them before its first step.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
@@ -6184,6 +6192,21 @@ Not a gate and no bar: a rate depends on what was pushed.
   buy is a cheaper re-run of a startup red (half a shard), and that is better bought by
   fixing startup. Revisit if a shard's median passes about 15 minutes (the 19w rule).
 
+- **19ad-5. `bottles` goes red when one splatter fling lands at the stroke's mirror.**
+  PR #525 (a copy and constant change that cannot reach the pour) failed `Every tool lays
+  the bottle` twice running on the same head, 2026-10-28, on a different bottle each time
+  and no other line: `splatter with the Oil bottle lays oil along the stroke`
+  (31 pours, 1 at the mirror) and `splatter with the Ferrofluid bottle lays ferrofluid
+  along the stroke, and not at its mirror` (30 pours, 1 at the mirror, three strays 0.12–0.13
+  from the hand). Pour and spray with both bottles read 0 at the mirror every time. Both
+  lines require `mirror === 0` of a stroke whose splatter flings drop within 0.14 of the
+  plate from the hand, so any fling that crosses the middle can land inside `rad` of the
+  mirrored path: the check asks the scatter's reach to stay clear of the mirror, which
+  it does not promise. Do not loosen the bar first: count the flings that land at the
+  mirror over a run of shards (`npm run flakes`) against how many a stroke's geometry
+  allows, then state the bar as that (the mirror reading should be the hand's own
+  flipped path, not the fling's reach). Seeded or recorded flings would settle it.
+
 ### 19ae. A phone check reads its dye across a plate rebuild and calls it a fault
 
 - **19ae-1. `npm run phone`'s "two fingers holding Drop lay dye under both" picks its
@@ -6747,12 +6770,8 @@ once the login works (23.14).*
 - **23.6** (**shipped**, this PR): the site's logo layer shows the ChromaGlass
   mark only (`SettingsPanel.tsx` and `DeskPanels.tsx`); your own
   logo is the app's. *Measure:* `npm run tiers` (11/11).
-- **23.8** (one PR, `desktop/`, before 23.7): Home's listening features. The app hears
-  whatever the Mac plays with no tab to share (macOS's own system-audio capture, asked
-  for once), and an ambient mode runs the plate full screen on the TV for hours with
-  the frame cap and the quiet of 14j. *Measure:* in `npm run desktop`, a tone played by
-  another process reaches the ear; on the owner's Mac, an album through a streaming app
-  drives the plate (docs/judging.md, next free number at merge).
+- **23.8** (**shipped**, this PR, `desktop/`): Home's listening features. The app hears
+  whatever the Mac plays with no tab to share (`desktop/main.js` `setDisplayMediaRequestHandler` with macOS ScreenCaptureKit loopback, `desktop/preload.cjs`, `desktop/electron-builder.config.cjs` `NSAudioCaptureUsageDescription`, `SoundPanel.tsx` `"System audio"` source), and an ambient TV mode (`Show → Ambient TV Mode (Cool & Quiet)`, `SoundPanel.tsx` toggle, `PhoneStage.tsx` Play sheet tile, `ambient.ts` the switch, `governor.ts` the 30 Hz step rate and rung ceiling, `drawGate.ts` the draw cap) runs the plate full screen on the TV for hours with the 60 Hz draw cap, 30 Hz solver step rate cap, and opening rung floor of 14j. *Measure:* in `npm run desktop` (13/13), the System audio source's pipeline reaches the ear and the picker was intercepted, and Ambient TV mode caps the solver at 30 steps/s, caps draws at 60 Hz in the app (`DrawGate`), and holds the opening rung; `npm run rungs` (76/76) and `npm run phone`. On the owner's Mac, an album through a streaming app drives the plate (`docs/judging.md` §87).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
 - **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
@@ -7047,13 +7066,14 @@ once the login works (23.14).*
 - **23.17b** (**shipped** with 23.17d, #494): the step-down card (`RunLocallyCard.tsx`) no longer sells the Mac app as Pro's, since Home opens it too; on every tier it names what Pro adds there, several projectors with edge blending. *Measured:* `npm run tiers` 12 reads the card's text (no "plus the Mac app", "several projectors" present).
 - **23.17c** (**shipped**, this PR): one tier for the Account pill and every Pro gate (the owner, 2026-10-25: the Mac app's pill said PRO beside a Simulation card selling him Pro for $199). `isProLicenseUnlocked()` read the licence alone; the pill read `getEffectiveTier()`, which on a build that gates nothing (the Mac app, a local show) answers Pro with no key. `isProLicenseUnlocked()` now is `canUseProFeature()`, so the upsell card, the 1024² option, the floating step-down nudge (`RunLocallyCard.tsx`) and the hosted ladder (`effectiveLadderTier`) all take the pill's answer. There was no separate account-derived tier to read: a signed-in Pro account reaches the browser as a licence key (`accountLicense.ts`, 23.12), which `getEffectiveTier()` already reads. *Measure:* `npm run rungs` (78): four builds stood in by a bare `window` (nothing gated, a gated site with no key, a gated app holding a Pro licence, one holding Home) each say the same from the pill, the Pro gate and the hosted ladder; the first fails on the old code (`gate=false ladder=hosted`). The panel's own card is read at the function it calls: a browser check of it stalled on `forceStepDown` not holding on software WebGPU, so a `tiers` line for it is still owed. No Mac release is needed to see it on the web; the Mac app takes it with its next release.
 - **23.17d** (**shipped**, this PR): the Mac app opens only on a Home or Pro licence (the owner, 2026-10-25: "The Mac app should check the license. The app won't work for free"). It had no sign-in at all (`desktop.yml` built the site with no `VITE_FIREBASE_*`), gated nothing, and read Pro for every download; and the key `desktop/main.js` verified at launch never reached the page (the preload decoded it with a `Buffer` that cannot read base64url in a sandbox, so the bridge always said free). Now `desktop.yml` builds the site with the accounts and `VITE_MAC_APP=1`; a packed app always asks (`app.isPackaged`, no switch opens it free), takes no signing key from its environment, and has no developer tools; the one other key it trusts is its own build's `checkKey`, the public half of a pair `desktop.yml` makes per build and throws away with the runner, so `desktop -- --packaged` can open it on a key nobody else can sign; and the show, in the app's window and in any browser opened on the app's server, waits behind `AppLicenceGate.tsx` until a verified key whose tier is in `MAC_APP_TIERS` (`lib/macApp.ts`) is on the machine. A free account is no longer enough, as it was under 23.11. The door: sign in (email and password in the window; Google and the emailed link finish in the real browser on the app's own server, `?macSignIn=1`, which files the account's key with that server while the window watches `/license-info.json`), confirm a new password's email, Buy Home or Pro with "check again", or type a key. **Offline:** no grace period, by choice. A verified key opens the app at every start with no network and no time limit (a touring set with no Wi-Fi for a month still opens; 14h); online and signed in, the account is asked, and a key filed under that same email that the account no longer lists (refunded) leaves the machine at the next start, never mid-show (`heldKeyRefunded`, `retireStoredLicenseKey`). The cost: a refunded buyer who never goes online again keeps the app, which a timed lease would close (23.17h). *Measure:* `npm run signin` 22–24 (signed out shows the sign-in; a free account gets Confirm, then Buy, and no plate; a Home key opens at Home; a refunded key leaves the machine and the next start asks to buy), 22 and 24 failing on the code before; `npm run desktop` licence lines (11/11 from the repo; 13/13 packed with the site built as the app ships: it opens on its build's key, a self-signed Pro key with `LICENSE_PUBLIC_KEY` and the network refused meets the door, and so does a plain browser on its server); `npm run tiers` 12/12 (its gate lines 5–7 now pass through the new door). Needs a Mac release (Actions → Mac app → Run workflow, release ticked) to reach installed apps. The owner settled the tiers on 2026-10-26 ("Home can open the app"), so the site's copy says so too: the Home price card lists the Mac app, the Mac line under the cards and the profile sheet's Mac row say it comes with Home and Pro, and the sheet offers Home the download (`macAppRow` reads `MAC_APP_TIERS`; `npm run updates` checks Home on a Mac gets the download).
-- **23.17e. The Mac app has no song ID and no crash Send.** Found with 23.17d: `desktop.yml` builds the app's site without `VITE_FINGERPRINT_PROXY_URL` or `VITE_CRASH_REPORT_URL`, so Home's song ID (sold as "in the ChromaGlass app") cannot work in the app, and its crash sheet offers Save and Copy only. Pass both, after checking each Worker answers the app's `http://localhost:<port>` origin. *Measure:* `npm run desktop` reads both from the packed build.
+- **23.17e** (**song ID shipped; crash Send owed by the owner**): the Mac app's site is built with `VITE_FINGERPRINT_PROXY_URL` and `VITE_CRASH_REPORT_URL` (the secrets `deploy.yml` uses). The song ID's is set, so the app has song ID now; `VITE_CRASH_REPORT_URL` is empty in this repository, because the report Worker was never deployed (`docs/crash-plan.md` steps 4 and 5: `npm run deploy:reports`, then the secret), so neither the site nor the app shows Send until the owner does that, and the next build of either picks it up. Both Workers' origin lists already name `http://localhost:<port>`. *Measure:* `npm run desktop` reads each address this run was given out of the bundles the app's page loaded and sends that Worker a preflight from the app's origin, asking for the header the app sends (a build that lacks an address its run has fails; with neither, the line skips). The network-off line exempts the two Workers' hosts: with the song ID's address in the build, the tone of the System audio phase makes the music intelligence ask the Worker what is playing, and the guard refuses it.
 - **23.17f. A Google sign-in from the app signs the browser in, not the app.** 23.17d's browser hand-off brings the account's key to the app, which is all the door needs, but the app's window stays signed out, so what needs the account inside it (cloud sync of looks, 13-sync; the profile sheet's name) does not have it. Hand the session over too, with an OAuth loopback sign-in in the browser that returns to the app's server (Google's own way for desktop apps), not a token in a URL. *Measure:* a check signs in with Google in a browser beside the app and reads the app's sheet naming the account.
-- **23.17g. A key opens the app on any number of Macs.** The Worker counts machines (`POST /activate`, two per key) but the app never asks it; the show server's own count is per machine and cannot see another Mac. Ask the Worker once when a key first opens the app on a Mac, online, and keep its answer for offline starts. *Measure:* `npm run license-worker` plus a `desktop` line: a third Mac's first start is refused with the two Macs named.
+- **23.17g** (**shipped**, this PR): a key opens the Mac app on two Macs, not any number. The Worker counted machines (`POST /activate`, two per key) but nothing asked it; the show server's own count is per Mac. Now the page asks (`src/lib/macSeat.ts`, called from `activateLocalLicenseKey` in `src/lib/licenseKey.ts`, only in the build the app ships, `VITE_MAC_APP=1`, with the Worker's address already in it) before a key is filed. The Mac's name for the count is a random id kept in the licence file (`seatId`, `server/server-license.js`), not the host name, which two Macs can share and an owner renames; the Worker's refusal now names the Macs holding the seats (`labels`) and the door says which. "Remove from this computer" gives the seat back at the Worker (`deactivateLocalLicenseKey`). Offline is not a refusal, by the never-lock-out rule (23.10): a Mac the Worker cannot be reached from opens on the key's signature, is filed as unconfirmed (`seatConfirmed`), and at every online start (`syncServerLicense` → `confirmHeldSeat`, which asks again even for a seat it holds, the Worker answering a known seat as a refresh) is seated and filed as such for the offline starts after; a refunded key, or a full key on a Mac the Worker never seated, leaves the Mac from its next start (`retireStoredLicenseKey`), never from the page it is showing. A "full" for a Mac the Worker had seated only marks it unconfirmed, so a hiccup in the Worker's store cannot take the app off a paying Mac; the start after, still full, retires it. This is what lets a refund reach a Mac that typed the key in at the door with no sign-in (`heldKeyRefunded` needs the window signed in under the key's email) — 12h. *Measured:* `npm run license-worker` 12a–12j (the real `licenseKey.ts`, bundled as the app builds it, and the real licence manager, five Macs against one key: a third is refused with the two named, a release frees a seat, an offline Mac is let in and sorted at its next online start, a refunded key says so; 12f is the control, the same page built for the site, which asks nothing and opens a third Mac). *Open:* a seat is lost for good when its Mac dies, is sold or has its data folder wiped, because only that Mac can give it back; the refusal tells the buyer to remove it on a Mac they no longer have, and only a hand edit of KV frees it (the review of #524). Now that every online start refreshes `activatedAt`, the Worker could let a seat unseen for N days be taken when the key is full. Lemon Squeezy sends `order_refunded` for partial refunds too, and the Worker revokes on any of them; read the order's `refunded` or `status` before a refund of an upgrade does this much. The packed app's own line (`desktop`: a third Mac's first start refused) needs a Worker for the app to reach and is not built, so the app's wiring is read through the page code only; and a Mac that never goes online is not counted at all, which no check of a signature can change (23.17h's lease would).
 - **23.17h. A timed lease, if refunds kept offline become a problem.** 23.17d chose no grace period (above). If the owner wants refunds to bite offline, the key the app keeps would carry a renewal date (say 60 days) that each online start renews, and the door would say so a week ahead, never mid-show. The owner's call; not started.
-- **23.17i. Refunding an upgrade takes Home away too.** Found in the review of #494: the Worker's refund of an Upgrade order drops the Pro key, and the Home key it replaced is not filed back, so a buyer who refunds only the upgrade ends with nothing, and 23.17d then takes the Mac app off them at the next start. Refile the `upgradeFrom` key on an upgrade's refund. *Measure:* `npm run license-worker`: Home, then Upgrade, then refund of the upgrade, and `/keys` lists the Home key.
+- **23.17i** (**shipped**, this PR): refunding just an upgrade order takes the buyer's Home key back to them. Found in the review of #494: an upgrade files the Pro key over the Home one under the same id, so the refund of the upgrade dropped the only record and revoked the id, and 23.17d then took the Mac app off the buyer at the next start. The upgrade now keeps what it replaced (`replaces` on the Pro record) and the refund files the Home key again (`refileHome`, `server/license-worker.js`), signed afresh with the Home entitlement (`issuedAt`, `updatesUntil`, `maxMachines`) the buyer bought, rebuilt from the Pro record when it predates `replaces`. It gets a new id (`<proId>_home_<upgradeOrderId>`), not the Pro key's: the Pro token verifies offline for ever, and a Mac holding it keeps it while `/keys` lists its id (`heldKeyRefunded`), so the id has to leave the list and be revoked. Refunding the Home order itself, which the upgrade stood on, still takes every key. *Measured:* `npm run license-worker` 11a–11d; on the old Worker 11a–11c fail (`keys after=0`) and 12a fails for want of the Macs' names (4 of 26 red, 22/26), with the new Worker 26/26. The Worker is deployed by hand from the owner's Mac (the owner's OK first); until it is, the live Worker still refunds as before. An upgrade filed before this change has no `replaces`, and its refund rebuilds the Home key from the Pro record (11c).
 - **23.17j. A `?cast` page runs the plate with no licence.** The door is for the show (`main.tsx`, `show` excludes `?remote` and `?cast`); a cast mirrors the show's canvas, but in a browser where it cannot it asks for its own GPU and draws, so `http://localhost:3000/?cast` on the app's server is a plate with no key. Hold a cast with no show to mirror behind the same door. *Measure:* `npm run desktop` opens `?cast` in a plain browser on a keyless app and finds no plate.
 - **23.17k. Electron's fuses, with 13.1-sign.** The packed app still honours `ELECTRON_RUN_AS_NODE`, `--inspect` and an edited `app.asar`; Electron's fuses (`RunAsNode`, `EnableNodeCliInspectArguments`, `EnableEmbeddedAsarIntegrityValidation`, `OnlyLoadAppFromAsar`) close them, and the integrity one needs the signed build. *Measure:* `npm run desktop -- --packaged` reads the fuses off the binary.
+- **23.17-cikeys** (**shipped**, this PR; the security audit of 2026-10-28): the Mac app's build handed the owner's Developer ID certificate, its password and the Apple notarisation password to every same-repo pull request's run (`desktop.yml` on `pull_request` with `CSC_FOR_PULL_REQUEST`), beside that branch's own build config, npm scripts and dependencies; and any workflow a branch wrote could read them, and the site's deploy key, as repository secrets. Now the build signs only on a Run workflow on main, in the `mac-signing` environment, with each signing secret passed under that condition; a pushed `desktop-v*` tag no longer releases (its run is the tag's own copy of the file); the deploy runs in `firebase-live`; every workflow is read-only at its top; the Firebase deploy action is pinned to a commit. *Measure:* `npm run cisecrets` (Measure · logic), each rule red on a broken copy of the real file first; `npm run updates` holds the release to main. *Owner, in Settings → Environments:* create `mac-signing` and `firebase-live`, each with deployment branches "main" only and no reviewers, add the five signing secrets to the first and `FIREBASE_SERVICE_ACCOUNT` to the second, then delete the repository copies (desktop/README.md). Until then the files already keep the signing set out of pull requests' runs, but a branch that edits a workflow could still read the repository copies. *Open:* a pull request no longer proves the signed path (hardened runtime, entitlements, notarisation); the next Run workflow on main does. If that gap bites, a signed check after each merge that touches `desktop/` is the fix, at about 40 Mac minutes a time.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free
@@ -7275,10 +7295,7 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     and until 18f-2 lands the ring there is the kick's own hand and the soap's. When 18f-2
     lands, `npm run areacords` should add a heat cord that opens the well's surface on a
     level plate, against the same cord with the heat off.
-  - **25h-2. The gate on every cord, and the rest of 30a.** The threshold, attack and
-    release are read on area cords only (lib/areaCords.ts CordGate); a whole-plate cord
-    still follows its reading. Folding the gate into the patch bay's fold (a state per cord,
-    by what the cord is), and 30a's curves, are 30a's.
+  - ~~**25h-2. The gate on every cord, and the rest of 30a.**~~ Shipped with 30a (`PatchBay.fold` holds a `CordGate` per whole-plate cord keyed by what the cord is and clocked from `fold`'s `now`, while area cords keep `CordGate` in `AreaHands`; `npm run soundcords`).
   - **25h-3. Area cords on the back plate.** They work on the plate the music plays, in its
     areas; a back plate with its own look has that look's areas (25d) but the front look's
     cords do not reach them, and the panel greys Plate for an area cord. With 25d.
@@ -8109,24 +8126,36 @@ Turing Print" work (#331), which also made the reaction grow at all.
     fails on any quoted retired id in src/, so retiring the look trips it on the layer.
     5b learns to tell a preset id from a setting key (named under `Check changes:`, its
     reach unchanged for preset ids), then the look retires.
-  - **28i-2. Give back the black, make the still ones move** (Antigravity, batch 2). Film
-    near black (5th percentile) at least 20% of the time: Classic (and two or more hues),
-    Galaxy, Stardust Collapse (colours at least .3), Jellyfish Bloom (flat at most .4),
-    Bass Drop (peak at least 2.5 × median). Cell Bloom: flat at most .4 and luma at least
-    half its 8 s value at 40 s. Cyberpunk: near black at the 95th percentile at most 60%,
-    three or more hues. Off the white: Turing Print colours at least .3 by 8 s and luma
-    at most .6; Roy flat at most .5, luma at most .6; Red Cabbage luma at most .5 with
-    three hues; Lava Lamp luma at most .6; Milk Marbling's white tamed. Colour: Macro
-    Bead and Lacing Run two or more hues and six colour changes a minute; Chemical Clock
-    six a minute. Microscopic Chaos detail at most half its 10-19 reading. Motion at
-    least .02 at 20 and 40 s: Velvet Underground, Poster 1969, Home Movie, Clock Glass,
-    Crowd Plate, Lava Lamp, Jellyfish, Microscopic Chaos. `gallery` label and
-    `film.yml` (`FILM_ONLY` the looks changed).
-    Also for this batch, found in #408: **Poster, 1969's plate runs at about 16 steps a
-    second on the Mac runner** (`squeeze` read 191, 215 and 327 steps in 12 s on it, 320
-    to 350 on the Fillmore), under the 30 a second where the plate stops flowing and
-    starts stepping (`PINNED_STEP_RATE`, `LiquidVisualizer.tsx`). Find what makes Poster
-    that heavy (its layers, its dye budget, its plate size) before it is made to move.
+  - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2,
+    **shipped** in this PR; story in `docs/plan-shipped.md` 28i-2): all 21 reworked looks
+    meet their gallery (`8/20/40 s`) and film (`90 s`) bars; `jellyfish-bloom` appears once
+    in `evolution.ts`'s `calm` bucket and `poster-1969` appears once in `sequencer.ts`'s
+    `Pace` sequence. `poster-1969` now runs on a single plate (`layerCount: 1`), raising its
+    12 s step rate from `15.9 steps/s` (two 384² plates) to `24.8 steps/s` (one 384² plate);
+    reaching `>= 30 steps/s` (`PINNED_STEP_RATE = 30`) is open as **28i-2a** below.
+  - **28i-2a, open. Poster, 1969's step rate on a single 384² plate.** Measured over 12 s
+    (`squeeze` harness), `poster-1969` on `main` ran `layerCount: 2` (`2 × 384²` thin-gap
+    plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at
+    `15.9 steps/s` (`191 steps / 12 s`, `simMs = 45.2 ms`, `2.05 substeps/frame`, `7.8 fps`).
+    Moving `poster-1969` to a single plate (`layerCount: 1`, matching its 28i-1 description
+    `"Poster, 1969 draws on one plate"`) cuts its GPU solver work in half and raises its
+    12 s step rate by +56% to `24.8 steps/s` (`298 steps / 12 s`, `simMs = 24.1 ms`,
+    `2.00 substeps/frame`, `12.4 fps`), still below `PINNED_STEP_RATE = 30` (`>= 200` steps
+    in a 6.67 s window) because the governor stays on the `384²` rung where each thin-gap
+    step takes ~12 ms on an integrated GPU. Stepping down to the `256²` rung on a single
+    plate reaches `35.2 steps/s` (`422 steps / 12 s`, `simMs = 11.4 ms`, `1.88 substeps/frame`,
+    `18.7 fps`), clearing `30 steps/s` with +17% margin; `governor.ts` needs a step-rate /
+    `simMs` downshift rule (or a `256²` start when `simMs > 16 ms`) so single-plate thin-gap
+    looks reach `PINNED_STEP_RATE = 30`.
+  - **28i-2b, open. The projector check cannot see a left/right shift of 0.2 or less.**
+    `scripts/webgpu-smoke.mjs`'s "the projector places the picture on the wall" probes only the
+    top rows and the middle, so a sideways shift of the picture by 0.2 of the frame or less
+    reaches neither (mutation run in a cloud session on Classic's opening, review of #523: pin
+    ignored, picture 0.2 up or down, half size, 0.3 sideways and a blackout that is ignored
+    all fail; 0.2 sideways passes). The frame is lit by construction now (the LED floor), so
+    a column probe closes it cheaply: the left 4% of columns lit when unpinned and dark when
+    pinned inside the frame, beside the top-rows probe. A check change: name its bar and
+    input in the PR body, and run the same mutations to show 0.2 sideways now fails.
   - **28i-3. Sound on the liquid, not the frame** (batch 3, **open for the film measure**;
     frame fixes on the eight looks and the Milk Marbling dead-patch fix **shipped** in #473,
     story in `docs/plan-shipped.md` 28i-3).
@@ -8178,7 +8207,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
       `clock-glass` (`3.0 swells/min` on 40 s / `0.0` on 30 s, `0.0 colour changes/min`, `r1 = 0.10`),
       `ferro-paint` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.03`),
       `roy` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.08`).
-      28i-2 stays open as briefed.
   - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
     magenta cells, no rainbow); then four or more hues on the film.
 
@@ -8551,7 +8579,7 @@ The gap is in how a sound or a note is shaped before it reaches a setting.
 check written first and built by Antigravity. None moves the whole frame by default
 (the owner's rule), and every reading is a fast one (the owner's rule for sound patches).
 
-1. **30a**, below: shape each sound cord.
+1. ~~**30a**, below: shape each sound cord.~~ (Shipped; `npm run soundcords`.)
 2. **14t-pc**: Program Change picks a look or a set-list item.
 3. **24.3**, moved up: notes as voices, with an envelope per note and notes as a source.
 4. **13.5-link** before **13.5-osc**: Link first.
@@ -8574,39 +8602,39 @@ as before: the shader editor and imports, the feedback layer, and anything that 
 the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
 analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
 
-### 30a. A sound cord has only a depth
+### ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
 
-A patch whose source is `sound` or `bands` carries a depth and nothing else, so a kick
-patch that fires on every boom of a live room, or a swell too slow for a ballad, cannot
-be tuned at the gig except by moving the depth, which changes how far it goes and not
-when. Add to each such patch a mode (*follow*: the reading rides the setting, as today;
-*gate*: a crossing fires a shaped pulse), a threshold, a gain, an attack and a release;
-and let a `bands` patch take its edges from a drag across a live spectrum in the panel
-rather than the eight fixed bands (`BAND_EDGES_HZ`, `audioFeatures.ts`), heard against
-its own recent range as the named bands are. Absent fields read as today's patch (follow,
-no threshold, gain 1, no smoothing beyond the feature's own), so every saved look and
-preset loads unchanged. On the phone, the patch's view carries the same controls and
-the spectrum strip. *Measure:* a new check fed synthetic tone bursts in and out of a
-dragged band: crossings counted against the threshold (equal, none doubled, none from
-outside the band), and the patch's rise and fall timed within 10% of its attack and
-release.
-
-*Check written first (2026-10-26):* `npm run soundcords` (`scripts/soundcords.mjs`), red on
-main in its 30a lines and green on a sketch of the build. Its header is the contract: the
-cord's fields (`mode`, `threshold`, `gain` before the threshold, `attack`, `release`, `band`
-as `[loHz, hiHz]` winning over `feature`), read through `songAudioTrack` and `PatchBay.fold`
-with the gate's clock from `fold`'s `now`. Attack and release are the 2%-to-98% times of
-the cord's rise and fall, and a gate rises to the hit's height (the most the reading times
-the gain reached while open), as an area cord's does. A whole-plate cord with no `mode`
-follows even if it carries a threshold, attack or release (it ignores them today); an area
-cord keeps its own rule. CI runs it with `--controls` (the
-tape, the counter on today's `CordGate`, the judge rejecting three wrong gates, every saved
-cord folding as before) until the build's PR drops the flag. 31c's two lines join it when 31c is built.
-- **30a-1. The dragged band on the cast display and the phone remote.** The cast display
-  rebuilds `AudioData` from the wire with no spectrum behind it (`liveValue`, sceneMap.ts),
-  so a dragged-band cord there reads nothing, as a `bands` cord does today. Whether the
-  wire carries the cord's reading or the projector just shows the laptop's fold is the
-  build's to decide and say.
+Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Each `sound` or `bands`
+cord on `SceneMapping` (`src/types.ts`) now carries `mode` (`'follow' | 'gate'`, absent =
+`'follow'` on whole-plate cords even when `threshold`, `attack` or `release` are present;
+area cords keep `CordGate`'s rule), `gain` (absent = 1, applied to the reading before the
+threshold in both modes), `threshold`, `attack`, `release`, and on `bands` cords a custom
+dragged `band` (`[loHz, hiHz]`, winning over `feature` while the panel writes `feature` as
+the named band holding the drag's middle for fallback). `BandRange` (`src/lib/audioFeatures.ts`)
+hears `[loHz, hiHz]` from `AudioReading`'s spectrum with the same `binsFor`, reference floor
+and `AutoRange` (6 dB minimum, 30 dB cap) as `band1`..`band8`, and `PatchBay.fold`
+(`src/lib/sceneMap.ts`) steps a `CordGate` per gated whole-plate cord clocked from `fold`'s
+`now` (closing **25h-2**). The patch bay editor (`src/components/SettingsPanel.tsx`) and
+`src/components/phone/BandStrip.tsx` draw the mode, gain, threshold, rise and fall controls
+and the live log-frequency spectrum strip on both the desk and the phone. Story in
+`docs/plan-shipped.md` §30a.
+- **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
+  on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the
+  projector mirrors `#liquid-canvas` directly, so it shows the laptop's fold (including
+  dragged-band cords) frame for frame. A standalone network `CastReceiver` rebuilds
+  `AudioData` from `CastAudio` on the wire with no spectrum behind it (`liveValue`,
+  `sceneMap.ts`), so `sound` cords fold and gate there while `bands` cords (fixed or
+  dragged) read nothing, matching fixed `bands` cords today. Carrying evaluated `bands`
+  cord readings over `CastAudio` if standalone receivers need `bands` patches remains open here.
+- **30a-2. Found in the review of #511.** (a) Shipped with it: an area cord on a dragged
+  band read 0 for the whole of a look fade (the range was kept per mapping object and a
+  fade builds every object again each frame); `AreaHands` now keeps the `BandRange` with
+  the cord's gate, and `areacords -- --node` holds it. Open: (b) `soundcords` has no line
+  that holds the drag's `AutoRange` minimum span against a quiet, narrow band (its tape's
+  band5 always swings far over 12 dB, so a 12 dB span passes); (c) `BandStrip` never
+  resets its `BandRange` when the band changes, so after a drag its live level reads
+  against the old band's range until it catches up; (d) the rule for when a cord gates is
+  written out twice in `SettingsPanel.tsx` beside `gated()` in `areaCords.ts`; import `gated`.
 
 ### 30b. The LFOs and envelopes are fixed
 
@@ -9085,9 +9113,10 @@ a grid of generic stock thumbnails: ours are the plate itself.
   prices and says "Buying opens soon". When 23's webhook issues a key from a test purchase, the
   tier cards get Buy buttons (`CHECKOUT_HOME_URL`, `CHECKOUT_PRO_URL` in `lib/tierGates.ts`) and
   the "opens soon" line goes. Until a test purchase has been made, no button.
-- **34a-5. The owner's words and the share card.** *(S; owner.)* "From the maker" and the refund
-  line are drafts in plain words for the owner to rewrite or sign. `og-card.png` is still the old
-  card; a new one would be the hero's frame with the name and the one line.
+- **34a-5. The owner's words and the share card.** *The words shipped (2026-10-28, the owner's OK
+  on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
+  the old card; a new one would be the hero's frame with the name and the new headline. The maker
+  note goes unsigned unless the owner says otherwise.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

@@ -68,6 +68,7 @@
  */
 import type { AreaTarget, SceneMapping } from '../types';
 import { areaFamily, type PlateArea } from './plateAreas.ts';
+import { BandRange } from './audioFeatures.ts';
 
 /** The four things a hand does to one place, in the order the patch bay lists them. */
 export const AREA_TARGETS: readonly { key: AreaTarget; label: string; hint: string }[] = [
@@ -126,8 +127,16 @@ export function areaWeight(d: number, r: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Has this cord a gate, or does it follow its reading? */
-export const gated = (m: SceneMapping): boolean => m.threshold !== undefined || m.attack !== undefined || m.release !== undefined;
+/**
+ * Has this cord a gate, or does it follow its reading?
+ *
+ * Explicit `mode: 'gate'` always gates and `mode: 'follow'` always follows
+ * (PLAN 30a). When `mode` is absent on an area cord (or in `CordGate.step`
+ * directly), any of `threshold`, `attack` or `release` turns the gate on, as
+ * PLAN 25h shipped it.
+ */
+export const gated = (m: SceneMapping): boolean =>
+  m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined));
 
 /**
  * One cord's gate and envelope (the least of PLAN 30a).
@@ -207,8 +216,9 @@ export function fluidSink(f: AreaFluid, gridScale: number): AreaSink {
   };
 }
 
-interface CordState { gate: CordGate; angle: number; dir: number; seen: boolean }
-const keyOf = (m: SceneMapping): string => `${m.source ?? 'room'}|${m.feature}|${m.setting}|${m.area}`;
+interface CordState { gate: CordGate; band: BandRange; angle: number; dir: number; seen: boolean }
+const keyOf = (m: SceneMapping): string =>
+  `${m.source ?? 'room'}|${m.source === 'bands' && m.band ? `${m.band[0]}-${m.band[1]}` : m.feature}|${m.setting}|${m.area}`;
 
 /**
  * Every area cord of a look, stepped and laid.
@@ -227,10 +237,12 @@ export class AreaHands {
    * Step every area cord by `dt` seconds. `read` is the cord's reading this
    * step times its source's master (the patch bay's own, sceneMap.ts
    * `cordReading`), or null when the source has nothing to say, which a gate
-   * hears as silence. A cord aimed at an area the look does not have does
+   * hears as silence; it is handed the cord's own `BandRange`, held here with
+   * its gate so a dragged band's auto-range survives a look fade that builds
+   * the cord's object again every frame. A cord aimed at an area the look does not have does
    * nothing, as a cord aimed at a plate not on the stage does nothing.
    */
-  step(cords: readonly SceneMapping[] | undefined, areas: readonly PlateArea[] | null, read: (m: SceneMapping) => number | null, dt: number): AreaAct[] {
+  step(cords: readonly SceneMapping[] | undefined, areas: readonly PlateArea[] | null, read: (m: SceneMapping, band: BandRange) => number | null, dt: number): AreaAct[] {
     this.acts = [];
     for (const s of this.state.values()) s.seen = false;
     if (cords && areas) {
@@ -249,10 +261,10 @@ export class AreaHands {
         twins.set(base, turn + 1);
         const k = turn ? `${base}#${turn}` : base;
         let s = this.state.get(k);
-        if (!s) { s = { gate: new CordGate(), angle: 0, dir: 1, seen: true }; this.state.set(k, s); }
+        if (!s) { s = { gate: new CordGate(), band: new BandRange(), angle: 0, dir: 1, seen: true }; this.state.set(k, s); }
         s.seen = true;
         const before = s.gate.fires;
-        const v = s.gate.step(read(m) ?? 0, dt, m);
+        const v = s.gate.step(read(m, s.band) ?? 0, dt, m);
         // A gated paddle turns back on each hit: a hand folding, not a motor.
         if (m.setting === 'areaStir' && gated(m) && s.gate.fires > before && before > 0) s.dir = -s.dir;
         this.acts.push({ cord: m, area, index: m.area!, target: m.setting as AreaTarget, amount: v * m.depth, key: k });
