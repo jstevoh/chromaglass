@@ -53,7 +53,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery, isGpuEngine } from './frame.mjs';
+import { engineQuery, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4347;
 const checks = [];
@@ -117,7 +117,8 @@ const SPOTS = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => ({ x: 0.5 + 0.15 * Math.cos(k 
 /** The band's largest bubble, in grid steps of 128 (LiquidVisualizer: (0.9 + bass × 1.2) × GRID_SCALE). */
 const BUBBLE = 2.1;
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 const results = [];
 try {
   for (const pg of PAGES) {
@@ -130,7 +131,8 @@ try {
       try { sessionStorage.setItem('chromaglass-audio-source', source); } catch { /* private window */ }
     }, pg.band ? 'simulated' : 'none');
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=256${engineQuery()}`, { waitUntil: 'load' });
-    await page.waitForTimeout(9000);
+    await settlePlate(page, 9000);
+    await waitForEngine(page);
     // A cold Mac takes longer than nine seconds to open the stage, as bottles.mjs
     // found: PR #370 moved depth and the flick off the tools shard, so this became
     // the first check its runner ran, on an empty shader cache, and silence's page
@@ -141,7 +143,7 @@ try {
     let engine = null;
     for (let k = 0; k < 10 && !isGpuEngine(engine); k++) {
       engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
-      if (!isGpuEngine(engine)) await page.waitForTimeout(2000);
+      if (!isGpuEngine(engine)) await settlePlate(page, 2000);
     }
     if (!isGpuEngine(engine)) {
       check(`${pg.name}: the GPU solver is the one being measured`, false, engine ?? 'no debug hook');
@@ -204,14 +206,14 @@ try {
 
     // The first click (in the corner, off the plate) starts the band where it is let.
     await page.mouse.click(5, 5);
-    await page.waitForTimeout(500);
+    await settlePlate(page, 500);
     const laysBefore = await page.evaluate(() => window.chromaglassDebug().phaseLays?.() ?? -1);
     // Ferrofluid turned up on a bare plate pours the look's own shape: Classic's ring.
     await page.evaluate(() => { window.chromaglassDebug().settings.phaseAmount = 0.6; });
     // The bubbles press from the pour on, as the band's own did on the runs where it dropped them.
     for (let k = 0; k < 5; k++) {
       if (pg.bubbles) await keepBubbles();
-      await page.waitForTimeout(500);
+      await settlePlate(page, 500);
     }
     const laysAfter = await page.evaluate(() => window.chromaglassDebug().phaseLays?.() ?? -1);
     await page.evaluate((held) => {
@@ -238,7 +240,7 @@ try {
         plateOk = plateOk && s.thin === !pg.oldPlate;
         steady = steady && s.lays === laysAfter && s.held.turbulenceScale === 0 && s.held.audioImpact === 0 && s.held.phaseAmount === 0.6;
       } else steady = false;
-      if (t < 12) await page.waitForTimeout(1500);
+      if (t < 12) await settlePlate(page, 1500);
     }
     const first = series[0], last = series[series.length - 1];
     if (!steady) console.log(`  ${pg.name}: the ring was laid again, a reading failed, or the held settings were let go while it was watched`);

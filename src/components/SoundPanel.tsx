@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Mic, Monitor, FileAudio, Music, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
-import { Sheet } from './ui';
+import { Sheet, LIT } from './ui';
+import { VuMeter } from './ui/Playful';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
 
@@ -40,7 +41,8 @@ const SOURCES: ReadonlyArray<{
 export function SoundPanel({
   source, onSource, inputs, inputId, onInput,
   playing, time, loop, onLoop, onToggle, onSeek,
-  nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle, onClose,
+  nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle, onClose, embed = false,
+  readLevel, deaf = false,
 }: {
   source: AudioSource;
   onSource: (s: AudioSource) => void;
@@ -62,29 +64,44 @@ export function SoundPanel({
   droneRunning: boolean;
   onDroneToggle: () => void;
   onClose: () => void;
+  /** Drawn in a desk panel rather than as a sheet (`Sheet embed`). */
+  embed?: boolean;
+  /** The plate's volume right now, 0 to 100, or null with no ear: what the VU needle is moved by. */
+  readLevel: () => number | null;
+  /** Listening, but nothing is arriving: the needle rests on its stop and the dial says so. */
+  deaf?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const chosen = SOURCES.find(s => s.id === source) ?? SOURCES[0];
 
   return (
-    <Sheet title={<><Music size={16} /> Sound</>} onClose={onClose} width={760} height={680} testId="sound-panel">
+    <Sheet embed={embed} title={<><Music size={16} /> Sound</>} onClose={onClose} width={760} height={680} testId="sound-panel">
       <div className="flex-1 overflow-y-auto p-5">
         <input
           ref={fileRef} type="file" accept="audio/*" className="hidden" data-testid="sound-file-input"
           onChange={e => { const f = e.target.files?.[0]; if (f) onPickFile(f); e.target.value = ''; }}
         />
 
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {/*
+          The meter that says the plate hears: a needle with a VU's 300 ms
+          rise (PLAN 35f). Today's dot only says listening or deaf; a needle
+          that moves with the kick says the band is getting in.
+        */}
+        <div className="mb-2 flex items-end justify-between gap-3">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
+          <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
+        </div>
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-5">
           {SOURCES.map(s => {
             const Icon = s.icon;
             const on = source === s.id;
             return (
               <button
+                aria-pressed={on}
                 key={s.id}
                 onClick={() => (s.id === 'file' ? fileRef.current?.click() : onSource(s.id))}
                 className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 transition-colors ${
-                  on ? 'border-white/60 bg-white/10 text-text' : 'border-border text-muted hover:bg-hover hover:text-text'
+                  on ? LIT : 'border-border text-muted hover:bg-hover hover:text-text'
                 }`}
                 data-testid={`sound-source-${s.id}`}
               >
@@ -100,11 +117,12 @@ export function SoundPanel({
           <div className="mt-3 rounded-xl border border-border p-3" data-testid="drone-controls">
             <div className="mb-3 flex items-center gap-3">
               <button
+                aria-pressed={droneRunning}
                 onClick={onDroneToggle}
                 className={`flex items-center gap-2 rounded-full border px-4 py-1.5 text-[12px] font-bold transition-colors ${
                   droneRunning
-                    ? 'border-white/50 bg-white/15 text-text hover:bg-white/20'
-                    : 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25'
+                    ? `${LIT} hover:opacity-90`
+                    : 'border-border-strong text-text-2 hover:bg-hover'
                 }`}
                 aria-label={droneRunning ? 'Stop the instrument' : 'Start the instrument'}
                 data-testid="drone-toggle"
@@ -116,7 +134,7 @@ export function SoundPanel({
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted">The instrument</p>
               <span className="ml-auto text-[11px] text-faint">{droneRunning ? 'playing the plate' : 'stopped'}</span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 @lg:grid-cols-2">
               <label className="flex items-center gap-2 text-[12px] text-muted">
                 <span className="w-20 shrink-0">Key</span>
                 <select
@@ -216,11 +234,12 @@ export function SoundPanel({
             const on = nowPlaying?.track?.src === t.src;
             return (
               <button
+                aria-pressed={on}
                 key={t.src}
                 onClick={() => onPickTrack(t)}
                 className={`flex w-full items-baseline gap-3 px-3 py-2.5 text-left transition-colors ${
                   i ? 'border-t border-border' : ''
-                } ${on ? 'bg-white/10 text-text' : 'text-muted hover:bg-hover hover:text-text'}`}
+                } ${on ? LIT : 'text-muted hover:bg-hover hover:text-text'}`}
                 data-testid={`sound-track-${t.src.split('/').pop()?.replace('.mp3', '')}`}
               >
                 {on && playing ? <Pause size={13} /> : <Play size={13} />}
@@ -238,7 +257,7 @@ export function SoundPanel({
         */}
         <p className="mt-2 text-[11px] leading-relaxed text-faint">
           Music by {credits()}, and public-domain pieces by Thomas Park. Re-encoded and level-matched
-          for a room. Sources on <a href="https://archive.org/details/netlabels" target="_blank" rel="noreferrer" className="underline hover:text-muted">archive.org</a>.
+          for a room. Sources on <a href="https://archive.org/details/netlabels" target="_blank" rel="noreferrer" className="inline-flex min-h-6 items-center underline hover:text-muted">archive.org</a>.
           Nothing here carries a non-commercial or no-derivatives restriction.
         </p>
 
@@ -266,9 +285,10 @@ export function SoundPanel({
               />
               <span className="font-mono text-[10px] text-faint">{clock(time.d)}</span>
               <button
+                aria-pressed={loop}
                 onClick={() => onLoop(!loop)}
                 className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                  loop ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100' : 'border-border text-faint hover:text-muted'
+                  loop ? LIT : 'border-border text-faint hover:text-muted'
                 }`}
                 title={nowPlaying.track
                   ? 'Hand over to the next track on the shelf when this one ends, and round again'

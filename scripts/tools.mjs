@@ -32,7 +32,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery } from './frame.mjs';
+import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4346;
 const checks = [];
@@ -48,7 +48,8 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise((r) => setTimeout(r, 2500));
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 /*
   Set once the page exists, and run in the `finally` below: `page` itself is
   scoped to the `try`, so the restore cannot reach it from there.
@@ -60,6 +61,7 @@ try {
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(8000);
+  await waitForEngine(page);
 
   // A calm plate: nothing moves the dye but the hand. The music would pour,
   // the turbulence and the turning would carry, the drips would streak.
@@ -76,8 +78,9 @@ try {
     await page.evaluate((want) => window.chromaglassTool?.(want), t);
     await page.waitForFunction((want) => window.chromaglassDebug?.().tool?.() === want, t, { timeout: 10000 });
   };
-  const clear = async () => { await page.evaluate(() => window.chromaglassAction?.('clear')); await page.waitForTimeout(2500); };
-  const settle = (ms) => page.waitForTimeout(ms);
+  const clear = async () => { await page.evaluate(() => window.chromaglassAction?.('clear')); await settle(2500); };
+  // The wall clock on a GPU; in software, its share of the steps too (`settlePlate`, PLAN.md 19l).
+  const settle = (ms) => settlePlate(page, ms);
 
   /** The lead plate's density, and where the pointer is on it (grid cells). */
   const snap = (keep) => page.evaluate((keep) => {
@@ -320,7 +323,7 @@ try {
     `centre of mass moved ${(along * 100).toFixed(1)}% of the plate toward where the stroke went`);
   // Bracketed by what the plate did alone before and after: a stroke that
   // neither creates nor destroys dye must fall within the plate's natural
-  // idle drift bracket (spanning fIdle, fIdleAfter and 0) plus the 15% allowance.
+  // idle drift bracket (spanning fIdle, fIdleAfter and 0) plus `fSlack` below.
   /*
     Gains only, and in proportion to the pool.
 
@@ -332,25 +335,45 @@ try {
     window reads −1, so the negative side is live and would be charged for
     nothing.
 
-    5% of the pool, floored at 5. The Mac reads +1 on pools of 357 and 611, so
-    this is twenty to thirty times the drift measured with the seeder off — and
-    deliberately not the 2% that measurement alone would justify, because CI's
-    pool is 49 to 279 and *no run anywhere has measured this quantity on a
-    shard with the seeder off*. A bar whose value rests on unmeasured variance
-    is the flake this repo keeps relearning. Tighten it when 40 shards have
-    reported, not before.
+    2% of the pool, and 1 more. This was 5% floored at 5, held loose until
+    the shards had measured the quantity with the seeder off, because no run
+    had and a bar resting on unmeasured variance is the flake this repo keeps
+    relearning. They have now (PR #449, 2026-10-24): 48 trials of
+    TOOLS_FINGER_TRIALS on four Mac runners, pools of 39 to 357, and the
+    plate left alone gained at most +0.74 (on 357) — at most 0.26% of its
+    pool, and +0.02 on every pool under 80. The six shard runs before them
+    and the five beside them read +0.72 at most; the owner's Mac reads +1 on
+    611. The tightest of all 48 sits at a tenth of this bar (+0.54 on 209,
+    against 5.2), so it is ten times the noise, and on a 357 pool it is 8.1
+    where it was 17.9. The 1 keeps a thin pool's bar off zero, where a
+    reading of +0.02 is rounding.
   */
-  const fQuietBar = Math.max(5, 0.05 * fa.total);
+  const fQuietBar = 0.02 * fa.total + 1;
   const fQuiet = Math.max(fIdle, fIdleAfter) <= fQuietBar;
   // A pool, or there is nothing to judge: an empty plate reads 0 → 0 and every
   // bound below is 0, so `adds none` would pass on nothing (check-skeptic).
   const fPooled = fa.total > 5;
   const fMinIdle = Math.min(0, fIdle, fIdleAfter);
   const fMaxIdle = Math.max(0, fIdle, fIdleAfter);
-  const fSlack = 0.15 * fa.total + 5;
+  /*
+    How far past the plate's own bracket the stroke may land: 2% of the pool,
+    and 1 more. It was 15% and 5 more, set when the windows were the seeder's
+    +35 and had to be that wide; with the seeder off it granted ±59 on a pool
+    of 357 against a hand that measured under a unit, so it passed a Finger
+    that created a sixth of the pool. Measured on the shards (PR #449): 48
+    trials, pools 39 to 357, the stroke's Δ landed at most 0.48 outside the
+    bracket, 0.17% of its pool, and 0.05 at most on pools under 80. The
+    nearest of them to this bar is a sixteenth of it. On a 357 pool it is
+    ±8.1, seven times sharper. What fails is a Δ beyond the plate's own
+    bracket by more than 2% of the pool and 1: on a quiet plate a Finger
+    that makes 3% of a pool over 100 fails, and on a pool under 50 two units
+    do. The bracket itself may widen by as much as `quiet` lets the plate
+    gain alone, so the worst case it can pass is 4% and 2.
+  */
+  const fSlack = 0.02 * fa.total + 1;
   const fDelta = fb.total - fa.total;
   check('and adds none', fPooled && fQuiet && fDelta >= fMinIdle - fSlack && fDelta <= fMaxIdle + fSlack,
-    `${!fPooled ? `no pool to judge (${fa.total.toFixed(1)}); ` : !fQuiet ? 'the plate was not quiet, so nothing below is the hand; ' : ''}${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(0)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(0)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(0)}] ± ${fSlack.toFixed(0)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(0)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(0)} after`);
+    `${!fPooled ? `no pool to judge (${fa.total.toFixed(1)}); ` : !fQuiet ? 'the plate was not quiet, so nothing below is the hand; ' : ''}${fa.total.toFixed(0)} → ${fb.total.toFixed(0)} (Δ ${fDelta >= 0 ? '+' : ''}${fDelta.toFixed(2)}), bracketed within [${fMinIdle >= 0 ? '+' : ''}${fMinIdle.toFixed(2)}, ${fMaxIdle >= 0 ? '+' : ''}${fMaxIdle.toFixed(2)}] ± ${fSlack.toFixed(1)} from ${fIdle >= 0 ? '+' : ''}${fIdle.toFixed(2)} before and ${fIdleAfter >= 0 ? '+' : ''}${fIdleAfter.toFixed(2)} after`);
   check('and stops when the hand stops', drift < Math.max(0.003, 0.5 * moved),
     `${(moved * 100).toFixed(1)}% moved during the stroke, ${(drift * 100).toFixed(1)}% while held still after it`);
   /*
@@ -455,6 +478,45 @@ try {
     else console.log(`    with no stroke the second window is ${gap <= fQuietBar ? 'not' : ''} biased by where it sits in the run\n`);
   }
   /*
+    The noise `fSlack` is set from, measured where it lives.
+
+    The bar above is only as sharp as the plate's noise allows, and that noise
+    is a property of the runner: the pool a 1.5 s Drop lays follows the
+    machine's speed (49 to 356 across CI's shards, 611 on the owner's Mac), and
+    a thin pool is where advection's rounding is largest against what is
+    there. One run reads one pool, so a slack set from the shards' own `adds
+    none` lines needs forty pushes. This repeats the same stroke on the same
+    helpers, cycling the Drop's hold so one runner reads thin pools and thick
+    ones, and prints each with the hand's excess over the plate's own bracket,
+    as a share of the pool. Reporting, not gating. Set TOOLS_FINGER_TRIALS=<n>.
+  */
+  const fTrials = Number(process.env.TOOLS_FINGER_TRIALS ?? 0);
+  if (fTrials > 0) {
+    const holds = [300, 600, 1000, 1500];
+    let worst = 0, worstShare = 0;
+    for (let i = 0; i < fTrials; i++) {
+      await clear();
+      await hold('dropper', A, holds[i % holds.length]);
+      await settle(1500);
+      await settle(3000);
+      const tIdle = await idleChange(A, 3800);
+      const t0p = await snap('trial0');
+      await stroke('finger', A, B, 1500, 1500);
+      await settle(700);
+      await snap('trial1');
+      const ta = await measure('trial0', t0p), tb = await measure('trial1', t0p);
+      const tIdleAfter = await idleChange(A, 3800);
+      const tDelta = tb.total - ta.total;
+      const excess = Math.max(tDelta - Math.max(0, tIdle, tIdleAfter), Math.min(0, tIdle, tIdleAfter) - tDelta, 0);
+      const share = ta.total > 5 ? excess / ta.total : NaN;
+      if (Number.isFinite(share)) { worst = Math.max(worst, excess); worstShare = Math.max(worstShare, share); }
+      console.log(`  finger trial ${i + 1}/${fTrials}: hold ${holds[i % holds.length]} ms, pool ${ta.total.toFixed(2)}, Δ ${tDelta >= 0 ? '+' : ''}${tDelta.toFixed(2)}, ` +
+        `alone ${tIdle >= 0 ? '+' : ''}${tIdle.toFixed(2)} before and ${tIdleAfter >= 0 ? '+' : ''}${tIdleAfter.toFixed(2)} after, ` +
+        `outside the bracket by ${excess.toFixed(2)} (${Number.isFinite(share) ? `${(share * 100).toFixed(2)}% of the pool` : 'no pool'})`);
+    }
+    console.log(`  finger trials: worst ${worst.toFixed(2)} outside the bracket, ${(worstShare * 100).toFixed(2)}% of its pool\n`);
+  }
+  /*
     The seeder back on for everything after the Finger, as the Blow and the
     Press put it back after theirs.
   */
@@ -525,7 +587,24 @@ try {
         const rb0 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
         const w0p = await snap('wind0');
         const t0 = Date.now();
-        await stroke('blow', from, to, 1500);
+        /*
+          The stroke takes 3000 ms of waiting (4.1 to 4.6 s with its 30 pointer
+          round trips), not 1500 (2.6 to 3.3 s). What the Blow's push follows is the
+          solver steps the wind is laid on, not the pool or the clock: over the
+          28 strokes of 14 Mac runs it correlates 0.73 with the wind steps (-0.22
+          with the pool's size, -0.32 with the moves' time), and the CI Macs step
+          only 12 to 23 times a second, so a stroke of fixed wall time got 38 to
+          71 wind steps and the push read -0.07% to +1.64% against +0.15% to beat.
+          The four reds in those runs each had a stroke of 41 to 53 wind steps
+          and read -0.07% to +0.05%. One Mac run (#465) drew nine strokes at
+          three paces: 45 to 53 wind steps read +0.46% to +0.79% (750 ms of
+          waiting), 67 to 70 read +0.92% to +1.64%, and the slowest paces, 92 and
+          112 wind steps, +1.55% and +2.97% (those at 3000), at 14 to 29
+          solver steps a second, with no straw step in any (the moves 140 to 155 ms apart at 3000, where
+          the straw is a hand held still for three frames). Twice the time gave
+          about twice the wind steps and a push six to twenty times the bar's.
+        */
+        await stroke('blow', from, to, 3000);
         const strokeMs = Date.now() - t0;
         await settle(700);
         await snap('wind1');

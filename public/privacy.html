@@ -42,13 +42,15 @@
 <p>We do not sell anything about you, show you ads, or use analytics or tracking of any kind.</p>
 
 <h2>Your account</h2>
-<p>To use the site you sign in with Google or with a link we email you. Sign-in is run by Google's Firebase Authentication, which keeps:</p>
+<p>To use the site you sign in with Google, with a link we email you, or with an email and a password. Sign-in is run by Google's Firebase Authentication, which keeps:</p>
 <ul>
   <li>your email address,</li>
+  <li>if you choose a password, the password in scrambled (hashed) form: it is held by Firebase, never by our servers, and we cannot read it,</li>
   <li>an account id it makes for you,</li>
   <li>which way you signed in, and when you made the account and last signed in.</li>
 </ul>
-<p>While a signed-in show is running with its local show server, your account also holds a short-lived entry for that running show (its name, its local network address and its show key, expiring after 90 seconds once the show closes) so a phone, tablet or laptop signed in to the same account can join it with a tap. Once linked, the remote talks to the show directly over your own network. If you buy a Home or Pro licence, our Cloudflare Worker also keeps your signed licence key and up to two activated machine identifiers under your email address in Workers KV, so signing in restores your licence and lets you move it between machines.</p>
+<p>While a signed-in show is running with its local show server, your account also holds a short-lived entry for that running show (its name, its local network address and its show key, expiring after 90 seconds once the show closes) so a phone, tablet or laptop signed in to the same account can join it with a tap. Once linked, the remote talks to the show directly over your own network. To check that a phone asking for those shows is really signed in to your account, the show server fetches Google's public sign-in keys from www.googleapis.com; nothing about you is sent with it. If you buy a Home or Pro licence, our Cloudflare Worker also keeps your signed licence key and up to two activated machine identifiers under your email address in Workers KV, so signing in restores your licence and lets you move it between machines. If you have Pro and leave <em>Cloud sync</em> on in <a href="/profile">Profile &amp; Store</a>, the same Worker keeps a copy of your saved looks, sequences, set lists, song shows, custom liquids, MIDI map and app settings under your account, so every computer you sign in to has them; <em>Erase the cloud copy</em> on that page deletes it, and deleting your account deletes it too.</p>
+<p>Firebase sends the emails an email-and-password account needs (confirm your address, choose a new password). One email address is one account: signing in with Google and with a password on the same address reach the same account and the same licence.</p>
 <p>We use your email to sign you in and, if you buy a licence, to send you your key and receipt. We only send product updates or newsletter emails if you explicitly tick the optional opt-in box on the sign-in screen or in <a href="/profile">Profile &amp; Store</a> (stored as an opt-in flag and timestamp under your email in Workers KV), and you can unsubscribe at any time in <a href="/profile">/profile</a> or at <a href="/unsubscribe">/unsubscribe</a>. We never hand or sell your address to anyone.</p>
 
 <h2>Deleting your account</h2>

@@ -24,7 +24,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery, installFrameReader, isGpuEngine } from './frame.mjs';
+import { engineQuery, installFrameReader, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4338;
 const checks = [];
@@ -50,7 +50,8 @@ const MX = 0.30, MY = 0.72;     // off-centre in both axes, on purpose
 */
 const GY = MY;
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
@@ -68,7 +69,8 @@ try {
     a magnet.
   */
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic&sim=384${engineQuery()}`, { waitUntil: 'load' });
-  await page.waitForTimeout(9000);
+  await settlePlate(page, 9000);
+  await waitForEngine(page);
 
   const engine = await page.evaluate(() => window.chromaglassDebug?.().engine ?? null);
   check('the GPU solver is the one being measured', isGpuEngine(engine), engine ?? 'no debug hook');
@@ -98,7 +100,7 @@ try {
       });
     }, magnet);
     // Long enough for any seeding the settings change provoked to finish.
-    await page.waitForTimeout(1500);
+    await settlePlate(page, 1500);
     await page.evaluate(() => {
       const g = window.chromaglassDebug().fluids?.[0]?.gpu;
       g?.clearPhase?.();
@@ -121,7 +123,7 @@ try {
       let t = 0; for (let i = 0; i < f.data.length; i++) t += f.data[i];
       return t;
     });
-    await page.waitForTimeout(6000);
+    await settlePlate(page, 6000);
     const kept = await page.evaluate(async () => {
       const f = await window.chromaglassDebug().readPhase();
       if (!f) return -1;

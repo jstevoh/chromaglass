@@ -13,23 +13,43 @@
  * checks the panel's own source against it.
  */
 
-import { PINNABLE } from './deskPins';
+import { PINNABLE, PIN_RANGE } from './deskPins';
 
 export interface SettingsCategory { id: string; name: string; hint: string }
 
 /**
- * Four groups, by what you are doing when you open one.
+ * Seven groups, by what you are doing when you open one (PLAN 35b).
  *
- * Not by how often: that was the old Perform/Setup split, and the trouble with
- * it was that "how often" is not a thing you can search for. "The camera is an
- * input" is.
+ * There used to be four vocabularies for the same sections and they did not
+ * agree: `data-group` in the panel's markup (perform, setup, look, inputs,
+ * stage), the rail's five (Live, Inputs, Look, Plate, Stage), the panel
+ * browser's, which borrowed the rail's and added its own panels to them, and the
+ * phone's Settings strip, which drew the same groups with the headings hidden.
+ * This is the one list; the rail, the browser, the sections' `data-group` and
+ * the desk's own panels (`lib/deskLayout.ts`) all read it, in this order.
+ *
+ * What goes where is the question you have in your hand: Play is riding the
+ * show you have, Pour is putting liquid on the plate, Feed is what drives the
+ * show (sound, a camera, a film, a controller), Motion is how the plate moves
+ * by itself, Chemistry is the liquid's own behaviour, Look is what the light
+ * does to the picture, and Stage is the room and the machine. Not by how
+ * often: that was the old Perform/Setup split, and "how often" is not a thing
+ * you can search for.
+ *
+ * Only which group a section sits in changes here. A section's controls, its
+ * id and its place on the desk are what they were (PLAN 35c, one home for
+ * each setting, is the step that split Squish Plate up: it held the plate's
+ * tilt, the oil, the ferrofluid and the reactions, and was the only member of
+ * Chemistry until then).
  */
 export const SETTINGS_CATEGORIES: SettingsCategory[] = [
-  { id: 'live',   name: 'Live',    hint: 'running the show' },
-  { id: 'inputs', name: 'Inputs',  hint: 'what drives the show' },
-  { id: 'look',   name: 'Look',    hint: 'what it looks like' },
-  { id: 'plate',  name: 'Plate',   hint: 'the liquid itself' },
-  { id: 'stage',  name: 'Stage',   hint: 'the room and the machine' },
+  { id: 'play',      name: 'Play',      hint: 'riding the show you have' },
+  { id: 'pour',      name: 'Pour',      hint: 'putting liquid on the plate' },
+  { id: 'feed',      name: 'Feed',      hint: 'what drives the show' },
+  { id: 'motion',    name: 'Motion',    hint: 'how the plate moves by itself' },
+  { id: 'chemistry', name: 'Chemistry', hint: 'the liquid itself' },
+  { id: 'look',      name: 'Look',      hint: 'what the light does to the picture' },
+  { id: 'stage',     name: 'Stage',     hint: 'the room and the machine' },
 ];
 
 export interface SettingsSection {
@@ -49,7 +69,7 @@ export interface SettingsSection {
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   // First, so the sheet opens on it: what a show is run with, whatever the look.
-  { id: 'master', name: 'Master', category: 'live',
+  { id: 'master', name: 'Master', category: 'play',
     terms: 'master house lights dimmer blackout black out flash limit strobe photosensitive epilepsy safety speed pace tempo of the plate' },
   /*
     The mixer (lib/mixer.ts, docs/rig-plan.md R7): every picture on the wall
@@ -57,7 +77,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     Master, because it is ridden during a show; the desks and the phone open
     the same panel.
   */
-  { id: 'mixer', name: 'Mixer', category: 'live',
+  { id: 'mixer', name: 'Mixer', category: 'play',
     terms: 'mixer video mixer stack order layers layer order bring forward send back led ring platform film video logo mark front plate back plate brightness contrast saturation hue grade proc amp colour correction opacity level' },
   /*
     Sound Mappings is in here now: Sound Drive and the four bands' wiring.
@@ -67,16 +87,16 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     the sound it reads, the way Room Drive is in The Room and Film Drive in
     Video. `MERGED_SECTIONS` below sends its old id here.
   */
-  { id: 'audio-input', name: 'Sound', category: 'inputs',
-    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation' },
+  { id: 'audio-input', name: 'Sound', category: 'feed',
+    terms: 'sound microphone mic system file band device tempo bpm tap midi clock beat prediction calibration calibrate recalibrate song mappings bass mid treble energy timbre map drive reactive velocity density colour color rotation impact' },
   /*
     Called by what it does (PLAN 14ad, the owner 2026-10-24: "what the room
     control is vs. showing video on the plate"). "The Room" said where the
     camera points, which is also where a webcam showing a picture points; this
     one stirs and is never shown. Search still finds it by "room".
   */
-  { id: 'room', name: 'Motion camera', category: 'inputs',
-    terms: 'room camera video webcam people crowd dancers track tracking hands motion movement sensor floor deadzone smoothing mirror flip presence drive' },
+  { id: 'room', name: 'Motion camera', category: 'feed',
+    terms: 'room camera video webcam people crowd dancers track tracking hands motion movement sensor floor deadzone smoothing mirror flip presence drive impact' },
   /*
     The film projector, out of Projectors.
 
@@ -87,8 +107,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     here too, because nobody loads a reel and then goes to a different
     section to see it.
   */
-  { id: 'film', name: 'Video', category: 'inputs',
-    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive' },
+  { id: 'film', name: 'Film', category: 'feed',
+    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive impact' },
   /*
     The patch bay, with every master over it.
 
@@ -99,9 +119,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     Room Impact in The Room, Film Impact in Projectors (and the shapes had
     none). One place now, after the sources it reads.
   */
-  { id: 'patches', name: 'Patches', category: 'inputs',
+  { id: 'patches', name: 'Patches', category: 'feed',
     terms: 'patch patches patch bay modular route routing mapping mappings map source feature control depth impact master lfo envelope shape shapes modulator room film sound' },
-  { id: 'midi', name: 'Controller', category: 'inputs',
+  { id: 'midi', name: 'Controller', category: 'feed',
     terms: 'midi apc40 apc mini launchpad nanokontrol launch control xl fader knob pad learn map bank shift soft takeover led clock controller akai novation korg usb' },
 
   { id: 'look', name: 'Light Show Look', category: 'look',
@@ -118,7 +138,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     dimensions were constants in the shader, so there was nothing to group.
     Now there is.
   */
-  { id: 'kaleidoscope', name: 'Kaleidoscope', category: 'look',
+  { id: 'kaleidoscope', name: 'Kaleidoscope', category: 'motion',
     terms: 'kaleidoscope mirror folds wedges spin rotation turn rig zoom mandala symmetry reflect prism' },
   /*
     The lamp, and everything else a crew put in front of it.
@@ -133,27 +153,55 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade transmission light through dye thickness depth pale deep' },
   { id: 'stock', name: 'Film Stock', category: 'look',
     terms: 'film stock 16mm super 8 slide reversal negative faded grain gate weave projector curve toe shoulder period sixties' },
-  { id: 'camera', name: 'Camera', category: 'look',
-    terms: 'photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
+  { id: 'camera', name: 'Lens', category: 'look',
+    terms: 'camera photograph paper focus aperture bloom chromatic aberration refraction droplets thin film lens depth of field' },
   { id: 'macro', name: 'Macro Closeup', category: 'look',
     terms: 'zoom bead chase magnify closeup detail cells lacing depth relief' },
-  { id: 'automation', name: 'Automation', category: 'look',
+  { id: 'automation', name: 'Automation', category: 'motion',
     terms: 'evolve random drops air bursts rate dye budget' },
 
-  { id: 'squish', name: 'Squish Plate', category: 'plate',
-    terms: 'plate pressure squeeze film hele-shaw gap thickness viscosity thick thin smear drip rain' },
+  /*
+    Squish Plate was forty controls under one name: the glass, the oil, the
+    ferrofluid, the reactions and the tilt. It is five sections now (PLAN 35c,
+    the owner 2026-10-24: one home for each setting), and this one is the
+    glass itself. Its id stays: a saved desk layout and a deep link name it,
+    and the controls that stayed are the ones the name was always about.
+  */
+  { id: 'squish', name: 'Squish Plate', category: 'chemistry',
+    terms: 'plate pressure press squeeze film hele-shaw gap thin gap thickness plate shape dome depth drag press lift viscosity thick thin smear glass drip rain' },
+  { id: 'oil', name: 'Oil & Soap', category: 'chemistry',
+    terms: 'oil tension bodies soap bursts surfactant clear film lace polarity repulsion repel immiscible water alcohol surface tension' },
+  { id: 'ferro', name: 'Ferrofluid', category: 'chemistry',
+    terms: 'ferrofluid magnet magnetic domain size phase edge pushes dye labyrinth maze detail spikes walk strength height lattice' },
+  { id: 'reactions', name: 'Reactions', category: 'chemistry',
+    terms: 'reaction reactions chemistry ph indicator acid bz belousov zhabotinsky liesegang rings turing pattern spots labyrinth print ink starch drift' },
+  /*
+    The plate tipped. Gravity and Tilt Direction were in Squish Plate, Slosh
+    beside them, and Plate Rock in Light Show Look between Bubbles and Frame
+    Sway: four controls that all say which way the heavy colour runs.
+  */
+  { id: 'tilt', name: 'Tilt & Rock', category: 'motion',
+    terms: 'tilt rock rocking gravity slosh tip tipping dish upright direction downhill beat plate rock' },
+  /*
+    The plate turning, which was the first half of Plates & LED. That section
+    is Stage's, and Stage is the group that keeps a panel out of Build and Gig,
+    so the dish's spin could not be docked beside the set it is ridden in.
+    Same ids, same keys: only the section a pin is filed under changed.
+  */
+  { id: 'spin', name: 'Plate Spin', category: 'motion',
+    terms: 'spin rotation rotate turn flick auto spin turntable dish rpm tempo beats a turn reverse spin direction wander drag flywheel motor plate speed' },
   // The old names of Momentum, Updraft and Vibration stay findable, as Grain
   // Fineness's does under Light Show Look: someone who learned them as
   // Damping, Blow Velocity, Vibration Freq and Grain Size will type those.
   // And Heat Slide, which was two knobs on a panel of its own (Evaporation
   // Rate, Heat Decay): the heat they set is the heat Heat Spread spreads and
   // Buoyancy lifts, which were already here.
-  { id: 'physics', name: 'Fluid Physics', category: 'plate',
+  { id: 'physics', name: 'Fluid Physics', category: 'motion',
     terms: 'viscosity diffusion vorticity immiscibility fingering surface tension advection damping friction heat slide temperature buoyancy convection evaporation' },
   // The bottles themselves: design one, load one from a file, save them.
-  { id: 'liquids', name: 'Liquids', category: 'plate',
+  { id: 'liquids', name: 'Liquids', category: 'pour',
     terms: 'liquid liquids bottle bottles shelf custom design make create own import upload load export save file json ferrofluid magnetic oil water soap polarity weight' },
-  { id: 'interaction', name: 'Manual Interaction', category: 'plate',
+  { id: 'interaction', name: 'Manual Interaction', category: 'pour',
     terms: 'brush dropper blow press tools mouse touch radius strength velocity air wind draught draft frequency drop height fall splash impact crown satellite droplets' },
 
   /*
@@ -184,7 +232,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'mark', name: 'Logo & Titles', category: 'stage',
     terms: 'logo mark brand branding title card watermark sponsor client name overlay still image png transparent credit' },
   { id: 'layers', name: 'Plates & LED', category: 'stage',
-    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform spin flick auto spin turntable dish rpm tempo beats a turn reverse spin' },
+    terms: 'layer layers plates blend mode screen multiply overlay exclusion count led platform' },
   { id: 'simulation', name: 'Simulation', category: 'stage',
     terms: 'fluid grid solver resolution gpu cpu engine performance quality sharpness granulation grain' },
 ];
@@ -205,6 +253,35 @@ export const resolveSection = (id: string): string => MERGED_SECTIONS[id] ?? id;
 
 export const SECTION_NAME = new Map(SETTINGS_SECTIONS.map(s => [s.id, s.name]));
 export const SECTION_BY_ID = new Map(SETTINGS_SECTIONS.map(s => [s.id, s]));
+
+/** The group a section sits in, for the markup's `data-group`. */
+export const groupOf = (id: string): string => SECTION_BY_ID.get(id)?.category ?? '';
+
+/**
+ * The group a *setting* lives in, by the section that draws it, so a knob in
+ * the Rides panel (a Play panel) carries the colour of the group its own
+ * section is in and not the panel's: one control, one colour, wherever it is
+ * pinned (PLAN 35d). Undefined for a key no section draws; the knob then
+ * takes the colour of whatever it sits inside.
+ */
+export const groupOfSetting = (key: string | null | undefined): string | undefined => {
+  const section = key ? PIN_RANGE.get(key)?.section : undefined;
+  return section ? SECTION_BY_ID.get(section)?.category : undefined;
+};
+
+/**
+ * The five controls that set a *pace*, which wear a snail at the slow end of
+ * the travel and a hare at the fast one (PLAN 35d). A pace is how fast
+ * something runs by itself, so Master Speed, Evolve Speed, the gel wheel's
+ * and the macro camera's chase, and the kaleidoscope's spin. A control that
+ * is a rate of something else (a Flow, a Rate of rain) is not one of them.
+ * `bipolar` is the spin that runs backwards below zero: the hare is at both
+ * ends, the snail at the stop in the middle.
+ */
+export const PACE_KEYS: Record<string, { bipolar?: boolean }> = {
+  globalSpeed: {}, automateRate: {}, gelSpeed: {}, macroChase: {}, kaleidoSpin: { bipolar: true },
+};
+export const paceOf = (key: string | null | undefined): { bipolar?: boolean } | undefined => (key ? PACE_KEYS[key] : undefined);
 
 /*
   Every control's own label, by the section it lives in.

@@ -422,7 +422,7 @@ export const ACTION_LABELS: Record<MidiAction, string> = {
   'play-toggle': 'Play / Pause', 'automate-toggle': 'Random Evolve', 'overlays-toggle': 'Clean Screen', 'macro-toggle': 'Macro',
   'seq-play-pause': 'Sequencer Play / Pause', 'seq-next': 'Sequencer Next', 'seq-prev': 'Sequencer Previous', 'seq-stop': 'Sequencer Stop',
   'preset-next': 'Next Preset', 'preset-prev': 'Previous Preset',
-  'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record Performance',
+  'blackout-toggle': 'Blackout', 'record-toggle': 'Record', 'performance-toggle': 'Record a Take',
   'scene-toggle': 'Watch the Room',
   'cue-next': 'Cue Next Look', 'cue-prev': 'Cue Previous Look', 'go': 'Go', 'revert': 'Back',
   'go-back-plate': 'Go to Back Plate', 'back-follows-front': 'Back Plate Follows Front',
@@ -561,6 +561,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // because the way down is a gesture too: the colours start to cross the
   // edges and the bodies bleed into the water they sit in.
   { key: 'oilBodies',       label: 'Oil Bodies',       min: 0, max: 1 },
+  { key: 'filmHold',        label: 'Film Hold',        min: 0, max: 1 },
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.
   { key: 'clearFilm',       label: 'Clear Film',       min: 0, max: 1 },

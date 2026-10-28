@@ -1,14 +1,16 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import type { TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
-  Droplet, SprayCan, Paintbrush, FlaskConical, Slash, Wind, Hand, Fingerprint, Magnet,
+  Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
-  Crosshair,
+  Crosshair, LayoutGrid, Plus,
 } from 'lucide-react';
-import { Slider } from '../ui';
+import { Slider, Segmented, LIT, LIVE } from '../ui';
+import { ToolGlyph } from '../ui/ToolGlyph';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
@@ -22,6 +24,11 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
+import { TabStrip } from '../desk/TabStrip';
+import type { TabEdit } from '../../hooks/useDeskLayout';
+import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
+import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
+import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 
 /**
  * ChromaGlass on a phone.
@@ -52,18 +59,18 @@ import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 
 export type PhoneTool = 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet' | 'spin';
 
-const TOOLS: { id: PhoneTool; label: string; icon: ComponentType<{ size?: number }> }[] = [
-  { id: 'dropper', label: 'Drop', icon: Droplet },
-  { id: 'spray', label: 'Spray', icon: SprayCan },
-  { id: 'splatter', label: 'Splat', icon: Paintbrush },
-  { id: 'pour', label: 'Pour', icon: FlaskConical },
-  { id: 'streak', label: 'Streak', icon: Slash },
-  { id: 'blow', label: 'Blow', icon: Wind },
-  { id: 'press', label: 'Press', icon: Hand },
-  { id: 'finger', label: 'Finger', icon: Fingerprint },
-  { id: 'magnet', label: 'Magnet', icon: Magnet },
+const TOOLS: { id: PhoneTool; label: string }[] = [
+  { id: 'dropper', label: 'Drop' },
+  { id: 'spray', label: 'Spray' },
+  { id: 'splatter', label: 'Splat' },
+  { id: 'pour', label: 'Pour' },
+  { id: 'streak', label: 'Streak' },
+  { id: 'blow', label: 'Blow' },
+  { id: 'press', label: 'Press' },
+  { id: 'finger', label: 'Finger' },
+  { id: 'magnet', label: 'Magnet' },
   // The dish under the finger (PLAN §22): go round the middle and it turns.
-  { id: 'spin', label: 'Spin', icon: RotateCw },
+  { id: 'spin', label: 'Spin' },
 ];
 
 export interface PhoneLook {
@@ -74,7 +81,34 @@ export interface PhoneLook {
   swatch: string;
 }
 
-type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more';
+type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs';
+
+/**
+ * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
+ * reordered, added and taken away the same way, each tab's panels stacked in
+ * one sheet. A settings section or one of the screens (Songs, Sequences,
+ * Music & Drone) is drawn in it whole; the desk's own panels (the bottles,
+ * the set list, the rides) were built for a mouse, and the phone has its own
+ * of each, so their card opens that sheet instead.
+ */
+export interface PhoneTabs {
+  tabs: { id: string; name: string }[];
+  tab: string;
+  onTab: (id: string) => void;
+  onEdit: (e: TabEdit) => void;
+  /** The panels out on the tab that is up, in reading order. */
+  panels: string[];
+  onAdd: (id: string) => void;
+  onRemove: (id: string) => void;
+  /** A panel drawn whole, or null for one of the desk's own. */
+  render: (id: string) => ReactNode | null;
+}
+
+/** The phone's own sheet for each of the desk's own panels. */
+const OWN_SHEET: Record<string, Exclude<SheetName, 'tabs' | 'more'>> = {
+  bottles: 'dye', dyes: 'dye', tools: 'dye', cues: 'looks', recipe: 'play', rides: 'play', score: 'play', mixer: 'mix',
+};
+const SHEET_NAME: Record<string, string> = { dye: 'Dye', looks: 'Looks', play: 'Motion', mix: 'Mix', sound: 'Sound' };
 type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
 
 export interface PhoneStageProps {
@@ -83,6 +117,8 @@ export interface PhoneStageProps {
   lookSwatch: string;
   looks: PhoneLook[];
   activeLookId: string | null;
+  /** The look on stage's place in `looks`, which way the slide tray clicks (PLAN 35g). */
+  lookSlot?: number | null;
   onLook: (id: string) => void;
   onRandomLook: () => void;
   onRevert: (() => void) | null;
@@ -110,6 +146,8 @@ export interface PhoneStageProps {
   // The bottles
   liquids: LiquidType[];
   selectedLiquidId: string;
+  /** What is left of the Dye Budget, 0 to 1, for the bottle in hand. */
+  dyeRoom?: () => number;
   onLiquid: (id: string) => void;
   dyeColors: readonly string[];
   onDyeColor: (hex: string) => void;
@@ -144,7 +182,7 @@ export interface PhoneStageProps {
     a turn. On the Play sheet beside the flick, since a turning dish is
     something played, not set up.
   */
-  spin: { auto: number; rpm: number; beats: number; onChange: (patch: Partial<VisualizerSettings>) => void };
+  spin: { auto: number; rpm: number; beats: number; /** The tempo the dish's Tempo mode is lit by, bpm, or 0. */ bpm: number; onChange: (patch: Partial<VisualizerSettings>) => void };
   // The closeup
   zoom: number;
   onZoom: () => void;
@@ -182,6 +220,12 @@ export interface PhoneStageProps {
   mapLine: string | null;
   /** Listening but hearing nothing (hooks/useAudioAnalyzer.ts): the dock's dot turns amber and the sound sheet says so. */
   deaf: boolean;
+  /** The plate's volume, 0 to 100, or null with no ear: what the VU needle in the Sound sheet is moved by. */
+  readLevel: () => number | null;
+  /** The tempo source: where the tempo comes from, a tap, and the reading the beat light polls. */
+  tempo: { source: string | null; bpm: number; taps: number };
+  onTap: () => void;
+  readTempo: () => TempoReading | null;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
     the filmed shows (lib/scenePacing.ts), started and stopped from a tile on
@@ -295,9 +339,11 @@ export interface PhoneStageProps {
   onSettings: () => void;
   onSongs: () => void;
   onGuide: () => void;
-  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void };
+  recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void };
   onHide: () => void;
   onFullLayout: () => void;
+  /** The desk's tabs, on the phone (More → Tabs). */
+  deskTabs?: PhoneTabs;
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
   onOpenAccount?: () => void;
@@ -333,8 +379,10 @@ function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 /** A square button for a sheet's grid: icon over a word, 64 tall. */
-function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
+function Tile({ icon: Icon, label, on = false, onPress, testId, tone, glyph }: {
   icon: ComponentType<{ size?: number }>; label: string; on?: boolean; onPress: () => void; testId?: string; tone?: 'live';
+  /** A picture in place of the icon (Record's tape reels). */
+  glyph?: ReactNode;
 }) {
   return (
     <button
@@ -342,13 +390,13 @@ function Tile({ icon: Icon, label, on = false, onPress, testId, tone }: {
       aria-pressed={on}
       data-testid={testId}
       className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-lg border text-[13px] transition-colors active:scale-[0.97] ${
-        tone === 'live' && on ? 'border-live-border bg-live-bg text-live'
-          : on ? 'border-accent-border bg-accent-bg text-accent-text'
+        tone === 'live' && on ? LIVE
+          : on ? LIT
           : 'border-border bg-elevated text-text-2 active:bg-active'
       }`}
     >
-      <Icon size={20} />
-      <span>{label}</span>
+      {glyph ?? <Icon size={20} />}
+      <span className="tabular-nums">{label}</span>
     </button>
   );
 }
@@ -414,8 +462,9 @@ export function PhoneStage(p: PhoneStageProps) {
           data-testid="phone-look-button"
           aria-label="Choose a look"
         >
-          <span className="h-9 w-9 shrink-0 rounded-full border border-white/20" style={{ background: p.lookSwatch }} />
+          <SlideMount swatch={p.lookSwatch} size={36} />
           <span className="truncate text-[14px] font-medium text-text">{p.lookName ?? 'Custom'}</span>
+          <span className="shrink-0 text-muted"><SlideTray at={p.lookSlot ?? null} size={20} /></span>
           <ChevronDown size={16} className="shrink-0 text-muted" />
         </button>
         <div className="pointer-events-auto flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
@@ -437,15 +486,16 @@ export function PhoneStage(p: PhoneStageProps) {
             aria-pressed={zoomed}
             aria-label={zoomed ? 'Leave the closeup' : 'Closeup'}
             data-testid="phone-zoom"
-            className={`flex h-12 w-12 items-center justify-center rounded-full ${zoomed ? 'bg-accent-bg text-accent-text' : 'text-text-2 active:bg-active'}`}
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${zoomed ? LIT : 'text-text-2 active:bg-active'}`}
           >
             <Microscope size={20} />
           </button>
           <button
             onClick={p.onPlay}
-            aria-label={p.playing ? 'Pause the plate' : 'Play the plate'}
+            aria-label={p.playing ? 'Pause the plate' : 'Paused. Play the plate'}
+            aria-pressed={!p.playing}
             data-testid="phone-play"
-            className={`flex h-12 w-12 items-center justify-center rounded-full ${p.playing ? 'text-text-2 active:bg-active' : 'bg-primary text-on-primary'}`}
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${p.playing ? 'text-text-2 active:bg-active' : LIT}`}
           >
             {p.playing ? <Pause size={20} /> : <Play size={20} fill="currentColor" />}
           </button>
@@ -469,7 +519,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 onClick={() => p.onCamera(c)}
                 aria-pressed={p.camera === c}
                 data-testid={`phone-camera-${c}`}
-                className={`flex h-10 min-w-[64px] items-center justify-center gap-1.5 rounded-full px-3 text-[13px] capitalize ${p.camera === c ? 'bg-accent-bg text-accent-text' : 'text-text-2'}`}
+                className={`flex h-10 min-w-[64px] items-center justify-center gap-1.5 rounded-full px-3 text-[13px] capitalize ${p.camera === c ? LIT : 'text-text-2'}`}
               >
                 {/* As on the desk's chip (QA-11): Follow is locked on one subject, Auto cuts. */}
                 {c === 'follow' && <Crosshair size={14} aria-hidden />}
@@ -611,7 +661,7 @@ export function PhoneStage(p: PhoneStageProps) {
         data-testid="phone-dock"
       >
         <div className="grid min-w-0 flex-1 grid-cols-6 gap-1 landscape:grid-cols-11" data-testid="phone-tools">
-          {TOOLS.map(({ id, label, icon: Icon }) => {
+          {TOOLS.map(({ id, label }) => {
             const on = p.tool === id;
             return (
               <button
@@ -627,10 +677,10 @@ export function PhoneStage(p: PhoneStageProps) {
                 aria-label={on ? `${label}, in hand. Tap again for its amount` : label}
                 data-testid={`phone-tool-${id}`}
                 className={`relative flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${
-                  on ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-transparent text-text-2 active:bg-active'
+                  on ? `${LIT} translate-y-[2px]` : 'border-transparent text-text-2 active:bg-active'
                 }`}
               >
-                <Icon size={20} />
+                <ToolGlyph id={id} size={20} />
                 <span>{label}</span>
                 {on && Math.abs(p.amount - 1) > 0.01 && (
                   <span className="absolute right-0.5 top-0.5 rounded-xs bg-black/60 px-1 font-mono text-[11px] text-text">{p.amount.toFixed(1)}</span>
@@ -643,17 +693,18 @@ export function PhoneStage(p: PhoneStageProps) {
             aria-pressed={sheet === 'dye'}
             aria-label={`Dye: ${liquid?.name ?? 'none'}. Choose a bottle and its colour`}
             data-testid="phone-open-dye"
-            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-transparent text-text-2 active:bg-active'}`}
+            className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? LIT : 'border-transparent text-text-2 active:bg-active'}`}
           >
-            <span className="h-5 w-5 rounded-full border-2 border-white/40" style={liquid ? bottleSwatch(liquid) : { backgroundColor: '#fff' }} />
+            {/* The bottle in hand, filled to what is left of the Dye Budget (PLAN 35e); it leans while its sheet is open. */}
+            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
         <div className="grid shrink-0 grid-cols-5 gap-1 border-t border-border pt-1.5 landscape:pt-1 wide-land:w-[264px] wide-land:border-l wide-land:border-t-0 wide-land:pl-1.5 wide-land:pt-0">
           {([
-            ['looks', 'Presets', Palette],
+            ['looks', 'Looks', Palette],
             ['sound', 'Sound', Music],
-            ['play', 'Play', Waves],
+            ['play', 'Motion', Waves],
             ['mix', 'Mix', SlidersVertical],
             ['more', 'More', MoreHorizontal],
           ] as const).map(([name, label, Icon]) => (
@@ -662,11 +713,11 @@ export function PhoneStage(p: PhoneStageProps) {
               onClick={() => open(name)}
               aria-pressed={sheet === name}
               data-testid={`phone-open-${name}`}
-              className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] ${sheet === name ? 'border border-accent-border bg-accent-bg text-accent-text' : 'border border-transparent text-text-2 active:bg-active'}`}
+              className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] ${sheet === name ? `border ${LIT}` : 'border border-transparent text-text-2 active:bg-active'}`}
             >
               <Icon size={18} />
               <span>{label}</span>
-              {name === 'play' && (p.evolving || p.tilt.on) && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-accent" />}
+              {name === 'play' && (p.evolving || p.tilt.on) && <span className={`absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full ${sheet === name ? 'bg-on-lit' : 'bg-accent'}`} />}
               {name === 'sound' && p.audioSource !== 'none' && <span className={`absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full ${p.deaf ? 'bg-warn' : 'bg-ok'}`} data-testid="phone-sound-dot" data-deaf={p.deaf ? 'true' : undefined} />}
               {name === 'more' && p.recording.on && <span className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-live" />}
             </button>
@@ -693,10 +744,12 @@ export function PhoneStage(p: PhoneStageProps) {
                       onClick={() => { p.onLiquid(l.id); p.onTool('dropper'); }}
                       aria-pressed={on}
                       data-testid={`phone-liquid-${l.id}`}
-                      className={`flex h-12 items-center gap-2.5 rounded-lg border px-3 text-left text-[14px] ${on ? 'text-text' : 'border-border bg-elevated text-text-2'}`}
-                      style={on ? { borderColor: l.color, backgroundColor: `${l.color}26` } : undefined}
+                      className={`flex h-12 items-center gap-2.5 rounded-lg border px-3 text-left text-[14px] ${on ? LIT : 'border-border bg-elevated text-text-2'}`}
                     >
-                      <span className="h-5 w-5 shrink-0 rounded-full border-2 border-white/30" style={bottleSwatch(l)} />
+                      {/* The picked bottle leans and shows what is left of the budget; the others stand full. */}
+                      {on
+                        ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} height={24} testId="phone-bottle-in-hand" />
+                        : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} height={24} />}
                       <span className="truncate">{l.name}</span>
                     </button>
                   );
@@ -752,7 +805,7 @@ export function PhoneStage(p: PhoneStageProps) {
             <button
               onClick={() => p.onPalette(null)}
               aria-pressed={p.paletteLock == null}
-              className={`h-12 shrink-0 rounded-lg border px-4 text-[13px] ${p.paletteLock == null ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}
+              className={`h-12 shrink-0 rounded-lg border px-4 text-[13px] ${p.paletteLock == null ? LIT : 'border-border bg-elevated text-text-2'}`}
             >
               Auto
             </button>
@@ -761,7 +814,7 @@ export function PhoneStage(p: PhoneStageProps) {
                 key={pal.name}
                 onClick={() => p.onPalette(i)}
                 aria-pressed={p.paletteLock === i}
-                className={`flex h-12 shrink-0 items-center gap-2 rounded-lg border px-3 text-[13px] ${p.paletteLock === i ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}
+                className={`flex h-12 shrink-0 items-center gap-2 rounded-lg border px-3 text-[13px] ${p.paletteLock === i ? LIT : 'border-border bg-elevated text-text-2'}`}
               >
                 <span className="flex">
                   {pal.colors.slice(0, 4).map((c, j) => <span key={j} className="-ml-1 h-4 w-4 rounded-full border border-black/40 first:ml-0" style={{ backgroundColor: c }} />)}
@@ -879,9 +932,9 @@ export function PhoneStage(p: PhoneStageProps) {
                       }}
                       aria-pressed={on}
                       data-testid={`phone-look-${l.id}`}
-                      className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? 'border-accent-border bg-accent-bg' : 'border-transparent active:bg-active'}`}
+                      className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
                     >
-                      <span className="h-10 w-10 shrink-0 rounded-md border border-white/10" style={{ background: l.swatch }} />
+                      <SlideMount swatch={l.swatch} size={44} />
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
                         {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
@@ -899,7 +952,10 @@ export function PhoneStage(p: PhoneStageProps) {
       {sheet === 'sound' && (
         <PhoneSheet title="Sound" onClose={close} testId="phone-sheet-sound">
           <PanelGuard name="The Sound sheet" inline onClose={close}>
-          <p className="mb-3 text-[13px] leading-snug text-muted">What the plate listens to. It moves with whatever is playing.</p>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-[13px] leading-snug text-muted">What the plate listens to. It moves with whatever is playing.</p>
+            <VuMeter read={p.readLevel} listening={p.audioSource !== 'none'} deaf={p.audioSource !== 'none' && p.deaf} width={72} />
+          </div>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Mic} label="Microphone" on={p.audioSource === 'microphone'} onPress={() => p.onAudioSource(p.audioSource === 'microphone' ? 'none' : 'microphone')} testId="phone-sound-mic" />
             <Tile icon={Music} label="Band" on={p.audioSource === 'simulated'} onPress={() => p.onAudioSource(p.audioSource === 'simulated' ? 'none' : 'simulated')} testId="phone-sound-band" />
@@ -921,7 +977,7 @@ export function PhoneStage(p: PhoneStageProps) {
                   key={t.src}
                   onClick={() => p.onTrack(t)}
                   aria-pressed={p.nowPlaying?.src === t.src}
-                  className={`flex min-h-[52px] flex-col justify-center rounded-lg px-3 text-left ${p.nowPlaying?.src === t.src ? 'bg-accent-bg' : 'active:bg-active'}`}
+                  className={`flex min-h-[52px] flex-col justify-center rounded-lg px-3 text-left ${p.nowPlaying?.src === t.src ? LIT : 'active:bg-active'}`}
                 >
                   <span className={`text-[14px] ${p.nowPlaying?.src === t.src ? 'text-accent-text' : 'text-text'}`}>{t.title}</span>
                   <span className="text-[12px] text-dim">{t.artist} · {t.licence}</span>
@@ -973,6 +1029,13 @@ export function PhoneStage(p: PhoneStageProps) {
               </p>
             </div>
           )}
+          <SectionLabel>Tap the tempo</SectionLabel>
+          <div className="flex items-stretch gap-2" data-testid="phone-tempo">
+            <TapPad tempo={p.tempo} read={p.readTempo} onTap={p.onTap} touch />
+          </div>
+          <p className="mt-1 text-[12px] leading-snug text-dim" data-testid="phone-tempo-says">
+            {p.tempo.source ? `${p.tempo.bpm} bpm, ${p.tempo.source === 'clock' ? 'from MIDI clock' : p.tempo.source === 'tap' ? 'tapped' : 'set'}. Four taps give a good one.` : 'Listening for the tempo. Two taps give one, four give a good one.'}
+          </p>
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
@@ -982,7 +1045,7 @@ export function PhoneStage(p: PhoneStageProps) {
       )}
 
       {sheet === 'play' && (
-        <PhoneSheet title="Play" onClose={close} testId="phone-sheet-play">
+        <PhoneSheet title="Motion" onClose={close} testId="phone-sheet-play">
           <PanelGuard name="The Play sheet" inline onClose={close}>
           <div className="grid grid-cols-2 gap-1.5">
             <Tile icon={Hourglass} label={p.evolving ? 'Evolving' : 'Evolve'} on={p.evolving} onPress={() => p.onEvolve(!p.evolving)} testId="phone-evolve" />
@@ -1025,7 +1088,7 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="grid gap-1.5" style={{ gridTemplateColumns: p.layers > 1 ? `repeat(${p.layers}, minmax(0, 1fr)) auto` : '1fr' }}>
             {p.layers > 1 && Array.from({ length: p.layers }).map((_, i) => (
               <button key={i} onClick={() => p.onLayer(i)} aria-pressed={p.activeLayer === i} data-testid={`phone-layer-${i}`}
-                className={`h-12 rounded-lg border text-[14px] ${p.activeLayer === i ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
+                className={`h-12 rounded-lg border text-[14px] ${p.activeLayer === i ? LIT : 'border-border bg-elevated text-text-2'}`}>
                 {i === 0 ? 'Front' : i === 1 ? 'Back' : `Layer ${i + 1}`}
               </button>
             ))}
@@ -1042,11 +1105,20 @@ export function PhoneStage(p: PhoneStageProps) {
             )}
           </div>
           <SectionLabel>Turn the dish by itself</SectionLabel>
+          <div className="mb-2 flex items-center gap-3" data-testid="phone-spin-strobe">
+            <StrobeRing mode={p.spin.auto} rpm={p.spin.rpm} beats={p.spin.beats} bpm={p.spin.bpm} size={44} />
+            <p className="text-[12px] leading-snug text-dim" data-testid="phone-spin-strobe-says">
+              {Math.round(p.spin.auto) === 2 && p.spin.bpm > 0
+                ? `Locked to ${p.spin.bpm} bpm: the dots stand still while the dish turns once in ${Math.round(p.spin.beats)} beats.`
+                : Math.round(p.spin.auto) === 0 ? 'Auto Spin is off.'
+                : `Turning at ${Math.abs(p.spin.rpm).toFixed(1)} rpm${Math.round(p.spin.auto) === 2 ? ' until a tempo is heard' : ''}.`}
+            </p>
+          </div>
           <div className="grid grid-cols-3 gap-1.5" data-testid="phone-spin-auto">
             {(['Off', 'Rate', 'Tempo'] as const).map((name, mode) => (
               <button key={name} onClick={() => p.spin.onChange({ spinAuto: mode })} aria-pressed={Math.round(p.spin.auto) === mode}
                 data-testid={`phone-spin-auto-${name.toLowerCase()}`}
-                className={`h-12 rounded-lg border text-[14px] ${Math.round(p.spin.auto) === mode ? 'border-accent-border bg-accent-bg text-accent-text' : 'border-border bg-elevated text-text-2'}`}>
+                className={`h-12 rounded-lg border text-[14px] ${Math.round(p.spin.auto) === mode ? LIT : 'border-border bg-elevated text-text-2'}`}>
                 {name}
               </button>
             ))}
@@ -1093,30 +1165,50 @@ export function PhoneStage(p: PhoneStageProps) {
         </PhoneSheet>
       )}
 
+      {sheet === 'tabs' && p.deskTabs && (
+        <PhoneSheet title="Tabs" onClose={close} testId="phone-sheet-tabs">
+          <PanelGuard name="The Tabs sheet" inline onClose={close}>
+            <PhoneTabsBody t={p.deskTabs} openSheet={open} />
+          </PanelGuard>
+        </PhoneSheet>
+      )}
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
           <div className="grid grid-cols-3 gap-1.5">
-            {p.recording.supported && (
-              <Tile
-                icon={p.recording.on ? Square : Circle}
-                label={p.recording.on ? `${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
-                on={p.recording.on}
-                tone="live"
-                onPress={p.recording.onToggle}
-                testId="phone-record"
-              />
-            )}
+            <Tile
+              icon={p.recording.on ? Square : Circle}
+              label={p.recording.on ? `${Math.floor(p.recording.seconds / 60)}:${String(p.recording.seconds % 60).padStart(2, '0')}` : 'Record'}
+              on={p.recording.on}
+              tone="live"
+              onPress={p.recording.onToggle}
+              testId="phone-record"
+              glyph={<TapeReels seconds={p.recording.seconds} running={p.recording.on} height={20} />}
+            />
             <Tile icon={Clapperboard} label="Songs" onPress={() => { close(); p.onSongs(); }} testId="phone-songs" />
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
-            {p.onPlayScreen && <Tile icon={Waves} label="Play screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
+            {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
+            {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
             {p.onOpenAccount && <Tile icon={Settings} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
                 laptop. Not on the website, whose https page cannot reach a
                 laptop's plain ws:// relay (lib/appLink.ts). */}
             {isPhoneApp() && <Tile icon={Laptop} label="Laptop remote" onPress={() => { close(); goRemote(); }} testId="phone-laptop-remote" />}
+          </div>
+          {/* What the Record tile makes, said in the same words as the desk's Record panel (lib/recordChoice.ts). */}
+          <div className="mt-3 flex flex-col gap-1.5" data-testid="phone-record-makes">
+            <SectionLabel>Record makes</SectionLabel>
+            <Segmented
+              value={p.recording.choice.video && p.recording.choice.take ? 'both' : p.recording.choice.take ? 'take' : 'video'}
+              options={[['video', 'Plate video'], ['take', 'Take'], ['both', 'Both']] as const}
+              onChange={(v) => p.recording.onChoice({ video: v !== 'take', take: v !== 'video' })}
+              height={44}
+              fill
+              testId="phone-record-makes-segmented"
+            />
+            <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
           </div>
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">
@@ -1141,11 +1233,67 @@ export function PhoneStage(p: PhoneStageProps) {
           )}
           <p className="mt-3 text-[12px] leading-snug text-dim">
             Full layout is the laptop's, for the rest of this visit. The phone's comes back next time.
-            {p.onPlayScreen && ' Play screen is the simple one: the plate, the dyes and three hands.'}
+            {p.onPlayScreen && ' Simple screen is the plain one: the plate, the dyes and three hands.'}
             {isPhoneApp() && ' Laptop remote makes this phone the remote for a show running on the laptop; Play here brings it back.'}
           </p>
           </PanelGuard>
         </PhoneSheet>
+      )}
+    </div>
+  );
+}
+
+function PhoneTabsBody({ t, openSheet }: { t: PhoneTabs; openSheet: (s: SheetName) => void }) {
+  const [adding, setAdding] = useState(false);
+  const out = new Set(t.panels);
+  return (
+    <div className="flex flex-col gap-2" data-testid="phone-tabs-body">
+      <TabStrip tabs={t.tabs} tab={t.tab} onTab={t.onTab} onEdit={t.onEdit} onAddPanel={() => setAdding(true)} height={44} touch />
+      {t.panels.length === 0 && <p className="text-[13px] text-dim">Nothing on this tab yet. Add a panel below.</p>}
+      {t.panels.map(id => {
+        const spec = PANEL_BY_ID.get(id);
+        const body = t.render(id);
+        const own = OWN_SHEET[id];
+        return (
+          <section key={id} className="rounded-lg border border-border bg-elevated" data-testid={`phone-tab-panel-${id}`}>
+            <div className="flex items-center justify-between pl-3">
+              <span className="text-[14px] font-medium text-text">{spec?.name ?? id}</span>
+              <button onClick={() => t.onRemove(id)} className="flex h-12 w-12 items-center justify-center text-muted active:bg-active"
+                aria-label={`Take ${spec?.name ?? id} off this tab`} data-testid={`phone-tab-remove-${id}`}><X size={16} /></button>
+            </div>
+            {body ? (
+              <div className="max-h-[60dvh] overflow-y-auto border-t border-border px-3 pb-3 pt-2">{body}</div>
+            ) : own ? (
+              <button onClick={() => openSheet(own)} className="mx-3 mb-3 flex h-12 w-[calc(100%-24px)] items-center justify-center rounded-lg border border-border-strong text-[14px] text-text-2 active:bg-active"
+                data-testid={`phone-tab-open-${id}`}>Open {SHEET_NAME[own]}</button>
+            ) : (
+              <p className="px-3 pb-3 text-[13px] text-dim">On the laptop's desk.</p>
+            )}
+          </section>
+        );
+      })}
+      <button onClick={() => setAdding(a => !a)} aria-expanded={adding}
+        className={`flex h-12 items-center justify-center gap-2 rounded-lg border border-dashed text-[14px] ${adding ? LIT : 'border-border-strong text-text-2 active:bg-active'}`}
+        data-testid="phone-tab-add"><Plus size={16} /> Panel on this tab</button>
+      {adding && (
+        <div className="flex flex-col gap-1" data-testid="phone-tab-add-list">
+          {SETTINGS_CATEGORIES.map(c => {
+            const rows = PANELS.filter(x => x.category === c.id && !out.has(x.id));
+            if (rows.length === 0) return null;
+            return (
+              <div key={c.id}>
+                <SectionLabel>{c.name}</SectionLabel>
+                <div className="grid grid-cols-2 gap-1">
+                  {rows.map(x => (
+                    <button key={x.id} onClick={() => { t.onAdd(x.id); setAdding(false); }}
+                      className="h-12 truncate rounded-lg border border-border bg-elevated px-3 text-left text-[14px] text-text-2 active:bg-active"
+                      data-testid={`phone-tab-add-${x.id}`}>{x.name}</button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

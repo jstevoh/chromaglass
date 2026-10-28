@@ -22,6 +22,7 @@ import {
   signLicenseKey,
   verifyLicenseKey,
 } from './license-key.js';
+import { SYNC_PATH, handleSync } from './cloud-sync.js';
 
 const ALLOWED_ORIGINS = [
   /^https:\/\/(www\.)?chromaglass\.art$/,
@@ -34,7 +35,7 @@ const ALLOWED_ORIGINS = [
 export const MAX_BYTES = 64 * 1024;
 
 const CORS_BASE = {
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Signature, Paddle-Signature',
   'Access-Control-Max-Age': '86400',
   Vary: 'Origin',
@@ -62,6 +63,9 @@ export default {
       if (url.pathname === '/webhook') {
         if (request.method !== 'POST') return json({ error: 'POST only' }, 405, cors);
         return await handleWebhook(request, env, cors);
+      }
+      if (url.pathname === SYNC_PATH) {
+        return await handleSync(request, env, cors, verifyFirebaseIdToken);
       }
       if (url.pathname === '/keys') {
         if (request.method !== 'GET') return json({ error: 'GET only' }, 405, cors);

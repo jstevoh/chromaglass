@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { usePortalBody } from '../portalBody';
+import { TIP_DELAY_MS } from '../../lib/tipDelay';
 
 /*
   The card that says what a control is (PLAN.md 8j).
@@ -15,9 +16,11 @@ import { usePortalBody } from '../portalBody';
 
   Two ways in, because a desk has a mouse and a phone has not:
 
-    · hover or keyboard focus (desk): after a short wait, so crossing a deck
-      of forty knobs does not flash forty cards. Once up it stays through a
-      drag, and the value on it follows the hand.
+    · hover or keyboard focus (desk): after a long wait (`TIP_DELAY_MS`, 1.5 s,
+      the owner's call: 380 ms woke a card on every third knob of a deck
+      crossed), counted afresh on every control with no grace for a neighbour of
+      one just seen. Once up it stays through a drag, and the value on it
+      follows the hand.
     · a tap on the name (phone, `tap`): the card toggles, and goes on the
       next touch anywhere else or after a few seconds.
 
@@ -36,7 +39,6 @@ import { usePortalBody } from '../portalBody';
 /** The card up now, if any: its id, and how to put it down. */
 let current: { id: string; close: () => void } | null = null;
 
-const SHOW_AFTER_MS = 380;
 /** A tapped card goes by itself: a phone has no pointer-leave to end it. */
 const TAP_HIDE_MS = 6000;
 const CARD_W = 248;
@@ -67,7 +69,7 @@ export function useControlTip({ name, help, value, hint, held = false, disabled 
 
   useEffect(() => {
     if (!want || disabled) { setShown(false); return; }
-    const t = window.setTimeout(() => setShown(true), SHOW_AFTER_MS);
+    const t = window.setTimeout(() => setShown(true), TIP_DELAY_MS);
     return () => window.clearTimeout(t);
   }, [want, disabled]);
 
