@@ -20,9 +20,12 @@
 //
 // The baseline is scripts/sizes.json, and it only shrinks. Against the commit
 // this one is measured from (below), an entry may be lowered or removed, never
-// raised or added: otherwise the way to get a grown App.tsx green would be to
-// write its new size in, and the check would be a form to fill in. A big file
-// renamed is a new file over budget, so a rename does not launder it either.
+// raised: otherwise the way to get a grown App.tsx green would be to write its
+// new size in, and the check would be a form to fill in. An entry is added only
+// for bytes a move carried out of a file the base already held over budget
+// (judge(), "A move out carries its ceiling"): no more than left those files in
+// the same pull request, measured on the files, not on their ceilings. A big
+// file renamed without its entry is a new file over budget.
 //
 // Why there is slack below a ceiling and none above it. If a file that shrinks
 // at all had to have its entry lowered in the same PR, nearly every PR that
@@ -156,22 +159,28 @@ export function judge(sizes, now, then, was = null, pr = true) {
       split by moving lines: its methods would have to be pulled apart into
       files that reach each other's private state.
 
-      So an entry the base does not have is allowed when what the baseline
-      holds in all does not grow: the bytes came out of another file's
-      ceiling in the same pull request, and the session reading the new file
-      reads what it would have read in the old one, no more. The new entry is
-      the file's own size, no slack in it, so it cannot grow from the day it
-      is written. A file that simply appears over budget still fails as new
-      (nothing in sizes.json names it), and one written in with nothing taken
-      out elsewhere still fails as raised. What this lets through that the
-      first rule did not is a rename that moves its entry with it; the
-      sessions' cost is the same either way, which is what the budget is for.
+      So an entry the base does not have is allowed for bytes that moved: the
+      new entries together may hold no more than actually left the files the
+      base's baseline held over budget, in this pull request (each such file's
+      size at the base less its size now, a deleted one counting whole). That
+      is measured on the files and not on their ceilings, because a ceiling
+      can sit above its file: slack banked by an earlier `--update`, or an
+      entry dropped for a file that had already shrunk, is not bytes this PR
+      moved, and crediting the sum of ceilings let a fresh 41.5 KB file and a
+      big file renamed and grown 3 KB through together (the review of #548,
+      reproduced in a scratch repository). The new entry is the file's own
+      size, no slack in it, so it cannot grow from the day it is written. A
+      file that simply appears over budget still fails as new (nothing in
+      sizes.json names it). What this lets through that the first rule did
+      not is a rename that moves its entry with it, unchanged; a session's
+      cost is the same either way, which is what the budget is for.
     */
-    const total = (b) => Object.values(b.files).reduce((a, n) => a + n, 0);
-    const carried = total(now) <= total(then);
+    const moved = was ? Object.keys(then.files).reduce((a, f) => a + Math.max(0, (was.get(f) ?? 0) - (sizes.get(f) ?? 0)), 0) : 0;
+    const added = Object.keys(now.files).filter((f) => !(f in then.files) && !(f in then.ledgers));
+    const carrying = added.reduce((a, f) => a + (sizes.get(f) ?? 0), 0);
     for (const [f, cap] of Object.entries(now.files)) {
       if (!(f in then.files) && !(f in then.ledgers)) {
-        if (!carried) bad.push(['raised', f, `${f} has a ceiling the base's ${BASELINE} does not, and the ceilings in all grew from ${total(then)} to ${total(now)} bytes: a new ceiling only carries bytes moved out of another`]);
+        if (carrying > moved) bad.push(['raised', f, `${f} has a ceiling the base's ${BASELINE} does not, and the new entries hold ${carrying} bytes where ${moved} left the files the base held over budget: a new ceiling only carries bytes moved out of another`]);
         else if (cap !== sizes.get(f)) bad.push(['raised', f, `${f}'s new ceiling of ${cap} is not its size (${sizes.get(f) ?? 'gone'}): a carried ceiling is the bytes that moved, with no slack`]);
       }
       else if (f in then.files && cap > then.files[f]) bad.push(['raised', f, `${f}'s ceiling went up from ${then.files[f]} to ${cap}: the baseline only shrinks`]);
@@ -303,6 +312,15 @@ function selftest() {
     expect('a file back under budget fails until its ceiling goes', () => put('src/big.ts', 1024), ['stale src/big.ts']);
     expect('and passes once lowering drops it', () => { put('src/big.ts', 1024); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); }, []);
     expect('a ledger under budget fails until it leaves the list', () => put('PLAN.md', 1024), ['stale PLAN.md']);
+    // The review of #548: credited on the sum of ceilings, a ceiling sitting
+    // above its file at the base (slack, or an entry for a file that has
+    // already shrunk) paid for a fresh file over budget with no bytes moved.
+    reset(); put('src/slack.ts', 45 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/slack.ts': 60 * 1024 } }); g('add', '-A'); g('commit', '-qm', 'a base with slack');
+    const slackBase = g('rev-parse', 'HEAD').trim();
+    put('src/slack.ts', 30 * 1024); put('src/fresh.ts', 41 * 1024 + 512);
+    baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/fresh.ts': 41 * 1024 + 512 } });
+    const funded = run(dir, { ref: slackBase, ci: false }).bad.map(([k, f]) => `${k} ${f}`).sort().join(', ');
+    t(funded === 'raised src/fresh.ts', 'slack under a base ceiling cannot fund a fresh file: only the 15 KB that moved counts, not the 60 KB ceiling', funded || 'passed');
     // In CI the base is HEAD^1 (the PR's merge commit's first parent), read
     // without a ref: a ceiling raised in the PR's last commit is caught there.
     reset(); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); g('commit', '-qam', 'raise');
