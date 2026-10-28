@@ -156,8 +156,10 @@ Then the rest of `docs/judging.md` in its own order, an area a sitting (the look
 Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet (0.13),
 with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-smoke**, the site on two Windows PCs, by hand (§13).
 The owner's account steps sit here too: **S8-on** (switch the crash reports on),
-**19g** (more Mac runners), **12.2** (the store accounts), **13.1-sign** (the Mac app's
-Developer ID and notarisation, which takes away the "may harm your Mac" refusal on first open).
+**19g** (more Mac runners), **12.2** (the store accounts). ~~**13.1-sign**~~ (the Mac app's
+Developer ID and notarisation) is in, 2026-10-27: the five secrets are set and a pull
+request's build came back "Notarized Developer ID"; what is left of it is
+**13-update-signed** (§13), from the first signed release.
 
 ### Wave 3. Seams in the two big files (one session, in a quiet week)
 
@@ -2821,7 +2823,11 @@ network):
   (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §75.
-  - **13-update-signed** *(after 13.1-sign)*: with the Developer ID secrets in, the
+  - **13-update-signed** *(13.1-sign is in, 2026-10-27: the secrets are set, and a PR's
+    build was notarised and accepted by Gatekeeper as "Notarized Developer ID"; the
+    build job's limit went from 40 to 75 minutes after a run was cancelled at 40 still
+    waiting on Apple's notary service. Next: the owner runs the first signed release)*:
+    with the Developer ID secrets in, the
     same code downloads in the background and installs on quit. Nothing to build;
     the first signed release is judged by installing the one before it and seeing it
     replace itself (§75's last step). Signing is also what takes away the first-open
@@ -2883,6 +2889,16 @@ network):
   window still there and one projector window (the `check-skeptic`). Red on a build
   with no mirror canvas (missing at 8.02 s), on one whose hint ignores full screen,
   and on that one again with the projector reloading, or closing, 1 s after the mirror.
+- **desktop-cast-late** *(found 2026-10-27 on #507, which touched only the workflow's
+  timeout)*: the projector line went red again on CI's Mac, the mirror's canvas
+  "missing at 8.15 s" because the `CastDisplay` chunk itself arrived at 8.12 s (the
+  index scripts by 1.69 s, the page's longest frame 1.19 s with 0 ms of script). So
+  the 8 s wait was spent fetching one lazy chunk from the app's own server, not in
+  the page. The re-run, and every other Mac app run that day, passed. Find what held
+  that chunk (the server busy with the show's reload, or the runner's disk while the
+  notary upload ran beside it) before touching the 8 s: the bar is the app's own
+  loading bar, and a projector that takes eight seconds to appear at a gig is a fault.
+  *Measure:* `npm run desktop` printing when each chunk was asked for and answered.
   Keeping the solver's 668 kB chunk out of the mirror's page was tried and moved
   nothing in the cloud (0.42–0.63 s against 0.39–0.65 s), so it was left out. *Still
   open:* whether the Mac's 3 s is Chromium's GPU-start hold (`npm run startup` reads
