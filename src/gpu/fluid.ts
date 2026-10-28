@@ -36,6 +36,9 @@ import { pressShare } from '../lib/pressRing';
 import { SLOSH_N, type SloshDrive } from '../lib/slosh';
 import { WebGPUSlosh } from './slosh';
 import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
+import { rimCount } from '../lib/rimMask';
+import { RimRead } from './rimRead';
+import { ReadGate } from './readGate';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR, dyeAbsorbances } from '../lib/dye';
@@ -3707,56 +3710,21 @@ export class WebGPUFluid {
    */
   async speciesShare(): Promise<number> {
     if (!this.species || !this.speciesLive) return 0;
-    // One read at a time: a second asker shares the one in flight, rather
-    // than mapping the one buffer twice.
-    return this.shareRead ??= this.readShare().finally(() => { this.shareRead = null; });
-  }
-
-  private shareRead: Promise<number> | null = null;
-  /** The buffer the share is read into, kept: `readField` made one, and two 590 KB arrays, every read (PLAN 14ab-9). */
-  private shareBuf: GPUBuffer | null = null;
-  /** Which of the read's cells lie inside the rim, worked out once a grid rather than by a square root a cell a read. */
-  private shareRim: Uint8Array | null = null;
-
-  private async readShare(): Promise<number> {
     const pours = this.speciesQuiet;
-    const L = this.L, row = this.rbRow;
-    if (!this.shareBuf || this.shareBuf.size !== row * L) {
-      if (this.shareBuf) this.disposer.release(this.shareBuf);
-      this.shareBuf = this.disposer.track(this.device.createBuffer({ label: 'species share', size: row * L, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }));
-    }
-    if (!this.shareRim || this.shareRim.length !== L * L) {
-      this.shareRim = new Uint8Array(L * L);
-      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
-        if (Math.hypot((i + 0.5) / L - 0.5, (j + 0.5) / L - 0.5) < OPEN_RIM) this.shareRim[i + j * L] = 1;
-      }
-    }
-    const buf = this.shareBuf, rim = this.shareRim;
-    this.simF[0] = this.N; this.simF[1] = L;
-    this.device.queue.writeBuffer(this.sim, 0, this.simData);
-    const enc = this.device.createCommandEncoder({ label: 'species share' });
-    const pass = enc.beginComputePass();
-    this.run(pass, 'downsample', this.readTarget, [this.speciesLive ? this.species!.read : this.blank('rgba')], this.arg('none', [0, 0, 0, 0]), L);
-    pass.end();
-    enc.copyTextureToBuffer({ texture: this.readTarget }, { buffer: buf, bytesPerRow: row }, [L, L]);
-    this.submitRead(enc);
-    await buf.mapAsync(GPUMapMode.READ);
-    // Summed where it was mapped, row by row past the padding: the same cells,
-    // in the same order, as the unpadded copy `readField` made, so the same sum.
-    let sum = 0, cells = 0;
-    try {
-      const f = new Float32Array(buf.getMappedRange());
-      const stride = row / 4;
-      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
-        if (!rim[i + j * L]) continue;
-        sum += f[j * stride + i * 4];
-        cells++;
-      }
-    } finally { buf.unmap(); }
-    const share = sum / Math.max(1, cells);
+    this.shareRead ??= new RimRead(this.device, this.disposer, 'species share');
+    const share = await this.shareRead.read(this.L, this.rbRow, this.readTarget, (enc) => {
+      this.simF[0] = this.N; this.simF[1] = this.L;
+      this.device.queue.writeBuffer(this.sim, 0, this.simData);
+      const pass = enc.beginComputePass();
+      this.run(pass, 'downsample', this.readTarget, [this.speciesLive ? this.species!.read : this.blank('rgba')], this.arg('none', [0, 0, 0, 0]), this.L);
+      pass.end();
+    });
     if (share < 1e-6 && pours === this.speciesQuiet) this.speciesLive = false;
     return share;
   }
+
+  /** Where the share is read into, kept (PLAN 14ab-9). */
+  private shareRead: RimRead | null = null;
 
   /**
    * The species' stage (PLAN 18d): its carry in the colour's substeps, unless
@@ -5250,18 +5218,9 @@ export class WebGPUFluid {
    * see a field a frame or two old, as they did on WebGL.
    */
   readbackAsync(): boolean {
-    /*
-      Asked for only when something has been written since the last one was
-      (PLAN 14ab-3, and 14j's "a readback every frame, even frozen"). The
-      frame asks every frame, at the display's rate, and the solver steps at
-      its own: at 120 Hz with sixty steps, or with the governor at thirty,
-      every other frame read back the same fields again, and a frozen plate
-      read back an unchanged one sixty times a second. Each is two downsample
-      dispatches, two 590 KB copies off the GPU and two mappings. And until a
-      ring has something from this epoch (`forgetReadbacks`), asked for anyway.
-    */
+    // Asked only after a write, each landing taken once (`ReadGate`, PLAN 14ab-3).
     const rings = this.rbRings;
-    if (this.wrote !== this.rbWrote || !rings.dye.latest || !rings.vel.latest) {
+    if (this.reads.wants([rings.dye, rings.vel])) {
       this.simF[0] = this.N; this.simF[1] = this.L;
       this.device.queue.writeBuffer(this.sim, 0, this.simData);
       const none = this.arg('none', [0, 0, 0, 0]);
@@ -5276,48 +5235,31 @@ export class WebGPUFluid {
       }
       this.submitRead(enc);
       for (const s of slots) if (s.buf) rings[s.which].collect(s.buf);
-      // Asked for only when both found a free slot: a ring with all three
-      // still in flight skipped this one, and the next frame asks again
-      // rather than leaving the mirror on the field before the write.
-      if (slots.every((s) => s.buf)) this.rbWrote = this.wrote;
+      if (slots.every((s) => s.buf)) this.reads.askedNow();
     }
-    /*
-      And taken only when a newer one has landed. It was taken whenever the
-      ring held anything, which was every frame after the first: the rows
-      copied out again and the caller's loop over every cell run again on
-      the same numbers. `syncFromGpu` counts what this returns as a fresh
-      mirror (`rbSeq`), and the bubbles' rim deposit is told by that count
-      not to put the same displaced dye back twice.
-    */
     let fresh = false;
     for (const which of ['dye', 'vel'] as const) {
-      const ring = rings[which];
-      const data = ring.latest;
-      if (!data || ring.landed === this.rbTaken[which]) continue;
-      this.rbTaken[which] = ring.landed;
+      const data = this.reads.take(rings[which]);
+      if (!data) continue;
       const src = new Float32Array(data);
       const dst = which === 'dye' ? this.rbDye : this.rbVel;
       const stride = this.rbRow / 4;
       for (let y = 0; y < this.L; y++) dst.set(src.subarray(y * stride, y * stride + this.L * 4), y * this.L * 4);
-      if (which === 'dye') this.rbDyeSeq = ring.landed;
+      if (which === 'dye') this.rbDyeSeq = rings.dye.landed;
       fresh = true;
     }
     return fresh;
   }
 
-  /** Every submit that may change a field counts here, so `readbackAsync` knows when there is something new to read. */
-  private wrote = 1;
-  /** `wrote` as it stood when the last readback was asked for. */
-  private rbWrote = 0;
-  /** The readback each ring last handed out (`ReadbackRing.landed`). */
-  private readonly rbTaken = { dye: -1, vel: -1 };
+  private readonly reads = new ReadGate();
 
+  /** A submit that may change a field: counted, so the next readback reads it. */
   private submit(enc: GPUCommandEncoder): void {
     this.device.queue.submit([enc.finish()]);
-    this.wrote++;
+    this.reads.wroteOne();
   }
 
-  /** A submit that only reads: a harness's look at a field changes nothing `readbackAsync` should read again. */
+  /** A submit that only reads, which nothing need read again. */
   private submitRead(enc: GPUCommandEncoder): void {
     this.device.queue.submit([enc.finish()]);
   }
@@ -5363,22 +5305,8 @@ export class WebGPUFluid {
   /** The last measurement, without asking for another. */
   get stats(): FieldStats { return this.statsLatest; }
 
-  private dishAreaCells = 0;
   /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
-  private get dishArea(): number {
-    if (this.dishAreaCells) return this.dishAreaCells;
-    let count = 0;
-    const n = this.N;
-    for (let j = 0; j < n; j++) {
-      for (let i = 0; i < n; i++) {
-        const u = (i + 0.5) / n - 0.5;
-        const v = (j + 0.5) / n - 0.5;
-        if (Math.hypot(u, v) < OPEN_RIM) count++;
-      }
-    }
-    this.dishAreaCells = count;
-    return count;
-  }
+  private get dishArea(): number { return rimCount(this.N); }
 
   /**
    * The same measurement, waiting for the GPU. For harnesses, not the show:

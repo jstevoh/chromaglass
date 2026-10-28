@@ -3754,7 +3754,7 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   belongs in a compute pass beside it.
 - ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*.~~
   **Shipped** (#549): `readbackAsync` asks only when a submit since the last one may have
-  written a field (`submit`, `wrote`), and hands back "fresh" only for a readback it has not
+  written a field (`submit`, `gpu/readGate.ts`), and hands back "fresh" only for a readback it has not
   handed back before, so `syncFromGpu`'s loop runs once a landing, not once a frame. A still
   plate, thirty frames: 60 → 0 asked, 30 → 0 taken; a step every other frame: 60 → 15
   asked (`npm run framereads`). The means stay in the loop: it copies every cell into the

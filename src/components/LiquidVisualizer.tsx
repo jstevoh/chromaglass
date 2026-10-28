@@ -43,6 +43,7 @@ import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } 
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, OPEN_RIM, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, dyeDensityContrast, lookMotor, lookMotorRate } from '../lib/turntable';
+import { rimCount, rimMask } from '../lib/rimMask';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
@@ -1743,9 +1744,8 @@ class FluidSimulation {
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0, sr = 0, sg = 0, sb = 0;
     const S = this.size;
-    // The rim's cells, worked out once rather than by two divisions and a
-    // compare a cell a frame (PLAN 14ab-3); the same test, so the same means.
-    const rim = this.thinGap ? this.rimCells() : null;
+    // The rim's cells, a mask made once (PLAN 14ab-3), not a test a cell a frame.
+    const rim = this.thinGap ? rimMask(S) : null;
     let count = 0;
     for (let j = 0; j < S; j++) {
       for (let i = 0; i < S; i++) {
@@ -1766,39 +1766,8 @@ class FluidSimulation {
     this.rbSeq++;
   }
 
-  private rimMask: Uint8Array | null = null;
-  /** Which cells lie inside the dish's rim (r < OPEN_RIM), one byte a cell, made once. */
-  private rimCells(): Uint8Array {
-    const S = this.size;
-    if (this.rimMask?.length === S * S) return this.rimMask;
-    const m = new Uint8Array(S * S);
-    for (let j = 0; j < S; j++) {
-      for (let i = 0; i < S; i++) {
-        const u = (i + 0.5) / S - 0.5;
-        const v = (j + 0.5) / S - 0.5;
-        if (u * u + v * v < OPEN_RIM * OPEN_RIM) m[i + j * S] = 1;
-      }
-    }
-    this.rimMask = m;
-    return m;
-  }
-
-  private dishAreaCells = 0;
   /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
-  private get dishArea(): number {
-    if (this.dishAreaCells) return this.dishAreaCells;
-    let count = 0;
-    const S = this.size;
-    for (let j = 0; j < S; j++) {
-      for (let i = 0; i < S; i++) {
-        const u = (i + 0.5) / S - 0.5;
-        const v = (j + 0.5) / S - 0.5;
-        if (u * u + v * v < OPEN_RIM * OPEN_RIM) count++;
-      }
-    }
-    this.dishAreaCells = count;
-    return count;
-  }
+  private get dishArea(): number { return rimCount(this.size); }
 
   private pullStateFromGpu() {
     const gpu = this.gpu!;

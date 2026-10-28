@@ -6082,7 +6082,7 @@ back again and again. And it returned "fresh" whenever its ring held anything, s
 `syncFromGpu`'s loop over every cell ran each frame on numbers it had, and `rbSeq`, which
 tells the bubbles' rim deposit not to put the same displaced dye back twice, rose on every
 frame instead of on every new mirror. Every solver submit that may write a field goes through
-`submit`, which counts (`wrote`); the readback, `measure`, the share's read and the
+`submit`, which counts (`ReadGate`, `gpu/readGate.ts`); the readback, `measure`, the share's read and the
 harnesses' reads go through `submitRead`, which does not. The review pass found the two
 delta writers (`applyDeltas`, `applySplats`) submitting on their own and going round the
 count: a pour handed across with no step after it was never read back. They count now,
@@ -6096,6 +6096,7 @@ read straight out. The bubbles' rim deposit now runs once a new mirror, as its c
 meant, which on a 120 Hz display or a governor at thirty is half as often as before. The means stay in the loop that fills the mirror; the rim is a mask.
 
 14ab-9. `speciesShare` went through `readField`: a new MAP_READ buffer, a 590 KB `slice` and
-a 590 KB unpadded copy a read, and a square root a cell. One kept buffer, summed where it is
-mapped in the same order, the rim a mask made once: the share is the same number to the bit
+a 590 KB unpadded copy a read, and a square root a cell. One kept buffer (`gpu/rimRead.ts`), summed where it is
+mapped in the same order, the rim a mask made once (`lib/rimMask.ts`, which the solver's and
+the app's dish areas use too): the share is the same number to the bit
 (`npm run framereads`), and the two reads after the first make no buffer (2 before).

@@ -60,7 +60,7 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const { page, close } = await openLab();
+const { page, close } = await openLab({ entry: 'scripts/lab-chain.ts' });
 try {
   const rows = await page.evaluate(async ({ n, sizes, frames }) => {
     await lab.create(n);
