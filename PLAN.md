@@ -182,11 +182,16 @@ merge conflicts are the shared documents', which 0.6 ends.
 
 ### Wave 4. The frame budget (lane C, measured with `npm run stages` and `npm run renders`)
 
-- **4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.
+- ~~**4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.~~
+  Shipped with 14aa (`npm run encode`, 512², thin gap: 506 KB allocated a step → 31 KB,
+  249 writes for 267 dispatches → 2, the main thread in `step()` 3.4 ms → 0.4). Story in
+  `docs/plan-shipped.md` §14aa.
 - **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
-  after a step, a heat-aware governor.
+  after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
+- **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
+  video pour's pause and play every frame, shipped with 14ac).
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
@@ -3177,12 +3182,15 @@ widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
   and the readback go on at the display's rate. Read back only on a frame that stepped
   or wrote deltas.
 - *The governor knows nothing of heat.* It climbs whenever frames are fast and
-  retries a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
+  retried a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
   is warming up climbs, drops frames for a second and a half, steps down, and does it
-  again every minute and a half. Every Apple GPU classes as `strong` (`device.ts`), so
+  again every minute and a half. **The doubling shipped with 14aa** (`npm run rungs`,
+  "hunting": 38 rung changes in half an hour → 10, the first retry still at 99 s); what
+  follows on the phone's ladder, the adapter and a cool setting is still open. Every
+  Apple GPU classes as `strong` (`device.ts`), so
   an iPhone opens at 512² and climbs; the phone layout does not touch the ladder; and
   the adapter is always asked for `high-performance`, which wakes the discrete GPU on
-  dual-GPU laptops. Double the wait each time the same rung fails, cap a phone's climb
+  dual-GPU laptops. Cap a phone's climb
   at its starting rung, and consider a "cool / battery" output setting (low-power
   adapter, 30 steps, a capped top rung) that ships with its phone control.
 - *The gamepad* is polled every 16 ms with no pad connected (`useGamepad.ts`); start
@@ -3680,24 +3688,111 @@ Mic or Band pick came back on every launch from `localStorage`.
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
 
-### 14ab (partly). Per-frame CPU work found with 14aa: 14ab-7 and 14ab-8 shipped (2026-10-28)
+### 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
 
-The rest of 14ab (the list found with 14aa, 2026-10-24) is written with 14aa in #441; these two
-did not touch the files that PR and #474 do, so they went first. The story is in
-`docs/plan-shipped.md` under the same numbers.
+The owner: "things are a little jittery sometimes"; make sure the GPU is used across
+the code. Three causes, each with its check: the step count stopped and doubled the
+liquid in bursts (`npm run cadence`), each solver step made half a megabyte of garbage
+for the page's collector to stop for (`npm run encode`), and the governor retried a
+rung the machine could not hold every ninety seconds for ever (`npm run rungs`,
+"hunting"). How each was found and measured is in `docs/plan-shipped.md` §14aa.
 
-- ~~**14ab-7** *The ear allocates every frame.*~~ **Shipped** (#533): the seventeen onset
-  detectors keep their second of flux in two rings and take the median and its deviation by
-  partial sort, to the same number to the bit; the live ear no longer copies its two byte
-  arrays into every reading; the fifteen-frame median's scratch is kept. `AudioFeatures.update`
-  0.5–0.6 → 0.30 ms and 227.65 → 5.7 KB an update, readings identical. `npm run eargc`.
-- ~~**14ab-8** *The gamepad renders the App at 30 Hz while its ring shows.*~~ **Shipped**
-  (#533): the ring (`GamepadRing`) listens to a store in the hook and moves itself; the App
-  renders 43 → 1.0 times a second with the ring up (`npm run renders`' gamepad phase), and
-  the poll sets `connected` once, not on every tick.
-- **14ab-7b** *What the ear still makes per reading* is the reading itself, 5.7 KB: seventeen
-  onset objects, three arrays and the chroma. Smaller if a caller that keeps readings
-  (`recent`, the song render) is given one to fill, not worth doing until a Mac profile asks.
+- ~~**14aa-3**~~ shipped below (2026-10-25).
+- **14aa-1** (open, the owner's eyes): on the owner's 120 Hz laptop and on the wall, does
+  the plate still stutter now and then? `docs/judging.md` §88.
+- ~~**14aa-2**~~ (measured 2026-10-25 on the owner's Mac, Metal, comment on #441): at
+  sixty steps a second (Poster 1969, 256², 60 s) 9.16 % of frames took no step or two
+  before, 0 after. Governed three-minute runs at thirty steps: frames of two steps 1 → 0
+  (Classic) and 2 → 0 (Neon Coral Reef), gaps over 50 ms 2 → 0, and the [1, 0] pattern
+  broken on 0.01 % of on-time pairs. Poster 1969's 136 two-step frames fell in the 14 s
+  the governor tried sixty steps and the frames were slow: catch-up, not cadence (14aa-3).
+
+### 14aa-3. The governor climbs back to sixty steps into a stutter (shipped 2026-10-25)
+
+**Shipped**: the governor measures what a solver step costs apart from the frame's drawing,
+judges each climb on what the state it climbs to would cost, and gives sixty steps up when
+frames keep missing a refresh with the GPU over its budget, where it used to wait for an
+average that sat either side of its line. Poster, 1969 on the owner's Mac held 8.5 to 16.8 s at
+sixty steps after each climb, 82 to 192 frames of two steps; replayed in node, 57 to 1136 such
+frames after the opening on the old governor and none on the new (`npm run rungs`); on the
+GPU, `npm run stutter`. The story is in `docs/plan-shipped.md` under the same number.
+
+Open, found doing it:
+
+- **14aa-4** (open, a named shortcut): a climb's cost is predicted from the cells for a
+  step and the pixels for the drawing. Neither is the machine's own: Poster's step went
+  8.2 → 25.1 ms from 512² to 768² on the owner's Mac, 3.1 times for 2.25 times the cells (the
+  larger grid's textures leave the cache), and part of the drawing does not scale with the
+  pixels at all, so a pixel climb is predicted dearer than it is and a grid climb cheaper.
+  Learn each rung's ratio from the frames it has drawn this session (a step's cost on every
+  grid visited, the drawing's on every pixel share) and predict from that. Two trades this
+  shortcut makes today, both visible next to the old governor (the review of #474): a light
+  look tops out a rung lower (512² at two pixels, where the old governor climbed on to 768²
+  at two pixels and sixty steps, predicted 11.6 ms against the 9 ms budget), and after one
+  busy tab a light look climbs to 768² at thirty steps and sixty never comes back (the old
+  governor had it back in about ninety seconds). The second could also be priced: give up
+  the rung again when that wins back sixty under budget.
+- **14aa-5** (open): the governor's lines are 60 Hz milliseconds (`SLOW_MS`, `FAST_MS`,
+  `MISSED_MS`): on a 120 Hz display a missed refresh is 8.3 ms late and is not seen as one. Take
+  the refresh from the draw gate (`drawGate.refreshMs`) and draw the lines in refreshes.
+- **14aa-6** (open): `npm run stutter` runs by hand on the Mac (the watcher). Whether it joins
+  a Mac shard depends on what the CI runner's GPU makes of Poster, which no run has asked yet.
+
+### 14ab. What else runs on the CPU every frame (found with 14aa, read in the code)
+
+An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show pays.
+
+- ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Shipped
+  with 14ac (#451). `App.tsx`'s
+  frame loop calls `pourVideo` each frame, and `pourVideo` pauses the element it holds
+  and plays it again, which fires `pause` and `play`, which set React state twice a frame
+  and restart the loop. Fix: `pourVideo` does nothing for the video it already pours, and
+  is asked once, on play. Check: a page with a video poured counts `play` events and App
+  renders a second.
+- **14ab-2** *The video pour's optical flow is a CPU loop* over a 192² `getImageData`
+  each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
+  pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
+  belongs in a compute pass beside it.
+- **14ab-3** *Every frame reads both fields back and averages them on the CPU*
+  (`syncFromGpu`, a loop over every cell of each layer for the mean density and colour)
+  where `measure()` on the GPU returns the same means in 32 bytes. With 14j's "read back
+  only on a frame that stepped".
+- **14ab-4** *A CPU pour uploads the whole grid every step* (`flushDeltas`: about 1.3 MB
+  through three to five `writeTexture`s and the upsamples), for a few changed cells.
+  Splat records on the GPU (`applySplats`) are the path; what still goes through the
+  delta grids is the bubbles' rims, the hands, the breath and the room stir.
+- **14ab-5** *The plate, post chain, camera, output and particles make their bind groups
+  and views every frame* (10–20 `createBindGroup`, 40–60 `createView`); the solver
+  caches its own (H2c-11).
+- **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
+  gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
+- ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
+  `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort
+  on their history. A ring and a selection median.~~ **Shipped** (#533, 2026-10-28): the
+  detectors keep two rings and take the median and its deviation by partial sort, to the
+  same number to the bit; the live ear stopped copying its byte arrays; the fifteen-frame
+  median's scratch is kept. `AudioFeatures.update` 0.5–0.6 → 0.30 ms, 227.65 → 5.7 KB an
+  update, readings identical (`npm run eargc`). Story in `docs/plan-shipped.md`. What is
+  left (5.7 KB an update) is the reading itself: seventeen onset objects, three arrays and
+  the chroma; not worth a ring of readings until a Mac profile asks.
+- ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
+  object each tick) and sets `connected` on every poll through a stale closure (with
+  14j's timer line).~~ **Shipped** (#533): the ring (`GamepadRing`) listens to a store in
+  the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
+  (`npm run renders`' gamepad phase), and the poll sets `connected` once.
+- **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
+  sixty steps (`speciesShare`); a ring like the readback's.
+- **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
+  tools shard, two attempts on one head were each red on one line of 224, a different line
+  each time. Attempt 1 failed "both windows animating, 0.25 of a refresh behind", which read
+  1.1x, against a bar of 1.05: 21.9 drawn against 20.4 served, with displays at 19.4 and
+  30.1 Hz. Attempt 2 failed "both windows were handed the same refreshes", which read 1.154x
+  (17.2 served against 14.9), over its bar of 1.15. The PR changes neither `drawGate.ts` nor the place frames are offered
+  to it. The runner was handing each window 11 to 30 of its 60 refreshes. Green runs that
+  night handed 13 to 40, and #461's green run read 1.13x on the same line. The lines' own
+  comments say a starved runner's late timers part the two windows' frames by themselves. Find
+  a measure of the gate's fault that holds at a quarter of the display's refreshes, or a
+  starvation reading that sets the line aside and says so. The bar itself stays where it is.
 
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 
@@ -6269,6 +6364,51 @@ Not a gate and no bar: a rate depends on what was pushed.
   (`https://chromaglass.art`) and the topics. Suggested text is in the PR that shipped
   19af-1.
 
+### 19ag. The site's security headers, and the dependencies' advisories (2026-10-28)
+
+Found by the owner's security audit of 2026-10-28 (findings 11 and 18): `firebase.json`
+sent no Content-Security-Policy, no frame-ancestors, no Referrer-Policy and no
+Permissions-Policy, so anything could frame the show and a script injected into the page ran
+with the visitor's licence key and sign-in in reach; and the root `npm audit` counted fifteen
+advisories.
+
+- **19ag-1. Shipped.** `firebase.json` sends, on every path: an **enforced**
+  `Content-Security-Policy` of the four directives that cannot break a page this app serves
+  (`frame-ancestors` for the site's own three names only, which the Auth iframe needs;
+  `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`); a **report-only** policy of
+  everything else (scripts, styles, fonts, images, media, connections, frames, workers),
+  logged in the console and enforced by nothing; `Referrer-Policy: strict-origin-when-cross-origin`;
+  `X-Content-Type-Options: nosniff` (the service worker's note on HTML served under a `.js`
+  URL is the case); and a `Permissions-Policy` that names what the app asks the browser for
+  (camera, microphone, screen capture, MIDI, fullscreen, window management, gamepads,
+  clipboard, tilt) as the site's own and refuses the rest (geolocation, payment, USB, serial,
+  HID, XR). `npm run csp` serves the built site with those headers, opens the show, the
+  remote, a cast and the static pages with a blob worker, blob media and the lookups the
+  app makes tried on top, and judges: nothing reported; the controls (http, eval, `<base>`,
+  `<object>`, a data worker) reported or blocked; another origin cannot frame it; the
+  Permissions-Policy parses in Chromium and allows what the app uses. It caught `bluetooth`,
+  which Chromium does not know. `npm audit` is at zero: `npm audit fix` (vite, postcss,
+  nanoid, browserslist and others), `esbuild` ^0.28.2 (a file read on Windows's dev server),
+  and overrides for `@grpc/grpc-js` (^1.14.6, which Firestore's Node build pulls and the web
+  app never loads) and `uuid` (^11.1.1, which Capacitor's `xcode` pulls). Judging §89.
+- **19ag-2. Open, the CSP enforced.** The report-only policy keeps `'unsafe-inline'` in
+  `script-src` for three inline scripts in `index.html` and the preload list the build writes
+  into the page (`vite.config.ts`), whose text, and so hash, changes with every build.
+  Enforcing needs the hashes in the header, which Firebase Hosting only reads from
+  `firebase.json`: either the deploy job writes them in after the build, or the build emits
+  the policy as a `<meta>` tag (no `frame-ancestors` there, which stays a header). Also before
+  enforcing: the owner signs in with Google (the popup loads `apis.google.com`), plays a song,
+  buys and activates a key on the live site with the console open and sends the violations
+  that appear; and the Workers' real addresses (`connect-src` lists `*.workers.dev`,
+  `lrclib.net` and Google's APIs; a custom domain would be reported). A report endpoint (a
+  `report-to` route on the report Worker) would make that unnecessary; it is a Worker deploy.
+- **19ag-3. Open, found along the way.** `Cross-Origin-Opener-Policy: same-origin-allow-popups`
+  (the Auth popup keeps working with it; not added, as nothing needs it and the cast and
+  panel windows use `window.open`); HSTS preload (Firebase Hosting sends a plain
+  `Strict-Transport-Security` itself); the Mac app's own server sends none of these headers
+  (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
+  (Electron, the audit's finding 7).
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
@@ -7103,6 +7243,7 @@ once the login works (23.14).*
 - **23.17i** (**shipped**, this PR): refunding just an upgrade order takes the buyer's Home key back to them. Found in the review of #494: an upgrade files the Pro key over the Home one under the same id, so the refund of the upgrade dropped the only record and revoked the id, and 23.17d then took the Mac app off the buyer at the next start. The upgrade now keeps what it replaced (`replaces` on the Pro record) and the refund files the Home key again (`refileHome`, `server/license-worker.js`), signed afresh with the Home entitlement (`issuedAt`, `updatesUntil`, `maxMachines`) the buyer bought, rebuilt from the Pro record when it predates `replaces`. It gets a new id (`<proId>_home_<upgradeOrderId>`), not the Pro key's: the Pro token verifies offline for ever, and a Mac holding it keeps it while `/keys` lists its id (`heldKeyRefunded`), so the id has to leave the list and be revoked. Refunding the Home order itself, which the upgrade stood on, still takes every key. *Measured:* `npm run license-worker` 11a–11d; on the old Worker 11a–11c fail (`keys after=0`) and 12a fails for want of the Macs' names (4 of 26 red, 22/26), with the new Worker 26/26. The Worker is deployed by hand from the owner's Mac (the owner's OK first); until it is, the live Worker still refunds as before. An upgrade filed before this change has no `replaces`, and its refund rebuilds the Home key from the Pro record (11c).
 - **23.17j. A `?cast` page runs the plate with no licence.** The door is for the show (`main.tsx`, `show` excludes `?remote` and `?cast`); a cast mirrors the show's canvas, but in a browser where it cannot it asks for its own GPU and draws, so `http://localhost:3000/?cast` on the app's server is a plate with no key. Hold a cast with no show to mirror behind the same door. *Measure:* `npm run desktop` opens `?cast` in a plain browser on a keyless app and finds no plate.
 - **23.17k. Electron's fuses, with 13.1-sign.** The packed app still honours `ELECTRON_RUN_AS_NODE`, `--inspect` and an edited `app.asar`; Electron's fuses (`RunAsNode`, `EnableNodeCliInspectArguments`, `EnableEmbeddedAsarIntegrityValidation`, `OnlyLoadAppFromAsar`) close them, and the integrity one needs the signed build. *Measure:* `npm run desktop -- --packaged` reads the fuses off the binary.
+- **23.17m. The Mac app's findings from the security audit (2026-10-28), shipped.** (4) OSC has no show key, so anyone on the venue's Wi-Fi could drive the show; the app now opens with it off, and *Show → OSC input* turns it on for this Mac only (127.0.0.1) or from the network (0.0.0.0), live (`setOsc` in `server/remote-server.js`) and kept in `show.json`; `OSC_PORT` in the environment still decides outright, and `OSC_BIND=127.0.0.1` narrows the terminal server. A menu on the laptop with no phone version, on purpose: a phone that could open the show to the network would hand that to whoever holds its key. (7) Electron 44.10.0 and `npm audit fix` in `desktop/` (0 advisories). (9) A packed app quits when launched with `--remote-debugging-port` or `-pipe`, unless Node's inspector is already open (the build whose fuse is open, which the check drives). (10) `/license-info.json`, `/license-activate` and `/license-deactivate` turn away a request that came from another site (`Sec-Fetch-Site`, `Origin`) and a POST that is not JSON. (13) `disable-library-validation` and `allow-unsigned-executable-memory` are out of the entitlements. *Measure:* `npm run tiers` 3b (fails on the old server), `npm run desktop -- --packaged` lines `OSC closed`, `no debugger`, `entitlements`. *Open:* the entitlements line proves the start on the hardened runtime only in a build signed with the Developer ID; a pull request's build is signed ad hoc now that the signing secrets stay out of branch runs (23.17-cikeys), so the first signed dispatch from `main` is the proof (this PR's own Mac run, signed before that landed, started the packed app on the narrower entitlements and passed), and `disable-library-validation` goes back first if that build will not start. A lease for a key that has not been online in some days (finding 8) is 23.17h, the owner's call. Art-Net in is also unauthenticated UDP and off until a map is set: give it the same *Show* choice if it is ever turned on by default.
 - **23.17-cikeys** (**shipped**, this PR; the security audit of 2026-10-28): the Mac app's build handed the owner's Developer ID certificate, its password and the Apple notarisation password to every same-repo pull request's run (`desktop.yml` on `pull_request` with `CSC_FOR_PULL_REQUEST`), beside that branch's own build config, npm scripts and dependencies; and any workflow a branch wrote could read them, and the site's deploy key, as repository secrets. Now the build signs only on a Run workflow on main, in the `mac-signing` environment, with each signing secret passed under that condition; a pushed `desktop-v*` tag no longer releases (its run is the tag's own copy of the file); the deploy runs in `firebase-live`; every workflow is read-only at its top; the Firebase deploy action is pinned to a commit. *Measure:* `npm run cisecrets` (Measure · logic), each rule red on a broken copy of the real file first; `npm run updates` holds the release to main. *Owner, in Settings → Environments:* create `mac-signing` and `firebase-live`, each with deployment branches "main" only and no reviewers, add the five signing secrets to the first and `FIREBASE_SERVICE_ACCOUNT` to the second, then delete the repository copies (desktop/README.md). Until then the files already keep the signing set out of pull requests' runs, but a branch that edits a workflow could still read the repository copies. *Open:* a pull request no longer proves the signed path (hardened runtime, entitlements, notarisation); the next Run workflow on main does. If that gap bites, a signed check after each merge that touches `desktop/` is the fix, at about 40 Mac minutes a time.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
@@ -8410,7 +8551,7 @@ the code's entry points, the checks to add and the scenes to match, in
   while it is dragged by `npm run ferrohold` (each pass switched off by hand turns its own line red;
   `phaseCompress` is a lab-only step option, 1 by default), and two-phase carry of a coherent drop's
   trailing rim on the thin gap (`phaseVelocity`, 29c-8; `npm run ferrodrag` 3/3 and in CI since
-  29c-10, its Thin-Gap-off lines by hand until 29c-11; `ferrohold` 5/5 over the whole drag). If the closeup's camera ever follows the drop, it follows smoothly and never with the
+  29c-10, its Thin-Gap-off lines since 29c-11; `ferrohold` 5/5 over the whole drag). If the closeup's camera ever follows the drop, it follows smoothly and never with the
   sound (the sway work's `frameSway`, default 0, stays the only way sound moves the frame). Still
   open:
   - **29c-1. The moving edge is compressed back to the grid's width, and the deep plate keeps
@@ -8541,23 +8682,19 @@ the code's entry points, the checks to add and the scenes to match, in
   - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (this PR; story in `docs/plan-shipped.md` §29c):
     `npm run ferrodrag` on the show shard (lines 1 to 3, 3/3 on Metal in 39 s), and `ferrohold` read
     over the whole drag (steps 60 to 180) with its bars between the runs again (5/5 on Metal: lead
-    `1.74R` vs `2.07R`, half-full `105.8` vs `82.2`). The Thin-Gap-off line is written but held out
-    of CI, under **29c-11**.
-  - **29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**
-    `npm run ferrodrag -- --thinoff` takes the dragged drop, switches Thin Gap off and the magnet away,
-    and runs 120 deep steps (line 4: moves under `1R`, keeps half its half-full cells), with a control
-    lab whose `runPhaseAdvect` rides `phaseVelT` on the deep plate (line 5: the control must fail line 4
-    by `0.5R` more). On software WebGPU it separates cleanly (real `0.16R`, `104 → 94`; control
-    `1.93R`, `104 → 0`). On Metal (#521's show shard, runs 40592589582 and 40595560209) both read
-    `0.70R` (cx `0.6201 → 0.6341 0.6350 0.6352 0.6354` on each: most of it in the first 30 steps, then
-    still), so riding the stale velocity makes no difference there, and the half-full count followed the
-    order the labs were opened in rather than the program (the first lab of the run `106 → 74` in both
-    runs, the real plate first and then the control first; the second lab `106 → 90`). Find, on a Mac,
-    why the deep plate moves the drop five times further on Metal than on SwiftShader in its first
-    half-second, why `phaseVelT` is not what carries it there, and what differs between the first and
-    second lab of a process; then put lines 4 and 5 in CI with bars from Metal's numbers. Also: once
-    `phaseCompress` moves onto the deep plate (29c-1), `phaseVel()`'s `thin = true` default must be
-    keyed off `thinLive`, or the stale `phaseVelT` comes back there.
+    `1.74R` vs `2.07R`, half-full `105.8` vs `82.2`). The Thin-Gap-off line joined CI under 29c-11.
+  - ~~**29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**~~
+    **Shipped** (this PR; story in `docs/plan-shipped.md` §29c): the lab stayed thin for the first of
+    those "deep" steps while the old plate's pipelines built off the frame (`thinGapOn`), and on Metal
+    the build outlasted the drop's coast (57 of 120 steps deep on the real plate, 0 on the control).
+    `lab.step` now builds the old plate first after a thin step; lines 4 and 5 require all 120 steps
+    deep and run in CI (`npm run ferrodrag -- --thinoff`, show shard). Metal 5/5: real `0.09R`,
+    control `1.93R`.
+  - **29c-12. Key `phaseVel()`'s default off `thinLive` before `phaseCompress` reaches the deep plate.**
+    `runPhaseCompress` and `runPhasePlanned` call `phaseVel()` with `thin = true`, which today runs only
+    on a thin step. Once `phaseCompress` moves onto the deep plate (29c-1), that default must be keyed
+    off `thinLive`, or the stale `phaseVelT` comes back there; `ferrodrag -- --thinoff` would catch the
+    carry, not necessarily the compression.
   - **29c-9. Replace `phaseVelocity`'s local window reconstruction with a coupled two-fluid velocity
     solve.** `phaseVelocity` (29c-8) is a named shortcut: instead of solving two coupled momentum
     and Darcy-projection equations for `u_ff` and `u_oil` across the diffuse interface (with

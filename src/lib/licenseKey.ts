@@ -433,7 +433,8 @@ export async function deactivateLocalLicenseKey(): Promise<void> {
     if (seat?.key) await releaseSeat(worker, seat.key, seat.seatId);
   }
   try {
-    await fetch('/license-deactivate', { method: 'POST' });
+    // JSON, said so, like every other post to the show server: it turns away a post that is not (server-license.js).
+    await fetch('/license-deactivate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   } catch {
     // ignore
   }
