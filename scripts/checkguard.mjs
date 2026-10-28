@@ -619,20 +619,29 @@ const COMMAND = /^(?:[A-Z_][A-Z0-9_]*=\S+\s+)*(?:npm run ([\w:.-]+)|node (?:--[\
   real bodies (#505, #511), which quoted lines like these.
 */
 const CHECK_LINE = /^((all )?ok\b|FAIL\b|PASS\b|SKIP\b|[✓✗✔✘]|> \S|\d+\/\d+\s|\d+ passed, \d+ failed)/;
-export function looksPrinted(text, source = '') {
+export function looksPrinted(text, source = '', file = null) {
   const t = text.trim();
   if (t.split(/\s+/).length < 2) return false;
-  if (CHECK_LINE.test(t)) return true;
+  const cl = CHECK_LINE.exec(t);
+  if (cl && /^> /.test(cl[1])) return file != null && new RegExp(`^> node (--\\S+\\s+)*${file.replace(/[.]/g, '\\.')}(\\s|$)`).test(t);
+  if (cl) return true;
   const lead = [];
   for (const w of t.toLowerCase().split(/\s+/)) {
     if (lead.length === 3 || /[\d/.]/.test(w.replace(/:$/, ''))) break;
     lead.push(w);
     if (w.endsWith(':')) break; // "adapter: apple": the label is the script's, the value is the machine's
   }
-  if (lead.length && source.replace(/\s+/g, ' ').includes(lead.join(' ')) && (lead.length > 1 || /:$/.test(lead[0]))) return true;
+  if (lead.length && source.replace(/\s+/g, ' ').includes(lead.join(' ')) && (lead.length > 1 || (/:$/.test(lead[0]) && !/\b(pass\w*|green|clean|success\w*|works?|fine|good)\b/i.test(t.slice(lead[0].length))))) return true;
   // A verdict anywhere in a span that does not begin as a check's line does.
   if (/\b(pass\w*|green|clean|success\w*|works?)\b/i.test(t)) return false;
   return /\d/.test(t);
+}
+
+// The text inside a script's string literals, comments stripped: what it can print.
+// A comment or an object key is not output, so a sentence found only there is not a printed line.
+export function stringLiterals(src) {
+  const x = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
+  return [...x.matchAll(/'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)].map((m) => m[1] ?? m[2] ?? m[3]).join('\n');
 }
 
 /*
@@ -647,7 +656,7 @@ export function looksPrinted(text, source = '') {
     source   the lowercased text of the scripts a command runs, for looksPrinted
     mdOnly   the PR changes only Markdown, so "none" is a true answer
 */
-export function measuredProblems(body, { known, exists, source = () => '', mdOnly = false }) {
+export function measuredProblems(body, { known, exists, source = () => '', pkgFile, mdOnly = false }) {
   const { found, groups } = measuredGroups(body);
   const problems = [];
   if (!found || groups.length === 0) return ['the body has no "Measured:" line with anything under it'];
@@ -658,10 +667,10 @@ export function measuredProblems(body, { known, exists, source = () => '', mdOnl
       continue;
     }
     let commands = 0;
-    let quoted = 0; // commands on the lines below the first that quote their line
+    const quotedCmds = new Set(); const headCmds = [];
     const heading = []; // the first line's: a heading over lines that quote for themselves is not a claim
     for (const [n, line] of g.entries()) {
-      const bad = n === 0 && g.length > 1 && /:$/.test(line.trim()) ? heading : problems;
+      const isHead = n === 0 && g.length > 1 && /:$/.test(line.trim());
       // Code spans in order; a command span is followed by the span it printed.
       const spans = [...line.matchAll(/`([^`]+)`/g)].map((m) => m[1].trim());
       for (let i = 0; i < spans.length; i++) {
@@ -672,14 +681,17 @@ export function measuredProblems(body, { known, exists, source = () => '', mdOnl
         if (m[2] && !exists(m[2])) problems.push(`\`${spans[i]}\`: ${m[2]} does not exist`);
         // The span right after the command: another between them is not what it
         // printed, except the CI job or commit it ran in (`job 121955921102`).
+        const cmdSpan = m[1] ?? m[2];
         let j = i + 1;
         while (j < spans.length && /^([0-9a-f]{7,40}|\d{9,})$/.test(spans[j])) j++;
-        if (j >= spans.length || !looksPrinted(spans[j], source(m[1], m[2]))) bad.push(`\`${spans[i]}\`: no line it printed is quoted after it on the same line (\`ok 12/12 …\`, a number with its words); "passed" is a verdict, not output`);
-        else { i = j; if (n > 0) quoted++; }
+        const bad = isHead ? heading : problems;
+        if (isHead) headCmds.push(m[1] ?? m[2]);
+        if (j >= spans.length || !looksPrinted(spans[j], source(m[1], m[2]), m[2] ?? ((pkgFile?.(m[1])) ?? null))) bad.push(`\`${spans[i]}\`: no line it printed is quoted after it on the same line (\`ok 12/12 …\`, a number with its words); "passed" is a verdict, not output`);
+        else { i = j; if (n > 0) quotedCmds.add(cmdSpan); }
       }
     }
     // "Before (`main`, `npm run grating`, 22 lines failed):" over lines that each quote the command and its line.
-    if (quoted === 0) problems.push(...heading);
+    if (headCmds.some((c) => !quotedCmds.has(c))) problems.push(...heading);
     if (commands === 0) problems.push(`"${cut(g[0])}": names no command in backticks (\`npm run <script>\`), so no one can run it again`);
   }
   return problems;
@@ -693,8 +705,9 @@ function reportMeasured(branch, body, mdOnly) {
   const known = new Set(Object.keys(pkg));
   // What a command's scripts say in their own words: the files its package.json line names.
   const source = (name, file) => [...(name ? (pkg[name] ?? '').matchAll(/scripts\/[\w./-]+\.m?[jt]s/g) : [[file]])]
-    .map(([f]) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } }).join('\n').toLowerCase();
-  const problems = measuredProblems(body, { known, exists: (p) => fs.existsSync(p), source, mdOnly });
+    .map(([f]) => { try { return stringLiterals(fs.readFileSync(f, 'utf8')); } catch { return ''; } }).join('\n').toLowerCase();
+  const pkgFile = (name) => (pkg[name] ?? '').match(/scripts\/[\w./-]+\.m?[jt]s/)?.[0] ?? null;
+  const problems = measuredProblems(body, { known, exists: (p) => fs.existsSync(p), source, pkgFile, mdOnly });
   if (problems.length === 0) console.log(`ok   Measured: every command in the body quotes a line it printed (${branch})`);
   for (const p of problems) console.log(`FAIL Measured: ${p}`);
   if (problems.length) {
@@ -1142,10 +1155,19 @@ function selftest() {
   const src = 'console.log("all lines pass"); console.log(`  adapter: ${a}`);';
   const mq = (body) => mp(body, { source: () => src });
   t(mq('Measured: `npm run grating` → `PASS  the tape: 30 dB over the rest`').length === 0 && mq('Measured: `npm run grating` → `36/36 checks passed`').length === 0 && mq('Measured: `npm run grating` → `11 passed, 0 failed`').length === 0, 'PASS lines and a check\'s own "N/N checks passed" count are its lines');
-  t(mq('Measured: `npm run grating` → `✓ The draining soap film on Metal, 34 s`').length === 0 && mq('Measured: `npm run grating` → `> node scripts/grating.mjs`').length === 0, 'a ✓ line and npm\'s own echo are printed lines');
+  t(mq('Measured: `npm run grating` → `✓ The draining soap film on Metal, 34 s`').length === 0, 'a ✓ line is a printed line');
+  const me = (body) => mp(body, { source: () => src, pkgFile: () => 'scripts/grating.mjs' });
+  t(me('Measured: `npm run grating` → `> node scripts/grating.mjs`').length === 0 && me('Measured: `npm run grating` → `> node scripts/lint.mjs`').length > 0 && mq('Measured: `npm run grating` → `> node scripts/grating.mjs`').length > 0, 'npm\'s own echo is the command\'s own script, and only when the script is known');
   t(mq('Measured: `npm run grating` → `24 checks green`').length > 0 && mq('Measured: `npm run grating` → `3 of 3 passed`').length > 0, 'but a count in words of the writer\'s own is still a verdict');
   t(mq('Measured: `npm run grating` → `all lines pass`').length === 0 && mp('Measured: `npm run grating` → `all lines pass`').length > 0, '"all lines pass" is quoted when the script prints it, and not when no script does');
   t(mq('Measured: `npm run grating` → `adapter: apple`').length === 0 && mq('Measured: `npm run grating` → `it passed on 2026-10-26`').length > 0, 'a label the script prints counts with the machine\'s value after it, a sentence it never prints does not');
+  // The reviewer's (#542): the source lookup reads string literals, not comments or object keys.
+  const lit = stringLiterals('// it passed on 2026-10-26\n/* trust me, it works */\nconst o = { name: 1, timeout: 2 };\nconsole.log(`  adapter: ${a}`); console.log("all lines pass"); const u = "https://x.test/a"; // the check is green\n').toLowerCase();
+  const ml = (body) => mp(body, { source: () => lit });
+  t(ml('Measured: `npm run grating` → `all lines pass`').length === 0 && ml('Measured: `npm run grating` → `adapter: apple`').length === 0, 'what a script prints in a string literal still counts');
+  t(ml('Measured: `npm run grating` → `it passed on 2026-10-26`').length > 0 && ml('Measured: `npm run grating` → `trust me, it works`').length > 0 && ml('Measured: `npm run grating` → `the check is green`').length > 0, 'a sentence found only in a comment does not');
+  t(ml('Measured: `npm run grating` → `name: all green`').length > 0 && ml('Measured: `npm run grating` → `timeout: fine`').length > 0, 'nor a label that is an object key with a verdict after it');
+  t(mq('Measured:\n- Before (`npm run grating`, `npm run wall`):\n  - `npm run grating` → `ok 12/12 holds`').length > 0, 'a heading naming two commands is excused only when both are quoted below it');
   t(mq('Measured: `npm run grating` → `trust me, it works`').length > 0, 'and a line that is in no script and has no number is not one');
   t(mq('Measured: (`npm run grating`, job `121955921102`) → `ok 12/12 holds`').length === 0 && mq('Measured: (`npm run grating`, job `121955921102`) → `nice`').length > 0, 'the CI job a command ran in may stand between it and its line');
   t(mq('Measured:\n- Before (`main`, `npm run grating`, 22 lines failed):\n  - `npm run grating` → `22 line(s) failed`').length === 0, 'a heading naming the command over lines that quote it is not a claim');

@@ -92,8 +92,8 @@ script is not in `package.json`, or when there is no `Measured:` at all; the gua
 same job as `Check changes:` (`npm run checkguard`), so after editing the body, re-run the
 failed jobs; no push is needed. A printed line is two words or more and a number or the
 word a check puts first (`ok …`, `FAIL …`, `PASS …`, `all ok`, `✓ …`, a `36/36 checks
-passed` count, npm's own `> node scripts/x.mjs`), or words the command's own script prints
-(`all lines pass`, `adapter: apple`: the guard looks for them in the script's source);
+passed` count, npm's own `> node scripts/x.mjs` for that command's script), or words the command's own script prints
+(`all lines pass`, `adapter: apple`: the guard looks for them in the script's string literals, not its comments, and a label such as `name:` does not carry a verdict after it);
 "passed", "green" and "clean" are not, anywhere in the span unless it begins as a check's
 line does. The CI job a command ran in may stand between it and its line
 (`` (`npm run grating`, job `121955921102`) → `ok …` ``). A command that prints nothing when it
