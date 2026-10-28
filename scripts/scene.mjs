@@ -76,21 +76,38 @@ function meanFlow(r) {
 
 function run(name, paint) {
   const sense = new SceneSense();
-  let energy = 0, flow = { x: 0, y: 0 }, ms = 0, samples = 0;
+  let energy = 0, flow = { x: 0, y: 0 }, samples = 0;
+  const cpu = [];
   const ids = new Map();
   let people = 0;
 
   for (let f = 0; f < FRAMES; f++) {
     const px = room(f * 7919 + 13);
     paint(px, f / (FRAMES - 1), f);
+    // The cost is the process's CPU time over the push, and a room's is its
+    // median frame, not the sensor's own wall-clock `r.ms` averaged. A machine
+    // with the cores taken (a runner, a session running its checks side by
+    // side) deschedules the process mid-frame and the wall time doubles with
+    // nothing slower in the analysis, and one cold frame (the optimiser's
+    // first pass, a collection) is 12 ms in a mean of thirty. Measured on 4
+    // cores, PLAN 19k-5: the mean of `r.ms` was 1.23 ms alone and 2.46 ms
+    // with twelve busy loops beside it, red against the 2 ms bar in 2 s; the
+    // median frame's CPU time is 0.2 to 0.5 ms in either, with the worst
+    // frame 11 to 15 ms alone and loaded (always the first room's, the
+    // optimiser's first pass), so the worst frame has its own bar below, 20 ms:
+    // a steady slowdown of the analysis goes red at about 1.4x on it where the
+    // mean went red at 1.5x, and a stall in a warm room (4 to 9 ms measured) at
+    // 2x.
+    const c0 = process.cpuUsage();
     const r = sense.push(px, N, N, DT, f * DT * 1000, OPTS);
+    const c1 = process.cpuUsage(c0);
     if (!r.ready) continue;
     // The first frames are the background model settling; judge the rest.
     if (f < FRAMES * 0.25) continue;
+    cpu.push((c1.user + c1.system) / 1000);
     energy += r.energy;
     const mf = meanFlow(r);
     flow.x += mf.x; flow.y += mf.y;
-    ms += r.ms;
     samples++;
     people = Math.max(people, r.people.length);
     for (const p of r.people) ids.set(p.id, (ids.get(p.id) ?? 0) + 1);
@@ -102,7 +119,8 @@ function run(name, paint) {
     energy: energy / samples,
     fx: flow.x / samples,
     fy: flow.y / samples,
-    ms: ms / samples,
+    ms: [...cpu].sort((a, b) => a - b)[cpu.length >> 1],
+    worst: Math.max(...cpu),
     people,
     ids: ids.size,
     /** The longest run of frames one id survived, as a share of the frames judged. */
@@ -121,11 +139,11 @@ const results = [
 
 const pad = (s, n) => String(s).padEnd(n);
 const num = (v, n = 2) => (v >= 0 ? ' ' : '') + v.toFixed(n);
-console.log(`${pad('room', 8)} ${pad('energy', 7)} ${pad('flow x', 7)} ${pad('flow y', 7)} ${pad('people', 7)} ${pad('ids', 4)} ${pad('hold', 6)} ms`);
+console.log(`${pad('room', 8)} ${pad('energy', 7)} ${pad('flow x', 7)} ${pad('flow y', 7)} ${pad('people', 7)} ${pad('ids', 4)} ${pad('hold', 6)} ms (median CPU)  worst`);
 for (const r of results) {
   console.log(
     `${pad(r.name, 8)} ${pad(num(r.energy), 7)} ${pad(num(r.fx), 7)} ${pad(num(r.fy), 7)} ` +
-    `${pad(r.people, 7)} ${pad(r.ids, 4)} ${pad(num(r.hold), 6)} ${r.ms.toFixed(2)}`,
+    `${pad(r.people, 7)} ${pad(r.ids, 4)} ${pad(num(r.hold), 6)} ${pad(r.ms.toFixed(2), 16)}${r.worst.toFixed(1)}`,
   );
 }
 
@@ -267,7 +285,9 @@ const checks = [
   ['a walker is one person', by.walker.people === 1],
   ['a walker keeps one id', by.walker.ids <= 2 && by.walker.hold > 0.7],
   ['a strobe is not a crowd', by.strobe.people <= 1],
-  ['analysis costs under 2 ms', Math.max(...results.map(r => r.ms)) < 2],
+  ['the cost was read (CPU time over each push, above zero)', Math.min(...results.map(r => r.ms)) > 0],
+  ['analysis costs under 2 ms a frame, the median frame of each room', Math.max(...results.map(r => r.ms)) < 2],
+  ['and the costliest frame of each room, the cold first one included, is under 20 ms', Math.max(...results.map(r => r.worst)) < 20],
   ['a camera on itself finds a ceiling', loopLate < loopMid * 1.25],
   ['and the ceiling is a plate, not a wall', loopLate < 20],
   ['a fan in the corner still drives the plate', carLate > carEarly * 0.5],
@@ -417,3 +437,4 @@ for (const [what, ok] of checks) {
 }
 console.log(`\n${checks.length - failed}/${checks.length} checks passed`);
 process.exit(failed === 0 ? 0 : 1);
+

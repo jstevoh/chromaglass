@@ -2337,6 +2337,24 @@ plate and projector let go. It runs in CI's browser part.
 Measured: `npm run cartoons` 16/16 (no GPU and `PW_WEBGPU=1`), `layout` 77/77, `phone`
 357/357, `desk` 48/48, `panel` 197/197, `lint` clean.
 
+**Colour (2026-10-27).** The owner: "the out of copyright cartoons we added are all black and
+white - we need some color ones please." Five more, whole and looping, on the same shelf and the
+phone's dye sheet, each with a `colour` flag in `lib/cartoons.ts` and a "colour" tag in its row:
+*Fiddlesticks* (1930; two-colour), *Jack Frost* (1934) and *Balloon Land* (1935) (Ub Iwerks'
+ComiColors, Cinecolor), *Somewhere in Dreamland* (1936; a Fleischer Color Classic) and *Gulliver's
+Travels* (1939; the Fleischer feature in Technicolor, title and End cards cut, 74 minutes).
+Finding free ones took the renewal records, not the dates: a film from 1931 on is free only if
+nobody renewed it in its 28th year, and the Copyright Office's *Catalog of Copyright Entries*
+(on the Internet Archive as text) showed nine of the 1933 to 1934 ComiColors *were* renewed
+(Exclusive Pictures, 1961 to 1962), so those are not here, while Jack Frost, Balloon Land,
+Somewhere in Dreamland and Gulliver's Travels have none. Fiddlesticks is free by date: renewed in
+1959, which does not extend a 1930 film past 95 years. What was left off, and why, is in
+`SOURCES.md`. The colour cost bits: 4.2 to 7.3 MB a short against 1.5 to 8.1 grey, and the feature
+27 MB; the check's bars moved to match (a feature up to 30 MB, the shelf under 80). The pour
+already lays each pixel's own colour, so no drawing code changed; `npm run cartoons` now decodes
+each file in the browser and holds its flag to its picture (0.0 colourfulness for each grey one,
+30 to 82 for the colour ones).
+
 ### 15i. Picking a bottle pours nothing (shipped)
 
 **Shipped.** The owner, 2026-10-04: "when I pick the ferrofluid liquid - it deposits a
@@ -2496,6 +2514,21 @@ a press and lift; carrying the volume on the cells' filtered velocities emptied 
 0.53, because that flux carried 18% more out of it than the glass displaced. Only the
 solve's own face flux (the mean of two cells' h·u plus the second difference of
 M_f·ΔP) keeps both.
+
+### 15e. The liquids' own forces on the GPU plate (the check, shipped 2026-10-27)
+
+`npm run liquids` held soap, glycerine, milk and silicone to what each is for on a 96²
+stand-in, and nothing held the solver the app draws, which has carried the liquids in two
+textures of its own (`addLiquidDrop`, `liquidForces`) since they were ported. The stand-in
+and its four scenes moved into `scripts/liquidStandIn.mjs` (liquids.mjs prints the same
+lines to the digit, its ceiling and cost sections aside, which are random and timed), and
+`npm run liquidsgpu` lays those scenes on the lab's GPU solver on the thin gap the looks
+use, the stand-in's pools cell for cell at its 96-cell logical grid. Two runs of a scene:
+the deltas folded every step, and folded only on the pour's frame, as the app folds them
+only on a frame something is laid in. A control (a stirred pool with no liquid, folded
+every step and not) reads the same to the bit, so the fold itself moves nothing. What it
+found is PLAN 15e-1 to 15e-9; the lines those items owe print as owed and fail the run
+the day they pass.
 
 ## 16. Many plates: each projector its own source (rig-plan R1)
 
@@ -3073,6 +3106,34 @@ constantly." Measured from the Actions API over 04:00 to 23:45 UTC that day, 183
   different site files moving the same picture; the next PR's own run, on main with both,
   measures that.
 
+### 19i. A green Mac result carries across a merge of main
+
+**Shipped** (#429): When the new head's tree differs from the tree of the PR's last green Mac run only in files main changed (disjoint from the PR's own site files), or only in files that never reach a Mac shard, the shards are skipped with the verdict "carried" (annotated on What the change reaches), and the deploy gate follows that chain back to the run that passed. 14 selftest cases in `reach.mjs` and deploy gate history verified.
+
+*Measured 2026-10-04 over 25 merged PRs (#204 to #244), 103 `Checks` runs.* A PR ran its
+checks about four times. Of those runs, 53 started on a push that only merged main in, and
+8 on a docs-only commit: together 61 of 103 runs and 2,011 of 3,124 Mac runner-minutes
+(64 %), on pushes that added none of the PR's own site code. They also held 20 of the 29
+runs that went red on their first attempt. Each restarts all four shards, 37 to 62
+minutes of wall time since #239 (75 before), at a time when the five Mac runners were 87
+to 91 % busy, so every one of them lengthened everyone else's queue too.
+
+*Fix:* the PR side of `deploygate.sh`'s rule 5. When the new head's tree differs from the
+tree of the PR's last green Mac run only in files main changed (and those are disjoint
+from the PR's own site files, `reach.mjs --site`), or only in files that never reach a Mac
+shard, the shards are skipped with the verdict "carried", and the deploy gate follows that
+chain back to the run that passed. The ship skill then merges without bringing main in
+whenever the gate would say `disjoint`. *What it leaves unmeasured* is what 19h-3 already
+accepted for deploys: two PRs in different files moving the same picture. To keep every
+check running on the combined tree, one full Mac run on main every N merges, or after each
+publish with 19o's rollback behind it. *Measure:* Mac minutes per merged PR and runs per
+PR over the next 25 PRs, against 125 and 4.1. *Size:* M.
+
+*Found in 19k (2026-10-26):* `carry()` asked for a green run whose Mac shards were exactly
+`open,plate,show,tools`, written by hand, while `checks.yml` had run five since 19w
+(2026-10-11). So from the day it shipped no run carried, the same miss the deploy gate had
+before #393. 19k reads the shards from the manifest, and a selftest case runs four of five.
+
 ### 19j. A merge with no site change deploys nothing
 
 **Shipped** (#253). Eight of the last thirty merges changed no file the site is built from
@@ -3096,6 +3157,140 @@ followed a site change whose run was cancelled or red, so theirs was the deploy 
 up (d027626's 111 minutes, which this section first counted as a docs-only wait, were three
 PRs' site changes going out). The gain grows with 19i and 0.3: fewer red or superseded
 deploys leave more docs merges directly on top of a live commit.
+
+### 19k. One manifest of checks
+
+**Shipped** (#502). What was asked, as it stood in the plan:
+
+Every new check edits `.github/workflows/checks.yml` and `package.json` (13 and 14 of the
+last 30 merges), which is where three of the recorded merge conflicts were. Seven of the
+last 25 PRs changed only check scripts and needed one shard of four, but ran all four (17
+runs, about 30 Mac-minutes each). And `npm run check` runs about 35 scripts one after
+another, some 15 minutes, where its header says a minute.
+
+*Fix:* `scripts/checks.json`, one entry per check (its name, its shard, its command, the
+`src/` files it imports, from esbuild's metafile, as 19c traced). `checks.yml` builds each
+shard's steps from it; `package.json`'s scripts stay for hands, generated or checked against
+it. A PR that changes only check scripts runs the shards those scripts are in, plus Measure;
+a change to `src/`, a shared helper (`frame`, `chromium`, `lab`, `lab-entry`) or a workflow
+selects every shard. `npm run quick` reads the same map and runs, in parallel, the checks
+the diff reaches, which is CLAUDE.md's "which checks for which files" table made
+executable. *Measure:* Mac minutes on check-only PRs, and conflicts in `checks.yml` and
+`package.json`. *Size:* M.
+
+*What shipped.* `scripts/checks.json` is the list: every check CI ran, 180 steps lifted
+from `checks.yml` in their order with their comments as `why` (and one more, `npm run
+checks`, which holds it). `checks.yml` went from 1,734 lines to about 400: each Measure part
+and Mac shard keeps its setup (Node, the cached ffmpeg, Chromium, the build) and runs `node
+scripts/checks.mjs --ci <shard>`. Each check opens a `Run <command>` group as its step's log
+did, which is the line `flakes.mjs` files its FAILs under; a red check is an error
+annotation with its name and FAIL lines; each keeps its timeout and env; every check runs
+whatever failed before it; the job summary is a table of each check's time. One step a
+shard, not a workflow written out from the manifest, because a written-out workflow would
+still be edited by every new check.
+
+`reach.mjs --diff` now also says which Mac shards: a change that reaches the Mac only through
+check scripts (traced through their imports and the paths they name, held to esbuild's
+metafile by `npm run checks`), manifest entries (a `why` alone selects nothing) or the npm
+scripts checks run selects those checks' shards; anything else, a shared helper (`chromium`,
+`frame`, `lab`, `lab-entry`, `checks.mjs`) or a script no check traces selects every shard.
+The matrix is `fromJSON(needs.reach.outputs.shards)`, and `deploygate.sh` reads the shard
+list from the manifest.
+
+`npm run quick` reads the same manifest, asks each check what it reads (its scripts, the
+`src/` files they and the entries they bundle at run time import, from esbuild's metafile,
+and every site file for a check that serves the app), and runs the ones a diff reaches side
+by side, a red one again alone. `npm run check` is now `quick --measure`. Found along the
+way: the turntable step had no `if:`, so it ran in all four Measure parts; and 19i's carry
+never fired (above, under 19i).
+
+And the plate shard had reached its 20-minute timeout: 19.1 to 20.4 minutes on the PR runs
+of 2026-10-26, and #502's own run was stopped there with one check of 40 left (every one
+before it green). The rides (101 s) and the Ben-Day print (96 s), both lab checks, moved to
+tools, which ran 13.9 to 14.5: a one-line change each in the manifest now.
+
+*Measured.* Replayed over the 60 PRs merged up to #497 (2026-10-26), 14,213 Mac
+runner-minutes: six changed only check scripts (#429, #449, #456, #462, #465, #472) and
+spent 1,325 Mac minutes on every shard, where the shards their checks are on took 275.
+Merge conflicts: 60 adjacent merges replayed with `git merge-tree` (each PR as if opened
+beside the one before) gave 9 conflicts, in PLAN.md, `docs/judging.md`,
+`docs/plan-shipped.md` and three `src/` files, none in `checks.yml` or `package.json`; so the
+conflict half of the claim is for 19k-2 to show over the next merges, not this PR.
+`deploygate --history 20` read the same 20 verdicts before and after.
+
+#### 19k-1, 19k-3, 19k-4 and the rest of 19k's follow-ups
+
+**Shipped** (the follow-up PR to #502). *19k-1:* `checkguard.mjs` reads `scripts/checks.json`: an
+entry removed (or renamed), or kept with another command, env or timeout, is a change to
+what a check measures and is named under `Check changes:` with the check's name and the
+numbers that differ (a timeout 15 to 20, a `--seed 3` to `--seed 4`) and a reason. A new
+entry, a move to another shard, a reorder and a reworded `why` are not. Before the manifest the
+same edit to a step in `checks.yml` was as invisible.
+
+*19k-3:* `scripts/actionlint.mjs` (`npm run actionlint`, an `always` entry in Measure's
+logic part) fetches actionlint 1.7.7 from its release page, holds it to the sha256 of the
+release's own checksums file, keeps it in `scratch/actionlint/`, proves on a workflow with
+three mistakes that it is red and names each, then lints `.github/workflows`. shellcheck and
+pyflakes are off: the Ubuntu runner has shellcheck and a session or a Mac does not, so the same
+file would be green in one place and red in another. The fetch that 19k's session was refused
+went through in this one (curl, with the session's proxy); what a cloud session still cannot do
+is run a binary it has just downloaded, so the first run of this check was CI's.
+
+*19k-4:* `reach.mjs --diff` also says which Measure parts and which checks a PR reaches
+(`parts`, `only`). A diff that is only check scripts (traced), manifest entries, the npm scripts
+checks run and documents (a root or `docs/` Markdown file, `.claude/`, `LICENSE`, which select
+the checks that read them, by the same trace) runs only those checks and the `always` ones (the
+typecheck, that every script parses, that the manifest agrees with the workflow, the workflows
+lint, and the panel and the plate, which walk all of `scripts/` at run time for a phantom `npm run` and a retired look, so the trace cannot name what they read; `npm run checks` finds any Measure check that walks `scripts/` and requires it `always`), in only the parts that have any; anything else, `src/`, `public/` (Markdown there too),
+a workflow, the lockfile, a shared helper or a script no check traces, and every deploy and run
+by hand, runs Measure in full as before. `checks.mjs --ci` reads `CHECKS_ONLY` and names the
+checks it left out in a notice. The reach job leaves a `measure` notice when it was partial and
+`deploygate.sh` does not take such a run as proof of a whole tree, as it does not one that
+skipped a Mac shard; it fails closed, so a run whose jobs or annotations cannot be read, or that has no reach job, counts as partial too, and a carried run is asked as well (a selftest runs the function against a stubbed `api`). The guard also names a check moved between the Mac and Measure. A document-only PR no longer waits twelve minutes for the browser part.
+
+*Reviewer nits on `checks.mjs` (#502's review).* The runner waits for the shell's `exit` and
+gives the pipes three seconds to drain, then lets go of them and ends the group, where it
+waited for `close` and a server a check started and never stopped held the shard until the
+check's timeout (a selftest runs `sleep 31.7 & echo started` and requires green in under five
+seconds and the sleep gone); the exit code is set, not `process.exit`, which can cut the last
+log lines on macOS; reordering the entries of a shard selects the shard (the order they run in
+is part of them); and the comment on what a manifest edit selects is exact (the shard lists
+select every shard, the prose `about` none).
+
+*Plate shard.* #498's review put it at 19.4 of 20 minutes; #502 had already moved the rides and
+the Ben-Day print to tools, and the last run of that PR read plate 15.2, show 15.3, fifth
+15.6, open 16.4, tools 16.6 minutes of checks (setup is another 1.3 to 1.5), so nothing more
+moved. tools is now the longest, at about 18 of its 20 minutes with setup.
+
+*19k-5, in part.* `scene` ("The room") was red in two seconds beside other checks and green alone
+because its bar, "analysis costs under 2 ms", was the sensor's own wall-clock timer averaged
+over thirty frames: 1.23 ms alone, 2.46 ms with twelve busy loops on 4 cores, one cold frame of
+12 ms among thirty. It now reads the process's CPU time over each push (0.2 to 0.5 ms for the
+median frame in either case), judges each room's median frame against the same 2 ms, and holds
+the costliest frame to its own bar of 20 ms (11 to 15.8 ms measured over twelve runs, alone and with twelve busy loops: always the first room's cold frame; a steady slowdown of the analysis goes red at about 1.4x on it where the old wall mean went red at 1.5x). Switches and
+The intro did not go red under CPU load alone: with eight busy loops on 4 cores (twice the
+cores) Switches read 992 of 992 and The intro 13 of 13, so what turned them red beside the
+others in the first run is not the cores; `quick` keeps their logs in `scratch/quick/` and
+19k-5 stays open for the next red one.
+
+*19k-5, closed (2026-10-27).* `npm run check` on a 4-core cloud session, all of Measure side by
+side: 95 of 95 green in 52 min 55 s, Switches (1:56) and The intro (42 s) among them, so the two
+reds seen beside others in the first `quick` run did not come back, and nothing was left to fix or
+file. With eight busy loops they had already read 992 of 992 and 13 of 13, so the cause was never
+the cores and is not known; it was not reproduced in this run or in the eight-loop run. If one
+goes red beside others again, `quick` writes its log to `scratch/quick/` and 19k-5 is reopened
+with that log.
+
+*The two nits on #504.* `checks.mjs`'s walk detector (which makes a Measure check that walks
+`scripts/` an `always` entry) knew `walk('scripts')` and `walk(join(root, 'scripts'))` only; a
+`walk(\`${ROOT}/scripts\`)` or `readdirSync(ROOT + '/scripts/')` slipped past, so it now takes any
+text after the call's open bracket on the same statement with `scripts` between quotes or slashes (nested brackets such as `join(process.cwd(), 'scripts')` too; a path built in a variable first is still not seen), and the
+selftest holds both new spellings and a `walk(join(root, 'src'))` followed by another walk, which
+must not borrow the later one. `deploygate.sh`'s `measurepartial` ran `jq | grep | head || true`
+over the reach job's annotations, so a body that was not JSON (a 502 page, a cut read) or was an
+error object (`{"message":"rate limited"}`) gave an empty answer, which reads as "ran in full";
+it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
+function (2 FAIL) and green on the new.
 
 ### 19r. Smaller, for the same pass: the open shard evened
 
@@ -3710,8 +3905,64 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   reads 0.48); Dye Weight 1 ×1.266 further at 20 s against the law's ×1.286. A numpy copy
   of the kernels at 768² (the cap binds harder there) reads 10.96 mm at 60 s. The
   before and after pictures are in the project's files (`diffusion/`).
-- **Found along the way:** the grid's checkerboard filter (`dampGrid`) adds dye at a
-  drop's rim, 3.2% in 20 s (18m-5); the check runs with it off.
+- **Found along the way:** the grid's checkerboard filter (`dampGrid`) added dye at a
+  drop's rim, 3.2% in 20 s (fixed in **18m-5** below).
+
+#### 18m-5. The grid filter makes dye at a drop's rim (shipped 2026-10-25)
+
+- **Reported:** 2026-10-20, found while building 18m (`scripts/slump.mjs`). `dampGrid` takes
+  the grid's checkerboard out of the dye with the 5×5 high-pass filter `f' = f − s·K(f)`,
+  `K = k⊗k/256`, `k = [1 −4 6 −4 1]`, and clamps each cell to the range `[lo, hi]` of its
+  3×3 neighbours so the negative lobes of `k` cannot ring past a hard edge. That cell-wise
+  clamp is not conservative: at a drop's rim on an empty plate (`f = 0` outside), `−s·K(f)`
+  is negative just outside the rim and positive just inside it; the clamp cuts off the
+  negative undershoot at `lo = 0` outside while keeping the positive lobe inside, making net
+  dye every step.
+- **Measured on main** (`7d77141`, 256², a 0.05 mL drop in glycerine, `gapThickness: 1`,
+  `solutalBuoyancy: 0`, `diff: 0`): with `gridDamp` off, dye total `231.13` (`+0.000%` at 2 s
+  and 20 s), front `3.94 mm` → `3.94 mm` (2 s) → `4.50 mm` (20 s). With `gridDamp` on, dye
+  total `231.13` → `233.27` (`+0.926%` at 2 s) → `238.53` (`+3.202%` at 20 s), front
+  `3.94 mm` → `4.13 mm` (2 s) → `4.66 mm` (`+0.72 mm` at 20 s).
+- **Why not face-by-face third-difference flux limiting:** writing `K(f) = (1/256) δx⁴ δy⁴ f`
+  as the divergence of face fluxes `Fx = δx³ δy⁴ f`, `Fy = δx⁴ δy³ f` and limiting each face
+  with Zalesak's limiter fails `pressed` in `npm run grating` (`68.7%–69.0%` worst channel vs
+  `< 68.0%` bar). A third difference is non-zero on a smooth wave whose fourth difference is
+  nearly zero, so scaling a cell's two opposite faces by different neighbour factors breaks
+  the cancellation `F_{i+1/2} − F_{i−1/2}` and traps that through-flux inside the cell as
+  grid-scale ripple.
+- **What was built:** a three-pass filter (`dampGridCurv`, `dampGridLimit`, `dampGrid` in
+  `src/gpu/wgsl/fluid.ts`, dispatched by `src/gpu/fluid.ts`) that evaluates the full
+  fourth-difference update `u_p = −s·K(f)_p` first (with half-sample reflection `reflect1`
+  across the grid walls so the stencil matrix is symmetric with zero column sums and 1-cell
+  lines and rows stay invariant), clamps each cell to `c_p = clamp(f_p + u_p, lo_p, hi_p)`,
+  and returns each clamped cell's excess `e_p = c_p − (f_p + u_p)` back across the 7×7
+  neighbourhood (`-3..3`) weighted by each neighbour's room `w_p = min(c_p − lo_p, hi_p − c_p)`
+  to its local bounds. The return window is 7×7 (`-3..3`) rather than 5×5 (`-2..2`) because the
+  5×5 filter clamps a two-cell-wide band at a steep drop rim (`room = -1`), so a 5×5 return
+  window leaves the inner rim cell short of unclamped neighbours (`+0.028%` at 20 s on the
+  glycerine drop vs `+0.000%` with 7×7). Because `w_p > 0` only where `e_p = 0`, clamped cells
+  take none of their own excess back and receiving cells stay inside `[lo_p, hi_p]`. On the
+  four opposite neighbour pairs, `hi` is gated by the one-sided numerical rule
+  `6.0 * (here − mn) > mx − here` (where `6` matches the central stencil weight `k_0 = 6` of
+  `k = [1 −4 6 −4 1]`): the plain 3×3 max blocks the distance-2 overshoot ring (`k_{±2} = +1`)
+  but lets the distance-1 weight (`k_{±1} = −4`, `+4s/256 > 0`) diffuse dye one cell outward
+  into a dry toe (moving the glycerine drop's front to `4.13 mm` at 2 s and `4.66 mm` at 20 s).
+  Across gate factors `4.0`, `6.0`, and `8.0`, the glycerine drop holds `231.13` (`+0.000%` at
+  2 s and 20 s) with its front at `3.94 mm` (2 s) and `4.50 mm` (20 s), and `pressed` reads
+  `65.91%`, `65.96%`, and `65.95%`. The 3×3 neighbour box mirrors across grid walls with
+  whole-cell reflection `mirror1` (`−x` and `2n − 2 − x`) so `macCormack`'s wall-clamped outer
+  ring does not set `nW = here` (`here − mn = 0`) and trip the one-sided `hi` gate along the
+  wall (`+5.51 ppm/s` with `reflect1` on the 3×3 box vs `+0.42 ppm/s` with `mirror1`). The
+  `OPEN_RIM` under `thinGap` guard is unchanged.
+- **Measured after:** glycerine drop with `gridDamp` on holds `231.13` (`+0.000%` at 2 s and
+  20 s) and its front matches `gridDamp` off (`3.94 mm` at 2 s, `4.50 mm` at 20 s).
+  `npm run grating`: all 24 checks pass (1 step `94.6%`, 1 s `4.2%`, spread `29.7%` / `6.9%`,
+  pressed `66.0%` `< 68.0%`, 1-cell lines/rows `0.000%`, disc ring `0.002%`, halo `0.4%`,
+  conservation `+0.42 ppm/s` against `+1.47 ppm/s` on `main`, bar `< 10 ppm/s`).
+  `npm run stages` (768², 2 layers, `apple` / `metal-3`, two alternating pairs): `dye grid`
+  goes from `1.54 ms` / `0.63 ms` (`3.4%` / `1.4%` of L0) and `0.81 ms` / `0.77 ms`
+  (`3.8%` / `3.5%` of L1) on `main` to `3.41 ms` / `3.76 ms` (`7.1%` / `7.5%` of L0) and
+  `1.99 ms` / `2.33 ms` (`8.5%` / `9.5%` of L1) on this branch.
 
 ### 19aa-3. The API scripts never print the token
 
@@ -4962,6 +5213,59 @@ and the script runs both off-scenes itself and requires each pass worth half its
 signed (a second window that gains over 3 cells is red too) and line 3 also holds Σc·h at step 380;
 `docs/judging.md` §54 says what the rim pull and `phaseMomentum` look like.
 
+**29c-8. Two-phase carry at the trailing rim (#495).** Chosen fix: a **two-phase carry**
+(`phaseVelocity` in `src/gpu/wgsl/fluid.ts`, writing `this.phaseVelT` read by `phaseAdvect`,
+`phaseAdvectPlan` and `phaseCompress` while `this.vel` remains the mixture velocity for the dye, oil
+and `phaseMomentum`), chosen over a pre-projection Korteweg or sub-grid contact-line force because
+any force added before `hsProject` still leaves a single projected cell velocity
+`u_mix = φ·u_ff + (1 − φ)·u_oil` shared by both phases (and any curl-free edge force is removed by
+the pressure projection). Where the back rim of a dragged drop thins below half full, the displaced
+oil's dipole return flow dominates `u_mix` and turns it backward into the wake; carrying the
+ferrofluid phase with its own velocity `u_ff` keeps the trailing rim moving with the drop.
+Named shortcut: instead of solving two coupled momentum and Darcy-projection equations for `u_ff`
+and `u_oil` across the diffuse interface (queued as `PLAN.md` **29c-9**), `phaseVelocity`
+reconstructs the local drop velocity `u_m` and centre-of-mass offset `x_m` from the half-full body
+(`φ >= 0.50`) within an 11-cell Gaussian window (`w = ((φ − 0.50)/0.50)·exp(−r²/64)`), gated off on
+labyrinth and standing-spike scenes (`cohere = (1 − 2·maze)·(1 − spikeAmt)` while `!filmHeld`) so an
+11-cell window never bridges the 2–4 cell valleys between standing domes or labyrinth fingers
+(`spikes` 6/6, `maze` 4/4, `fingers` 4/4, `domes` 4/4). Leaving `v` untouched whenever
+`dot(v.xy, u_m) >= |u_m|²` makes the pass a no-op on radial squeeze flows under a press where
+`|u(r)| ∝ r` (`ferropress` 7/7: middle `0.968 → 0.981`, worst ring `0.012`), and weighting the
+carry by `along = dot(x_m, u_m)/|u_m|` carries the trailing rim (`along > 0`, `φ < 0.96`) at `u_m`
+while carrying only the outer leading toe (`along < 0`, `φ < 0.49`) so the front half-full contour
+keeps its Taylor–Saffman two-liquid Darcy speed (`magnetgain` 5/5: `+2%` weak, `+3%` strong) and
+MUSCL shear (`ferrohold` 5/5: mean lead `1.69R` vs `1.93R` with `phaseMomentum` off, `+0.24R` against
+`0.13R`; mean half-full `107.6` vs `92.6` with `phaseCompress` off, `+15.0` against `13`). On the Mac
+GPU, `npm run ferrodrag` reaches **3/3** (lag `1.82R` against `2.0R`, half-full cells `100 → 106`,
+`106.0%` kept against `±15%`, cells over `0.01` `324 → 378` vs `1238` on `main`, stationary control
+`0.010` cells). Per the 29c-8 brief, `ferrodrag` was not added to `checks.yml` in #495.
+The review found one hole, fixed in the same PR: `runPhaseAdvect` chose `phaseVelT` whenever the thin
+solve's buffers existed, and they outlive Thin Gap, so with Thin Gap switched off after a drag the deep
+plate kept carrying the ferrofluid on the last thin step's velocity (magnet off, the drop slid `0.0425`
+of the plate in 120 steps and smeared to `0` half-full cells). It now asks the step's own `thinLive`
+(`0.6206 → 0.6241`, `104 → 94` half-full); the check for it is PLAN 29c-10.
+
+**29c-10. `ferrodrag` in CI, and `ferrohold` over the whole drag (#521).** `npm run ferrodrag` is an
+entry in `scripts/checks.json` on the `show` shard (the lightest on #495's run, 14.2 minutes of 20;
+the check takes 39 s there): on Metal lag `1.82R`, `106.0%` kept, stationary `0.010` cells, 3/3.
+
+A fourth line was written for the review's `runPhaseAdvect` fix: the dragged drop at step 180, Thin
+Gap off and the magnet away, 120 deep steps, the drop held to less than one radius of movement and at
+least half its half-full cells, with a fifth that runs the same on a lab built with `runPhaseAdvect`
+keyed off `hsP` alone (#495's head before its review) and requires it red. On software WebGPU the two
+separate: real `0.16R`, `104 → 94` (cx `0.6235 0.6237 0.6239 0.6241` every 30 steps); control `1.93R`,
+`104 → 0` (half-full `100 78 8 0`). On Metal both read `0.70R`, so the two lines run by hand
+(`-- --thinoff`) until PLAN 29c-11 finds why.
+
+`ferrohold`'s window was steps 60 to 120 because the rim used to go in the second half of the drag.
+Read there after #495, both absolute bars were passed by the runs they were set to fail (lead `1.93R`
+with `phaseMomentum` off against `2.15R`; `92.6` half-full with `phaseCompress` off against `47`), and
+the compression pass's margin was `15.0` cells on Metal and `13.4` on software against `13`. Over steps
+60 to 180: lead `1.72R` on, `2.06R` with `phaseMomentum` off; half-full `105.8` on, `82.0` with
+`phaseCompress` off (software; Metal `1.74R`, `2.07R`, `105.8`, `82.2`). The window is now the drag,
+`LAG_BAR` `2.15 → 1.89` and `HALF_BAR` `47 → 94` (midway), `DLAG_BAR` `0.13 → 0.16` (half the gap),
+`DHALF_BAR` kept at `13` (gap `23.8`).
+
 ## 32. The soap film: a draining film seen in reflection
 
 ### 32a. The CPU reference (#403)
@@ -5026,6 +5330,56 @@ fringe (`d_eff ≈ 200` nm) shifts down from row 27 (`h = 206.7` nm) at `0°` to
 (`h = 208.6` nm) at `30°` to row 45 (`h = 246.0` nm) at `50°`, and the second-order green-gold
 peak (`d_eff ≈ 320` nm) shifts down from row 71 (`h = 319.9` nm) at `0°` to row 78
 (`h = 353.1` nm) at `30°` to row 84 (`h = 393.2` nm) at `50°`.
+
+### 32c. The GPU solver (this PR, #505)
+
+Built `src/gpu/soapFilm.ts` (`createSoapFilmGpu(device, { nx, ny, dx })` with `write(h)`,
+`step(dt, { g, evap, zeta })`, `read() → { h, uf, vf }` and `destroy()`) and its compute
+shaders in `src/gpu/wgsl/soapFilm.ts` (`soapSetup`, `soapSorRed`, `soapSorBlack`, `soapProject`,
+`soapTransport`), implementing the CPU reference (`src/lib/soapFilm.ts`, `stepSoapFilm`) pass
+for pass on the GPU under the contract in `scripts/soapgpu-cpu.ts`:
+- `soapSetup`: marks cells with `h < 30` nm (`BLACK_THRESHOLD_NM`) as ruptured, reduces the
+  film's mean thickness `hbar` (and mean-centres `p` when warm-started so float32 gauge drift
+  cannot accumulate over thousands of steps), evaluates unprojected vertical Darcy buoyancy
+  `v* = (rho * g / zeta) * (h_face - hbar) * 1e-9` on the interior horizontal faces
+  (`j = 1 .. ny - 1`) with all four walls shut, reduces `maxStar = max |v*|`, and forms the
+  unprojected cell divergence `rhs_ij = vf*[j+1, i] - vf*[j, i]` (or zeroes `uf`, `vf`, `p`
+  and `rhs` when `maxStar <= 1e-18`).
+- `soapSorRed` / `soapSorBlack`: solves `deg_ij * p_ij - sum_neighbours(p) = -rhs_ij` on the
+  staggered MAC grid by red-black SOR with `omega = 2 / (1 + sin(pi / max(nx, ny)))`,
+  warm-started from the previous step's tension `p` (60 sweeps warm, 80 sweeps cold when `g`
+  changes or `write(h)` lays a fresh film).
+- `soapProject`: projects interior MAC face velocities `uf[i, j] = -(p[i, j] - p[i-1, j])`
+  and `vf[i, j] = vf*[i, j] - (p[i, j] - p[i, j-1])` with walls zero, reduces `uMax`, and
+  sets the CFL sub-step count `steps = max(1, ceil(uMax * dt / (0.45 * dx)))`.
+- `soapTransport`: advances `h` through `steps` conservative flux-form sub-steps using
+  second-order upwind reconstruction with the minmod limiter (`sx`, `sy`), computing each
+  shared face flux (`fx`, `fy`) once for both adjacent cells and blocking inflow into ruptured
+  cells when `evap > 0`, followed by uniform evaporation (`evap` nm/s) and exponential
+  relaxation (`BLACK_RELAX_TAU = 0.5` s) of ruptured cells (`< 30` nm) toward Newton black
+  (`8` nm).
+- Constants (`RHO_WATER = 1000`, `DEFAULT_ZETA = 1.5`, `BLACK_THRESHOLD_NM = 30`,
+  `NEWTON_BLACK_NM = 8`, `BLACK_RELAX_TAU = 0.5`) are copied under the same names rather than
+  imported from `src/lib/soapFilm.ts`, so the GPU solver's bundle carries 0 bytes of the CPU
+  reference.
+- Wired `npm run soapgpu` into `scripts/checks.json` on the Mac `plate` shard beside `sloshgpu`,
+  and `npm run soapgpu -- --selftest` into `Measure`'s `lab` shard beside `sloshgpu` (in `lab`
+  rather than `logic` because `scripts/soapgpu.mjs` calls `openLab` to launch Chromium and
+  request a WebGPU adapter even under `--selftest`, and `checks.yml` installs Chromium only on
+  the `browser` and `lab` shards).
+
+Measured: `npm run soapgpu` 29/29 on `apple metal-3` (first-step face flows RMS diff 0.195%
+within 2%, thickness change 1.116% within 5%; 1 s thickness RMS diff 0.065% at `dt = 0.05` s,
+0.022% at `dt = 1/60` s, and 0.884% at `zeta = 0.25, dt = 0.2` s across 4 CFL sub-steps; C1
+thick patch +29.41 vs +29.41 rows, thin patch −22.56 vs −22.55 rows; C4 excess 83%, mass 0.77,
+max `|div u|` 1.8e-4 /s against 1.9e-3 /s, 0.00% of cells outside face fluxes, wall flow 0; C2
+mass drift 7.0e-9, uniform film 0.0e+0 nm; C3 `g = 0` 0.0e+0 nm, half-gravity ratio 0.54,
+reversed −20.86 vs −20.85 rows; C6 quarter means ordered from 30 s, worst quarter mean diff
+0.08%, top 10% black at 115 s vs 115 s, 0 refilled on the drain or on the torn hole, black hole
+spread 160 vs 160 cells; 0 of 4785 steps idle, 0 of 514 reads idle; `src/lib/soapFilm.ts` not in
+bundle; 0 WebGPU errors; `cost: 2.44 ms a step at 256 × 256 on apple metal-3`); `npm run soapgpu
+-- --selftest` 29/29 (`cost: 189.18 ms a step at 256 × 256`); `npm run soapfilm` 23/23; `npm run
+wgsl` 142 shaders; `npm run physics` 20/20; `npm run derive` 4/4.
 
 
 ## 33. Bubbles and the closeup, per liquid
@@ -5405,6 +5759,18 @@ seeded plate, mean 0 to 255 per channel, old then new: 0.25 (64.4, 44.1, 55.9) t
 (68.8, 25.4, 6.0), against 6500 K's (63.5, 45.8, 61.4), a blue dye going nearly black as it does under a real
 tungsten lamp. The vignette is unchanged, blended as it was (a first version multiplied by a second blend and was 4 to 6% dark in the corners, which the review caught), and full from 1 on. `npm run panel` holds the shader to the uniforms, the
 kelvin to even mireds ending at 3200 K, the tint to the blackbody's ratios, and 0 to 1 to the old grade.
+
+### 35e-4. Home Movie at 3560 K, the warm end as bright as the white (shipped 2026-10-27)
+
+The owner left both open choices to the session. Home Movie went from Lamp Warmth 0.45 to 3 (3560 K): a Super 8
+projector's lamp is a 3200 to 3400 K halogen, and the end of the slider (3.75) is not used because the tint is the
+full blackbody ratio, which a camera records and a room-adapted eye sees less of. Brightness: colour temperature does
+not set a lamp's output. A lamp run cool on a dimmer does lose light (flux goes as the lamp voltage to the 3.4, its
+temperature as the voltage to the 0.42, so about the eighth power of temperature near 3000 K), but that is Exposure,
+not the colour. `lampTint` now scales the tint above 1 to keep the luminance it has at 1 (0.924), where it had fallen
+to 0.811 at 2, 0.718 at 3 and 0.660 at 3.75. Red rises to 1.36 at 3 and 1.48 at 3.75, so a full-red pigment clips:
+named, and the six-band lamp spectrum (35e-3) is its proper fix. 0 to 1 is untouched. `npm run panel` holds the
+luminance to 1e-9 from 1 to 3.75.
 
 ### 35f. Show hardware (shipped 2026-10-25)
 

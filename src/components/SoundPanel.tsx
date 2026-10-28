@@ -43,7 +43,7 @@ export function SoundPanel({
   source, onSource, inputs, inputId, onInput,
   playing, time, loop, onLoop, onToggle, onSeek,
   nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle,
-  ambientMode = false, onAmbientMode, onClose,
+  ambientMode = false, onAmbientMode, onClose, embed = false,
   readLevel, deaf = false,
 }: {
   source: AudioSource;
@@ -68,6 +68,8 @@ export function SoundPanel({
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
   onClose: () => void;
+  /** Drawn in a desk panel rather than as a sheet (`Sheet embed`). */
+  embed?: boolean;
   /** The plate's volume right now, 0 to 100, or null with no ear: what the VU needle is moved by. */
   readLevel: () => number | null;
   /** Listening, but nothing is arriving: the needle rests on its stop and the dial says so. */
@@ -87,7 +89,7 @@ export function SoundPanel({
   const chosen = sources.find(s => s.id === source) ?? sources[0];
 
   return (
-    <Sheet title={<><Music size={16} /> Sound</>} onClose={onClose} width={760} height={680} testId="sound-panel">
+    <Sheet embed={embed} title={<><Music size={16} /> Sound</>} onClose={onClose} width={760} height={680} testId="sound-panel">
       <div className="flex-1 overflow-y-auto p-5">
         <input
           ref={fileRef} type="file" accept="audio/*" className="hidden" data-testid="sound-file-input"
@@ -103,7 +105,7 @@ export function SoundPanel({
           <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
           <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-5">
           {sources.map(s => {
             const Icon = s.icon;
             const on = source === s.id;
@@ -168,7 +170,7 @@ export function SoundPanel({
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted">The instrument</p>
               <span className="ml-auto text-[11px] text-faint">{droneRunning ? 'playing the plate' : 'stopped'}</span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 @lg:grid-cols-2">
               <label className="flex items-center gap-2 text-[12px] text-muted">
                 <span className="w-20 shrink-0">Key</span>
                 <select
@@ -291,7 +293,7 @@ export function SoundPanel({
         */}
         <p className="mt-2 text-[11px] leading-relaxed text-faint">
           Music by {credits()}, and public-domain pieces by Thomas Park. Re-encoded and level-matched
-          for a room. Sources on <a href="https://archive.org/details/netlabels" target="_blank" rel="noreferrer" className="underline hover:text-muted">archive.org</a>.
+          for a room. Sources on <a href="https://archive.org/details/netlabels" target="_blank" rel="noreferrer" className="inline-flex min-h-6 items-center underline hover:text-muted">archive.org</a>.
           Nothing here carries a non-commercial or no-derivatives restriction.
         </p>
 

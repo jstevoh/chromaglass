@@ -7,6 +7,7 @@ import {
   CHECKOUT_UPGRADE_URL,
   buildCheckoutUrl,
   getActiveLicenseInfo,
+  getEffectiveTier,
   isTierGatingEnforced,
   openAccountSheet,
 } from '../lib/tierGates';
@@ -45,7 +46,8 @@ export function RunLocallyCard({ status }: { status: EngineStatus | null }) {
   if (!status || dismissed) return null;
   if (status.tier !== 'hosted' && !isTierGatingEnforced()) return null;
   if (!status.steppedDown && !status.gpuUnavailable) return null;
-  if (licenseInfo.valid && licenseInfo.tier === 'pro') return null;
+  // The tier the Account pill shows, not the licence alone: an ungated build is Pro too.
+  if (getEffectiveTier() === 'pro') return null;
 
   const dismiss = () => {
     setDismissed(true);

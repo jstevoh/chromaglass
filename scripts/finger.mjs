@@ -10,7 +10,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery, installFrameReader } from './frame.mjs';
+import { engineQuery, installFrameReader, settlePlate, waitForEngine } from './frame.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -23,14 +23,16 @@ process.on('exit', stop);
 for (const s of ['SIGTERM','SIGINT','SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
-  await page.waitForTimeout(9000);
+  await settlePlate(page, 9000);
+  await waitForEngine(page);
   await page.evaluate((sp) => { const d = window.chromaglassDebug(); d.settings.automateRate = 0; d.settings.globalSpeed = sp; }, Number(process.env.FSPEED ?? 0.02));
-  await page.waitForTimeout(3000);
+  await settlePlate(page, 3000);
 
   const state = () => page.evaluate(() => {
     const d = window.chromaglassDebug();
@@ -98,7 +100,7 @@ try {
   */
   const idleSample = async () => {
     const p0 = await state();
-    await page.waitForTimeout(1600);
+    await settlePlate(page, 1600);
     const p1 = await state();
     return { moved: moved(p0.dye, p1.dye), speed: p1.speed };
   };
@@ -125,7 +127,7 @@ try {
   const fingerRuns = [];
   for (const dy of BANDS) {
     const q0 = await state();
-    await page.waitForTimeout(1600);
+    await settlePlate(page, 1600);
     const q1 = await state();
     const bandIdle = movedIn(q0.dye, q1.dye, dy);
     const p0 = await state();

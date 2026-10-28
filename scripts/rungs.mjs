@@ -35,7 +35,8 @@
  * rung costs on a real GPU.
  */
 
-import { qualityLadder, canvasPixelsFor, effectiveLadderTier } from '../src/lib/platform';
+import { qualityLadder, canvasPixelsFor, effectiveLadderTier, isProLicenseUnlocked } from '../src/lib/platform';
+import { getEffectiveTier } from '../src/lib/tierGates';
 import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf, handValueAt } from '../src/lib/midi';
 import { readSetting } from '../src/lib/readout';
 import { QualityGovernor, STEP_RATES } from '../src/lib/governor';
@@ -659,6 +660,43 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       pro1x[0].grid === 1024,
     `hosted 2x top=${hostedRetina[0].grid}²@${hostedRetina[0].dpr}x, Pro 2x top=${proRetina[0].grid}²@${proRetina[0].dpr}x, Pro 1x top=${pro1x[0].grid}²@${pro1x[0].dpr}x`,
   );
+}
+
+// ── Every Pro gate reads the tier the Account pill reads (the owner, 2026-10-25) ──
+// The Mac app's pill said PRO while the Simulation card beside it sold him Pro:
+// the pill asked getEffectiveTier(), the card and the ladder asked for a
+// licence key alone. The page is stood in for by a bare `window` carrying what
+// each build has: nothing gated (the Mac app, a local show), a gated site with
+// no key, and a gated site whose native bridge holds a Pro licence. In each,
+// the gate the panel asks (`isProLicenseUnlocked`), the pill's tier and the
+// ladder the governor climbs must say the same thing, and the answers must
+// differ between the builds, or this would pass for want of anything to tell
+// apart. (The panel's own card is a one-line `!isProLicenseUnlocked()`; a
+// browser check of it stalled on the forced step-down not holding on software
+// WebGPU, so it is read here, at the function the card calls.)
+{
+  const saved = globalThis.window;
+  const builds = [
+    ['nothing gated, no key', {}, 'pro', 'local'],
+    ['gated site, no key', { __CHROMAGLASS_NATIVE__: { license: { valid: false, tier: 'free', enforced: true } } }, 'free', 'hosted'],
+    ['gated app holding a Pro licence', { __CHROMAGLASS_NATIVE__: { license: { valid: true, tier: 'pro', enforced: true } } }, 'pro', 'local'],
+    ['gated app holding a Home licence', { __CHROMAGLASS_NATIVE__: { license: { valid: true, tier: 'home', enforced: true } } }, 'home', 'hosted'],
+  ];
+  const seen = [];
+  for (const [name, bridge, tier, ladder] of builds) {
+    globalThis.window = { location: { search: '' }, ...bridge };
+    const pill = getEffectiveTier();
+    const gate = isProLicenseUnlocked();
+    const climbs = effectiveLadderTier('hosted');
+    const top = ladderAt(climbs, 'strong', 2).rungs[0];
+    seen.push(`${name}: pill=${pill} gate=${gate} ladder=${climbs} ${top.grid}²`);
+    check(
+      `${name}: the pill reads ${tier}, the Pro gate says ${tier === 'pro'} and the hosted ladder is ${ladder}`,
+      pill === tier && gate === (tier === 'pro') && climbs === ladder && top.grid === (ladder === 'local' ? 768 : 512),
+      seen[seen.length - 1],
+    );
+  }
+  globalThis.window = saved;
 }
 
 let failed = 0;

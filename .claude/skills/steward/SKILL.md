@@ -16,8 +16,10 @@ sharded: check each shard) and collect:
 
 - every line containing `FAIL`, with the three lines before it;
 - every `##[error]` line;
-- the step each came from (the step name maps to a script: see
-  `.github/workflows/checks.yml`).
+- the check each came from: every part and shard runs its checks in one step,
+  `The checks`, each in a `##[group]Run <command>` block, and a red one is an
+  `##[error]` annotation titled with the check's name (`scripts/checks.json` maps
+  names to commands; the job's summary lists each check's result and time).
 
 A long log is best read by a subagent told to quote the `FAIL` lines verbatim.
 

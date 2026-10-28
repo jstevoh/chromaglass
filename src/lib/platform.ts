@@ -10,7 +10,7 @@
  */
 
 import { isPhoneApp } from './appLink';
-import { getCachedLicenseStatus } from './licenseKey';
+import { canUseProFeature } from './tierGates';
 
 export type PlatformTier = 'hosted' | 'local' | 'native';
 
@@ -64,21 +64,21 @@ export function detectTier(): PlatformTier {
 }
 
 /**
- * True when an Ed25519-verified Pro licence is active in browser storage or the
- * native desktop shell bridge (PLAN.md §23.17).
+ * True when this machine is on the Pro tier, by the one answer the Account pill
+ * reads: `getEffectiveTier()` (tierGates.ts), which is a verified licence in
+ * browser storage or the native bridge (PLAN.md §23.17), or, where nothing is
+ * gated (the Mac app and a local show, which enforce nothing), Pro.
+ *
+ * Reported by the owner, 2026-10-25: the Mac app's Account pill said PRO and
+ * the Simulation panel beside it asked him to buy Pro. This function used to
+ * read the licence alone, so on a build that gates nothing the pill took the
+ * "nothing is gated, so everything is open" answer and the upsell, the 1024²
+ * option and the ladder took "no key, so Free". One tier, one reader: a gate
+ * that wants to know whether Pro is open asks this, and the pill, the card and
+ * the ladder cannot disagree again (`npm run tiers` 13, `npm run rungs`).
  */
 export function isProLicenseUnlocked(): boolean {
-  const cached = getCachedLicenseStatus();
-  if (cached.valid && cached.tier === 'pro') return true;
-  if (typeof window !== 'undefined') {
-    const w = window as unknown as {
-      __CHROMAGLASS_NATIVE__?: { license?: { valid?: boolean; tier?: string } };
-    };
-    if (w.__CHROMAGLASS_NATIVE__?.license?.valid && w.__CHROMAGLASS_NATIVE__.license.tier === 'pro') {
-      return true;
-    }
-  }
-  return false;
+  return canUseProFeature();
 }
 
 /**
