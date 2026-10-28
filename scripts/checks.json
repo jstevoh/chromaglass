@@ -1672,16 +1672,18 @@
     {
       "name": "The dragged ferrofluid drop follows the magnet",
       "shard": "show",
-      "run": "npm run ferrodrag",
+      "run": "npm run ferrodrag -- --thinoff",
       "why": [
         "The closeup's ferrofluid drop dragged 0.3 of the plate in three",
         "seconds (PLAN 29c, 29c-8): it follows the magnet within two radii and",
         "keeps its half-full body within 15%, which the two-phase carry of its",
         "trailing rim (phaseVelocity) made true on Metal, 3/3 (out of CI as",
-        "known red until then). With no magnet the drop does not move. Its",
-        "Thin-Gap-off lines run by hand (`-- --thinoff`, PLAN 29c-11): on Metal",
-        "they read the same with the review's fix and without it. On the show",
-        "shard, the lightest on #495's run (14.2 minutes of 20); 39 s there."
+        "known red until then). With no magnet the drop does not move. With",
+        "`-- --thinoff` (PLAN 29c-11): Thin Gap off after the drag, all 120",
+        "steps deep, the drop stays put and stays a drop, and a lab whose deep",
+        "plate rides the thin gap's stale velocity is red on the same line",
+        "(the #495 review's fix, in the run). On the show shard, the lightest",
+        "on #495's run (14.2 minutes of 20); 39 s there for lines 1 to 3."
       ]
     },
     {

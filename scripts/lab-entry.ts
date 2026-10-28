@@ -287,6 +287,21 @@ const api = {
     // thin gap from its first step too. BASE has no thinGap: a lab check
     // runs the old plate unless it asks for the thin one (PLAN 18a).
     if ((over.thinGap ?? 0) > 0.5) await l.solver.prepareThinGap();
+    /*
+      And the other way (PLAN 29c-11): a plate that ran thin and is asked
+      for the old plate stays thin while the old plate's pipelines build off
+      the frame (thinGapOn, prepareOldPlate), as the app does the first time
+      Thin Gap is switched off in a show. On SwiftShader a step outlasts
+      those compiles and the next step was deep; on Metal they lasted many
+      steps, so `ferrodrag`'s 120 "deep" steps after the drag were thin ones
+      for most of their first half-second, carried on a fresh phaseVelT, and
+      the line that asks what the deep plate does with the stale one read
+      0.70R with the fix and without it. Built here, the deep plate is what
+      a check asking for it measures from its first step, on any adapter.
+      Only after a thin step: a lab that never ran thin builds the old
+      plate's pipelines on the frame, as it always has.
+    */
+    else if (l.solver.thinGapLive) await l.solver.prepareOldPlate();
     for (let k = 0; k < n; k++) {
       l.time += 1 / 60;
       const p = { ...BASE, ...over, time: l.time } as GpuStepParams;
@@ -312,6 +327,8 @@ const api = {
   /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
   prepareFilm() { return lab!.solver.prepareFilm(); },
   filmSteps() { return lab!.solver.filmSteps; },
+  /** Whether the last step ran the plate as a thin gap (thinGapOn), whatever it asked for. */
+  thinLive() { return lab!.solver.thinGapLive; },
   /** Thin Gap's viscosity for a Thickness, and the ferrofluid's (src/gpu/fluid.ts), so a check never copies either. */
   thinGapViscosity,
   /** The real seconds a lab step takes, for `npm run thick`'s kept share and `npm run flush`'s pours. */

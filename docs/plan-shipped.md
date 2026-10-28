@@ -5393,6 +5393,32 @@ separate: real `0.16R`, `104 → 94` (cx `0.6235 0.6237 0.6239 0.6241` every 30 
 `104 → 0` (half-full `100 78 8 0`). On Metal both read `0.70R`, so the two lines run by hand
 (`-- --thinoff`) until PLAN 29c-11 finds why.
 
+**29c-11. The Thin-Gap-off lines measure the deep plate on Metal, and join CI (#528).** Why Metal read
+`0.70R` for the real plate and the control alike: a solver that ran thin and is asked for the old
+plate stays thin while the old plate's pipelines build off the frame (`thinGapOn`, `prepareOldPlate`),
+as the app does the first time Thin Gap is switched off in a show. The lab built ahead only the other
+way (`lab.step` awaited `prepareThinGap`). On SwiftShader a 384² step outlasts those compiles, so the
+next step was deep; on Metal the compiles outlasted dozens of steps. Counted on the show shard
+(run 40628207753, with `lab.thinLive` read after each step): the real plate ran 57 of its 120 "deep"
+steps deep, the control 0 of 120. The control is the first lab opened in the process, with Metal's
+shader cache cold, which is also why the first lab's half-full count differed from the second's.
+Those thin steps carried the drop on a freshly written `phaseVelT` (`0.6201 → 0.6341` in the first
+30, the drop coasting to rest after the drag), and by the time the deep plate took over, the stale
+velocity it would have ridden held almost nothing.
+
+`lab.step` now awaits `prepareOldPlate` when the last step ran thin and this one asks for the deep
+plate, so a check measures the plate it asks for from its first step on any adapter. A lab that never
+ran thin builds the old plate on the frame as before, and no other check steps thin and then deep in
+one solver. Lines 4 and 5 also require all 120 steps deep and print the count, so a lab that slips
+back to thin is red by name. They run in CI (`npm run ferrodrag -- --thinoff`, show shard).
+
+After, 120 of 120 steps deep on both labs. Metal (run 40636264043): real `0.09R` (cx `0.6201 → 0.6214
+0.6217 0.6219 0.6221`, half-full `106 → 100 91 92 90`); control `1.93R` (`0.6478 0.6545 0.6585
+0.6624`, half-full `106 → 96 66 0 0`), `1.83R` further, 5/5. Software WebGPU (the cloud lab): real
+`0.09R` (`104 → 96`), control `1.92R` (`104 → 0`), 5/5. Metal and SwiftShader now read the same plate
+to within a thousandth of the plate, so the bars (one radius, half kept, half a radius between) sit
+where software put them, with room on both sides on both.
+
 `ferrohold`'s window was steps 60 to 120 because the rim used to go in the second half of the drag.
 Read there after #495, both absolute bars were passed by the runs they were set to fail (lead `1.93R`
 with `phaseMomentum` off against `2.15R`; `92.6` half-full with `phaseCompress` off against `47`), and
