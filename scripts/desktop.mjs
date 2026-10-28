@@ -794,9 +794,11 @@ if (!PACKAGED) {
   const drift = Object.entries(wanted).filter(([k, v]) => asked[k] !== v).map(([k]) => k);
   check('fuses: the packing config asks for exactly those', drift.length === 0, drift.length ? `config differs on ${drift.join(', ')}` : 'same six');
 
-  // Run a binary for a few seconds, or until it exits, and say what it printed. (Run as Node, Electron
-  // refuses Chromium's flags, so --no-sandbox, which a root cloud session needs, is not added then.)
-  const probe = async (exe, args, extraEnv, ms) => {
+  // Run a binary for a few seconds, or until it exits, and say what it printed and whether its show
+  // server answered (/remote-info.json, polled while it runs: after it is killed nothing answers).
+  // (Run as Node, Electron refuses Chromium's flags, so --no-sandbox, which a root cloud session
+  // needs, is not added then.) `until: 'served'` stops as soon as the server has answered.
+  const probe = async (exe, args, extraEnv, ms, until = null) => {
     const dir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-probe-'));
     scratch.push(dir);
     const e = { ...env, PORT: String(await freePort('tcp')), OSC_PORT: String(await freePort('udp')), CHROMAGLASS_USER_DATA: dir, ...extraEnv };
@@ -805,11 +807,16 @@ if (!PACKAGED) {
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
-    const exited = new Promise((r) => child.once('exit', (code, signal) => r({ code, signal })));
-    const result = await Promise.race([exited, sleep(ms).then(() => null)]);
-    if (!result) child.kill('SIGKILL');
+    let exit = null;
+    const exited = new Promise((r) => child.once('exit', (code, signal) => { exit = { code, signal }; r(exit); }));
+    let served = false;
+    for (const t0 = Date.now(); !exit && Date.now() - t0 < ms && !(served && until === 'served');) {
+      served ||= await fetch(`http://localhost:${e.PORT}/remote-info.json`, { signal: AbortSignal.timeout(1000) }).then((r) => r.ok, () => false);
+      if (!(served && until === 'served')) await Promise.race([exited, sleep(400)]);
+    }
+    if (!exit) child.kill('SIGKILL');
     await Promise.race([exited, sleep(2000)]);
-    return { out, exit: result, port: e.PORT };
+    return { out, exit, served, port: e.PORT };
   };
   const stock = desktopRequire('electron');
   const stockDir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-stock-'));
@@ -834,27 +841,52 @@ if (!PACKAGED) {
   check('fuses: --inspect on the packed app opens no debugger', inspectWorks && !SAID.test(packedInspect.out),
     !inspectWorks ? 'the probe measures nothing: a stock Electron did not open a debugger either' : SAID.test(packedInspect.out) ? 'THE PACKED APP OPENED A DEBUGGER' : 'no debugger (a stock Electron opens one)');
 
+  // The app as shipped, untouched. Every window above is a copy, re-signed ad hoc (no hardened runtime, no
+  // entitlements); this is the one line that starts the signed, notarised binary itself with the fuses on,
+  // so a fuse that stops the app starting (the asar check against a Developer ID bundle, say) is seen here.
+  const shipped = await probe(packedExe, [], {}, 60_000, 'served');
+  check('fuses: the packed app as shipped, untouched, starts and serves the show', shipped.served,
+    shipped.served ? 'its show server answered /remote-info.json' : `it never answered${shipped.exit ? ` and stopped (${shipped.exit.signal ?? `exit ${shipped.exit.code}`})` : ''}: ${shipped.out.trim().split('\n').slice(-3).join(' | ').slice(0, 300)}`);
+
   // An edited app.asar. Electron checks it on macOS and Windows only.
   if (!isMac) {
     skip('fuses: an app.asar with its header changed, signed again, does not start', 'Electron checks the asar only on macOS and Windows; the Mac runner does');
   } else {
-    const tam = copyBundle(packedExe, 'tamper');
-    scratch.push(tam.dir);
-    const asar = join(tam.bundle, 'Contents', 'Resources', 'app.asar');
-    const buf = readFileSync(asar);
-    // The asar is a 16-byte pickle, then the header as JSON; the check hashes that string.
-    const at = buf.indexOf('"main.js"');
-    if (at < 0 || at > 1 << 20) {
-      check('fuses: an app.asar with its header changed, signed again, does not start', false, 'could not find main.js in the asar header to change');
-    } else {
-      buf[at + 6] = 'z'.charCodeAt(0);   // "main.js" → "main.jz": same length, so the archive still parses
+    // The change is harmless to the app: one letter of the name of an icon nobody loads to start the show.
+    // Without the fuse the changed copy must start (the control); with it, it must not. Otherwise "it stopped"
+    // would say only that the edit broke the app.
+    const tamper = (bundle) => {
+      const asar = join(bundle, 'Contents', 'Resources', 'app.asar');
+      const buf = readFileSync(asar);
+      const head = buf.subarray(16, 16 + (1 << 20)).toString('latin1');
+      const name = head.match(/"(apple-touch-icon\.png|favicon\.svg|icon-192\.png)":\{/);
+      if (!name) return null;
+      buf[16 + name.index + 1] = 'Z'.charCodeAt(0);   // same length, so the archive still parses
       writeFileSync(asar, buf);
-      const signed = resign(tam.bundle);
-      const run = await probe(tam.exe, [], {}, 30_000);
-      const served = await fetch(`http://localhost:${run.port}/remote-info.json`, { signal: AbortSignal.timeout(2000) }).then((r) => r.ok, () => false);
-      check('fuses: an app.asar with its header changed, signed again, does not start', signed.status === 0 && !!run.exit && !served,
-        signed.status !== 0 ? `could not sign the changed copy: ${signed.stderr}` : !run.exit ? 'THE CHANGED APP STAYED RUNNING' : served ? 'THE CHANGED APP SERVED THE SHOW' : `it stopped by itself (${run.exit.signal ?? `exit ${run.exit.code}`}) and served nothing`);
-    }
+      return name[1];
+    };
+    const make = async (label, integrityOn) => {
+      const c = copyBundle(packedExe, label);
+      scratch.push(c.dir);
+      const named = tamper(c.bundle);
+      if (!integrityOn) {
+        await fusesLib.flipFuses(c.bundle, { version: fusesLib.FuseVersion.V1, resetAdHocDarwinSignature: false, [fusesLib.FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: false });
+      }
+      return { ...c, named, signed: resign(c.bundle) };
+    };
+    const off = await make('tamper-control', false);
+    const on = await make('tamper', true);
+    const ranOff = await probe(off.exe, [], {}, 60_000, 'served');
+    const ranOn = await probe(on.exe, [], {}, 30_000);
+    const FATAL = /asar integrity|Integrity check failed|Failed to validate/i;
+    check('fuses: an app.asar with its header changed, signed again, does not start (and starts with the integrity fuse off)',
+      !!off.named && off.signed.status === 0 && on.signed.status === 0 && ranOff.served && !ranOn.served && !!ranOn.exit,
+      !off.named ? 'found no icon in the asar header to change'
+        : off.signed.status !== 0 || on.signed.status !== 0 ? `could not sign the changed copies: ${off.signed.stderr || on.signed.stderr}`
+          : !ranOff.served ? `the control (same edit, integrity fuse off) never served, so the edit breaks the app and this measures nothing: ${ranOff.out.trim().split('\n').slice(-2).join(' | ').slice(0, 200)}`
+            : ranOn.served ? 'THE CHANGED APP SERVED THE SHOW'
+              : !ranOn.exit ? 'THE CHANGED APP STAYED RUNNING'
+                : `edited "${on.named}": with the fuse off it served; with it on it stopped by itself (${ranOn.exit.signal ?? `exit ${ranOn.exit.code}`}) and served nothing${FATAL.test(ranOn.out) ? ', saying so' : ''}`);
   }
 }
 for (const d of scratch) rmSync(d, { recursive: true, force: true });
