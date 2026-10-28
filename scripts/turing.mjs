@@ -590,10 +590,10 @@ try {
   // The held-spots plate is the shader's own spots end, so its numbers are read from the shader's
   // text (as the preset's Drift is from presets.ts) and not typed a second time: if the cap or the
   // share moves there, this follows, and if the lines are not found the check cannot run.
-  const fluidSrc = readFileSync(new URL('../src/gpu/wgsl/fluid.ts', import.meta.url), 'utf8');
+  const fluidSrc = readFileSync(new URL('../src/gpu/wgsl/fluid/reactions.ts', import.meta.url), 'utf8');
   const capM = /let cap = max\(([0-9.]+) - ([0-9.]+) \* f1,/.exec(fluidSrc);
   const shareM = /let above = cap \* mix\(([0-9.]+), ([0-9.]+), r\);/.exec(fluidSrc);
-  if (!capM || !shareM) throw new Error('turing: the regime lines (cap, above) were not found in fluid.ts');
+  if (!capM || !shareM) throw new Error('turing: the regime lines (cap, above) were not found in wgsl/fluid/reactions.ts');
   const SPOT_CAP = Number(capM[1]) - Number(capM[2]) * FEED, SPOT_SHARE = Number(shareM[2]);
   // The rate the app moves the Drift it hands the solver by is read from the visualizer, so the
   // lab ramps as the app does and not as a number typed twice (a step of full Drift starves a tile).

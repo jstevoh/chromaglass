@@ -379,10 +379,10 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 
   // The model above is a model. These two read the shipped solvers, so a gate
   // quietly put back the way it was fails here rather than in a show.
-  const shader = fs.readFileSync(process.cwd() + '/src/gpu/wgsl/fluid.ts', 'utf8');
+  const shader = fs.readFileSync(process.cwd() + '/src/gpu/wgsl/fluid/dye.ts', 'utf8');
   const gpuGate = /fn gate\(a: vec4f, b: vec4f\) -> f32 \{ return min\(a\.a, b\.a\)/.test(shader);
   check('the GPU solver reads its gate from the thickness, not from the channel',
-    gpuGate, gpuGate ? '' : 'gate() in gpu/wgsl/fluid.ts is back to per-channel');
+    gpuGate, gpuGate ? '' : 'gate() in gpu/wgsl/fluid/dye.ts is back to per-channel');
   const cpu = fs.readFileSync(process.cwd() + '/src/components/LiquidVisualizer.tsx', 'utf8');
   const cpuBody = cpu.slice(cpu.indexOf('private sharpenDye'), cpu.indexOf('private advectMacCormack'));
   const cpuGate = cpuBody.includes('this.shpA.set(this.density)') && /gate\(a, ga\[/.test(cpuBody);

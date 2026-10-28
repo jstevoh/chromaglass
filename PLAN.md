@@ -6390,6 +6390,25 @@ advisories.
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
 
+### 19ai. The biggest source files, split by what they hold (the owner's separation plan, 2026-10-28)
+
+A session pays for what it has read on every step after, and the solver's two files
+were 290 KB each: a shader thread opened the whole of one to change one pass. Each split
+is a pure move (no behaviour changes, its checks green), with a table of old lines to
+new files in its PR so a branch caught mid-move can re-apply its edit. The other items
+of the plan (the plan split, the folder READMEs, the checks' hooks, `npm run sizes`,
+App's hooks, SettingsPanel, the frame loop) are written in by the PRs that take them.
+
+- **19ai-6. Shipped:** `wgsl/fluid.ts` split into one file a pass under
+  `src/gpu/wgsl/fluid/`, every kernel's text byte-identical (docs/plan-shipped.md, 19ai-6).
+- **19ai-6a. Open, found along the way.** About sixty comments across `src/` and
+  `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
+  file's header, which names each pass's file. Repoint one when its file is next touched,
+  not in a sweep of its own (it would collide with every open branch for nothing).
+- **19ai-7. Open, next:** `src/gpu/fluid.ts` (291 KB, about 95 methods) split into
+  pipeline setup and per-pass encoding, the same way: a pure move, before Antigravity's
+  GPU briefs resume (they touch both files).
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
