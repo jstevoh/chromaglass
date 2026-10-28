@@ -23,8 +23,9 @@
 //
 // Its job is done, and it stops, once every one of the owner's Mac's jobs has
 // started (a job that has started cannot stall in the queue; one whose Mac
-// sleeps under it fails within `timeout-minutes`), or once every one of the
-// checks has finished.
+// sleeps under it fails within `timeout-minutes`), or once the checks' summary
+// job `WebGPU (macOS)` has finished, which waits for every shard, or for none
+// when `reach` skipped them.
 //
 // The cancelled run is attempt 1 and cancelled, which `deploygate.sh` reads
 // as replaced, not as red; the dispatched run checks and deploys the same
@@ -45,15 +46,15 @@ const POLL_S = 30;
 /**
  * What the run's jobs say: `stalled` (one of ours queued, none running),
  * `done` (every one of ours started, or nothing else left to finish), or
- * `wait`. "Nothing else" is the checks' own jobs (`Checks / …`, the called
- * workflow's): the probe and `verified` have finished before this job starts,
- * and the checks' jobs appear only after, so counting those two would call a
- * run that has not begun finished.
+ * `wait`. "Finished" is the one job that waits for every shard, the checks'
+ * `WebGPU (macOS)`, and not "every job made so far": in the seconds after
+ * `reach` finishes and before the shards' jobs exist, everything made so far
+ * has finished (the first review, 19ah-3a).
  */
+export const SUMMARY = 'Checks / WebGPU (macOS)';
 export function verdict(jobs, shards) {
   const ours = jobs.filter((j) => (j.labels || []).includes(LABEL));
-  const checks = jobs.filter((j) => j.name.startsWith('Checks / '));
-  if (checks.length && checks.every((j) => j.status === 'completed')) return 'done';
+  if (jobs.some((j) => j.name === SUMMARY && j.status === 'completed')) return 'done';
   const waiting = ours.filter((j) => j.status === 'queued' || j.status === 'waiting' || j.status === 'pending');
   if (ours.length >= shards.length && !waiting.length) return 'done';
   if (waiting.length && !ours.some((j) => j.status === 'in_progress')) return 'stalled';
@@ -126,7 +127,9 @@ function selftest() {
     ['asleep from the first', [mac('lab', 'queued'), mac('app1', 'queued'), mac('app2', 'queued')], 'stalled'],
     ['every shard started', [mac('lab', 'completed'), mac('app1', 'completed'), mac('app2', 'in_progress'), job('Checks / Measure', 'in_progress')], 'done'],
     ['only some made yet, all started', [mac('lab', 'in_progress'), job('Checks / Measure', 'in_progress')], 'wait'],
-    ['everything else finished', [job('Watchdog', 'in_progress'), job('Checks / reach', 'completed'), job('Build and deploy', 'queued')], 'done'],
+    ['after reach, before the shards exist', [job('Watchdog', 'in_progress'), job('Checks / reach', 'completed'), job('Checks / Measure', 'completed')], 'wait'],
+    ['the summary waiting on the shards', [job('Checks / reach', 'completed'), job(SUMMARY, 'queued'), mac('lab', 'queued')], 'stalled'],
+    ['the summary finished', [job('Watchdog', 'in_progress'), job('Checks / reach', 'completed'), job(SUMMARY, 'completed'), job('Build and deploy', 'queued')], 'done'],
     ['a GitHub Mac queued is not ours', [job('Checks / WebGPU (macOS) · lab', 'queued'), mac('app1', 'in_progress')], 'wait'],
   ];
   let fail = 0;

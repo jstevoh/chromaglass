@@ -6412,7 +6412,9 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   user of its own (logged in, for the GPU) would take the reach away.
 - **19ah-3. Shipped (with 19ah): a shard queued for a Mac that went to sleep after the
   probe.** `deploy.yml`'s `Watchdog` (`scripts/macwatch.mjs`) starts the deploy again with
-  `hosted` and cancels the stalled run after 15 minutes queued with none running. Still
+  `hosted` and cancels the stalled run after 15 minutes queued with none running. It
+  counts the run finished only when the checks' `WebGPU (macOS)` job has (19ah-3a: every
+  job made so far is briefly finished after `reach`, before the shards' jobs exist). Still
   open: it holds an ubuntu runner for the length of the shards (free on a public
   repository); a shorter way would be a watchdog that wakes on a schedule.
 - **19ah-4. Open: the by-hand Mac workflows** (`gallery`, `controls`, `pixels`, `film`) could
