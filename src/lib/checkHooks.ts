@@ -1,6 +1,9 @@
 /**
  * The app's hooks for the checks: every `window.chromaglass*` and `window.__cg*`
- * name a script in `scripts/` reads or writes, in one place (PLAN 19ai-4).
+ * name the app's own code sets for a check or reads from one, in one place
+ * (PLAN 19ai-4). Names a harness keeps for itself on the page (`__cgFrame`,
+ * `__cgShot`, `__cgSockets`, … set and read by the script's own init code,
+ * never by `src/`) are the script's and are not declared here.
  *
  * These are the checks' interface to the running app. A harness in
  * `scripts/` drives a real page in a browser, and the only door it has into

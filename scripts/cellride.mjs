@@ -70,7 +70,7 @@ const note = (text) => console.log(`      ${text}`);
 const WIDTH = 1440;
 const ZOOM = 6;
 const PX_PER_UV = 1.5 * WIDTH * ZOOM;
-const GRID = 192;                 // GRID_SIZE in LiquidVisualizer
+const GRID = 192;                 // GRID_SIZE in src/sim/constants.ts
 /**
  * Every `cellField(...)` call in the shader, period, phase and the clock it
  * is timed on, read off the source: a period changed there is a period
