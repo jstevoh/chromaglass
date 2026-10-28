@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
-import { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
 /**
  * The page a first visit meets before the sign-in (PLAN.md 34a).
@@ -39,11 +38,6 @@ import { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
  * page. The choice is kept in sessionStorage for the tab: Google can
  * sign in by a redirect that reloads the page, and the sign-in screen is what
  * collects that redirect, so a reload with the flag set goes straight to it.
- *
- * "Buy" on Home and Pro opens the store's own checkout in a new tab
- * (`checkoutLinks.ts`, the same links as the account sheet). A visitor has no
- * account yet, so the page asks them to buy with the email they will sign in
- * with: a licence belongs to the email on the order.
  */
 
 interface LandingProps {
@@ -78,6 +72,16 @@ const CLIPS: ClipCard[] = [
   { id: 'macro', name: 'Up close', line: 'The camera close in on a bead: cells, lacing and razor edges.' },
 ];
 
+// What plays under each film (`TRACKS` in scripts/landingfilm.mjs holds the same
+// four, with the file each came from). CC BY asks for the artist's name and the
+// licence beside the work, so they sit under the clips rather than in a document.
+const MUSIC: { where: string; title: string; artist: string; licence: string; source: string }[] = [
+  { where: 'Top of the page:', title: 'The Sun Is Scheduled to Come Out Tomorrow', artist: 'Chris Zabriskie', licence: 'CC BY 3.0', source: 'https://archive.org/details/ChrisZabriskieIAmAManWhoWillFightForYourHonor' },
+  { where: 'Ferrofluid:', title: 'Caught In The Beat', artist: 'Broke For Free', licence: 'CC BY 3.0', source: 'https://archive.org/details/Slam_Funk-7603' },
+  { where: 'Dye in water:', title: 'Aria, Goldberg Variations', artist: 'Kimiko Ishizaka playing Bach', licence: 'CC0', source: 'https://archive.org/details/OpenGoldbergVariations' },
+  { where: 'Up close:', title: 'Set This Thing on Fire', artist: 'Chris Zabriskie', licence: 'CC BY 4.0', source: 'https://archive.org/details/cz-blackhole' },
+];
+
 const STEPS: { n: string; title: string; body: string }[] = [
   { n: '1', title: 'Play something', body: 'The plate listens to your music through the browser and answers each kick and note.' },
   { n: '2', title: 'Pick a look', body: 'Dye in water, oil, soap film or ferrofluid over a magnet. Every look is a different liquid.' },
@@ -85,7 +89,7 @@ const STEPS: { n: string; title: string; body: string }[] = [
   { n: '4', title: 'Put it on the wall', body: 'Send the plate to a TV or projector. In the app, your phone becomes the remote.' },
 ];
 
-const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: string }[] = [
+const TIERS: { id: string; name: string; price: string; lines: string[] }[] = [
   {
     id: 'free',
     name: 'Free',
@@ -101,7 +105,6 @@ const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: s
     id: 'home',
     name: 'Home',
     price: '$35',
-    buy: CHECKOUT_HOME_URL,
     lines: [
       'Full-length recording, 1080p and 4K render, no mark',
       'Phone remote',
@@ -114,7 +117,6 @@ const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: s
     id: 'pro',
     name: 'Pro',
     price: '$199',
-    buy: CHECKOUT_PRO_URL,
     lines: [
       'Everything in Home',
       'Several projectors with edge blending',
@@ -265,7 +267,6 @@ const btnGhost =
   'inline-flex min-h-[48px] items-center justify-center rounded-lg border border-border-strong px-6 text-[15px] font-medium text-text-2 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-bg),0_0_0_4px_var(--color-accent)]';
 
 export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
-  const [still] = useState(wantsStill);
   const [mac] = useState(() => onMacComputer());
 
   const [autoplay] = useState(mayAutoplay);
@@ -382,8 +383,14 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             <ClipItem key={c.id} clip={c} autoplay={autoplay} sound={sound} onSound={setSound} scroller={root} />
           ))}
         </ul>
-        <p className="mt-3 text-[12px] text-dim">
-          Music in the films: AmbiSphere, public domain (<a href="https://archive.org/details/ambisphere" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-text-2">archive.org</a>).
+        <p data-cg-landing-credits="" className="mt-3 text-[12px] leading-relaxed text-dim">
+          Music in the films, each clip its own piece:{' '}
+          {MUSIC.map((m, i) => (
+            <React.Fragment key={m.title}>
+              {i > 0 && '; '}
+              {m.where} <a href={m.source} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-text-2">{m.title}</a>, {m.artist}, {m.licence}
+            </React.Fragment>
+          ))}.
         </p>
       </section>
 
@@ -436,11 +443,11 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Free to play. Pay for the app.</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
           The whole plate is free in your browser. The app adds what a room needs: unmarked recordings, the phone remote, more projectors.
-          One payment, no subscription. The store opens in a new tab; buy with the email you will sign in with, so the app finds your licence.
+          One payment, no subscription. Buying opens soon.
         </p>
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {TIERS.map((t) => (
-            <div key={t.name} className="flex flex-col rounded-xl border border-border bg-surface p-5">
+            <div key={t.name} className="rounded-xl border border-border bg-surface p-5">
               <div className="flex items-baseline justify-between">
                 <h3 className="text-[16px] font-medium">{t.name}</h3>
                 <span className="font-mono text-[13px] text-text-2">{t.price}</span>
@@ -448,21 +455,6 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
               <ul className="mt-4 space-y-2 text-[14px] leading-snug text-muted">
                 {t.lines.map((x) => <li key={x}>{x}</li>)}
               </ul>
-              <div className="mt-auto pt-6">
-                {t.buy ? (
-                  <a
-                    href={t.buy}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-cg-landing-buy={t.id}
-                    className={`${btnPrimary} w-full`}
-                  >
-                    Buy {t.name}, {t.price}
-                  </a>
-                ) : (
-                  <button type="button" data-cg-landing-tier-play="" onClick={onPlay} className={`${btnGhost} w-full`}>Play free</button>
-                )}
-              </div>
             </div>
           ))}
         </div>

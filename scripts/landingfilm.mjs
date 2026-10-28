@@ -14,8 +14,15 @@
  * (`scripts/recorder.mjs`): the canvas and the sound in one file, with a track
  * from `public/music` playing through the app's own player, so the plate is
  * answering the music that is in the file and not a mix laid over it after.
- * Those tracks are public domain or CC BY (`src/lib/musicLibrary.ts` carries
- * each licence), which is why they and no others.
+ * Each clip has its own piece, so that the page does not sound like one album:
+ * an ambient piano swell, a hip-hop groove, solo Bach and an electro-rock build.
+ * They are public domain, CC0 or CC BY (TRACKS below carries each one's licence
+ * and where it came from; the page credits the CC BY ones under the clip), and
+ * only the few seconds each clip uses leave this script. The full tracks are
+ * fetched from the Internet Archive into `landing-takes/music/` the first time
+ * (checked by size), served for the take at `/music/landing/`, and never added
+ * to the repository: the show's own shelf (`musicLibrary.ts`) is not changed.
+ * `LF_MUSIC=/dir` uses tracks already there instead of downloading them.
  *
  * What it writes to `public/landing/clips/`, per clip:
  *   <id>.webm   VP9 and Opus, the first thing a browser is offered
@@ -47,18 +54,55 @@ const ENCODE_ONLY = process.env.LF_ENCODE === '1';
 /** Seconds of the plate before the take starts, so the clip opens on a plate that is already alive. */
 const WARM = Number(process.env.LF_WARM ?? 6);
 
+const MUSIC = path.resolve(process.env.LF_MUSIC ?? path.join(TAKES, 'music'));
+
 /**
- * The clips. `look` is a preset id; `track` and `from` are what plays and
- * where in it; `seconds` is what the visitor sees. A loop is filmed `fold`
- * seconds longer (see above). `width` is the file's width; the page shows the
- * hero across the screen and the others in a row of cards.
+ * The pieces the clips are filmed to. `bytes` is the file's size on the
+ * Internet Archive, held so a changed or truncated download is refused. The
+ * licences are the archive items' own, and the page repeats them under each clip
+ * (`CLIPS` in `Landing.tsx`); PLAN.md 34a-2 lists them too.
+ */
+const TRACKS = {
+  sun: { file: 'sun.mp3', bytes: 7017472, licence: 'CC BY 3.0', title: 'The Sun Is Scheduled to Come Out Tomorrow', artist: 'Chris Zabriskie',
+    url: 'https://archive.org/download/ChrisZabriskieIAmAManWhoWillFightForYourHonor/Chris%20Zabriskie%20-%20I%20Am%20a%20Man%20Who%20Will%20Fight%20for%20Your%20Honor%20-%2002%20The%20Sun%20is%20Scheduled%20to%20Come%20Out%20Tomorrow.mp3' },
+  beat: { file: 'beat.mp3', bytes: 10803543, licence: 'CC BY 3.0', title: 'Caught In The Beat', artist: 'Broke For Free',
+    url: 'https://archive.org/download/Slam_Funk-7603/Broke_For_Free_-_04_-_Caught_In_The_Beat.mp3' },
+  aria: { file: 'aria.mp3', bytes: 5849600, licence: 'CC0 (Bach, public domain)', title: 'Goldberg Variations: Aria', artist: 'Kimiko Ishizaka',
+    url: 'https://archive.org/download/OpenGoldbergVariations/Kimiko%20Ishizaka%20-%20J.S.%20Bach-%20-Open-%20Goldberg%20Variations%2C%20BWV%20988%20%28Piano%29%20-%2001%20Aria.mp3' },
+  fire: { file: 'fire.mp3', bytes: 7287204, licence: 'CC BY 4.0', title: 'Set This Thing on Fire', artist: 'Chris Zabriskie',
+    url: 'https://archive.org/download/cz-blackhole/06%20-%20Set%20This%20Thing%20on%20Fire.mp3' },
+};
+
+/**
+ * The clips. `look` is a preset id; `track` is a TRACKS key and `from` is where
+ * in it the take starts; `seconds` is what the visitor sees. A loop is filmed
+ * `fold` seconds longer (see above). `width` is the file's width; the page shows
+ * the hero across the screen and the others in a row of cards. `from` is
+ * chosen where the piece is playing something (its swell, its groove), not its
+ * intro: the plate answers what it hears.
  */
 const CLIPS = [
-  { id: 'hero', look: 'jellyfish-bloom', track: '/music/ambisphere-d.mp3', from: 40, seconds: 12, fold: 2, loop: true, width: 1280, crf: 38, crfMp4: 27, seed: 3 },
-  { id: 'ferrofluid', look: 'ferro-paint', track: '/music/ambisphere-c.mp3', from: 90, seconds: 8, width: 960, crf: 42, crfMp4: 31, seed: 5 },
-  { id: 'dye-pour', look: 'poster-1969', track: '/music/ambisphere-e.mp3', from: 60, seconds: 8, width: 960, crf: 42, crfMp4: 31, seed: 2 },
-  { id: 'macro', look: 'macro-bead', track: '/music/ambisphere-d.mp3', from: 150, seconds: 8, width: 800, fps: 20, crf: 58, crfMp4: 38, seed: 1 },
+  { id: 'hero', look: 'jellyfish-bloom', track: 'sun', from: 255, seconds: 12, fold: 2, loop: true, width: 1280, crf: 38, crfMp4: 27, seed: 3 },
+  { id: 'ferrofluid', look: 'ferro-paint', track: 'beat', from: 100, seconds: 8, width: 960, crf: 42, crfMp4: 31, seed: 5 },
+  { id: 'dye-pour', look: 'poster-1969', track: 'aria', from: 150, seconds: 8, width: 960, crf: 42, crfMp4: 31, seed: 2 },
+  { id: 'macro', look: 'macro-bead', track: 'fire', from: 232, seconds: 8, width: 800, fps: 20, crf: 58, crfMp4: 38, seed: 1 },
 ];
+
+/** Fetch whatever of TRACKS is not in MUSIC yet, holding each to its size. */
+async function fetchTracks(keys) {
+  fs.mkdirSync(MUSIC, { recursive: true });
+  for (const k of keys) {
+    const t = TRACKS[k];
+    const f = path.join(MUSIC, t.file);
+    if (fs.existsSync(f) && fs.statSync(f).size === t.bytes) continue;
+    const res = await fetch(t.url);
+    if (!res.ok) throw new Error(`${t.title}: ${res.status} from ${t.url}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length !== t.bytes) throw new Error(`${t.title}: ${buf.length} bytes, expected ${t.bytes}`);
+    fs.writeFileSync(f, buf);
+    console.log(`  fetched ${t.artist}, ${t.title} (${t.licence})`);
+  }
+}
 
 const run = (cmd, args) => {
   const r = spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 1 << 26 });
@@ -128,6 +172,12 @@ if (ENCODE_ONLY) {
   process.exit(bad ? 1 : 0);
 }
 
+const wanted = [...new Set(CLIPS.filter(c => !ONLY || ONLY.includes(c.id)).map(c => c.track))];
+await fetchTracks(wanted);
+// vite preview serves dist/ as it is on disk, so the tracks go in beside the build.
+fs.mkdirSync('dist/music/landing', { recursive: true });
+for (const k of wanted) fs.copyFileSync(path.join(MUSIC, TRACKS[k].file), path.join('dist/music/landing', TRACKS[k].file));
+
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
 let leaving = false;
@@ -161,7 +211,11 @@ try {
       if (!running.ok) throw new Error('the show never ran steadily');
       // The music, from where the clip wants it; a new song must not cue another look over this one.
       await page.evaluate(() => window.chromaglassSettings?.({ onNewSong: 'off' }));
-      await page.evaluate((t) => window.chromaglassMusic(t), clip.track);
+      // Start the app's own player (any shelf track), then put the clip's piece in its audio element: the
+      // analyser is wired to that element, so the plate hears the swapped-in file.
+      await page.evaluate(() => window.chromaglassMusic('/music/ambisphere-c.mp3'));
+      await page.waitForFunction(() => { const a = document.querySelector('audio'); return a && !a.paused && a.currentTime > 0; }, null, { timeout: 20000 });
+      await page.evaluate(async (src) => { const a = document.querySelector('audio'); a.src = src; await a.play(); }, `/music/landing/${TRACKS[clip.track].file}`);
       await page.waitForFunction(() => { const a = document.querySelector('audio'); return a && !a.paused && a.currentTime > 0; }, null, { timeout: 20000 });
       await page.evaluate((s) => { const a = document.querySelector('audio'); if (a) a.currentTime = s; }, clip.from);
       await page.waitForTimeout(WARM * 1000);
