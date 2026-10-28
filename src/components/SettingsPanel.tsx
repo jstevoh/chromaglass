@@ -2399,7 +2399,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                                 next[i] = rest;
                                 onUpdate({ sceneMappings: next });
                               }}
-                              className={`min-h-6 px-2.5 rounded text-[12px] font-medium border ${!isGated ? LIT : 'bg-white/5 border-white/10'}`}
+                              className={`min-h-6 px-2.5 rounded text-[12px] font-medium border ${!isGated ? LIT : 'bg-transparent border-white/10'}`}
                               data-testid={`patch-mode-follow-${i}`}
                             >
                               Follow
@@ -2418,7 +2418,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                                 };
                                 onUpdate({ sceneMappings: next });
                               }}
-                              className={`min-h-6 px-2.5 rounded text-[12px] font-medium border ${isGated ? LIT : 'bg-white/5 border-white/10'}`}
+                              className={`min-h-6 px-2.5 rounded text-[12px] font-medium border ${isGated ? LIT : 'bg-transparent border-white/10'}`}
                               data-testid={`patch-gate-on-${i}`}
                             >
                               Gate
