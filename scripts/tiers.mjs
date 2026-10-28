@@ -212,8 +212,9 @@ try {
     check(
       '3b. /license-activate and /license-deactivate turn away another site\'s page (Origin, Sec-Fetch-Site, null) and a body that is not JSON, and leave the licence as it was; the app\'s own page is still answered',
       byOrigin.status === 403 && bySite.status === 403 && byNull.status === 403 && plain.status === 415 && noType.status === 415 &&
-        before.valid === true && after.valid === true && after.tier === before.tier && own.status === 200,
-      `evil origin ${byOrigin.status}, cross-site ${bySite.status}, null origin ${byNull.status}, text/plain ${plain.status}, no type ${noType.status}; licence ${before.tier} → ${after.tier} (${after.valid ? 'valid' : 'GONE'}); own page ${own.status}`,
+        before.valid === true && after.valid === true && after.tier === before.tier &&
+        JSON.stringify(after.machines) === JSON.stringify(before.machines) && after.machineId === before.machineId && own.status === 200,
+      `evil origin ${byOrigin.status}, cross-site ${bySite.status}, null origin ${byNull.status}, text/plain ${plain.status}, no type ${noType.status}; licence ${before.tier} → ${after.tier} (${after.valid ? 'valid' : 'GONE'}), seats ${JSON.stringify(before.machines)} → ${JSON.stringify(after.machines)}; own page ${own.status}`,
     );
   }
 

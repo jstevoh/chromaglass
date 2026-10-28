@@ -1060,15 +1060,20 @@ if (!PACKAGED) {
     else if (!exit) await sleep(3000);
     const quit = exit !== null;
     if (!exit) child.kill('SIGKILL');
-    rmSync(dir, { recursive: true, force: true });
+    // Chromium's helpers can still be writing to the profile for a moment after the main process is gone.
+    await sleep(500);
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
     return { served, quit, exit, out };
   };
   const plain = await run([]);
   const debugged = await run(['--remote-debugging-port=0']);
   const piped = await run(['--remote-debugging-pipe']);
-  check('no debugger: the packed app serves when launched plainly, and quits when launched with --remote-debugging-port or -pipe, serving nothing',
-    plain.served && !debugged.served && debugged.quit && debugged.exit?.code === 1 && !piped.served && piped.quit && piped.exit?.code === 1,
-    `plain: ${plain.served ? 'served' : 'NEVER SERVED'}; --remote-debugging-port: ${debugged.served ? 'SERVED' : debugged.quit ? `quit (${debugged.exit?.code})` : 'still running'}; -pipe: ${piped.served ? 'SERVED' : piped.quit ? `quit (${piped.exit?.code})` : 'still running'}`);
+  // Chromium reads a single dash as the same switch; a review found -remote-debugging-port=9333 opened DevTools past a guard that matched `--`.
+  const single = await run(['-remote-debugging-port=0']);
+  check('no debugger: the packed app serves when launched plainly, and quits when launched with --remote-debugging-port, -pipe or the single-dash spelling, serving nothing',
+    plain.served && !debugged.served && debugged.quit && debugged.exit?.code === 1 && !piped.served && piped.quit && piped.exit?.code === 1 &&
+    !single.served && single.quit && single.exit?.code === 1,
+    `plain: ${plain.served ? 'served' : 'NEVER SERVED'}; --remote-debugging-port: ${debugged.served ? 'SERVED' : debugged.quit ? `quit (${debugged.exit?.code})` : 'still running'}; -pipe: ${piped.served ? 'SERVED' : piped.quit ? `quit (${piped.exit?.code})` : 'still running'}; -remote-debugging-port: ${single.served ? 'SERVED' : single.quit ? `quit (${single.exit?.code})` : 'still running'}`);
 }
 
 /*

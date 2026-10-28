@@ -54,7 +54,8 @@ const SERVER = join(ROOT, 'server', 'remote-server.js');
   at once, saying why. This cannot stop the owner of the Mac, who can do
   anything to software that runs as them; it stops the easy way past the gate
   and another program borrowing the app's microphone and camera by attaching.
-  One exception, which is not a way in: when Node's own inspector is already
+  (Asked of Chromium's own command line, `app.commandLine`, so any spelling of
+  the switch it accepts is caught.) One exception, which is not a way in: when Node's own inspector is already
   open (`--inspect`), the build is one whose fuses are open, and anyone with
   that can attach anyway. Playwright (the checks) launches Electron with
   --inspect=0 and --remote-debugging-port=0 together, and the check drives a
@@ -62,7 +63,9 @@ const SERVER = join(ROOT, 'server', 'remote-server.js');
   shipped app has it off (PLAN 23.17k), so the inspector never opens there and
   the exception never applies to it.
 */
-if (app.isPackaged && !inspector.url() && process.argv.some((a) => /^--remote-debugging-(port|pipe)\b/.test(a))) {
+// Chromium's own parser decides what is a switch: it takes a single dash too (-remote-debugging-port=9333 opened DevTools
+// in a review of this guard, which had matched `--` only), so the question goes to it, not to a pattern on process.argv.
+if (app.isPackaged && !inspector.url() && (app.commandLine.hasSwitch('remote-debugging-port') || app.commandLine.hasSwitch('remote-debugging-pipe'))) {
   console.error('ChromaGlass does not run with a remote debugger attached. Quit and open it normally.');
   app.exit(1);
 }
