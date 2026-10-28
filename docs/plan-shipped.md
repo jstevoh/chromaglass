@@ -5564,6 +5564,24 @@ Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is
 comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
 returning visit nor for `?remote` and `?cast`.
 
+### 34a-5. The page's words, rewritten (2026-10-28)
+
+Asked: the owner wanted the landing page's words looked at again, and decided there is no free
+beta of the paid app. The page never said "beta", but it did not say the free website was more
+than a taste, never named the $164 upgrade, and its maker note and refund line gave no way to
+reach anyone ("say so and I will make it right").
+
+What changed, each line approved by the owner from a draft that put the old and new words side
+by side with a reason: the headline says the show is played, not only that it moves ("A liquid
+light show you play to your music."); the subline names both audiences, a gig and a living room;
+the line under the buttons and the pricing paragraph say the website is free for good and not a
+trial; the pricing paragraph names the upgrade's $164; the maker note and the refund line link
+support@chromaglass.art; "the solver" became "the app" for a home listener; the search and share
+descriptions follow the headline. The layout, tier lists, steps and look lines are untouched.
+
+Measured: `npm run signin` 28/28 (the landing's own lines among them), `layout` 81/81; at 390 ×
+844 and 1440 × 900 the page has 0 px of sideways overflow and the new headline fits the hero.
+
 ## 35. Clear controls: on reads on, one name for one thing
 
 ### 35a. One look for on, every name unique (2026-10-24)
