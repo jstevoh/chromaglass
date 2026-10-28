@@ -3797,12 +3797,20 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   caches its own (H2c-11).
 - **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
   gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
-- **14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
+- ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort
-  on their history. A ring and a selection median.
-- **14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
+  on their history. A ring and a selection median.~~ **Shipped** (#533, 2026-10-28): the
+  detectors keep two rings and take the median and its deviation by partial sort, to the
+  same number to the bit; the live ear stopped copying its byte arrays; the fifteen-frame
+  median's scratch is kept. `AudioFeatures.update` 0.5–0.6 → 0.30 ms, 227.65 → 5.7 KB an
+  update, readings identical (`npm run eargc`). Story in `docs/plan-shipped.md`. What is
+  left (5.7 KB an update) is the reading itself: seventeen onset objects, three arrays and
+  the chroma; not worth a ring of readings until a Mac profile asks.
+- ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
   object each tick) and sets `connected` on every poll through a stale closure (with
-  14j's timer line).
+  14j's timer line).~~ **Shipped** (#533): the ring (`GamepadRing`) listens to a store in
+  the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
+  (`npm run renders`' gamepad phase), and the poll sets `connected` once.
 - **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
   sixty steps (`speciesShare`); a ring like the readback's.
 - **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
@@ -6261,6 +6269,17 @@ Not a gate and no bar: a rate depends on what was pushed.
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
   measurement on the Mac, not from this line.
 
+- **19ac-3. `bottles` counts the look's own pours as the hand's, and goes red on one at the
+  mirror.** `WebGPU (macOS) · tools` failed `bottles` twice on one head (#533, which changes
+  neither the bottle nor the tools), on two different lines: "splatter with the Oil bottle"
+  (39 pours, 1 at the mirror) and "splatter with the Ferrofluid bottle" (37 pours, 1 at the
+  mirror; the hand's flings 0.13 from the hand, nothing near the mirror), and passed on the
+  third run. The stroke's mirror is 0.4 of the plate from it and a splatter's fling reaches
+  about 0.07, so the pour is not the hand's: read it from `__bottleLog` with the call's
+  `auto` flag and the look's lays, and count the hand's alone. Until then a lone pour at
+  the mirror is this, not a flipped coordinate (that puts every pour there). Not yet shown
+  from the log.
+
 ### 19ad. The `open` shard flakes on four unrelated faults
 
 - **19ad-1. `WebGPU (macOS) · open` goes red on marginal timing and on a stray reading.**
@@ -6420,6 +6439,35 @@ advisories.
   `Strict-Transport-Security` itself); the Mac app's own server sends none of these headers
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
+
+### 19ai. Smaller sessions: the separation plan (2026-10-28)
+
+The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
+the docs PR numbers the series 19ai-1..10). Only 19ai-5 is written here so far.
+
+- **19ai-5. Shipped: `npm run sizes`, a size ratchet.** A file not in `scripts/sizes.json`
+  stays at or under 40 KB; a file already over it (52 on main at b38801e, 4.9 MB between
+  them) may not grow past the bytes recorded beside it, nor past its size at the PR's base
+  (so two PRs that each fit under a ceiling cannot land together over it), and new code for it
+  goes in a module beside it. The baseline only shrinks against the base (HEAD^1 in CI: the PR's merge
+  commit's first parent, or the main before a deploy's commit): a ceiling raised or added,
+  or a new ledger, is red, and a big file renamed is a new file over budget. A file more
+  than 4 KB under its ceiling is red, in a PR that resized it, until `npm run sizes -- --update`
+  lowers it (on main, or for a file the PR did not resize, a note: two PRs that each trim
+  2.5 KB must not turn the deploy and every open PR red), so a real move out banks what it saved, while a PR that trims a few lines does not have to touch the
+  same line of `sizes.json` as every other PR in flight. Binary files and
+  `package-lock.json` are not counted. Six **ledgers** that every PR writes in (PLAN.md,
+  `docs/plan-shipped.md`, `docs/judging.md`, `docs/guide.md`, CHANGELOG.md,
+  `scripts/checks.json`) are exempt by name until split. One manifest entry on the `logic`
+  part, `always`; no Mac. Its self-test meets each rule's break in a scratch repository.
+- **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
+  App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
+  such PR now has to move as many bytes out as it adds, wiring lines included. If that turns
+  out to cost more than the splits save, the owner decides whether over-budget files get a
+  small fixed allowance; until then the rule is the one approved.
+- **19ai-5b. Open: the ledgers come out.** 19m (PLAN.md split by section) takes PLAN.md and
+  the archive off the list; `docs/guide.md` and `docs/judging.md` want the same split by
+  part of the app; `scripts/checks.json` could be one file per shard.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
@@ -7255,6 +7303,7 @@ once the login works (23.14).*
 - **23.17i** (**shipped**, this PR): refunding just an upgrade order takes the buyer's Home key back to them. Found in the review of #494: an upgrade files the Pro key over the Home one under the same id, so the refund of the upgrade dropped the only record and revoked the id, and 23.17d then took the Mac app off the buyer at the next start. The upgrade now keeps what it replaced (`replaces` on the Pro record) and the refund files the Home key again (`refileHome`, `server/license-worker.js`), signed afresh with the Home entitlement (`issuedAt`, `updatesUntil`, `maxMachines`) the buyer bought, rebuilt from the Pro record when it predates `replaces`. It gets a new id (`<proId>_home_<upgradeOrderId>`), not the Pro key's: the Pro token verifies offline for ever, and a Mac holding it keeps it while `/keys` lists its id (`heldKeyRefunded`), so the id has to leave the list and be revoked. Refunding the Home order itself, which the upgrade stood on, still takes every key. *Measured:* `npm run license-worker` 11a–11d; on the old Worker 11a–11c fail (`keys after=0`) and 12a fails for want of the Macs' names (4 of 26 red, 22/26), with the new Worker 26/26. The Worker is deployed by hand from the owner's Mac (the owner's OK first); until it is, the live Worker still refunds as before. An upgrade filed before this change has no `replaces`, and its refund rebuilds the Home key from the Pro record (11c).
 - **23.17j. A `?cast` page runs the plate with no licence.** The door is for the show (`main.tsx`, `show` excludes `?remote` and `?cast`); a cast mirrors the show's canvas, but in a browser where it cannot it asks for its own GPU and draws, so `http://localhost:3000/?cast` on the app's server is a plate with no key. Hold a cast with no show to mirror behind the same door. *Measure:* `npm run desktop` opens `?cast` in a plain browser on a keyless app and finds no plate.
 - **23.17k. Electron's fuses, with 13.1-sign.** The packed app still honours `ELECTRON_RUN_AS_NODE`, `--inspect` and an edited `app.asar`; Electron's fuses (`RunAsNode`, `EnableNodeCliInspectArguments`, `EnableEmbeddedAsarIntegrityValidation`, `OnlyLoadAppFromAsar`) close them, and the integrity one needs the signed build. *Measure:* `npm run desktop -- --packaged` reads the fuses off the binary.
+- **23.17m. The Mac app's findings from the security audit (2026-10-28), shipped.** (4) OSC has no show key, so anyone on the venue's Wi-Fi could drive the show; the app now opens with it off, and *Show → OSC input* turns it on for this Mac only (127.0.0.1) or from the network (0.0.0.0), live (`setOsc` in `server/remote-server.js`) and kept in `show.json`; `OSC_PORT` in the environment still decides outright, and `OSC_BIND=127.0.0.1` narrows the terminal server. A menu on the laptop with no phone version, on purpose: a phone that could open the show to the network would hand that to whoever holds its key. (7) Electron 44.10.0 and `npm audit fix` in `desktop/` (0 advisories). (9) A packed app quits when launched with `--remote-debugging-port` or `-pipe`, unless Node's inspector is already open (the build whose fuse is open, which the check drives). (10) `/license-info.json`, `/license-activate` and `/license-deactivate` turn away a request that came from another site (`Sec-Fetch-Site`, `Origin`) and a POST that is not JSON. (13) `disable-library-validation` and `allow-unsigned-executable-memory` are out of the entitlements. *Measure:* `npm run tiers` 3b (fails on the old server), `npm run desktop -- --packaged` lines `OSC closed`, `no debugger`, `entitlements`. *Open:* the entitlements line proves the start on the hardened runtime only in a build signed with the Developer ID; a pull request's build is signed ad hoc now that the signing secrets stay out of branch runs (23.17-cikeys), so the first signed dispatch from `main` is the proof (this PR's own Mac run, signed before that landed, started the packed app on the narrower entitlements and passed), and `disable-library-validation` goes back first if that build will not start. A lease for a key that has not been online in some days (finding 8) is 23.17h, the owner's call. Art-Net in is also unauthenticated UDP and off until a map is set: give it the same *Show* choice if it is ever turned on by default.
 - **23.17-cikeys** (**shipped**, this PR; the security audit of 2026-10-28): the Mac app's build handed the owner's Developer ID certificate, its password and the Apple notarisation password to every same-repo pull request's run (`desktop.yml` on `pull_request` with `CSC_FOR_PULL_REQUEST`), beside that branch's own build config, npm scripts and dependencies; and any workflow a branch wrote could read them, and the site's deploy key, as repository secrets. Now the build signs only on a Run workflow on main, in the `mac-signing` environment, with each signing secret passed under that condition; a pushed `desktop-v*` tag no longer releases (its run is the tag's own copy of the file); the deploy runs in `firebase-live`; every workflow is read-only at its top; the Firebase deploy action is pinned to a commit. *Measure:* `npm run cisecrets` (Measure · logic), each rule red on a broken copy of the real file first; `npm run updates` holds the release to main. *Owner, in Settings → Environments:* create `mac-signing` and `firebase-live`, each with deployment branches "main" only and no reviewers, add the five signing secrets to the first and `FIREBASE_SERVICE_ACCOUNT` to the second, then delete the repository copies (desktop/README.md). Until then the files already keep the signing set out of pull requests' runs, but a branch that edits a workflow could still read the repository copies. *Open:* a pull request no longer proves the signed path (hardened runtime, entitlements, notarisation); the next Run workflow on main does. If that gap bites, a signed check after each merge that touches `desktop/` is the fix, at about 40 Mac minutes a time.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
@@ -8562,7 +8611,7 @@ the code's entry points, the checks to add and the scenes to match, in
   while it is dragged by `npm run ferrohold` (each pass switched off by hand turns its own line red;
   `phaseCompress` is a lab-only step option, 1 by default), and two-phase carry of a coherent drop's
   trailing rim on the thin gap (`phaseVelocity`, 29c-8; `npm run ferrodrag` 3/3 and in CI since
-  29c-10, its Thin-Gap-off lines by hand until 29c-11; `ferrohold` 5/5 over the whole drag). If the closeup's camera ever follows the drop, it follows smoothly and never with the
+  29c-10, its Thin-Gap-off lines since 29c-11; `ferrohold` 5/5 over the whole drag). If the closeup's camera ever follows the drop, it follows smoothly and never with the
   sound (the sway work's `frameSway`, default 0, stays the only way sound moves the frame). Still
   open:
   - **29c-1. The moving edge is compressed back to the grid's width, and the deep plate keeps
@@ -8693,23 +8742,19 @@ the code's entry points, the checks to add and the scenes to match, in
   - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (this PR; story in `docs/plan-shipped.md` §29c):
     `npm run ferrodrag` on the show shard (lines 1 to 3, 3/3 on Metal in 39 s), and `ferrohold` read
     over the whole drag (steps 60 to 180) with its bars between the runs again (5/5 on Metal: lead
-    `1.74R` vs `2.07R`, half-full `105.8` vs `82.2`). The Thin-Gap-off line is written but held out
-    of CI, under **29c-11**.
-  - **29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**
-    `npm run ferrodrag -- --thinoff` takes the dragged drop, switches Thin Gap off and the magnet away,
-    and runs 120 deep steps (line 4: moves under `1R`, keeps half its half-full cells), with a control
-    lab whose `runPhaseAdvect` rides `phaseVelT` on the deep plate (line 5: the control must fail line 4
-    by `0.5R` more). On software WebGPU it separates cleanly (real `0.16R`, `104 → 94`; control
-    `1.93R`, `104 → 0`). On Metal (#521's show shard, runs 40592589582 and 40595560209) both read
-    `0.70R` (cx `0.6201 → 0.6341 0.6350 0.6352 0.6354` on each: most of it in the first 30 steps, then
-    still), so riding the stale velocity makes no difference there, and the half-full count followed the
-    order the labs were opened in rather than the program (the first lab of the run `106 → 74` in both
-    runs, the real plate first and then the control first; the second lab `106 → 90`). Find, on a Mac,
-    why the deep plate moves the drop five times further on Metal than on SwiftShader in its first
-    half-second, why `phaseVelT` is not what carries it there, and what differs between the first and
-    second lab of a process; then put lines 4 and 5 in CI with bars from Metal's numbers. Also: once
-    `phaseCompress` moves onto the deep plate (29c-1), `phaseVel()`'s `thin = true` default must be
-    keyed off `thinLive`, or the stale `phaseVelT` comes back there.
+    `1.74R` vs `2.07R`, half-full `105.8` vs `82.2`). The Thin-Gap-off line joined CI under 29c-11.
+  - ~~**29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**~~
+    **Shipped** (this PR; story in `docs/plan-shipped.md` §29c): the lab stayed thin for the first of
+    those "deep" steps while the old plate's pipelines built off the frame (`thinGapOn`), and on Metal
+    the build outlasted the drop's coast (57 of 120 steps deep on the real plate, 0 on the control).
+    `lab.step` now builds the old plate first after a thin step; lines 4 and 5 require all 120 steps
+    deep and run in CI (`npm run ferrodrag -- --thinoff`, show shard). Metal 5/5: real `0.09R`,
+    control `1.93R`.
+  - **29c-12. Key `phaseVel()`'s default off `thinLive` before `phaseCompress` reaches the deep plate.**
+    `runPhaseCompress` and `runPhasePlanned` call `phaseVel()` with `thin = true`, which today runs only
+    on a thin step. Once `phaseCompress` moves onto the deep plate (29c-1), that default must be keyed
+    off `thinLive`, or the stale `phaseVelT` comes back there; `ferrodrag -- --thinoff` would catch the
+    carry, not necessarily the compression.
   - **29c-9. Replace `phaseVelocity`'s local window reconstruction with a coupled two-fluid velocity
     solve.** `phaseVelocity` (29c-8) is a named shortcut: instead of solving two coupled momentum
     and Darcy-projection equations for `u_ff` and `u_oil` across the diffuse interface (with
