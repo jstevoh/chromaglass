@@ -74,7 +74,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 
 | You touched | Run before pushing |
 |---|---|
-| anything | `npm run lint` (typecheck) |
+| anything | `npm run lint` (typecheck), `npm run sizes` (no new file over 40 KB, no file already over it grows; PLAN 19ai-5) |
 | `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `disc` (the magnet's field), `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
 | `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), `lampzero` (the before-lamp control finds the lamp's lines by count), `litstage` (each look over a projector's black lifted by a stage wash; `-- --controls` until PLAN 36a is built), and a `look` render |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
