@@ -608,10 +608,20 @@ try {
       const W = innerWidth;
       const box = document.querySelector('[data-cg-landing]');
       const b = document.querySelector('[data-cg-landing-play]').getBoundingClientRect();
-      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5 };
+      // The films must not have loaded anything yet beyond the hero's: three clips, each with a poster.
+      const clips = [...document.querySelectorAll('[data-cg-landing-clip]')];
+      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, clips: clips.length };
     }) : null;
-    s.landOk = !!f && !f.over && !f.outside && f.h >= 44;
-    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}` : 'landing page not drawn'}`);
+    if (up && process.env.SIGNIN_SHOT) await p.screenshot({ path: `${process.env.SIGNIN_SHOT}/landing-${s.name.replace(/\W+/g, '-')}.png`, fullPage: true });
+    if (up && process.env.SIGNIN_SHOT) {
+      for (const [tag, sel] of [['clips', '#clips']]) {
+        await p.evaluate((q) => document.querySelector(q)?.scrollIntoView({ block: 'start' }), sel);
+        await p.waitForTimeout(800);
+        await p.screenshot({ path: `${process.env.SIGNIN_SHOT}/landing-${tag}-${s.name.replace(/\W+/g, '-')}.png` });
+      }
+    }
+    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.clips === 3;
+    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px, ${f.clips} clips${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}` : 'landing page not drawn'}`);
     await c.close();
   }
   check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));

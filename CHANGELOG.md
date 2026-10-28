@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - On projected looks the oil's painted rim is gone; a clear oil drop or a clear pour with no
   dye across its edge draws no rim line until PLAN 18e-2 deflects light by the optical path.
 
+### Added — Landing page films with their own music, and sharp look cards (PLAN 34a-2, 34a-3)
+
+- The landing page plays a filmed hero loop and a "See it move" row of three clips (ferrofluid, dye pour, close macro), filmed from the app, each to its own piece of music (Chris Zabriskie, Broke For Free, Kimiko Ishizaka playing Bach), credited under the clips. They start muted with a "Sound on" button; one film has sound at a time and it stops when you scroll away, switch tab or open the sign-in.
+- The eight look cards are 960 × 600 (were 480 × 300), under 60 KB each bar the macro bead. `npm run landinglooks`.
+
 ### Added — Slosh (PLAN 18a-13)
 
 - **Slosh** (`slosh`, Settings → Physics beside Tilt Direction; MIDI, the desks, the remote and the phone's Play sheet): tip the plate one way and then the other and the liquid slops across it and back, piles on the low side and reflects off the rim, mixing the colour. A shallow-water dish on the CPU (`src/lib/slosh.ts`) fed only by the tilt (Gravity and Tilt Direction, the remote's tilt), its flow added to the thin solve's velocity. Default 0, the plate exactly as before; the dial itself is never moved by sound, a look or Evolve; the frame does not move. At the default Thickness the liquid flows to its new level and barely overshoots; it rings at Thickness 0.3 and thinner. `npm run slosh`.

@@ -14,27 +14,30 @@ import { introOut } from '../lib/intro';
  * in neither Firebase nor the engine, so the entry chunk and `npm run startup`
  * are as they were, and nothing here starts the solver: the check that the
  * plate does not start behind the sign-in (signin 3) still means what it said.
- * The hero is a slow cross-fade of five frames the app drew of its own looks,
- * not the engine running live: a visitor on a weak phone should not pay for a
- * fluid solver to read a headline, and a still paints at once while the rest of
- * the page arrives. Only opacity and transform move, which the compositor runs
- * on its own thread. What was tried first, a loop of the lab's plate as a
- * video, was set aside: the lab lays a few dye drops that barely move in the
- * seconds a hero has, and nothing in a cloud session can film the app itself
- * (PLAN.md 34a-2 asks for that film from a Mac). The looks below are frames
- * from the app's own renders of its shipped looks, with each look's own name;
- * nothing is mocked up. They are 480 × 300, so they are shown under a dark
- * scrim in the hero and at their own size in the grid.
+ * The pictures are the app's own: a first frame of the hero's film paints at
+ * once, and the film itself (`npm run landingfilm`, PLAN.md 34a-2) is asked for
+ * only after the page has loaded and a visitor's connection looks able to carry
+ * it. It is a few seconds of the real plate with a track playing, looped so
+ * that it does not jump. The three clips below it are the same, one per kind of
+ * liquid, and the grid under them is a frame from each shipped look
+ * (`npm run landinglooks`, 34a-3). Nothing is mocked up. Only opacity and
+ * transform move on the page itself, which the compositor runs on its own
+ * thread.
+ *
+ * Sound: browsers do not let a page start sound on its own, so every film
+ * starts muted and has a "Sound on" button. One film has sound at a time; it is
+ * muted again when it scrolls out of view, when the tab is hidden and when the
+ * sign-in comes up. The films carry their own music, and nothing on the page
+ * moves with sound (the owner's rule, 2026-10-11: no whole-frame motion from
+ * sound). For a visitor who asks for reduced motion, or for less data, nothing
+ * plays by itself: the first frame stands in and each clip has a button that
+ * plays it, with its sound, when asked.
  *
  * "Play free" mounts the sign-in over this page rather than replacing it, so
  * the card sits on the hero and a visitor who backs out of it is still on the
  * page. The choice is kept in sessionStorage for the tab: Google can
  * sign in by a redirect that reloads the page, and the sign-in screen is what
  * collects that redirect, so a reload with the flag set goes straight to it.
- *
- * Nothing on the page moves with sound (the owner's rule, 2026-10-11: no
- * whole-frame motion from sound), and there is no sound at all. It stops
- * moving for a visitor who asks for reduced motion; the first frame stands in.
  */
 
 interface LandingProps {
@@ -47,8 +50,8 @@ interface LandingProps {
 interface LookCard { id: string; name: string; line: string }
 
 // The names are the shipped looks' own (src/presets.ts); the lines are theirs,
-// shortened. The pictures are 480 × 300 frames from the app's render of each
-// look (PLAN.md 28i-1's contact sheets).
+// shortened. The pictures are 960 × 600 frames from the app's render of each
+// look (`npm run landinglooks`).
 const LOOKS: LookCard[] = [
   { id: 'ferro-paint', name: 'Ferro Paint', line: 'Black ferrofluid worked through amber, teal and coral under a wandering magnet.' },
   { id: 'aurora-borealis', name: 'Aurora Borealis', line: 'Curtains of jade and lime rippling across a night sky.' },
@@ -60,10 +63,24 @@ const LOOKS: LookCard[] = [
   { id: 'neon-coral-reef', name: 'Neon Coral Reef', line: 'A reaction grows coral across the glass, branch by branch.' },
 ];
 
-// Five of the looks above, in the order the hero shows them; each stays about
-// HERO_SLIDE_S seconds, the last quarter of it crossing into the next.
-const HERO = ['ferro-paint', 'aurora-borealis', 'jellyfish-bloom', 'neon-coral-reef', 'cell-bloom'];
-const HERO_SLIDE_S = 7;
+interface ClipCard { id: string; name: string; line: string }
+
+// Filmed from the app by `npm run landingfilm`, each with a track playing.
+const CLIPS: ClipCard[] = [
+  { id: 'ferrofluid', name: 'Ferrofluid', line: 'Black ferrofluid pulled into maze lines and worked through colour.' },
+  { id: 'dye-pour', name: 'Dye in water', line: 'Poured dye folding into itself, a slow swirl in the glass.' },
+  { id: 'macro', name: 'Up close', line: 'The camera close in on a bead: cells, lacing and razor edges.' },
+];
+
+// What plays under each film (`TRACKS` in scripts/landingfilm.mjs holds the same
+// four, with the file each came from). CC BY asks for the artist's name and the
+// licence beside the work, so they sit under the clips rather than in a document.
+const MUSIC: { where: string; title: string; artist: string; licence: string; source: string }[] = [
+  { where: 'Top of the page:', title: 'The Sun Is Scheduled to Come Out Tomorrow', artist: 'Chris Zabriskie', licence: 'CC BY 3.0', source: 'https://archive.org/details/ChrisZabriskieIAmAManWhoWillFightForYourHonor' },
+  { where: 'Ferrofluid:', title: 'Caught In The Beat', artist: 'Broke For Free', licence: 'CC BY 3.0', source: 'https://archive.org/details/Slam_Funk-7603' },
+  { where: 'Dye in water:', title: 'Aria, Goldberg Variations', artist: 'Kimiko Ishizaka playing Bach', licence: 'CC0', source: 'https://archive.org/details/OpenGoldbergVariations' },
+  { where: 'Up close:', title: 'Set This Thing on Fire', artist: 'Chris Zabriskie', licence: 'CC BY 4.0', source: 'https://archive.org/details/cz-blackhole' },
+];
 
 const STEPS: { n: string; title: string; body: string }[] = [
   { n: '1', title: 'Play something', body: 'The plate listens to your music through the browser and answers each kick and note.' },
@@ -72,8 +89,9 @@ const STEPS: { n: string; title: string; body: string }[] = [
   { n: '4', title: 'Put it on the wall', body: 'Send the plate to a TV or projector. In the app, your phone becomes the remote.' },
 ];
 
-const TIERS: { name: string; price: string; lines: string[] }[] = [
+const TIERS: { id: string; name: string; price: string; lines: string[] }[] = [
   {
+    id: 'free',
     name: 'Free',
     price: 'In your browser',
     lines: [
@@ -84,6 +102,7 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     ],
   },
   {
+    id: 'home',
     name: 'Home',
     price: '$35',
     lines: [
@@ -95,6 +114,7 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     ],
   },
   {
+    id: 'pro',
     name: 'Pro',
     price: '$199',
     lines: [
@@ -105,9 +125,141 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
   },
 ];
 
-function wantsStill(): boolean {
-  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+/**
+ * Whether the page may start a film by itself: not for a visitor who asked for
+ * reduced motion or less data, and not over a link that reports itself as slow.
+ * Where the browser gives no hint, assume a good link.
+ */
+function mayAutoplay(): boolean {
+  try {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (c?.saveData) return false;
+    if (c?.effectiveType && c.effectiveType !== '4g') return false;
+  } catch { /* no hints */ }
+  return true;
 }
+
+interface FilmOpts {
+  /** The file's stem under /landing/clips. */
+  id: string;
+  /** May it start by itself, muted? Otherwise only the button plays it. */
+  autoplay: boolean;
+  /** Begin once the page has loaded (the hero) rather than when scrolled near. */
+  eager?: boolean;
+  /** Which film has sound now: one at a time. */
+  sound: string | null;
+  onSound: (id: string | null) => void;
+  scroller: React.RefObject<HTMLElement | null>;
+}
+
+/**
+ * One film on the page. Nothing is fetched until it is wanted: the <video> is
+ * mounted (its poster loads) when the page has loaded, for the hero, or when it
+ * is within a screen of the viewport, and it only downloads when it plays, in
+ * view, with `preload="none"` until then. It pauses when scrolled out of view,
+ * and gives up the sound when it does.
+ */
+function useFilm({ id, autoplay, eager, sound, onSound, scroller }: FilmOpts) {
+  const box = useRef<HTMLDivElement>(null);
+  const video = useRef<HTMLVideoElement>(null);
+  const [armed, setArmed] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [started, setStarted] = useState(false);
+  const hasSound = sound === id;
+
+  useEffect(() => {
+    if (!eager) return;
+    if (!autoplay) return;
+    let t = 0;
+    const go = () => { t = window.setTimeout(() => setArmed(true), 400); };
+    if (document.readyState === 'complete') go(); else window.addEventListener('load', go, { once: true });
+    return () => { window.clearTimeout(t); window.removeEventListener('load', go); };
+  }, [eager, autoplay]);
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof IntersectionObserver === 'undefined') { setVisible(true); if (!eager) setArmed(true); return; }
+    const near = eager ? null : new IntersectionObserver((e) => { if (e.some(x => x.isIntersecting)) { setArmed(true); near?.disconnect(); } },
+      { root: scroller.current, rootMargin: '400px 0px' });
+    near?.observe(el);
+    const seen = new IntersectionObserver((e) => setVisible(e[e.length - 1].intersectionRatio >= 0.4),
+      { root: scroller.current, threshold: [0, 0.4, 1] });
+    seen.observe(el);
+    return () => { near?.disconnect(); seen.disconnect(); };
+  }, [eager, scroller]);
+
+  useEffect(() => {
+    const v = video.current;
+    if (!v) return;
+    if (visible && (autoplay || started)) v.play().catch(() => { /* blocked: it stays on its first frame */ });
+    else v.pause();
+  }, [armed, visible, autoplay, started]);
+
+  useEffect(() => { if (video.current) video.current.muted = !hasSound; }, [armed, hasSound]);
+  // Out of view means out of earshot.
+  useEffect(() => { if (!visible && hasSound) onSound(null); }, [visible, hasSound, onSound]);
+
+  const toggleSound = () => {
+    const v = video.current;
+    if (hasSound) {
+      onSound(null);
+      if (!autoplay) setStarted(false);
+      return;
+    }
+    setStarted(true);
+    onSound(id);
+    if (v) {
+      // Inside the tap, so the browser lets the sound start.
+      v.muted = false;
+      v.play().catch(() => { v.muted = true; onSound(null); });
+    }
+  };
+
+  return { box, video, armed, playing, setPlaying, hasSound, toggleSound };
+}
+
+const SoundButton: React.FC<{ id: string; on: boolean; autoplay: boolean; onClick: () => void; className?: string }> = ({ id, on, autoplay, onClick, className = '' }) => (
+  <button
+    type="button"
+    data-cg-landing-sound={id}
+    onClick={onClick}
+    className={`inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/25 bg-black/55 px-4 text-[13px] font-medium text-white transition-colors hover:bg-black/70 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_#000,0_0_0_4px_var(--color-accent)] ${className}`}
+  >
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor" />
+      {on ? <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" /> : <path d="m16 9 5 6m0-6-5 6" />}
+    </svg>
+    {autoplay ? (on ? 'Sound off' : 'Sound on') : (on ? 'Stop' : 'Play with sound')}
+  </button>
+);
+
+const ClipItem: React.FC<{ clip: ClipCard; autoplay: boolean; sound: string | null; onSound: (id: string | null) => void; scroller: React.RefObject<HTMLElement | null> }> = ({ clip, autoplay, sound, onSound, scroller }) => {
+  const f = useFilm({ id: clip.id, autoplay, sound, onSound, scroller });
+  return (
+    <li data-cg-landing-clip={clip.id} className="w-[82%] shrink-0 snap-start min-[560px]:w-[46%] lg:w-auto">
+      <div ref={f.box} className="relative aspect-video overflow-hidden rounded-xl border border-border bg-surface">
+        <img src={`/landing/clips/${clip.id}.jpg`} alt="" width={960} height={540} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+        {f.armed && (
+          <video
+            ref={f.video}
+            poster={`/landing/clips/${clip.id}.jpg`}
+            muted loop playsInline preload="none"
+            aria-label={`${clip.name}: ${clip.line}`}
+            className="absolute inset-0 h-full w-full object-cover"
+          >
+            <source src={`/landing/clips/${clip.id}.webm`} type="video/webm" />
+            <source src={`/landing/clips/${clip.id}.mp4`} type="video/mp4" />
+          </video>
+        )}
+        <SoundButton id={clip.id} on={f.hasSound} autoplay={autoplay} onClick={f.toggleSound} className="absolute bottom-2 right-2" />
+      </div>
+      <p className="mt-3 text-[14px] font-medium">{clip.name}</p>
+      <p className="mt-1 text-[13px] leading-snug text-muted">{clip.line}</p>
+    </li>
+  );
+};
 
 const btnPrimary =
   'inline-flex min-h-[48px] items-center justify-center rounded-lg bg-primary px-6 text-[15px] font-medium text-on-primary transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-bg),0_0_0_4px_var(--color-accent)]';
@@ -115,9 +267,13 @@ const btnGhost =
   'inline-flex min-h-[48px] items-center justify-center rounded-lg border border-border-strong px-6 text-[15px] font-medium text-text-2 transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_var(--color-bg),0_0_0_4px_var(--color-accent)]';
 
 export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
-  const [still] = useState(wantsStill);
   const [mac] = useState(() => onMacComputer());
+
+  const [autoplay] = useState(mayAutoplay);
   const root = useRef<HTMLDivElement>(null);
+  // Which film has sound: 'hero', a clip's id, or none.
+  const [sound, setSound] = useState<string | null>(null);
+  const hero = useFilm({ id: 'hero', autoplay, eager: true, sound, onSound: setSound, scroller: root });
 
   // The intro `index.html` painted has done its job: this page is what a
   // visitor sees now, and it should not sit under it turning.
@@ -128,6 +284,13 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
     if (!el) return;
     if (covered) el.setAttribute('inert', ''); else el.removeAttribute('inert');
   }, [covered]);
+  // The sign-in coming up, or the visitor leaving the tab (the store opens in another), ends the sound.
+  useEffect(() => { if (covered) setSound(null); }, [covered]);
+  useEffect(() => {
+    const h = () => { if (document.hidden) setSound(null); };
+    document.addEventListener('visibilitychange', h);
+    return () => document.removeEventListener('visibilitychange', h);
+  }, []);
 
   return (
     <div
@@ -135,29 +298,29 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
       data-cg-landing=""
       className="fixed inset-0 z-40 overflow-y-auto overflow-x-hidden bg-bg font-sans text-text"
     >
-      <style>{`
-        @keyframes cg-hero-slide {
-          0% { opacity: 0; transform: scale(1); }
-          5% { opacity: 1; }
-          22% { opacity: 1; }
-          28% { opacity: 0; transform: scale(1.07); }
-          100% { opacity: 0; transform: scale(1.07); }
-        }
-        .cg-hero-slide { animation: cg-hero-slide ${HERO.length * HERO_SLIDE_S}s linear infinite; will-change: opacity, transform; }
-      `}</style>
       {/* Hero */}
       <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
-        <div aria-hidden="true" className="absolute inset-0 -z-20 overflow-hidden bg-bg">
-          {HERO.map((id, i) => (
-            <img
-              key={id}
-              src={`/landing/looks/${id}.webp`}
-              alt=""
-              decoding="async"
-              style={still ? { opacity: i === 0 ? 1 : 0 } : { animationDelay: `${i * HERO_SLIDE_S - HERO_SLIDE_S / 4}s` }}
-              className={`absolute inset-0 h-full w-full object-cover opacity-0 ${still ? '' : 'cg-hero-slide'}`}
-            />
-          ))}
+        <div ref={hero.box} aria-hidden="true" className="absolute inset-0 -z-20 overflow-hidden bg-bg">
+          {/* The film's first frame: it paints at once and is what the film fades in over. */}
+          <img
+            src="/landing/clips/hero.jpg"
+            alt=""
+            decoding="async"
+            fetchPriority="high"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          {hero.armed && (
+            <video
+              ref={hero.video}
+              muted loop playsInline preload="none"
+              tabIndex={-1}
+              onPlaying={() => hero.setPlaying(true)}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${hero.playing ? 'opacity-100' : 'opacity-0'}`}
+            >
+              <source src="/landing/clips/hero.webm" type="video/webm" />
+              <source src="/landing/clips/hero.mp4" type="video/mp4" />
+            </video>
+          )}
         </div>
         <div
           aria-hidden="true"
@@ -170,14 +333,19 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             <img src="/favicon.svg" alt="" aria-hidden="true" className="h-7 w-7" />
             <span className="text-[15px] font-semibold tracking-wide">ChromaGlass</span>
           </div>
-          <button
-            type="button"
-            data-cg-landing-signin=""
-            onClick={onPlay}
-            className="min-h-[44px] rounded-md px-3 text-[14px] text-text-2 transition-colors hover:text-text"
-          >
-            Sign in
-          </button>
+          <div className="flex items-center gap-1 sm:gap-3">
+            {hero.armed && hero.playing && (
+              <SoundButton id="hero" on={hero.hasSound} autoplay onClick={hero.toggleSound} />
+            )}
+            <button
+              type="button"
+              data-cg-landing-signin=""
+              onClick={onPlay}
+              className="min-h-[44px] rounded-md px-3 text-[14px] text-text-2 transition-colors hover:text-text"
+            >
+              Sign in
+            </button>
+          </div>
         </header>
 
         <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col justify-end px-4 pb-[max(32px,env(safe-area-inset-bottom))] pt-16 sm:px-8 sm:pb-16">
@@ -204,6 +372,28 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         </div>
       </section>
 
+      {/* Films from the app */}
+      <section id="clips" className="mx-auto w-full max-w-[1120px] px-4 pt-16 sm:px-8 sm:pt-24">
+        <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">See it move</h2>
+        <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
+          Filmed from the app, with the music on. A browser will not play sound until you ask, so each clip starts quiet.
+        </p>
+        <ul className="-mx-4 mt-8 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-3 lg:gap-4 lg:overflow-visible lg:px-0">
+          {CLIPS.map((c) => (
+            <ClipItem key={c.id} clip={c} autoplay={autoplay} sound={sound} onSound={setSound} scroller={root} />
+          ))}
+        </ul>
+        <p data-cg-landing-credits="" className="mt-3 text-[12px] leading-relaxed text-dim">
+          Music in the films, each clip its own piece:{' '}
+          {MUSIC.map((m, i) => (
+            <React.Fragment key={m.title}>
+              {i > 0 && '; '}
+              {m.where} <a href={m.source} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-text-2">{m.title}</a>, {m.artist}, {m.licence}
+            </React.Fragment>
+          ))}.
+        </p>
+      </section>
+
       {/* Looks */}
       <section id="looks" className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-8 sm:py-24">
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Real looks from the app</h2>
@@ -211,14 +401,14 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
           Each one is a frame from the solver, a different liquid with its own physics.
         </p>
         {/* On a phone the looks are a row to swipe, so eight of them are not four screens of scrolling. */}
-        <ul className="-mx-4 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 min-[560px]:mx-0 min-[560px]:grid min-[560px]:grid-cols-2 min-[560px]:gap-4 min-[560px]:overflow-visible min-[560px]:px-0 lg:grid-cols-4">
+        <ul className="-mx-4 mt-8 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 min-[560px]:mx-0 min-[560px]:grid min-[560px]:grid-cols-2 min-[560px]:gap-4 min-[560px]:overflow-visible min-[560px]:px-0 lg:grid-cols-4">
           {LOOKS.map((l) => (
             <li key={l.id} className="w-[78%] shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-surface min-[560px]:w-auto">
               <img
                 src={`/landing/looks/${l.id}.webp`}
                 alt={`${l.name}: ${l.line}`}
-                width={480}
-                height={300}
+                width={960}
+                height={600}
                 loading="lazy"
                 decoding="async"
                 className="block aspect-[8/5] w-full object-cover"

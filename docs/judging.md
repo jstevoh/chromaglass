@@ -1498,8 +1498,12 @@ beats) is right or wants one a bar, and whether the dent wants to be bigger.
 Open the site in a private window, at a laptop's width and on a phone. The page should say what
 ChromaGlass is in the first screen, and "Play free" should be the one obvious thing to press; the
 sign-in then opens over the page. Say whether: the headline and the line under it are the words you
-would use (they are drafts); the hero's cross-fade of five frames is slow enough not to be noticed
-and not so soft on a big screen that it looks like a blur (it is 480 px frames, PLAN 34a-3); "From
+would use (they are drafts); the hero film is calm enough to sit behind the headline, and its Sound on
+button starts the music; the three clips under it (ferrofluid, dye pour, close macro) are ones you would
+show, each with its sound and each a different piece of music (hero, ferrofluid, dye pour, close
+macro: do the four pieces suit their looks, and is the credit line under the clips right and
+unobtrusive?); the hero's right half is mostly empty navy, say if that bothers you; the look cards
+are sharp on a Retina screen (PLAN 34a-2, 34a-3); "From
 the maker" is something you would sign, and the 14-day refund line matches what you will honour;
 the Free, Home and Pro cards promise only what the app does today. Then sign in, sign out and come
 back: the page should not flash for a returning visit.
