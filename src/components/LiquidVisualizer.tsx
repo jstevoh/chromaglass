@@ -63,6 +63,7 @@ import { LEARNABLE_SETTINGS, type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent, type SongShapeState } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
+import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib/melodyWalk';
 import { BarGrid, Accent, type BarNow } from '../lib/barGrid';
 import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
 import { squishDisc, glassSpring, PressLifts, KickRelease, KICK_HOLD, KICK_RELEASE, kickPress, kickDepth, BassPress, bassPressFor, bassBoostGain, bassRouteValue, type Presser, type Stroke } from '../lib/squish';
@@ -5142,6 +5143,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     fluid.addTemp(rx, ry, 1.2);
     doseArea(fluid, layer, area, rx, ry, 0.8);
   };
+  /**
+   * One note of the melody, let go as a drop (lib/melodyWalk.ts, PLAN
+   * 24.3-place): a real dropper drop of the look's dye at the place its pitch
+   * names, with a dose of the look's liquid (or the line's own, Oil and Water's
+   * oil) where it lands, so neighbours merge or hold apart as the liquids do.
+   * `gain` is Melody Walk; a harder note is a bigger drop. The dye is held
+   * under the look's fill as every music pour is (`room`, the regulator of
+   * PLAN 28d-A); the liquid has its own headroom (pourLiquid).
+   */
+  const layMelodyDrop = (fluid: FluidSimulation, layer: number, d: MelodyDrop, line: MelodyLine, gain: number, room: number) => {
+    const x = Math.max(1, Math.min(GRID_SIZE - 2, Math.round(d.x * GRID_SIZE)));
+    const y = Math.max(1, Math.min(GRID_SIZE - 2, Math.round(d.y * GRID_SIZE)));
+    const vol = gain * (0.3 + 0.7 * d.strength * d.strength);
+    // The pitch walks the line's dyes, low to high; a line with none walks the look's working set.
+    const dyes = line.dyes && line.dyes.length > 0 ? line.dyes : harmonyOf(layer);
+    const c = harmonyCycle(dyes, d.along * (dyes.length - 1));
+    if (room > 0.001) fluid.autoInject('drop', x, y, 4.5 * vol * room, c.r, c.g, c.b, 0.5);
+    fluid.addTemp(x, y, 0.5 * vol);
+    if (line.liquid) pourLiquid(fluid, line.liquid, x, y, vol);
+    else doseLiquid(fluid, liquidsOf(layer), x, y, vol);
+  };
   /** Pour into an area: its own liquid while the bottles are the look's, else one of the bottles picked. */
   const doseArea = (fluid: FluidSimulation, layer: number, a: PlateArea, x: number, y: number, strength: number) => {
     if (areaBottlesRef.current || (layer >= 1 && backDyesRef.current)) pourLiquid(fluid, a.liquid, x, y, strength);
@@ -5572,6 +5594,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     next frame.
   */
   const hitSourceRef = useRef(new HitSource());
+  /**
+   * The melody (lib/melodyWalk.ts, PLAN 24.3-place): the walk hears every
+   * reading, the drops it lets go of wait here for the next running step that
+   * lays them (with the area cords'), and the line is the look's.
+   */
+  const melodyWalkRef = useRef(new MelodyWalk());
+  const melodyQueueRef = useRef<MelodyDrop[]>([]);
+  const melodyLineRef = useRef<MelodyLine>(melodyLine(null));
   const songEventsRef = useRef<(SongEvent & { seq: number })[]>([]);
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
@@ -6055,6 +6085,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
     plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
     areasRef.current = plateAreas(presetId);
+    melodyLineRef.current = melodyLine(presetId);
     areaBottlesRef.current = true;
     areaKicksRef.current = 0;
     // The plate is laid with its liquids as well as its dye, rather than
@@ -6328,6 +6359,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // preset's liquids are what gets poured, and into its areas if it has any.
       plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
       areasRef.current = plateAreas(presetId);
+      melodyLineRef.current = melodyLine(presetId);
       areaBottlesRef.current = true;
       if (!harmonyLockRef.current) {
         const contract = presetContractRef.current;
@@ -7223,6 +7255,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
           hitSourceRef.current.update(heard, songClockRef.current);
+          /*
+            The melody hears every reading whatever the setting, so turning
+            Melody Walk up mid-song finds its armed note as it is; it queues drops only while the dial is up, and only a few (a
+            plate that stalls for a second does not catch up with a flood).
+          */
+          {
+            const dropsNow = melodyWalkRef.current.update(heard, melodyLineRef.current);
+            if ((currentSettings.melodyWalk ?? 0) > 0) {
+              for (const d of dropsNow) melodyQueueRef.current.push(d);
+              if (melodyQueueRef.current.length > 4) melodyQueueRef.current.splice(0, melodyQueueRef.current.length - 4);
+            } else melodyQueueRef.current.length = 0;
+          }
           for (const e of songEvents) {
             songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
             if (songEventsRef.current.length > 16) songEventsRef.current.shift();
@@ -9125,6 +9169,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
             }
             /*
+              The melody's drops (lib/melodyWalk.ts), on the plate the music
+              plays, on the first running step after the walk let them go. The
+              queue is emptied whatever happens here, so a stopped or
+              draining plate does not hold a flood of notes for the moment it
+              runs again.
+            */
+            if (melodyQueueRef.current.length > 0) {
+              const drops = melodyQueueRef.current.splice(0);
+              const mf = fluidsRef.current[activeLayerRef.current];
+              const gain = Math.max(0, Math.min(1, currentSettings.melodyWalk ?? 0));
+              if (mf && gain > 0 && isActiveRef.current && drainFrameRef.current === 0) {
+                const target = dyeLookTarget(mf.seedMean, currentSettings.dyeBudget ?? 0.85, mf.seedBudget);
+                const clearPhase = mf.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
+                const room = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - mf.meanDensity / Math.max(0.06, target)) * 2.5));
+                for (const d of drops) layMelodyDrop(mf, activeLayerRef.current, d, melodyLineRef.current, gain, room);
+              }
+            }
+            /*
               The bass's hand on the glass, on the plate the music plays (the
               active one), every running step: let up on every other plate,
               and on this one when the music is quiet, off or Sound Drive is
@@ -10248,6 +10310,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // before, so it starts fresh with the song it is about to hear.
       songShapeRef.current.reset();
       hitSourceRef.current.reset();
+      melodyWalkRef.current.reset();
+      melodyQueueRef.current.length = 0;
       // The bar too, for the same reason: its beats are on the old clock.
       barGridRef.current.reset();
       accentRef.current.reset();

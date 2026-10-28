@@ -888,6 +888,15 @@ export interface VisualizerSettings {
    */
   kickBloom: number;
   /**
+   * The melody walks across the plate (lib/melodyWalk.ts, PLAN 24.3-place):
+   * each note the ear hears lets go of one drop of the look's liquid, low
+   * notes on one side of the plate and high notes on the other, a harder
+   * note a bigger drop. This is how big: 0 lays none (what every look had),
+   * 1 a full drop. Fast readings only, a tenth of a second behind the note
+   * while its pitch settles; a drum is not a note.
+   */
+  melodyWalk: number;
+  /**
    * Accent the One: how far the kick's press (Beat Squeeze) and push (Plate
    * Rock) follow the kick's place in the bar, as a projectionist plays a
    * rhythm plate: the one pressed hardest, three lighter, two, four and the
@@ -1157,6 +1166,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   hueJourney: 3,
   beatSqueeze: 0.0,
   kickBloom: 1,               // the ring each kick has always thrown
+  melodyWalk: 0,              // off: no note lays a drop, as every look had it
   beatAccent: 0,            // off: every kick pressed alike, as every look had it
   backgroundLoop: 0.5,
   kaleidoscope: 0,

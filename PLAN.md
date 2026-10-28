@@ -206,7 +206,7 @@ bar grid together); **14e** (M, output latency and one lead per source); **10.2-
 **10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11,
 re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering the
 music, explored as four directions the same day and all four taken, in this order:
-~~**25h** areas that listen for themselves~~ (shipped), then **24.3-place** the melody walks across the plate (B, M), then **25i**
+~~**25h** areas that listen for themselves~~ (shipped), ~~**24.3-place** the melody walks across the plate~~ (shipped), then **25i**
 colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
 14r read per area); then **30a**'s rest, shaped sound cords (M; its check `soundcords` written 2026-10-26, Antigravity's Brief 8), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
@@ -7157,16 +7157,37 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   way) so a pad held on ten fingers does not flood the plate, and a channel can be sent to
   an area (25h). The measure adds a three-note chord: three drops in one frame, ordered
   across the plate by pitch, and a fifth held note releasing the first.
-  *The melody walks across the plate (24.3-place, direction B of the owner's 2026-10-24
-  exploration; after 25h).* The same scale across the plate, heard from the microphone as
-  well as MIDI: the lead note's pitch (the `note` source, a fast reading) places its drop,
-  low on one side and high on the other, so a played line draws across the plate; how hard
-  it was hit sets the drop's volume. Each is a real pipette drop of the look's liquid, so
-  neighbours merge or hold apart by immiscibility. First on **Aurora Borealis** (lead notes
-  drop jade and lavender along the curtain's top and the current draws each run into a
-  ribbon) and **Oil and Water** (each note a bead of amber oil, a chord a cluster that
-  rounds into bodies and merges where they touch). *Measure:* a synthetic rising scale on
-  the microphone path lands its drops in pitch order across the plate, one drop per note.
+  ~~*The melody walks across the plate (24.3-place, direction B of the owner's 2026-10-24
+  exploration; after 25h).*~~ (shipped: each note the microphone hears lets go of one drop,
+  low notes on one side of the plate and high on the other, a harder note a bigger drop; a
+  `Melody Walk` dial, on Aurora Borealis and Oil & Water; `npm run melody`.) Story in
+  `docs/plan-shipped.md` §24. Open, found building it:
+  - **24.3-place-1. Only the microphone path, not MIDI.** The chord version (a note-on
+    from a sequencer, spread across the plate by pitch, velocity as the drop's volume, a
+    voice cap per channel) is still 24.3 proper; it should lay through `layMelodyDrop`
+    and take its place from `melodyWalk.ts` (the same scale, the same line) so a played
+    line looks alike whichever way it arrives.
+  - **24.3-place-2. The notes the ear misses.** Under a kick on every beat and a snare on
+    the backbeat, 10 of the scale's 15 notes were called (14 of 15 with no drums): the
+    note onset (55 to 1000 Hz) is a rise against the band's recent loudness, and a note
+    arriving in a kick's tail rises less. Not fixed here; the walk is honest about it
+    (a melody under a hard kick has gaps). A note onset read from the tonal (median-
+    filtered) spectrum, which the kick has been taken out of, would hear them.
+  - **24.3-place-3. A snare called on a lead's own attack.** The snare source fired at
+    full strength on 8 of the 15 notes of the scale (a note above A3 has its third and
+    fourth partners in 1 to 5 kHz), so the snare's onset is not a snare. The walk gets
+    round it (a note beside a snare onset must have moved the pitch), but the beat
+    clock's and 10.2-snare's snares are read from the same onset; 10.2-snare should
+    test the harmonic-to-percussive balance before it believes one.
+  - **24.3-place-4. Colour still follows the bin's class.** `pitchClass` (True
+    Synesthesia, the music's colour) is read from a 43 Hz bin and so is off by up to two
+    semitones at middle C; `pitchFine` is within a semitone from A3 up. Moving the
+    colour to it changes every look's colours with sound, so it waits for the owner's
+    say (a judging item) rather than going in with the melody.
+  - **24.3-place-5. Two more looks, and a line you draw.** The two named looks have lines
+    of their own; every other look takes a straight line across the middle if Melody
+    Walk is turned up. Which looks next, and a way to drag the line on the desk (the
+    way an area is placed), wait for the owner's eyes on these two (judging §89).
 - **24.4** *CV out* (after 24.1b). The plate back into the rack through the interface's
   DC-coupled outputs: how much dye is moving, where the brightest pool sits on the plate
   (x and y), the colour under a point, and a trigger when a drop lands. Then the liquid

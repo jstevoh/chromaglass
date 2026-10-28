@@ -543,6 +543,18 @@
       ]
     },
     {
+      "name": "The melody walks across the plate",
+      "shard": "logic",
+      "run": "npm run melody",
+      "why": [
+        "A played scale (24.3-place) goes through the real analyser and the walk:",
+        "one drop per note the ear called, each on the note played and in pitch",
+        "order across the plate, none from a kick or a snare, a harder note a",
+        "bigger drop, and a drop waiting for its pitch to settle is on the note",
+        "where one placed on the onset is on the note before."
+      ]
+    },
+    {
       "name": "Hold keeps the closeup",
       "shard": "logic",
       "run": "npm run holdjump",

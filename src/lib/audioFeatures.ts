@@ -60,6 +60,8 @@ import { ChromaEar } from './chroma.ts';
  * or second frame after it lands.
  */
 export const ANALYSER_FFT_SIZE = 1024;
+/** Where the melody's pitch starts looking, Hz: above a kick's body, at about A2. */
+export const MELODY_LOW_HZ = 110;
 /** The AnalyserNode's own time smoothing (`smoothingTimeConstant`). */
 export const ANALYSER_SMOOTHING = 0.6;
 /**
@@ -179,6 +181,21 @@ export interface AudioReading {
   tonalHigh: number;
   pitch: number;
   pitchClass: number;
+  /**
+   * How long a new note takes to win the pitch: the median it is read from
+   * spans fifteen readings, so a note holds it from the eighth after it
+   * starts. That many of the ear's own intervals (smoothed), in seconds;
+   * about 0.13 at sixty readings a second, 0.27 at thirty. 0 before two
+   * readings have been seen. Whatever places a note by its pitch waits this
+   * long after the note's onset (`melodyWalk.ts`).
+   */
+  pitchSettleS?: number;
+  /**
+   * The pitch read between the analyser's bins (a parabola through the peak
+   * and its neighbours), in MIDI notes with a fraction; 0 with none. `pitch`
+   * is a bin's, 43 Hz wide; this is the one a melody is placed by.
+   */
+  pitchFine?: number;
   /**
    * The twelve notes sounding, C first, summed to 1 (all zero in silence):
    * the harmony, whatever plays it (`chroma.ts`). The song follower matches
@@ -495,6 +512,8 @@ export class AudioFeatures {
   private ref = ABS_FLOOR_DB;
   private prevPeak = ABS_FLOOR_DB;
   private lastTime: number | null = null;
+  /** The ear's reading interval, smoothed (seconds), for `pitchSettleS`. */
+  private intervalS = 0;
   private levelDb = new Float64Array(0);
   private odf = new Float64Array(0);
   /** New power per bin (linear) this frame, per region. */
@@ -510,6 +529,7 @@ export class AudioFeatures {
   private readonly chromaEar = new ChromaEar();
   pitch = 0;
   pitchClass = 0;
+  pitchFine = 0;
   brightness = 0;
   timbre = 0;
   complexity = 0;
@@ -519,6 +539,7 @@ export class AudioFeatures {
     this.ref = ABS_FLOOR_DB;
     this.prevPeak = ABS_FLOOR_DB;
     this.lastTime = null;
+    this.intervalS = 0;
     this.fresh.fill(0);
     this.ranges.forEach(r => r.reset());
     this.heard.fill(0);
@@ -528,6 +549,7 @@ export class AudioFeatures {
     this.chromaEar.reset();
     this.pitch = 0;
     this.pitchClass = 0;
+    this.pitchFine = 0;
     this.brightness = 0;
     this.timbre = 0;
     this.complexity = 0;
@@ -594,6 +616,8 @@ export class AudioFeatures {
     }
     const dt = this.lastTime === null ? 0 : Math.max(0, time - this.lastTime);
     this.lastTime = time;
+    // A stall or a restarted clock is not the ear's rate.
+    if (dt > 0 && dt < 0.25) this.intervalS = this.intervalS === 0 ? dt : this.intervalS + (dt - this.intervalS) * 0.1;
 
     const ring = this.specRing[this.specRingPos];
     ring.set(db);
@@ -656,11 +680,54 @@ export class AudioFeatures {
     if (bestBin >= 1 && maxHps > -Infinity) {
       const f0 = bestBin * this.hzPerBin;
       this.pitch = 69 + 12 * Math.log2(f0 / 440);
+      /*
+        The melody's pitch (melodyWalk.ts), kept apart from `pitch` above
+        because the colour of the music follows that one's class (True
+        Synesthesia) and would move if the note were read differently. Two
+        differences, both measured by `npm run melody` on a scale of known
+        notes with a kick on every beat:
+
+        Between the bins. The pitch above is a bin's, 43 Hz wide at 1024
+        points and 44.1 kHz: two to three semitones at middle C and an octave
+        across C2 to C3, so a scale read through it climbs in steps of a bin
+        rather than of a note. The peak's neighbours, in the same summed
+        decibels, say which side of the bin the note sits, as a parabola
+        through the three (the Hann window's main lobe is a parabola near its
+        top in decibels).
+
+        Out of the kick's reach. The product above searches from 55 Hz, where
+        a kick's body (45 to 120 Hz) is the loudest thing there is, and under
+        a kick on each beat the median's pitch read the drum for half of every
+        beat (28.8 where the notes were 57 to 81). The melody's search starts
+        at MELODY_LOW_HZ, above the body, so the drum is not in its product
+        at the fundamental; its harmonics at 2 to 4 times are, and are the
+        weaker.
+      */
+      const sum = (b: number) => {
+        let h = hDb[b];
+        if (2 * b <= this.top) h += hDb[2 * b];
+        if (3 * b <= this.top) h += hDb[3 * b];
+        if (4 * b <= this.top) h += hDb[4 * b];
+        return h;
+      };
+      const fineLo = Math.max(2, Math.ceil(MELODY_LOW_HZ / this.hzPerBin));
+      let fineBin = -1, fineBest = -Infinity;
+      for (let b = fineLo; b <= maxHpsBin; b++) {
+        const h = sum(b);
+        if (h > fineBest) { fineBest = h; fineBin = b; }
+      }
+      if (fineBin > 1 && fineBin < this.top) {
+        const a = sum(fineBin - 1), c = sum(fineBin + 1);
+        const den = a - 2 * fineBest + c;
+        const delta = den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0;
+        this.pitchFine = 69 + 12 * Math.log2(((fineBin + delta) * this.hzPerBin) / 440);
+      } else this.pitchFine = 0;
       this.pitchClass = Math.round(this.pitch) % 12;
       if (this.pitchClass < 0) this.pitchClass += 12;
     } else {
       this.pitch = 0;
       this.pitchClass = 0;
+      this.pitchFine = 0;
     }
 
     let peak = ABS_FLOOR_DB;
@@ -748,6 +815,8 @@ export class AudioFeatures {
       db: Array.from(this.levelDb.subarray(0, SOURCE_NAMES.length)),
       pitch: this.pitch,
       pitchClass: this.pitchClass,
+      pitchFine: this.pitchFine,
+      pitchSettleS: 8 * this.intervalS,
       chroma,
       brightness: this.brightness,
       timbre: this.timbre,

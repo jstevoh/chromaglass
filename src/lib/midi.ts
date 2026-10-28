@@ -474,6 +474,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
   { key: 'slosh',           label: 'Slosh',            min: 0, max: 1 },
   { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 1.5 },
+  { key: 'melodyWalk',      label: 'Melody Walk',      min: 0, max: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   // A knob: a verse wants every kick, a chorus the one.
   { key: 'beatAccent',      label: 'Accent the One',   min: 0, max: 1 },

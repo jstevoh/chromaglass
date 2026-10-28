@@ -487,6 +487,8 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.15,
       ledColor: '#020818',
       secondLamp: 0.35,
+      // Each note of a tune a drop of jade or lavender along the top of the curtains (PLAN 24.3-place).
+      melodyWalk: 0.7,
       sceneMappings: [
         /*
           Both read 0 until 28f: `note` and `tonalMid` are the `bands`
@@ -1542,6 +1544,8 @@ export const PRESETS: Preset[] = [
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
+      // Each note of a tune a bead of amber oil along the dish's middle (PLAN 24.3-place).
+      melodyWalk: 0.8,
       /*
         Immiscible oil and water between glass (PLAN 28i-3b): kicks push water
         fingers into the amber oil pools, snares shear the meniscus, and the
