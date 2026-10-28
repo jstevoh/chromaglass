@@ -1742,8 +1742,10 @@ class FluidSimulation {
     if (this.carry) { this.carry.destroy(); this.carry = null; }
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0, sr = 0, sg = 0, sb = 0;
-    const isThin = this.thinGap;
     const S = this.size;
+    // The rim's cells, worked out once rather than by two divisions and a
+    // compare a cell a frame (PLAN 14ab-3); the same test, so the same means.
+    const rim = this.thinGap ? this.rimCells() : null;
     let count = 0;
     for (let j = 0; j < S; j++) {
       for (let i = 0; i < S; i++) {
@@ -1752,11 +1754,7 @@ class FluidSimulation {
         this.rbDensity[idx] = d;
         this.rbVx[idx] = vel[idx * 4];
         this.rbVy[idx] = vel[idx * 4 + 1];
-        if (isThin) {
-          const u = (i + 0.5) / S - 0.5;
-          const v = (j + 0.5) / S - 0.5;
-          if (u * u + v * v >= OPEN_RIM * OPEN_RIM) continue;
-        }
+        if (rim && !rim[idx]) continue;
         sum += d;
         sr += dye[idx * 4]; sg += dye[idx * 4 + 1]; sb += dye[idx * 4 + 2];
         count++;
@@ -1766,6 +1764,23 @@ class FluidSimulation {
     this.meanDensity = sum / area;
     this.meanColor = [sr / area, sg / area, sb / area];
     this.rbSeq++;
+  }
+
+  private rimMask: Uint8Array | null = null;
+  /** Which cells lie inside the dish's rim (r < OPEN_RIM), one byte a cell, made once. */
+  private rimCells(): Uint8Array {
+    const S = this.size;
+    if (this.rimMask?.length === S * S) return this.rimMask;
+    const m = new Uint8Array(S * S);
+    for (let j = 0; j < S; j++) {
+      for (let i = 0; i < S; i++) {
+        const u = (i + 0.5) / S - 0.5;
+        const v = (j + 0.5) / S - 0.5;
+        if (u * u + v * v < OPEN_RIM * OPEN_RIM) m[i + j * S] = 1;
+      }
+    }
+    this.rimMask = m;
+    return m;
   }
 
   private dishAreaCells = 0;

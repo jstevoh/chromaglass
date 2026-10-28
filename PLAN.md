@@ -191,7 +191,8 @@ merge conflicts are the shared documents', which 0.6 ends.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
   after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
-  video pour's pause and play every frame, shipped with 14ac).
+  video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
+  -5, -9 with #PRNUM). Left: 14ab-4, -2, -6, -10.
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
@@ -3177,10 +3178,8 @@ widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
   in each, so a 120 Hz ProMotion MacBook, a 90/120 Hz Android phone or a 144 Hz
   laptop pays for 120–144 draws a second of a liquid that steps at 60 or 30. Cap the
   draw rate at 60, or twice the step rate when the governor has halved it.
-- *A readback every frame, even frozen.* `syncFromGpu()` runs for every layer each
-  frame whatever the solver did; with the plate frozen the solver stops but the draw
-  and the readback go on at the display's rate. Read back only on a frame that stepped
-  or wrote deltas.
+- ~~*A readback every frame, even frozen.*~~ **Shipped with 14ab-3** (#PRNUM): the solver
+  reads its fields back only after a submit that may have written them.
 - *The governor knows nothing of heat.* It climbs whenever frames are fast and
   retried a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
   is warming up climbs, drops frames for a second and a half, steps down, and does it
@@ -3753,17 +3752,28 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
   pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
   belongs in a compute pass beside it.
-- **14ab-3** *Every frame reads both fields back and averages them on the CPU*
-  (`syncFromGpu`, a loop over every cell of each layer for the mean density and colour)
-  where `measure()` on the GPU returns the same means in 32 bytes. With 14j's "read back
-  only on a frame that stepped".
+- ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*.~~
+  **Shipped** (#PRNUM): `readbackAsync` asks only when a submit since the last one may have
+  written a field (`submit`, `wrote`), and hands back "fresh" only for a readback it has not
+  handed back before, so `syncFromGpu`'s loop runs once a landing, not once a frame. A still
+  plate, thirty frames: 60 → 0 asked, 30 → 0 taken; a step every other frame: 60 → 15
+  asked (`npm run framereads`). The means stay in the loop: it copies every cell into the
+  mirror the readers need anyway, so `measure()` would add a pass and save four adds a cell;
+  the rim's test is a mask made once. Story in `docs/plan-shipped.md`.
 - **14ab-4** *A CPU pour uploads the whole grid every step* (`flushDeltas`: about 1.3 MB
   through three to five `writeTexture`s and the upsamples), for a few changed cells.
   Splat records on the GPU (`applySplats`) are the path; what still goes through the
   delta grids is the bubbles' rims, the hands, the breath and the room stir.
-- **14ab-5** *The plate, post chain, camera, output and particles make their bind groups
-  and views every frame* (10–20 `createBindGroup`, 40–60 `createView`); the solver
-  caches its own (H2c-11).
+  A smaller first step, seen with 14ab-3: upload only the rows the CPU wrote since the
+  last flush together with the rows the last upload wrote (zeros there now), since the
+  fold reads the whole delta texture and a stale row would be folded in again.
+- ~~**14ab-5** *The plate, post chain, camera, output and particles make their bind groups
+  and views every frame*.~~ **Shipped** (#PRNUM): `gpu/groupCache.ts` finds a group again by
+  the pipeline and the objects it binds (`WeakMap`s, so a texture let go takes its groups),
+  and a texture's view by the texture; the plate, camera, post chain, projector, particles,
+  air, slosh and the ferrofluid drop use it. The app's chain of passes, measured in the lab:
+  12 bind groups and 64 views a frame → 0 and 0, every frame the same picture byte for byte
+  (`npm run framegroups`).
 - **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
   gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
 - ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
@@ -3780,8 +3790,11 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   14j's timer line).~~ **Shipped** (#533): the ring (`GamepadRing`) listens to a store in
   the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
   (`npm run renders`' gamepad phase), and the poll sets `connected` once.
-- **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
-  sixty steps (`speciesShare`); a ring like the readback's.
+- ~~**14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
+  sixty steps.~~ **Shipped** (#PRNUM): one kept buffer, summed where it is mapped, the rim
+  a mask made once; the share is the same number to the bit, and a read after the first
+  makes no buffer (`npm run framereads`). A ring was not needed: one read is in flight at a
+  time (`shareRead`).
 - **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
   tools shard, two attempts on one head were each red on one line of 224, a different line
   each time. Attempt 1 failed "both windows animating, 0.25 of a refresh behind", which read
