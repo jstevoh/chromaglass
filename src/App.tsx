@@ -5151,6 +5151,7 @@ export default function App() {
       onWallTest={setWallTest}
       tempo={tempoLabel}
       readTempo={readTempo}
+      readEar={() => ear.live.current?.features ?? null}
       spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
       onTap={tapTempo}
       onTempoClear={clearTempo}

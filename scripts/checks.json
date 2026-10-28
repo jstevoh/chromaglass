@@ -599,7 +599,7 @@
     {
       "name": "The sound cords",
       "shard": "logic",
-      "run": "npm run soundcords -- --controls",
+      "run": "npm run soundcords",
       "why": [
         "A sound cord's shape (PLAN 30a): tone bursts in and out of a dragged",
         "band, fires counted against the threshold and timed against the attack",
