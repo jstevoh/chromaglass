@@ -3422,11 +3422,17 @@ final script, ten runs beside twelve busy loops, 4.7 to 6.0 ms and 0.53. Both ba
 each FAIL line now prints its reading and its room.
 
 Still red on a real slowdown: `npm run scene -- --slow k` runs the analysis k times a frame inside
-the timed push. Five runs a factor, the worst frame read 4.7 to 5.4 ms at 1x, 9 to 16 at 2x, 14 at
-3x, 18.5 to 25.7 at 4x (red in 3 of 5) and 23 to 30 at 5x and 6x (red in all); the median went red
-at 5 to 6x (1.6 to 3.0 ms). The old reading, the same sweep with one other process beside it, was
-13.7 to 20.3 at 1x (red in 1 of 5) and red in all from 2x. So the worst-frame bar is quieter on an
-unchanged tree and coarser on a slow one, which 19k-7a is to tighten from CI's numbers.
+the timed push. Against the old 20 ms the worst-frame bar would have gone red only at 4 to 5x
+(18.5 to 25.7 ms at 4x, red in 3 of 5), where on the process's reading it went red from 2x, half
+of that reading being the compiler; keeping the number would have loosened the bar in effect, so
+it is 12 ms. In the cloud session: about 120 runs at 1x read 4.5 to 10.4 ms but one 14.6 (the
+VM's steal time climbing through that batch); fifteen at 2x 9.0 to 16.5 (red in 9); fifteen at
+3x 13.4 to 26.8 (red in all). Measure's runner read 3.6 ms at 1x on #551, so there it goes red
+from a little over 3x. The median bar went red at 5 to 6x on either reading (1.6 to 3.0 ms at 5x
+and 6x), so it stays at 2 ms; one run in fifty here read 2.28 at 1x, the still room's median
+carrying the optimiser's main-thread work (19k-7a). The review (one, as for every check change)
+found the thread reading exact against busy waits of 0.1 to 2 ms and asked for `--slow`'s typos
+to be refused rather than run at 1x, which they are.
 
 *The two nits on #504.* `checks.mjs`'s walk detector (which makes a Measure check that walks
 `scripts/` an `always` entry) knew `walk('scripts')` and `walk(join(root, 'scripts'))` only; a

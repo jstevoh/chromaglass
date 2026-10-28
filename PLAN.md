@@ -5617,14 +5617,17 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   / the job summary over the next merges and split the browser part next if it passes 21.
 - **19k-7** (S): **shipped**, `npm run scene`'s cost bars time the main thread, not the process.
   They went red on #540 (22.5 ms worst frame, 2.01 ms median) with nothing changed, because
-  `process.cpuUsage()` counted V8's background compiler; `--slow k` shows the bars still go red
-  when the analysis does more work. (#540 filed this as 19k-6, a number already used.) The story
-  is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
-  - **19k-7a** (S): the costliest-frame bar of 20 ms now catches a 4 to 5x slowdown of the
-    analysis where it caught 2x (half of what it read was the compiler). Read the worst frame on
-    Measure's runners over the next ten runs (it is on the line now) and, if it stays under about
-    8 ms there as here, move the bar to about 12 ms (`--slow 2` read 9 to 16 here). A tighter
-    bar, never a looser one, and named under `Check changes:`.
+  `process.cpuUsage()` counted V8's background compiler. The worst-frame bar is tightened from
+  20 to 12 ms so it still goes red at 2 to 3x the analysis (`--slow k` shows it). (#540 filed
+  this as 19k-6, a number already used.) The story is in
+  [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
+  - **19k-7a** (S): the worst frame is nearly always the still room's first optimised one, the
+    optimiser's main-thread work, and that is where what is left of the noise lives: in a cloud
+    session 1 run of about 120 read past 12 ms at 1x (14.6, with the VM's steal time climbing)
+    and 1 in 50 read a still-room median of 2.28 against 2. Measure's runner read 3.6 ms and
+    0.48. If either goes red on CI on a tree that did not change the sensor, time the first
+    room's cold frame as its own line and hold the warm rooms (0.5 to 2 ms peaks) to a bar of
+    their own, which would catch a stall in a warm room the 12 ms bar lets through.
 
 ### 19l. App frames readable in a cloud session
 

@@ -45,7 +45,12 @@ const FRAMES = 40;
 const DT = 1 / 20;
 const OPTS = { deadzone: 0.25, smooth: 0.2, people: true };
 const slowAt = process.argv.indexOf('--slow');
-const SLOW = slowAt < 0 ? 1 : Math.max(1, Math.round(Number(process.argv[slowAt + 1]) || 1));
+const SLOW = slowAt < 0 ? 1 : Number(process.argv[slowAt + 1]);
+if (!Number.isInteger(SLOW) || SLOW < 1 || process.argv.some(a => a.startsWith('--slow='))) {
+  console.error('FAIL  --slow takes a whole number of times to run the analysis a frame: --slow 5');
+  process.exit(1);
+}
+if (SLOW > 1) console.log(`the analysis runs ${SLOW} times a frame (--slow ${SLOW}): the cost bars should read red`);
 
 /** A frame of flat grey with a little sensor noise, as RGBA. */
 function room(seed) {
@@ -151,17 +156,22 @@ function run(name, paint) {
     // the show is what it keeps the main thread from doing, so that is what
     // is counted now, against the same two bars.
     //
-    // What that costs the bars, shown with `--slow k` (the analysis run k
-    // times a frame), five runs a factor: the costliest frame read 4.7 to 5.4
-    // ms at 1x, 9 to 16 at 2x, 14 at 3x, 18.5 to 25.7 at 4x (red in 3 of 5)
-    // and 23 to 30 at 5x and 6x (red in all); the process's reading, run the
-    // same way with one other process beside it, was 13.7 to 20.3 at 1x (red
-    // in 1 of 5, on nothing) and red in all from 2x. So the worst-frame bar now
-    // catches a slowdown of four to five times where it caught two, because
-    // half of what it read before was the compiler; it still catches a stall,
-    // and it no longer fires on an unchanged tree. The median bar went red at
-    // five to six times either way (1.6 to 3.0 ms at 5x and 6x). A tighter
-    // worst-frame bar is PLAN 19k-7a, to be set from CI's readings.
+    // What that does to the bars, shown with `--slow k` (the analysis run k
+    // times a frame). At 20 ms the worst-frame bar would have gone red only at
+    // four to five times the analysis (18.5 to 25.7 ms at 4x, red in 3 of 5),
+    // where on the process's reading it went red from 2x: half of what it read
+    // was the compiler. So the bar is 12 ms now, set from the main thread's
+    // spread: in a cloud session about 120 runs at 1x read 4.5 to 10.4 ms,
+    // busy or not, but one 14.6 (the VM's steal time climbing), fifteen at 2x
+    // 9.0 to 16.5 (red in 9), fifteen at 3x 13.4 to 26.8
+    // (red in all); Measure's runner read 3.6 on the PR that set it, so there it
+    // goes red from a little over 3x. The old reading went red at 1x in 1 of 5
+    // here, on nothing, and at 22.5 on #540. It is still nearly always the
+    // still room's first optimised frame; a warm room peaks at 0.5 to 2 ms, so
+    // a stall in one is caught only past 12, six times its peak or more. The
+    // median bar went red at five to six times either way (1.6 to 3.0 ms at 5x
+    // and 6x) and stays at 2 ms; one run in fifty here read 2.28 at 1x, the
+    // still room carrying the optimiser's main-thread work (PLAN 19k-7a).
     const t0 = threadMs();
     for (const s of shadows) s.push(px, N, N, DT, f * DT * 1000, OPTS);
     const r = sense.push(px, N, N, DT, f * DT * 1000, OPTS);
@@ -356,7 +366,7 @@ const checks = [
   [`the cost was read (the main thread's CPU time over each push, above zero; its clock steps ${clockStep.toFixed(3)} ms, under 0.1)`,
     Math.min(...results.map(r => r.ms)) > 0 && clockStep < 0.1],
   [`analysis costs under 2 ms a frame, the median frame of each room (${costliest.ms.toFixed(2)} ms, ${costliest.name})`, costliest.ms < 2],
-  [`and the costliest frame of each room, the first optimised one included, is under 20 ms (${stalliest.worst.toFixed(1)} ms, ${stalliest.name})`, stalliest.worst < 20],
+  [`and the costliest frame of each room, the first optimised one included, is under 12 ms (${stalliest.worst.toFixed(1)} ms, ${stalliest.name})`, stalliest.worst < 12],
   ['a camera on itself finds a ceiling', loopLate < loopMid * 1.25],
   ['and the ceiling is a plate, not a wall', loopLate < 20],
   ['a fan in the corner still drives the plate', carLate > carEarly * 0.5],
