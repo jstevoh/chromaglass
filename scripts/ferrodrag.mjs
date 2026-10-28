@@ -153,7 +153,9 @@ const scene = async ({ N, R, dragOnly, thinOff }) => {
   const s1 = await getStats();
 
   // 4. Thin Gap off, magnet gone: 120 steps of the deep plate, read every 30.
+  // And how many of them the plate ran thin all the same (thinGapOn).
   const tail = [];
+  let thinSteps = 0;
   for (let k = 1; k <= (thinOff ? 120 : 0); k++) {
     await lab.step(1, {
       phaseSharp: 0.75,
@@ -161,10 +163,11 @@ const scene = async ({ N, R, dragOnly, thinOff }) => {
       thinGap: 0,
       magnetStrength: 0,
     });
+    if (lab.thinLive()) thinSteps++;
     if (k % 30 === 0) tail.push(await getStats());
   }
   const s2 = tail[tail.length - 1];
-  if (dragOnly) return { s0, s1, s2, tail };
+  if (dragOnly) return { s0, s1, s2, tail, thinSteps };
 
   // 2. Stationary control: settle 20 steps, then 180 steps with no magnet
   await lab.create(N, N);
@@ -189,7 +192,7 @@ const scene = async ({ N, R, dragOnly, thinOff }) => {
   }
   const noMag1 = await getStats();
 
-  return { s0, s1, s2, tail, noMag0, noMag1 };
+  return { s0, s1, s2, tail, thinSteps, noMag0, noMag1 };
 };
 
 let control;
@@ -240,22 +243,23 @@ try {
     const moved = Math.hypot(r.s2.cx - r.s1.cx, r.s2.cy - r.s1.cy);
     return {
       moved,
+      deep: r.thinSteps === 0,
       ok: moved < R && r.s1.cx > 0.55 && r.s1.halfCount > 0 && r.s2.halfCount >= 0.5 * r.s1.halfCount,
-      text: `moved ${(moved / R).toFixed(2)}R in 120 deep steps (cx ${r.s1.cx.toFixed(4)} → ${r.tail.map((t) => t.cx.toFixed(4)).join(' ')}, limit 1R); half-full ${r.s1.halfCount} → ${r.tail.map((t) => t.halfCount).join(' ')} (limit half kept); ${r.s1.n01} → ${r.s2.n01} cells over 0.01`,
+      text: `${120 - r.thinSteps} of 120 steps ran deep; moved ${(moved / R).toFixed(2)}R in 120 deep steps (cx ${r.s1.cx.toFixed(4)} → ${r.tail.map((t) => t.cx.toFixed(4)).join(' ')}, limit 1R); half-full ${r.s1.halfCount} → ${r.tail.map((t) => t.halfCount).join(' ')} (limit half kept); ${r.s1.n01} → ${r.s2.n01} cells over 0.01`,
     };
   };
   if (THIN_OFF) {
     const off = stays(result), stale = stays(control);
     check(
       'with Thin Gap off after the drag and no magnet, the drop stays put and stays a drop',
-      off.ok,
+      off.ok && off.deep,
       off.text,
     );
     // 5. The control: the same scene on the plate that rides the stale velocity
     // fails line 4, by more than the real plate's movement again.
     check(
       'and it is the deep plate not riding the thin gap\'s last velocity: with it ridden, the same line is red',
-      !stale.ok && stale.moved - off.moved >= R / 2,
+      stale.deep && !stale.ok && stale.moved - off.moved >= R / 2,
       `${stale.text}; ${((stale.moved - off.moved) / R).toFixed(2)}R further than the real plate (bar >= 0.5R)`,
     );
   }

@@ -312,6 +312,8 @@ const api = {
   /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
   prepareFilm() { return lab!.solver.prepareFilm(); },
   filmSteps() { return lab!.solver.filmSteps; },
+  /** Whether the last step ran the plate as a thin gap (thinGapOn), whatever it asked for. */
+  thinLive() { return lab!.solver.thinGapLive; },
   /** Thin Gap's viscosity for a Thickness, and the ferrofluid's (src/gpu/fluid.ts), so a check never copies either. */
   thinGapViscosity,
   /** The real seconds a lab step takes, for `npm run thick`'s kept share and `npm run flush`'s pours. */

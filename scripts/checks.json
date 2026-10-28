@@ -1619,7 +1619,7 @@
     {
       "name": "The dragged ferrofluid drop follows the magnet",
       "shard": "show",
-      "run": "npm run ferrodrag",
+      "run": "npm run ferrodrag -- --thinoff",
       "why": [
         "The closeup's ferrofluid drop dragged 0.3 of the plate in three",
         "seconds (PLAN 29c, 29c-8): it follows the magnet within two radii and",
