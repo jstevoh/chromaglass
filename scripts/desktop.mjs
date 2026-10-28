@@ -597,7 +597,7 @@ try {
   // ScreenCaptureKit path is docs/judging.md §87). Ambient TV mode caps the
   // solver at 30 steps/s, caps frames drawn in the app at 60 Hz through
   // DrawGate, and holds the machine's opening rung.
-  await page.locator('[data-testid=mode-segmented-sound]').click();
+  await page.locator('[data-testid=mode-segmented-setup]').click();
   await page.locator('[data-testid=sound-source-system]').waitFor({ timeout: 5_000 });
   const sysLabel = (await page.locator('[data-testid=sound-source-system]').textContent())?.trim() ?? '';
   const asksBefore = await electronApp.evaluate(() => globalThis.__chromaglassSystemAudioAsks ?? 0);
@@ -803,12 +803,14 @@ try {
   // own page loaded, not out of the environment, so a build that dropped them
   // fails here whatever this run's env says, and then asks each Worker, as the
   // page's origin, whether it answers the app. The addresses come from the same
-  // secrets deploy.yml uses, so a run with none (a fork's, or a session's) has
-  // nothing to look for and skips; CI on this repository has them.
+  // secrets deploy.yml uses. One that is unset has nothing to look for (the
+  // crash report Worker was never deployed, so its secret is empty, and the
+  // line says so in its row rather than naming it a pass); a run with neither
+  // (a fork's, or a session's) skips.
   {
     const want = { song: process.env.VITE_FINGERPRINT_PROXY_URL, crash: process.env.VITE_CRASH_REPORT_URL };
     if (!want.song && !want.crash) {
-      skip("workers: the app's build carries the song ID and crash-report addresses, and each Worker answers the app's origin", 'this run has neither VITE_FINGERPRINT_PROXY_URL nor VITE_CRASH_REPORT_URL (desktop.yml passes both from the repository secrets)');
+      skip("workers: each address this run was given (song ID, crash report) is in the app's build, and its Worker answers the app's origin", 'this run has neither VITE_FINGERPRINT_PROXY_URL nor VITE_CRASH_REPORT_URL (desktop.yml passes both from the repository secrets)');
     } else {
       const bundles = await page.evaluate(async () => {
         const urls = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => /\.js(\?|$)/.test(u));
@@ -823,7 +825,7 @@ try {
       // in X-ChromaGlass-Key (fingerprint.ts), the crash report's is JSON.
       const asks = { song: 'x-chromaglass-key', crash: 'content-type' };
       for (const [name, url] of Object.entries(want)) {
-        if (!url) { rows.push(`${name}: NO ADDRESS in this run's env (the repository secret is unset)`); all = false; continue; }
+        if (!url) { rows.push(`${name}: no address in this run (its repository secret is unset), so nothing to look for`); continue; }
         const carried = bundles.some((t) => t.includes(url));
         const reply = await fetch(url, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': asks[name] } }).catch(() => null);
         const allowed = reply?.headers.get('access-control-allow-origin');
@@ -831,7 +833,7 @@ try {
         rows.push(`${name}: ${carried ? 'in the build' : 'MISSING from the build'}, preflight from ${origin} ${reply ? `${reply.status}, allows ${allowed ?? 'nothing'}` : 'got no answer'}`);
         all = all && carried && answers;
       }
-      check("workers: the app's build carries the song ID and crash-report addresses, and each Worker answers the app's origin", all,
+      check("workers: each address this run was given (song ID, crash report) is in the app's build, and its Worker answers the app's origin", all,
         `${bundles.length} bundles read; ${rows.join('; ')}`);
     }
   }
