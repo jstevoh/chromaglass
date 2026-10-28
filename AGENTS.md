@@ -16,6 +16,14 @@ there the same day: a comment on the related PR or issue, or a line in `PLAN.md`
 table when there is no PR. Name secrets, never their values. Details in
 `docs/handoff.md` ("Leaving a record").
 
+## Quote what the command printed
+
+In your PR body, every line under `Measured:` gives the command and the line it printed,
+both in backticks: `` `npm run grating` → `ok 24/24 …` ``. A verdict ("passed", "clean",
+"CI green") is not a measurement, and CI turns a PR from an `antigravity/…` branch red
+for one (`npm run checkguard`; the form is in `docs/handoff.md`, "Measured quotes what
+the command printed"). Then re-run the failed jobs; no push is needed.
+
 ## Never deploy by hand, never commit keys
 
 Never deploy by hand: deploys come only from `main` through CI.
