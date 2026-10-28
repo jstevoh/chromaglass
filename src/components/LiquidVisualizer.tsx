@@ -46,6 +46,7 @@ import { AutoSpin, GRIP_SECONDS, OPEN_RIM, SpinHand, carrierViscosity, dishFollo
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL, DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
+import { PlateKick } from '../lib/plateKick';
 import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus, type GpuClass } from '../lib/platform';
@@ -701,17 +702,6 @@ const SIM_MAX_CATCHUP = (() => {
   `engineQuery({ lockstep: true })` (scripts/frame.mjs), which a GPU never
   sends, so nothing a Mac measures moves.
 */
-/*
-  How long a kick waits for the plate's next step before it is let go
-  (`plateKickRef`): a tenth of a second, past one step's interval at the
-  governor's floor of thirty steps a second (33 ms) and at the nineteen a
-  second the Mac runner reached under the squeeze (53 ms), and short enough
-  that a press laid after it would be the beat's ghost, not the beat. It is
-  counted from the frame after the one that decided the kick, so a slow frame
-  never drops a kick it steps for, and in a render, where `showNow()` is the
-  render's own frame clock, a kick waits a tenth of the song's seconds.
-*/
-const KICK_OWED_MS = 100;
 const LOCKSTEP = (() => {
   if (typeof window === 'undefined') return false;
   return new URLSearchParams(window.location.search).get('lockstep') === '1';
@@ -5708,28 +5698,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
-  /*
-    A kick the plate has still to take (PLAN 30a-3).
-
-    The clock decides a kick once a frame, and everything a kick does to the
-    plate (Beat Squeeze's press, Plate Rock's lean, the bloom's ring, the
-    bubbles, the bass moving on to its next area) is laid inside the step
-    loop on its first step, `simStep === 0`. A frame that takes no step has
-    no first step, so its kick was dropped without a word. That is most
-    frames once the plate steps slower than the display refreshes: at thirty
-    steps a second on a 120 Hz screen three frames in four take none, and in
-    the squeeze check's window on the Mac runner 16 of 41 kicks pressed. A
-    projectionist's hand on the glass doesn't wait for a solver step; the
-    plate feels the press on the next step it takes. So the kick is held
-    here, with the song time and the lead it was decided at (the accent asks
-    where in the bar it fell, and the bar has moved on by the next step),
-    until a frame steps, and let go if no step comes within `KICK_OWED_MS`
-    (a stalled or paused plate, where a press laid a second late is not the
-    beat's).
-  */
-  const plateKickRef = useRef<{ owed: boolean; fresh: boolean; at: number; predicted: boolean; ms: number }>({ owed: false, fresh: false, at: 0, predicted: false, ms: 0 });
-  /** Kicks the plate took on a step, and kicks let go untaken (`npm run squeeze` asks every kick is one or the other). */
-  const plateKicksRef = useRef({ taken: 0, lost: 0 });
+  /** A kick held for the plate's next step (lib/plateKick.ts, PLAN 30a-3). */
+  const plateKickRef = useRef(new PlateKick());
   /**
    * Every kick onset the ear handed the clock, once each (`npm run kicks`,
    * and the Mac's checks, compare it with the kicks the clock fired and the
@@ -7441,11 +7411,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           */
           const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
-          if (kickRef.current.kick) {
-            // A kick still owed when the next is decided is one the plate never stepped for.
-            if (plateKickRef.current.owed) plateKicksRef.current.lost++;
-            plateKickRef.current = { owed: true, fresh: true, at: songClockRef.current, predicted: kickRef.current.predicted, ms: nowMs };
-          }
+          if (kickRef.current.kick) plateKickRef.current.decide(songClockRef.current, kickRef.current.predicted, nowMs);
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
           hitSourceRef.current.update(heard, songClockRef.current);
@@ -8179,16 +8145,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
 
 
-        // The kick this frame's first step lays, if it has one (`plateKickRef`).
+        // The kick this frame's first step lays, if it has one (lib/plateKick.ts).
         const plateKick = plateKickRef.current;
-        // Never late on the frame that decided it: that frame's own work (a slow
-        // frame, a software plate's seconds-long step) is not a stall between kicks.
-        const kickLate = plateKick.owed && !plateKick.fresh && showNow() - plateKick.ms > KICK_OWED_MS;
-        plateKick.fresh = false;
-        const kickNow = plateKick.owed && !kickLate && simSteps > 0;
-        if (kickNow) plateKicksRef.current.taken++;
-        if (kickLate) plateKicksRef.current.lost++;
-        if (kickNow || kickLate) plateKick.owed = false;
+        const kickNow = plateKick.take(simSteps > 0, showNow());
         for (let simStep = 0; simStep < simSteps; simStep++) {
           // The room stirs the lead plate: it is ambient, not a tool, so it
           // goes where the show is rather than onto whichever layer happens to
@@ -9399,18 +9358,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               falls in the bar, the one pressed hardest, two and four let go.
               Asked of every kick, whatever the setting, so the one after a
               fill is known when the setting comes up; at 0 it is exactly 1,
-              and so are kicks the bar grid is unsure of. A *predicted* kick
-              fires beatLead ahead of what is heard, so the beat it means is
-              that far on along the readings' clock the grid keeps; a kick
-              fired from a heard onset (all of them with Beat Prediction at 0,
-              and those before the clock locks or after it loses the lock)
-              fires as it is heard and means the beat now. Shifting those too
-              put them 80 ms past their beat at the default lead: at 140 bpm
-              103 of 109 kicks fell off the beat and weighed 0 at full accent,
-              so turning Accent up in detection-only mode all but stopped the
-              squeeze (measured with the real grid on the club songs).
+              and so are kicks the bar grid is unsure of. At the beat the kick
+              means (lib/plateKick.ts `meant`).
             */
-            const accentAt = plateKick.at + (plateKick.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
+            const accentAt = plateKick.meant(currentSettings.beatLead);
             const accent = kickStep ? accentRef.current.kick(barGridRef.current, accentAt, currentSettings.beatAccent ?? 0) : 1;
             /*
               The hand's lean and sway, the slider applied once (lib/plateRock.ts,
@@ -10515,7 +10466,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       tempoMulRef.current = 1;
       kickRef.current = { kick: false, predicted: false };
       kickCountRef.current = 0;
-      plateKickRef.current = { owed: false, fresh: false, at: 0, predicted: false, ms: 0 };
+      plateKickRef.current.reset();
       magnetWalkRef.current = 0;
       phrasingRef.current.reset();
       phraseRef.current = { drive: 1, gust: 0, drift: 0.5 };
@@ -10906,8 +10857,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,
-        /** Of those, the ones the plate took on its next step and the ones let go untaken (`plateKickRef`, PLAN 30a-3). */
-        plateKicks: () => ({ ...plateKicksRef.current }),
+        /** Of those, the ones the plate took on a step and the ones let go (lib/plateKick.ts). */
+        plateKicks: () => ({ taken: plateKickRef.current.taken, lost: plateKickRef.current.lost }),
         /** Kick onsets the ear handed the beat clock, each once: what it heard, before the clock's own beats. */
         heardKicks: () => heardKicksRef.current.n,
         /** The music's chances to release air and what it did with them (see `musicBubblesRef`): none released at Audio Impact 0. */
