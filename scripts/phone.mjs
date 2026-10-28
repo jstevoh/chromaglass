@@ -744,6 +744,14 @@ try {
       await tap(page, 'phone-show');
       const showOff = (await page.getByTestId('phone-show').first().getAttribute('aria-pressed')) === 'false';
       check('and the tile stops it', showOff, '');
+      await tap(page, 'phone-ambient');
+      const ambPhoneOn = (await page.getByTestId('phone-ambient').first().getAttribute('aria-pressed')) === 'true';
+      const ambStateOn = await page.evaluate(() => Boolean(window.chromaglassAmbient?.()));
+      await tap(page, 'phone-ambient');
+      const ambPhoneOff = (await page.getByTestId('phone-ambient').first().getAttribute('aria-pressed')) === 'false';
+      const ambStateOff = await page.evaluate(() => Boolean(window.chromaglassAmbient?.()));
+      check('the Play sheet toggles Ambient TV mode from a tile', ambPhoneOn && ambStateOn && ambPhoneOff && !ambStateOff,
+        `on: pressed=${ambPhoneOn}, ambient=${ambStateOn}; off: pressed=${ambPhoneOff}, ambient=${ambStateOff}`);
       await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
 
       /*

@@ -58,7 +58,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
   'comet':              [18, 20, 23, 7, 16, 2],
   'galaxy':             [7, 18, 20, 17, 23, 8],  // ice-blue arms, ultramarine, magenta knots, an amber core's glow; it was six blues and violets, one hue on the wall
-  'cyberpunk':          [20, 2, 10, 18, 16, 6],
+  'cyberpunk':          [2, 20, 6, 16, 1, 18],
   'acid-trip':          [18, 20, 2, 21, 17, 6],
   'bass-drop':          [4, 11, 20, 18, 9, 7],
   'microscopic-chaos':  [20, 2, 10, 23, 18, 8],
@@ -68,9 +68,9 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'fractal-dream':      [17, 21, 20, 10, 16, 19],
   'velvet-underground': [18, 20, 11, 23, 21, 10],   // ultramarine, magenta, raspberry; then each pool's second: lavender, coral, purple (PLAN 25h)
   'neon-coral-reef':    [21, 2, 17, 0, 16, 7],
-  'stardust-collapse':  [15, 23, 10, 17, 21, 7],
+  'stardust-collapse':  [17, 21, 20, 7, 16, 2],
   'lumia':              [10, 7, 1],
-  'turing-print':       [14, 22],                // graphite and midnight, unused while the print is on: its colour is the indicator's (depositChem)
+  'turing-print':       [16, 17, 20, 8, 2],       // teal, amber, magenta, blue and hot pink pools for the print to carve through
   'poster-1969':        [1, 21, 17, 18, 10],
   'fillmore-wash':      [5, 10, 9],
   // The dye mixes like filters, so a set is chosen for what its overlaps make:
@@ -78,10 +78,9 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // is what the first gallery of this set showed on four plates.
   // The three that show off a part of the app nothing else used.
   'oil-and-water':      [17, 16],             // amber oil, teal water
-  'red-cabbage':        [23, 10],             // the indicator itself: violet, and its deep purple
-  // A dish of gel is clear: the ferroin is its only colour. Icy blue under
-  // the red reads as brown blots (the showreel's "muddy red-green marble").
-  'chemical-clock':     [15],                 // clear gel: the reaction's own red and blue are the colour
+  'red-cabbage':        [2, 20, 16, 19, 10],  // hot pink acid, violet neutral, teal-green base across the dish
+  // Ferroin's red and blue fronts turn the plate as the waves sweep across it.
+  'chemical-clock':     [16, 20, 19, 8, 3],   // teal, magenta, emerald, ultramarine and red indicator pools under the ferroin waves
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
   'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
   'lava-lamp':          [4, 1, 20, 17, 21, 11],  // the wax: crimson, orange, magenta, amber, coral, raspberry
@@ -94,9 +93,9 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // blacks come from the cell rings and lacing, not from the dye. The three
   // used to share one warm set on three dark reds; each now has its own
   // ground and its own family, so the three read as three.
-  'macro-bead':         [16, 19, 17, 21, 1, 7],
+  'macro-bead':         [16, 17, 20, 1, 18, 2],
   'cell-bloom':         [20, 23, 18, 17],
-  'lace-run':           [17, 1, 21, 3, 4, 11],
+  'lace-run':           [17, 16, 2, 18, 0, 20],
   // Six dyes of six families rather than one: the point of this one is that
   // a person gets a colour of their own.
   'crowd-plate':        [17, 20, 16, 21, 18, 6],
@@ -113,7 +112,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'cyberpunk':          ['streak', 'splatter'],
   'acid-trip':          ['splatter', 'spray'],
   'bass-drop':          ['splatter', 'drop'],
-  'microscopic-chaos':  ['drop'],
+  'microscopic-chaos':  ['pour'],
   'aurora-borealis':    ['streak', 'spray'],
   'solar-flare':        ['splatter', 'streak'],
   'jellyfish-bloom':    ['pour', 'drop'],
@@ -128,7 +127,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'poster-1969':        ['pour', 'drop'],
   'crowd-plate':        ['drop', 'pour'],
   'macro-bead':         ['drop', 'splatter'],
-  'cell-bloom':         ['drop'],
+  'cell-bloom':         ['pour', 'drop'],
   'lace-run':           ['pour', 'streak'],
   'milk-marble':        ['drop'],
   'soap-film':          ['pour', 'drop'],
@@ -180,7 +179,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // Each hit blows a clear hole and the colour runs off the rim of it.
   'bass-drop':          ['water', 'soap'],
   // This one is about colour and rotation; the plate should stay out of it.
-  'microscopic-chaos':  ['oil', 'silicone'],
+  'microscopic-chaos':  ['water', 'glycerine'],
   // Curtains have to drape rather than blow away: body, not tension.
   'aurora-borealis':    ['water', 'glycerine'],
   // Heat drives this one, and alcohol is the liquid that answers heat.

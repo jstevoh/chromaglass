@@ -98,6 +98,11 @@ jobs:
         run: npm run build
         env:
           VITE_MAC_APP: '1'
+          # Home's song ID and the crash sheet's Send (PLAN 23.17e): both Workers
+          # answer the app's http://localhost:<port> origin, which `npm run desktop`
+          # asks them before it trusts the build.
+          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+          VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -177,6 +182,10 @@ jobs:
           # The site above was built as the app ships it: the check's licence
           # lines ask a plain browser on the app's server for the door too.
           VITE_MAC_APP: '1'
+          # The addresses the build above carries, so the check can look for them
+          # in the app's bundles and ask each Worker (PLAN 23.17e).
+          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+          VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
           DESKTOP_CHECK_PRIVATE_KEY_FILE: ${{ runner.temp }}/check-key.json
       - name: Throw the check's key away
         if: always()
