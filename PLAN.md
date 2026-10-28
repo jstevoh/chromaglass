@@ -6415,7 +6415,7 @@ The owner approved splitting the files sessions read most (the plan page of 2026
 the docs PR numbers the series 19ai-1..10). Only 19ai-5 is written here so far.
 
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** A file not in `scripts/sizes.json`
-  stays at or under 40 KB; a file already over it (52 on main at a9dd9f2, 4.9 MB between
+  stays at or under 40 KB; a file already over it (52 on main at b38801e, 4.9 MB between
   them) may not grow past the bytes recorded beside it, nor past its size at the PR's base
   (so two PRs that each fit under a ceiling cannot land together over it), and new code for it
   goes in a module beside it. The baseline only shrinks against the base (HEAD^1 in CI: the PR's merge

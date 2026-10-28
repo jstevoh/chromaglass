@@ -5,7 +5,7 @@
     "bytes written beside it: new code for it goes in a module beside it. `ledgers` grow by",
     "design with every PR and are exempt until split. Against the base this only shrinks: an",
     "entry lowered or dropped, never raised or added. `npm run sizes -- --update` lowers it to",
-    "the tree; nothing raises it. Recorded from main at a9dd9f2, 2026-10-28."
+    "the tree; nothing raises it. Recorded from main at b38801e, 2026-10-28."
   ],
   "ledgers": {
     "PLAN.md": "Every PR writes in the plan; out when 19m splits it into one file per section.",
@@ -48,7 +48,7 @@
     "scripts/wall.mjs": 141896,
     "scripts/watch.mjs": 67407,
     "scripts/webgpu-smoke.mjs": 48561,
-    "src/App.tsx": 372900,
+    "src/App.tsx": 372525,
     "src/components/desk/Desk.tsx": 44167,
     "src/components/desk/DeskPanels.tsx": 53253,
     "src/components/GuidePanel.tsx": 58766,
@@ -62,7 +62,7 @@
     "src/gpu/wgsl/fluid.ts": 290108,
     "src/gpu/wgsl/plate.ts": 193897,
     "src/gpu/wgsl/thinGap.ts": 52275,
-    "src/lib/audioFeatures.ts": 41137,
+    "src/lib/audioFeatures.ts": 43848,
     "src/lib/beads.ts": 56642,
     "src/lib/midi.ts": 65526,
     "src/lib/slosh.ts": 45993,
