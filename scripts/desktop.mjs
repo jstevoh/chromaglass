@@ -819,10 +819,13 @@ try {
       const origin = `http://localhost:${PORT}`;
       const rows = [];
       let all = bundles.length > 0;
+      // What each request really sends: the song ID's is FormData with the key
+      // in X-ChromaGlass-Key (fingerprint.ts), the crash report's is JSON.
+      const asks = { song: 'x-chromaglass-key', crash: 'content-type' };
       for (const [name, url] of Object.entries(want)) {
-        if (!url) { rows.push(`${name}: no address in this run's env`); continue; }
+        if (!url) { rows.push(`${name}: NO ADDRESS in this run's env (the repository secret is unset)`); all = false; continue; }
         const carried = bundles.some((t) => t.includes(url));
-        const reply = await fetch(url, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' } }).catch(() => null);
+        const reply = await fetch(url, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': asks[name] } }).catch(() => null);
         const allowed = reply?.headers.get('access-control-allow-origin');
         const answers = !!reply && reply.status < 300 && (allowed === origin || allowed === '*');
         rows.push(`${name}: ${carried ? 'in the build' : 'MISSING from the build'}, preflight from ${origin} ${reply ? `${reply.status}, allows ${allowed ?? 'nothing'}` : 'got no answer'}`);
@@ -834,7 +837,13 @@ try {
   }
 
   // ── network off, the whole run ────────────────────────────────────
-  const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));
+  // The two Workers (23.17e) are the app's deliberate online features: with the
+  // song ID's address in the build, the System audio phase's tone is heard by the
+  // music intelligence, which asks the Worker what is playing, and the guard
+  // refuses it. That refusal is the guard doing its job and the page carrying on
+  // without a name, so it is not something the show "had to" fetch.
+  const workerHosts = [process.env.VITE_FINGERPRINT_PROXY_URL, process.env.VITE_CRASH_REPORT_URL].filter(Boolean).map((u) => { try { return new URL(u).host; } catch { return null; } }).filter(Boolean);
+  const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe') && !workerHosts.some((h) => { try { return new URL(b.url).host === h; } catch { return false; } }));
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
     !probeSeen ? 'the guard never refused the probe, so it saw nothing' : outside.length ? outside.slice(0, 6).map((b) => `${b.type} ${b.url}`).join(', ') : 'every request the pages made was to the app itself');
 
