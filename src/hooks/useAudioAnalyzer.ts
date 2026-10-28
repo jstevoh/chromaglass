@@ -8,6 +8,13 @@ import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
 
 export interface AudioData {
+  /**
+   * The bytes of the reading, in the ear's own buffers: the live ear hands out
+   * the same two arrays every reading rather than a copy of each (two 512-byte
+   * arrays a frame, nothing in the app reads them), so what is read from them
+   * is the latest reading's, and a producer that must keep one copies it (the
+   * song render's `SongTrack` does).
+   */
   frequencyData: Uint8Array;
   timeDomainData: Uint8Array;
   volume: number;
@@ -273,8 +280,8 @@ export function useAudioAnalyzer(
         // Smoothed against the last reading, not the last one React was
         // shown: the smoothing is per reading, and the plate hears every one.
         const next: AudioData = {
-          frequencyData: new Uint8Array(frequencyData),
-          timeDomainData: new Uint8Array(timeDomainData),
+          frequencyData,
+          timeDomainData,
           ...smoothLevels(liveRef.current, raw),
           calibration,
           features: reading,
