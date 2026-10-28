@@ -310,7 +310,14 @@ export function createCloudSync(deps: SyncDeps) {
         stamps[id] = { t: clock(m), h: '', del: true, dirty: true };
         touched = true;
       }
-      if (first) { m.seeded[spec.name] = true; touched = true; }
+      if (first) {
+        m.seeded[spec.name] = true;
+        // Here, not in `round`: the routine scan (every few seconds, `scan`) can
+        // be the one that seeds a store, when sign-in finishes after it, and a
+        // round that looked for newly seeded stores would then find none.
+        if (m.rev > 0) m.refetch = true;
+        touched = true;
+      }
     }
     return touched;
   }
@@ -442,9 +449,7 @@ export function createCloudSync(deps: SyncDeps) {
   async function round(full: boolean): Promise<SyncState> {
     if (!isOn()) { setStatus({ state: 'off' }); return 'off'; }
     const m = readMeta();
-    const unseeded = SYNC_STORES.filter((spec) => !m.seeded[spec.name]);
     scanInto(m);
-    if (m.rev > 0 && unseeded.some((spec) => m.seeded[spec.name])) m.refetch = true;
     setStatus({ state: 'syncing' });
     try {
       let rounds = 0;

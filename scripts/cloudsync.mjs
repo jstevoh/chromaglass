@@ -468,6 +468,8 @@ check(
   const [gone] = SYNC_STORES.splice(at, 1);
   await round(K);
   SYNC_STORES.splice(at, 0, gone);
+  // The routine scan, not the round, is what first sees the store when sign-in finishes after it.
+  K.sync.scan();
   await round(K, N, K, N, K);
   check(
     '14h. a device that synced on the build before desk tabs, after another pushed its tabs, and then updated: both devices\' tabs are on both',
