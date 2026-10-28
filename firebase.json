@@ -23,6 +23,31 @@
         ]
       },
       {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "frame-ancestors 'self' https://chromaglass.art https://chromaglass.web.app https://chromaglass.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+          },
+          {
+            "key": "Content-Security-Policy-Report-Only",
+            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: data: mediastream:; connect-src 'self' blob: data: wss: https://lrclib.net https://*.googleapis.com https://*.workers.dev; frame-src https://chromaglass.firebaseapp.com https://chromaglass.art https://chromaglass.web.app https://accounts.google.com; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(self), microphone=(self), display-capture=(self), fullscreen=(self), midi=(self), window-management=(self), gamepad=(self), clipboard-write=(self), autoplay=(self), accelerometer=(self), gyroscope=(self), magnetometer=(self), geolocation=(), payment=(), usb=(), serial=(), hid=(), xr-spatial-tracking=(), browsing-topics=()"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          }
+        ]
+      },
+      {
         "source": "/assets/**",
         "headers": [
           {

@@ -6216,6 +6216,51 @@ Not a gate and no bar: a rate depends on what was pushed.
   (`https://chromaglass.art`) and the topics. Suggested text is in the PR that shipped
   19af-1.
 
+### 19ag. The site's security headers, and the dependencies' advisories (2026-10-28)
+
+Found by the owner's security audit of 2026-10-28 (findings 11 and 18): `firebase.json`
+sent no Content-Security-Policy, no frame-ancestors, no Referrer-Policy and no
+Permissions-Policy, so anything could frame the show and a script injected into the page ran
+with the visitor's licence key and sign-in in reach; and the root `npm audit` counted fifteen
+advisories.
+
+- **19ag-1. Shipped.** `firebase.json` sends, on every path: an **enforced**
+  `Content-Security-Policy` of the four directives that cannot break a page this app serves
+  (`frame-ancestors` for the site's own three names only, which the Auth iframe needs;
+  `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`); a **report-only** policy of
+  everything else (scripts, styles, fonts, images, media, connections, frames, workers),
+  logged in the console and enforced by nothing; `Referrer-Policy: strict-origin-when-cross-origin`;
+  `X-Content-Type-Options: nosniff` (the service worker's note on HTML served under a `.js`
+  URL is the case); and a `Permissions-Policy` that names what the app asks the browser for
+  (camera, microphone, screen capture, MIDI, fullscreen, window management, gamepads,
+  clipboard, tilt) as the site's own and refuses the rest (geolocation, payment, USB, serial,
+  HID, XR). `npm run csp` serves the built site with those headers, opens the show, the
+  remote, a cast and the static pages with a blob worker, blob media and the lookups the
+  app makes tried on top, and judges: nothing reported; the controls (http, eval, `<base>`,
+  `<object>`, a data worker) reported or blocked; another origin cannot frame it; the
+  Permissions-Policy parses in Chromium and allows what the app uses. It caught `bluetooth`,
+  which Chromium does not know. `npm audit` is at zero: `npm audit fix` (vite, postcss,
+  nanoid, browserslist and others), `esbuild` ^0.28.2 (a file read on Windows's dev server),
+  and overrides for `@grpc/grpc-js` (^1.14.6, which Firestore's Node build pulls and the web
+  app never loads) and `uuid` (^11.1.1, which Capacitor's `xcode` pulls). Judging §89.
+- **19ag-2. Open, the CSP enforced.** The report-only policy keeps `'unsafe-inline'` in
+  `script-src` for three inline scripts in `index.html` and the preload list the build writes
+  into the page (`vite.config.ts`), whose text, and so hash, changes with every build.
+  Enforcing needs the hashes in the header, which Firebase Hosting only reads from
+  `firebase.json`: either the deploy job writes them in after the build, or the build emits
+  the policy as a `<meta>` tag (no `frame-ancestors` there, which stays a header). Also before
+  enforcing: the owner signs in with Google (the popup loads `apis.google.com`), plays a song,
+  buys and activates a key on the live site with the console open and sends the violations
+  that appear; and the Workers' real addresses (`connect-src` lists `*.workers.dev`,
+  `lrclib.net` and Google's APIs; a custom domain would be reported). A report endpoint (a
+  `report-to` route on the report Worker) would make that unnecessary; it is a Worker deploy.
+- **19ag-3. Open, found along the way.** `Cross-Origin-Opener-Policy: same-origin-allow-popups`
+  (the Auth popup keeps working with it; not added, as nothing needs it and the cast and
+  panel windows use `window.open`); HSTS preload (Firebase Hosting sends a plain
+  `Strict-Transport-Security` itself); the Mac app's own server sends none of these headers
+  (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
+  (Electron, the audit's finding 7).
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
