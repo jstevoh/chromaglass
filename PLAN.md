@@ -8595,6 +8595,15 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   `sceneMap.ts`), so `sound` cords fold and gate there while `bands` cords (fixed or
   dragged) read nothing, matching fixed `bands` cords today. Carrying evaluated `bands`
   cord readings over `CastAudio` if standalone receivers need `bands` patches remains open here.
+- **30a-2. Found in the review of #511.** (a) Shipped with it: an area cord on a dragged
+  band read 0 for the whole of a look fade (the range was kept per mapping object and a
+  fade builds every object again each frame); `AreaHands` now keeps the `BandRange` with
+  the cord's gate, and `areacords -- --node` holds it. Open: (b) `soundcords` has no line
+  that holds the drag's `AutoRange` minimum span against a quiet, narrow band (its tape's
+  band5 always swings far over 12 dB, so a 12 dB span passes); (c) `BandStrip` never
+  resets its `BandRange` when the band changes, so after a drag its live level reads
+  against the old band's range until it catches up; (d) the rule for when a cord gates is
+  written out twice in `SettingsPanel.tsx` beside `gated()` in `areaCords.ts`; import `gated`.
 
 ### 30b. The LFOs and envelopes are fixed
 

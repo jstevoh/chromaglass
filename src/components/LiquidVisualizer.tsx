@@ -9114,7 +9114,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 areas are others, which index alone would match them to.
               */
               const own = activeLayerRef.current >= 1 && backDyesRef.current;
-              const acts = hands.step(currentSettings.sceneMappings, own ? null : areasOf(activeLayerRef.current), (m) => cordReading(patchCtx, m, patchNow), simStepS);
+              const acts = hands.step(currentSettings.sceneMappings, own ? null : areasOf(activeLayerRef.current), (m, band) => cordReading(patchCtx, m, patchNow, band), simStepS);
               const af = fluidsRef.current[activeLayerRef.current];
               if (af && acts.length > 0) {
                 const target = dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget);

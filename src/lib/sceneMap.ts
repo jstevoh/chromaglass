@@ -262,10 +262,18 @@ function liveValue(
  * source has nothing to say: what the fold below rides a setting by, for a
  * cord aimed at an area (lib/areaCords.ts), which is a hand in one place
  * rather than a setting and so is not folded here.
+ *
+ * `band` is the caller's own `BandRange` for a dragged band: `AreaHands` keeps
+ * one per cord, as it keeps its gate, because a range that is made new reads 0
+ * on its first read and a look fade (lookFade.ts `crossfadePatches`) builds
+ * every cord's object again each frame. Without it the reading falls back to a
+ * range per mapping object (`cordBandRange`), which is right for a one-off
+ * read and for a cord object that is held, and wrong across a fade (the review
+ * of #511).
  */
-export function cordReading(ctx: PatchContext, m: SceneMapping, now: number = performance.now()): number | null {
+export function cordReading(ctx: PatchContext, m: SceneMapping, now: number = performance.now(), band?: BandRange | null): number | null {
   if (!m || m.feature === 'none') return null;
-  const got = liveValue(ctx, m, now);
+  const got = liveValue(ctx, m, now, band);
   return got ? got.value * got.impact : null;
 }
 
