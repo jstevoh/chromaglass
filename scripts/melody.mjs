@@ -106,11 +106,26 @@ function noteOf(drop, notes) {
 console.log('A rising scale with a kick on the beat');
 const SCALE = [57, 59, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81];
 const notes = SCALE.map((m, i) => ({ t: 0.3 + i * 0.5, m }));
-const pcm = new Float32Array(SR * (SCALE.length * 0.5 + 1));
-for (const n of notes) tone(pcm, n.t, 0.5, n.m, 0.6);
-// Kicks at 120 bpm a fifth of a second before each note, and a snare on the backbeat: close to the notes but never the same moment.
-for (let t = 0.2; t < pcm.length / SR - 0.3; t += 0.5) kick(pcm, t);
-for (let t = 0.65; t < pcm.length / SR - 0.3; t += 1.0) snare(pcm, t);
+/** The scale with a kick every beat at `kickAt` seconds from each note (null: none) and a snare on the backbeat. */
+function scaleWith({ kickAt = -0.1, backbeat = true } = {}) {
+  const pcm = new Float32Array(SR * (SCALE.length * 0.5 + 1));
+  for (const n of notes) tone(pcm, n.t, 0.5, n.m, 0.6);
+  if (kickAt !== null) for (let t = 0.3 + kickAt; t < pcm.length / SR - 0.3; t += 0.5) kick(pcm, Math.max(0, t));
+  if (backbeat) for (let t = 0.65; t < pcm.length / SR - 0.3; t += 1.0) snare(pcm, t);
+  return pcm;
+}
+/** How many of the scale's notes got a drop on that note (within TOL), and how many drops sat on no note. */
+function score(drops) {
+  const hit = new Set();
+  let wrong = 0;
+  for (const d of drops) {
+    const n = noteOf(d, notes);
+    if (n && Math.abs(d.pitch - n.m) <= TOL) hit.add(n.m); else wrong++;
+  }
+  return { hit: hit.size, wrong };
+}
+// Kicks at 120 bpm a tenth of a second before each note, and a snare on the backbeat: close to the notes but not on them.
+const pcm = scaleWith();
 const r60 = analysePcm(pcm, SR, 60);
 const { walk, drops } = walkOver(r60);
 const placed = drops.map((d) => ({ d, n: noteOf(d, notes) }));
@@ -127,6 +142,21 @@ check('they step across the plate in pitch order: x never goes back',
 const run = Math.max(...xs) - Math.min(...xs);
 check('the top of the scale is over half the line from the bottom',
   run > 0.5 * (DEFAULT_MELODY_LINE.x1 - DEFAULT_MELODY_LINE.x0), `${f2(run)} of ${f2(DEFAULT_MELODY_LINE.x1 - DEFAULT_MELODY_LINE.x0)}`);
+
+// ── 1b. A kick on the note, and a scale with no drums ───────────────────────
+
+console.log('\nThe kick where the note is, and no drums');
+/*
+  The kick a tenth ahead of each note is outside the drum window, so it never
+  asks what a kick ON a note does, the commonest thing in the music (a kick
+  with the bass or the lead on the downbeat). The review of #537 ran it: a
+  veto laid 0 of 15 notes on the note and 7 (2 wrong) 30 ms off it.
+*/
+for (const [label, at, need] of [['on the note', 0, 6], ['30 ms before it', -0.03, 6], ['30 ms after it', 0.03, 6], ['no kick, no snare', null, 11]]) {
+  const sc = score(walkOver(analysePcm(scaleWith({ kickAt: at, backbeat: at !== null }), SR, 60)).drops);
+  check(`a scale with the kick ${label}: most notes lay a drop and none lands on the wrong note`,
+    sc.hit >= need && sc.wrong === 0, `${sc.hit} of ${SCALE.length} notes, ${sc.wrong} drops off the note (need ${need})`);
+}
 
 // ── 2. Why a drop waits ────────────────────────────────────────────────────
 
@@ -145,7 +175,8 @@ for (let t = 0.2; t < 7.5; t += 0.5) kick(dpcm, t);
 for (let t = 0.45; t < 7.5; t += 1.0) snare(dpcm, t);
 const drummed = walkOver(analysePcm(dpcm, SR, 60));
 check('a kick and a snare lay no drops', drummed.drops.length === 0, `${drummed.drops.length} drops in 8 s of drums`);
-check('the walk saw note onsets and gave them to the drums', drummed.walk.drummed > 0, `${drummed.walk.drummed} given to a drum`);
+check('the walk saw the drums\' note onsets and turned them away (no pitch under them, or none that moved)',
+  drummed.walk.drummed + drummed.walk.unpitched > 0, `${drummed.walk.drummed} given to a drum, ${drummed.walk.unpitched} with no pitch`);
 
 // ── 4. Strength and return ─────────────────────────────────────────────────
 
@@ -185,6 +216,9 @@ console.log('\nSilence, and the lines');
 const quiet = walkOver(analysePcm(new Float32Array(SR * 3), SR, 60));
 const none = new MelodyWalk();
 check('silence lays nothing', quiet.drops.length === 0);
+const qr = analysePcm(new Float32Array(SR * 3), SR, 60);
+check('and the melody\'s pitch reads nothing in silence, not the floor of its search (the review of #537)',
+  qr.every((r) => r.pitchFine === 0), `${qr.filter((r) => r.pitchFine !== 0).length} of ${qr.length} readings`);
 check('no reading lays nothing, and forgets an armed note', none.update(null).length === 0);
 check('every drop is on the plate', drops.every((d) => d.x >= 0 && d.x <= 1 && d.y >= 0 && d.y <= 1 && d.strength >= 0 && d.strength <= 1));
 const onPlate = (l) => [l.x0, l.y0, l.x1, l.y1].every((v) => v >= 0.05 && v <= 0.95) && l.spread >= 0 && l.spread <= 0.5;

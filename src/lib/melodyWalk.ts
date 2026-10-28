@@ -33,12 +33,16 @@
  * second behind the note, which a liquid takes for the time a drop takes to
  * fall.
  *
- * A drum is not a note. The note band overlaps the kick's body, and a kick
- * calls a note onset of its own, so an onset within `DRUM_WINDOW_S` of a
- * kick's is the drum's and lays nothing. A snare cannot veto a note outright:
- * the snare source fired at full strength on 8 of 15 notes of the test scale
- * (a lead's third and fourth partners are in its 1 to 5 kHz), so a note beside
- * a snare onset lays a drop only if it moved the pitch (`CHANGE_SEMITONES`).
+ * A drum is not a note. The note band overlaps the kick's body, so a kick calls
+ * a note onset of its own, and the snare source fired at full strength on 8
+ * of 15 notes of the test scale (a lead's third and fourth partners are in its
+ * 1 to 5 kHz). An onset within `DRUM_WINDOW_S` of either drum's may be the
+ * drum's, and lays a drop only if it moved the pitch (`CHANGE_SEMITONES`): a
+ * drum leaves the median where it was, a note does not. A kick cannot simply
+ * veto: a kick with the bass or the lead on the downbeat is the commonest
+ * thing in the music (a veto laid none of the scale's 15 notes with the kick
+ * on each note). The cost is a note repeated on the same pitch under a drum,
+ * which is lost.
  *
  * ## Where, along the line
  *
@@ -146,15 +150,18 @@ export const MIN_GAP_S = 0.09;
 export const SCALE_LOW = 48;
 export const SCALE_HIGH = 84;
 /**
- * A note onset beside a snare's must be a note that changed the pitch by this
- * many semitones, or it is the drum's. The snare's onset fires on a lead's
- * own attack (its harmonics from a third or fourth partner up are in the
+ * A note onset beside a kick's or a snare's must be a note that changed the
+ * pitch by this many semitones, or it is the drum's. It was 0.8, and a
+ * semitone step lost: the pitch glides through the settle (the median turns
+ * over a few readings) and the fine pitch's own error is a third of a
+ * semitone, so a real step reads 0.6 to 1 (72 and 77 of the scale were lost
+ * on a drum-free run). The snare's onset fires on a lead's own attack (its harmonics from a third or fourth partner up are in the
  * snare's 1 to 5 kHz: 8 of 15 notes of a scale played above A3 called a
  * snare of full strength), so a snare cannot veto a note outright; but a real
  * snare's crack under a held note is dropped by the pitch's median and leaves
  * the pitch where it was, so a note that did not move it is not a new note.
  */
-export const CHANGE_SEMITONES = 0.8;
+export const CHANGE_SEMITONES = 0.5;
 /** A clock that jumps by more than this, backward or forward, is another stream. */
 const JUMP_S = 5;
 
@@ -174,6 +181,8 @@ export class MelodyWalk {
   count = 0;
   /** Note onsets the drums took, for a check. */
   drummed = 0;
+  /** Note onsets with no pitch under them, for a check. */
+  unpitched = 0;
 
   /** Forget: a stop, a render starting, a new stream. */
   reset(): void {
@@ -203,15 +212,24 @@ export class MelodyWalk {
       const stale = first && note.at < time - SETTLE_MAX_S;
       if (!stale) {
         const kick = reading.onsets.kick?.at, snare = reading.onsets.snare?.at;
-        // A kick's body is in the note's band: its onset is the drum's.
-        if (kick != null && Math.abs(kick - note.at) <= DRUM_WINDOW_S) this.drummed++;
-        else this.armed = {
+        /*
+          A kick's body is in the note's band, so its onset calls a note
+          onset of its own; a snare's crack is in the lead's partners. Either
+          beside an onset makes it one that may be the drum's, and then it
+          counts only if the pitch moved. A kick could not simply veto: a
+          kick on the downbeat with the bass or the lead is the commonest
+          thing in the music, and a veto laid 0 of 15 notes with the kick on
+          the note and 7 of 15 (2 on the wrong note) 30 ms off it (the review
+          of #537).
+        */
+        const beside = (d: number | null | undefined) => d != null && Math.abs(d - note.at!) <= DRUM_WINDOW_S;
+        this.armed = {
           at: note.at,
           peak: clamp01(reading.note),
           settle: Math.min(SETTLE_MAX_S, Math.max(0.03, reading.pitchSettleS ?? SETTLE_DEFAULT_S)),
           // The pitch the onset's own reading still holds: the note before.
           before: fine,
-          needsChange: snare != null && Math.abs(snare - note.at) <= DRUM_WINDOW_S,
+          needsChange: beside(kick) || beside(snare),
         };
       }
     }
@@ -221,7 +239,7 @@ export class MelodyWalk {
     if (!a || time < a.at + a.settle) return [];
     this.armed = null;
     // Nothing pitched under the onset (a noise burst in the band): no note to place.
-    if (!(fine >= MELODY_LOW)) return [];
+    if (!(fine >= MELODY_LOW)) { this.unpitched++; return []; }
     if (a.needsChange && Math.abs(fine - a.before) < CHANGE_SEMITONES) { this.drummed++; return []; }
     if (a.at - this.lastDropAt < MIN_GAP_S) return [];
     this.lastDropAt = a.at;

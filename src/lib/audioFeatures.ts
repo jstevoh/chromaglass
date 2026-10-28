@@ -716,7 +716,14 @@ export class AudioFeatures {
         const h = sum(b);
         if (h > fineBest) { fineBest = h; fineBin = b; }
       }
-      if (fineBin > 1 && fineBin < this.top) {
+      /*
+        A peak, and only a peak. In silence, and under a kick's skirt, the
+        product is flat or climbs to the search's own floor, and "the highest"
+        of a flat run is its first bin: 47.8, the floor's note, read for
+        silence and laid as a drop (the review of #537). A reading counts only
+        where the product is strictly above both neighbours.
+      */
+      if (fineBin > 1 && fineBin < this.top && sum(fineBin - 1) < fineBest && sum(fineBin + 1) < fineBest) {
         const a = sum(fineBin - 1), c = sum(fineBin + 1);
         const den = a - 2 * fineBest + c;
         const delta = den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0;
