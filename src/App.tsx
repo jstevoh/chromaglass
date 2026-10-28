@@ -102,6 +102,7 @@ import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COL
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { getEffectiveTier, isFreeTierGated } from './lib/tierGates';
+import { portraitStage } from './lib/clipFrame';
 import { syncServerLicense } from './lib/licenseKey';
 import { usePublishAccountShow } from './lib/accountShows';
 import { startCloudSync, useCloudSyncReload } from './lib/cloudSyncApp';
@@ -3773,7 +3774,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // ── Recording ──
-  const recorder = useRecorder();
+  const recorder = useRecorder({ shape: phone ? 'portrait' : 'plate' });
   const [showRecordPanel, setShowRecordPanel] = useState(false);
   /*
     The one Record button (lib/recordChoice.ts). R, the desk's button, the
@@ -3781,9 +3782,39 @@ export default function App() {
     what the Record panel says it makes (the Plate video, a Take, or both);
     anything running, it stops all of it. `toggleVideo` is the video alone.
   */
+  /*
+    A portrait clip (PLAN 34f, lib/clipFrame.ts) is the plate drawn at 9:16:
+    the wall's visualizer is given a 9:16 stage for as long as the clip runs,
+    as a projector would give it, and put back to what it had (the projector's
+    own size, or none) when the recording ends however it ends. With a
+    projector attached, or on a phone, the canvas is not ours to reshape and
+    the recorder takes the centred 9:16 slice instead.
+  */
+  const clipStageRef = useRef(false);
+  const endClipStage = useCallback(() => {
+    if (!clipStageRef.current) return;
+    clipStageRef.current = false;
+    wallRef.current?.setStage(stageRef.current);
+  }, []);
   const toggleVideo = useCallback(() => {
-    recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
-  }, [recorder, audioStream]);
+    const canvas = document.getElementById('liquid-canvas') as HTMLCanvasElement | null;
+    if (!recorder.recording && canvas && recorder.options.shape === 'portrait' && !stageRef.current && !phone && wallRef.current) {
+      clipStageRef.current = true;
+      wallRef.current.setStage(portraitStage(isFreeTierGated()));
+      // A moment for the plate to draw into the new size. A timer, not frames: on a machine
+      // whose frames take seconds the recording would otherwise begin seconds after the press.
+      setTimeout(() => {
+        if (!recorder.start(canvas, audioStream)) endClipStage();
+      }, 120);
+      return;
+    }
+    recorder.toggle(canvas, audioStream);
+  }, [recorder, audioStream, phone, endClipStage]);
+  const wasRecordingRef = useRef(false);
+  useEffect(() => {
+    if (wasRecordingRef.current && !recorder.recording) endClipStage();
+    wasRecordingRef.current = recorder.recording;
+  }, [recorder.recording, endClipStage]);
   const [recordChoice, setRecordChoiceState] = useState<RecordChoice>(loadRecordChoice);
   const setRecordChoice = useCallback((c: RecordChoice) => {
     const next = normalizeChoice(c);
@@ -6135,7 +6166,7 @@ export default function App() {
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
-            recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, choice: recordChoice, onChoice: setRecordChoice }}
+            recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, choice: recordChoice, onChoice: setRecordChoice, shape: recorder.options.shape, onShape: (shape) => recorder.setOptions(shape === 'portrait' ? { shape, includeAudio: true } : { shape }), take: recorder.lastTake }}
             onHide={hideOverlays}
             onFullLayout={() => {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }

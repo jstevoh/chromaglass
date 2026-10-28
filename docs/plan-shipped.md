@@ -5564,6 +5564,38 @@ Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is
 comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
 returning visit nor for `?remote` and `?cast`.
 
+### 34f. A clip made to be posted: the Record button's 9:16 frame (2026-10-28)
+
+What was asked: a single "Save a clip with sound" that picks the container and size itself, for
+Reels and TikTok, with the free site's mark (PLAN 34, 23). Most of it was there: Record writes the
+plate with the sound it hears, the free site caps it at 15 seconds and marks it, and Play's Share
+clip hands the file to the phone's share sheet. What was missing was the frame: a post meant a
+landscape file cropped in another app, or a strip of plate with black above and below.
+
+What was built, on the one Record button (14ae; no second button): a **Frame** choice, *As the
+plate is* or *Portrait 9:16* (`RecorderOptions.shape`, `lib/clipFrame.ts`). Portrait asks for MP4
+first (Instagram does not take WebM) and keeps sound on.
+
+- **Drawn at 9:16, not cut down.** When nothing else owns the canvas the visualizer is given a
+  1080 × 1920 stage (720 × 1280 on the free site) for as long as the recording runs, through the
+  same `setStage` a projector uses: the solver lays the plate out tall, the window letterboxes it,
+  and the stage is put back when the recording ends however it ends (`App.tsx`, `endClipStage`).
+- **A slice where the canvas is not ours.** With a projector attached, or on a phone, the canvas
+  keeps its shape and the recorder draws the widest centred 9:16 slice of it onto a canvas of its
+  own (`coverCrop`); that is the one crop, and PLAN 34f-2 is the item to replace it.
+- **The free site's mark** keeps its 15 seconds and its text, and in a portrait frame sits centred
+  at 80% of the height, above the caption band Reels and TikTok cover.
+- **Share.** The Record panel's last clip has a Share button and the phone's More sheet a
+  *Share the last clip* one, both through `lib/shareClip.ts`, which Play's Share clip now uses too.
+- A phone opens on Portrait (a desk on the plate); More › Record has the Frame beside what Record
+  makes.
+
+Measured (`npm run clip` 30 checks, 21 of them in node and 9 recording in the page and reading the file's own bytes; the page half is the Mac's, a cloud session's software renderer lands a frame every few seconds and passed it two runs in three):
+the slice of every window shape is 9:16 in even pixels (1920 × 1080 → 606 × 1080, 31.6% of the width,
+the reason the plate is drawn tall when it can be); on a 1440 × 900 desk the canvas is 9:16 while
+recording and back to 1.600 after, the free site's file is a 9:16 MP4 with an Opus track, and a
+phone's is the 9:16 slice of its screen.
+
 ## 35. Clear controls: on reads on, one name for one thing
 
 ### 35a. One look for on, every name unique (2026-10-24)

@@ -286,10 +286,19 @@ export function drawChromaGlassWatermark(
   const padY = Math.max(12, Math.round(height * 0.022));
   ctx.font = `600 ${fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
   ctx.textBaseline = 'bottom';
-  ctx.textAlign = 'right';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.72)';
   ctx.shadowBlur = 6;
   ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
-  ctx.fillText(FREE_SITE_LOGO_TEXT, width - padX, height - padY);
+  if (height > width) {
+    // A portrait clip (PLAN 34f) is watched inside Reels' and TikTok's own
+    // chrome: the caption and account name cover the bottom fifth and the
+    // buttons the right edge, so a corner mark would be hidden by the very
+    // app the clip is for. Centred, above that band.
+    ctx.textAlign = 'center';
+    ctx.fillText(FREE_SITE_LOGO_TEXT, width / 2, height * 0.8);
+  } else {
+    ctx.textAlign = 'right';
+    ctx.fillText(FREE_SITE_LOGO_TEXT, width - padX, height - padY);
+  }
   ctx.restore();
 }
