@@ -74,6 +74,33 @@ function readJsonBody(req) {
   });
 }
 
+/**
+ * Did a web page on another site send this? The licence routes act on whoever
+ * reaches this port from the laptop itself, and a page in any browser on the
+ * laptop can make that request: with no check, `fetch('http://localhost:3000/
+ * license-deactivate', { method: 'POST', mode: 'no-cors' })` from a stranger's
+ * site signs the running app out of its licence, in Safari and Firefox, which
+ * do not ask first as current Chrome does (the security audit of 2026-10-28,
+ * finding 10). A browser says where a request came from, in `Sec-Fetch-Site`
+ * and `Origin`, and a page cannot change either; a request with neither (curl,
+ * the checks, a script on this Mac) is not a page and is let through, since
+ * anything on the laptop could read the licence file anyway.
+ */
+function fromAnotherSite(req) {
+  const site = req.headers['sec-fetch-site'];
+  if (site !== undefined && site !== 'same-origin' && site !== 'none') return true;
+  const origin = req.headers.origin;
+  if (origin === undefined) return false;
+  try {
+    return new URL(origin).host.toLowerCase() !== String(req.headers.host ?? '').toLowerCase();
+  } catch {
+    return true; // `Origin: null`, from a sandboxed frame or a file: page
+  }
+}
+
+/** A body that is JSON, said so: a cross-site form or a plain fetch cannot send that without asking first. */
+const saysJson = (req) => /^application\/json\b/i.test(String(req.headers['content-type'] ?? ''));
+
 function sendJson(res, status, payload) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -246,6 +273,15 @@ export function createServerLicenseManager(options = {}) {
   async function handleRequest(req, res, pathname, isLaptopReq) {
     if (!isLaptopReq) {
       sendJson(res, 403, { error: 'laptop only' });
+      return;
+    }
+
+    if (fromAnotherSite(req)) {
+      sendJson(res, 403, { error: 'cross-site' });
+      return;
+    }
+    if (req.method === 'POST' && !saysJson(req)) {
+      sendJson(res, 415, { ok: false, error: 'json-only' });
       return;
     }
 

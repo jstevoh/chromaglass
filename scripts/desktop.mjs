@@ -55,6 +55,18 @@
  *                 same app with no key shows its door, the sign-in, and no
  *                 plate, and (built as it ships, VITE_MAC_APP=1) so does a
  *                 plain browser opened on its server (PLAN.md 23.17d)
+ *   OSC closed    the app opens with OSC off (nothing listens on its port);
+ *                 Show > OSC input turns it on for this Mac only (bound to
+ *                 127.0.0.1) or the network (0.0.0.0) without a restart, off
+ *                 again, and the choice is there after the app is quit and
+ *                 opened (PLAN.md 23.17m, the security audit's finding 4)
+ *   no debugger   (packed only) the packed app launched with
+ *                 --remote-debugging-port quits by itself, beside the same
+ *                 app launched plainly, which serves (finding 9)
+ *   entitlements  (packed, macOS) the signature carries no
+ *                 disable-library-validation and no allow-unsigned-
+ *                 executable-memory, and the app as signed still starts and
+ *                 serves, which is the proof it did not need them (finding 13)
  *
  * The second screen is a stand-in: an init script adds one to what the real
  * `getScreenDetails` returns, so the real permission (granted by the app, not
@@ -65,7 +77,7 @@
  * the site). On Linux with no display it runs itself under xvfb-run.
  */
 import { _electron as electron } from 'playwright';
-import { spawnSync } from 'node:child_process';
+import { spawn as launchProcess, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -934,6 +946,155 @@ try {
     await second?.close().catch(() => {});
     rmSync(bare, { recursive: true, force: true });
   }
+}
+
+/*
+  ── OSC is closed until the performer opens it ───────────────────────
+  PLAN 23.17m, the security audit of 2026-10-28 (finding 4). OSC is UDP with
+  no show key, so whoever shares the venue's Wi-Fi and sends the Mac a packet
+  drives the show; the app used to listen on every interface from the first
+  launch. Read here from the main process (`globalThis.__chromaglassOsc`,
+  which says the choice and what the socket did with it) and from the world's
+  side: a plain socket asked to bind the port, which a listener (it holds the
+  port with SO_REUSEADDR) turns away. The menu item is clicked in the app, not
+  the setting written to a file, so the click handler is what is under test.
+*/
+{
+  const dir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-osc-'));
+  const oscPort = await freePort('udp');
+  const oscEnv = { ...env, PORT: String(await freePort('tcp')), CHROMAGLASS_USER_DATA: dir, CHROMAGLASS_OSC_PORT: String(oscPort) };
+  for (const k of ['OSC_PORT', 'OSC_HOST', 'CHROMAGLASS_UPDATE_FEED', 'CHROMAGLASS_QUERY']) delete oscEnv[k];
+  const open = () => electron.launch({ executablePath: app.executablePath, args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], env: oscEnv, timeout: 60_000 });
+  const stateOf = async (a) => {
+    for (let i = 0; i < 300; i++) {
+      const s = await a.evaluate(() => globalThis.__chromaglassOsc ?? null).catch(() => null);
+      if (s) return s;
+      await sleep(200);
+    }
+    return null;
+  };
+  /** Can this check take the port for itself? A listener on it, even one with SO_REUSEADDR, says no to a socket that does not share. */
+  const portIsFree = () => new Promise((done) => {
+    const probe = createSocket('udp4');
+    probe.once('error', () => { probe.close(); done(false); });
+    probe.bind(oscPort, '0.0.0.0', () => { probe.close(() => done(true)); });
+  });
+  const pick = (a, id) => a.evaluate(({ Menu }, i) => { Menu.getApplicationMenu().getMenuItemById(i).click(); }, id);
+  const settle = async (a, want) => {
+    for (let i = 0; i < 50; i++) {
+      const s = await a.evaluate(() => globalThis.__chromaglassOsc ?? null).catch(() => null);
+      if (s && s.state !== undefined && want(s)) return s;
+      await sleep(100);
+    }
+    return a.evaluate(() => globalThis.__chromaglassOsc ?? null).catch(() => null);
+  };
+  let first = null;
+  let again = null;
+  try {
+    first = await open();
+    const start = await stateOf(first);
+    const freeAtStart = await portIsFree();
+    check('OSC closed: a new app listens for no OSC on its port', start?.mode === 'off' && start.state === 'off' && freeAtStart,
+      `choice ${start?.mode ?? 'unread'}, socket ${start?.state ?? 'unread'}, port ${oscPort} ${freeAtStart ? 'free' : 'TAKEN'}`);
+
+    await pick(first, 'osc-local');
+    const local = await settle(first, (s) => s.mode === 'local' && /^udp /.test(s.state));
+    const heldLocal = !(await portIsFree());
+    await pick(first, 'osc-network');
+    const net = await settle(first, (s) => s.mode === 'network' && /^udp /.test(s.state));
+    await pick(first, 'osc-off');
+    const off = await settle(first, (s) => s.mode === 'off' && s.state === 'off');
+    const freeAgain = await portIsFree();
+    check('OSC closed: Show > OSC input opens it for this Mac only (127.0.0.1) or the network (0.0.0.0), and closes it, with no restart',
+      local?.state === `udp 127.0.0.1:${oscPort}` && heldLocal && net?.state === `udp 0.0.0.0:${oscPort}` && off?.state === 'off' && freeAgain,
+      `this Mac only: ${local?.state ?? 'unread'} (port ${heldLocal ? 'held' : 'NOT held'}); network: ${net?.state ?? 'unread'}; off: ${off?.state ?? 'unread'} (port ${freeAgain ? 'free' : 'STILL TAKEN'})`);
+
+    await pick(first, 'osc-local');
+    await settle(first, (s) => s.mode === 'local');
+    await first.close().catch(() => {});
+    first = null;
+    oscEnv.PORT = String(await freePort('tcp'));
+    again = await open();
+    const kept = await stateOf(again);
+    check('OSC closed: the choice is kept for the next launch', kept?.mode === 'local' && kept.state === `udp 127.0.0.1:${oscPort}`,
+      `after a restart: ${kept?.mode ?? 'unread'}, ${kept?.state ?? 'unread'}`);
+  } catch (err) {
+    check('OSC closed: the run finished', false, err?.message ?? String(err));
+  } finally {
+    await first?.close().catch(() => {});
+    await again?.close().catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/*
+  ── a packed app takes no debugger ───────────────────────────────────
+  PLAN 23.17m (finding 9). No fuse covers Chromium's --remote-debugging-port,
+  and a page that can be attached to is a licence gate that can be stepped
+  past, so a packed app launched with it quits at once (desktop/main.js). The
+  same binary launched without it must serve, or "it quit" would mean nothing:
+  it might simply not have started. (Playwright's own launch passes the flag
+  too, and its loader takes it out of process.argv before the app runs; every
+  other line here is that launch.)
+*/
+if (!PACKAGED) {
+  skip('no debugger: the packed app quits when launched with --remote-debugging-port', 'run from the repo, where the guard is off (add --packaged)');
+} else {
+  const run = async (args) => {
+    const dir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-debug-'));
+    const port = await freePort('tcp');
+    const e = { ...env, PORT: String(port), OSC_PORT: '0', CHROMAGLASS_USER_DATA: dir };
+    delete e.CHROMAGLASS_UPDATE_FEED;
+    const child = launchProcess(app.executablePath, [...app.args, ...args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], { env: e, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { out += d; });
+    let exit = null;
+    child.once('exit', (code, signal) => { exit = { code, signal }; });
+    let served = false;
+    for (const t0 = Date.now(); !exit && !served && Date.now() - t0 < 45_000;) {
+      served = await fetch(`http://localhost:${port}/remote-info.json`, { signal: AbortSignal.timeout(1000) }).then((r) => r.ok, () => false);
+      if (!served) await sleep(400);
+    }
+    if (served) await sleep(500);
+    else if (!exit) await sleep(3000);
+    const quit = exit !== null;
+    if (!exit) child.kill('SIGKILL');
+    rmSync(dir, { recursive: true, force: true });
+    return { served, quit, exit, out };
+  };
+  const plain = await run([]);
+  const debugged = await run(['--remote-debugging-port=0']);
+  const piped = await run(['--remote-debugging-pipe']);
+  check('no debugger: the packed app serves when launched plainly, and quits when launched with --remote-debugging-port or -pipe, serving nothing',
+    plain.served && !debugged.served && debugged.quit && debugged.exit?.code === 1 && !piped.served && piped.quit && piped.exit?.code === 1,
+    `plain: ${plain.served ? 'served' : 'NEVER SERVED'}; --remote-debugging-port: ${debugged.served ? 'SERVED' : debugged.quit ? `quit (${debugged.exit?.code})` : 'still running'}; -pipe: ${piped.served ? 'SERVED' : piped.quit ? `quit (${piped.exit?.code})` : 'still running'}`);
+}
+
+/*
+  ── the hardened runtime's exceptions are the three it needs ─────────
+  PLAN 23.17m (finding 13). disable-library-validation and allow-unsigned-
+  executable-memory let code that is not ours load into a process that holds
+  the microphone and the camera, and Electron's JIT needs allow-jit alone. The
+  signature is read for what it carries, and the app as signed is started: a
+  signature without them is a claim until the app runs on it. Whether the
+  hardened runtime was actually in force says whether that start proves
+  anything: a pull request's build is signed ad hoc with none (desktop.yml), and
+  the line says so rather than passing for it.
+*/
+if (!PACKAGED || !isMac) {
+  skip('entitlements: the signed app carries no disable-library-validation or allow-unsigned-executable-memory, and still starts', !PACKAGED ? 'run from the repo (add --packaged)' : 'macOS only: codesign');
+} else {
+  const bundle = resolve(app.executablePath, '..', '..', '..');
+  const ents = spawnSync('codesign', ['-d', '--entitlements', '-', '--xml', bundle], { encoding: 'utf8' });
+  const keys = [...String(ents.stdout ?? '').matchAll(/<key>([^<]+)<\/key>/g)].map((m) => m[1]);
+  const flags = spawnSync('codesign', ['-dv', bundle], { encoding: 'utf8' });
+  const hardened = /flags=0x[0-9a-f]+\([^)]*runtime/.test(`${flags.stderr}${flags.stdout}`);
+  const loose = keys.filter((k) => /disable-library-validation|allow-unsigned-executable-memory/.test(k));
+  const needs = ['com.apple.security.cs.allow-jit'];
+  check('entitlements: the signature carries no disable-library-validation or allow-unsigned-executable-memory, and keeps allow-jit',
+    ents.status === 0 && loose.length === 0 && needs.every((k) => keys.includes(k)),
+    `${keys.length ? keys.map((k) => k.replace('com.apple.security.', '')).join(', ') : 'no entitlements read'}${loose.length ? `; LOOSE: ${loose.join(', ')}` : ''}; hardened runtime ${hardened ? 'on, so the start above ran on exactly these' : 'OFF in this build (ad hoc), so the start above proves nothing about them: the signed release run does'}`);
 }
 
 const failed = results.filter((r) => !r.ok);

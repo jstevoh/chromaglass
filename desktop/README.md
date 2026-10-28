@@ -6,9 +6,11 @@ show server (`server/remote-server.js`, the same file `npm run show` runs). Open
 and:
 
 - the show opens from the server inside the app, with no network needed, ever;
-- the phone remote, network displays, OSC (UDP 9000) and Art-Net work with no
-  terminal (Show → Show Server Details… prints what the terminal used to: the show
-  key and the phone's address);
+- the phone remote, network displays and Art-Net work with no terminal, and so
+  does OSC (UDP 9000) once *Show → OSC input* turns it on: it starts off, because
+  OSC has no key and anyone on the venue's Wi-Fi could drive the show (Show →
+  Show Server Details… prints what the terminal used to: the show key and the
+  phone's address);
 - the show key is kept between launches, so phones set up at soundcheck stay
   linked after a restart;
 - a projector that is plugged in gets the show at once, in full screen, with no
