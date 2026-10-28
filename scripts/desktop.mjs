@@ -1087,6 +1087,14 @@ if (!PACKAGED) {
   anything: a pull request's build is signed ad hoc with none (desktop.yml), and
   the line says so rather than passing for it.
 */
+{
+  // A plist codesign cannot parse stops the whole signed build: an XML comment with two hyphens in it did exactly that on #539, and
+  // nothing in a cloud session noticed, because only the Mac signs. plutil is the Mac's own parser; xmllint is what a Linux box has.
+  const file = join(DESKTOP, 'resources', 'entitlements.mac.plist');
+  const lint = isMac ? spawnSync('plutil', ['-lint', file], { encoding: 'utf8' }) : spawnSync('xmllint', ['--noout', file], { encoding: 'utf8' });
+  if (lint.error) skip('entitlements: the plist parses', `no ${isMac ? 'plutil' : 'xmllint'} on this machine`);
+  else check('entitlements: the plist parses (a comment with two hyphens in it stops codesign)', lint.status === 0, lint.status === 0 ? `${isMac ? 'plutil' : 'xmllint'} reads it` : `${lint.stdout}${lint.stderr}`.trim().slice(0, 200));
+}
 if (!PACKAGED || !isMac) {
   skip('entitlements: the signed app carries no disable-library-validation or allow-unsigned-executable-memory, and still starts', !PACKAGED ? 'run from the repo (add --packaged)' : 'macOS only: codesign');
 } else {

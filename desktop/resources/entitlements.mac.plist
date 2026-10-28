@@ -13,8 +13,9 @@
   pages without the JIT's own entitlement; V8 asks for JIT pages through
   `allow-jit` alone, as Chrome itself ships). If a signed build ever fails to
   start with a "code signature" or "library not loaded" line in Console, put
-  `disable-library-validation` back first and say why here; `npm run desktop --
-  --packaged` on the Mac is the check that starts the app as it ships.
+  `disable-library-validation` back first and say why here; the packed desktop check
+  on the Mac (the one named in PLAN 23.17m) starts the app as it ships. (No double
+  hyphens inside this comment: XML forbids them, and codesign stopped on one.)
 -->
 <plist version="1.0">
 <dict>
