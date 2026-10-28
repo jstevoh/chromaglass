@@ -562,7 +562,7 @@ Where each batch stands, as of 2026-09-27:
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
-| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
+| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped**; 34a-2 its films, each with its own music, and 34a-3 its sharp looks **shipped**; 34a-4 Buy buttons wait for the live store; 34a-5 the owner's words open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 | 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -9063,28 +9063,38 @@ a grid of generic stock thumbnails: ours are the plate itself.
   "Play free" opens the sign-in over it; a returning visit, `?remote`, `?cast`, the iPhone app,
   a desktop launch and a visit part way through a redirect or an emailed link never see it.
   `npm run signin` holds it (3a, 3, 6, 7, 10, 11b).
-- **34a-2. A filmed hero with its music, from a Mac.** *Shipped (2026-10-22), story in
-  `docs/plan-shipped.md` §34a-2.* `npm run landingfilm` films the hero loop (12 s of Jellyfish
-  Bloom, 1280 wide, folded so it loops) and three example clips (ferrofluid, dye pour, a close
-  macro) with AmbiSphere (public domain, `public/music`), as WebM and MP4 under `public/landing/clips`.
-  They start muted with a "Sound on" button; one film has sound at a time and it stops when the
-  visitor scrolls away, leaves the tab or opens the sign-in. Reduced motion, Data Saver and slow links
-  get the poster and a "Play with sound" button. *Open:* the hero's loop seam measures 1.2 against a
-  typical frame-to-frame change of 0.3 (codec noise sits at that level, so it is not a visible jump
-  but the "less than a frame" bar is not met by this measure); the macro clip is grain-heavy and costs
-  875 KB WebM where the others cost 170 to 490 KB; the music is one public-domain album, and a
-  licensed track would need the owner's rights check.
+- **34a-2. A filmed hero with its music, from a Mac.** *Shipped (2026-10-22; the music changed
+  2026-10-28, the owner: "make sure we have different music to go with it"), story in
+  `docs/plan-shipped.md` §34a-2.* `npm run landingfilm` films the hero loop (12 s of Jellyfish Bloom,
+  1280 wide, folded so it loops) and three example clips (ferrofluid, dye pour, a close macro), as
+  WebM and MP4 under `public/landing/clips`, each to its own piece. The pieces are fetched from the
+  Internet Archive by size-checked URL, never added to the repository, and credited under the clips
+  (`MUSIC` in `Landing.tsx`):
+  hero, Chris Zabriskie, "The Sun Is Scheduled to Come Out Tomorrow" (CC BY 3.0, archive.org/details/ChrisZabriskieIAmAManWhoWillFightForYourHonor);
+  ferrofluid, Broke For Free, "Caught In The Beat" (CC BY 3.0, archive.org/details/Slam_Funk-7603);
+  dye pour, Kimiko Ishizaka playing Bach's Aria (CC0, archive.org/details/OpenGoldbergVariations);
+  macro, Chris Zabriskie, "Set This Thing on Fire" (CC BY 4.0, archive.org/details/cz-blackhole).
+  The licences are the archive items' own and the three artists release their work under them
+  (the archive's licence field is the uploader's word, and many items there are mis-tagged, so
+  each was picked from the artist's own release). They start muted with a "Sound on" button; one
+  film has sound at a time and it stops when the visitor scrolls away, leaves the tab or opens the
+  sign-in. Reduced motion, Data Saver and slow links get the poster and a "Play with sound" button.
+  *Open:* the hero's loop seam measures 0.61 against a typical frame-to-frame change of 0.30
+  (the bar is 1.5 times; codec noise sits at that level, not a visible jump); the hero's right half
+  is mostly empty navy (a different `seed` may fill it, one more Mac run); the macro clip is
+  grain-heavy (636 KB WebM at CRF 61, a little blocky); a Mac run where the app's player changes
+  its audio element's source mid-recording (auto-advance) may return an empty take, since the
+  recorder fails on a second audio track (found filming; not checked in the app).
 - **34a-3. Sharper looks in the grid.** *Shipped (2026-10-22).* `npm run landinglooks` takes each
   of the eight looks at 1440 × 900 after 20 s and writes a 960 × 600 WebP (was 480 × 300), under
   60 KB each, except the macro bead at 95 KB (its cells and grain do not compress).
-- **34a-4. Buy buttons.** *Shipped (2026-10-22).* The Home and Pro cards carry Buy buttons that open
-  the Lemon Squeezy checkout in a new tab (`src/lib/checkoutLinks.ts`, shared with the account sheet),
-  and the page says to buy with the email the visitor signs in with, because the licence worker keys
-  on the order email. *Open:* the store (501059) is still in **test mode** (`test_mode: true` on the
-  store), so the buttons open a test checkout until the owner takes it live; no test purchase has been
-  made from this session (it may not move money), so the webhook, key issue and licence unlock after a
-  real checkout are unproven end to end. Add the buyer's sign-in email to the checkout URL on the
-  landing too, once a visitor is signed in (it is today only on the account sheet).
+- **34a-4. Buy buttons, when the store is live (23).** *Not built.* An earlier version (#428, 2026-10-22)
+  put Buy buttons on the Home and Pro cards; they are left off this page until the Lemon Squeezy
+  store is out of test mode, because they would open a test checkout (the Worker's refusal of
+  test-mode orders is 34a-4b, #526). When the live product ids are settings, the cards get Buy
+  buttons that open the checkout in a new tab, with a line asking buyers to use their sign-in
+  email (the licence is keyed on the order email); `signin` 11b then also holds them 44 px tall
+  and opening in a new tab. Until then the page says "Buying opens soon".
 - **34a-5. The owner's words and the share card.** *(S; owner.)* "From the maker" and the refund
   line are drafts in plain words for the owner to rewrite or sign. `og-card.png` is still the old
   card; a new one would be the hero's frame with the name and the one line.

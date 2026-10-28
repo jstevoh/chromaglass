@@ -1500,9 +1500,10 @@ ChromaGlass is in the first screen, and "Play free" should be the one obvious th
 sign-in then opens over the page. Say whether: the headline and the line under it are the words you
 would use (they are drafts); the hero film is calm enough to sit behind the headline, and its Sound on
 button starts the music; the three clips under it (ferrofluid, dye pour, close macro) are ones you would
-show, each with its sound; the look cards are sharp on a Retina screen (PLAN 34a-2, 34a-3); the
-Buy buttons open the store in a new tab (still in test mode) and the line about buying with your
-sign-in email reads right; "From
+show, each with its sound and each a different piece of music (hero, ferrofluid, dye pour, close
+macro: do the four pieces suit their looks, and is the credit line under the clips right and
+unobtrusive?); the hero's right half is mostly empty navy, say if that bothers you; the look cards
+are sharp on a Retina screen (PLAN 34a-2, 34a-3); "From
 the maker" is something you would sign, and the 14-day refund line matches what you will honour;
 the Free, Home and Pro cards promise only what the app does today. Then sign in, sign out and come
 back: the page should not flash for a returning visit.

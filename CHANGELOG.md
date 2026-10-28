@@ -33,11 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - On projected looks the oil's painted rim is gone; a clear oil drop or a clear pour with no
   dye across its edge draws no rim line until PLAN 18e-2 deflects light by the optical path.
 
-### Added — Landing page films, sharp looks and Buy buttons (PLAN 34a-2, 34a-3, 34a-4)
+### Added — Landing page films with their own music, and sharp look cards (PLAN 34a-2, 34a-3)
 
-- The landing page now plays a filmed hero loop and a "See it move" row of three clips (ferrofluid, dye pour, close macro), filmed from the app with public-domain music. They start muted with a "Sound on" button; one film has sound at a time and it stops on scroll-away, a hidden tab and the sign-in. Reduced motion, Data Saver and slow links get posters and a "Play with sound" button. `npm run landingfilm`.
+- The landing page plays a filmed hero loop and a "See it move" row of three clips (ferrofluid, dye pour, close macro), filmed from the app, each to its own piece of music (Chris Zabriskie, Broke For Free, Kimiko Ishizaka playing Bach), credited under the clips. They start muted with a "Sound on" button; one film has sound at a time and it stops when you scroll away, switch tab or open the sign-in.
 - The eight look cards are 960 × 600 (were 480 × 300), under 60 KB each bar the macro bead. `npm run landinglooks`.
-- Home and Pro have Buy buttons to the Lemon Squeezy checkout in a new tab; the page asks buyers to use their sign-in email. The store is still in test mode.
 
 ### Added — Slosh (PLAN 18a-13)
 

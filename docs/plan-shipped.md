@@ -5820,25 +5820,30 @@ and settle, and has no loop and no timer. It is on the cue bar and beside the ph
 heading. Under reduced motion it does not turn. Held by `npm run panel` ("Looks as slides in a tray"). Judging
 §82.
 
-### 34a-2, 34a-3, 34a-4. Films with their music, sharp looks, Buy buttons (2026-10-22)
+### 34a-2, 34a-3. Films with their music, sharp looks (2026-10-22; music changed 2026-10-28)
 
-What was asked: real clips of the plate with the music audible, sharper look cards on a Retina
-screen, and Buy buttons for Home and Pro.
+What was asked: real clips of the plate with the music audible, and sharper look cards on a Retina
+screen. Then, 2026-10-28: "make sure we have different music to go with it".
 
 What changed: `npm run landingfilm` films the app on the Mac (the recorder's own take, with the
-track the show played) and encodes WebM and MP4: a 12 s hero loop folded with a 2 s cross-fade so it
-repeats, and ferrofluid, dye pour and macro clips of 8 s. The hero is the poster (a JPEG) until the
-page has loaded, then the video fades in; the three clips sit in a "See it move" row, each with a
-poster, `preload="none"`, and a video that is added only when the card nears the viewport. All start
-muted (browsers refuse sound without a tap); a "Sound on" button unmutes one film and mutes the rest,
-and sound stops on scroll-away, on a hidden tab and when the sign-in opens. Reduced motion, Data Saver
-and a link slower than 4g play nothing on their own and offer "Play with sound". `npm run
-landinglooks` redraws the eight look cards at 960 × 600 from 1440 × 900 frames. The tier cards carry
-Buy buttons to the Lemon Squeezy checkout (new tab) and a line asking buyers to use their sign-in email.
-Nothing on the page moves with the sound; only the films do. Sizes: hero 290 KB WebM / 450 KB MP4,
-clips 170 to 880 KB; the entry chunk grew 507 B gzipped (bar 6000 B); the Landing chunk is 5.3 KB
-gzipped. `npm run signin` 16/16, with 11b now holding that both Buy buttons are 44 px tall, open a
-`lemonsqueezy.com` URL in a new tab and that three clip cards are drawn at laptop, phone and phone-on-its-side.
+piece playing) and encodes WebM and MP4: a 12 s hero loop folded with a 2 s cross-fade so it
+repeats, and ferrofluid, dye pour and macro clips of 8 s. The first version filmed all four to
+AmbiSphere; now each has its own piece (a piano and synth swell, a hip-hop groove, solo Bach, an
+electro-rock build; the licences are in PLAN 34a-2 and under the clips on the page). The pieces
+are fetched from the Internet Archive into `landing-takes/music/`, held to their byte size, and
+loaded into the take through the Sound sheet's file input like a visitor's own file. A first try
+swapped the audio element's source behind the app's back; Chrome's captured stream then held two
+audio tracks and the recorder returned an empty file ("no download within 20 s of Stop"), so the
+take must carry one. The hero is the poster (a JPEG) until the page has loaded, then the video
+fades in; the three clips sit in a "See it move" row, each with a poster, `preload="none"`, and a
+video added only when the card nears the viewport. All start muted (browsers refuse sound without
+a tap); "Sound on" unmutes one film and mutes the rest, and sound stops on scroll-away, on a
+hidden tab and when the sign-in opens. Reduced motion, Data Saver and a link slower than 4g play
+nothing on their own and offer "Play with sound". `npm run landinglooks` redraws the eight look
+cards at 960 × 600 from 1440 × 900 frames. Nothing on the page moves with the sound; only the
+films do. Sizes (WebM / MP4): hero 350 / 557 KB, ferrofluid 423 / 442 KB, dye pour 227 / 231 KB,
+macro 636 / 763 KB; posters 22 to 39 KB. Every file has a non-silent audio stream (mean volume
+-23, -10.5, -28 and -10 dB).
 
-What is not proven: a purchase. The store is in test mode and this session may not pay, so the
-webhook-to-licence path after checkout is still the owner's to try (PLAN 34a-4).
+Buy buttons (34a-4) were built in the first version and are not in this one: the store is in test
+mode, so they would open a test checkout. They wait for the live store (PLAN 34a-4).
