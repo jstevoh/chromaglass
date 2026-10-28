@@ -63,7 +63,7 @@ const SHOTS = [
   { id: 'poster-1969', name: 'poster-1969', seconds: 34 },
   { id: 'oil-and-water', name: 'oil-and-water', seconds: 30 },
   { id: 'macro-bead', name: 'macro-bead', seconds: 30 },
-  { id: 'lumia', name: 'lumia', seconds: 25 },
+  { id: 'velvet-underground', name: 'velvet-underground', seconds: 25 },
   // These two are the ones that need a real graphics card, and they are at the
   // end so a set shot in a sandbox still has four usable frames in it. Both
   // fill their plate a step at a time — Classic drop by drop from the

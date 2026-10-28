@@ -37,7 +37,7 @@ export function CartoonShelf({ pouring, filming, onPour, onFilm, onStopPour, siz
         <div key={c.id} className="flex items-center gap-1.5" data-testid={`cartoon-${c.id}`}>
           <div className="min-w-0 flex-1">
             <div className={`truncate ${phone ? 'text-[14px]' : 'text-[12px]'} text-text`}>{c.title}</div>
-            <div className="truncate text-[11px] text-dim">{c.year} · {runningTime(c.seconds)}</div>
+            <div className="truncate text-[11px] text-dim">{c.year} · {runningTime(c.seconds)}{c.colour ? ' · colour' : ''}</div>
           </div>
           {pouring === c.id ? (
             <button onClick={onStopPour} aria-pressed className={`${btn} ${on}`} title="Pouring into the dish. Click to stop." data-testid={`cartoon-stop-${c.id}`}>

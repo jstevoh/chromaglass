@@ -8,10 +8,10 @@ A psychedelic liquid light show visualizer that reacts to your microphone or sys
 
 | | |
 |---|---|
-| ![The Fillmore East, 1969 preset](shots/fillmore-east-1969.jpg) | ![The Oil on Water preset](shots/oil-on-water.jpg) |
-| *Fillmore East, 1969* — each layer its own dish on a black screen, pressed on every kick | *Oil on Water* — the photographic render: domes with dark menisci, satellite droplets, a camera pass with real depth of field |
-| ![The Macro Bead preset](shots/macro-bead.jpg) | ![The Lumia preset](shots/lumia.jpg) |
-| *Macro Bead* — a tracking camera chasing a single bead at high magnification | *Lumia* — Thomas Wilfred's slow folded sheets of light, under the plate |
+| ![The Poster, 1969 preset](shots/poster-1969.jpg) | ![The Oil & Water preset](shots/oil-and-water.jpg) |
+| *Poster, 1969* — two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster | *Oil & Water* — amber oil on teal water between two glasses, each keeping its own colour as bodies round up and merge |
+| ![The Macro Bead preset](shots/macro-bead.jpg) | ![The Velvet Underground preset](shots/velvet-underground.jpg) |
+| *Macro Bead* — a tracking camera chasing a single bead at high magnification | *Velvet Underground* — three pools apart on deep violet: glycerine on the mids, soap on the bass, syrup on the treble |
 
 Frames from the app itself, written by `npm run shots`. These were made on a
 machine rasterising in software, so they undersell what a real GPU draws;
@@ -44,6 +44,7 @@ ones.
 - **The wall, not the look** — rear-projection mirror, a four-corner keystone, feathered edge masks that stop the light before a face or a ceiling, and an output gain and gamma for the room. Kept on the machine rather than in the preset, because it describes the venue; measured by `npm run wall`
 - **Three flashes a second, and no more** — a probe reads back what actually reached the screen and holds the whole field under the clinical limit for photosensitive seizures, by counting flashes rather than smoothing fast changes, so a single hard hit on a kick is untouched
 - **A tempo you can hand it** — MIDI clock from the desk on the port the faders are already on, four taps, or a typed bpm; each sets the bar as well as the tempo, and the microphone can no longer drag it around while one of them is driving
+- **Tabs you make** — the chips across the top of the desk are sets of panels: Perform, Sequence and Setup ship as examples, and the pencil beside them renames, reorders, adds (empty, or a copy of the tab that is up) and deletes them; + Panel (⌘P) puts any panel on the tab that is up, and ⌘1 to ⌘9 go to the tabs in order. On the phone they are under More › Tabs. Measured by `npm run desklayout` and `npm run layout`
 - **Shift layers on the controller** — four banks, so nine faders reach forty settings; a binding on the base layer stays live on all of them, and changing layer drops every fader out of soft takeover so nothing jumps
 - **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, meniscus edge relief, trapped-air bubbles, plate rocking on the beat, a second layer at its own magnification, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
 - **The other projectors** — a Wilfred lumia layer (slow folded sheets of light under the plate), a rotating gel wheel over the lamp, a film projector that plays a video loop or a live camera through the dye, a reaction-diffusion "chemistry" mode that grows coral and cells on the plate the way Mark Boyle's Sensual Laboratory projected reactions, and a halogen grade for the sealed oil-wheel look — with presets Lumia, Sensual Laboratory and Oil Wheel
@@ -424,7 +425,7 @@ The same build serves three situations, and only the assumed headroom differs:
 |---|---|---|
 | **Hosted** | chromaglass.web.app | up to 512² at 1.5x pixels — starts low and climbs only if the machine holds it |
 | **Local** | `npm run remote` on your own machine | up to 768² at native pixel density, plus the phone remote |
-| **Native** | a desktop shell around `dist/` (not built yet) | as local |
+| **Native** | the Mac app (`desktop/`), which opens only on a Home or Pro licence (`desktop/README.md`) | as local |
 
 The tier is detected from where the page was loaded (`localhost`, a private
 LAN address or `.local` is local; an Electron/Tauri shell is native), and the
@@ -557,10 +558,12 @@ runs them before anything reaches the live site (`.github/workflows/checks.yml`)
 `qa` needs a Chromium; it looks for one at `/opt/pw-browsers/chromium` and takes
 `PW_CHROMIUM` for anywhere else. `npm run qa -- --head` watches it happen.
 
-**Before a push, `npm run check`.** It runs everything above that needs no GPU
-(the ubuntu job's list, read from `checks.yml`), the shader compile and the layout,
-in about a minute, and reports every failure rather than the first. What reads the
-plate is left to the macOS job, and it says so.
+**Before a push, `npm run quick`.** It runs the checks your change reaches, side by
+side: it reads the list CI runs (`scripts/checks.json`), works out what each check
+reads, and picks the ones whose files you changed; `npm run quick -- --dry` says which
+and why. `npm run check` runs every check that needs no GPU (Measure's list, from the
+same file) the same way. Both report every failure rather than the first, run a red
+one again alone, and leave what reads the app's frames to the macOS job, saying so.
 
 ## Tech Stack
 
@@ -623,7 +626,7 @@ src/
     MidiPanel.tsx              # MIDI: devices, factory maps, learn, bindings, files
     ControllerSurface.tsx      # The controller drawn to scale: assign by touching, and the cheat sheet
     RunLocallyCard.tsx         # Hosted-build nudge to run the show locally
-    OutputPanel.tsx            # Load-in: drag the corners square, pull the masks in, grade for the room
+    OutputPanel.tsx            # Setup's Wall panel: drag the corners square, pull the masks in, grade for the room
 server/
   fingerprint-worker.js        # Cloudflare Worker proxy for AudD/ACRCloud
   remote-server.js             # LAN static server + control relay + OSC in + Art-Net (npm run remote)

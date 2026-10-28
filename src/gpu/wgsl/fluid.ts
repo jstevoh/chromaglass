@@ -1537,6 +1537,133 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    Two-phase carry of a coherent drop's rim on a thin gap (PLAN 29c-8;
+    a named shortcut for the rim's ferrofluid velocity, with PLAN 29c-9 to
+    replace the local window reconstruction by a coupled two-fluid velocity
+    solve).
+
+    What was reported and measured: on \`npm run ferrodrag\` (384², a drop of
+    radius R = 0.025 dragged 0.3 of the plate in 3 s, 180 steps), after
+    phaseMomentum and phaseCompress (29c-1) and degenerate Cahn–Hilliard
+    mobility (29c-7), the drop still shed its trailing rim into a long wake
+    (cells over 0.01: 324 → 1238, half-full cells: 100 → 0) and fell behind
+    the magnet (lag 3.24R against the 2.0R bar, 1/3 checks).
+
+    Physics, and why two-phase carry was chosen over a Korteweg or contact-line
+    force before projection: the drop is an immiscible ferrofluid bead in clear
+    oil in a thin gap. As the magnet drags the bead forward, the displaced oil
+    closes in behind it in a 2D dipole return flow. Across the diffuse
+    Cahn–Hilliard rim, a cell's projected velocity u_mix = φ·u_ff + (1 − φ)·u_oil
+    blends the forward-moving ferrofluid column with the backward-moving oil.
+    Where the back rim thins below half full, (1 − φ)·u_oil turns u_mix to zero
+    and then backward into the wake; phaseAdvectPlan then carried faint
+    ferrofluid into the wake, and phaseCompress (reading u_mix for its face
+    Courant number) saw c_s ≈ 0 at the reversal line and compressed the shed
+    tail along the wake instead of back into the drop. A real drop's back edge
+    moves with the drop because surface tension holds the meniscus together and
+    the ferrofluid column has its own phase velocity u_ff distinct from u_oil.
+    Adding a Korteweg or sub-grid force before hsProject still leaves a single
+    projected cell velocity u_mix shared by both phases (and any curl-free edge
+    force is removed by the pressure projection). Carrying the ferrofluid phase
+    with its own velocity here (read by phaseAdvect, phaseAdvectPlan and
+    phaseCompress, while this.vel stays the mixture velocity for the dye, oil
+    and phaseMomentum) gives the rim its phase velocity directly.
+
+    Why each guard is here, measured against the checks 29c-4's body-carry
+    attempts broke:
+    - Pressed pools (\`npm run ferropress\`): under a press the radial squeeze
+      speed |u(r)| = ½|dh/dt|/h · r grows linearly with r. A φ-weighted window
+      round a rim cell has its centre of mass x_m shifted inward toward smaller
+      r where |u| is slower; replacing v when v is already faster along u_m
+      (dot(v.xy, um) >= dot(um, um)) held back the outward squeeze flow and
+      overfilled the middle of the pressed paraboloid pool (0.968 → 1.183, 3/7).
+      Leaving v untouched whenever dot(v.xy, um) >= u2 makes the pass a no-op
+      on radial squeeze flows (ferropress 7/7, middle 0.968 → 0.981, worst ring
+      0.012).
+    - Two-liquid Darcy speed (\`npm run magnetgain\`) and the momentum and
+      compression controls (\`npm run ferrohold\`): inside a diffuse drop the
+      centre cells (φ ≈ 0.98) move ~30% faster than the drop's Taylor–Saffman
+      two-liquid Darcy speed 2·c_clear/(c_ff + c_clear). Replacing v across the
+      whole drop with the peak core speed sped the centroid up by 46%
+      (magnetgain 4/5) and erased the leading-edge shear that phaseCompress
+      acts on (ferrohold 4/5, half-full difference 8.3 against 13). Sampling the
+      half-full body (φ >= 0.50) and weighting the carry by position along the
+      drop's motion (along = dot(xm, um) / |um|: full carry up to φ = 0.96 on
+      the trailing side along > 0 where the oil return flow turns backward, and
+      only the outer toe φ < 0.49 on the leading side along < 0 so the front
+      half-full contour keeps its Darcy velocity and MUSCL shear) holds
+      magnetgain to 5/5 (+2% weak, +3% strong), ferrohold to 5/5 (lag 1.69R vs
+      1.93R without momentum, +0.24R; half-full 107.6 vs 92.6 without
+      compression, +15.0), and ferrodrag to 3/3 (lag 1.82R, 324 → 378 cells
+      over 0.01, 100 → 106 half-full cells, stationary 0.010 cells).
+    - Labyrinth and standing spikes (\`npm run spikes\`, \`maze\`, \`fingers\`,
+      \`domes\`): when a labyrinth field (ferroLabyrinth > 0) or a close magnet
+      past SPIKE_ONSET (spikeAmt > 0, filmHeld) is on, dipole repulsion
+      (mazeForce) and the standing film (standing.ts) part the pool into narrow
+      fingers and domes separated by 2–4 cell valleys; an 11-cell window across
+      those valleys glued the domes into 3 pieces (spikes 4/6). A.a.x scales the
+      carry by (1 − 2·maze)·(1 − spikeAmt) and zeroes it while filmHeld, so the
+      pass steps aside on labyrinth and spike scenes (spikes 6/6, maze 4/4,
+      fingers 4/4, domes 4/4).
+  */
+  phaseVelocity: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+const phaseBody: f32 = 0.50;
+const phaseFull: f32 = 0.96;
+const phaseReach: i32 = 11;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let v = textureLoad(vel, p, 0);
+  let own = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  if (own >= phaseFull || A.a.x <= 1e-4) { textureStore(dst, p, v); return; }
+  var near = own;
+  if (near <= 1e-4) {
+    for (var j = -1; j <= 1; j++) {
+      for (var i = -1; i <= 1; i++) {
+        let q = clamp(p + vec2i(i, j), vec2i(0), vec2i(n - 1));
+        near = max(near, textureLoad(phase, q, 0).r);
+      }
+    }
+  }
+  if (near <= 1e-4) { textureStore(dst, p, v); return; }
+  var s = 0.0;
+  var mu = vec2f(0.0);
+  var mx = vec2f(0.0);
+  let reach = min(phaseReach, n - 1);
+  for (var j = -reach; j <= reach; j++) {
+    for (var i = -reach; i <= reach; i++) {
+      let q = p + vec2i(i, j);
+      if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
+      let pq = clamp(textureLoad(phase, q, 0).r, 0.0, 1.0);
+      if (pq < phaseBody) { continue; }
+      let r2 = f32(i * i + j * j);
+      let b = (pq - phaseBody) / (1.0 - phaseBody);
+      let w = b * exp(-r2 / 64.0);
+      let uq = textureLoad(vel, q, 0).xy;
+      s += w;
+      mu += w * uq;
+      mx += w * vec2f(f32(i), f32(j));
+    }
+  }
+  if (s <= 0.0) { textureStore(dst, p, v); return; }
+  let um = mu / s;
+  let u2 = dot(um, um);
+  if (u2 <= 1e-12 || dot(v.xy, um) >= u2) { textureStore(dst, p, v); return; }
+  let xm = mx / s;
+  let along = dot(xm, um) / sqrt(u2);
+  let front = 0.72 * (1.0 - smoothstep(0.28, 0.49, own));
+  let back = 1.0 - smoothstep(0.88, phaseFull, own);
+  let trail = A.a.x * mix(front, back, smoothstep(-1.0, 2.0, along));
+  if (trail <= 0.0) { textureStore(dst, p, v); return; }
+  let u = mix(v.xy, um, trail);
+  textureStore(dst, p, safeVel(vec4f(u, v.z, v.w)));
+}`,
+
+  /*
     phaseSeparate's grid-scale filter alone, for the ferrofluid carried as a
     volume under Thin Gap (phaseAdvect's A.a.x). The filter exchanges share
     between neighbours, which keeps Σc; but under a press the plate's
@@ -4630,23 +4757,289 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     across loses s/16 a step, six cells across s/256. The kernel sums to
     zero, so dye is moved, not made or lost.
 
-    And the result is held to the range of its eight neighbours and itself.
+    And the result is held to the range of its eight neighbours and itself,
+    taking the clamp's excess back across the 7×7 neighbourhood around the
+    stencil so that a drop's rim does not manufacture dye (PLAN 18m-5).
     A filter this sharp rings like any other: a hard diagonal edge is a
     staircase, the staircase is a checkerboard one cell wide, and taking it
     out left a ring past the edge 12.9% of its height after five seconds
     (`npm run grating`'s disc with the clamp taken out; the Gibbs overshoot
-    of any sharp cutoff). Held to its
-    neighbours, a cell can soften toward them but never pass them, so the
-    ring is gone (0.003% of the edge) and the checkerboard, whose every cell
-    sits inside its neighbours' range, goes as fast as before. The clamp is
-    the one place dye can be made: 15 parts per million in ten seconds on a
-    plate of hard edges. `npm run grating` holds it to all of this.
+    of any sharp cutoff). Clamping each cell after the filter removed the
+    ring (0.003% of the edge) and only drifted 1.47 ppm/s on a disc sitting on
+    a 0.5 base, where the positive and negative rings nearly cancelled. At a
+    drop's rim on an empty plate, they do not: outside the drop the dye is
+    zero, so the cell clamp cut off the negative undershoot outside the rim
+    while keeping the positive lobe inside it. In the lab
+    (`scripts/slump.mjs`), a glycerine drop with `dampGrid` on gained 0.93% of
+    its dye in 2 s (231.13 → 233.27) and 3.20% in 20 s (231.13 → 238.53), and
+    its front moved 0.72 mm in 20 s (3.94 → 4.66 mm, against 3.94 → 4.50 mm
+    with the filter off, and 3.94 → 4.13 mm at 2 s before the slump itself had
+    moved a cell).
+
+    Why this takes the clamp's excess back from the neighbours around the
+    stencil rather than limiting third-difference face fluxes Fx = δx³δy⁴f,
+    Fy = δx⁴δy³f face by face: because K(f) = δx⁴δy⁴f / 256 is a fourth
+    difference, its face fluxes are third differences, which on a smooth wave
+    enter one face of a cell and leave the opposite face in nearly equal
+    measure. Scaling the two faces by different Zalesak factors min(R_p, R_q)
+    whenever one neighbour hits its local bound breaks the cancellation
+    F_{i+½} - F_{i-½} and traps that through-flux inside the cell as grid-scale
+    ripple; on `npm run grating`'s pressed plate, face-limited FCT read 68.7%
+    to 69.0% (over the 68% bar, and higher than both the unclamped filter at
+    67.1% and the cell clamp at 64.9%). Evaluating the fourth difference
+    u = -s·K(f) first (with half-sample reflection `reflect1` across the grid
+    walls so the stencil matrix is symmetric with zero column sums while
+    1-cell lines and rows up to the walls stay at 0.000%) keeps that
+    cancellation intact everywhere. With c = clamp(f + u, lo, hi), the clamp's
+    excess at each cell is e = c - (f + u), which is zero wherever the clamp
+    did not bite and whose room to absorb a neighbour's excess without leaving
+    [lo, hi] is w = min(c - lo, hi - c) (mutually exclusive with e ≠ 0, since
+    c = lo or hi whenever the clamp bites). `dampGridCurv` writes w (or -1
+    where e ≠ 0); `dampGridLimit` exits immediately where e = 0 and at clamped
+    cells divides -e across the 7×7 neighbourhood (`-3..3`) in proportion to w
+    (β_q = -e_q / ∑w); and `dampGrid` adds w_p · ∑β_q over the same 7×7
+    window to c_p, clamped to [lo_p, hi_p]. The excess return uses 7×7 (`-3..3`)
+    rather than 5×5 (`-2..2`) because the 5×5 filter clamps a two-cell-wide
+    band at a steep drop rim (`room = -1`), so a 5×5 return window leaves the
+    inner rim cell short of unclamped neighbours (+0.028% at 20 s on the
+    glycerine drop vs +0.000% with 7×7). Where ∑w > 0 and w_p · ∑β_q stays
+    within each receptor's room w_p, the returned excess cancels e_q; the
+    pressed plate reads 66.0% and the disc halo drops from 2.4% to 0.4%.
+
+    Why `hi` is gated on the four opposite neighbour pairs (axes and diagonals)
+    with `6.0 * (here - mn) > mx - here`: this is a one-sided (`hi` gated, `lo`
+    not), hand-picked numerical shortcut rather than contact-line physics.
+    The plain 3×3 maximum (`hi = max(hi, mx)`) blocks the distance-2 overshoot
+    ring (where k_{±2} = +1 makes -s·K(f) negative outside a positive step),
+    but at distance 1 from a step the kernel weight is k_{±1} = -4, so -s·K(f)
+    has a positive +4s/256 weight that diffuses dye one cell outward into a
+    dry toe whenever `hi` takes the wet neighbour's `mx` (with `hi = max(hi, mx)`,
+    the glycerine drop's 2% front creeps to 4.13 mm at 2 s and 4.66 mm at
+    20 s even though its dye total holds to -0.0003%). On each opposite pair
+    (a, b) with mn = min(a, b) and mx = max(a, b), a trough (mn > here) rises
+    to mx, while a monotone cell (mn ≤ here ≤ mx) only takes mx when
+    `6.0 * (here - mn) > mx - here`. The literal `6.0` matches the central
+    stencil weight k_0 = 6 of k = [1, -4, 6, -4, 1], requiring the foot
+    `here - mn` above the low neighbour to be at least a sixth of the jump
+    `mx - here` into the high neighbour. Across factors `4.0`, `6.0`, and `8.0`,
+    the glycerine drop holds 231.13 (+0.000% at 2 s and 20 s) with its front at
+    3.94 mm (2 s) and 4.50 mm (20 s), and `pressed` reads 65.91%, 65.96%, and
+    65.95% (bar < 68.0%). The 3×3 neighbour box uses whole-cell reflection
+    `mirror1` across the outer walls (`-x` and `2n - 2 - x`) rather than
+    `reflect1` (`-1 - x`): on `npm run grating` §4 (`STILL`), `macCormack`
+    clamps wall sample coordinates to `1/n`, smoothing the outer texel ring so
+    `reflect1(-1) = 0` set `nW = here` (`here - mn = 0`), which tripped the
+    one-sided `hi` gate along the wall and made `macCormack` manufacture
+    +5.51 ppm/s; with `mirror1` on the 3×3 box, §4 reads +0.42 ppm/s (against
+    main's +1.47 ppm/s, bar < 10 ppm/s). `npm run grating` holds it to all of
+    this.
 
     A.a.x is s.
   */
-  dampGrid: `${HEAD}
+  dampGridCurv: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+fn pastRim(p: vec2i) -> bool {
+  return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
+}
+fn inDom(q: vec2i) -> bool {
+  let n = i32(S.n);
+  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
+}
+fn reflect1(x: i32, n: i32) -> i32 {
+  if (x < 0) { return -1 - x; }
+  if (x >= n) { return 2 * n - 1 - x; }
+  return x;
+}
+fn mirror1(x: i32, n: i32) -> i32 {
+  if (x < 0) { return -x; }
+  if (x >= n) { return 2 * n - 2 - x; }
+  return x;
+}
+fn loadDom(q: vec2i, here: vec4f) -> vec4f {
+  let n = i32(S.n);
+  let qp = vec2i(reflect1(q.x, n), reflect1(q.y, n));
+  if (pastRim(qp)) { return here; }
+  return textureLoad(src, qp, 0);
+}
+fn loadBox(q: vec2i, here: vec4f) -> vec4f {
+  let n = i32(S.n);
+  let qp = vec2i(mirror1(q.x, n), mirror1(q.y, n));
+  if (pastRim(qp)) { return here; }
+  return textureLoad(src, qp, 0);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  if (pastRim(p)) {
+    textureStore(dst, p, vec4f(0.0));
+    return;
+  }
+  let here = textureLoad(src, p, 0);
+  let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  var acc = vec4f(0.0);
+  for (var j = -2; j <= 2; j++) {
+    let wy = k[j + 2];
+    for (var i = -2; i <= 2; i++) {
+      acc += (k[i + 2] * wy) * (loadDom(p + vec2i(i, j), here) - here);
+    }
+  }
+  let nW  = loadBox(p + vec2i(-1,  0), here);
+  let nE  = loadBox(p + vec2i( 1,  0), here);
+  let nS  = loadBox(p + vec2i( 0, -1), here);
+  let nN  = loadBox(p + vec2i( 0,  1), here);
+  let nSW = loadBox(p + vec2i(-1, -1), here);
+  let nNE = loadBox(p + vec2i( 1,  1), here);
+  let nNW = loadBox(p + vec2i(-1,  1), here);
+  let nSE = loadBox(p + vec2i( 1, -1), here);
+  let a0 = array<vec4f, 4>(nW, nS, nSW, nNW);
+  let b0 = array<vec4f, 4>(nE, nN, nNE, nSE);
+  var lo = here;
+  var hi = here;
+  for (var m = 0; m < 4; m++) {
+    let mn = min(a0[m], b0[m]);
+    let mx = max(a0[m], b0[m]);
+    let toe = select(here, mx, 6.0 * (here - mn) > mx - here);
+    hi = max(hi, select(toe, mx, mn > here));
+    lo = min(lo, mn);
+  }
+  lo = max(lo, vec4f(0.0));
+  hi = max(hi, vec4f(0.0));
+
+  let u = -A.a.x * (acc * (1.0 / 256.0));
+  let c = clamp(here + u, lo, hi);
+  let e = c - (here + u);
+  let w = max(vec4f(0.0), min(c - lo, hi - c));
+  textureStore(dst, p, select(w, vec4f(-1.0), abs(e) > vec4f(1e-20)));
+}`,
+
+  dampGridLimit: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var room: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+fn pastRim(p: vec2i) -> bool {
+  return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
+}
+fn inDom(q: vec2i) -> bool {
+  let n = i32(S.n);
+  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
+}
+fn reflect1(x: i32, n: i32) -> i32 {
+  if (x < 0) { return -1 - x; }
+  if (x >= n) { return 2 * n - 1 - x; }
+  return x;
+}
+fn mirror1(x: i32, n: i32) -> i32 {
+  if (x < 0) { return -x; }
+  if (x >= n) { return 2 * n - 2 - x; }
+  return x;
+}
+fn loadDom(q: vec2i, here: vec4f) -> vec4f {
+  let n = i32(S.n);
+  let qp = vec2i(reflect1(q.x, n), reflect1(q.y, n));
+  if (pastRim(qp)) { return here; }
+  return textureLoad(src, qp, 0);
+}
+fn loadBox(q: vec2i, here: vec4f) -> vec4f {
+  let n = i32(S.n);
+  let qp = vec2i(mirror1(q.x, n), mirror1(q.y, n));
+  if (pastRim(qp)) { return here; }
+  return textureLoad(src, qp, 0);
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  if (pastRim(p)) {
+    textureStore(dst, p, vec4f(0.0));
+    return;
+  }
+  let r0 = textureLoad(room, p, 0);
+  if (all(r0 >= vec4f(0.0))) {
+    textureStore(dst, p, vec4f(0.0));
+    return;
+  }
+  let here = textureLoad(src, p, 0);
+  let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  var acc = vec4f(0.0);
+  var sumW = vec4f(0.0);
+  for (var j = -2; j <= 2; j++) {
+    let wy = k[j + 2];
+    for (var i = -2; i <= 2; i++) {
+      let q = p + vec2i(i, j);
+      acc += (k[i + 2] * wy) * (loadDom(q, here) - here);
+    }
+  }
+  for (var j = -3; j <= 3; j++) {
+    for (var i = -3; i <= 3; i++) {
+      let q = p + vec2i(i, j);
+      if (inDom(q)) {
+        sumW += max(vec4f(0.0), textureLoad(room, q, 0));
+      }
+    }
+  }
+  let nW  = loadBox(p + vec2i(-1,  0), here);
+  let nE  = loadBox(p + vec2i( 1,  0), here);
+  let nS  = loadBox(p + vec2i( 0, -1), here);
+  let nN  = loadBox(p + vec2i( 0,  1), here);
+  let nSW = loadBox(p + vec2i(-1, -1), here);
+  let nNE = loadBox(p + vec2i( 1,  1), here);
+  let nNW = loadBox(p + vec2i(-1,  1), here);
+  let nSE = loadBox(p + vec2i( 1, -1), here);
+  let a0 = array<vec4f, 4>(nW, nS, nSW, nNW);
+  let b0 = array<vec4f, 4>(nE, nN, nNE, nSE);
+  var lo = here;
+  var hi = here;
+  for (var m = 0; m < 4; m++) {
+    let mn = min(a0[m], b0[m]);
+    let mx = max(a0[m], b0[m]);
+    let toe = select(here, mx, 6.0 * (here - mn) > mx - here);
+    hi = max(hi, select(toe, mx, mn > here));
+    lo = min(lo, mn);
+  }
+  lo = max(lo, vec4f(0.0));
+  hi = max(hi, vec4f(0.0));
+
+  let u = -A.a.x * (acc * (1.0 / 256.0));
+  let c = clamp(here + u, lo, hi);
+  let e = c - (here + u);
+  let beta = select(vec4f(0.0), -e / max(sumW, vec4f(1e-30)), sumW > vec4f(1e-30));
+  textureStore(dst, p, beta);
+}`,
+
+  dampGrid: `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var room: texture_2d<f32>;
+@group(0) @binding(4) var lim: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+fn pastRim(p: vec2i) -> bool {
+  return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
+}
+fn inDom(q: vec2i) -> bool {
+  let n = i32(S.n);
+  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
+}
+fn reflect1(x: i32, n: i32) -> i32 {
+  if (x < 0) { return -1 - x; }
+  if (x >= n) { return 2 * n - 1 - x; }
+  return x;
+}
+fn mirror1(x: i32, n: i32) -> i32 {
+  if (x < 0) { return -x; }
+  if (x >= n) { return 2 * n - 2 - x; }
+  return x;
+}
+fn loadDom(q: vec2i, here: vec4f) -> vec4f {
+  let n = i32(S.n);
+  let qp = vec2i(reflect1(q.x, n), reflect1(q.y, n));
+  if (pastRim(qp)) { return here; }
+  return textureLoad(src, qp, 0);
+}
+fn loadBox(q: vec2i, here: vec4f) -> vec4f {
+  let n = i32(S.n);
+  let qp = vec2i(mirror1(q.x, n), mirror1(q.y, n));
+  if (pastRim(qp)) { return here; }
+  return textureLoad(src, qp, 0);
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -4656,22 +5049,52 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     return;
   }
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
-  var c = vec4f(0.0);
-  var lo = vec4f(1e30);
-  var hi = vec4f(-1e30);
-  for (var j = 0; j < 5; j++) {
-    var row = vec4f(0.0);
-    for (var i = 0; i < 5; i++) {
-      let qp = clampP(p + vec2i(i - 2, j - 2), S.n);
-      var q = textureLoad(src, qp, 0);
-      if (S.thinGap > 0.5 && length((vec2f(qp) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { q = here; }
-      row += k[i] * q;
-      if (abs(i - 2) <= 1 && abs(j - 2) <= 1) { lo = min(lo, q); hi = max(hi, q); }
+  var acc = vec4f(0.0);
+  for (var j = -2; j <= 2; j++) {
+    let wy = k[j + 2];
+    for (var i = -2; i <= 2; i++) {
+      acc += (k[i + 2] * wy) * (loadDom(p + vec2i(i, j), here) - here);
     }
-    c += k[j] * row;
   }
-  let f = here - A.a.x * c * (1.0 / 256.0);
-  textureStore(dst, p, clamp(f, max(lo, vec4f(0.0)), max(hi, vec4f(0.0))));
+  let nW  = loadBox(p + vec2i(-1,  0), here);
+  let nE  = loadBox(p + vec2i( 1,  0), here);
+  let nS  = loadBox(p + vec2i( 0, -1), here);
+  let nN  = loadBox(p + vec2i( 0,  1), here);
+  let nSW = loadBox(p + vec2i(-1, -1), here);
+  let nNE = loadBox(p + vec2i( 1,  1), here);
+  let nNW = loadBox(p + vec2i(-1,  1), here);
+  let nSE = loadBox(p + vec2i( 1, -1), here);
+  let a0 = array<vec4f, 4>(nW, nS, nSW, nNW);
+  let b0 = array<vec4f, 4>(nE, nN, nNE, nSE);
+  var lo = here;
+  var hi = here;
+  for (var m = 0; m < 4; m++) {
+    let mn = min(a0[m], b0[m]);
+    let mx = max(a0[m], b0[m]);
+    let toe = select(here, mx, 6.0 * (here - mn) > mx - here);
+    hi = max(hi, select(toe, mx, mn > here));
+    lo = min(lo, mn);
+  }
+  lo = max(lo, vec4f(0.0));
+  hi = max(hi, vec4f(0.0));
+
+  let u = -A.a.x * (acc * (1.0 / 256.0));
+  let c = clamp(here + u, lo, hi);
+  let w = max(vec4f(0.0), textureLoad(room, p, 0));
+  if (all(w == vec4f(0.0))) {
+    textureStore(dst, p, c);
+    return;
+  }
+  var sumB = vec4f(0.0);
+  for (var j = -3; j <= 3; j++) {
+    for (var i = -3; i <= 3; i++) {
+      let q = p + vec2i(i, j);
+      if (inDom(q)) {
+        sumB += textureLoad(lim, q, 0);
+      }
+    }
+  }
+  textureStore(dst, p, clamp(c + w * sumB, lo, hi));
 }`,
 
   // Box-filter a field down to the logical grid, for the CPU's readers.

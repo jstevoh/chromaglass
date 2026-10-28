@@ -22,8 +22,8 @@ import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
 import { DEFAULT_RIDES } from './components/desk/DeskPanels';
 import type { Cue, SetAction, SetItemAction, ControlKind } from './components/desk/deskProps';
-import { useDeskLayouts } from './hooks/useDeskLayout';
-import { LAYOUT_OF_MODE } from './lib/deskLayout';
+import { useDeskTabs } from './hooks/useDeskLayout';
+import { closePanel, isSectionPanel, openPanel, openPanels } from './lib/deskLayout';
 import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { luckyLook } from './lib/lucky';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
@@ -152,7 +152,6 @@ const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'str
   d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet', n: 'spin',
 };
 
-const DESK_MODE_KEY = 'chromaglass-desk-mode';
 /** How often Evolve listens and steps its glides (lib/slowEvolve.ts). */
 const DRIFT_STEP_MS = 500;
 /**
@@ -663,36 +662,21 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   /** Which guide topic to open at, when something sent you there to read one. */
   const [helpFocus, setHelpFocus] = useState<string | null>(null);
-  /**
-   * Perform, or Design.
-   *
-   * Design is what this has always been: the plate fills the window, which is
-   * the right shape for *building* a look. Perform is the desk — the plate
-   * becomes a preview and the controls get the room, because during a show the
-   * plate is already on a wall behind you, larger, and the thing you cannot
-   * see is the desk. Nothing is taken away; it is a different arrangement of
-   * the same controls, and the toggle is one click.
-   */
-  const [deskMode, setDeskMode] = useState<'design' | 'perform' | 'loadin'>(() => {
-    try {
-      const m = localStorage.getItem(DESK_MODE_KEY);
-      return m === 'perform' || m === 'loadin' ? m : 'design';
-    } catch { return 'design'; }
-  });
-  useEffect(() => { try { localStorage.setItem(DESK_MODE_KEY, deskMode); } catch { /* private window */ } }, [deskMode]);
   /*
-    Desk v2: the two desks are one, and Design, Perform and the new Load-in
-    are its three layouts, Build, Gig and Load-in (lib/deskLayout.ts). The
-    stored mode keeps the old words, so a laptop that was left on Perform
-    opens on Gig. Each layout remembers where its panels were.
+    The desk's tabs (lib/deskTabs.ts): the owner's to make since 2026-10-27,
+    each a set of panels, with Perform, Sequence and Setup shipped as the
+    three to start from. The tab that is up is kept under the old desk mode's
+    key, so a laptop left on Gig or Build opens on Perform and one left on
+    Load-in opens on Setup. Each tab remembers where its panels were.
   */
-  const deskLayouts = useDeskLayouts();
-  const layoutName = LAYOUT_OF_MODE(deskMode);
-  const deskLayout = deskLayouts.layouts[layoutName];
-  const { update: updateLayout, reset: resetLayout } = deskLayouts;
+  const deskTabs = useDeskTabs();
+  const deskTab = deskTabs.tab;
+  const setDeskTab = deskTabs.setTab;
+  const deskLayout = deskTabs.layout;
+  const { update: updateLayout, reset: resetLayout } = deskTabs;
   // Stable, so the desk's drag and key listeners are not rebuilt on every render the sound causes.
-  const onDeskLayout = useCallback((change: (l: typeof deskLayout) => typeof deskLayout) => updateLayout(layoutName, change), [updateLayout, layoutName]);
-  const onDeskReset = useCallback(() => resetLayout(layoutName), [resetLayout, layoutName]);
+  const onDeskLayout = useCallback((change: (l: typeof deskLayout) => typeof deskLayout) => updateLayout(deskTab, change), [updateLayout, deskTab]);
+  const onDeskReset = useCallback(() => resetLayout(deskTab), [resetLayout, deskTab]);
   /** The Stage sheet (⌘,): the room and the machine, the sections no look saves. */
   const [showStage, setShowStage] = useState(false);
   /*
@@ -1991,15 +1975,15 @@ export default function App() {
   const readDyeRoom = useCallback(() => visualizerRef.current?.dyeRoom?.() ?? 1, []);
   const [layerReport, setLayerReport] = useState<{ index: number; fill: number; colour: string }[]>([]);
   const layerReportKey = useRef('');
-  /** Which desk is up, for the poll below, which is armed once and never re-armed. */
-  const deskModeRef = useRef(deskMode);
-  deskModeRef.current = deskMode;
+  /** Whether the plate is in Preview, for the poll below, which is armed once and never re-armed. */
+  const buildingRef = useRef(false);
+  buildingRef.current = deskLayout.plateMode === 'preview';
   useEffect(() => {
     const id = setInterval(() => {
-      // Only the bench draws them, and only when there is more than one layer
-      // to tell apart — otherwise this is a re-render for a badge nobody is
-      // looking at.
-      if (deskModeRef.current !== 'design') return;
+      // Only a tab building a look in Preview draws them (Build's bench did),
+      // and only when there is more than one layer to tell apart — otherwise
+      // this is a re-render for a badge nobody is looking at.
+      if (!buildingRef.current) return;
       const r = visualizerRef.current?.layerReport?.();
       if (!r || r.length < 2) return;
       // Only when the badge would change: a fresh array every poll re-rendered
@@ -2099,7 +2083,6 @@ export default function App() {
     setDocId(null);
     setDocDirty(false);
     setCued(null);
-    setDeskMode('design');
     setToast('Empty plate');
   };
   /** The song playing now, as a file would remember it. */
@@ -2490,7 +2473,13 @@ export default function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   // A phone is never a desk, whatever its width turned sideways.
-  const performing = deskMode === 'perform' && roomForDesk && !phone;
+  /*
+    "Performing" was the Gig desk being up: Space is Go, a look picked from
+    the palette is cued rather than put up, and the look's clock runs. With
+    the tabs the owner's to make, it is the tab's plate being Live: the show,
+    whichever panels are round it. Preview is building (below).
+  */
+  const performing = deskLayout.plateMode === 'live' && roomForDesk && !phone;
   /*
     "Designing" was the Design desk being up. It is now the plate in Preview,
     which is what it always meant to the show: while a look is being built
@@ -2713,11 +2702,16 @@ export default function App() {
   const lookSince = useRef(Date.now());
   const [lookFor, setLookFor] = useState(0);
   useEffect(() => { lookSince.current = Date.now(); setLookFor(0); }, [pinnedPresetId]);
+  const clockLive = deskLayout.plateMode === 'live';
   useEffect(() => {
-    if (deskMode !== 'perform') return;
+    // On the tab's plate being Live, as it ran on the Gig desk being chosen:
+    // not on `performing`, which is also a window wide enough for the desk,
+    // so a phone (never a desk) lost the clock and `npm run renders` read 0
+    // renders a second where its clock is asked for (0.6 to 1.5).
+    if (!clockLive) return;
     const id = setInterval(() => setLookFor((Date.now() - lookSince.current) / 1000), 1000);
     return () => clearInterval(id);
-  }, [deskMode]);
+  }, [clockLive]);
 
   /*
     "Edited" is the document's own flag now.
@@ -2841,6 +2835,16 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   []);
 
+  // The stage look's place in each list, for the slide tray's click (PLAN 35g):
+  // the desk's is among all the presets, the phone's among its grouped list.
+  const deskLookSlot = useMemo(() => {
+    const i = pinnedPresetId ? allPresets.findIndex(p => p.id === pinnedPresetId) : -1;
+    return i < 0 ? null : i;
+  }, [allPresets, pinnedPresetId]);
+  const phoneLookSlot = useMemo(() => {
+    const i = pinnedPresetId ? phoneLooks.findIndex(l => l.id === pinnedPresetId) : -1;
+    return i < 0 ? null : i;
+  }, [phoneLooks, pinnedPresetId]);
   const liveLookName = useMemo(
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
@@ -4757,15 +4761,14 @@ export default function App() {
       { id: 'open-seq',      name: 'Stage sequences', kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
       { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
       { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
-      { id: 'open-design',   name: deskMode === 'perform' ? 'Build layout' : 'Gig layout', kind: 'Open',
-        run: () => setDeskMode(m => (m === 'perform' ? 'design' : 'perform')) },
-      { id: 'open-loadin',   name: 'Load-in layout', kind: 'Open', run: () => setDeskMode('loadin') },
+      // A command for each of the desk's tabs, by the name it has now.
+      ...deskTabs.tabs.map(t => ({ id: `open-tab-${t.id}`, name: `${t.name} tab`, kind: 'Open' as const, run: () => setDeskTab(t.id) })),
       { id: 'open-stage',    name: 'Stage: the room and the machine', kind: 'Open', run: () => { setShowStage(true); setShowSettings(false); } },
     ];
 
     return [...looks, ...doing, ...opening, ...sections];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskMode, docId, docName,
+  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskTabs.tabs, setDeskTab, docId, docName,
       cueLook, cuePreset, goLook, goLookNow, revertLook, toggleBlackout, toggleRecording, hideOverlays]);
 
   useEffect(() => {
@@ -4938,6 +4941,84 @@ export default function App() {
     sheet (the room and the machine, `scope="stage"`). One list, so a
     control cannot be wired one way in the sheet and another on the desk.
   */
+  /*
+    The three screens that were behind the Sequence and Sound chips, each
+    drawn either as the sheet it was (from a status dot, the palette or a
+    link inside another sheet) or, embedded, as a panel on any tab
+    (lib/deskLayout.ts: songs, sequences, player).
+  */
+  const soundScreen = (embed: boolean) => (
+    <SoundPanel
+      source={audioSource}
+      onSource={(x) => { void handleSourceChange(x); }}
+      inputs={audioInputs}
+      inputId={audioInputId}
+      onInput={chooseAudioInput}
+      playing={musicPlaying}
+      time={musicTime}
+      loop={musicLoop}
+      onLoop={setMusicLoop}
+      onToggle={toggleMusic}
+      onSeek={(t) => { const el = musicElRef.current; if (el) el.currentTime = t; }}
+      nowPlaying={musicFile ? { name: musicFile.name, track: musicFile.track } : null}
+      onPickFile={playMusicFile}
+      onPickTrack={playTrack}
+      drone={droneParams}
+      onDrone={changeDrone}
+      droneRunning={droneRunning}
+      onDroneToggle={toggleDrone}
+      readLevel={readLevel}
+      deaf={earDeaf}
+      embed={embed}
+      onClose={() => setShowSound(false)}
+    />
+  );
+  const songsScreen = (embed: boolean) => (
+    <SongsPanel
+      shows={songShows}
+      onShows={setSongShows}
+      sets={actionSets}
+      onSaveSet={saveActionSet}
+      onDeleteSet={deleteActionSet}
+      looks={lookChoices}
+      currentSong={currentSong}
+      follow={followSongs}
+      onFollow={setFollowSongs}
+      status={songRuntime.status}
+      onRun={songRuntime.start}
+      onStop={songRuntime.stop}
+      onOpenSequences={() => { setShowSongs(false); setShowSequencer(true); }}
+      exportShows={() => { const used = savedLooksUsed(songShows); return showsFile(songShows, userPresets.presets.filter(p => used.has(p.id))); }}
+      onImportLooks={(looks) => { for (const raw of looks) { try { userPresets.upsert(parsePresetFile(JSON.stringify(raw))); } catch { /* not a look: skipped */ } } }}
+      embed={embed}
+      onClose={() => setShowSongs(false)}
+    />
+  );
+  const sequencesScreen = (embed: boolean) => (
+    <SequencerPanel
+      sequences={sequencer.sequences}
+      selectedId={sequencer.selectedId}
+      onSelect={sequencer.setSelectedId}
+      status={sequencer.status}
+      onPlay={sequencer.play}
+      onPause={sequencer.pause}
+      onStop={sequencer.stop}
+      onNext={sequencer.next}
+      onPrev={sequencer.prev}
+      onGoTo={sequencer.goTo}
+      onSave={sequencer.upsertSequence}
+      onRemove={sequencer.removeSequence}
+      hasSections={musicIntel.state.section !== null}
+      presets={allPresets}
+      onExport={exportSequence}
+      onImportFile={importSequenceFile}
+      currentSong={currentSong}
+      onBindSong={bindSequenceToSong}
+      embed={embed}
+      onClose={() => setShowSequencer(false)}
+    />
+  );
+
   const settingsPanel = (over: Partial<ComponentProps<typeof SettingsPanel>> & { onClose: () => void }) => (
     <SettingsPanel
       mixTakes={mixTakes}
@@ -5686,22 +5767,20 @@ export default function App() {
                   <span className="text-[7px] font-bold uppercase tracking-widest">Settings</span>
                 </button>
 
-                {/* Perform or Design */}
+                {/*
+                  The desk's tab, for when the window is wide enough for the
+                  desk again: it was Perform or Design, and is now whichever
+                  of the owner's tabs is next. Not a toggle, so not lit: it
+                  names the tab the desk will open on.
+                */}
                 <button
-                  aria-pressed={deskMode === 'perform'}
-                  onClick={() => setDeskMode(m => (m === 'perform' ? 'design' : 'perform'))}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    deskMode === 'perform' ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title={deskMode === 'perform'
-                    ? (roomForDesk
-                      ? 'Perform: the plate is a preview and the controls have the room. Click for Design.'
-                      : 'Perform needs a wider window — showing Design until there is room for both columns.')
-                    : 'Design: the plate fills the window, for building a look. Click for Perform.'}
+                  onClick={() => { const t = deskTabs.tabs; const i = t.findIndex(x => x.id === deskTab); setDeskTab(t[(i + 1) % t.length].id); }}
+                  className="flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full bg-white/5 hover:bg-white/10 border-white/10"
+                  title={`The desk opens on ${deskTabs.tabs.find(t => t.id === deskTab)?.name ?? ''} once the window is wide enough. Click for the next tab.`}
                   data-testid="desk-mode-button"
                 >
-                  <LayoutGrid size={16} className={deskMode === 'perform' ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">{deskMode === 'perform' ? 'Perform' : 'Design'}</span>
+                  <LayoutGrid size={16} className="opacity-60 group-hover:opacity-100" />
+                  <span className="max-w-full truncate text-[7px] font-bold uppercase tracking-widest">{deskTabs.tabs.find(t => t.id === deskTab)?.name}</span>
                 </button>
 
                 {/* Songs: a look for each song and what happens while it plays */}
@@ -5875,6 +5954,7 @@ export default function App() {
           edited={!activePresetName && fading <= 0 && !!pinnedLookName}
           looks={phoneLooks}
           activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+          lookSlot={phoneLookSlot}
           onLook={(id) => goLookNow(id)}
           onShuffle={triggerLucky}
           onSave={(name) => saveCurrentPreset(name, '', false)}
@@ -5914,6 +5994,17 @@ export default function App() {
           {phoneScreenUp === 'stage' && (
           <PanelGuard name="The phone controls">
           <PhoneStage
+            deskTabs={{
+              tabs: deskTabs.tabs,
+              tab: deskTab,
+              onTab: setDeskTab,
+              onEdit: deskTabs.edit,
+              panels: openPanels(deskLayout),
+              onAdd: (id) => onDeskLayout(l => openPanel(l, id, 'deck')),
+              onRemove: (id) => onDeskLayout(l => closePanel(l, id)),
+              render: (id) => (id === 'songs' ? songsScreen(true) : id === 'sequences' ? sequencesScreen(true) : id === 'player' ? soundScreen(true)
+                : isSectionPanel(id) && id !== 'mixer' ? settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} }) : null),
+            }}
             // Mid-fade the settings are between two looks and match neither,
             // so the look is named by where it is going: the name a thumb
             // just picked, not "Custom" for the two seconds of the crossfade.
@@ -5921,6 +6012,7 @@ export default function App() {
             lookSwatch={swatchOf((activePresetId ?? (fading > 0 ? pinnedPresetId : null)) ?? undefined)}
             looks={phoneLooks}
             activeLookId={activePresetId ?? (fading > 0 ? pinnedPresetId : null)}
+            lookSlot={phoneLookSlot}
             // A look from the phone crossfades in, as Go does on the desk: a
             // thumb in front of a room should never cut the plate to clean glass.
             onLook={(id) => goLookNow(id)}
@@ -6154,51 +6246,12 @@ export default function App() {
       <AnimatePresence>
         {showSound && (
           <PanelGuard name="Sound" onClose={() => setShowSound(false)}>
-          <SoundPanel
-            source={audioSource}
-            onSource={(x) => { void handleSourceChange(x); }}
-            inputs={audioInputs}
-            inputId={audioInputId}
-            onInput={chooseAudioInput}
-            playing={musicPlaying}
-            time={musicTime}
-            loop={musicLoop}
-            onLoop={setMusicLoop}
-            onToggle={toggleMusic}
-            onSeek={(t) => { const el = musicElRef.current; if (el) el.currentTime = t; }}
-            nowPlaying={musicFile ? { name: musicFile.name, track: musicFile.track } : null}
-            onPickFile={playMusicFile}
-            onPickTrack={playTrack}
-            drone={droneParams}
-            onDrone={changeDrone}
-            droneRunning={droneRunning}
-            onDroneToggle={toggleDrone}
-            readLevel={readLevel}
-            deaf={earDeaf}
-            onClose={() => setShowSound(false)}
-          />
+          {soundScreen(false)}
           </PanelGuard>
         )}
         {showSongs && (
           <PanelGuard name="Songs" onClose={() => setShowSongs(false)}>
-          <SongsPanel
-            shows={songShows}
-            onShows={setSongShows}
-            sets={actionSets}
-            onSaveSet={saveActionSet}
-            onDeleteSet={deleteActionSet}
-            looks={lookChoices}
-            currentSong={currentSong}
-            follow={followSongs}
-            onFollow={setFollowSongs}
-            status={songRuntime.status}
-            onRun={songRuntime.start}
-            onStop={songRuntime.stop}
-            onOpenSequences={() => { setShowSongs(false); setShowSequencer(true); }}
-            exportShows={() => { const used = savedLooksUsed(songShows); return showsFile(songShows, userPresets.presets.filter(p => used.has(p.id))); }}
-            onImportLooks={(looks) => { for (const raw of looks) { try { userPresets.upsert(parsePresetFile(JSON.stringify(raw))); } catch { /* not a look: skipped */ } } }}
-            onClose={() => setShowSongs(false)}
-          />
+          {songsScreen(false)}
           </PanelGuard>
         )}
       </AnimatePresence>
@@ -6207,27 +6260,7 @@ export default function App() {
       <AnimatePresence>
         {showSequencer && (
           <PanelGuard name="The sequencer" onClose={() => setShowSequencer(false)}>
-          <SequencerPanel
-            sequences={sequencer.sequences}
-            selectedId={sequencer.selectedId}
-            onSelect={sequencer.setSelectedId}
-            status={sequencer.status}
-            onPlay={sequencer.play}
-            onPause={sequencer.pause}
-            onStop={sequencer.stop}
-            onNext={sequencer.next}
-            onPrev={sequencer.prev}
-            onGoTo={sequencer.goTo}
-            onSave={sequencer.upsertSequence}
-            onRemove={sequencer.removeSequence}
-            hasSections={musicIntel.state.section !== null}
-            presets={allPresets}
-            onExport={exportSequence}
-            onImportFile={importSequenceFile}
-            currentSong={currentSong}
-            onBindSong={bindSequenceToSong}
-            onClose={() => setShowSequencer(false)}
-          />
+          {sequencesScreen(false)}
           </PanelGuard>
         )}
       </AnimatePresence>
@@ -6348,7 +6381,7 @@ export default function App() {
           </button>
           {presetMenu === 'title' && (
             <PanelGuard name="The look menu" onClose={() => setPresetMenu('none')}>
-            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
+            <PresetMenu activePresetId={activePresetId} onApplyPreset={applyPreset} onCuePreset={cueLook} swatchOf={swatchOf} onClose={() => setPresetMenu('none')} userPresets={userPresets.presets} onApplyUserPreset={applyUserPreset} onSaveCurrent={saveCurrentPreset} onLoadFile={loadPresetFile} onExportUserPreset={userPresets.exportPreset} onDeleteUserPreset={deleteSavedLook} currentSong={currentSong} align="left" />
             </PanelGuard>
           )}
         </div>
@@ -6513,10 +6546,14 @@ export default function App() {
         can be a panel in any of them.
       */}
       {deskUp && (
-        <PanelGuard name="The desk" onClose={() => deskLayouts.reset(layoutName)} closeLabel="Put this layout back as it shipped">
+        <PanelGuard name="The desk" onClose={() => deskTabs.reset(deskTab)} closeLabel="Put this tab's panels back as it shipped">
         <Desk
           bare={!overlaysVisible}
-          layoutName={layoutName}
+          tabs={deskTabs.tabs}
+          tab={deskTab}
+          onTab={(id) => { setShowSound(false); setShowSongs(false); setShowSequencer(false); setDeskTab(id); }}
+          onTabEdit={deskTabs.edit}
+          screens={{ songs: songsScreen(true), sequences: sequencesScreen(true), player: soundScreen(true) }}
           layout={deskLayout}
           onLayout={onDeskLayout}
           onResetLayout={onDeskReset}
@@ -6525,15 +6562,6 @@ export default function App() {
           onOpenSection={openSettingsAt}
           onStage={() => { setShowStage(true); setShowSettings(false); setShowHelp(false); }}
           onRelayout={preview.remeasure}
-          mode={showSound ? 'sound' : showSongs || showSequencer ? 'sequence' : deskMode}
-          onMode={(m) => {
-            if (m === 'sound') { setShowSound(true); setShowSongs(false); setShowMidi(false); return; }
-            setShowSound(false);
-            if (m === 'sequence') { setShowSongs(true); setShowMidi(false); return; }
-            setShowSongs(false);
-            setShowSequencer(false);
-            setDeskMode(m);
-          }}
           dots={deskDots}
           midiName={midi.activeInputName ?? null}
           onSound={deskOpen.sound}
@@ -6542,13 +6570,6 @@ export default function App() {
           onSearch={() => setShowPalette(true)}
           onOpenSettings={openAllSettings}
           onOpenAccount={openAccount}
-          showCrumb={
-            <>
-              <span className="text-muted">Show</span>
-              <span className="text-faint">/</span>
-              <span>{liveLookName ?? 'Untitled'}</span>
-            </>
-          }
           status={{
             audio: deskAudioLine,
             engine: engineStatus?.label ?? '',
@@ -6733,6 +6754,9 @@ export default function App() {
           <CueBar
             cued={cued}
             liveName={liveLookName}
+            liveSwatch={swatchOf(activePresetId ?? (fading > 0 ? pinnedPresetId : null) ?? undefined)}
+            cuedSwatch={cued ? swatchOf(cued.id) : undefined}
+            liveAt={deskLookSlot}
             fading={fading}
             fadeSeconds={fadeSeconds}
             onFadeSeconds={setFadeSeconds}

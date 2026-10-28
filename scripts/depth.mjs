@@ -25,7 +25,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery, installFrameReader } from './frame.mjs';
+import { engineQuery, installFrameReader, settlePlate, waitForEngine, developPlate } from './frame.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -61,7 +61,8 @@ for (const s of ['SIGTERM','SIGINT','SIGHUP']) process.on(s, () => { stop(); pro
 await new Promise(r => setTimeout(r, 2500));
 if (!up) process.exit(2);
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1060, height: 700 } });
   await installFrameReader(page);
@@ -88,8 +89,10 @@ try {
     };
     setTimeout(sample, 250);
   });
-  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
-  await page.waitForTimeout(9000);
+  await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery({ lockstep: true })}`, { waitUntil: 'load' });
+  // In software, the opening's first step first (25 to 100 s), then the Mac's nine seconds in steps (frame.mjs).
+  await waitForEngine(page);
+  await developPlate(page, 9000);
 
   /*
     And then until the show is actually running.
@@ -113,18 +116,30 @@ try {
     measured until the plate has stepped in every quarter second for two
     seconds running. A freeze after that is still a red line.
   */
+  /*
+    And only while the timeline is still being written. It keeps 400 rows,
+    a hundred seconds, which on a Mac is long past this line (nine seconds
+    and at most 45 more). In a cloud session the opening is the Mac's 540
+    steps, twenty minutes to over an hour of software (frame.mjs's
+    `developPlate`), and the first run of it read this line from the last
+    nine rows of a timeline that had stopped an hour before, and passed: two
+    "steady seconds" from the page's first minute. Rows that stopped are not
+    the last two seconds, so they are not read as them.
+  */
   const running = await page.evaluate(async () => {
     const t0 = performance.now();
     const rows = () => window.__depthLoad ?? [];
+    const recording = () => rows().length < 400;
     const steady = () => {
       const r = rows().slice(-9);
-      return r.length === 9 && r.every((row, i) => i === 0 || row[3] > r[i - 1][3]);
+      return recording() && r.length === 9 && r.every((row, i) => i === 0 || row[3] > r[i - 1][3]);
     };
     while (!steady() && performance.now() - t0 < 45000) await new Promise((r) => setTimeout(r, 250));
-    return { ok: steady(), waited: (performance.now() - t0) / 1000 };
+    return { ok: steady(), waited: (performance.now() - t0) / 1000, recording: recording(), rows: rows().length };
   });
   check('the show is running before anything is measured', running.ok,
-    `${running.waited.toFixed(1)} s after the first nine to see two steady seconds`);
+    `${running.waited.toFixed(1)} s after the first nine to see two steady seconds (timeline row ${running.rows})`
+    + (running.recording ? '' : '; the quarter-second timeline had ended (400 rows), so nothing said the last two seconds'));
 
   // A plate that is not being poured on or evolved, so what moves is the flow
   // already there and not the next drop landing.
@@ -243,7 +258,7 @@ try {
 
   await mark();
   await set({ automateRate: 0, plateCurve: CURVE, depthDrag: 0 });
-  await page.waitForTimeout(6000);
+  await settlePlate(page, 6000);
   const shaped = await settled(STEPPED_CURVE);
   /*
     Waiting must not turn a frozen plate green. The same solver taking no
@@ -399,10 +414,10 @@ try {
   const off = [], on = [];
   for (let i = 0; i < 3; i++) {
     await set({ depthDrag: 0 });
-    await page.waitForTimeout(4000);
+    await settlePlate(page, 4000);
     off.push(await speeds());
     await set({ depthDrag: DRAG });
-    await page.waitForTimeout(4000);
+    await settlePlate(page, 4000);
     on.push(await speeds());
   }
   const mean = (a, k) => a.reduce((s, x) => s + x[k], 0) / a.length;
@@ -456,14 +471,14 @@ try {
     sixteen seconds.
   */
   await set({ plateCurve: 0, depthDrag: 0 });
-  await page.waitForTimeout(5000);
+  await settlePlate(page, 5000);
   const flatOffs = [], flatOns = [];
   for (let i = 0; i < 5; i++) {
     await set({ depthDrag: 0 });
-    await page.waitForTimeout(4000);
+    await settlePlate(page, 4000);
     flatOffs.push(await speeds());
     await set({ depthDrag: DRAG });
-    await page.waitForTimeout(4000);
+    await settlePlate(page, 4000);
     flatOns.push(await speeds());
   }
   const pairRatios = flatOns.map((o, i) => o.inner / flatOffs[i].inner);
@@ -487,10 +502,10 @@ try {
   const thinDome = [], thinFlat = [];
   for (let i = 0; i < 3; i++) {
     await set({ plateCurve: CURVE, depthDrag: 0 });
-    await page.waitForTimeout(5000);
+    await settlePlate(page, 5000);
     thinDome.push(await speeds());
     await set({ plateCurve: 0, depthDrag: 0 });
-    await page.waitForTimeout(5000);
+    await settlePlate(page, 5000);
     thinFlat.push(await speeds());
   }
   const rDome = mean(thinDome, 'outer') / mean(thinDome, 'inner');
@@ -513,7 +528,7 @@ try {
     from rest stays pushed.
   */
   await set({ plateCurve: 0, depthDrag: 0 });
-  await page.waitForTimeout(4000);
+  await settlePlate(page, 4000);
   const gapAt = () => page.evaluate(async () => {
     const sq = await window.chromaglassDebug().readSqueeze?.();
     if (!sq) return null;
@@ -536,7 +551,7 @@ try {
   const pressed = await gapAt();
   await mark();
   await set({ plateCurve: 1 });
-  await page.waitForTimeout(250);
+  await settlePlate(page, 250);
   /*
     And the same wait here, for the opposite reason: a plate that has not
     stepped since the change still holds the dent exactly as it was pressed,

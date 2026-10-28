@@ -62,12 +62,12 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 
 | Where | Can verify | Cannot |
 |---|---|---|
-| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `regrid`, `particles`, `derive`, `mixer`, `disc`), the Mac app's `desktop` (under xvfb, all but its lit plate and hidden-window lines), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | Anything that reads the **app's** frames: the full app on software WebGPU returns zero readbacks, so `qa`, `bubbles`, `tools`, `magnet`, `mirror`, `gallery`, `moving`, `film` fail or pass vacuously here |
+| A cloud session (no GPU; Chromium with SwiftShader) | `npm run lint`, `wgsl`, the node harnesses (`plate`, `desk`, `panel`, `pops`, `setlist`, `music`, `liquids`, …), the lab (`physics`, `straw`, `microscope`, `ferrolook`, `maze`, `spikes`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `ferropour`, `regrid`, `particles`, `derive`, `mixer`, `disc`), the Mac app's `desktop` (under xvfb, all but its lit plate and hidden-window lines), `codecblip` (the recorder's encoder, by hand) and DOM/layout checks in a browser | The **app's** numbers: with `PW_WEBGPU=1` the app runs headed under Xvfb and its frames read back (PLAN.md 19l), but at about 0.4 solver steps a second against Metal's sixty, so `tools`, `magnet`, `mirror`, `bottles`, `take`, `ferro`, `ferrodrift`, `finger`, `bubbles`, `depth`, `handpour`, `kickbubbles` run their logic on a twentieth of the steps (`settlePlate` in `scripts/frame.mjs`) and not their magnitudes; `qa`, `gallery`, `moving`, `film` are still the Mac's |
 | CI, macOS runner (Metal) | Everything | — |
 | The owner's machine | How it looks at 60 fps | — |
 
-`PW_WEBGPU=1` gives a harness software WebGPU (`scripts/chromium.mjs`), which is
-enough for the lab, not for the app. For pictures of a change, use the `look`
+`PW_WEBGPU=1` gives a harness software WebGPU (`scripts/chromium.mjs`): enough for the lab,
+and for the app's logic at a crawl. For pictures of a change, use the `look`
 skill: the lab renders the real plate shader on a deterministic plate.
 
 ## Which checks for which files
@@ -76,13 +76,14 @@ skill: the lab renders the real plate shader on a deterministic plate.
 |---|---|
 | anything | `npm run lint` (typecheck) |
 | `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `disc` (the magnet's field), `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
-| `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), `lampzero` (the before-lamp control finds the lamp's lines by count), and a `look` render |
+| `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), `lampzero` (the before-lamp control finds the lamp's lines by count), `litstage` (each look over a projector's black lifted by a stage wash; `-- --controls` until PLAN 36a is built), and a `look` render |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | areas of the dish and their cords (`src/lib/plateAreas.ts`, `src/lib/areaCords.ts`, a preset's area cords) | `areacords` (`-- --node` for the gate and the tables; the lab half with `PW_WEBGPU=1`), `plate`, `desk` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
 | Preview's copy (`drafting`, `wallRef` in `App.tsx`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
 | the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
 | sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`, `useAudioAnalyzer`, `lib/earClock.ts`, `lib/audioFeatures.ts`, `lib/handSounds.ts`) | `shelf`, `music`, `ears`, `renders` (what the sound re-renders, and whether the plate hears each frame's reading), `kicks`, `clicks` (a click on the laptop is not a beat; `-- --app` in a browser) |
+| the patch bay's cords (`src/lib/sceneMap.ts`, a cord's gate, gain or dragged band; `CordGate` in `lib/areaCords.ts`) | `soundcords` (`-- --controls` until PLAN 30a is built), `scene`, `areacords -- --node` |
 | the cartoons (`src/lib/cartoons.ts`, `public/video/cartoons/`, `CartoonShelf.tsx`), the video pour (`pourVideo`, `pourVideoFrom` in `App.tsx`) | `cartoons` (a new cartoon gets its row in `public/video/cartoons/SOURCES.md` first), `phone`, `layout` |
 | `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
@@ -93,11 +94,17 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`, `server/remote-server.js`), the Phone · iPad panel | `applink`, `remotemix`, `phonelink` (the panel's code, and the relay's count of phones); the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
 | the Mac app (`desktop/`, `scripts/desktop.mjs`), and what it leans on: `useProjector`, `useCastSession`, `CastDisplay`, `server/remote-server.js` | `desktop` (`npm --prefix desktop install` once; `-- --packaged` after `npm --prefix desktop run pack`); `desktop.yml` checks the packed app on a Mac |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
-| a new or changed check in `scripts/` | that check, and the `check-skeptic` agent |
-| `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `actionlint` |
-| `.github/workflows/checks.yml`, `scripts/reach.mjs` | `npm run reach`, `npm run closedruns`, `actionlint`; `npm run macqueue -- --hours 24` for the Mac time before and after |
+| a new or changed check in `scripts/` | that check, and the `check-skeptic` agent; a new one is an entry in `scripts/checks.json` (its shard, its command, why), never a step in `checks.yml`, then `npm run checks` |
+| `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `npm run actionlint` |
+| `.github/workflows/checks.yml`, `scripts/reach.mjs`, `scripts/checks.mjs`, `scripts/checks.json` | `npm run checks`, `npm run reach`, `npm run closedruns`, `npm run actionlint` (a pinned release, fetched on first use); `npm run macqueue -- --hours 24` for the Mac time before and after |
 | a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/gpu/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
+
+`npm run quick` is this table made executable (PLAN 19k): it reads
+`scripts/checks.json`, works out what each check reads (its scripts, the `src/` files
+they import, every site file for a check that serves the app) and runs, side by side,
+the checks your diff from `origin/main` reaches and a cloud session can run; `-- --dry`
+says which and why. The rows above stay for what it cannot see: agents, pictures, the Mac.
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
 not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
@@ -107,15 +114,25 @@ not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
 `.github/workflows/checks.yml`, on every PR and called by `deploy.yml` before a
 deploy:
 
-- **Measure** (ubuntu, four parts side by side, 4–12 min each): typecheck, every script
-  parsing, the shaders compiling on SwiftShader, and the node harnesses.
+- **Measure** (ubuntu, five parts side by side, 4–19 min each): typecheck, every script
+  parsing, the workflows linted (`actionlint`), the shaders compiling on SwiftShader, and
+  the node harnesses. A PR whose diff is only check scripts, manifest entries, the npm
+  scripts checks run and documents runs only the Measure checks it reaches (PLAN 19k-4;
+  `always` entries in `scripts/checks.json` hold the rest), and the deploy never takes
+  such a run as proof of a whole tree.
+- Which checks each Measure part and Mac shard runs is `scripts/checks.json`; each job's
+  one `The checks` step runs its shard's list (`scripts/checks.mjs --ci`), each check in a
+  `Run <command>` log group, a red one an error annotation with its name and FAIL lines,
+  the job summary a table of every check's time.
 - **Check changes named** (`scripts/checkguard.mjs`, under `Measure`): a PR that moves a
   check's bar or input names each change in its body under `Check changes:`, or is red.
   Re-run the failed jobs after editing the body; no push is needed.
 - **What the change reaches** (`scripts/reach.mjs`): a PR that changes only Markdown,
   `.claude/`, `ios/`, `desktop/`, a workflow that never runs a Mac shard or the scripts
   that check the workflows (`closedruns`, `macqueue`, `deploygate`) skips the
-  Mac shards (Measure still runs), and the deploy gate never trusts such a run.
+  Mac shards (Measure still runs), and the deploy gate never trusts such a run. A PR
+  whose Mac-reaching change is only check scripts, manifest entries or the npm scripts
+  checks run runs only those checks' shards (PLAN 19k).
 - **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
   jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is, or when `reach` skipped them all.
 - A deploy skips the checks when main's new tree is the exact tree its PR's

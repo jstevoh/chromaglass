@@ -88,23 +88,42 @@ export function warmthKelvin(warmth: number): number {
   return 1e6 / (MIRED_NEUTRAL + MIRED_PER_UNIT * w);
 }
 
+/** Rec. 709 luminance of a linear sRGB triple: what the eye counts as the picture's brightness. */
+const luminance = (c: readonly number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+
 let tintMemo: { w: number; tint: [number, number, number] } | null = null;
 /**
  * What the plate multiplies the picture by at Lamp Warmth `warmth`: the
  * blackbody's red, green and blue against the neutral's, held to the red
  * channel so that warmth takes its light from blue and green and leaves red
  * where it was, plus the small red lift the old grade had.
- * Holding red still is a choice, made so that 0 to 1 stays the old grade: it
- * is what makes the warm end about a third dimmer (luminance 0.66 at 3200 K).
- * A lamp's brightness is not fixed by its colour temperature, so this is not
- * physics; Exposure puts it back.
+ *
+ * Holding red still keeps 0 to 1 the old grade, but left alone it would make
+ * the halogen end a third dimmer (luminance 0.66 at 3200 K), and a lamp's
+ * brightness is not set by its colour temperature: a projector's 3200 K
+ * halogen is as bright as the designer made it, and a lens throws no less
+ * light for the lamp being amber. (A lamp run cool on a dimmer does lose light,
+ * steeply, about the eighth power of its temperature near 3000 K; that is a
+ * different knob, and it is Exposure.) So past the old end of the travel the
+ * tint is scaled to keep the luminance it has at 1. The red then rises above
+ * 1 (1.48 at 3200 K), which is what a tungsten lamp does to a white picture:
+ * its light is mostly red. A pigment already at full red clips there, a named
+ * limit of a multiply on a finished picture (PLAN 35e-3). 0 to 1 is not
+ * touched, so saved looks keep their colour and their brightness.
  */
 export function lampTint(warmth: number): [number, number, number] {
   const w = Math.max(0, Math.min(LAMP_WARMTH_MAX, Number.isFinite(warmth) ? warmth : 0));
   if (tintMemo && tintMemo.w === w) return tintMemo.tint;
-  const s = blackbodyShift(warmthKelvin(w));
-  const lift = 1 + RED_LIFT * Math.min(w, 1);
-  const tint: [number, number, number] = [lift, lift * s[1] / s[0], lift * s[2] / s[0]];
+  const grade = (v: number): [number, number, number] => {
+    const s = blackbodyShift(warmthKelvin(v));
+    const lift = 1 + RED_LIFT * Math.min(v, 1);
+    return [lift, lift * s[1] / s[0], lift * s[2] / s[0]];
+  };
+  const tint = grade(w);
+  if (w > 1) {
+    const hold = luminance(grade(1)) / luminance(tint);
+    tint[0] *= hold; tint[1] *= hold; tint[2] *= hold;
+  }
   tintMemo = { w, tint };
   return tint;
 }

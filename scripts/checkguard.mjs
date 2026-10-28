@@ -34,6 +34,15 @@
 //             app's own constant moves with it, which is how #362 moved one;
 //   removed   a file under scripts/ that held `check(` calls now holds fewer,
 //             or is gone;
+//   manifest  a check's entry in scripts/checks.json that is removed, or whose
+//             command, env or timeout changes (PLAN.md 19k-1): `QA_GPU=mid`
+//             dropped from the command, a `--node` flag added, a timeout
+//             lengthened, is a check that stopped measuring what it did, and
+//             before the manifest the same edit to a step in checks.yml was as
+//             invisible. A check moved between the Mac and Measure is one too
+//             (an app-frame check passes vacuously off Metal). A new entry, a
+//             move between two Mac shards or two Measure parts, a reorder and
+//             a reworded `why` are not changes to what a check measures;
 //   flip      a check turned to assert the opposite: a quantity compared with
 //             `>` on the removed lines and only with `<` on the added ones,
 //             or a check's name that gains "not", "never", "stays" or
@@ -82,7 +91,8 @@
 // What it does not see: a new line that bends a measured value
 // (`moved *= 1.3`) with nothing removed; a 0 or a 1 on a rewritten line (left
 // out on purpose, see below); arguments in package.json's scripts or a
-// workflow's steps; a check that stops being run because its caller changed;
+// workflow's steps (a check's entry in scripts/checks.json is read since 19k-1);
+// a check that stops being run because its caller changed;
 // a physics constant that is not SHOUTING_CASE (PLAN.md 19x-2). A bar
 // computed from a variable two lines up whose own number changed shows as an
 // input: still named, just called an input. `--history` measures how often
@@ -556,6 +566,63 @@ export function names(line, change) {
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 const show = (rev, file) => git('show', `${rev}:${file}`);
 
+/*
+  The changes between two texts of scripts/checks.json (PLAN.md 19k-1): an
+  entry gone, or kept with another command, env or timeout. Entries are
+  matched by name (a check that moves shard keeps its name, and moving is not
+  a change to what it measures); a name on two shards is matched by both.
+  A move between the Mac and Measure is a change too (where a check runs is what
+  it is measured on); one between two Mac shards or two Measure parts is not.
+  Returns the same shape as `changesIn`: `words` is the check's name, which the
+  naming line must carry, and `need` the numbers that differ (a timeout 15 → 20,
+  a `--seed 3` → `--seed 4`), so the line has to say both.
+*/
+export function manifestChanges(oldText, newText) {
+  let a, b;
+  let macA = [], macB = [];
+  try {
+    const A = JSON.parse(oldText), B = JSON.parse(newText);
+    a = A.checks; b = B.checks;
+    macA = A.shards?.mac ?? []; macB = B.shards?.mac ?? [];
+  } catch { return []; }
+  if (!Array.isArray(a) || !Array.isArray(b)) return [];
+  const key = (c) => `${c.name}\u0000${c.shard}`;
+  const now = new Map(b.map((c) => [key(c), c]));
+  const byName = new Map();
+  for (const c of b) byName.set(c.name, [...(byName.get(c.name) ?? []), c]);
+  const out = [];
+  const file = 'scripts/checks.json';
+  const env = (c) => Object.entries(c.env ?? {}).map(([k, v]) => `${k}=${v}`).sort().join(' ');
+  for (const was of a) {
+    let is = now.get(key(was));
+    // Moved to another shard: the same name, found once.
+    if (!is && (byName.get(was.name) ?? []).length === 1 && !a.some((c) => c !== was && c.name === was.name)) is = byName.get(was.name)[0];
+    if (!is) {
+      out.push({ file, line: 0, kind: 'manifest', what: `the check "${was.name}" removed (or renamed) in the manifest`, from: was.run, to: '', words: [was.name], need: [], removed: true, code: was.run.slice(0, 100) });
+      continue;
+    }
+    const diffs = [];
+    // Between the Mac and Measure: an app-frame check passes vacuously off
+    // Metal (CLAUDE.md, "What can be verified where"), and the lab checks run
+    // on another renderer, so where a check runs is part of what it measures.
+    // A move between two Mac shards, or two Measure parts, is only balancing.
+    if (was.shard !== is.shard && macA.includes(was.shard) !== macB.includes(is.shard)) {
+      diffs.push({ field: 'place', from: `${was.shard} (${macA.includes(was.shard) ? 'Mac' : 'Measure'})`, to: `${is.shard} (${macB.includes(is.shard) ? 'Mac' : 'Measure'})` });
+    }
+    if (was.run !== is.run) diffs.push({ field: 'command', from: was.run, to: is.run });
+    if (env(was) !== env(is)) diffs.push({ field: 'env', from: env(was) || '(none)', to: env(is) || '(none)' });
+    if ((was.timeout ?? null) !== (is.timeout ?? null)) diffs.push({ field: 'timeout', from: String(was.timeout ?? 'none'), to: String(is.timeout ?? 'none') });
+    for (const d of diffs) {
+      const before = (clean(d.from).match(NUM) ?? []).map(value), after = (clean(d.to).match(NUM) ?? []).map(value);
+      // The numbers in one and not the other, as a bag.
+      const left = [...after];
+      const gone = before.filter((v) => { const i = left.indexOf(v); if (i >= 0) { left.splice(i, 1); return false; } return true; });
+      out.push({ file, line: 0, kind: 'manifest', what: `the check "${was.name}": its ${d.field} changed`, from: d.from, to: d.to, words: [was.name], need: [...gone, ...left].map(String), code: `${d.from.slice(0, 70)} → ${d.to.slice(0, 70)}` });
+    }
+  }
+  return out;
+}
+
 export function changesBetween(from, to) {
   const diff = git('diff', '--no-renames', '-U0', from, to, '--', 'scripts', 'src');
   const out = [];
@@ -568,6 +635,11 @@ export function changesBetween(from, to) {
     if (f.created) continue;   // a new file moves no bar that was there
     out.push(...changesIn(f.file, show(from, f.file), f.deleted ? null : show(to, f.file), f.hunks, scriptsText));
   }
+  // The manifest of checks, which the diff above does not list (it reads
+  // scripts/*.mjs|js|cjs|ts and src/).
+  let old = null, now = null;
+  try { old = show(from, 'scripts/checks.json'); now = show(to, 'scripts/checks.json'); } catch { /* absent on one side: nothing was there to change */ }
+  if (old != null && now != null && old !== now) out.push(...manifestChanges(old, now));
   return out;
 }
 
@@ -809,6 +881,42 @@ function selftest() {
   c = run('scripts/x.mjs', ab, 'check(\'a\', x >= 0.04 && y < 4, \'\');');
   t(c.length === 2 && c.every((x) => x.kind === 'bar'), 'two bars changed on one line are two changes');
   t(!['scripts/x.mjs 0.05 → 0.04: the plate moved further than the bar allowed'].some((l) => names(l, c[1])), 'and naming one does not name the other');
+
+  // The manifest of checks (PLAN.md 19k-1): a check's entry removed, or its
+  // command, env or timeout changed, is named; a move, a reorder and prose are not.
+  const mf = (...checks) => JSON.stringify({ about: [], shards: { measure: ['a'], mac: ['b', 'c'] }, checks });
+  const qa = { name: 'The app, every look', shard: 'b', run: 'QA_GPU=mid npm run qa -- --looks 12', timeout: 15, env: { SEED: '3' }, why: ['because'] };
+  const other = { name: 'The desk', shard: 'a', run: 'npm run desk' };
+  const base = mf(qa, other);
+  t(manifestChanges(base, mf(qa, other)).length === 0, 'a manifest that did not change has no change to name');
+  t(manifestChanges(base, mf({ ...qa, shard: 'c' }, other)).length === 0, 'a check moved between two Mac shards is only balancing, not a change');
+  c = manifestChanges(base, mf({ ...qa, shard: 'a' }, other));
+  t(c.length === 1 && /place/.test(c[0].what) && /Mac/.test(c[0].from) && /Measure/.test(c[0].to), 'a check moved from the Mac to Measure is a change', c.map((x) => `${x.what}: ${x.from} → ${x.to}`).join('; '));
+  t(names('The app, every look: place b (Mac) to a (Measure) because the lab renders its looks the same without a GPU', c[0]), 'and named with a reason, it passes');
+  t(manifestChanges(base, mf(qa, { ...other, shard: 'b' })).length === 1, 'and so is one from Measure to the Mac');
+  t(manifestChanges(mf(qa, other, { name: 'Third', shard: 'a', run: 'npm run slosh' }), mf(qa, other, { name: 'Third', shard: 'a', run: 'npm run slosh' })).length === 0, 'a manifest read against itself has no moves');
+  t(manifestChanges(base, mf(other, qa)).length === 0, 'a reorder is not');
+  t(manifestChanges(base, mf({ ...qa, why: ['reworded'] }, other)).length === 0, 'nor is the prose');
+  t(manifestChanges(base, mf(qa, other, { name: 'A new one', shard: 'a', run: 'npm run slosh' })).length === 0, 'nor a new entry');
+  c = manifestChanges(base, mf(other));
+  t(c.length === 1 && c[0].removed && c[0].words[0] === 'The app, every look', 'a removed entry is one change', c.map((x) => x.what).join('; '));
+  t(names('The app, every look: removed, its looks are measured by gallery.yml now on the Mac', c[0]), 'named as removed with a reason, it passes');
+  t(!names('The app, every look: changed, its looks are measured by gallery.yml now on the Mac', c[0]), 'named as changed, it does not');
+  c = manifestChanges(base, mf({ ...qa, run: 'npm run qa -- --looks 12' }, other));
+  t(c.length === 1 && c[0].kind === 'manifest' && /command/.test(c[0].what), 'QA_GPU=mid dropped from a command is a change', c.map((x) => x.what).join('; '));
+  t(names('The app, every look: command loses QA_GPU=mid because the Mac runner has a real GPU anyway', c[0]), 'and named with a reason, it passes');
+  t(!names('The app: command loses QA_GPU=mid because the Mac runner has a real GPU anyway', c[0]), 'but not by another check\'s name');
+  c = manifestChanges(base, mf({ ...qa, timeout: 20 }, other));
+  t(c.length === 1 && /timeout/.test(c[0].what) && c[0].need.join() === '15,20', 'a timeout 15 to 20 is a change that needs both numbers', c.map((x) => `${x.what} ${x.need}`).join('; '));
+  t(!names('The app, every look: timeout 15 → 25 because the shard runs slower now on the runner', c[0]), 'named with the wrong number, it does not pass');
+  t(names('The app, every look: timeout 15 → 20 because the shard runs slower now on the runner', c[0]), 'with both numbers and a reason, it does');
+  c = manifestChanges(base, mf({ ...qa, run: 'QA_GPU=mid npm run qa -- --looks 24' }, other));
+  t(c.length === 1 && c[0].need.join() === '12,24', 'a number in the command that changes is needed by value', c.map((x) => `${x.need}`).join('; '));
+  c = manifestChanges(base, mf({ ...qa, env: { SEED: '4' } }, other));
+  t(c.length === 1 && /env/.test(c[0].what) && c[0].need.join() === '3,4', 'an env value that changes is a change', c.map((x) => `${x.what} ${x.need}`).join('; '));
+  c = manifestChanges(base, mf({ name: 'The app, now every look', shard: 'b', run: qa.run, timeout: 15, env: qa.env }, other));
+  t(c.length === 1 && c[0].removed, 'a renamed check reads as the old name removed', c.map((x) => x.what).join('; '));
+  t(manifestChanges('not json', base).length === 0 && manifestChanges(base, '{').length === 0, 'a manifest that does not parse is another check\'s to refuse');
   return failed;
 }
 

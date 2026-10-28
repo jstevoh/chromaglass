@@ -21,9 +21,9 @@
  * frame loop: the macOS runner, in checks.yml.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, presentsInXvfb } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery } from './frame.mjs';
+import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4343;
 const checks = [];
@@ -39,12 +39,14 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise(r => setTimeout(r, 2500));
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', e => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
-  await page.waitForTimeout(8000);
+  await settlePlate(page, 8000);
+  await waitForEngine(page);
 
   const dot = page.locator('[data-testid=dot-rec]');
   const stored = () => page.evaluate(() => new Promise((res) => {
@@ -56,7 +58,12 @@ try {
     };
     r.onerror = () => res([]);
   }));
-  const note = async () => (await page.locator('[data-testid=performance-note]').textContent({ timeout: 3000 }).catch(() => null)) ?? '';
+  // The note is a toast that comes when the take's save has landed and goes in a few seconds. In
+  // software (PLAN.md 19l) the save waits behind a plate that steps at 0.4 a second, so the note is
+  // waited for longer; and the wait before reading the one after the first stop is the wall
+  // clock, not `settlePlate`'s steps, which would outlast the toast.
+  const noteWait = presentsInXvfb() ? 30_000 : 3000;
+  const note = async () => (await page.locator('[data-testid=performance-note]').textContent({ timeout: noteWait }).catch(() => null)) ?? '';
 
   // 0. There is a button to do it with, labelled, on the Perform desk: the
   //    only way in used to be an unlabelled dot (reported: "I'm not seeing
@@ -69,7 +76,7 @@ try {
   // 1. T starts one.
   await page.mouse.click(5, 5);
   await page.keyboard.press('t');
-  await page.waitForTimeout(1500);
+  await settlePlate(page, 1500);
   const liveTitle = (await dot.first().getAttribute('title')) ?? '';
   check('T starts a take, and the one Rec dot says so', /^Recording Take /.test(liveTitle), liveTitle.slice(0, 60));
   const liveLabel = (await button.first().textContent().catch(() => '')) ?? '';
@@ -83,14 +90,15 @@ try {
   const empty = await note();
   await page.evaluate(() => localStorage.setItem('chromaglass-record-choice', JSON.stringify({ video: false, take: true })));
   await page.reload({ waitUntil: 'load' });
-  await page.waitForTimeout(8000);
+  await settlePlate(page, 8000);
+  await waitForEngine(page);
   await page.mouse.click(5, 5);
   await page.keyboard.press('r');
-  await page.waitForTimeout(1200);
+  await settlePlate(page, 1200);
   const viaR = (await dot.first().getAttribute('title').catch(() => '')) ?? '';
   check('with Take chosen, R starts a take and nothing else', /^Recording Take /.test(viaR), viaR.slice(0, 50));
   await page.keyboard.press('r');
-  await page.waitForTimeout(800);
+  await settlePlate(page, 800);
   check('and R stops it', (await dot.count()) === 0);
   await page.evaluate(() => localStorage.removeItem('chromaglass-record-choice'));
 
@@ -100,11 +108,11 @@ try {
     /Nothing was painted/.test(empty) && none.length === 0, `"${empty}", ${none.length} stored`);
 
   // 3. Painted and stopped.
-  await page.waitForTimeout(4500);
+  await settlePlate(page, 4500);
   const canvas = await page.$('canvas');
   const box = await canvas.boundingBox();
   await page.keyboard.press('t');
-  await page.waitForTimeout(500);
+  await settlePlate(page, 500);
   await page.keyboard.press('d');
   await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.5);
   await page.mouse.down();
@@ -113,10 +121,10 @@ try {
     await page.waitForTimeout(50);
   }
   await page.mouse.up();
-  await page.waitForTimeout(500);
+  await settlePlate(page, 500);
   await page.keyboard.press('t');
   const kept = await note();
-  await page.waitForTimeout(800);
+  await settlePlate(page, 800);
   const saved = await stored();
   check('painted and stopped, it is kept with what was painted',
     /Performance kept/.test(kept) && saved.length === 1 && saved[0].n >= 3,

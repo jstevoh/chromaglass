@@ -21,7 +21,7 @@ import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import { ToolGlyph } from '../ui/ToolGlyph';
-import { Bottle, LiveBottle } from '../ui/Playful';
+import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
 
@@ -329,7 +329,7 @@ function CuesBody({ p }: { p: DeskProps }) {
                       data-testid={`perform-saved-${l.id}`}
                       data-state={state}
                     >
-                      <span className="h-4 w-4 shrink-0 rounded-sm" style={{ background: l.swatch }} />
+                      <SlideMount swatch={l.swatch} size={20} />
                       <span className={`truncate text-[13px] ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{l.name}</span>
                     </button>
                     {state === 'live' ? <Tag tone="live">live</Tag> : state === 'next' ? <Tag tone="next">next</Tag> : null}
@@ -477,7 +477,7 @@ function RidesBody({ p }: { p: DeskProps }) {
       */}
       <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
         {!mixerOut && <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
-        <Button full height={40} onClick={p.onOpenSettings} testId="open-all-settings">All settings…</Button>
+        <Button full height={40} onClick={p.onOpenSettings} testId="open-all-settings-rides">All settings…</Button>
       </div>
       <div className="flex shrink-0 gap-2 p-3">
         <Button full height={40} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
@@ -566,7 +566,7 @@ function RecipeBody({ p }: { p: DeskProps }) {
         the fold (the Mac's `qa` checks it is on screen).
       */}
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
-        {!ridesOut && <Button full height={32} onClick={p.onOpenSettings} testId="open-all-settings">All settings…</Button>}
+        {!ridesOut && <Button full height={32} onClick={p.onOpenSettings} testId="open-all-settings-bench">All settings…</Button>}
         <Button
           height={32}
           pressed={!!p.settings.macroMode}
@@ -1061,6 +1061,9 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
     case 'score': return p.score ? <SongScore {...p.score} /> : null;
+    case 'songs': return p.screens.songs;
+    case 'sequences': return p.screens.sequences;
+    case 'player': return p.screens.player;
   }
   const spec = PANEL_BY_ID.get(id);
   if (!spec) return null;

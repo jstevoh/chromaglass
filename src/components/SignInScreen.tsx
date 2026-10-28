@@ -14,6 +14,8 @@ import {
 } from '../lib/firebaseAuth';
 import { hasEmailSignInLink } from '../lib/authFlag';
 import { getMarketingOptIn, setMarketingOptIn } from '../lib/tierGates';
+import { isDesktopApp } from '../lib/platform';
+import { openSignInInBrowser } from '../lib/macApp';
 
 interface SignInScreenProps {
   onSignedIn: () => void;
@@ -52,7 +54,17 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   const [marketingOptIn, setMarketingOptInState] = useState(() => getMarketingOptIn());
   // The email panel has two ways in: the emailed link (what it was, and still
   // the one a returning link lands on) and a password (PLAN 23.10e).
-  const [method, setMethod] = useState<'link' | 'password'>('link');
+  //
+  // In the Mac app (PLAN.md 23.17d) the password comes first, because it is
+  // the one way that finishes in the app's own window. Google refuses to sign
+  // in inside an embedded browser, and the app opens any outside address in
+  // the real browser (desktop/main.js), so its popup never comes back; the
+  // emailed link opens in the browser too. Both still work: they finish in the
+  // browser, on the app's own server, which hands the licence to the app (the
+  // gate, AppLicenceGate.tsx, sees it arrive).
+  const inApp = isDesktopApp();
+  const [inBrowser, setInBrowser] = useState(false);
+  const [method, setMethod] = useState<'link' | 'password'>(inApp ? 'password' : 'link');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -176,7 +188,11 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
           <button
             type="button"
             data-cg-signin-provider="google.com"
-            onClick={() => handleProvider('google.com')}
+            onClick={() => {
+              if (!inApp) { void handleProvider('google.com'); return; }
+              openSignInInBrowser();
+              setInBrowser(true);
+            }}
             className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15 active:bg-white/20"
           >
             <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -189,8 +205,13 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
                 d="M12.18 22c4.32 0 7.95-1.43 10.6-3.88l-5.18-3.62c-1.43.96-3.26 1.53-5.42 1.53-4.17 0-7.7-2.81-8.96-6.6H-2.1v3.73C.54 18.4 5.94 22 12.18 22z"
               />
             </svg>
-            <span>Continue with Google</span>
+            <span>{inApp ? (inBrowser ? 'Finish in your browser…' : 'Continue with Google in your browser') : 'Continue with Google'}</span>
           </button>
+          {inApp && (
+            <p data-cg-signin-in-browser="" className="text-center text-[11px] leading-snug text-neutral-400">
+              Google's sign-in and the emailed link finish in your browser. This window opens the show by itself once you have signed in there.
+            </p>
+          )}
 
           {APPLE_SIGN_IN && (
             <button

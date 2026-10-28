@@ -21,6 +21,33 @@ The site inside is the one from the day it was built. Every change still lands o
 the website first; a release (below) brings it to the app, and an installed app
 finds the release by itself.
 
+## What it opens on: a Home or Pro licence
+
+The app opens the show only with a ChromaGlass Home or Pro licence on the Mac
+(PLAN.md 23.17d); the website stays the free tier. The first start shows a door
+(`src/components/AppLicenceGate.tsx`):
+
+- **Sign in** with the account the licence was bought with. Email and password
+  finish in the app's window. Google, and the emailed link, finish in the real
+  browser on the app's own server (`http://localhost:3000/show?macSignIn=1`):
+  that tab fetches the account's key and files it with the app's server, and the
+  app's window, which watches the server, opens by itself.
+- A new password account is asked to **confirm its email** first (the licence
+  Worker hands keys only to a confirmed address).
+- An account with no licence gets **Buy Home** and **Buy Pro** (the store, in the
+  browser) and *I have bought it: check again*.
+- **Have a licence key?** takes a `cg1.` key typed in, checked offline.
+
+Once a key is on the Mac it is verified against its signature at every start, with
+no network and no time limit: a gig with no Wi-Fi opens like any other night. When
+the app is online and signed in it asks the account again; a key the account no
+longer holds (refunded) leaves the Mac at the next start, never in the middle of a
+show. Home and Pro unlock what they unlock on the website.
+
+The packed app always asks. From the repo (`npm run app`) it asks only with
+`CHROMAGLASS_REQUIRE_SIGNIN=1`, so working on the app needs no key. A key for a
+terminal show is still `CHROMAGLASS_LICENSE_KEY=cg1.… npm run show`.
+
 ## Getting the app
 
 **The download.** The newest release is always at
@@ -113,7 +140,12 @@ as repository secrets (Settings → Secrets and variables → Actions):
 
 With them the workflow signs with the hardened runtime and notarizes; without them
 (and on every pull request from a fork) it signs ad hoc, which is what lets an Apple
-silicon Mac open it at all. The first signed release is also the first that can
+silicon Mac open it at all. Notarising adds a wait on Apple's notary service to
+every signed run, from a few minutes to over half an hour (the first ones, on
+2026-10-27, took about 30), which is why the build job allows 75 minutes. The
+`.p12` and its key are kept off the repository; lose them and a new Developer ID
+certificate is made on developer.apple.com and the two `CSC_` secrets replaced.
+The first signed release is also the first that can
 update itself in place; apps installed from ad hoc releases keep offering the
 download, once more, and update in place from then on.
 

@@ -1061,6 +1061,8 @@ export class WebGPUFluid {
   private phaseMuT: GPUTexture | null = null;
   /** The ferrofluid blurred once a step (phaseBlur), for phaseCompress's edge normal. */
   private phaseBlurT: GPUTexture | null = null;
+  /** The ferrofluid's own phase velocity (phaseVelocity), for phaseAdvect and phaseCompress on a thin gap. */
+  private phaseVelT: GPUTexture | null = null;
   /*
     The ferrofluid standing up under a close magnet (standing.ts, PLAN §9t):
     the film, made the first time a magnet is that close, and the window the
@@ -1155,6 +1157,8 @@ export class WebGPUFluid {
       // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
       ['addSlosh', [VEL], false],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
+      ['dampGridCurv', [dye], true],
+      ['dampGridLimit', [dye], true],
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
       ['jacobi', [VEL, dye], true],
@@ -1264,6 +1268,7 @@ export class WebGPUFluid {
       ['phaseMu', [RG32], open.phase],
       ['phaseCH', [R32], open.phase],
       ['phaseCHVolume', [R32], open.phase && open.thinGap],
+      ['phaseVelocity', [VEL], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
       ['phaseMomentum', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
@@ -1594,6 +1599,9 @@ export class WebGPUFluid {
     return this.phaseGap;
   }
 
+  /** The ferrofluid's carry velocity on a thin gap (phaseVelocity), or the mixture's off it. */
+  private phaseVel(thin = true): GPUTexture { return thin && this.phaseVelT ? this.phaseVelT : this.ride(); }
+
   /**
    * phaseAdvect: runPressed's bindings, then the gap, the gap the phase last
    * saw, and the thin solve's pressure and mobility (a stand-in for each until
@@ -1603,7 +1611,14 @@ export class WebGPUFluid {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
     if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
-    const ride = this.ride();
+    /*
+      The ferrofluid's own velocity only on a step that wrote it: hsP and
+      hsMob outlive Thin Gap, so keyed off them alone, a plate whose Thin Gap
+      was switched off kept carrying the ferrofluid on the last thin step's
+      phaseVelT, frozen (a dragged drop, magnet off, slid on 0.0425 of the
+      plate in 120 steps and smeared to no half-full cell; PLAN 29c-8).
+    */
+    const ride = this.phaseVel(thin && this.thinLive);
     const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}:${ride.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1626,7 +1641,7 @@ export class WebGPUFluid {
   private runPhaseCompress(pass: GPUComputePassEncoder, stand: GPUTexture, args: GPUBuffer): void {
     const pipe = this.pipeline('phaseCompress', this.phase.write.format);
     if (!pipe) return;
-    const reads = [this.phase.read, this.phaseBlurT!, this.ride(), this.squeeze.read, stand];
+    const reads = [this.phase.read, this.phaseBlurT!, this.phaseVel(), this.squeeze.read, stand];
     const key = `phaseCompress:${this.phase.write.label}:${reads.map((r) => r.label).join(',')}:${args.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1663,13 +1678,13 @@ export class WebGPUFluid {
     pass.setBindGroup(0, group);
     pass.dispatchWorkgroups(1);
     const gap = this.ensurePhaseGap();
-    const there = this.phase.read, back = this.phase.write;
+    const there = this.phase.read, back = this.phase.write, ride = this.phaseVel();
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
       const a = this.arg(`phase advect plan ${j}`, [1, j, 0, REST_GAP, 0, disp, 1, 0]);
-      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.ride().label}`;
+      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${ride.label}`;
       let ga = this.groups.get(ka);
       if (!ga) {
-        ga = bindGroup(this.device, adv, [this.sim, a, there, this.ride(), back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
+        ga = bindGroup(this.device, adv, [this.sim, a, there, ride, back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
         this.groups.set(ka, ga);
       }
       pass.setPipeline(adv);
@@ -2980,13 +2995,15 @@ export class WebGPUFluid {
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
-      this.run(pass, 'dampGrid', this.dye.write, [this.dye.read], k);
-      this.dye.swap();
+      const damp = (field: PingPong) => {
+        this.run(pass, 'dampGridCurv', this.scratchA, [field.read], k);
+        this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
+        this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
+        field.swap();
+      };
+      damp(this.dye);
       // The oil's share has the same grid in it, from the same faces.
-      if (bodiesOn) {
-        this.run(pass, 'dampGrid', this.oilDye!.write, [this.oilDye!.read], k);
-        this.oilDye!.swap();
-      }
+      if (bodiesOn) damp(this.oilDye!);
     }, gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
@@ -3064,6 +3081,23 @@ export class WebGPUFluid {
         as lines every other cell through the black.
       */
       const grid = this.arg('phase grid', [0, 0, 0, 0]);
+      /*
+        Two-phase carry on the thin gap (phaseVelocity in wgsl/fluid.ts,
+        PLAN 29c-8): reconstructs the coherent drop's ferrofluid velocity
+        at the trailing rim so the oil's dipole return flow cannot sweep it
+        backward into the wake, while stepping aside when a labyrinth or
+        standing-spike field parts the pool into narrow valleys.
+      */
+      if (thin) {
+        if (!this.phaseVelT) {
+          this.phaseVelT = this.disposer.track(this.device.createTexture({
+            label: 'phase vel', size: [this.N, this.N], format: VEL,
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+          }));
+        }
+        const cohere = !this.filmHeld ? Math.max(0, 1 - 2 * maze) * (1 - spikeAmt) : 0;
+        this.run(pass, 'phaseVelocity', this.phaseVelT, [this.ride(), this.phase.read], this.arg('phase vel', [cohere, 0, 0, 0]));
+      }
       /*
         Carried as a volume, in as many substeps as the step's flow needs,
         never fewer than these (phasePlan in wgsl/fluid.ts, and why: a kick's

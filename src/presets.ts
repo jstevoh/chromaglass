@@ -1809,7 +1809,9 @@ export const PRESETS: Preset[] = [
       stockGrain: 0.6,
       stockWeave: 1.2,
       stockGate: 0.5,
-      lampWarmth: 0.45,
+      // 3 is 3560 K, a Super 8 projector's lamp (3200 to 3400 K, the lamp the film was made to be shown by). Not the slider's
+      // end: the tint is the full blackbody ratio, which a camera sees and a room-adapted eye would see less of (PLAN 35e-3).
+      lampWarmth: 3,
       dishVignette: 0.3,
       hueJourney: 2,
       /*

@@ -1855,3 +1855,88 @@ after the sound stops, a cap that is red when the room is lit, a ring that turns
 moves with reduced motion on (the reels and ring stop and the needle shows the number instead), or a violet
 or red that is not "on" or "live". Decide too: the VU dial is the plate's own 0 to 100 volume, not decibels
 (PLAN 35f-2).
+
+## 82. Looks as slides in a tray (PLAN 35g)
+
+On the desk and the phone:
+
+1. Click the preset name at the top left. Every look in the menu is a small square slide: cardboard mount, one
+   clipped corner, a landscape window with the look's two colours on the film. The slide is the same cardboard
+   on every row; the look you are on keeps its violet row, nothing about the slide itself changes colour.
+2. Open the set list. Each row is a slide where the little colour square was. Cue a look: the cue bar shows the
+   one on stage as a slide, a round tray to its left, and the cued one as a slide behind the arrow.
+3. Press Go. The tray clicks one slot, a quick turn with a small overshoot, and settles; nothing else moves.
+   Go to a look earlier in the list and it clicks back; to a look far away and it still clicks only one slot.
+4. On the phone: the look button at the top shows the slide, the look's name and a small tray that clicks
+   when the look changes. The Looks sheet lists slides. On the Play screen the Looks strip is a row of slides
+   you flick; each flick stops on one slide (it cannot coast past several), the one up has the violet ring and
+   its name in the lit chip, and the tray beside "Looks" clicks when you tap one.
+5. With reduced motion on, the tray does not turn.
+
+Bad: a slide whose mount turns violet or red, a tray that spins freely or turns on the beat, a strip that
+coasts past slides, a ring clipped at the slide's corner, a click that is a slide-sized jump of the layout, or a
+tray on a screen that shows no look. Decide too: ten slots on the drum, a real tray has eighty (PLAN 35g-2).
+
+
+## 83. The Mac app opens only on a Home or Pro licence (PLAN 23.17d)
+
+After the next Mac release (Actions → Mac app → Run workflow, release ticked), on a Mac:
+
+1. Install the new app over the old one and open it. If this Mac already had a key, the show opens at once,
+   with no screen in front of it. Otherwise a sign-in screen is drawn where the plate would be, and nothing
+   plays behind it.
+2. Sign in with the email and password of an account that has bought nothing. The screen asks you to confirm
+   your email if the account is new, then offers Buy Home and Buy Pro. The show does not open.
+3. Sign out, and choose Continue with Google. Your own browser opens on the app's address (localhost), you
+   sign in there, that tab says you can go back to the app, and the app's window opens the show by itself
+   within a few seconds. The tier in the profile sheet is the one you bought.
+4. Quit, turn Wi-Fi off and open the app again. It still opens straight to the show.
+5. With the app open, open `http://localhost:` and the app's port in Chrome on the same Mac. Chrome shows the
+   same sign-in screen, not the show.
+
+Bad: the show visible for a frame before the sign-in screen, a Google sign-in that opens inside the app's
+window and is refused, a browser tab that signs in but the app never notices, a licensed app that asks again
+with Wi-Fi off, or Chrome on localhost playing the show free. Decide too: offline, a refunded key keeps working
+until the app next goes online (no grace period, PLAN 23.17h).
+
+## 84. Home Movie on a Super 8 lamp, and the warm end as bright as the white (PLAN 35e-4)
+
+1. Open Home Movie. It should now be the amber of a home-movie projector, lamp reading 3560 K (Settings, Lamp &
+   Light), with orange and coral held and the teal gone dark and quiet, not a brown wash.
+2. Drag Lamp Warmth from 1 to the end on any look. The picture should change colour and not get darker; before, it
+   lost a third of its light by the end. Exposure still dims it if you want a dim lamp.
+3. Bad: a bright red or coral that goes flat and clipped at the warm end (the red is multiplied up to 1.36 at Home Movie, 1.48 at the end), a step
+   in brightness at 1, or Velvet Underground, Lucky or any look under 1 that changed.
+4. Decide: is 3 (3560 K) the right amber for Home Movie, or the full 3.75 (3200 K)? And is the red clipping on
+   hot reds acceptable, or should the end hold only half the brightness back?
+
+## 85. The colour cartoons (PLAN 14ac, 14ac-4)
+
+Five cartoons in colour on the Cartoons shelf (the desk's Dye panel, the phone's dye sheet), marked "colour":
+Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Travels.
+
+1. **Pour** Jack Frost on Classic, then on a pale look. The dye should be the picture's own colours (the blues of
+   the winter forest, the orange of the autumn), not grey.
+2. **Film** Balloon Land and Fiddlesticks with Film Mix at its default and at full. Fiddlesticks is a two-colour
+   print, orange and teal with no true blue or yellow; say whether it reads as a feature of the plate or as a
+   brown wash (14ac-5).
+3. **Gulliver's Travels** is 74 minutes. Pick it on the phone over mobile data: it should start within a few
+   seconds and not stall, since the file streams. Say whether a feature is wanted on the shelf at all (14ac-6).
+4. Bad: a colour cartoon that pours grey, Pour or Film that does not start on a colour one, or a picture so
+   muddy at 384 px that you cannot tell what it is.
+5. Decide: do you want the palette to tint them (Film's grade can already), and is there a colour cartoon you
+   expected that is not here?
+
+## 86. The tabs across the top are yours (PLAN 8-tabs)
+
+1. Open the desk on a laptop. The chips should read Perform, Sequence, Setup, with a pencil beside them. Perform has
+   the set list, bottles, rides, dyes, tools and the knobs Build had; Sequence the set list, Songs, Sequences and the
+   score; Setup the controller, Sound, Music & Drone, the Wall and Mapping.
+2. Press the pencil. Rename Setup to the venue's name, move it first, add a New tab and put two panels on it with
+   + Panel, then reload: all of it should come back as you left it. Delete the new tab (two presses), and "Put the
+   shipped tabs back" puts the three back.
+3. On the phone: More › Tabs shows the same three, each tab's panels stacked; Setup's Wall and Sound draw in place,
+   Perform's bottles and set list are buttons to the phone's own Dye and Looks sheets.
+4. Bad: a control you used under Build, Gig, Load-in, Sequence or Sound that you cannot find now on any tab or in
+   + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
+5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?

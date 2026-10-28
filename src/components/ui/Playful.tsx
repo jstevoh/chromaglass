@@ -4,6 +4,8 @@ import { FORM_S, dripFallFor } from '../../lib/dripPace';
 import { HUB_CM, reelsAt } from '../../lib/tapeReels';
 import { VU_FULL, VU_RED_FROM, needleAtRest, needleDeg, stepNeedle } from '../../lib/vuMeter';
 import { strobeOf } from '../../lib/strobeRing';
+import { shownRoom } from '../../lib/dyeTarget';
+import { NOTCH_MM, MOUNT_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_W, stepOf, trayDeg } from '../../lib/slideTray';
 import type { TempoReading } from '../../lib/tempo';
 
 /*
@@ -11,7 +13,8 @@ import type { TempoReading } from '../../lib/tempo';
   what is left of the Dye Budget, a drop that lets go at the pace of the
   carrier's viscosity, a bulb whose filament glows the colour of the
   temperature the Lamp Warmth grade matches, and the show hardware (tape
-  reels, a tap pad, a VU needle, a lens cap, a strobe ring). Each moves only inside its own few pixels, and
+  reels, a tap pad, a VU needle, a lens cap, a strobe ring) and the looks (a slide
+  mount and the round tray that clicks one slot when the look changes, 35g). Each moves only inside its own few pixels, and
   stands still under reduced motion (index.css). Colour says where, never
   whether: the drop and the bottle's outline take the control's own text colour,
   so violet stays "on" and red stays "live".
@@ -67,17 +70,14 @@ export function Bottle({ colour, level, tipped = false, height = 20, testId }: {
 /**
  * The reading `read` gives, polled while mounted: how much of the Dye Budget is
  * left. Only the picked bottle asks, a few times a second, and it re-renders
- * only when the level moves a twentieth, so a plate at rest costs nothing and
- * nothing above it re-renders (`npm run renders`).
+ * only when the level moves a twentieth past a wobble (`shownRoom`), so a
+ * plate at rest costs nothing and nothing above it re-renders (`npm run renders`).
  */
 export function useDyeRoom(read: (() => number) | undefined): number {
   const [room, setRoom] = useState(1);
   useEffect(() => {
     if (!read) return;
-    const poll = () => {
-      const v = Math.round(Math.max(0, Math.min(1, read())) * 20) / 20;
-      setRoom(prev => (prev === v ? prev : v));
-    };
+    const poll = () => { const r = read(); setRoom(prev => shownRoom(prev, r)); };
     poll();
     const id = setInterval(poll, 400);
     return () => clearInterval(id);
@@ -436,6 +436,70 @@ export function StrobeRing({ mode, rpm, beats, bpm, size = 40 }: { mode: number;
       </g>
       <circle cx="20" cy="20" r="9" fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth="1.2" />
       <circle cx="20" cy="20" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+// ── Slide mount and tray ─────────────────────────────────────────────
+
+/** Cardboard, the colour of an unprinted Kodak mount; one colour on every look, so it says only "a slide". */
+const MOUNT_COLOUR = '#cfc9ba';
+
+/**
+ * A look as a 35 mm slide (lib/slideTray.ts has the proportions): a square
+ * cardboard mount with one clipped corner and a landscape window with the
+ * look's own palette on the film. The mount never changes colour for state;
+ * the row or tile around it carries lit and live as it did before.
+ */
+export function SlideMount({ swatch, size = 24, className = '' }: { swatch: string; size?: number; className?: string }) {
+  const n = NOTCH_MM / MOUNT_MM * 100;
+  return (
+    <span
+      aria-hidden
+      className={`relative inline-block shrink-0 ${className}`}
+      style={{ width: size, height: size, background: MOUNT_COLOUR, clipPath: `polygon(0 ${n}%, ${n}% 0, 100% 0, 100% 100%, 0 100%)` }}
+    >
+      <i
+        className="absolute"
+        style={{
+          left: `${(1 - WINDOW_W) / 2 * 100}%`, top: `${(1 - WINDOW_H) / 2 * 100}%`,
+          width: `${WINDOW_W * 100}%`, height: `${WINDOW_H * 100}%`,
+          background: swatch, boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.5)',
+        }}
+      />
+    </span>
+  );
+}
+
+/**
+ * The round tray from above: slots round a drum, the one at the gate marked
+ * and fixed at the top. `at` is the look's place in its list; when it moves,
+ * the drum clicks one slot the way it moved (stepOf), with a small overshoot
+ * and settle (index.css), and nothing else on the screen moves. It holds
+ * only how many pushes it has had, so there is no timer and no loop.
+ */
+export function SlideTray({ at, size = 28 }: { at: number | null; size?: number }) {
+  const prev = useRef(at);
+  const [clicks, setClicks] = useState(0);
+  useEffect(() => {
+    const d = stepOf(prev.current, at);
+    prev.current = at;
+    if (d) setClicks(c => c + d);
+  }, [at]);
+  const deg = trayDeg(clicks);
+  const slot = (i: number) => {
+    const a = i * SLOT_DEG;
+    return <rect key={i} x={12.7} y={2.4} width={2.6} height={4.6} rx={0.6} transform={`rotate(${a} 14 14)`} fill="currentColor" opacity={0.38} />;
+  };
+  return (
+    <svg viewBox="0 0 28 28" width={size} height={size} aria-hidden className="shrink-0" data-testid="slide-tray" data-clicks={clicks} data-deg={deg}>
+      <circle cx={14} cy={14} r={13} fill="none" stroke="currentColor" strokeWidth={1.1} opacity={0.7} />
+      <g className="cg-tray" style={{ transform: `rotate(${deg}deg)`, transformOrigin: '14px 14px' }}>
+        <circle cx={14} cy={14} r={3.2} fill="none" stroke="currentColor" strokeWidth={1} opacity={0.7} />
+        {Array.from({ length: TRAY_SLOTS }, (_, i) => slot(i))}
+      </g>
+      {/* The gate: fixed at the top, the slot that is in the light. */}
+      <rect x={12.4} y={1.6} width={3.2} height={6} rx={0.7} fill="none" stroke="currentColor" strokeWidth={1.2} />
     </svg>
   );
 }

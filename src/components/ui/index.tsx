@@ -7,6 +7,7 @@ import { helpFor } from '../../lib/controlHelp';
 import { useControlTip } from './ControlTip';
 import { groupOfSetting, paceOf } from '../../lib/settingsMap';
 import { Hare, PaceTrack, Snail } from './Pace';
+import { SlideMount } from './Playful';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -165,9 +166,9 @@ export function Segmented<T extends string>({
    */
   compact?: boolean;
   /**
-   * A hairline before this option: the desk's layouts (Build, Gig, Load-in)
-   * are one kind of thing and Sequence another, and the design keeps them in
-   * one switch with a rule between.
+   * A hairline before this option, for a switch whose options are two kinds
+   * of thing kept in one row with a rule between (the desk's layouts and its
+   * Sequence screen were, before the tabs were the owner's).
    */
   divideBefore?: T;
   /** Narrower items, for a header that has to fit at 1024. */
@@ -944,7 +945,7 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
       className={`group flex h-12 w-full items-center gap-3 rounded-md border px-2.5 text-left transition-colors duration-[120ms] ${shell} ${hit ? MIDI_HIT : ''}`}
     >
       <span className="w-5 shrink-0 font-mono text-[12px] text-faint">{String(index).padStart(2, '0')}</span>
-      <span className="h-6 w-6 shrink-0 rounded-sm" style={{ background: swatch }} />
+      <SlideMount swatch={swatch} size={28} />
       <span className={`flex-1 truncate text-[13px] font-medium ${state === 'idle' ? 'text-text-2' : 'text-text'}`}>{name}</span>
       {trailing}
     </button>
@@ -953,8 +954,20 @@ export function CueRow({ index, name, swatch, state, trailing, onClick, onDouble
 
 // ── Sheet ────────────────────────────────────────────────────────────
 
-export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right' }: {
+const NOOP = () => {};
+
+export function Sheet({ title, onClose, children, width = 720, height = 640, testId, docked = false, dockSide = 'right', embed = false }: {
   title: ReactNode; onClose: () => void; children: ReactNode; width?: number; height?: number; testId?: string;
+  /**
+   * Drawn inside a desk panel rather than over the window: no scrim, no
+   * title bar (the panel has its own), the body filling the panel. For the
+   * screens a tab can hold (Songs, Sequences, Music & Drone). A container
+   * for `@container` queries, so a body laid out in columns for the sheet's
+   * width can stack them in a column a third as wide. Its test id is the
+   * sheet's with `-box`, so a panel and the sheet open over it are never
+   * one control under two hands.
+   */
+  embed?: boolean;
   /** Which edge a docked sheet lies against: the side of the panel that opened it. */
   dockSide?: 'left' | 'right';
   /**
@@ -967,7 +980,15 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
   docked?: boolean;
 }) {
   // Listened for once: an effect keyed on onClose could drop the key (useEscape).
-  useEscape(onClose);
+  // An embedded one is a panel, which Escape does not close.
+  useEscape(embed ? NOOP : onClose);
+  if (embed) {
+    return (
+      <div className="@container flex h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden" data-testid={testId ? `${testId}-box` : undefined}>
+        {children}
+      </div>
+    );
+  }
   return (
     <div
       className={docked
@@ -990,7 +1011,7 @@ export function Sheet({ title, onClose, children, width = 720, height = 640, tes
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
           </button>
         </div>
-        <div className="flex min-h-0 flex-1">{children}</div>
+        <div className="@container flex min-h-0 flex-1">{children}</div>
       </div>
     </div>
   );

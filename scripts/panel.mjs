@@ -55,10 +55,11 @@ import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
 import { HALOGEN_KELVIN, LAMP_WARMTH_MAX, LEGACY_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, kelvinLabel, lampTint, warmthKelvin } from '../src/lib/lampKelvin.ts';
 import { dripFallSeconds, FALL_THIN_S } from '../src/lib/dripPace.ts';
 import { THICK_NU, WATER_NU } from '../src/lib/turntable.ts';
-import { dyeRoomOf } from '../src/lib/dyeTarget.ts';
+import { dyeRoomOf, shownRoom } from '../src/lib/dyeTarget.ts';
 import { FULL_CM, HUB_CM, TAPE_CM_PER_S, TAPE_SECONDS, reelsAt } from '../src/lib/tapeReels.ts';
 import { VU_FULL, needleAtRest, needleDeg, stepNeedle } from '../src/lib/vuMeter.ts';
 import { MAX_DOTS, strobeOf } from '../src/lib/strobeRing.ts';
+import { MOUNT_MM, NOTCH_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_H_MM, WINDOW_W, WINDOW_W_MM, stepOf, trayDeg } from '../src/lib/slideTray.ts';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
@@ -1894,6 +1895,13 @@ check('and neither starts over the limit',
   }
   check('from 0 to 1 the tint is the old grade to 1.5% a channel, so every saved look keeps its colour',
     worstLegacy < 0.015, `worst ${(worstLegacy * 100).toFixed(2)}% over 21 notches`);
+  // A lamp's colour does not set its brightness: past the old end the tint keeps the luminance it has at 1, and
+  // 0 to 1 (the saved looks) is left alone.
+  const lum = t => 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2];
+  let worstHold = 0;
+  for (const w of steps.filter(w => w >= 1)) worstHold = Math.max(worstHold, Math.abs(lum(lampTint(w)) / lum(lampTint(1)) - 1));
+  check('past the old end of the travel the lamp keeps the picture\'s brightness, so the halogen end is not a third dimmer',
+    worstHold < 1e-9 && lum(lampTint(LAMP_WARMTH_MAX)) > 0.9, `luminance ${lum(lampTint(1)).toFixed(3)} at 1, ${lum(lampTint(2)).toFixed(3)} at 2, ${lum(lampTint(LAMP_WARMTH_MAX)).toFixed(3)} at ${LAMP_WARMTH_MAX}, worst drift ${worstHold.toExponential(1)}`);
   // The vignette blends as it always did (1 - w + w*g*vig), not tint times a second blend: the review found 6% in the corners.
   const shaderForm = /tint - \(tint - vec3f\(1\.0 - min\(U\.lampWarmth, 1\.0\)\)\) \* \(1\.0 - vig\)/.test(plateWgsl);
   let worstCorner = 0;
@@ -1928,6 +1936,26 @@ check('and neither starts over the limit',
   check('the bottle is full on an empty plate, half at half the target, empty at it, and never past either',
     dyeRoomOf(0, 0.85) === 1 && Math.abs(dyeRoomOf(0.425, 0.85) - 0.5) < 1e-12 && dyeRoomOf(0.85, 0.85) === 0 &&
     dyeRoomOf(3, 0.85) === 0 && dyeRoomOf(NaN, 0.85) === 1);
+  /*
+    What the bottle re-renders for. A plate at rest reads a level that wobbles by
+    a few thousandths (the Mac's read-back mean); on a rounding boundary the
+    plain rounding the bottle had flipped it every other poll, and the Perform
+    desk's quiet line in `npm run renders` read the extra commits. Measured on
+    the rule itself: a wobble of 0.004 about 0.875, a boundary, over 100 polls,
+    and a drain from full to empty at a hundredth a poll.
+  */
+  {
+    const wobble = Array.from({ length: 100 }, (_, i) => 0.875 + 0.004 * Math.sin(i * 1.7));
+    const runs = (step) => { let shown = 1, n = 0; const seen = []; for (const r of wobble) { const v = step(shown, r); if (v !== shown) n++; shown = v; seen.push(v); } return { n, seen }; };
+    const rounded = runs((_, r) => Math.round(r * 20) / 20);
+    const held = runs(shownRoom);
+    let shown = 1, moves = 0;
+    for (let k = 100; k >= 0; k--) { const v = shownRoom(shown, k / 100); if (v !== shown) moves++; shown = v; }
+    check('a level wobbling on a boundary moves the bottle once, where rounding moved it on every crossing',
+      held.n === 1 && rounded.n > 10, `${held.n} moves held, ${rounded.n} rounded, over 100 polls`);
+    check('and a drain from full to empty moves it a twentieth at a time, to empty',
+      moves === 20 && shown === 0 && shownRoom(0, 1) === 1 && shownRoom(0.5, NaN) === 1, `${moves} moves, ending at ${shown}`);
+  }
   check('the visualizer answers it from the regulator\'s own target and the closeup\'s, and the desk and phone ask for it',
     /dyeRoom: \(\) => \{[\s\S]{0,420}dyeLookTarget\(f\.seedMean, st\.dyeBudget \?\? 0\.85, f\.seedBudget\)[\s\S]{0,200}macroAmountOf\(st\)/.test(panel0) &&
     (panel0app.match(/dyeRoom=\{readDyeRoom\}/g) ?? []).length === 2);
@@ -2043,6 +2071,57 @@ check('and neither starts over the limit',
   check('under reduced motion the reels do not turn, the cap does not snap and the ring does not drift',
     /@media \(prefers-reduced-motion: reduce\) \{\s*\.cg-reel \{ transform: none !important;[^}]*\}\s*\.cg-cap, \.cg-ring \{ animation: none !important; \}/.test(css) &&
     /matchMedia\?\.\('\(prefers-reduced-motion: reduce\)'\)/.test(ui));
+}
+
+// ── Looks as slides in a tray (PLAN 35g) ───────────────────────────────
+//
+// A look is a 35 mm slide and the stage takes one at a time from a round tray
+// that clicks one slot. Held to the real mount (2 x 2 in, a 24 x 36 mm frame
+// shown through a 22.5 x 34 mm aperture), to the changer's one slot a push
+// whatever the distance, and to every place a look is shown.
+{
+  const read = (f) => readFileSync(join(root, f), 'utf8');
+  const ui = read('src/components/ui/Playful.tsx');
+  const uiIndex = read('src/components/ui/index.tsx');
+  const css = read('src/index.css');
+  const cueSrc = read('src/components/CueBar.tsx');
+  const menuSrc = read('src/components/PresetMenu.tsx');
+  const deskPanelsSrc = read('src/components/desk/DeskPanels.tsx');
+  const playSrc = read('src/components/phone/PhonePlay.tsx');
+  const stageSrc = read('src/components/phone/PhoneStage.tsx');
+
+  check('the mount is square, its aperture is the 3:2 of a 35 mm frame and sits inside it, and one corner is clipped',
+    MOUNT_MM === 50 && Math.abs(WINDOW_W / WINDOW_H - 3 / 2) < 0.02 && WINDOW_W_MM < MOUNT_MM && WINDOW_H_MM < WINDOW_W_MM && WINDOW_W < 1 && NOTCH_MM > 0 && NOTCH_MM < MOUNT_MM / 4,
+    `${WINDOW_W_MM} x ${WINDOW_H_MM} mm in ${MOUNT_MM} mm, ratio ${(WINDOW_W / WINDOW_H).toFixed(3)}`);
+  check('the tray has whole slots round it, so a click always lands one in the gate',
+    Number.isInteger(TRAY_SLOTS) && Math.abs(SLOT_DEG * TRAY_SLOTS - 360) < 1e-9 && Math.abs(trayDeg(TRAY_SLOTS) - 360) < 1e-9, `${TRAY_SLOTS} slots, ${SLOT_DEG} deg`);
+  // The changer moves one slot a push, whatever the distance in the list, and the first look loaded is not a change.
+  const steps = [stepOf(3, 4), stepOf(4, 3), stepOf(0, 39), stepOf(39, 0), stepOf(5, 5), stepOf(null, 7), stepOf(7, null)];
+  check('a look later in the list clicks the tray forward one slot and an earlier one back one, however far, and no change or no place clicks nothing',
+    steps.join(',') === '1,-1,1,-1,0,0,0', steps.join(','));
+  // Pushes add up on the drum: +1, -1, none, +1, -1 leaves it where it started, and a slot is SLOT_DEG.
+  let drum = 0;
+  for (const [a, b] of [[0, 5], [5, 2], [2, 2], [2, 9], [9, 1]]) drum += stepOf(a, b);
+  let drum2 = 0;
+  for (const [a, b] of [[0, 5], [5, 7], [7, 9]]) drum2 += stepOf(a, b);
+  check('the drum is the sum of its pushes: out and back leaves it home, three forward leaves it three slots on',
+    drum === 0 && trayDeg(drum) === 0 && drum2 === 3 && trayDeg(drum2) === 3 * SLOT_DEG, `net ${drum}, then ${drum2}`);
+
+  check('a look is a slide on the set list rows, the cue bar, the preset menu, the performer\'s saved list and both phone surfaces',
+    /<SlideMount swatch=\{swatch\}/.test(uiIndex) && /<SlideMount swatch=\{liveSwatch\}/.test(cueSrc) && /<SlideMount swatch=\{cuedSwatch\}/.test(cueSrc) &&
+    (menuSrc.match(/<SlideMount swatch=\{swatchOf\(p\.id\)\}/g) ?? []).length === 2 && /<SlideMount swatch=\{l\.swatch\}/.test(deskPanelsSrc) &&
+    /<SlideMount swatch=\{p\.lookSwatch\}/.test(stageSrc) && /<SlideMount swatch=\{l\.swatch\}/.test(stageSrc) && /<SlideMount swatch=\{l\.swatch\} size=\{60\}/.test(playSrc));
+  check('the tray is on the cue bar and the phone\'s look button and Looks strip, each given the look\'s place in its own list',
+    /<SlideTray at=\{liveAt\}/.test(cueSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(stageSrc) && /<SlideTray at=\{p\.lookSlot \?\? null\}/.test(playSrc) &&
+    /liveAt=\{deskLookSlot\}/.test(panel0app) && (panel0app.match(/lookSlot=\{phoneLookSlot\}/g) ?? []).length === 2);
+  check('the Looks strip flicks one slide at a time: it snaps, and every slide stops it',
+    /snap-x snap-mandatory/.test(playSrc) && /snap-start snap-always/.test(playSrc));
+  const mountFn = ui.slice(ui.indexOf('export function SlideMount'), ui.indexOf('export function SlideTray'));
+  check('the film is the look\'s own palette and the mount takes no state colour: nothing lit, live or group-coloured inside SlideMount',
+    mountFn.includes('background: swatch') && !/color-lit|color-live|accent|ring-lit|group/.test(mountFn) && /MOUNT_COLOUR = '#[0-9a-f]{6}'/i.test(ui));
+  check('the tray moves only itself, from a count of pushes: no loop, no timer, and not under reduced motion',
+    !/setInterval|requestAnimationFrame/.test(ui.slice(ui.indexOf('export function SlideTray'))) &&
+    /@media \(prefers-reduced-motion: reduce\) \{[^@]*\.cg-tray \{ transform: none !important; transition: none; \}/.test(css) && /\.cg-tray \{ transition: transform 160ms/.test(css));
 }
 
 // ── Result ──────────────────────────────────────────────────────────

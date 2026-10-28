@@ -6,10 +6,10 @@ A liquid light show you play. Colored oils squeezed between glass plates, heated
 
 | | |
 |---|---|
-| ![The Fillmore East, 1969 preset](docs/shots/fillmore-east-1969.jpg) | ![The Oil on Water preset](docs/shots/oil-on-water.jpg) |
-| *Fillmore East, 1969*: each layer its own dish on a black screen, pressed on every kick | *Oil on Water*: the photographic render, with domes, satellite droplets and real depth of field |
-| ![The Macro Bead preset](docs/shots/macro-bead.jpg) | ![The Lumia preset](docs/shots/lumia.jpg) |
-| *Macro Bead*: a tracking camera chasing a single bead at high magnification | *Lumia*: Thomas Wilfred's slow folded sheets of light |
+| ![The Poster, 1969 preset](docs/shots/poster-1969.jpg) | ![The Oil & Water preset](docs/shots/oil-and-water.jpg) |
+| *Poster, 1969*: two opaque dyes on a single plate, hard-edged and flat like a screen-printed Fillmore poster | *Oil & Water*: amber oil on teal water between two glasses, each keeping its own colour as bodies round up and merge |
+| ![The Macro Bead preset](docs/shots/macro-bead.jpg) | ![The Velvet Underground preset](docs/shots/velvet-underground.jpg) |
+| *Macro Bead*: a tracking camera chasing a single bead at high magnification | *Velvet Underground*: three pools apart on deep violet — glycerine on the mids, soap on the bass, syrup on the treble |
 
 Frames from the app itself. They were made on a machine drawing in software, so a real GPU looks better.
 
@@ -41,7 +41,7 @@ npm run build
 npm run remote       # prints the phone address and the projector address
 ```
 
-Useful commands: `npm run lint` (typecheck), `npm run wgsl` (compile every shader), `npm run check` (everything that needs no GPU, in about a minute), `npm run phone` (the phone layout). The installable Mac app and the iPhone app are built from `desktop/` and `ios/`.
+Useful commands: `npm run lint` (typecheck), `npm run wgsl` (compile every shader), `npm run quick` (the checks your change reaches, side by side), `npm run check` (every check that needs no GPU), `npm run phone` (the phone layout). The installable Mac app and the iPhone app are built from `desktop/` and `ios/`.
 
 ## Where things are
 

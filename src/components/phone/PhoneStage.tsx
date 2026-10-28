@@ -7,7 +7,7 @@ import {
   Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
-  Crosshair,
+  Crosshair, LayoutGrid, Plus,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
@@ -24,7 +24,11 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
-import { Bottle, LiveBottle, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
+import { TabStrip } from '../desk/TabStrip';
+import type { TabEdit } from '../../hooks/useDeskLayout';
+import { PANELS, PANEL_BY_ID } from '../../lib/deskLayout';
+import { SETTINGS_CATEGORIES } from '../../lib/settingsMap';
+import { Bottle, LiveBottle, SlideMount, SlideTray, StrobeRing, TapPad, TapeReels, VuMeter } from '../ui/Playful';
 
 /**
  * ChromaGlass on a phone.
@@ -77,7 +81,34 @@ export interface PhoneLook {
   swatch: string;
 }
 
-type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more';
+type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs';
+
+/**
+ * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
+ * reordered, added and taken away the same way, each tab's panels stacked in
+ * one sheet. A settings section or one of the screens (Songs, Sequences,
+ * Music & Drone) is drawn in it whole; the desk's own panels (the bottles,
+ * the set list, the rides) were built for a mouse, and the phone has its own
+ * of each, so their card opens that sheet instead.
+ */
+export interface PhoneTabs {
+  tabs: { id: string; name: string }[];
+  tab: string;
+  onTab: (id: string) => void;
+  onEdit: (e: TabEdit) => void;
+  /** The panels out on the tab that is up, in reading order. */
+  panels: string[];
+  onAdd: (id: string) => void;
+  onRemove: (id: string) => void;
+  /** A panel drawn whole, or null for one of the desk's own. */
+  render: (id: string) => ReactNode | null;
+}
+
+/** The phone's own sheet for each of the desk's own panels. */
+const OWN_SHEET: Record<string, Exclude<SheetName, 'tabs' | 'more'>> = {
+  bottles: 'dye', dyes: 'dye', tools: 'dye', cues: 'looks', recipe: 'play', rides: 'play', score: 'play', mixer: 'mix',
+};
+const SHEET_NAME: Record<string, string> = { dye: 'Dye', looks: 'Looks', play: 'Motion', mix: 'Mix', sound: 'Sound' };
 type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
 
 export interface PhoneStageProps {
@@ -86,6 +117,8 @@ export interface PhoneStageProps {
   lookSwatch: string;
   looks: PhoneLook[];
   activeLookId: string | null;
+  /** The look on stage's place in `looks`, which way the slide tray clicks (PLAN 35g). */
+  lookSlot?: number | null;
   onLook: (id: string) => void;
   onRandomLook: () => void;
   onRevert: (() => void) | null;
@@ -309,6 +342,8 @@ export interface PhoneStageProps {
   recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; choice: { video: boolean; take: boolean }; onChoice: (c: { video: boolean; take: boolean }) => void };
   onHide: () => void;
   onFullLayout: () => void;
+  /** The desk's tabs, on the phone (More → Tabs). */
+  deskTabs?: PhoneTabs;
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
   onOpenAccount?: () => void;
@@ -427,8 +462,9 @@ export function PhoneStage(p: PhoneStageProps) {
           data-testid="phone-look-button"
           aria-label="Choose a look"
         >
-          <span className="h-9 w-9 shrink-0 rounded-full border border-white/20" style={{ background: p.lookSwatch }} />
+          <SlideMount swatch={p.lookSwatch} size={36} />
           <span className="truncate text-[14px] font-medium text-text">{p.lookName ?? 'Custom'}</span>
+          <span className="shrink-0 text-muted"><SlideTray at={p.lookSlot ?? null} size={20} /></span>
           <ChevronDown size={16} className="shrink-0 text-muted" />
         </button>
         <div className="pointer-events-auto flex shrink-0 items-center gap-1 rounded-full border border-border-strong bg-black/55 p-0.5 backdrop-blur-xl">
@@ -898,7 +934,7 @@ export function PhoneStage(p: PhoneStageProps) {
                       data-testid={`phone-look-${l.id}`}
                       className={`flex min-h-[56px] items-center gap-3 rounded-lg border px-2 text-left ${on ? LIT : 'border-transparent active:bg-active'}`}
                     >
-                      <span className="h-10 w-10 shrink-0 rounded-md border border-white/10" style={{ background: l.swatch }} />
+                      <SlideMount swatch={l.swatch} size={44} />
                       <span className="min-w-0 flex-1">
                         <span className={`block truncate text-[14px] ${on ? 'text-accent-text' : 'text-text'}`}>{l.name}</span>
                         {l.description && <span className="block truncate text-[12px] text-dim">{l.description}</span>}
@@ -1129,6 +1165,13 @@ export function PhoneStage(p: PhoneStageProps) {
         </PhoneSheet>
       )}
 
+      {sheet === 'tabs' && p.deskTabs && (
+        <PhoneSheet title="Tabs" onClose={close} testId="phone-sheet-tabs">
+          <PanelGuard name="The Tabs sheet" inline onClose={close}>
+            <PhoneTabsBody t={p.deskTabs} openSheet={open} />
+          </PanelGuard>
+        </PhoneSheet>
+      )}
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
@@ -1146,6 +1189,7 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
+            {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}
             {p.onPlayScreen && <Tile icon={Waves} label="Simple screen" onPress={() => { close(); p.onPlayScreen?.(); }} testId="phone-play-screen" />}
             {p.onOpenAccount && <Tile icon={Settings} label="Account" onPress={() => { close(); p.onOpenAccount?.(); }} testId="phone-account" />}
             {/* The iPhone app's other mode: the remote for a show on the
@@ -1194,6 +1238,62 @@ export function PhoneStage(p: PhoneStageProps) {
           </p>
           </PanelGuard>
         </PhoneSheet>
+      )}
+    </div>
+  );
+}
+
+function PhoneTabsBody({ t, openSheet }: { t: PhoneTabs; openSheet: (s: SheetName) => void }) {
+  const [adding, setAdding] = useState(false);
+  const out = new Set(t.panels);
+  return (
+    <div className="flex flex-col gap-2" data-testid="phone-tabs-body">
+      <TabStrip tabs={t.tabs} tab={t.tab} onTab={t.onTab} onEdit={t.onEdit} onAddPanel={() => setAdding(true)} height={44} touch />
+      {t.panels.length === 0 && <p className="text-[13px] text-dim">Nothing on this tab yet. Add a panel below.</p>}
+      {t.panels.map(id => {
+        const spec = PANEL_BY_ID.get(id);
+        const body = t.render(id);
+        const own = OWN_SHEET[id];
+        return (
+          <section key={id} className="rounded-lg border border-border bg-elevated" data-testid={`phone-tab-panel-${id}`}>
+            <div className="flex items-center justify-between pl-3">
+              <span className="text-[14px] font-medium text-text">{spec?.name ?? id}</span>
+              <button onClick={() => t.onRemove(id)} className="flex h-12 w-12 items-center justify-center text-muted active:bg-active"
+                aria-label={`Take ${spec?.name ?? id} off this tab`} data-testid={`phone-tab-remove-${id}`}><X size={16} /></button>
+            </div>
+            {body ? (
+              <div className="max-h-[60dvh] overflow-y-auto border-t border-border px-3 pb-3 pt-2">{body}</div>
+            ) : own ? (
+              <button onClick={() => openSheet(own)} className="mx-3 mb-3 flex h-12 w-[calc(100%-24px)] items-center justify-center rounded-lg border border-border-strong text-[14px] text-text-2 active:bg-active"
+                data-testid={`phone-tab-open-${id}`}>Open {SHEET_NAME[own]}</button>
+            ) : (
+              <p className="px-3 pb-3 text-[13px] text-dim">On the laptop's desk.</p>
+            )}
+          </section>
+        );
+      })}
+      <button onClick={() => setAdding(a => !a)} aria-expanded={adding}
+        className={`flex h-12 items-center justify-center gap-2 rounded-lg border border-dashed text-[14px] ${adding ? LIT : 'border-border-strong text-text-2 active:bg-active'}`}
+        data-testid="phone-tab-add"><Plus size={16} /> Panel on this tab</button>
+      {adding && (
+        <div className="flex flex-col gap-1" data-testid="phone-tab-add-list">
+          {SETTINGS_CATEGORIES.map(c => {
+            const rows = PANELS.filter(x => x.category === c.id && !out.has(x.id));
+            if (rows.length === 0) return null;
+            return (
+              <div key={c.id}>
+                <SectionLabel>{c.name}</SectionLabel>
+                <div className="grid grid-cols-2 gap-1">
+                  {rows.map(x => (
+                    <button key={x.id} onClick={() => { t.onAdd(x.id); setAdding(false); }}
+                      className="h-12 truncate rounded-lg border border-border bg-elevated px-3 text-left text-[14px] text-text-2 active:bg-active"
+                      data-testid={`phone-tab-add-${x.id}`}>{x.name}</button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
