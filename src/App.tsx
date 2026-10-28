@@ -295,6 +295,7 @@ import { LIT, LIVE } from './components/ui';
 import { ACCOUNTS_ON, useSignedIn } from './lib/useSignedIn';
 import { isSignedInCached, onAuthFlagChange } from './lib/authFlag';
 import { syncAccountLicense } from './lib/accountLicense';
+import { startSystemTap } from './lib/systemTap';
 
 const hasAccountOrLicenseUI =
   Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
@@ -1096,63 +1097,17 @@ export default function App() {
           __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: Float32Array, sampleRate: number) => void) => () => void };
         }).__CHROMAGLASS_NATIVE__?.onSystemAudioPcm;
         if (nativeTap) {
-          // Mac app (PLAN.md 23.8): ScreenCaptureKit loopback via setDisplayMediaRequestHandler
-          // (no tab picker) combined with the main-process loopback audio tap.
-          // Subscribe the PCM tap and hand `dest.stream` to `useAudioAnalyzer` immediately,
-          // before `getDisplayMedia` resolves (~0.8 s on macOS), so no early PCM packets
-          // are dropped while ScreenCaptureKit initializes.
-          const ctx = new AudioContext();
-          if (ctx.state === 'suspended') void ctx.resume();
-          // Under ?debug, for `npm run desktop` to say whether this context
-          // was running yet when it read the ear, beside the ear's own.
-          if (new URLSearchParams(window.location.search).has('debug')) {
-            (window as unknown as { __systemTapContext?: AudioContext }).__systemTapContext = ctx;
-          }
-          const dest = ctx.createMediaStreamDestination();
-          let displayStream: MediaStream | null = null;
-          let nextTime = 0;
-          let pcmChunks = 0;
-          const unsubPcm = nativeTap((samples: Float32Array, sampleRate: number) => {
-            if (!samples || samples.length === 0 || ctx.state === 'closed') return;
-            if (ctx.state === 'suspended') void ctx.resume();
-            const sr = sampleRate > 0 ? sampleRate : ctx.sampleRate;
-            const buf = ctx.createBuffer(1, samples.length, sr);
-            buf.getChannelData(0).set(samples);
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            src.connect(dest);
-            const now = ctx.currentTime;
-            // Give the first scheduled chunk 60 ms so React has committed `dest.stream`
-            // and `useAudioAnalyzer` has connected its `AnalyserNode`.
-            if (nextTime < now) nextTime = now + (pcmChunks === 0 ? 0.06 : 0.005);
-            src.start(nextTime);
-            nextTime += buf.duration;
-            pcmChunks += 1;
-          });
-          systemTapRef.current = {
-            stop: () => {
-              unsubPcm();
-              displayStream?.getTracks().forEach(t => t.stop());
-              if (ctx.state !== 'closed') void ctx.close();
-            },
-          };
-          stream = dest.stream;
+          // Mac app (PLAN.md 23.8): ScreenCaptureKit's loopback through
+          // setDisplayMediaRequestHandler (no tab picker) and the main
+          // process's PCM tap, played into one stream (lib/systemTap.ts).
+          const tap = startSystemTap(
+            nativeTap,
+            () => ask === sourceAskRef.current,
+            new URLSearchParams(window.location.search).has('debug'),
+          );
+          systemTapRef.current = tap;
+          stream = tap.stream;
           setAudioStream(stream);
-          void navigator.mediaDevices.getDisplayMedia({
-            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
-            video: true,
-          }).then((ds) => {
-            if (ask !== sourceAskRef.current || ctx.state === 'closed') {
-              ds.getTracks().forEach(t => t.stop());
-              return;
-            }
-            displayStream = ds;
-            if (ds.getAudioTracks().length > 0) {
-              try {
-                ctx.createMediaStreamSource(ds).connect(dest);
-              } catch { /* fallback to PCM tap */ }
-            }
-          }, () => { /* loopback tap continues */ });
         } else {
           // Raw, as the microphone below, and in stereo: a shared tab is the
           // music itself. With plain `audio: true` Chrome shared a music tab as

@@ -127,7 +127,7 @@ export interface Ear {
    */
   deaf: boolean;
   /** For `?debug` and `npm run ears`: readings by who offered them, and the context's state. */
-  debug: () => { reads: Record<'frame' | 'ask' | 'tick', number>; recent: { driver: 'frame' | 'ask' | 'tick'; at: number }[]; state: string; deaf: boolean; published: number } | null;
+  debug: () => { reads: Record<'frame' | 'ask' | 'tick', number>; recent: { driver: 'frame' | 'ask' | 'tick'; at: number }[]; state: string; currentTime: number; sampleRate: number; deaf: boolean; published: number } | null;
 }
 
 export function useAudioAnalyzer(
@@ -420,7 +420,10 @@ export function useAudioAnalyzer(
     const ear = earRef.current;
     const ctx = audioContextRef.current;
     if (!ear || !ctx) return null;
-    return { reads: { ...ear.reads }, recent: ear.recent.slice(), state: ctx.state, deaf: deafRef.current, published: publishedRef.current };
+    // The clock beside the state: "running" means the context asked for an
+    // output stream, and currentTime says whether the device answered
+    // (lib/systemTap.ts, the desktop check's system-audio line).
+    return { reads: { ...ear.reads }, recent: ear.recent.slice(), state: ctx.state, currentTime: ctx.currentTime, sampleRate: ctx.sampleRate, deaf: deafRef.current, published: publishedRef.current };
   }, []);
 
   const onReading = useCallback((fn: (a: AudioData) => void) => {
