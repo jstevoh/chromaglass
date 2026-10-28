@@ -387,7 +387,7 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   const cpuBody = cpu.slice(cpu.indexOf('private sharpenDye'), cpu.indexOf('private advectMacCormack'));
   const cpuGate = cpuBody.includes('this.shpA.set(this.density)') && /gate\(a, ga\[/.test(cpuBody);
   check('the CPU solver reads its gate from the thickness too',
-    cpuGate, cpuGate ? '' : 'sharpenDye in sim/fluidSimulation.ts is back to per-channel');
+    cpuGate, cpuGate ? '' : 'sharpenDye in src/sim/ is back to per-channel');
 }
 
 // ── 5.7. The closeup is a travel, not a switch ─────────────────
@@ -395,8 +395,8 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 // The macro zoom used to reach the renderer only through a boolean, so the
 // closeup arrived in one frame: a different exposure, a different depth of
 // field, a different silhouette, all at once. It ramps now, and how far along
-// the ramp a given zoom sits is a pure function of two constants beside the
-// solver (src/sim/constants.ts) — so this reads them out and runs it.
+// the ramp a given zoom sits is a pure function of two constants (in
+// sim/constants.ts) — so this reads them out and runs it.
 //
 // It is here rather than in `npm run qa` because qa tried to check this from
 // the pixels, by asking whether a frame at 1.4x sits nearer the plate-wide
@@ -473,12 +473,10 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const at = `${dir}/${e.name}`;
       if (e.isDirectory()) walk(at);
-      // The CPU solver still has the retired looks' cases in seedPreset
-      // (src/sim/fluidSimulation.ts since PLAN 19ai-3 moved it out of
-      // LiquidVisualizer.tsx), dead since nothing can apply a retired id: they
-      // go when that file is next free to change (PLAN.md 28c; another PR held
-      // it in 28a).
-      else if (/\.(ts|tsx|mjs)$/.test(e.name) && !at.endsWith('src/presets.ts') && !at.endsWith('src/components/LiquidVisualizer.tsx') && !at.endsWith('src/sim/fluidSimulation.ts')) {
+      // The CPU solver (src/sim/) still has the retired looks' cases in seedPreset,
+      // dead since nothing can apply a retired id: they go when that file is
+      // next free to change (PLAN.md 28c; another PR held it in 28a).
+      else if (/\.(ts|tsx|mjs)$/.test(e.name) && !/src\/(presets\.ts|components\/LiquidVisualizer\.tsx|sim\/fluidSimulation\.ts)$/.test(at)) {
         const text = fs.readFileSync(at, 'utf8');
         for (const id of Object.keys(RETIRED_PRESETS)) if (new RegExp(`['"\`]${id}['"\`]`).test(text)) stale.push(`${at}:${id}`);
       }

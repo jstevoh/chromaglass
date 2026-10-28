@@ -3766,12 +3766,20 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   caches its own (H2c-11).
 - **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
   gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
-- **14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
+- ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort
-  on their history. A ring and a selection median.
-- **14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
+  on their history. A ring and a selection median.~~ **Shipped** (#533, 2026-10-28): the
+  detectors keep two rings and take the median and its deviation by partial sort, to the
+  same number to the bit; the live ear stopped copying its byte arrays; the fifteen-frame
+  median's scratch is kept. `AudioFeatures.update` 0.5–0.6 → 0.30 ms, 227.65 → 5.7 KB an
+  update, readings identical (`npm run eargc`). Story in `docs/plan-shipped.md`. What is
+  left (5.7 KB an update) is the reading itself: seventeen onset objects, three arrays and
+  the chroma; not worth a ring of readings until a Mac profile asks.
+- ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
   object each tick) and sets `connected` on every poll through a stale closure (with
-  14j's timer line).
+  14j's timer line).~~ **Shipped** (#533): the ring (`GamepadRing`) listens to a store in
+  the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
+  (`npm run renders`' gamepad phase), and the poll sets `connected` once.
 - **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
   sixty steps (`speciesShare`); a ring like the readback's.
 - **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
@@ -6230,6 +6238,17 @@ Not a gate and no bar: a rate depends on what was pushed.
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
   measurement on the Mac, not from this line.
 
+- **19ac-3. `bottles` counts the look's own pours as the hand's, and goes red on one at the
+  mirror.** `WebGPU (macOS) · tools` failed `bottles` twice on one head (#533, which changes
+  neither the bottle nor the tools), on two different lines: "splatter with the Oil bottle"
+  (39 pours, 1 at the mirror) and "splatter with the Ferrofluid bottle" (37 pours, 1 at the
+  mirror; the hand's flings 0.13 from the hand, nothing near the mirror), and passed on the
+  third run. The stroke's mirror is 0.4 of the plate from it and a splatter's fling reaches
+  about 0.07, so the pour is not the hand's: read it from `__bottleLog` with the call's
+  `auto` flag and the look's lays, and count the hand's alone. Until then a lone pour at
+  the mirror is this, not a flipped coordinate (that puts every pour there). Not yet shown
+  from the log.
+
 ### 19ad. The `open` shard flakes on four unrelated faults
 
 - **19ad-1. `WebGPU (macOS) · open` goes red on marginal timing and on a stray reading.**
@@ -6390,11 +6409,10 @@ advisories.
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
 
-### 19ai. Smaller files for a session to read: the solver out of the visualizer, the checks' hooks declared (2026-10-28)
+### 19ai. Smaller sessions: the separation plan (2026-10-28)
 
-The owner's plan for smaller sessions (the 2026-10-28 review of how much a session has to
-read to find its place) ranked the splits of the code by context saved per unit of effort.
-Its items 3 and 5 are here, as one PR of pure moves.
+The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves) and 19ai-5.
 
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
   was module code above the component: the CPU solver `class FluidSimulation` (3,900 lines)
@@ -6411,18 +6429,52 @@ Its items 3 and 5 are here, as one PR of pure moves.
   `panel` (the per-layer list against the solver), `plate` (the CPU gate, the closeup's
   ramp, and the retired looks' exemption, which follows `seedPreset`) and `turing` (the
   drift rates).
-- **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
-  reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
-  whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
-- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
-  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
-  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
 - **19ai-3a. Found along the way.** The review said `lib/stir`, `squish`, `plateRock` and
   `turntable` import types from the component; they only name it in comments. The one
   importer was `hooks/useSongRender.ts`. And 26 checks read `LiquidVisualizer.tsx` as text:
   a later split of the frame loop (the review's item 11) moves code those checks grep, so
   each piece moved has to be held against them the way this one was (a pattern that matched
   the old file and no longer matches the new one is a check that moved with the code).
+- **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
+  reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
+  whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
+- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
+  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
+  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
+- **19ai-5. Shipped: `npm run sizes`, a size ratchet.** A file not in `scripts/sizes.json`
+  stays at or under 40 KB; a file already over it (52 on main at b38801e, 4.9 MB between
+  them) may not grow past the bytes recorded beside it, nor past its size at the PR's base
+  (so two PRs that each fit under a ceiling cannot land together over it), and new code for it
+  goes in a module beside it. The baseline only shrinks against the base (HEAD^1 in CI: the PR's merge
+  commit's first parent, or the main before a deploy's commit): a ceiling raised or added,
+  or a new ledger, is red, and a big file renamed is a new file over budget. A file more
+  than 4 KB under its ceiling is red, in a PR that resized it, until `npm run sizes -- --update`
+  lowers it (on main, or for a file the PR did not resize, a note: two PRs that each trim
+  2.5 KB must not turn the deploy and every open PR red), so a real move out banks what it saved, while a PR that trims a few lines does not have to touch the
+  same line of `sizes.json` as every other PR in flight. Binary files and
+  `package-lock.json` are not counted. Six **ledgers** that every PR writes in (PLAN.md,
+  `docs/plan-shipped.md`, `docs/judging.md`, `docs/guide.md`, CHANGELOG.md,
+  `scripts/checks.json`) are exempt by name until split. One manifest entry on the `logic`
+  part, `always`; no Mac. Its self-test meets each rule's break in a scratch repository.
+- **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** The ratchet's first real move
+  (the solver, 194,508 bytes in one class, out of the visualizer) read as a new file over
+  budget, and the owner did not want the solver cut into 40 KB pieces to pass a number (a
+  class is not split by moving lines). So a pull request may add a ceiling the base does not
+  have when the ceilings in all do not grow (the bytes came out of another file in the same
+  PR) and the new entry is the file's own size. A file that appears over budget with nothing
+  written in still fails as new, and an entry added with nothing taken out still fails as
+  raised; what it lets through that the first rule did not is a rename that moves its entry
+  with it, which costs a session the same. Four self-tests hold it. Whether 40 KB is the right
+  budget for a new file at all is the owner's question, raised 2026-10-28 ("40kb seems
+  somewhat arbitrary. I don't want quality to go down because of this").
+- **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
+  App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
+  such PR now has to move as many bytes out as it adds, wiring lines included. If that turns
+  out to cost more than the splits save, the owner decides whether over-budget files get a
+  small fixed allowance; until then the rule is the one approved.
+- **19ai-5b. Open: the ledgers come out.** 19m (PLAN.md split by section) takes PLAN.md and
+  the archive off the list; `docs/guide.md` and `docs/judging.md` want the same split by
+  part of the app; `scripts/checks.json` could be one file per shard.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
