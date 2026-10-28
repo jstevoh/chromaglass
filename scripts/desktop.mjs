@@ -49,6 +49,16 @@
  *                 the app's menu and to the page's profile sheet, unasked for
  *                 nothing else (PLAN 13-update; `npm run updates` asks the
  *                 rest of what desktop/updates.js promises, in plain Node)
+ *   fuses         (packed only) the Electron fuses (PLAN.md 23.17k) read off the
+ *                 packed binary, not off the config that asked for them, and
+ *                 the three that matter most asked of the app itself:
+ *                 ELECTRON_RUN_AS_NODE=1 and --inspect do nothing (each beside
+ *                 a stock Electron that does, so the probe is seen to work),
+ *                 and, on a Mac, an app.asar with one byte of its header
+ *                 changed, and the bundle signed again, does not start. The
+ *                 windows below are driven on a copy with the inspect fuse
+ *                 back on, because Playwright attaches to Electron with
+ *                 --inspect; every other line asks the packed app as shipped
  *   quits         closing the show window, with the projector open, quits
  *                 the app and frees the port
  *   licence       the run above opened on a Pro key (signed for this run); the
@@ -65,14 +75,14 @@
  * the site). On Linux with no display it runs itself under xvfb-run.
  */
 import { _electron as electron } from 'playwright';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signLicenseKey } from '../server/license-key.js';
 
@@ -153,7 +163,48 @@ function oscMessage(address, ...floats) {
   return Buffer.concat([addr, tags, args]);
 }
 
+/*
+  The packed app as shipped has the inspect fuse off (desktop/electron-builder.config.cjs),
+  and Playwright launches Electron with --inspect=0 and attaches to what it prints,
+  so the windows below are driven on a copy of it with that one fuse flipped back
+  on. Nothing else differs but, on a Mac, the signature (ad hoc, as a pull
+  request's build is). The fuses line at the end reads and runs the original.
+*/
+const desktopRequire = createRequire(join(DESKTOP, 'package.json'));
+/** The .app (macOS) or the unpacked folder (Linux) that holds an executable. */
+const bundleOf = (exe) => (isMac ? resolve(exe, '..', '..', '..') : dirname(exe));
+function copyBundle(exe, label) {
+  const dir = mkdtempSync(join(tmpdir(), `chromaglass-desktop-${label}-`));
+  const from = bundleOf(exe);
+  const to = join(dir, basename(from));
+  // -c: clone the files on APFS, where the app is a few hundred megabytes of them.
+  let r = isMac ? spawnSync('cp', ['-cR', from, to]) : { status: 1 };
+  if (r.status !== 0) r = spawnSync('cp', ['-R', from, to]);
+  if (r.status !== 0) { console.error(`FAIL  could not copy ${from}: ${r.stderr}`); process.exit(1); }
+  return { dir, bundle: to, exe: isMac ? join(to, 'Contents', 'MacOS', basename(exe)) : join(to, basename(exe)) };
+}
+/** Sign the bundle ad hoc: what a copy that was changed needs on Apple silicon to run. */
+const resign = (bundle) => spawnSync('codesign', ['--force', '--deep', '--sign', '-', bundle], { encoding: 'utf8' });
+const scratch = [];
+
 const app = whichApp();
+const packedExe = app.executablePath;
+if (PACKAGED) {
+  const fusesLib = desktopRequire('@electron/fuses');
+  const copy = copyBundle(packedExe, 'drive');
+  scratch.push(copy.dir);
+  await fusesLib.flipFuses(isMac ? copy.bundle : copy.exe, {
+    version: fusesLib.FuseVersion.V1,
+    resetAdHocDarwinSignature: false,
+    [fusesLib.FuseV1Options.EnableNodeCliInspectArguments]: true,
+  });
+  if (isMac) {
+    const r = resign(copy.bundle);
+    if (r.status !== 0) { console.error(`FAIL  could not sign the copy the check drives: ${r.stderr}`); process.exit(1); }
+  }
+  app.executablePath = copy.exe;
+  app.label += ' (driven on a copy with the inspect fuse on)';
+}
 const profile = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-'));
 const PORT = await freePort('tcp');
 const OSC_PORT = await freePort('udp');
@@ -701,6 +752,144 @@ try {
     rmSync(bare, { recursive: true, force: true });
   }
 }
+
+/*
+  ── fuses ────────────────────────────────────────────────────────────
+  PLAN.md 23.17k. Electron's fuses are switches in the binary; a stock Electron
+  honours ELECTRON_RUN_AS_NODE (the app becomes a Node that runs any script with
+  the app's permissions), --inspect and SIGUSR1 (a debugger on the main process,
+  where the verified licence lives), NODE_OPTIONS, and an edited app.asar. The
+  config (desktop/electron-builder.config.cjs) asks for them closed; this reads
+  the packed binary, so a fuse that was never flipped, or flipped back by a later
+  change to the packing, is seen here, and then asks the packed app, not its
+  bytes, whether the two that run code do.
+
+  The required set is repeated here rather than read from the config, so a fuse
+  dropped from the config fails this line instead of agreeing with it. The probes
+  are each run beside a stock Electron that obeys the same flag; a probe that
+  cannot tell a closed fuse from a launch that never got going says so and fails.
+*/
+if (!PACKAGED) {
+  skip('fuses: the packed binary has run-as-node, --inspect and a loose asar closed', 'run from the repo, where nothing is packed (add --packaged)');
+} else {
+  const fusesLib = desktopRequire('@electron/fuses');
+  const { FuseV1Options: F } = fusesLib;
+  // The byte a fuse reads as in the binary (@electron/fuses' FuseState, not exported by its index).
+  const FuseState = { DISABLE: 48, ENABLE: 49 };
+  const WANT = {
+    [F.RunAsNode]: ['runAsNode', FuseState.DISABLE],
+    [F.EnableNodeOptionsEnvironmentVariable]: ['NODE_OPTIONS', FuseState.DISABLE],
+    [F.EnableNodeCliInspectArguments]: ['--inspect', FuseState.DISABLE],
+    [F.EnableEmbeddedAsarIntegrityValidation]: ['asar integrity', FuseState.ENABLE],
+    [F.OnlyLoadAppFromAsar]: ['only the asar', FuseState.ENABLE],
+    [F.GrantFileProtocolExtraPrivileges]: ['file:// privileges', FuseState.DISABLE],
+  };
+  const wire = await fusesLib.getCurrentFuseWire(isMac ? bundleOf(packedExe) : packedExe);
+  const wrong = Object.entries(WANT).filter(([i, [, state]]) => wire[i] !== state).map(([, [name, state]]) => `${name} should be ${state === FuseState.ENABLE ? 'on' : 'off'}`);
+  check('fuses: the packed binary has run-as-node, --inspect, NODE_OPTIONS and file:// closed, the asar integrity check and asar-only on', wrong.length === 0,
+    wrong.length ? wrong.join('; ') : Object.values(WANT).map(([name, state]) => `${name} ${state === FuseState.ENABLE ? 'on' : 'off'}`).join(', '));
+  // The config says the same (so a change to either one is seen against the other).
+  const asked = desktopRequire('./electron-builder.config.cjs').electronFuses ?? {};
+  const wanted = { runAsNode: false, enableNodeCliInspectArguments: false, enableNodeOptionsEnvironmentVariable: false, enableEmbeddedAsarIntegrityValidation: true, onlyLoadAppFromAsar: true, grantFileProtocolExtraPrivileges: false };
+  const drift = Object.entries(wanted).filter(([k, v]) => asked[k] !== v).map(([k]) => k);
+  check('fuses: the packing config asks for exactly those', drift.length === 0, drift.length ? `config differs on ${drift.join(', ')}` : 'same six');
+
+  // Run a binary for a few seconds, or until it exits, and say what it printed and whether its show
+  // server answered (/remote-info.json, polled while it runs: after it is killed nothing answers).
+  // (Run as Node, Electron refuses Chromium's flags, so --no-sandbox, which a root cloud session
+  // needs, is not added then.) `until: 'served'` stops as soon as the server has answered.
+  const probe = async (exe, args, extraEnv, ms, until = null) => {
+    const dir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-probe-'));
+    scratch.push(dir);
+    const e = { ...env, PORT: String(await freePort('tcp')), OSC_PORT: String(await freePort('udp')), CHROMAGLASS_USER_DATA: dir, ...extraEnv };
+    delete e.CHROMAGLASS_UPDATE_FEED;
+    const child = spawn(exe, [...args, ...(process.platform === 'linux' && !extraEnv.ELECTRON_RUN_AS_NODE ? ['--no-sandbox'] : [])], { env: e, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { out += d; });
+    let exit = null;
+    const exited = new Promise((r) => child.once('exit', (code, signal) => { exit = { code, signal }; r(exit); }));
+    let served = false;
+    for (const t0 = Date.now(); !exit && Date.now() - t0 < ms && !(served && until === 'served');) {
+      served ||= await fetch(`http://localhost:${e.PORT}/remote-info.json`, { signal: AbortSignal.timeout(1000) }).then((r) => r.ok, () => false);
+      if (!(served && until === 'served')) await Promise.race([exited, sleep(400)]);
+    }
+    if (!exit) child.kill('SIGKILL');
+    await Promise.race([exited, sleep(2000)]);
+    return { out, exit, served, port: e.PORT };
+  };
+  const stock = desktopRequire('electron');
+  const stockDir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-stock-'));
+  scratch.push(stockDir);
+  const stockMain = join(stockDir, 'stock.cjs');
+  writeFileSync(stockMain, "const { app } = require('electron');\napp.whenReady().then(() => setTimeout(() => app.quit(), 1500));\n");
+
+  // ELECTRON_RUN_AS_NODE=1 with -e: a Node that runs the script, or the app opening as if neither were there.
+  const MARK = 'RAN-AS-NODE-' + process.pid;
+  const asNode = ['-e', `console.log('${MARK}')`];
+  const control = await probe(stock, asNode, { ELECTRON_RUN_AS_NODE: '1' }, 20_000);
+  const packedNode = await probe(packedExe, asNode, { ELECTRON_RUN_AS_NODE: '1' }, 8000);
+  const controlWorks = control.out.includes(MARK);
+  check('fuses: ELECTRON_RUN_AS_NODE=1 on the packed app runs no script', controlWorks && !packedNode.out.includes(MARK),
+    !controlWorks ? 'the probe measures nothing: a stock Electron did not run the script either' : packedNode.out.includes(MARK) ? 'THE PACKED APP RAN THE SCRIPT' : 'the script did not run (a stock Electron runs it)');
+
+  // --inspect=0: a debugger listening on the main process, which Node says on stderr.
+  const SAID = /Debugger listening on ws:/;
+  const stockInspect = await probe(stock, ['--inspect=0', stockMain], {}, 20_000);
+  const packedInspect = await probe(packedExe, ['--inspect=0'], {}, 8000);
+  const inspectWorks = SAID.test(stockInspect.out);
+  check('fuses: --inspect on the packed app opens no debugger', inspectWorks && !SAID.test(packedInspect.out),
+    !inspectWorks ? 'the probe measures nothing: a stock Electron did not open a debugger either' : SAID.test(packedInspect.out) ? 'THE PACKED APP OPENED A DEBUGGER' : 'no debugger (a stock Electron opens one)');
+
+  // The app as shipped, untouched. Every window above is a copy, re-signed ad hoc (no hardened runtime, no
+  // entitlements); this is the one line that starts the signed, notarised binary itself with the fuses on,
+  // so a fuse that stops the app starting (the asar check against a Developer ID bundle, say) is seen here.
+  const shipped = await probe(packedExe, [], {}, 60_000, 'served');
+  check('fuses: the packed app as shipped, untouched, starts and serves the show', shipped.served,
+    shipped.served ? 'its show server answered /remote-info.json' : `it never answered${shipped.exit ? ` and stopped (${shipped.exit.signal ?? `exit ${shipped.exit.code}`})` : ''}: ${shipped.out.trim().split('\n').slice(-3).join(' | ').slice(0, 300)}`);
+
+  // An edited app.asar. Electron checks it on macOS and Windows only.
+  if (!isMac) {
+    skip('fuses: an app.asar with its header changed, signed again, does not start', 'Electron checks the asar only on macOS and Windows; the Mac runner does');
+  } else {
+    // The change is harmless to the app: one letter of the name of an icon nobody loads to start the show.
+    // Without the fuse the changed copy must start (the control); with it, it must not. Otherwise "it stopped"
+    // would say only that the edit broke the app.
+    const tamper = (bundle) => {
+      const asar = join(bundle, 'Contents', 'Resources', 'app.asar');
+      const buf = readFileSync(asar);
+      const head = buf.subarray(16, 16 + (1 << 20)).toString('latin1');
+      const name = head.match(/"(apple-touch-icon\.png|favicon\.svg|icon-192\.png)":\{/);
+      if (!name) return null;
+      buf[16 + name.index + 1] = 'Z'.charCodeAt(0);   // same length, so the archive still parses
+      writeFileSync(asar, buf);
+      return name[1];
+    };
+    const make = async (label, integrityOn) => {
+      const c = copyBundle(packedExe, label);
+      scratch.push(c.dir);
+      const named = tamper(c.bundle);
+      if (!integrityOn) {
+        await fusesLib.flipFuses(c.bundle, { version: fusesLib.FuseVersion.V1, resetAdHocDarwinSignature: false, [fusesLib.FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: false });
+      }
+      return { ...c, named, signed: resign(c.bundle) };
+    };
+    const off = await make('tamper-control', false);
+    const on = await make('tamper', true);
+    const ranOff = await probe(off.exe, [], {}, 60_000, 'served');
+    const ranOn = await probe(on.exe, [], {}, 30_000);
+    const FATAL = /asar integrity|Integrity check failed|Failed to validate/i;
+    check('fuses: an app.asar with its header changed, signed again, does not start (and starts with the integrity fuse off)',
+      !!off.named && off.signed.status === 0 && on.signed.status === 0 && ranOff.served && !ranOn.served && !!ranOn.exit,
+      !off.named ? 'found no icon in the asar header to change'
+        : off.signed.status !== 0 || on.signed.status !== 0 ? `could not sign the changed copies: ${off.signed.stderr || on.signed.stderr}`
+          : !ranOff.served ? `the control (same edit, integrity fuse off) never served, so the edit breaks the app and this measures nothing: ${ranOff.out.trim().split('\n').slice(-2).join(' | ').slice(0, 200)}`
+            : ranOn.served ? 'THE CHANGED APP SERVED THE SHOW'
+              : !ranOn.exit ? 'THE CHANGED APP STAYED RUNNING'
+                : `edited "${on.named}": with the fuse off it served; with it on it stopped by itself (${ranOn.exit.signal ?? `exit ${ranOn.exit.code}`}) and served nothing${FATAL.test(ranOn.out) ? ', saying so' : ''}`);
+  }
+}
+for (const d of scratch) rmSync(d, { recursive: true, force: true });
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed${failed.length ? `; failed: ${failed.map((f) => f.name).join('; ')}` : ''}`);
