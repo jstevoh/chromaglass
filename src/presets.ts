@@ -45,7 +45,7 @@ export const PRESETS: Preset[] = [
       surge: 0.5,        // unhurried, dreamlike pace
       layerCount: 2,
       blendMode: 'screen',       // additive glow — colors brighten where they overlap
-      gooeyEffect: 0.65,         // organic, rounded blob edges
+      gooeyEffect: 0.78,         // organic, rounded blob edges that hold clean dark space between them
       rotationSpeed: 0.07,       // the dish's motor; was 0.008 with a stir in the middle (PLAN 22j)
       centerGravity: 0.12,       // gentle inward drift prevents edge stagnation
       ledPlatform: false,
@@ -54,39 +54,33 @@ export const PRESETS: Preset[] = [
       advection: 0.35,           // smooth transport, no turbulence
       damping: 0.988,            // very slow energy loss — movements persist gracefully
       heatDecay: 0.992,          // warmth lingers, keeps gentle convection going
-      automateRate: 0.15,        // regular auto-injection keeps the frame alive
+      automateRate: 0.08,        // regular auto-injection keeps the frame alive
       platePressure: 0.25,       // subtle radial spread from center
       glassSmear: 0.3,           // soft smearing, no harsh edges
       rainDrip: 0.15,            // occasional downward streaks for variety
       viscosity: 'thick',        // heavy, syrupy movement
-      polarity: 0.7,             // colors stay distinct but can gently intermingle
-      evaporationRate: 0.005,    // colors persist a long time
+      polarity: 0.85,            // colors stay distinct but can gently intermingle
+      evaporationRate: 0.012,    // keeps black between the blobs across the show
       airVelocity: 0.04,         // near-still air — no turbulence
       vibrationFrequency: 0.08,  // minimal vibration — serene
       audioImpact: 0.55,         // audible music visibly drives the fluid
       turbulenceScale: 0.5,      // lively multi-scale ripple
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.35,  // colours hold apart loosely
+      blobSurfaceTension: 0.55,  // colours hold apart cleanly
       boundaryContrast: 0.5,     // bright line where dyes meet
-      saturationBoost: 1.45,
+      saturationBoost: 1.5,
       glossiness: 0.0,           // flat backlit dye — the projector look
-      postBlurRadius: 0.35,
-      secondLamp: 0.2,
+      postBlurRadius: 0.15,
+      secondLamp: 0.0,
+      hueJourney: 2,
       /*
-        28d (the showreel, 2026-10-11): the default look scored 4 of 10. On a
-        minute of a real song it was a full-frame gradient of magenta, red,
-        yellow and blue, slowly stirred, with big brown bubble discs and no
-        bodies at all: nothing like the blobs its name promises. The plate ran
-        at the default budget (0.85), which fills the dish until the colours
-        meet everywhere and run into one wash, the same fault Velvet
-        Underground was fixed of (0.45, dark between its pools). At 0.45 the
-        regulator holds about half the colour, so the blobs stay blobs with
-        the lamp between them, which is the overhead projector's own picture.
-        And the brown discs were the default Bubbles (0.2): trapped air
-        drawn dark against a dish this full. A few, not none, because a clock
-        glass on a projector always has some.
+        28d (the showreel, 2026-10-11) & 28i-2: the default look scored 4 of 10.
+        On a minute of a real song at 0.85 it was a full-frame gradient with no
+        bodies at all, and at 0.45 across two layers the film still dropped to
+        0% near black at the 5th percentile. At 0.18 the regulator holds the
+        blobs apart with dark screen between them throughout the show.
       */
-      dyeBudget: 0.45,
+      dyeBudget: 0.18,
       bubbles: 0.05,
       /*
         The overhead projector's dish answers in the liquid (PLAN 28i-3b): a
@@ -165,19 +159,19 @@ export const PRESETS: Preset[] = [
       gooeyEffect: 0.15,         // low goo — sharper points of light, less blobby
       rotationSpeed: 0.132,      // the dish's motor; was 0.035 with a stir in the middle (PLAN 22j)
       centerGravity: 0.85,       // strong pull inward — matter orbits a galactic core
-      ledPlatform: true,
+      ledPlatform: false,
       diffusionRate: 0.00004,    // extremely low — pinpoints of light stay sharp
       buoyancy: 0.25,            // minimal buoyancy — horizontal swirl dominates
       advection: 0.75,           // strong transport — sweeping spiral arm motion
       damping: 0.994,            // very high — movements persist, orbits sustain
       heatDecay: 0.998,          // heat lingers forever — nebula glow persists
-      automateRate: 0.14,        // moderate injection — periodic star bursts
+      automateRate: 0.11,        // moderate injection — periodic star bursts
       platePressure: 0.1,        // minimal plate spread — gravity dominates
       glassSmear: 0.15,          // light smearing — comet-tail streaks
       rainDrip: 0.0,             // no dripping — weightless space
       viscosity: 'thin',         // thin — fluid fragments into filaments and streams
       polarity: 0.25,            // low — colors intermingle freely like nebula gas
-      evaporationRate: 0.002,    // stars persist for a very long time
+      evaporationRate: 0.006,    // void stays clear between the spiral arms
       airVelocity: 0.02,         // near-vacuum — no turbulence
       vibrationFrequency: 0.0,   // no vibration — serene void
       audioImpact: 0.4,
@@ -186,16 +180,16 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.1,   // colours barely hold apart, and run together
       boundaryContrast: 0.25,
       saturationBoost: 1.45,     // vivid nebula color
-      // A galaxy is mostly void: at the default 0.85 the regulator kept the
-      // plate full and the whorl filled the frame. Near black 9% to 19% in
-      // the lab on the seeded spiral.
-      dyeBudget: 0.35,
+      // A galaxy is mostly void: at 0.35 with the LED platform on, near-black
+      // dropped to 11% at the 5th percentile in film (28i-2). At 0.24 on true
+      // black void, at least a fifth of the frame stays dark sky.
+      dyeBudget: 0.24,
       glossiness: 0.0,
       postBlurRadius: 0.2,       // very sharp — pinpoints of light stay pinpoints
       ledMode: 'single',
       ledColor: '#03041a',
       ledSpeed: 0.0,
-      secondLamp: 0.25,
+      secondLamp: 0.08,
       /*
         Sound on the liquid, not the frame (PLAN 28i-3): the energy reading
         that swayed the dish's rotation now raises star-mote beads across the
@@ -238,13 +232,19 @@ export const PRESETS: Preset[] = [
       advection: 0.6,
       damping: 0.95,
       heatDecay: 0.9,
-      automateRate: 0.2,
+      automateRate: 0.26,
       platePressure: 0.6,
       glassSmear: 0.8,
       rainDrip: 0.2,
       viscosity: 'thin',
-      polarity: 0.2,
-      evaporationRate: 0.05,
+      polarity: 0.75,
+      // 28i-2: at 0.05 on treble density the plate dried to 99% black and one
+      // blue hue. At 0.005 on bass density with a 0.70 budget, pink, cyan and
+      // lime neon stay on screen (95th-pct near black under 60%, ≥3 hues).
+      evaporationRate: 0.005,
+      dyeBudget: 0.7,
+      hueJourney: 2,
+      saturationBoost: 1.55,
       airVelocity: 0.3,
       vibrationFrequency: 0.8,
       chromaticAberration: 0.35,
@@ -262,7 +262,7 @@ export const PRESETS: Preset[] = [
       ],
       audioMappings: {
         velocity: 'energy',
-        density: 'complexity',   // moved off rotation to dye density (PLAN 28i-3)
+        density: 'bass',
         color: 'timbre',
         rotation: 'none',
       },
@@ -339,31 +339,36 @@ export const PRESETS: Preset[] = [
     name: 'Bass Drop',
     description: 'Every bass hit drops a heavy splash from height: crimson and ultramarine thrown across ice, the plate squeezed on the kick.',
     settings: {
-      globalSpeed: 0.021,
+      globalSpeed: 0.022,
       beads: 0.25,
-      surge: 0.9,
+      surge: 1.0,
       layerCount: 2,
       blendMode: 'lighter',
       gooeyEffect: 0.6,
-      rotationSpeed: 0.146,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
+      rotationSpeed: 0.008,      // low steady turn so the plate rests between gusts and leaps on the drop (PLAN 28i-2: peak >= 2.5x median)
       centerGravity: 0.15,       // was 0.4, which slid every well's dye into the middle (PLAN 25b-3)
       ledPlatform: false,
       diffusionRate: 0.0002,
-      buoyancy: 0.3,
-      advection: 0.5,
-      damping: 0.94,
-      heatDecay: 0.92,
-      automateRate: 0.05,
-      platePressure: 0.9,
-      glassSmear: 0.7,
-      rainDrip: 0.3,
+      buoyancy: 0.05,
+      advection: 0.62,
+      damping: 0.82,
+      heatDecay: 0.90,
+      automateRate: 0.10,
+      platePressure: 0.05,
+      glassSmear: 0.0,           // rests below the 0.2 smear gate between drops; hats open it on the full-band chorus kicks
+      turbulenceScale: 0.08,
+      rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.7,
-      evaporationRate: 0.02,
-      airVelocity: 0.2,
-      vibrationFrequency: 1.0,
-      dropHeight: 0.9,
+      evaporationRate: 0.020,
+      dyeBudget: 0.24,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.0,
+      audioImpact: 0.95,
+      dropHeight: 0.95,
       beatSqueeze: 0.8,
+      beatAccent: 1.0,           // 28i-2: squeeze and rock accent the bar's downbeat so the plate rests between drops (peak >= 2.5x median)
+      kickBloom: 0.06,           // 28i-2: quiet verse kick ring; hats + hatsHit open glassSmear past 0.20 in the chorus to carry peak >= 2.5x median
       // The one look whose music moves the frame (FRAME_MOVING_LOOKS): a
       // third of Frame Sway's travel, so the rock carries the picture without
       // the full slide #347 had on every look.
@@ -378,22 +383,26 @@ export const PRESETS: Preset[] = [
           level, which is loud between kicks too. Bass Drop is the one look
           that may move the frame with the music (FRAME_MOVING_LOOKS,
           lib/plateRock.ts): its Frame Sway above lets the rock carry the
-          picture, as nothing else on the shelf does.
+          picture, while the liquid's own smear (opened past its 0.20 gate
+          only when both hats level and hat hits are high in the chorus) and
+          chorus pour carry its 2.5x peak-over-median swell (PLAN 28i-2).
         */
         { source: 'hits', feature: 'kickHit', setting: 'plateRock', depth: 0.5 },
-        { source: 'sound', feature: 'bass', setting: 'gooeyEffect', depth: 0.3 },
+        { source: 'bands', feature: 'hats', setting: 'glassSmear', depth: 0.15 },
+        { source: 'hits', feature: 'hatsHit', setting: 'glassSmear', depth: 0.16 },
+        { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.45, threshold: 0.38, attack: 0.02, release: 0.35 },
         /*
           Its three wells (PLAN 25b-3, 25h): the kicks take them in turn
           (areaForBand), and on top of that the snare stirs the low well (area
           2) and the sub (band 1, 40 to 85 Hz) warms the left one (area 0)
           while it holds.
         */
-        { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 2, depth: 0.5, threshold: 0.3, attack: 0.02, release: 0.3 },
+        { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 2, depth: 0.6, threshold: 0.35, attack: 0.02, release: 0.35 },
         { source: 'bands', feature: 'band1', setting: 'areaHeat', area: 0, depth: 0.6, threshold: 0.5, attack: 0.05, release: 1.0 },
       ],
       audioMappings: {
-        velocity: 'bass',
-        density: 'bass',
+        velocity: 'none',
+        density: 'none',
         color: 'none',
         rotation: 'none',
       },
@@ -406,42 +415,46 @@ export const PRESETS: Preset[] = [
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
-      globalSpeed: 0.0168,
-      boundaryContrast: 0.7,
-      beads: 0.45,
-      surge: 0.9,
+      globalSpeed: 0.032,
+      boundaryContrast: 0.0,
+      beads: 0.0,
+      surge: 0.55,
       layerCount: 2,
       blendMode: 'multiply',
       gooeyEffect: 0.15,
-      rotationSpeed: 0.125,      // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.5,
+      postBlurRadius: 1.0,
+      rotationSpeed: 0.30,       // 28i-2: keeps the slide moving above 0.02 at 20 and 40 s while softening high-frequency cell noise
+      centerGravity: 0.45,
       ledPlatform: true,
       ledMode: 'single',
       ledSpeed: 0.0,
-      diffusionRate: 0.00005,
-      buoyancy: 0.4,
-      advection: 0.3,
-      damping: 0.98,
-      heatDecay: 0.95,
-      automateRate: 0.3,
-      platePressure: 0.8,
-      glassSmear: 0.2,
-      rainDrip: 0.1,
+      diffusionRate: 0.0002,
+      buoyancy: 0.45,
+      advection: 0.65,
+      damping: 0.985,
+      heatDecay: 0.96,
+      automateRate: 0.22,
+      platePressure: 0.25,
+      glassSmear: 0.5,
+      rainDrip: 0.05,
       viscosity: 'thick',
-      polarity: 0.95,
-      evaporationRate: 0.01,
-      airVelocity: 0.1,
-      vibrationFrequency: 0.6,
+      polarity: 0.15,
+      blobSurfaceTension: 0.05,
+      evaporationRate: 0.002,
+      airVelocity: 0.06,
+      vibrationFrequency: 0.02,
+      turbulenceScale: 0.22,
       ledColor: '#f1ebf5',
-      cells: 0.45,
-      saturationBoost: 1.15,
-      dyeBudget: 0.55,
+      cells: 0.0,
+      exposure: 0.22,
+      saturationBoost: 1.05,
+      dyeBudget: 0.72,
       sceneMappings: [
         // The hats by name are the `bands` source's; on `sound` this read 0 (28f).
-        // Kick and snare agitate the slide and nucleate micro-bubbles in the shear (28i-3b).
-        { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.5 },
-        { source: 'hits', feature: 'kickHit', setting: 'turbulenceScale', depth: 0.3 },
-        { source: 'hits', feature: 'snareHit', setting: 'bubbles', depth: 0.25 },
+        // Kick and snare agitate the slide's cover glass and swirl without drawing sharp beads or bubbles (28i-2, 28i-3b).
+        { source: 'bands', feature: 'hats', setting: 'buoyancy', depth: 0.15 },
+        { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.15 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.15 },
       ],
       audioMappings: {
         velocity: 'complexity',
@@ -571,31 +584,34 @@ export const PRESETS: Preset[] = [
     description: 'Translucent magenta and lavender bells pulse through teal water, lit from beneath.',
     settings: {
       globalSpeed: 0.0126,
-      surge: 0.25,
+      surge: 0.45,
       layerCount: 2,
       blendMode: 'screen',
-      gooeyEffect: 0.85,
-      rotationSpeed: 0.067,      // the dish's motor; was 0.006 with a stir in the middle (PLAN 22j)
+      gooeyEffect: 0.28,
+      rotationSpeed: 0.115,      // 28i-2: keeps the bells drifting past 0.02 motion at 20 and 40 s
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
       ledSpeed: 0.0,
       diffusionRate: 0.00008,
-      buoyancy: 0.55,
+      buoyancy: 0.65,
       advection: 0.25,
       damping: 0.988,
       heatDecay: 0.995,
-      automateRate: 0.16,  // 28a: at 0.08 two bells on an empty navy plate most of the minute (flat 61–70% on the Mac)
-      platePressure: 0.25,
+      automateRate: 0.22,  // 28a, 28i-2: keeps four bells and their trails filling the navy water (flat <= 0.4) while near-black stays >= 20%
+      platePressure: 0.45,
       glassSmear: 0.15,
       rainDrip: 0.45,
       viscosity: 'thick',
       polarity: 0.85,
-      evaporationRate: 0.005,
-      airVelocity: 0.04,
+      evaporationRate: 0.003,
+      airVelocity: 0.06,
       vibrationFrequency: 0.25,
+      audioImpact: 0.7,
+      plateRock: 0.35,
       transmission: 0.3,
-      secondLamp: 0.3,
+      secondLamp: 0.45,
+      lampHotspot: 0.4,
       ledColor: '#03102a',
       /*
         A band per bell (PLAN 25b-6, 25h; the bells are its areas). The kick
@@ -684,11 +700,11 @@ export const PRESETS: Preset[] = [
     description: 'Three pools apart on deep violet: thick magenta glycerine folded by the mids, a raspberry well of soap the bass breaks open, and ultramarine syrup glittering with the treble.',
     settings: {
       globalSpeed: 0.0084,
-      surge: 0.18,
-      layerCount: 2,
+      surge: 0.35,
+      layerCount: 1,
       blendMode: 'overlay',
-      gooeyEffect: 0.75,
-      rotationSpeed: 0.023,      // the dish's motor; was 0.005 with a stir in the middle (PLAN 22j)
+      gooeyEffect: 0.55,
+      rotationSpeed: 0.27,       // 28i-2: above lookMotorRate's 0.1 vertex (~0.086 rad/s, ~1.2 min/turn) so the three pools clear M >= 0.02 at 20 and 40 s
       // Flat: a concave dish slid all three pools into one in the middle. The
       // pools are its areas of the dish now (lib/plateAreas.ts).
       centerGravity: 0.0,
@@ -697,25 +713,28 @@ export const PRESETS: Preset[] = [
       ledColor: '#220044',
       ledSpeed: 0.0,
       diffusionRate: 0.00006,
-      buoyancy: 0.3,
+      buoyancy: 0.35,
       advection: 0.2,
       damping: 0.992,
       heatDecay: 0.997,
-      automateRate: 0.08,       // the hands tend three areas now, so a little more often (was 0.04)
-      platePressure: 0.3,
-      glassSmear: 0.25,
+      automateRate: 0.16,       // the hands tend three areas now, so a little more often (was 0.08)
+      platePressure: 0.45,
+      glassSmear: 0.22,
       rainDrip: 0.6,
       viscosity: 'thick',
       polarity: 0.9,
-      evaporationRate: 0.003,
-      airVelocity: 0.02,
-      vibrationFrequency: 0.1,
+      evaporationRate: 0.004,
+      airVelocity: 0.04,
+      vibrationFrequency: 0.15,
+      audioImpact: 0.7,
+      plateRock: 0.35,
       transmission: 0.55,
       lampWarmth: 0.25,
       glossiness: 0.35,
       edgeRelief: 0.45,
       boundaryContrast: 0.5,
-      dyeBudget: 0.45,          // dark violet between the pools: at the default 0.85 they ran into one wash
+      exposure: 0.78,
+      dyeBudget: 0.42,          // dark violet between the pools: at the default 0.85 they ran into one wash
       /*
         Each pool hears its own instrument (PLAN 25h, lib/areaCords.ts). The
         kick warms and stirs the soap well (area 1): a heat source under it
@@ -807,27 +826,29 @@ export const PRESETS: Preset[] = [
       blendMode: 'lighter',
       gooeyEffect: 0.05,
       rotationSpeed: 0.282,      // the dish's motor; was 0.06 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.95,
+      centerGravity: 0.55,
       // Glitter wants a night sky. On the rainbow wheel, with the dye dried
       // and diffused away, the frame was the wheel and nothing else.
       ledPlatform: false,
       ledMode: 'single',
       ledSpeed: 0.0,
       diffusionRate: 0.0002,     // a spark stays a spark
-      buoyancy: 0.7,
-      advection: 0.9,
+      buoyancy: 0.5,
+      advection: 0.75,
       damping: 0.92,
       heatDecay: 0.93,
-      automateRate: 0.22,
-      platePressure: 0.85,
-      glassSmear: 0.9,
-      rainDrip: 0.15,
+      automateRate: 0.16,
+      platePressure: 0.45,
+      glassSmear: 0.45,
+      rainDrip: 0.1,
       viscosity: 'thin',
-      polarity: 0.15,
-      evaporationRate: 0.006,
-      dyeBudget: 0.45,
+      polarity: 0.65,
+      evaporationRate: 0.011,
+      dyeBudget: 0.24,
+      saturationBoost: 1.6,
+      hueJourney: 2,
       audioImpact: 0.85,
-      airVelocity: 0.55,
+      airVelocity: 0.35,
       vibrationFrequency: 0.85,
       particles: 0.8,
       particleMix: 0.75,
@@ -930,12 +951,12 @@ export const PRESETS: Preset[] = [
     description: 'A reaction that prints: the CIMA reaction in a gel with starch, under a white lamp. Labyrinths of one stripe width grow out from each pour in blue-black on clear, and the flow drags them into whorls that heal back.',
     settings: {
       lampGround: 1,
-      globalSpeed: 0.0126,
-      surge: 0.2,
+      globalSpeed: 0.0168,
+      surge: 0.25,
       layerCount: 1,
       blendMode: 'multiply',
       gooeyEffect: 0,
-      rotationSpeed: 0.0,
+      rotationSpeed: 0.035,
       centerGravity: 0.0,
       ledPlatform: true,
       ledMode: 'single',
@@ -946,12 +967,12 @@ export const PRESETS: Preset[] = [
       advection: 0.4,
       damping: 0.985,
       heatDecay: 0.985,
-      automateRate: 0.02,
+      automateRate: 0.16,
       platePressure: 0.15,
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
-      polarity: 0.5,
+      polarity: 0.75,
       evaporationRate: 0.0,
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
@@ -960,8 +981,8 @@ export const PRESETS: Preset[] = [
       turbulenceDetail: 3,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0,
-      saturationBoost: 1.0,
-      dyeBudget: 0.35,
+      saturationBoost: 1.45,
+      dyeBudget: 0.85,
       // A gel print is flat: the complex sits in the gel and does not raise it (PLAN 26-colour-a).
       edgeRelief: 0,
       bubbles: 0,
@@ -994,7 +1015,7 @@ export const PRESETS: Preset[] = [
         { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
         { source: 'bands', feature: 'tonalHigh', setting: 'mazeDetail', depth: 0.2 },
       ],
-      audioMappings: { velocity: 'mid', density: 'none', color: 'none', rotation: 'none' },
+      audioMappings: { velocity: 'mid', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
   {
@@ -1013,33 +1034,33 @@ export const PRESETS: Preset[] = [
       transmission: 0.5,
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
-      globalSpeed: 0.0126,
-      surge: 0.55,
+      globalSpeed: 0.022,
+      surge: 0.65,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.6,
-      rotationSpeed: 0.0,
+      rotationSpeed: 0.095,
       centerGravity: 0.0,
       ledPlatform: false,
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
       diffusionRate: 0.00005,
-      buoyancy: 0.3,
-      advection: 0.5,
-      damping: 0.975,
-      heatDecay: 0.98,
-      automateRate: 0.1,
-      platePressure: 0.5,
+      buoyancy: 0.45,
+      advection: 0.65,
+      damping: 0.985,
+      heatDecay: 0.985,
+      automateRate: 0.22,
+      platePressure: 0.55,
       glassSmear: 0.2,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 1.0,
       evaporationRate: 0.002,
-      airVelocity: 0.0,
+      airVelocity: 0.04,
       vibrationFrequency: 0.0,
-      audioImpact: 0.55,
-      turbulenceScale: 0.35,
+      audioImpact: 0.7,
+      turbulenceScale: 0.55,
       turbulenceDetail: 2,
       blobSurfaceTension: 0.6,
       boundaryContrast: 0.9,
@@ -1050,7 +1071,7 @@ export const PRESETS: Preset[] = [
       edgeRelief: 0.0,
       bubbles: 0.07,
       plateRock: 0.5,
-      beatSqueeze: 0.0,
+      beatSqueeze: 0.35,
       layerScaleVariety: 0.0,
       lightPlay: 0.15,
       lampHotspot: 0.1,
@@ -1076,10 +1097,10 @@ export const PRESETS: Preset[] = [
     description: 'The camera chases one travelling bead — teal, amber and coral on a deep sea-green ground — cells, lacing and razor edges filling the frame.',
     settings: {
       macroMode: true,
-      macroCamera: 'follow',     // rides the liquid under the aim; aim it anywhere, or Auto to roam
-      macroZoom: 4.5,            // ~28 sim cells across — bead plus its surroundings
-      macroChase: 0.55,          // a quick follow with a whip on each cut
-      macroHold: 4.5,
+      macroCamera: 'auto',       // 28i-2: cuts across contrasting beads every few seconds so the closeup walks ≥2 hues and ≥6 colour changes/min
+      macroZoom: 2.1,            // 28i-2: fully in the closeup (>=2x) while wide enough to frame contrasting neighbour beads (>=2 hues/frame)
+      macroChase: 0.7,           // a quick follow with a whip on each cut
+      macroHold: 2.5,
       macroCells: 0.85,
       macroCellScale: 0.45,
       macroLacing: 0.7,
@@ -1088,41 +1109,42 @@ export const PRESETS: Preset[] = [
       macroRelief: 0.8,       // domed beads with wet highlights
       beads: 0.35,            // oil drops on the plate, each a lens on the colour under it
       globalSpeed: 0.06,
-      surge: 0.45,         // beads visibly travel — the whole point
+      surge: 0.55,        // beads visibly travel — the whole point
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.12,         // almost no metaball blur — keeps beads crisp
       postBlurRadius: 0.1,
-      rotationSpeed: 0.0,
-      centerGravity: 0.0,
+      rotationSpeed: 0.14,
+      centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
       ledColor: '#04181a',
       ledSpeed: 0.0,
-      diffusionRate: 0.00003,    // colors stay separate instead of muddying
+      diffusionRate: 0,          // colors stay separate instead of muddying
       buoyancy: 0.35,
-      advection: 0.6,
+      advection: 0.65,
       damping: 0.985,
       heatDecay: 0.985,
-      automateRate: 0.22,
-      platePressure: 0.3,
+      automateRate: 0.45,
+      platePressure: 0.35,
       glassSmear: 0.2,
       rainDrip: 0.05,
       viscosity: 'thick',
-      polarity: 0.9,             // strong immiscibility — hard color boundaries
-      evaporationRate: 0.006,
+      polarity: 0.98,            // strong immiscibility — hard color boundaries
+      evaporationRate: 0.005,
       airVelocity: 0.08,
       vibrationFrequency: 0.05,
-      audioImpact: 0.5,
+      audioImpact: 0.6,
       turbulenceScale: 0.45,
       turbulenceDetail: 3,
-      blobSurfaceTension: 0.55,
+      blobSurfaceTension: 0.75,
       bubbles: 0.12,
       layerScaleVariety: 0,
       boundaryContrast: 0.7,
-      saturationBoost: 1.5,
+      saturationBoost: 1.55,
+      hueJourney: 2,
       glossiness: 0.12,          // a hint of wet sheen at this distance
-      macroSync: 0.6,
+      macroSync: 0.8,
       /*
         Closeup bead physics (PLAN 28i-3b): kicks open cell rings inside the
         travelling silicone bead, snares stretch lacing along its dark
@@ -1135,8 +1157,8 @@ export const PRESETS: Preset[] = [
       ],
       audioMappings: {
         velocity: 'bass',
-        density: 'volume',
-        color: 'treble',
+        density: 'none',
+        color: 'timbre',
         rotation: 'none',
       },
     }
@@ -1163,33 +1185,34 @@ export const PRESETS: Preset[] = [
       blendMode: 'screen',
       gooeyEffect: 0.2,
       postBlurRadius: 0.12,
-      rotationSpeed: 0.156,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.05,
+      rotationSpeed: 0.18,       // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
+      centerGravity: 0.75,       // 28i-2: holds the three pools inside the central closeup frame instead of drifting off
       ledPlatform: true,
       ledMode: 'single',
       ledColor: '#12062a',
       ledSpeed: 0.0,
       diffusionRate: 0.00005,
-      buoyancy: 0.5,
-      advection: 0.45,
+      buoyancy: 0.05,            // 28i-2: at 0.5 buoyancy carried the three pools upward out of the hold camera's frame by 40 s
+      advection: 0.35,
       damping: 0.99,
       heatDecay: 0.99,
-      automateRate: 0.14,
-      platePressure: 0.45,
+      automateRate: 0.35,
+      platePressure: 0.35,
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.85,
-      evaporationRate: 0.004,  // 28a: at 0.01 the cells drained to one sliver by 40 s (flat 75% on the Mac)
+      evaporationRate: 0.0,      // 28i-2: keeps the cells bright past 40 s (luma(40s) >= half luma(8s), flat <= 0.4)
+      dyeBudget: 0.85,
       airVelocity: 0.05,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
-      turbulenceScale: 0.35,
+      turbulenceScale: 0.22,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.6,
+      blobSurfaceTension: 0.65,
       bubbles: 0.1,
       layerScaleVariety: 0,
-      boundaryContrast: 0.6,
+      boundaryContrast: 0.65,
       saturationBoost: 1.55,
       glossiness: 0.18,
       macroSync: 0.35,
@@ -1218,10 +1241,10 @@ export const PRESETS: Preset[] = [
     description: 'A tongue of amber dye spreading over dark red ground, dragging black dendritic lacing behind it; the camera cuts on the kick.',
     settings: {
       macroMode: true,
-      macroCamera: 'follow',     // rides the liquid under the aim; aim it anywhere, or Auto to roam
-      macroZoom: 4.0,
-      macroChase: 0.7,           // the liveliest of the three
-      macroHold: 4.0,            // short takes
+      macroCamera: 'auto',       // 28i-2: matches the description ("the camera cuts on the kick") so short takes traverse ≥2 hues and ≥6 colour changes/min
+      macroZoom: 2.1,            // 28i-2: fully in the closeup (>=2x) while wide enough to frame contrasting lacing tongues (>=2 hues/frame)
+      macroChase: 0.75,          // the liveliest of the three
+      macroHold: 2.4,            // short takes
       macroCells: 0.8,
       macroCellScale: 0.55,
       macroLacing: 1.0,          // lacing is the subject here
@@ -1234,23 +1257,23 @@ export const PRESETS: Preset[] = [
       blendMode: 'screen',
       gooeyEffect: 0.08,
       postBlurRadius: 0.08,
-      rotationSpeed: 0.0,
-      centerGravity: 0.0,
+      rotationSpeed: 0.16,
+      centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
       ledColor: '#2E0705',
       ledSpeed: 0.0,
-      diffusionRate: 0.00004,
+      diffusionRate: 0,
       buoyancy: 0.3,
       advection: 0.85,
       damping: 0.975,
       heatDecay: 0.97,
-      automateRate: 0.28,
+      automateRate: 0.45,
       platePressure: 0.45,       // squeeze drives the front without flattening it
       glassSmear: 0.4,
       rainDrip: 0.2,
       viscosity: 'thin',
-      polarity: 0.95,
+      polarity: 0.98,
       evaporationRate: 0.005,
       airVelocity: 0.2,
       vibrationFrequency: 0.1,
@@ -1261,9 +1284,10 @@ export const PRESETS: Preset[] = [
       bubbles: 0.15,
       layerScaleVariety: 0,
       boundaryContrast: 0.8,
-      saturationBoost: 1.4,
+      saturationBoost: 1.5,
+      hueJourney: 2,
       glossiness: 0.08,
-      macroSync: 0.85,
+      macroSync: 0.9,
       /*
         The running tongue of soap and silicone (PLAN 28i-3b): kicks drive the
         surfactant pull at the leading edge, snares split the front into
@@ -1276,8 +1300,8 @@ export const PRESETS: Preset[] = [
       ],
       audioMappings: {
         velocity: 'bass',
-        density: 'energy',
-        color: 'treble',
+        density: 'none',
+        color: 'timbre',
         rotation: 'none',
       },
     }
@@ -1289,31 +1313,29 @@ export const PRESETS: Preset[] = [
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
-      // A plate that wants stirring rather than one that is already busy: the
-      // turbulence starts low so what the room adds is what is seen moving,
-      // and the dye budget runs full so there is something there to move.
-      globalSpeed: 0.0126,
-      surge: 0.55,
+      // 28i-2: keeps the dish moving above 0.02 at 20 and 40 s even before a camera is turned on.
+      globalSpeed: 0.022,
+      surge: 0.65,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.0,
+      rotationSpeed: 0.095,
       centerGravity: 0.05,
       granulation: 0.5,
       diffusionRate: 0.00012,
-      buoyancy: 0.3,
-      advection: 0.45,
+      buoyancy: 0.45,
+      advection: 0.6,
       damping: 0.985,
       heatDecay: 0.99,
-      automateRate: 0.08,          // the room does the injecting; automation only tops it up
-      platePressure: 0.35,
+      automateRate: 0.18,          // keeps the plate stirred and replenished when no room camera is active
+      platePressure: 0.45,
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.7,
       evaporationRate: 0.0025,
-      audioImpact: 0.35,           // the music is still there, but it is not the loudest hand
-      turbulenceScale: 0.12,
+      audioImpact: 0.65,           // the music stirs the plate when no camera is on
+      turbulenceScale: 0.35,
       turbulenceDetail: 2,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.1,
@@ -1323,8 +1345,8 @@ export const PRESETS: Preset[] = [
       bubbles: 0.15,
       beads: 0.2,
       fingering: 0.6,              // a palm on the glass lifts into spokes as they move on
-      plateRock: 0.2,
-      beatSqueeze: 0.0,
+      plateRock: 0.35,
+      beatSqueeze: 0.3,
       lightPlay: 0.35,
       lampMotion: 0.25,
       lampHotspot: 0.5,
@@ -1386,24 +1408,25 @@ export const PRESETS: Preset[] = [
       advection: 0.5,
       damping: 0.985,
       heatDecay: 0.995,
-      automateRate: 0.07,          // a drop of soap now and then, not a stream of it
-      platePressure: 0.1,
+      automateRate: 0.14,          // a drop of soap and food colouring now and then keeps the marbling rich
+      platePressure: 0.15,
       glassSmear: 0.1,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.9,               // the colours stay four colours, not one brown one
-      evaporationRate: 0.0015,     // the ground has to last; this is a long, slow dish
+      evaporationRate: 0.001,      // the ground has to last; this is a long, slow dish
       airVelocity: 0.0,
       vibrationFrequency: 0.0,
-      audioImpact: 0.3,            // the beat is when a drop lands, not a shove of its own
-      turbulenceScale: 0.05,
+      audioImpact: 0.35,           // the beat is when a drop lands, not a shove of its own
+      turbulenceScale: 0.08,
       turbulenceDetail: 2,
       blobSurfaceTension: 0.7,
       boundaryContrast: 0.55,      // a bright line where a colour front meets the ground
-      saturationBoost: 1.5,
+      saturationBoost: 1.55,
+      exposure: 0.72,              // 28i-2: tames the white milk ground so the food colouring holds luma <= 0.6
       glossiness: 0.05,
       postBlurRadius: 0.1,
-      dyeBudget: 1.0,
+      dyeBudget: 1.1,
       edgeRelief: 0.3,
       bubbles: 0.0,
       plateRock: 0.1,
@@ -1566,37 +1589,40 @@ export const PRESETS: Preset[] = [
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
-      globalSpeed: 0.0105,
-      advection: 0.4,
-      platePressure: 0.35,
+      globalSpeed: 0.0168,
+      advection: 0.5,
+      platePressure: 0.45,
       beatSqueeze: 0.0,
-      dyeBudget: 0.9,
+      dyeBudget: 1.1,
       phIndicator: 1,
       thicknessOptics: 0.4,
-      ledColor: '#f2eefa',
-      surge: 0.35,
+      ledColor: '#e8dff5',
+      surge: 0.45,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.038,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
+      rotationSpeed: 0.085,      // 28i-2: carries the acid pink, neutral violet and base green zones across the dish
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
       ledSpeed: 0.0,
       diffusionRate: 0,
-      buoyancy: 0.2,
+      buoyancy: 0.3,
       damping: 0.985,
       heatDecay: 0.99,
-      automateRate: 0.1,
+      automateRate: 0.24,
       glassSmear: 0.2,
       rainDrip: 0.0,
       viscosity: 'thick',
-      evaporationRate: 0.003,
+      polarity: 0.8,
+      evaporationRate: 0.001,
       airVelocity: 0.02,
       vibrationFrequency: 0.1,
-      audioImpact: 0.5,
-      boundaryContrast: 0.3,
-      saturationBoost: 1.3,
+      audioImpact: 0.6,
+      boundaryContrast: 0.35,
+      saturationBoost: 1.5,
+      exposure: 0.75,            // 28i-2: deepens the cabbage indicator bath so luma stays <= 0.5 with >= 3 hues
+      hueJourney: 2,
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
@@ -1611,7 +1637,7 @@ export const PRESETS: Preset[] = [
         { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
         { source: 'bands', feature: 'tonalMid', setting: 'areaStir', area: 0, depth: 0.35, threshold: 0.35, attack: 0.04, release: 0.35 },
       ],
-      audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
+      audioMappings: { velocity: 'bass', density: 'mid', color: 'treble', rotation: 'none' },
     }
   },
   {
@@ -1621,50 +1647,55 @@ export const PRESETS: Preset[] = [
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
-      globalSpeed: 0.0084,
-      advection: 0.3,
-      platePressure: 0.2,
-      beatSqueeze: 0.0,
-      dyeBudget: 0.35,
-      bzReaction: 1,
+      globalSpeed: 0.024,
+      advection: 0.65,
+      platePressure: 0.45,
+      beatSqueeze: 0.35,
+      dyeBudget: 0.75,           // 28i-2: holds the indicator bath while exposure 0.58 lets the #fbf6ee lamp shine through at 8 s
+      exposure: 0.58,            // 28i-2: exposes thin indicator gel against filmLevel so t=8 s reads bright instead of Beer-Lambert dark
+      bzReaction: 0.78,
       ledColor: '#fbf6ee',
-      surge: 0.35,
+      surge: 0.6,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.019,      // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
+      rotationSpeed: 0.22,       // 28i-2: turns the ferroin red and oxidised blue fronts so colour reorganises >= 6/min
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
       ledSpeed: 0.0,
       diffusionRate: 0,
-      buoyancy: 0.2,
+      buoyancy: 0.4,
       damping: 0.985,
       heatDecay: 0.99,
-      automateRate: 0.1,
-      glassSmear: 0.2,
+      automateRate: 0.28,
+      glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
-      evaporationRate: 0.003,
-      airVelocity: 0.02,
-      vibrationFrequency: 0.1,
-      audioImpact: 0.5,
-      boundaryContrast: 0.3,
-      saturationBoost: 1.3,
+      polarity: 0.8,
+      evaporationRate: 0.004,
+      airVelocity: 0.05,
+      vibrationFrequency: 0.15,
+      audioImpact: 0.85,
+      turbulenceScale: 0.45,
+      boundaryContrast: 0.35,
+      saturationBoost: 1.5,
+      hueJourney: 1,
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
       /*
-        The Belousov-Zhabotinsky gel dish (PLAN 28i-3b): kicks push the
-        oxidation wave drift outward, snares shear wave tips into spiral
-        pairs, and mid harmony deepens the ferroin reaction.
+        The Belousov-Zhabotinsky gel dish (PLAN 28i-2, 28i-3b): bass and mid
+        harmony shift the ferroin oxidation weight so the dish alternates
+        between red/blue spiral fronts and the multi-hue indicator bath (>=6
+        colour changes/min), while snares shear wave tips into spiral pairs.
       */
       sceneMappings: [
-        { source: 'hits', feature: 'kickHit', setting: 'turingDrift', depth: 0.3 },
-        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.2 },
-        { source: 'bands', feature: 'tonalMid', setting: 'chemistry', depth: 0.15 },
+        { source: 'bands', feature: 'tonalLow', setting: 'bzReaction', depth: -0.58 },
+        { source: 'bands', feature: 'tonalMid', setting: 'bzReaction', depth: -0.55 },
+        { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
       ],
-      audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
+      audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
   },
   {
@@ -1745,32 +1776,33 @@ export const PRESETS: Preset[] = [
     settings: {
       // On the lamp: a dish that reads there with its own dye (PLAN 18b-1, `npm run lampjudge`).
       lampGround: 1,
-      globalSpeed: 0.0105,
-      surge: 0.55,
+      globalSpeed: 0.019,
+      surge: 0.65,
       layerCount: 2,
       blendMode: 'screen',
       gooeyEffect: 0.6,
-      rotationSpeed: 0.11,       // the dish's motor; was 0.01 with a stir in the middle (PLAN 22j)
+      rotationSpeed: 0.165,      // 28i-2: keeps the Super 8 dish moving past 0.02 at 20 and 40 s
       centerGravity: 0.15,
       ledPlatform: false,
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
       diffusionRate: 0,
-      buoyancy: 0.4,
-      advection: 0.4,
+      buoyancy: 0.48,
+      advection: 0.55,
       damping: 0.985,
       heatDecay: 0.99,
-      automateRate: 0.14,
-      platePressure: 0.35,
+      automateRate: 0.2,
+      platePressure: 0.45,
       glassSmear: 0.3,
       rainDrip: 0.1,
       viscosity: 'thick',
       polarity: 0.75,
       evaporationRate: 0.004,
-      airVelocity: 0.04,
+      airVelocity: 0.06,
       vibrationFrequency: 0.1,
-      audioImpact: 0.55,
+      audioImpact: 0.7,
+      turbulenceScale: 0.45,
       blobSurfaceTension: 0.4,
       boundaryContrast: 0.4,
       saturationBoost: 1.4,
@@ -1814,32 +1846,33 @@ export const PRESETS: Preset[] = [
       */
       oilTension: 0.9,
       oilBodies: 1,
-      globalSpeed: 0.0126,
-      surge: 0.4,
+      globalSpeed: 0.022,
+      surge: 0.55,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.5,
-      rotationSpeed: 0.123,      // the dish's motor; was 0.012 with a stir in the middle (PLAN 22j)
+      rotationSpeed: 0.19,       // 28i-2: keeps the oil bodies drifting past 0.02 at 20 and 40 s
       centerGravity: 0.1,
       ledPlatform: false,
       ledMode: 'single',
       ledColor: '#000000',
       ledSpeed: 0.0,
       diffusionRate: 0,
-      buoyancy: 0.2,
+      buoyancy: 0.38,
       advection: 0.45,
       damping: 0.985,
       heatDecay: 0.99,
-      automateRate: 0.12,
+      automateRate: 0.2,
       platePressure: 0.55,
       glassSmear: 0.25,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.85,
       evaporationRate: 0.003,
-      airVelocity: 0.02,
+      airVelocity: 0.04,
       vibrationFrequency: 0.05,
-      audioImpact: 0.55,
+      audioImpact: 0.7,
+      turbulenceScale: 0.45,
       blobSurfaceTension: 0.45,
       boundaryContrast: 0.35,
       saturationBoost: 1.45,
@@ -2036,31 +2069,31 @@ export const PRESETS: Preset[] = [
       // 88% of the dots held under a turn at 1, against its 90%).
       transmission: 0.5,
       benDay: 1,
-      globalSpeed: 0.0105,
+      globalSpeed: 0.016,
       surge: 0.45,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.7,
       rotationSpeed: 0.0,
-      centerGravity: 0.1,
+      centerGravity: 0.28,
       // The paper: a white light table, as Ferro Maze's.
       ledPlatform: true,
       ledMode: 'single',
       ledColor: '#ffffff',
       ledSpeed: 0.0,
-      diffusionRate: 0.00004,
-      buoyancy: 0.25,
-      advection: 0.4,
-      damping: 0.982,
+      diffusionRate: 0.00002,
+      buoyancy: 0.28,
+      advection: 0.42,
+      damping: 0.985,
       heatDecay: 0.985,
-      automateRate: 0.1,
-      platePressure: 0.35,
+      automateRate: 0.28,
+      platePressure: 0.38,
       glassSmear: 0.15,
       rainDrip: 0.0,
       viscosity: 'thick',
       // Two primaries that meet stay two primaries, with a hard seam.
       polarity: 1.0,
-      evaporationRate: 0.003,
+      evaporationRate: 0.0006,
       airVelocity: 0.02,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
@@ -2071,17 +2104,13 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.5,
       colourBody: 0.5,
       /*
-        A print is mostly paper. The budget is the mean the regulator lets the
-        plate fill to before it evaporates the excess, and at 0.9 Roy could
-        fill to eight times the panel it opens with (0.115, npm run royopen),
-        where the inks run into each other and three inks over each other
-        print black: the opening's stain again, laid by the drops instead of
-        the seed. At 0.45 it holds about four times the opening, room for the
-        pours and drops to add shapes, and it caps the plate short of one wash.
-        Inferred from the regulator and the print, not watched on a live
-        plate here (no app frames in a cloud session): docs/judging.md §37.
+        28i-2: at 0.45 with 0.003 evaporation, the Ben-Day dot washes thinned
+        below the print's dot threshold within 8 seconds, leaving 65% bare
+        white paper (luma 0.75, flat 0.65). At 0.68 with 0.0006 evaporation
+        and 0.28 automation, the comic shapes and dot fields hold across the
+        panel (flat <= 0.5, luma <= 0.6 at 8..40 s) while staying below the stain cap.
       */
-      dyeBudget: 0.45,
+      dyeBudget: 0.68,
       glossiness: 0.0,
       postBlurRadius: 0.1,
       edgeRelief: 0.0,
@@ -2136,44 +2165,45 @@ export const PRESETS: Preset[] = [
         the plumes toward salt fingers. Lit from behind like the real lamp.
       */
       plateUpright: 1,
-      solutalBuoyancy: 0.6,
+      solutalBuoyancy: 0.7,
       doubleDiffusion: 0.5,
       tiltDirection: 180,
       heatDecay: 0.995,
       lampGround: 1,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#ffe6bf',
+      ledColor: '#b58c5c',
       ledSpeed: 0.0,
-      globalSpeed: 0.0105,
-      surge: 0.3,
+      globalSpeed: 0.0168,
+      surge: 0.38,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.6,
       rotationSpeed: 0,          // a lamp does not turn: down has to stay down the screen
-      centerGravity: 0,
+      centerGravity: 0.32,       // 28i-2: holds the rising wax inside the bottle instead of draining out the open rim
       diffusionRate: 0,
-      buoyancy: 0.3,
-      advection: 0.4,
+      buoyancy: 0.42,
+      advection: 0.48,
       damping: 0.988,
-      automateRate: 0.06,        // a little new wax now and then; the plumes are the show
-      platePressure: 0.1,
-      glassSmear: 0.15,
+      automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
+      platePressure: 0.28,
+      glassSmear: 0.18,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
-      evaporationRate: 0.004,
-      airVelocity: 0.02,
+      evaporationRate: 0.001,
+      airVelocity: 0.04,
       vibrationFrequency: 0.0,
-      audioImpact: 0.35,
-      turbulenceScale: 0.2,
+      audioImpact: 0.55,
+      turbulenceScale: 0.42,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.4,
-      saturationBoost: 1.3,
+      saturationBoost: 1.45,
+      exposure: 0.46,
       glossiness: 0.15,
-      plateRock: 0.1,
+      plateRock: 0.25,
       beatSqueeze: 0.0,
-      dyeBudget: 0.6,
+      dyeBudget: 0.65,
       bubbles: 0,
       /*
         The pattern for a look's own patches (28f, the owner: "only use things

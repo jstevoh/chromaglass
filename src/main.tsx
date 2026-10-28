@@ -27,12 +27,6 @@ installCrashLog();
 
 const params = new URLSearchParams(window.location.search);
 const show = !params.has('remote') && !params.has('cast');
-// The GPU, asked for now, while the app's chunks are still downloading:
-// Chromium's start of it takes seconds on a cold Mac, and was waiting for
-// them (gpu/device.ts). Not for the remote, which draws no plate, nor a
-// cast, which mirrors the show's canvas when it can and asks for its own
-// GPU only when it cannot.
-if (show) requestGpuEarly();
 // The intro `index.html` painted, listened to from here on: a key or a press
 // on it takes it away, and the plate's first frame does (lib/intro.ts).
 installIntro(show);
@@ -79,6 +73,67 @@ function landingFirst(mustSignIn: boolean): boolean {
   const { pathname, search } = window.location;
   if (pathname.replace(/\/$/, '') === SHOW_PATH) return false;
   return mustSignIn || isLandingAddress(pathname, search);
+}
+
+/**
+ * The app's chunks and the GPU, for a visit whose first screen is the show.
+ *
+ * The GPU is asked for now, while the app's chunks are still downloading:
+ * Chromium's start of it takes seconds on a cold Mac, and was waiting for
+ * them (gpu/device.ts). Not for the remote, which draws no plate, nor a
+ * cast, which mirrors the show's canvas when it can and asks for its own
+ * GPU only when it cannot.
+ *
+ * Not at the webpage's address either (PLAN.md 14v-9). There the GPU's start
+ * held the webpage's whole thread while a visitor was reading it (on CI's
+ * Mac 0.6 to 4.5 s, `npm run startup`'s "held" line) for a show they might
+ * never open, and the app's 590 kB came down beside the webpage's pictures
+ * (the page's preload script, vite.config.ts). The webpage asks for the app
+ * once it has loaded, when the line is free, and Play asks for the GPU.
+ */
+type PreloadWindow = Window & { __cgPreloadApp?: () => void };
+const preloadApp = () => (window as PreloadWindow).__cgPreloadApp?.();
+const meetsLanding = show && landingFirst(false);
+if (show && !meetsLanding) {
+  requestGpuEarly();
+  preloadApp();
+} else if (meetsLanding) {
+  /*
+    Once the webpage is drawn: its own chunk in and run, and the pictures it
+    shows at once arrived (the looks further down load lazily, a film only to
+    its first frame). Not the page's `load` event, which once the app's
+    preloads had gone came before the webpage's chunk had even run, and asked
+    for the app ahead of the pictures it was meant to wait for (`npm run
+    loadtime` 4b). Four seconds at most: a picture that never arrives does not
+    keep the show from being ready behind it.
+  */
+  const until = performance.now() + 4000;
+  const drawn = () => {
+    const page = document.querySelector('[data-cg-landing]');
+    const shown = page ? [...page.querySelectorAll<HTMLImageElement | HTMLVideoElement>('img:not([loading=lazy]), video')] : [];
+    return !!page && shown.every((m) => (m instanceof HTMLImageElement ? m.complete : m.readyState >= 2));
+  };
+  const wait = () => {
+    if (drawn() || performance.now() > until) {
+      if ('requestIdleCallback' in window) requestIdleCallback(preloadApp, { timeout: 1000 }); else setTimeout(preloadApp, 100);
+    } else setTimeout(wait, 100);
+  };
+  wait();
+  /*
+    A hand on its way to Play: a pointer over it, or the keyboard's focus on
+    it. Its start of the GPU takes 1.8 to 4.3 s on CI's cold Mac (`npm run
+    startup`'s adapter and device lines), so the moment before the press is
+    worth having, for a visitor whose Play opens the show rather than the
+    sign-in. The thread it holds is the webpage's own, but the hero's slides
+    and a scroll are the compositor's and keep moving.
+  */
+  const reaching = (e: Event) => {
+    if (!(e.target instanceof Element) || !e.target.closest('[data-cg-landing-play]')) return;
+    preloadApp();
+    if (isSignedInCached() || hasValidLicenseSync()) requestGpuEarly();
+  };
+  document.addEventListener('pointerover', reaching, { passive: true });
+  document.addEventListener('focusin', reaching);
 }
 
 // Installable: the service worker is what lets Chrome and Edge offer
@@ -275,6 +330,10 @@ function SiteGate() {
   const [landing, setLanding] = useState(() => landingFirst(phase !== 'app'));
   const [asking, setAsking] = useState(!landing);
   const play = () => {
+    // The show is wanted now: its chunks if the webpage's load had not yet
+    // asked for them, and the GPU, for a visitor who goes straight to it.
+    preloadApp();
+    if (phase === 'app') requestGpuEarly();
     try {
       if (window.location.pathname === '/') {
         window.history.pushState(window.history.state, '', `${SHOW_PATH}${window.location.search}${window.location.hash}`);
