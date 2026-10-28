@@ -3604,7 +3604,15 @@ for, and the GPU was asked for only after they had arrived and drawn.
     then, since every kernel starts with `SIM_STRUCT`. Giving each kernel only the helpers it
     uses would spare the 24 of 124 that never read `S` on those ten. That is not worth the
     code, since 100 still read the struct.
-  - Left: on the owner's machine (an M4, not CI's virtual GPU), the cold opening and a
+  - *The stall reaches the frames.* `npm run startup` went red on #540's run 40741268086 (main's
+    opening; the PR changed nothing it runs): no frame for 2.35 s from 8.70 s, 0.13 s after the
+    intro stopped being held still (8.57 s), `fluid/dampGridCurv` under way. A still intro
+    needs nothing of the GPU process to keep its frames (`Quiet` in `gpu/prepare.ts`), so
+    holding it still to the end of the opening (`?stillall`, timed above: no slower to open)
+    would have kept them. It also makes the intro sit still for most of a cold opening, which
+    is the owner's to judge, so that is its own PR. The render pipelines' first draws handed
+    over after the compute kernels is the other way, untimed.
+  - Left: on the owner's own Mac (not CI's virtual GPU), the cold opening and a
     warm one after a deploy that changed only the display. The first needs the owner's OK
     to empty the shader cache (`npm run openingtime -- --cold`); the second needs no
     emptying. What is left to cut is the count of compiles: the item below.
@@ -5616,6 +5624,15 @@ from a pinned release), **19k-4** (Measure runs only the checks a diff reaches) 
 side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories are in
 [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
 
+- **19k-6** (S): `npm run scene`'s two cost bars red on a PR that changed nothing it runs
+  (#540, 2026-10-28, twice on one head): the worst frame 22.5 ms against 20 (the still room's
+  cold first push; 18.7 on the run before, 13.7 on another PR's that day, 11 to 15 when the bar
+  was set), and once the strobe room's median 2.01 ms against 2. The cost is
+  `process.cpuUsage()`, the whole process's, so the optimiser compiling on V8's background
+  threads during the first push is counted as the analysis's own. Measure the push's thread
+  alone (a worker, or `performance.now()` with the first push timed separately), or warm one
+  push before the timed ones and keep the 20 ms bar for the warm stalls it was set for; and
+  print the reading on the FAIL line, which today says only that it failed.
 - **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
   on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
   wall time on the check-only and document-only ones (19k-4: before it, every PR waited for the
