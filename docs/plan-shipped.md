@@ -5276,6 +5276,13 @@ ran thin builds the old plate on the frame as before, and no other check steps t
 one solver. Lines 4 and 5 also require all 120 steps deep and print the count, so a lab that slips
 back to thin is red by name. They run in CI (`npm run ferrodrag -- --thinoff`, show shard).
 
+After, 120 of 120 steps deep on both labs. Metal (run 40636264043): real `0.09R` (cx `0.6201 → 0.6214
+0.6217 0.6219 0.6221`, half-full `106 → 100 91 92 90`); control `1.93R` (`0.6478 0.6545 0.6585
+0.6624`, half-full `106 → 96 66 0 0`), `1.83R` further, 5/5. Software WebGPU (the cloud lab): real
+`0.09R` (`104 → 96`), control `1.92R` (`104 → 0`), 5/5. Metal and SwiftShader now read the same plate
+to within a thousandth of the plate, so the bars (one radius, half kept, half a radius between) sit
+where software put them, with room on both sides on both.
+
 `ferrohold`'s window was steps 60 to 120 because the rim used to go in the second half of the drag.
 Read there after #495, both absolute bars were passed by the runs they were set to fail (lead `1.93R`
 with `phaseMomentum` off against `2.15R`; `92.6` half-full with `phaseCompress` off against `47`), and

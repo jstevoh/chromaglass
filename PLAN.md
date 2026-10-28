@@ -8489,7 +8489,8 @@ the code's entry points, the checks to add and the scenes to match, in
     those "deep" steps while the old plate's pipelines built off the frame (`thinGapOn`), and on Metal
     the build outlasted the drop's coast (57 of 120 steps deep on the real plate, 0 on the control).
     `lab.step` now builds the old plate first after a thin step; lines 4 and 5 require all 120 steps
-    deep and run in CI (`npm run ferrodrag -- --thinoff`, show shard).
+    deep and run in CI (`npm run ferrodrag -- --thinoff`, show shard). Metal 5/5: real `0.09R`,
+    control `1.93R`.
   - **29c-12. Key `phaseVel()`'s default off `thinLive` before `phaseCompress` reaches the deep plate.**
     `runPhaseCompress` and `runPhasePlanned` call `phaseVel()` with `thin = true`, which today runs only
     on a thin step. Once `phaseCompress` moves onto the deep plate (29c-1), that default must be keyed
