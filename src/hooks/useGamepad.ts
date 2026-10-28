@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { MidiAction } from '../lib/midi';
 
 /**
@@ -26,15 +26,65 @@ export interface GamepadHost {
 
 export interface GamepadCursor { x: number; y: number; visible: boolean; pressing: boolean; }
 
+/**
+ * Where the ring is, outside React. The hook used to hand the App a new
+ * `cursor` object every thirty-third of a second while the ring showed, which
+ * rendered the whole App thirty times a second to move a ring (PLAN.md
+ * 14ab-8); now the ring (`GamepadRing`) listens here and the App is told
+ * nothing. `set` says whether anything changed, so a held trigger on a
+ * still cursor is no event at all.
+ */
+export interface CursorStore {
+  get: () => GamepadCursor;
+  set: (next: GamepadCursor) => boolean;
+  subscribe: (fn: () => void) => () => void;
+}
+
+export function makeCursorStore(): CursorStore {
+  let now: GamepadCursor = { x: 0.5, y: 0.5, visible: false, pressing: false };
+  const listeners = new Set<() => void>();
+  return {
+    get: () => now,
+    set: (next) => {
+      // Hidden stays hidden whatever the stick says: a ring nobody sees has no place.
+      if (!next.visible && !now.visible) return false;
+      if (next.x === now.x && next.y === now.y && next.visible === now.visible && next.pressing === now.pressing) return false;
+      now = next;
+      listeners.forEach(fn => fn());
+      return true;
+    },
+    subscribe: (fn) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
+  };
+}
+
+/**
+ * The ring's look, as a primitive a render can compare: it changes when the
+ * ring appears, goes, or grows with a pull of the trigger, and not when it
+ * moves. `GamepadRing` renders on this alone.
+ */
+export const ringLook = (c: GamepadCursor): 'hidden' | 'idle' | 'pressing' => (!c.visible ? 'hidden' : c.pressing ? 'pressing' : 'idle');
+
+/** The ring's look, re-rendering only the caller, and only when `ringLook` changes. */
+export function useRingLook(store: CursorStore) {
+  return useSyncExternalStore(store.subscribe, () => ringLook(store.get()));
+}
+
 const DEAD = 0.18;
 const dz = (v: number) => (Math.abs(v) < DEAD ? 0 : (v - Math.sign(v) * DEAD) / (1 - DEAD));
 
 export function useGamepad(host: GamepadHost, enabled = true) {
   const hostRef = useRef(host); hostRef.current = host;
   const [connected, setConnected] = useState<string | null>(null);
-  const [cursor, setCursor] = useState<GamepadCursor>({ x: 0.5, y: 0.5, visible: false, pressing: false });
+  // The name last handed to React: the poll compares against this, not against
+  // `connected`, which a timer made once only ever saw as it was then (null),
+  // so every tick set the state again.
+  const connectedRef = useRef<string | null>(null);
+  const storeRef = useRef<CursorStore | null>(null);
+  if (!storeRef.current) storeRef.current = makeCursorStore();
+  const cursor = storeRef.current;
   const cursorRef = useRef({ x: 0.5, y: 0.5 });
   const prevButtons = useRef<boolean[]>([]);
+  const pressedNow = useRef<boolean[]>([]);
   const lastBlow = useRef(0);
   const lastDrop = useRef(0);
   const lastCursorPush = useRef(0);
@@ -46,12 +96,21 @@ export function useGamepad(host: GamepadHost, enabled = true) {
     // window may be behind the projector's, and a hidden tab stops animating
     // while the show, and the hand on the controller, carry on.
     let last = performance.now();
-    const onConnect = (e: GamepadEvent) => setConnected(e.gamepad.id.replace(/\s*\(.*$/, ''));
-    const onDisconnect = () => {
+    const named = (id: string | null) => {
+      if (id === connectedRef.current) return;
+      connectedRef.current = id;
+      setConnected(id);
+    };
+    const firstPad = () => {
       const pads = navigator.getGamepads?.() ?? [];
-      const still = [...pads].find(p => p && p.connected);
-      setConnected(still ? still.id.replace(/\s*\(.*$/, '') : null);
-      if (!still) setCursor(c => ({ ...c, visible: false }));
+      for (let i = 0; i < pads.length; i++) { const p = pads[i]; if (p && p.connected) return p; }
+      return undefined;
+    };
+    const onConnect = (e: GamepadEvent) => named(e.gamepad.id.replace(/\s*\(.*$/, ''));
+    const onDisconnect = () => {
+      const still = firstPad();
+      named(still ? still.id.replace(/\s*\(.*$/, '') : null);
+      if (!still) cursor.set({ ...cursor.get(), visible: false });
     };
     window.addEventListener('gamepadconnected', onConnect);
     window.addEventListener('gamepaddisconnected', onDisconnect);
@@ -60,10 +119,9 @@ export function useGamepad(host: GamepadHost, enabled = true) {
       const now = performance.now();
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const pads = navigator.getGamepads?.() ?? [];
-      const pad = [...pads].find(p => p && p.connected);
+      const pad = firstPad();
       if (!pad) return;
-      if (!connected) setConnected(pad.id.replace(/\s*\(.*$/, ''));
+      if (!connectedRef.current) named(pad.id.replace(/\s*\(.*$/, ''));
       const h = hostRef.current;
       const ax = pad.axes;
       const lx = dz(ax[0] ?? 0), ly = -dz(ax[1] ?? 0);
@@ -91,7 +149,10 @@ export function useGamepad(host: GamepadHost, enabled = true) {
       if (rt > 0.05 && now - lastDrop.current > 90) { lastDrop.current = now; h.gesture('drop', c.x, c.y, rt); active = true; }
 
       // Buttons, on their rising edge.
-      const pressed = pad.buttons.map(b => b.pressed);
+      // Two arrays swapped, not one made a tick (it ran every 16 ms).
+      const pressed = pressedNow.current;
+      pressed.length = pad.buttons.length;
+      for (let i = 0; i < pad.buttons.length; i++) pressed[i] = pad.buttons[i].pressed;
       const rose = (i: number) => pressed[i] && !prevButtons.current[i];
       if (rose(0)) h.action('seed');
       if (rose(1)) h.action('drain');
@@ -107,7 +168,8 @@ export function useGamepad(host: GamepadHost, enabled = true) {
       if (rose(13)) h.cycleLayer(-1);
       if (rose(14)) h.action('preset-prev');
       if (rose(15)) h.action('preset-next');
-      if (pressed.some((p, i) => p && !prevButtons.current[i])) active = true;
+      for (let i = 0; i < pressed.length; i++) if (pressed[i] && !prevButtons.current[i]) active = true;
+      pressedNow.current = prevButtons.current;
       prevButtons.current = pressed;
 
       if (active) idleSince.current = now;
@@ -115,7 +177,7 @@ export function useGamepad(host: GamepadHost, enabled = true) {
       const pressing = push > 0 || lt > 0.05 || rt > 0.05;
       if (now - lastCursorPush.current > 33) {
         lastCursorPush.current = now;
-        setCursor(prev => (prev.visible === visible && !visible ? prev : { x: c.x, y: c.y, visible, pressing }));
+        cursor.set({ x: c.x, y: c.y, visible, pressing });
       }
     };
     const timer = setInterval(tick, 16);
