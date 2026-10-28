@@ -490,6 +490,35 @@
       ]
     },
     {
+      "name": "The 9:16 share clip",
+      "shard": "logic",
+      "run": "npm run clip",
+      "why": [
+        "The share clip's frame (PLAN 34f, lib/clipFrame.ts): the 9:16 slice of every",
+        "window shape in even pixels, the container a post needs, the free site's mark",
+        "out of the apps' caption band in a portrait frame and where it was in a",
+        "landscape one, and the Record panel's Frame and the phone's with one Record",
+        "button each. The file itself is `-- --app`."
+      ]
+    },
+    {
+      "name": "The 9:16 share clip, in the app",
+      "shard": "tools",
+      "run": "npm run clip -- --app",
+      "why": [
+        "A clip recorded in the page and the file read back from its own bytes (PLAN",
+        "34f, scripts/clipApp.mjs): on a 1440 x 900 desk the canvas is drawn 9:16 while",
+        "it records and is back to its own shape after, the file is a 9:16 MP4 with an",
+        "audio track, free and licensed, the plate as it is keeps the window's shape,",
+        "and a phone's is the 9:16 slice of its screen. On the Mac because a cloud",
+        "session's software WebGPU draws a frame every few seconds, and a clip that",
+        "caught none has sound and no picture (the file's size is read from its",
+        "bytes, so it says 0x0 then). dist/ is the job's build. The clip goes through",
+        "a canvas of its own with a size fixed at the start: the governor's ladder",
+        "moves the plate's pixels mid-clip, and an MP4 cannot."
+      ]
+    },
+    {
       "name": "The song's score",
       "shard": "logic",
       "run": "npm run score",

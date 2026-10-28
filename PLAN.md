@@ -562,7 +562,7 @@ Where each batch stands, as of 2026-09-27:
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
-| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
+| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f, **shipped** as a 9:16 Frame on Record; 34f-2 to 34f-5 open), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 | 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -9110,12 +9110,27 @@ a grid of generic stock thumbnails: ours are the plate itself.
   site. A lane on a song's timeline, bound to a setting by the same learn flow as MIDI
   (§5), saved with the song map. Phone: lanes are read and switched there, drawn on
   the desk. Waits on the sequencer's cue model; no default look changes.
-- **34f. One-button share export.** *(S.)* §6's Render and Record make the file; the
-  gap is a single "Save a clip with sound" on the desk and the phone that picks the
-  container and size itself, with the small mark on the free site (§23). First the 3-minute
-  1080p render in §6 has to be measured on a Mac. A portrait frame (9:16, for Reels and
-  TikTok) beside landscape, as VS 2's recorder offers (§30, 2026-10-24): the plate
-  rendered at that aspect, not a crop of the landscape frame.
+- **34f. One-button share export.** *Shipped (2026-10-28): the Record button's portrait
+  frame; the story is in `docs/plan-shipped.md` §34f, the owner's look is
+  `docs/judging.md` §89.* Not a second button (14ae): a **Frame** choice in the Record panel
+  (and More › Record on the phone), *As the plate is* or *Portrait 9:16*, that makes the one
+  Record button write a 9:16 MP4 with sound. Open from it:
+  - **34f-2.** *(M; the shortcut to replace.)* With a projector attached the wall must keep its
+    shape, so the clip is the centred 9:16 slice of the wall's picture (31.6% of a 16:9 frame's
+    width), the very crop the plan said not to make. The real thing is a second small plate for
+    the clip, solved beside the wall's, fed the same hands and sound: a second solver the
+    performer pays for the whole time the clip runs. Measure the frame cost of a second 720p
+    plate on the Mac before choosing; until then the Record panel says it is a slice.
+  - **34f-3.** *(S.)* Render a song at 9:16. `render.ts` and `plate.begin` take any width and
+    height already; the Render panel offers landscape sizes only. Add 1080 × 1920 and 720 × 1280
+    beside them (the free site's 720p ceiling and mark apply), then measure the 3-minute render
+    that §6 still has not.
+  - **34f-4.** *(S.)* The clip on the phone is the same slice (a phone screen is nearly 9:16, so it
+    loses about 18% of its height). Where a phone is held in landscape it is the 16:9 case:
+    tell it to turn the phone, or draw the stage at 9:16 as the desk does.
+  - **34f-5.** *(S; the owner's Mac.)* Instagram and TikTok take the MP4 from the share sheet:
+    whether they accept Chromium's and Safari's own H.264 mux is judged by posting one
+    (`docs/judging.md` §89), not by a check.
 - **34g. Legible reactions, named on the page.** *(S, copy.)* Kicks that stir the dye,
   a hit that seeds a bubble: these already exist in the sound patches (§28i-3). Name each
   look's reaction on its card in 34a and 34b ("kicks stir the ink") so a viewer sees that
@@ -9130,7 +9145,7 @@ a grid of generic stock thumbnails: ours are the plate itself.
   13.7 is the one a music-maker audience (Home's buyers) asks for first: when the signed
   Mac app (13.1-sign) is out, take 13.7 before 13.3.
 
-**Order.** 34a first (it needs no engine work and the site is the demo), then 34f and 34g
+**Order.** 34a first (it needs no engine work and the site is the demo), then ~~34f~~ (shipped) and 34g
 (small), then 34b and 34c; 34d, 34e and 34h are for when the planned VJ and DAW steps
 have shipped. Not started.
 

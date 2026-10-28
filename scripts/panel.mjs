@@ -1772,7 +1772,6 @@ check('and neither starts over the limit',
     ['parity', 'compared the two solvers; the CPU one went at P7'],
     ['post', 'compared the post chain against its GLSL twin; both went at P7'],
     ['uniforms', 'compared the two uniform packs field for field; the WebGL one went at P7'],
-    ['clip', 'docs/clip-plan.md plans it; scripts/clip* are local-only and run with node'],
   ]);
   const have = new Set(Object.keys(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts));
   const walk = (dir, out = []) => {

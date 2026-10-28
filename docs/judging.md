@@ -1940,3 +1940,25 @@ Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Tr
 4. Bad: a control you used under Build, Gig, Load-in, Sequence or Sound that you cannot find now on any tab or in
    + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
 5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?
+
+## 89. A clip to post: Record's 9:16 frame (PLAN 34f)
+
+What changed: the Record panel (the sliders button beside Record) has a **Frame**, *As the plate is* or
+*Portrait 9:16*; on the phone it is More › Record › Clip frame. Portrait makes the one Record button write a
+tall MP4 with sound, with the plate drawn tall while it records. A phone opens on Portrait, a desk on the plate.
+
+1. On the Mac app or the site at a laptop's size, pick Portrait 9:16, press R, drop and stir for ten seconds, press R.
+   While it records the plate on your screen becomes a tall strip with bars either side (the plate drawn tall, not the
+   landscape picture); the moment you stop it should widen back with no hitch you would notice mid-set.
+2. Open the file: it should be 9:16 with the music in it. Compare an edge of the plate with the screen: a drop near the left
+   edge of your window should be in the clip, because the plate was laid out tall, not cut down.
+3. Post it: send it to your phone and put it on Instagram and TikTok as a Reel and a post. Bad: either app refusing the file
+   (say which), the sound missing, or the picture stuttering.
+4. On the free site (signed out of a licence): the clip stops at 15 seconds and the word ChromaGlass sits centred a fifth of the
+   way up from the bottom. Is it clear of Reels' caption and TikTok's account name when you look at it in the app?
+5. With a projector attached (Cast › Second display), record a Portrait clip: the wall must not change shape. The clip is the
+   middle 9:16 of the wall (a third of its width, PLAN 34f-2). Bad: the wall flickering or reshaping.
+6. On the phone, Play's Share clip: the clip should open the phone's share sheet. Check More › Record › Clip frame reads
+   Portrait 9:16 and the clip is the middle of the screen, 9:16.
+7. Decide: is losing the plate's size on your own screen for the length of a clip acceptable on a laptop mid-set, or should it
+   record the slice and keep the screen as it is (cheaper, but a crop, 34f-2)?

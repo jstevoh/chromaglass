@@ -8,6 +8,7 @@ import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playG
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
+import { shareClip } from '../../lib/shareClip';
 import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
 
 /**
@@ -259,23 +260,10 @@ export function PhonePlay(p: PhonePlayProps) {
   );
 
   const take = p.recording.take;
-  const shareClip = async () => {
+  const onClip = async () => {
     if (p.recording.on) { p.recording.onToggle(); return; }
     if (!take) { p.recording.onToggle(); return; }
-    /*
-      The phone's own share sheet where it has one (Messages, Instagram,
-      Photos), with the clip as a file; a download where it has not. Called
-      from the tap itself: a share sheet opened after an await of anything
-      else is refused for want of a user gesture.
-    */
-    const file = new File([take.blob], take.filename, { type: take.blob.type || 'video/mp4' });
-    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-    if (nav.share && nav.canShare?.({ files: [file] })) {
-      try { await nav.share({ files: [file], title: 'ChromaGlass' }); } catch { /* closed without sharing */ }
-      return;
-    }
-    const a = document.createElement('a');
-    a.href = take.url; a.download = take.filename; a.click();
+    await shareClip(take);
   };
   const clipLabel = p.recording.on ? `Stop · ${clock(p.recording.seconds)}` : take ? 'Share clip' : 'Record a clip';
 
@@ -512,7 +500,7 @@ export function PhonePlay(p: PhonePlayProps) {
                 <button onClick={p.onClear} data-testid="play-clear"
                   className="h-[52px] min-w-0 flex-1 rounded-[14px] border border-white/10 text-[15px] font-medium text-text active:bg-white/10">Clear plate</button>
                 {p.recording.supported && (
-                  <button onClick={() => { void shareClip(); }} data-testid="play-share"
+                  <button onClick={() => { void onClip(); }} data-testid="play-share"
                     className="h-[52px] min-w-0 flex-1 truncate rounded-[14px] bg-primary px-2 text-[15px] font-medium tabular-nums text-on-primary">{clipLabel}</button>
                 )}
                 {p.onOpenAccount && (
