@@ -423,6 +423,14 @@ try {
         stick sweeps, or a ring that never showed would pass any count.
       */
       const { page, ctx } = await open(browser, screen, { source: 'none', desk: 'perform', pad: true });
+      const ringAt = () => page.evaluate(() => {
+        const r = document.querySelector('[data-testid="gamepad-cursor"]');
+        if (!r) return null;
+        const b = r.getBoundingClientRect();
+        // On the page (its centre inside the window) and drawn, not only present in the tree.
+        const on = b.width > 0 && b.left + b.width / 2 >= 0 && b.left + b.width / 2 <= innerWidth && b.top + b.height / 2 >= 0 && b.top + b.height / 2 <= innerHeight;
+        return { at: `${r.style.left},${r.style.top}`, width: r.style.width, on, shown: Number(getComputedStyle(r).opacity) > 0 };
+      });
       await page.evaluate(() => {
         // The stick swings left and right across the plate every 600 ms.
         let flip = 1;
@@ -439,21 +447,23 @@ try {
       const s = (b.t - a.t) / 1000;
       const moved = new Set(places.filter(Boolean)).size;
       check(`${screen.name}, a gamepad stick sweeping: the ring is on the page and changes place`,
-        places.every(Boolean) && moved >= 5, `${places.filter(Boolean).length} of 12 looks found it, ${moved} places`);
+        places.every(Boolean) && moved >= 5 && (await ringAt())?.on, `${places.filter(Boolean).length} of 12 looks found it, ${moved} places`);
       check(`${screen.name}, a gamepad stick sweeping: the App renders for its clock and no more (0.6 to 1.5 a second)`,
-        (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5,
+        (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5 && (!PLATE || b.frames - a.frames >= 45),
         `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s`);
       // The stick let go and the right trigger held: the ring swells and stays where it is.
       await page.evaluate(() => { clearInterval(window.__sweep); window.__pad.axes = [0, 0, 0, 0]; window.__pad.rt = 1; });
       await page.waitForTimeout(1000);
+      const before = await ringAt();
       const c = await sample(page);
       await page.waitForTimeout(3000);
       const d = await sample(page);
-      const held = await page.evaluate(() => { const r = document.querySelector('[data-testid="gamepad-cursor"]'); return r ? r.style.width : null; });
+      const after = await ringAt();
+      const held = after ? after.width : null;
       const s2 = (d.t - c.t) / 1000;
       check(`${screen.name}, a gamepad trigger held: the ring is up and swollen, and the App renders for its clock and no more`,
-        held === '44px' && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5,
-        `ring ${held}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s`);
+        held === '44px' && before && after && before.at === after.at && after.on && after.shown && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5 && (!PLATE || d.frames - c.frames >= 45),
+        `ring ${held} ${before?.at === after?.at ? 'still' : 'moved'}${after?.on ? ', on the page' : ', off the page'}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s`);
       await ctx.close();
     }
   }

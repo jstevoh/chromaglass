@@ -31,8 +31,8 @@
  *      is measured, for what the reading itself costs, over a seeded second
  *      of kicks.
  *
- * Run with `--expose-gc` and a large young generation so a scavenge does not
- * count the garbage away (`npm run eargc` does).
+ * Run with `--expose-gc` and a young generation large enough to hold a window
+ * (`npm run eargc` does); a collection inside a window fails its line.
  */
 import { AudioFeatures, AnalyserEmulator, OnsetDetector } from '../src/lib/audioFeatures.ts';
 
@@ -66,6 +66,7 @@ class Sorted {
       const dev = sorted.map(v => Math.abs(v - median)).sort((a, b) => a - b);
       threshold += median + K * dev[mid];
     }
+    this.thr = threshold;
     this.history.push(odf); this.historyAt.push(time);
     while (time - this.historyAt[0] > WINDOW_S) { this.history.shift(); this.historyAt.shift(); }
     if (odf <= threshold) this.armed = true;
@@ -77,14 +78,16 @@ class Sorted {
 }
 
 /** A stream of flux: a noisy floor, hits every ~0.27 s of a few times the floor, a silent stretch. */
-function stream(hz, seconds, seed, { flat = false, stallAt = -1 } = {}) {
+function stream(hz, seconds, seed, { flat = false, stallAt = -1, rates = null } = {}) {
   const r = rng(seed), out = [];
   let t = 0;
-  for (let i = 0; i < hz * seconds; i++) {
-    t += 1 / hz;
+  // `rates`: [[fromSecond, hz], ...], the display changing under the ear (a window dragged to another screen).
+  const rateAt = (time) => rates ? rates.reduce((h, [from, f]) => (time >= from ? f : h), rates[0][1]) : hz;
+  for (let i = 0; t < seconds; i++) {
+    t += 1 / rateAt(t);
     if (i === stallAt) t += 2;
     let odf = flat ? 1.5 : 0.4 + r() * 1.2;
-    if (!flat && i % Math.round(hz * 0.27) === 0) odf += 4 + r() * 6;
+    if (!flat && Math.floor(t / 0.27) !== Math.floor((t - 1 / rateAt(t)) / 0.27)) odf += 4 + r() * 6;
     out.push({ t, odf });
   }
   return out;
@@ -98,7 +101,9 @@ function disagreements(make, ref, frames, { resetAt = -1 } = {}) {
     if (i === resetAt) { d.reset(); s.reset(); }
     const minimum = 0.3, first = i === 0 || i === resetAt;
     const a = d.candidate(t, odf, first, minimum), b = s.candidate(t, odf, first, minimum);
-    if (a !== b) diff++;
+    // The threshold itself, to the bit, every frame: a hit sits several times over it, so the booleans alone
+    // let a median off by one place, a different K or a window of 0.9 s through.
+    if (a !== b || d.threshold !== s.thr) diff++;
     if (b) { hits++; d.fire(t, odf); s.fire(t); }
   });
   return { diff, hits };
@@ -108,6 +113,12 @@ for (const hz of [60, 144, 400]) {
   const f = stream(hz, 12, hz);
   const r = disagreements(() => new OnsetDetector(), new Sorted(), f);
   check(`the ring and the partial sort decide as the sort did, ${hz} refreshes a second`, r.diff === 0 && r.hits > 20, `${r.diff} disagreements over ${f.length} frames, ${r.hits} hits`);
+}
+{
+  // 60 -> 144 -> 400 -> 60: the rings fill while the head is somewhere in the middle, then double.
+  const f = stream(60, 14, 21, { rates: [[0, 60], [3, 144], [6, 400], [8, 60], [11, 400]] });
+  const r = disagreements(() => new OnsetDetector(), new Sorted(), f);
+  check('…while the display changes under it (60, 144, 400, 60, 400 Hz): the rings grow with the head mid-ring', r.diff === 0 && r.hits > 20, `${r.diff} disagreements over ${f.length} frames, ${r.hits} hits`);
 }
 {
   const f = stream(60, 12, 7, { stallAt: 300 });
@@ -126,15 +137,33 @@ for (const hz of [60, 144, 400]) {
 }
 
 // ── Garbage ─────────────────────────────────────────────────────────────
+/*
+  Bytes of heap grown over a window, which is garbage made only if no
+  collection fell inside it. A first version used --min-semi-space-size alone,
+  which Node 22 clamps to its 16 MB default maximum: eight scavenges fell in
+  the old way's window, and every line read the total modulo 16 MB (the old
+  way 16 KB a frame, not 230). So the young generation is made large enough
+  to hold a whole window (`npm run eargc` sets both ends), and a collection
+  seen by a `gc` observer inside a window is a FAIL of that line, not a
+  quieter number.
+*/
 const gc = globalThis.gc;
 const heap = () => process.memoryUsage().heapUsed;
-function kbPerFrame(frames, step) {
-  gc(); const before = heap();
+const { PerformanceObserver } = await import('node:perf_hooks');
+const collections = [];
+new PerformanceObserver((list) => { for (const e of list.getEntries()) collections.push(e.startTime); }).observe({ entryTypes: ['gc'] });
+const tick = () => new Promise((r) => setImmediate(r));
+async function kbPerFrame(frames, step) {
+  gc(); await tick();
+  const t0 = performance.now(), before = heap();
   for (let i = 0; i < frames.length; i++) step(frames[i], i);
-  return (heap() - before) / frames.length / 1024;
+  const grew = heap() - before, t1 = performance.now();
+  await tick();
+  const during = collections.filter((t) => t >= t0 && t <= t1).length;
+  return { kb: grew / frames.length / 1024, during };
 }
 if (!gc) {
-  console.log(' skip garbage lines: run with node --expose-gc (npm run eargc does)');
+  check('run with node --expose-gc (npm run eargc does): the garbage lines cannot be measured without it', false);
 } else {
   const f = stream(60, 20, 11);
   const make = (C) => Array.from({ length: 17 }, () => new C());
@@ -142,10 +171,11 @@ if (!gc) {
   const fresh = make(OnsetDetector), old = make(Sorted);
   warm(fresh); warm(old);
   const rest = f.slice(600);
-  const newKb = kbPerFrame(rest, ({ t, odf }) => { for (const d of fresh) d.candidate(t, odf, false, 0.3); });
-  const oldKb = kbPerFrame(rest, ({ t, odf }) => { for (const d of old) d.candidate(t, odf, false, 0.3); });
-  check('seventeen detectors make next to no garbage in a frame (a boxed number or two a call, not four arrays)', newKb < 2, `${newKb.toFixed(2)} KB a frame; the old way ${oldKb.toFixed(1)} KB`);
-  check('control: the old way is measured making garbage', oldKb > 8, `${oldKb.toFixed(1)} KB a frame`);
+  const n = await kbPerFrame(rest, ({ t, odf }) => { for (const d of fresh) d.candidate(t, odf, false, 0.3); });
+  const o = await kbPerFrame(rest, ({ t, odf }) => { for (const d of old) d.candidate(t, odf, false, 0.3); });
+  check('seventeen detectors make next to no garbage in a frame (a boxed number or two a call, not four arrays)', n.during === 0 && n.kb < 2,
+    `${n.kb.toFixed(2)} KB a frame, ${n.during} collections in the window; the old way ${o.kb.toFixed(1)} KB`);
+  check('control: the old way is measured making garbage, with no collection in its window', o.during === 0 && o.kb > 50, `${o.kb.toFixed(1)} KB a frame, ${o.during} collections`);
 
   // A whole update: the reading is returned to its callers and is the garbage that is left.
   const sr = 48000, fps = 60, secs = 12, r = rng(5);
@@ -162,8 +192,8 @@ if (!gc) {
   const features = new AudioFeatures();
   const upd = (fr) => features.update({ bins: fr.bins, timeDomainData: fr.timeDomainData, scale: 'db', sampleRate: sr, fftSize: em.fftSize }, fr.i / fps);
   frames.slice(0, 300).forEach(upd);
-  const kb = kbPerFrame(frames.slice(300), upd);
-  check('a whole reading costs only its own object', kb < 8, `${kb.toFixed(2)} KB an update; 13.1 before`);
+  const u = await kbPerFrame(frames.slice(300), upd);
+  check('a whole reading costs only its own object', u.during === 0 && u.kb < 8, `${u.kb.toFixed(2)} KB an update, ${u.during} collections in the window`);
 }
 
 const failed = checks.filter((c) => !c.ok);

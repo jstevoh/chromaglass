@@ -439,6 +439,8 @@ export class OnsetDetector {
   private count = 0;
   /** The median's working copy, and the deviations' (one scratch for both, selected in place). */
   private scratch = new Float64Array(128);
+  /** The threshold the last frame was held to; read by `npm run eargc`, which compares it to the sort's, to the bit, every frame. */
+  threshold = 0;
   private lastHit = -Infinity;
   private armed = true;
   private peak = 0;
@@ -477,6 +479,7 @@ export class OnsetDetector {
       for (let i = 0; i < n; i++) w[i] = Math.abs(this.history[(this.head + i) % cap] - median);
       threshold += median + ODF_K * select(w, n, n >> 1);
     }
+    this.threshold = threshold;
     if (this.count === cap) this.grow();
     const size = this.history.length;
     const tail = (this.head + this.count) % size;
