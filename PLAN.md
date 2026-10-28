@@ -5918,7 +5918,11 @@ commit. *Size:* S.
   pass`, `adapter: apple`, a heading over quoted lines, a CI job id beside the command), so a
   printed line now also counts in those forms, and by being in the command's own script's
   source; a sentence of the writer's own ("it passed on 2026-10-26", "24 checks green")
-  still does not. Found along the way: `namedLines` does not read a
+  still does not. Found by the review: run over `scripts/checkguard.mjs` itself, `npm run
+  checkguard` still reads "it passed on 2026-10-26" as printed, because the self-test holds
+  that sentence in a string literal; the lookup cannot tell a script's fixtures from what it
+  prints (the other scripts' fixtures are the same risk, small, and the reviewer's re-run is
+  the guard). Found along the way: `namedLines` does not read a
   `Check changes:` that is itself a list item (`- **Check changes:**`, how Antigravity's
   bodies write the whole block), so a named change under that form is not seen. It fails
   safe (red, never green) but costs a round; read it the way `measuredGroups` does.
