@@ -78,8 +78,10 @@ npm run desktop    # the check: the app, offline, on a lit plate (add -- --packa
 with *release* ticked. The run builds the app, runs the check on the built app,
 and then publishes it as the repository's newest release, `desktop-v<version>`.
 The version is the site's major and minor (`package.json`) and the run's number,
-so each release is newer than the last with nothing to bump first. Pushing a tag
-`desktop-v<version>` does the same with that version. A release is never made by a
+so each release is newer than the last with nothing to bump first. Pushing a
+`desktop-v` tag no longer makes a release (2026-10-28): the run a tag starts is the
+tagged commit's own copy of the workflow, which any branch can write, so it may not
+sign. A release is never made by a
 merge or a pull request: the site changes several times a day, and each release
 tells every installed app to update.
 
@@ -130,7 +132,9 @@ download button beside it in the presets menu) and the MIDI map
 
 An Apple Developer Program membership ($99 a year, already needed for the iPhone
 app) lets CI sign and notarize the download, so it opens with no warning. Add these
-as repository secrets (Settings → Secrets and variables → Actions):
+as secrets of the `mac-signing` environment (Settings → Environments → New
+environment, named `mac-signing`; under Deployment branches and tags choose Selected
+branches and add `main`; no required reviewers), not as repository secrets:
 
 | Secret | What |
 |---|---|
@@ -140,9 +144,16 @@ as repository secrets (Settings → Secrets and variables → Actions):
 | `APPLE_APP_SPECIFIC_PASSWORD` | An app-specific password from account.apple.com → Sign-In and Security |
 | `APPLE_TEAM_ID` | The ten-character team ID from developer.apple.com → Membership |
 
-With them the workflow signs with the hardened runtime and notarizes; without them
-(and on every pull request from a fork) it signs ad hoc, which is what lets an Apple
-silicon Mac open it at all. Notarising adds a wait on Apple's notary service to
+With them a Run workflow on main signs with the hardened runtime and notarizes; every
+other run (each pull request, a run on a branch) signs ad hoc, which is what lets an
+Apple silicon Mac open it at all. Why an environment (the security audit of
+2026-10-28): the certificate signs anything as ChromaGlass, and the app installs a
+newer signed build by itself. A repository secret is readable by any workflow a
+branch's pull request writes for itself, and a pull request's build runs that branch's
+own build config, scripts and dependencies; an environment that only main may use is
+out of their reach. Once the environment holds the five, delete the repository copies
+(Settings → Secrets and variables → Actions). `npm run cisecrets` holds the workflow to
+this. Notarising adds a wait on Apple's notary service to
 every signed run, from a few minutes to over half an hour (the first ones, on
 2026-10-27, took about 30), which is why the build job allows 75 minutes. The
 `.p12` and its key are kept off the repository; lose them and a new Developer ID

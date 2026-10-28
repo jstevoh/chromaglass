@@ -16,9 +16,15 @@ name: Deploy to Firebase Hosting
 #      --iam-account=<sa>@chromaglass.iam.gserviceaccount.com)
 #   2. The account needs the "Firebase Hosting Admin" and "API Keys Viewer"
 #      roles on the chromaglass project.
-#   3. GitHub → Settings → Secrets and variables → Actions → New repository
+#   3. GitHub → Settings → Environments → firebase-live → Add environment
 #      secret, named FIREBASE_SERVICE_ACCOUNT, with the whole JSON file as its
-#      value.
+#      value. An environment secret, not a repository one (the security audit
+#      of 2026-10-28): the key can publish anything to the live site, and a
+#      repository secret is readable by any workflow a pull request's branch
+#      writes for itself. `firebase-live` lets only main deploy (its
+#      deployment branches: main), so neither a branch's run nor a Run
+#      workflow started on a branch can reach it. No required reviewers: a
+#      merge deploys without anyone waiting (the owner, 2026-09-27).
 #
 # Optional: set VITE_FINGERPRINT_PROXY_URL as a second secret to enable
 # automatic song identification. Left unset, the build still succeeds and the
@@ -43,6 +49,14 @@ on:
   workflow_dispatch:
 
 # Never let two deploys race each other onto the live channel.
+# Read-only unless a job says otherwise; what the deploy gate and the checks
+# read is runs (actions) and the pull request (pull-requests). Written out, not
+# left to the repository's default, which a settings change could widen.
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
 concurrency:
   group: firebase-hosting-live
   cancel-in-progress: false
@@ -118,6 +132,8 @@ jobs:
           (needs.checks.result == 'success' ||
            (needs.checks.result == 'skipped' && needs.verified.outputs.tested == 'true')) }}
     runs-on: ubuntu-latest
+    # Where FIREBASE_SERVICE_ACCOUNT lives (step 3 at the top): main only.
+    environment: firebase-live
     permissions:
       contents: read
     steps:
@@ -156,7 +172,10 @@ jobs:
           fi
 
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        # Pinned to a commit (v0.11.0, the commit v0 named on 2026-10-28), not
+        # the moving v0 tag: this step holds the key that publishes the site,
+        # and a tag can be moved to other code by whoever controls that repo.
+        uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0.11.0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

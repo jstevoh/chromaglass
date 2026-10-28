@@ -119,6 +119,7 @@
     "onehost": "node scripts/onehost.mjs",
     "qa:gpu": "QA_GPU=mid npm run qa",
     "bench": "npm run build && node scripts/bench.mjs",
+    "stutter": "npm run build && node scripts/stutter.mjs",
     "map": "node --experimental-strip-types scripts/map.mjs",
     "qr": "node --experimental-strip-types scripts/qr.mjs",
     "score": "esbuild scripts/score.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/score.mjs && node node_modules/.cache/score.mjs",
@@ -126,6 +127,7 @@
     "stages": "npm run build && node scripts/stages.mjs",
     "ab": "npm run build && node scripts/ab.mjs",
     "ladder": "npm run build && node scripts/ladder.mjs",
+    "cadence": "esbuild scripts/cadence.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/cadence.mjs && node node_modules/.cache/cadence.mjs",
     "rungs": "esbuild scripts/rungs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/rungs.mjs && node node_modules/.cache/rungs.mjs",
     "spin": "npm run build && node scripts/spin.mjs",
     "dish": "node scripts/dish.mjs",
@@ -143,6 +145,7 @@
     "wgsl": "node scripts/wgsl.mjs",
     "deploygate": "bash scripts/deploygate.sh",
     "closedruns": "node scripts/closedruns.mjs",
+    "cisecrets": "node scripts/cisecrets.mjs",
     "checkguard": "node scripts/checkguard.mjs",
     "reach": "node scripts/reach.mjs",
     "macqueue": "node scripts/macqueue.mjs",
@@ -181,6 +184,7 @@
     "particles": "node scripts/particles.mjs",
     "finite": "node scripts/finite.mjs",
     "derive": "node scripts/derive.mjs",
+    "encode": "node scripts/encode.mjs",
     "straw": "node scripts/straw.mjs",
     "bubblephysics": "node scripts/bubblephysics.mjs",
     "lift": "node scripts/lift.mjs",
@@ -233,6 +237,7 @@
     "looks": "npm run build && esbuild scripts/looks.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/looks.mjs && node node_modules/.cache/looks.mjs",
     "depth": "npm run build && esbuild scripts/depth.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/depth.mjs && node node_modules/.cache/depth.mjs",
     "loadtime": "npm run build && node scripts/loadtime.mjs",
+    "csp": "npm run build && node scripts/csp.mjs",
     "intro": "npm run build && PW_WEBGPU=1 node scripts/intro.mjs",
     "startup": "npm run build && esbuild scripts/startup.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/startup.mjs && node node_modules/.cache/startup.mjs",
     "wash": "npm run build && esbuild scripts/wash.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/wash.mjs && node node_modules/.cache/wash.mjs",
@@ -283,9 +288,13 @@
     "@types/ws": "^8.18.1",
     "@webgpu/types": "^0.1.74",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.27.4",
+    "esbuild": "^0.28.2",
     "playwright": "^1.63.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6",
+    "uuid": "^11.1.1"
   }
 }

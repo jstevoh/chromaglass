@@ -590,6 +590,59 @@ for (const devicePx of [1, 1.5, 2, 3]) {
   }
 
   {
+    /*
+      Hunting (PLAN.md 14j). A machine that holds one rung and not the one
+      above it: a fill-bound laptop that draws 26 ms frames on its opening
+      rung and 16 ms one below, whatever the step rate. The governor gives
+      the rate up, then the rung, and is fast; ninety seconds on it offers the
+      rung again, drops frames for a second and a half finding it still too
+      slow, and comes back down. With the same ninety seconds every time that
+      was 38 rung changes in half an hour, a grid rebuilt both ways and four
+      seconds of stutter every minute and a half, for ever. Doubling the wait
+      each time the same rung fails again leaves the first retry where it
+      was (a load that went away is won back as soon as before) and makes
+      the fifth a matter of twenty-four minutes.
+    */
+    const hunt = (minutes, cooledAt = Infinity, burst = null) => {
+      const g = new QualityGovernor(rungs, 1, 0);
+      let now = 0;
+      const moves = [];
+      while (now < minutes * 60) {
+        const inBurst = burst !== null && now >= burst && now < burst + 4;
+        const ms = inBurst || (g.rungIndex <= 1 && now < cooledAt) ? 26 : 16;
+        now += ms / 1000;
+        if (g.sample(ms / 1000, 1, now, false, ms - 10)) moves.push({ at: now, index: g.rungIndex });
+      }
+      return { g, moves };
+    };
+    const { moves } = hunt(30);
+    const climbs = moves.filter((m, i) => i > 0 && m.index < moves[i - 1].index).map((m) => m.at);
+    const gaps = climbs.slice(1).map((t, i) => t - climbs[i]);
+    check('a rung that keeps failing is offered less and less often: at most 12 rung changes in 30 minutes',
+      moves.length <= 12, `${moves.length} changes; climbs at ${climbs.map((t) => t.toFixed(0)).join(', ')} s`);
+    check('each retry of it waits about twice the one before',
+      gaps.length >= 2 && gaps.slice(1).every((d, i) => d >= 1.8 * gaps[i]), gaps.map((d) => d.toFixed(0)).join(', ') + ' s apart');
+    check('and the first retry is as soon as it always was (under two minutes)',
+      climbs.length > 0 && climbs[0] < 120, climbs.length ? `${climbs[0].toFixed(0)} s` : 'never retried');
+    // The same machine cooling after ten minutes: the rung is still won back, within the longest wait.
+    const cooled = hunt(40, 600);
+    check('a machine that cooled gets its rung back within the longest wait (24 min)',
+      cooled.g.rungIndex <= 1 && cooled.moves.some((m) => m.at > 600 && m.index <= 1 && m.at < 600 + 24 * 60 + 30),
+      `on rung ${cooled.g.rungIndex} after 40 minutes; climbs after cooling at ${cooled.moves.filter((m) => m.at > 600 && m.index <= 1).map((m) => m.at.toFixed(0)).join(', ')} s`);
+    /*
+      And it forgets. The same hunt for half an hour, the machine cooling,
+      an hour held on the rung, then one four-second burst (a tab, a held
+      tool): the first version of the doubling remembered the half hour and
+      waited 24 minutes to climb back (the check-skeptic's model). Ten
+      minutes held clears the count, so it is the first retry's wait again.
+    */
+    const burst = hunt(100, 1800, 5400);
+    const back = burst.moves.find((m) => m.at > 5404 && m.index <= 1);
+    check('a rung held for an hour and lost to a 4 s burst is back within 150 s',
+      back !== undefined && back.at - 5400 <= 150, back ? `back ${(back.at - 5400).toFixed(0)} s after the burst` : 'not back in 100 minutes');
+  }
+
+  {
     // `?rung=` holds the whole rung for measuring. It has to hold the rate
     // too, or a measurement of a rung is a measurement of something else.
     const g = new QualityGovernor(rungs, 1, 0, true);
@@ -598,6 +651,152 @@ for (const devicePx of [1, 1.5, 2, 3]) {
     check('a pinned governor holds the step rate as well as the rung',
       seen(g.rung) === before.at && g.stepRate === before.rate,
       `${before.at} at ${before.rate}/s → ${seen(g.rung)} at ${g.stepRate}/s`);
+  }
+
+  {
+    /*
+      The climb that cost a stutter (PLAN.md 14aa-3). Poster, 1969 on the
+      owner's Mac (Metal, main at fd20c71, 3 × 180 s): at thirty steps a
+      second on 512² the GPU spent 7.6–8.7 ms a frame, under the 9 ms budget,
+      so the governor went back to sixty; there it spent 15.6–16, about one
+      frame in five missed a refresh, and every miss was followed by a frame
+      of two steps to catch up, the liquid stopping and then jumping. The
+      average frame sat at 22 ms, either side of the line, so it held there
+      8.5 to 16.8 s before stepping back: 82 to 192 two-step frames a climb.
+
+      What was measured, replayed: a frame's cost is the drawing (4.0 ms at
+      512² and one device pixel, with the pixels) and a step (8.2 ms at 512²
+      at thirty, 9.8 at sixty, which is what makes sixty's frames cost
+      15.6–16 with their catch-up steps, and 25.1 at 768²); a state whose
+      frames cost more than 13 ms misses refreshes, one frame in eight, five
+      or three across the runs here (the owner's was about one in five), and
+      one past a whole refresh misses half or more. The loop's own step
+      accumulator turns the intervals into steps, catch-up rule and all, and
+      the frames of two steps are counted. Seeded, three seeds a share.
+
+      What a governor that cannot see a climb's cost does here, and the old
+      one did before PLAN.md 14aa-3 (run this against that commit's governor): the opening
+      at sixty is held 8 to 17 s or never left, the climb to sixty comes back
+      every ninety seconds and to 512² at two pixels in between, 57 to 1105
+      two-step frames after the opening across the nine runs.
+    */
+    const R = 1000 / 60;
+    const posterAt = (missAt60) => (rung, rate) => {
+      const draw = 4.0 * rung.dpr ** 2;
+      const step = rung.grid === 768 ? 25.1 : rung.grid === 512 ? (rate === 60 ? 9.8 : 8.2) : 8.2 * (rung.grid / 512) ** 2;
+      const perFrame = draw + step * rate / 60;
+      const miss = perFrame <= 13 ? 0 : perFrame < R ? missAt60 : Math.min(1, 0.5 + (perFrame - R) / R);
+      return { draw, step, miss };
+    };
+    /** A seeded stream in [0, 1). */
+    const stream = (seed) => { let x = seed >>> 0; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 2 ** 32; }; };
+    const { rungs: ladder, start } = ladderAt('local', 'strong', 2);
+    /** Replay `seconds` of a look; `slowFrom`/`slowFor` hold every frame at two refreshes for a while (another tab). */
+    const replay = (machine, { seconds = 180, seed = 1, slowFrom = Infinity, slowFor = 0 } = {}) => {
+      const g = new QualityGovernor(ladder, start, 0);
+      const next = stream(seed);
+      let t = 0, last = 0, owed = 0, frames = 0, twoAfterOpening = 0;
+      const moves = [];
+      while (t < seconds * 1000) {
+        const state = machine(g.rung, g.stepRate);
+        const forced = t >= slowFrom * 1000 && t < (slowFrom + slowFor) * 1000;
+        t += forced || next() < state.miss ? 2 * R : R;
+        const dt = (t - last) / 1000;
+        last = t;
+        // LiquidVisualizer's accumulator and its catch-up rule.
+        const stepS = 1 / g.stepRate;
+        const catchUp = g.frameMs > 40 ? 1 : g.frameMs > 24 ? 2 : 4;
+        owed = Math.min(owed + dt, stepS * catchUp + 1e-9);
+        const steps = Math.floor(owed / stepS + 1e-9);
+        owed -= steps * stepS;
+        frames++;
+        if (steps >= 2 && t > 10_000) twoAfterOpening++;
+        if (g.sample(dt, 1, t / 1000, false, state.draw + state.step * steps, state.step, steps)) {
+          moves.push({ at: t / 1000, index: g.rungIndex, stepRate: g.stepRate });
+        }
+      }
+      return { g, frames, twoAfterOpening, moves };
+    };
+    const runs = [];
+    for (const share of [1 / 8, 1 / 5, 1 / 3]) {
+      for (const seed of [1, 2, 3]) runs.push({ share, seed, ...replay(posterAt(share), { seed }) });
+    }
+    const name = (r) => `1 in ${Math.round(1 / r.share)}, seed ${r.seed}`;
+    check('Poster replayed: no frame of two steps after the opening, at any share of missed refreshes',
+      runs.every((r) => r.twoAfterOpening === 0),
+      runs.map((r) => `${name(r)}: ${r.twoAfterOpening}`).join('; '));
+    check('it gives sixty up within 6 s of opening (settling, then a second and a half of misses)',
+      runs.every((r) => r.moves.length > 0 && r.moves[0].at <= 6 && r.moves[0].stepRate === 30),
+      runs.map((r) => (r.moves.length ? `${r.moves[0].at.toFixed(1)} s → ${r.moves[0].stepRate}/s` : 'never')).join(', '));
+    /*
+      A climb into a state it leaves again within ten seconds is a climb it
+      could have known better than to take: what the old governor did every
+      ninety seconds, to sixty steps and to 512² at two pixels.
+    */
+    const undone = (moves) => moves.filter((m, i) => i > 0 && i < moves.length - 1
+      && (m.index < moves[i - 1].index || m.stepRate > moves[i - 1].stepRate) && moves[i + 1].at - m.at < 10).length;
+    check('and makes no climb it undoes within 10 s, across three minutes',
+      runs.every((r) => undone(r.moves) === 0),
+      runs.map((r) => `${name(r)}: ${r.moves.map((m) => `${m.at.toFixed(0)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ')}`).join('; '));
+
+    /*
+      The controls: the prediction must not hold a plate down that has room,
+      and the missed-refresh rule must not take sixty from one whose frames
+      are on time.
+
+      A light plate, 1.5 ms of drawing at one device pixel and a 2.5 ms step
+      at 512²: it opens at sixty and climbs to two pixels, predicted 8.5 ms
+      (the drawing four times over, with the pixels), and no further, since
+      768² at two pixels is predicted 11.6 (the step 2.25 times over, with
+      the cells). The old governor climbed there too, on a frame's cost alone.
+      Stopping at two pixels is a trade, and a named one (PLAN.md 14aa-4): the
+      old governor climbed on to 768² at two pixels and sixty steps, which
+      in this model never misses; at Poster's measured 3.1 times a step for
+      the larger grid it would cost about 13.75 ms, over the miss line, so a
+      light look tops out a rung lower than it used to rather than risk that.
+
+      Then a tab takes the machine for five seconds (every frame two
+      refreshes, the plate's own cost unchanged): it gives the rate up, and
+      once the retry's wait is over it has back what it gave or better.
+      Better, here: at thirty steps 768² at two pixels is predicted 8.8 ms,
+      and a finer grid for steps nobody sees is the trade the ladder's order
+      makes on purpose (the rate comes back only when the picture is whole).
+      Also a trade, named in 14aa-4: sixty steps never comes back after that,
+      since 768² at two pixels and sixty is predicted at 11.6 ms; the old
+      governor had it back at 154 s.
+
+      The replay tests the policy given the governor's cost model, not the
+      model: its machine scales the pixels and the smaller grids as the
+      governor does, and only 768² and the step at sixty differ. The model
+      itself is 14aa-4's to measure.
+    */
+    const light = (rung) => ({ draw: 1.5 * rung.dpr ** 2, step: 2.5 * (rung.grid / 512) ** 2, miss: 0 });
+    const calm = replay(light, { seconds: 60 });
+    check('a light plate keeps sixty and climbs to the best rung predicted under budget, no further',
+      calm.g.stepRate === 60 && seen(calm.g.rung) === '512²@2.00' && calm.moves.length === 1,
+      calm.moves.map((m) => `${m.at.toFixed(0)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ') || 'no moves');
+    const tab = replay(light, { seconds: 240, slowFrom: 60, slowFor: 5 });
+    const gaveUp = tab.moves.find((m) => m.stepRate === 30);
+    const before = tab.moves.filter((m) => m.at < 60).at(-1);
+    const back = tab.moves.find((m) => gaveUp && before && m.at > gaveUp.at
+      && (m.stepRate === 60 ? m.index <= before.index : m.index < before.index));
+    check('a busy tab takes sixty away, and within 100 s the plate has back what it gave or better, for good',
+      gaveUp !== undefined && back !== undefined && back.at - gaveUp.at <= 100 && undone(tab.moves) === 0
+        && tab.g.rungIndex <= back.index,
+      tab.moves.map((m) => `${m.at.toFixed(0)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ') || 'no moves');
+    /*
+      A plate over the budget with its frames on time: Classic's frame costs
+      on the owner's Mac (5.8 ms of drawing, a 7.1 ms step, read at 256² and
+      one pixel, set here on 512² for the replay's opening rung), so sixty
+      steps cost 12.9 ms a frame, over the 9 that a climb needs and under a
+      refresh. Nothing is being dropped, so nothing is given up. Whether
+      Classic itself keeps or regains sixty is the Mac's to say
+      (`npm run stutter`).
+    */
+    const busy = (rung) => ({ draw: 5.8 * rung.dpr ** 2, step: 7.1 * (rung.grid / 512) ** 2, miss: 0 });
+    const held = replay(busy, { seconds: 120 });
+    check('a plate over the climb budget with every frame on time keeps sixty, and moves nowhere',
+      held.moves.length === 0 && held.g.stepRate === 60, `${held.moves.length} moves, at ${held.g.stepRate}/s`);
   }
 
   {
