@@ -37,6 +37,7 @@
     "music": "node --experimental-strip-types scripts/music.mjs",
     "songends": "node --experimental-strip-types scripts/songends.mjs",
     "bands": "node --experimental-strip-types scripts/bands.mjs",
+    "eargc": "node --experimental-strip-types --expose-gc --min-semi-space-size=512 --max-semi-space-size=512 scripts/eargc.mjs",
     "slowevolve": "esbuild scripts/slowevolve.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/slowevolve.mjs && node node_modules/.cache/slowevolve.mjs",
     "pacing": "esbuild scripts/pacing.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/pacing.mjs && node node_modules/.cache/pacing.mjs",
     "songfollow": "esbuild scripts/songfollow.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/songfollow.mjs && node node_modules/.cache/songfollow.mjs",
@@ -237,6 +238,7 @@
     "looks": "npm run build && esbuild scripts/looks.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/looks.mjs && node node_modules/.cache/looks.mjs",
     "depth": "npm run build && esbuild scripts/depth.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/depth.mjs && node node_modules/.cache/depth.mjs",
     "loadtime": "npm run build && node scripts/loadtime.mjs",
+    "csp": "npm run build && node scripts/csp.mjs",
     "intro": "npm run build && PW_WEBGPU=1 node scripts/intro.mjs",
     "startup": "npm run build && esbuild scripts/startup.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/startup.mjs && node node_modules/.cache/startup.mjs",
     "wash": "npm run build && esbuild scripts/wash.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/wash.mjs && node node_modules/.cache/wash.mjs",
@@ -288,9 +290,13 @@
     "@types/ws": "^8.18.1",
     "@webgpu/types": "^0.1.74",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.27.4",
+    "esbuild": "^0.28.2",
     "playwright": "^1.63.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6",
+    "uuid": "^11.1.1"
   }
 }

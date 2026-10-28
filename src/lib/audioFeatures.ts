@@ -440,10 +440,50 @@ const LOW_MID = SOURCE_NAMES.length;
 
 const toDb = (power: number): number => 10 * Math.log10(power + 1e-30);
 
-/** One source's threshold, refractory period and strength scale. */
-class OnsetDetector {
-  private history: number[] = [];
-  private historyAt: number[] = [];
+/**
+ * The k-th smallest of a[0..n), found by partitioning, and the array left
+ * partly ordered. A detector asks for the median of its last second of flux
+ * every frame, seventeen of them: sorting a copy for it (and sorting the
+ * deviations again for their median) made four arrays a detector a frame.
+ * The element is the same one the sorted array holds at k, so a threshold
+ * is the same number to the bit.
+ */
+function select(a: Float64Array, n: number, k: number): number {
+  let lo = 0, hi = n - 1;
+  while (lo < hi) {
+    // Median of three keeps a sorted or flat history (a silent source's) from
+    // partitioning one element at a time.
+    const mid = (lo + hi) >> 1;
+    if (a[mid] < a[lo]) { const t = a[mid]; a[mid] = a[lo]; a[lo] = t; }
+    if (a[hi] < a[lo]) { const t = a[hi]; a[hi] = a[lo]; a[lo] = t; }
+    if (a[hi] < a[mid]) { const t = a[hi]; a[hi] = a[mid]; a[mid] = t; }
+    const pivot = a[mid];
+    let i = lo, j = hi;
+    while (i <= j) {
+      while (a[i] < pivot) i++;
+      while (a[j] > pivot) j--;
+      if (i <= j) { const t = a[i]; a[i] = a[j]; a[j] = t; i++; j--; }
+    }
+    if (k <= j) hi = j; else if (k >= i) lo = i; else return a[k];
+  }
+  return a[k];
+}
+
+/** One source's threshold, refractory period and strength scale. Exported for `npm run eargc`. */
+export class OnsetDetector {
+  /**
+   * The last ODF_WINDOW_S seconds of flux and when each came, in rings that
+   * double when full (a faster display keeps more frames in a second). They
+   * were arrays pushed to and shifted from, copied and sorted every frame.
+   */
+  private history = new Float64Array(128);
+  private historyAt = new Float64Array(128);
+  private head = 0;
+  private count = 0;
+  /** The median's working copy, and the deviations' (one scratch for both, selected in place). */
+  private scratch = new Float64Array(128);
+  /** The threshold the last frame was held to; read by `npm run eargc`, which compares it to the sort's, to the bit, every frame. */
+  threshold = 0;
   private lastHit = -Infinity;
   private armed = true;
   private peak = 0;
@@ -452,25 +492,43 @@ class OnsetDetector {
   last = 0;
 
   reset(): void {
-    this.history = []; this.historyAt = [];
+    this.head = 0; this.count = 0;
     this.lastHit = -Infinity; this.armed = true;
     this.peak = 0; this.peakAt = 0;
     this.at = null;
     this.last = 0;
   }
 
+  private grow(): void {
+    const cap = this.history.length;
+    const h = new Float64Array(cap * 2), t = new Float64Array(cap * 2);
+    for (let i = 0; i < this.count; i++) {
+      const at = (this.head + i) % cap;
+      h[i] = this.history[at]; t[i] = this.historyAt[at];
+    }
+    this.history = h; this.historyAt = t; this.scratch = new Float64Array(cap * 2);
+    this.head = 0;
+  }
+
   /** Is this frame a candidate hit? Also records its flux in the history. */
   candidate(time: number, odf: number, first: boolean, minimum: number): boolean {
-    const n = this.history.length;
+    const n = this.count;
+    const cap = this.history.length;
     let threshold = minimum;
     if (n > 0) {
-      const sorted = this.history.slice().sort((a, b) => a - b);
-      const median = sorted[n >> 1];
-      const dev = sorted.map(v => Math.abs(v - median)).sort((a, b) => a - b);
-      threshold += median + ODF_K * dev[n >> 1];
+      const w = this.scratch;
+      for (let i = 0; i < n; i++) w[i] = this.history[(this.head + i) % cap];
+      const median = select(w, n, n >> 1);
+      for (let i = 0; i < n; i++) w[i] = Math.abs(this.history[(this.head + i) % cap] - median);
+      threshold += median + ODF_K * select(w, n, n >> 1);
     }
-    this.history.push(odf); this.historyAt.push(time);
-    while (time - this.historyAt[0] > ODF_WINDOW_S) { this.history.shift(); this.historyAt.shift(); }
+    this.threshold = threshold;
+    if (this.count === cap) this.grow();
+    const size = this.history.length;
+    const tail = (this.head + this.count) % size;
+    this.history[tail] = odf; this.historyAt[tail] = time;
+    this.count++;
+    while (time - this.historyAt[this.head] > ODF_WINDOW_S) { this.head = (this.head + 1) % size; this.count--; }
     if (odf <= threshold) this.armed = true;
     return !first && this.armed && odf > threshold && time - this.lastHit >= REFRACTORY_S;
   }
@@ -551,6 +609,9 @@ export class AudioFeatures {
 
   private specRing: Float64Array[] = [];
   private specRingPos = 0;
+  /** The fifteen-frame median of each bin and the column it is taken from; the frame reuses them. */
+  private hDb = new Float64Array(0);
+  private readonly vals = new Float64Array(15);
 
   private readonly chromaEar = new ChromaEar();
   pitch = 0;
@@ -603,6 +664,7 @@ export class AudioFeatures {
     this.odf = new Float64Array(R);
     this.fresh = new Float64Array(R);
     this.specRing = Array.from({ length: 15 }, () => new Float64Array(count).fill(ABS_FLOOR_DB));
+    this.hDb = new Float64Array(this.top + 1);
     this.hasPrev = false;
   }
 
@@ -649,8 +711,8 @@ export class AudioFeatures {
     ring.set(db);
     this.specRingPos = (this.specRingPos + 1) % 15;
 
-    const hDb = new Float64Array(this.top + 1);
-    const vals = new Float64Array(15);
+    const hDb = this.hDb;
+    const vals = this.vals;
     let pNum = 0, pDen = 0;
     for (let k = 1; k <= this.top; k++) {
             for (let i = 0; i < 15; i++) {

@@ -72,6 +72,7 @@ import { MidiPanel } from './components/MidiPanel';
 import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
+import { GamepadRing } from './components/GamepadRing';
 import { useSceneCamera } from './hooks/useSceneCamera';
 import { useCameras } from './hooks/useCameras';
 import { cameraPresent } from './lib/cameras';
@@ -4752,9 +4753,9 @@ export default function App() {
   });
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassInputs?: unknown }).chromaglassInputs = () => ({ midi: { enabled: midi.enabled, input: midi.activeInputName, bindings: midi.map.bindings.length, learning: midi.learning }, gamepad });
+      (window as unknown as { chromaglassInputs?: unknown }).chromaglassInputs = () => ({ midi: { enabled: midi.enabled, input: midi.activeInputName, bindings: midi.map.bindings.length, learning: midi.learning }, gamepad: { connected: gamepad.connected, cursor: gamepad.cursor.get() } });
     }
-  }, [midi.enabled, midi.activeInputName, midi.map, midi.learning, gamepad]);
+  }, [midi.enabled, midi.activeInputName, midi.map, midi.learning, gamepad.connected, gamepad.cursor]);
   // ── A projector, noticed ──
   // A second screen that is not built in is the projector. Ask (a chip),
   // Automatic (the show goes there on the next click after it appears), or
@@ -4763,12 +4764,11 @@ export default function App() {
     send: (screen) => { void startCast('window', screen); },
     casting: isCasting,
   });
-  const gamepadCursorStyle = useMemo(() => {
-    if (!gamepad.cursor.visible) return null;
+  // Where the controller's ring is drawn: the plate's rectangle, or the window before it has one.
+  const gamepadRingRect = useCallback(() => {
     const r = visualizerRef.current?.drawnRect?.();
-    const box = r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-    return { left: box.left + gamepad.cursor.x * box.width, top: box.top + (1 - gamepad.cursor.y) * box.height };
-  }, [gamepad.cursor]);
+    return r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+  }, []);
 
   // ── ⌘K, and the keys a hand finds in the dark ───────────────────
   /*
@@ -5274,13 +5274,7 @@ export default function App() {
         which is how a hand on a dish aims anyway; the design screen keeps it
         for finding where the cursor is. `npm run showcursor` asks both.
       */}
-      {gamepadCursorStyle && overlaysVisible && (
-        <div
-          className="pointer-events-none fixed z-30 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80 shadow-[0_0_12px_rgba(255,255,255,0.6)] transition-transform"
-          style={{ left: gamepadCursorStyle.left, top: gamepadCursorStyle.top, width: gamepad.cursor.pressing ? 44 : 28, height: gamepad.cursor.pressing ? 44 : 28, backgroundColor: gamepad.cursor.pressing ? `${selectedLiquid?.color ?? '#fff'}55` : 'transparent' }}
-          data-testid="gamepad-cursor"
-        />
-      )}
+      {overlaysVisible && <GamepadRing cursor={gamepad.cursor} rect={gamepadRingRect} colour={selectedLiquid?.color ?? '#fff'} />}
 
       {/* The music file's player: always audible, never in the way */}
       <audio ref={musicElRef} className="hidden" preload="auto"
