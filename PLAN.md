@@ -6435,8 +6435,35 @@ advisories.
 ### 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
-the docs PR numbers the series 19ai-1..10). Only 19ai-5 is written here so far.
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves) and 19ai-5.
 
+- **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
+  was module code above the component: the CPU solver `class FluidSimulation` (3,900 lines)
+  and the constants, switches and helpers around it. They are in `src/sim/` now, unchanged
+  (every non-import line of the old file is in the new files, counted line by line): the
+  solver in `fluidSimulation.ts`, the grid and the solver's constants in `constants.ts`, the
+  hands' and bottles' helpers in `tools.ts`, the step and its query-string switches in
+  `stepping.ts`, the dice and the palette window in `dice.ts`, and the frame's shapes
+  (`FrameView`, `PlateRenderer`, `VisualizerRender`, `FrameDigest`, the song shape) in
+  `frameTypes.ts`. The component is 441,458 bytes. `hooks/useSongRender.ts` imports its
+  types from `sim/frameTypes.ts` and no longer imports the component. Six checks read the
+  solver's source as text from the component and now read it where it went: `cellride`
+  (the step's cell clock), `oillift` (the step's rock), `pacing` (the paced clock),
+  `panel` (the per-layer list against the solver), `plate` (the CPU gate, the closeup's
+  ramp, and the retired looks' exemption, which follows `seedPreset`) and `turing` (the
+  drift rates).
+- **19ai-3a. Found along the way.** The review said `lib/stir`, `squish`, `plateRock` and
+  `turntable` import types from the component; they only name it in comments. The one
+  importer was `hooks/useSongRender.ts`. And 26 checks read `LiquidVisualizer.tsx` as text:
+  a later split of the frame loop (the review's item 11) moves code those checks grep, so
+  each piece moved has to be held against them the way this one was (a pattern that matched
+  the old file and no longer matches the new one is a check that moved with the code).
+- **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
+  reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
+  whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
+- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
+  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
+  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** A file not in `scripts/sizes.json`
   stays at or under 40 KB; a file already over it (52 on main at b38801e, 4.9 MB between
   them) may not grow past the bytes recorded beside it, nor past its size at the PR's base
@@ -6452,6 +6479,17 @@ the docs PR numbers the series 19ai-1..10). Only 19ai-5 is written here so far.
   `docs/plan-shipped.md`, `docs/judging.md`, `docs/guide.md`, CHANGELOG.md,
   `scripts/checks.json`) are exempt by name until split. One manifest entry on the `logic`
   part, `always`; no Mac. Its self-test meets each rule's break in a scratch repository.
+- **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** The ratchet's first real move
+  (the solver, 194,508 bytes in one class, out of the visualizer) read as a new file over
+  budget, and the owner did not want the solver cut into 40 KB pieces to pass a number (a
+  class is not split by moving lines). So a pull request may add a ceiling the base does not
+  have when the new entries hold no more than the bytes that left the base's over-budget
+  files in the same PR, and each new entry is its file's own size. A file that appears over budget with nothing
+  written in still fails as new, and an entry added with nothing taken out still fails as
+  raised; what it lets through that the first rule did not is a rename that moves its entry
+  with it, which costs a session the same. Five self-tests hold it, one the review of #548's exploit: the credit is the bytes that actually left the base's over-budget files in the PR, not the sum of their ceilings, so slack under a ceiling funds nothing. Whether 40 KB is the right
+  budget for a new file at all is the owner's question, raised 2026-10-28 ("40kb seems
+  somewhat arbitrary. I don't want quality to go down because of this").
 - **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
   App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
   such PR now has to move as many bytes out as it adds, wiring lines included. If that turns
