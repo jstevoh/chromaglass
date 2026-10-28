@@ -198,6 +198,16 @@
       "run": "npm run bands"
     },
     {
+      "name": "The ear's detectors",
+      "shard": "sound",
+      "run": "npm run eargc",
+      "why": [
+        "The seventeen onset detectors decide as the sorted history did and make",
+        "next to no garbage a frame (scripts/eargc.mjs, PLAN.md 14ab-7): against",
+        "the old detector verbatim, at 60, 144 and 400 refreshes a second."
+      ]
+    },
+    {
       "name": "Where songs end and begin",
       "shard": "sound",
       "run": "npm run songends",

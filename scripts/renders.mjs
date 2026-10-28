@@ -145,11 +145,19 @@ const FADER_MAP = JSON.stringify({
   ],
 });
 
-async function open(browser, screen, { source, desk, fader = false }) {
+async function open(browser, screen, { source, desk, fader = false, pad = false }) {
   const ctx = await browser.newContext({ viewport: screen.viewport, isMobile: screen.touch, hasTouch: screen.touch, deviceScaleFactor: screen.touch ? 2 : 1 });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
-  await page.addInitScript(({ source, desk, fader, map }) => {
+  await page.addInitScript(({ source, desk, fader, map, pad }) => {
+    if (pad) {
+      // A standard game controller, stood in for (as showcursor.mjs does): sticks and right trigger are `window.__pad`'s.
+      window.__pad = { axes: [0, 0, 0, 0], rt: 0 };
+      Object.defineProperty(Navigator.prototype, 'getGamepads', { configurable: true, value() {
+        return [{ id: 'Stand-in pad', index: 0, connected: true, mapping: 'standard', timestamp: performance.now(), axes: window.__pad.axes.slice(),
+          buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: i === 7 && window.__pad.rt > 0.05, touched: false, value: i === 7 ? window.__pad.rt : 0 })) }];
+      } });
+    }
     try {
       sessionStorage.setItem('chromaglass-audio-source', source);
       localStorage.setItem('chromaglass-desk-mode', desk);
@@ -177,7 +185,7 @@ async function open(browser, screen, { source, desk, fader = false }) {
       onScheduleFiberRoot() {}, onPostCommitFiberRoot() {}, onCommitFiberUnmount() {},
       onCommitFiberRoot() { window.__commits++; },
     };
-  }, { source, desk, fader, map: FADER_MAP });
+  }, { source, desk, fader, map: FADER_MAP, pad });
   await page.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.chromaglassCastState === 'function' && typeof window.chromaglassDebug === 'function', null, { timeout: 60_000 });
   // Past the opening: the first seconds build pipelines, load the look and
@@ -401,6 +409,51 @@ try {
       check(`${screen.name}, no sound, the Perform desk: the App renders for its clock and no more (0.6 to 1.5 a second)`,
         w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= 45)),
         w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', '));
+      await ctx.close();
+    }
+    {
+      /*
+        A game controller (PLAN.md 14ab-8). The hook handed the App a new
+        cursor object every thirty-third of a second while the ring showed, so
+        the whole App rendered thirty times a second to move a ring. Now the
+        ring listens to the hook's store and the App is told nothing: it
+        renders for its clock and no more, with the ring up and moving and with
+        a trigger held on a still ring. The feature is the ring, not the
+        quiet: it has to be on the page and its place has to change while the
+        stick sweeps, or a ring that never showed would pass any count.
+      */
+      const { page, ctx } = await open(browser, screen, { source: 'none', desk: 'perform', pad: true });
+      await page.evaluate(() => {
+        // The stick swings left and right across the plate every 600 ms.
+        let flip = 1;
+        window.__sweep = setInterval(() => { flip = -flip; window.__pad.axes = [0.9 * flip, 0.5 * flip, 0, 0]; }, 600);
+      });
+      await page.waitForTimeout(1500);
+      const places = [];
+      const a = await sample(page);
+      for (let i = 0; i < 12; i++) {
+        places.push(await page.evaluate(() => { const r = document.querySelector('[data-testid="gamepad-cursor"]'); return r ? `${r.style.left},${r.style.top}` : null; }));
+        await page.waitForTimeout(250);
+      }
+      const b = await sample(page);
+      const s = (b.t - a.t) / 1000;
+      const moved = new Set(places.filter(Boolean)).size;
+      check(`${screen.name}, a gamepad stick sweeping: the ring is on the page and changes place`,
+        places.every(Boolean) && moved >= 5, `${places.filter(Boolean).length} of 12 looks found it, ${moved} places`);
+      check(`${screen.name}, a gamepad stick sweeping: the App renders for its clock and no more (0.6 to 1.5 a second)`,
+        (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5,
+        `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s`);
+      // The stick let go and the right trigger held: the ring swells and stays where it is.
+      await page.evaluate(() => { clearInterval(window.__sweep); window.__pad.axes = [0, 0, 0, 0]; window.__pad.rt = 1; });
+      await page.waitForTimeout(1000);
+      const c = await sample(page);
+      await page.waitForTimeout(3000);
+      const d = await sample(page);
+      const held = await page.evaluate(() => { const r = document.querySelector('[data-testid="gamepad-cursor"]'); return r ? r.style.width : null; });
+      const s2 = (d.t - c.t) / 1000;
+      check(`${screen.name}, a gamepad trigger held: the ring is up and swollen, and the App renders for its clock and no more`,
+        held === '44px' && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5,
+        `ring ${held}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s`);
       await ctx.close();
     }
   }
