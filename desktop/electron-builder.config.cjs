@@ -48,6 +48,41 @@ module.exports = {
     { from: '../dist', to: 'dist', filter: ['**/*'] },
     { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'license-key.js'] },
   ],
+  // Electron's fuses (PLAN.md 23.17k): switches in the Electron binary itself,
+  // flipped here before the app is signed, that close the ways to run something
+  // other than what the owner shipped. A stock Electron honours all of them, and
+  // they are the cheapest way into a signed app: `ELECTRON_RUN_AS_NODE=1` turns
+  // the app into a Node that runs any script with the app's microphone, camera
+  // and network permissions; `--inspect` (or SIGUSR1) opens a debugger on the
+  // main process, where the licence the app verified is one assignment from
+  // being replaced; `NODE_OPTIONS` preloads a script; and an edited app.asar (or
+  // an `app/` folder beside it) is simply run. Closed, in that order:
+  //   runAsNode                     off  (the licence gate is not a Node REPL)
+  //   nodeCliInspect                off
+  //   nodeOptions                   off
+  //   embeddedAsarIntegrity         on   (macOS: the app aborts at start if app.asar is not
+  //                                       what was signed; electron-builder writes the hash
+  //                                       into Info.plist; Electron checks it on macOS and
+  //                                       Windows only, so a Linux build sets it for nothing)
+  //   onlyLoadAppFromAsar           on   (an app/ folder beside the asar is not looked for, so the
+  //                                       integrity check cannot be walked around)
+  //   grantFileProtocolExtraPrivileges off (the app loads http://localhost, never file://)
+  // Left alone: cookie encryption (a one-way change to a store the app keeps nothing
+  // in; the account is in IndexedDB), and the browser-process snapshot. The lists
+  // are repeated, on purpose, in `scripts/desktop.mjs`, which reads the packed binary:
+  // a fuse dropped from here fails there rather than quietly shipping open.
+  //
+  // `npm run desktop -- --packaged` cannot drive an app with the inspect fuse off
+  // (Playwright attaches to Electron by `--inspect`), so it drives a copy with that
+  // one fuse back on and reads, and runs, the packed original for the rest.
+  electronFuses: {
+    runAsNode: false,
+    enableNodeCliInspectArguments: false,
+    enableNodeOptionsEnvironmentVariable: false,
+    enableEmbeddedAsarIntegrityValidation: true,
+    onlyLoadAppFromAsar: true,
+    grantFileProtocolExtraPrivileges: false,
+  },
   // All of it in one archive: Electron reads the site (the server's fs calls)
   // and imports the server (an ES module) from inside it. `npm run desktop --
   // --packaged` is what says so.

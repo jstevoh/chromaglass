@@ -98,6 +98,17 @@ show: one notification on the laptop at most, and none while a projector window 
 open. *ChromaGlass → Check for Updates…* looks now. `CHROMAGLASS_NO_UPDATES=1`
 switches it off.
 
+## What the packed app refuses
+
+Electron's fuses (PLAN.md 23.17k; `electronFuses` in `electron-builder.config.cjs`) are
+set before the app is signed: `ELECTRON_RUN_AS_NODE`, `--inspect`, `NODE_OPTIONS` and
+`file://` privileges are off, and the app runs only from an `app.asar` whose header is
+checked against the hash written into Info.plist. `npm run desktop -- --packaged` reads
+them off the binary and tries each. One consequence for anyone testing the packed app:
+Playwright cannot attach to it (it attaches by `--inspect`), so the check drives a copy
+with that one fuse back on. To look inside the shipped app, run the one from the repo
+(`npm run app`), which has no fuses.
+
 ## First launch
 
 Until it is signed with a Developer ID (below), macOS says it cannot check the app
