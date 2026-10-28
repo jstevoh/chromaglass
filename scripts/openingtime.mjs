@@ -3,7 +3,7 @@
  * How long the plate's opening takes, one way against another, on a cold
  * shader cache (PLAN 14v-10).
  *
- *   npm run openingtime -- --runs 3 --variants ",stillall=1,computelanes=6"
+ *   npm run openingtime -- --cold --runs 3 --variants ",stillall=1,computelanes=6"
  *
  * Not a check: it judges nothing and is in no shard. It is the instrument
  * for choosing how the opening builds its pipelines, which `npm run startup`
@@ -17,9 +17,10 @@
  * Each variant is a query string added to the opening's address
  * (`gpu/prepare.ts` reads `lanes`, `computelanes` and `stillall`; empty is
  * the opening as it ships). Each opening gets its own browser, and on a Mac
- * the compiled-shader cache is emptied before it unless `--warm` (the same
- * emptying as `npm run startup`'s; it costs every app on the machine one slow
- * start, so on the owner's machine it is asked for, never assumed).
+ * the compiled-shader cache is emptied before it with `--cold` (and on CI),
+ * the same emptying as `npm run startup`'s: it costs every app on the machine
+ * one slow start, so on the owner's machine it is asked for, never assumed.
+ * Without it a Mac times a warm opening, which compiles almost nothing.
  *
  * What it prints, per opening: when the device was given, when the opening's
  * builds began and ended, the first step, the longest wait for a frame from
@@ -41,11 +42,11 @@ const arg = (name, fallback) => {
 };
 const RUNS = Number(arg('runs', '3'));
 const VARIANTS = arg('variants', ',stillall=1,computelanes=6,stillall=1&computelanes=6').split(',');
-const WARM = process.argv.includes('--warm');
+const COLD = process.argv.includes('--cold') || !!process.env.CI;
 const PORT = 4363;
 
 function coldCache() {
-  if (WARM || process.platform !== 'darwin') return 'left as it was';
+  if (!COLD || process.platform !== 'darwin') return 'left as it was (--cold empties it)';
   let root;
   try { root = execFileSync('getconf', ['DARWIN_USER_CACHE_DIR'], { encoding: 'utf8' }).trim(); } catch { return 'no DARWIN_USER_CACHE_DIR'; }
   const found = [];
