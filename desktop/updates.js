@@ -22,6 +22,18 @@
  *              "Download ChromaGlass <version>…", which opens the new .dmg in
  *              the browser, and the owner drags it over the old one
  *
+ * The performer picks how a signed build behaves (the owner, 2026-10-28: "an
+ * option to auto update or do manual updates"), saved in the app's own folder:
+ *
+ *   automatic  (the default) as above: downloads by itself, installs on quit
+ *   manual     it only looks. A new version shows in the menu and the profile
+ *              sheet with what is new in it and a "Download and Install"
+ *              button; the click downloads it (with a percentage) and then
+ *              "Restart to Update" installs it. Nothing is fetched before the
+ *              click, and a version never installs on quit that was not asked for
+ *
+ * An ad hoc build has one mode, the download in the browser, whichever is chosen.
+ *
  * Neither ever restarts the app, opens a window or asks a question on its own.
  * A performer may be twenty minutes into a set when a release lands, with the
  * plate on the wall: the most the app does by itself is one notification on the
@@ -42,6 +54,39 @@ export const DMG = 'ChromaGlass-mac-arm64.dmg';
 export const RECHECK_MS = 6 * 60 * 60 * 1000;
 /** How long after opening it first looks: after the show is on the screen, never in its way. */
 export const FIRST_CHECK_MS = 20_000;
+/** How an update is taken: by itself, or when the performer clicks. */
+export const MODES = ['auto', 'manual'];
+export const DEFAULT_MODE = 'auto';
+
+/** The saved choice, or the default for anything that is not one of the two. */
+export function cleanMode(m) {
+  return MODES.includes(m) ? m : DEFAULT_MODE;
+}
+
+/**
+ * What is new in a release, as plain text for a box and the profile sheet.
+ *
+ * electron-updater hands over the release's notes as HTML (GitHub's) or, from a
+ * feed file, as the text it holds, or a list of {version, note}. Only the
+ * "What's new" part is kept: the rest of a release's notes is how to install
+ * it, which a running app has no use for. Tags are dropped rather than
+ * rendered, so nothing a release says can put markup in the page.
+ */
+export function releaseNotesText(raw) {
+  const text = Array.isArray(raw) ? raw.map((r) => r?.note ?? '').join('\n') : String(raw ?? '');
+  const plain = text
+    .replace(/<\/(p|li|h[1-6]|div|ul|ol)>|<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n\s*\n+/g, '\n')
+    .trim();
+  const at = plain.search(/what.?s new/i);
+  if (at < 0) return '';
+  const body = plain.slice(at).replace(/^[^\n]*\n?/, '').split('\n').map((l) => l.replace(/^[-*•]\s*/, '').trim()).filter(Boolean);
+  const out = body.slice(0, 8).join('\n');
+  return out.length > 600 ? `${out.slice(0, 599)}…` : out;
+}
 
 /**
  * Whether this app looks for updates at all, and why not when it does not.
@@ -97,13 +142,16 @@ export function downloadUrl(info, feed) {
  * keeps the order they came in, for the check.
  */
 export function startUpdates(deps) {
-  const { autoUpdater, version, signed, feed, notify, openExternal, quiet, onChange, dialog, off } = deps;
+  const { autoUpdater, version, signed, feed, notify, openExternal, quiet, onChange, dialog, off, saveMode } = deps;
   const setTimer = deps.setTimer ?? setTimeout;
   const clearTimer = deps.clearTimer ?? clearTimeout;
-  const state = { status: off ? 'off' : 'idle', current: version, signed: !!signed, version: null, url: null, percent: 0, error: off ?? null, history: [off ? 'off' : 'idle'] };
+  const state = { status: off ? 'off' : 'idle', current: version, signed: !!signed, mode: cleanMode(deps.mode), install: !!signed, onQuit: false, notes: '', version: null, url: null, percent: 0, error: off ?? null, history: [off ? 'off' : 'idle'] };
   const told = new Set();
   let manual = false;
   let timer = null;
+  // Set by the performer's click on Download and Install: what was asked for
+  // installs when the app is quit, in either mode; what was not, only in auto.
+  let asked = false;
 
   const set = (patch) => {
     Object.assign(state, patch);
@@ -128,10 +176,14 @@ export function startUpdates(deps) {
     dialog?.({ message, detail });
   };
 
-  if (off) return { state, check: async () => { dialog?.({ message: 'Updates are off', detail: `This copy of ChromaGlass does not look for updates: ${off}.` }); }, act: () => {}, stop: () => {} };
+  if (off) return { state, check: async () => { dialog?.({ message: 'Updates are off', detail: `This copy of ChromaGlass does not look for updates: ${off}.` }); }, act: () => {}, setMode: () => {}, stop: () => {} };
 
-  autoUpdater.autoDownload = !!signed;
-  autoUpdater.autoInstallOnAppQuit = !!signed;
+  const applyMode = () => {
+    autoUpdater.autoDownload = !!signed && state.mode === 'auto';
+    autoUpdater.autoInstallOnAppQuit = !!signed && (state.mode === 'auto' || asked);
+    state.onQuit = autoUpdater.autoInstallOnAppQuit;
+  };
+  applyMode();
   autoUpdater.allowPrerelease = false;
   autoUpdater.allowDowngrade = false;
   if (feed) autoUpdater.setFeedURL({ provider: 'generic', url: feed });
@@ -155,12 +207,20 @@ export function startUpdates(deps) {
     const next = String(info?.version ?? '');
     const url = downloadUrl(info, feed);
     const same = next === state.version && holding();
-    if (signed) {
-      if (!same) set({ status: 'downloading', version: next, url, percent: 0 });
+    const notes = releaseNotesText(info?.releaseNotes);
+    if (signed && state.mode === 'auto') {
+      if (!same) set({ status: 'downloading', version: next, url, percent: 0, notes, install: true });
       answer(`ChromaGlass ${next} is ${state.status === 'ready' ? 'ready' : 'downloading'}`, 'It installs the next time you quit ChromaGlass, or now with Restart to Update once it has arrived.');
       return;
     }
-    if (!same) set({ status: 'available', version: next, url });
+    if (signed) {
+      // Manual: found, and left alone until the performer says so.
+      if (!same) set({ status: 'available', version: next, url, percent: 0, notes, install: true });
+      tell(`available:${next}`, `ChromaGlass ${next} is out`, 'Download and Install it from the ChromaGlass menu when you are ready.');
+      answer(`ChromaGlass ${next} is out`, `You have ${version}. ${notes ? `New in it:\n${notes}\n\n` : ''}Download and Install… in the ChromaGlass menu fetches it; nothing is downloaded until you do.`);
+      return;
+    }
+    if (!same) set({ status: 'available', version: next, url, notes, install: false });
     tell(`available:${next}`, `ChromaGlass ${next} is out`, 'Download it from the ChromaGlass menu, then drag it into Applications over this one.');
     answer(`ChromaGlass ${next} is out`, `You have ${version}. Download ChromaGlass ${next}… in the ChromaGlass menu opens the new download in your browser.`);
   });
@@ -183,7 +243,7 @@ export function startUpdates(deps) {
   const ready = () => {
     if (!fetched || !squirrel) return;
     set({ status: 'ready', percent: 100 });
-    tell(`ready:${state.version}`, `ChromaGlass ${state.version} is ready`, 'It installs when you quit ChromaGlass. Restart to Update in the ChromaGlass menu does it now.');
+    tell(`ready:${state.version}`, `ChromaGlass ${state.version} is ready`, state.onQuit ? 'It installs when you quit ChromaGlass. Restart to Update in the ChromaGlass menu does it now.' : 'Restart to Update in the ChromaGlass menu installs it.');
   };
   autoUpdater.on('update-downloaded', (info) => {
     if (info?.version) state.version = String(info.version);
@@ -196,7 +256,7 @@ export function startUpdates(deps) {
     const error = String(err?.message ?? err).split('\n')[0].slice(0, 200);
     // A download that failed falls back to the download in the browser, which
     // always works; anything else found stays as it was (above).
-    if (state.status === 'downloading' && state.url) set({ status: 'available', error });
+    if (state.status === 'downloading' && state.url) set({ status: 'available', error, install: false });
     else if (holding()) set({ error });
     // Offline at a venue is the usual case, and not news. Kept for the menu's
     // own check, which says it, and for the check, which reads it.
@@ -221,8 +281,20 @@ export function startUpdates(deps) {
 
   /** The one thing the menu item or the profile sheet's button does, which is only ever a click. */
   let installing = false;
+  const fetchNow = () => {
+    set({ status: 'downloading', percent: 0, error: null });
+    Promise.resolve(autoUpdater.downloadUpdate?.()).catch((err) => {
+      // The 'error' event has said it; this is for a rejection that came without one.
+      if (state.status === 'downloading') set({ status: 'available', error: String(err?.message ?? err).split('\n')[0].slice(0, 200), install: false });
+    });
+  };
   const act = () => {
-    if (state.status === 'available' && state.url) void openExternal?.(state.url);
+    if (state.status === 'available' && state.install) {
+      // Download and Install (manual, signed): fetch it now, and install it on quit as asked.
+      asked = true;
+      applyMode();
+      fetchNow();
+    } else if (state.status === 'available' && state.url) void openExternal?.(state.url);
     else if (state.status === 'ready') {
       if (installing) return;
       installing = true;
@@ -230,13 +302,30 @@ export function startUpdates(deps) {
     } else void check(true);
   };
 
-  return { state, check, act, stop: () => { if (timer) clearTimer(timer); timer = null; } };
+  /**
+   * Automatic or manual, from the profile sheet or the menu. Saved at once, and
+   * the change takes hold in what is on offer: choosing Automatic with a
+   * version waiting starts fetching it (that is what the performer asked for);
+   * choosing Manual leaves a download that is under way to finish, and nothing
+   * that was not asked for installs on quit.
+   */
+  const setMode = (mode) => {
+    const next = cleanMode(mode);
+    if (next === state.mode) return;
+    state.mode = next;
+    applyMode();
+    set({});
+    saveMode?.(next);
+    if (next === 'auto' && signed && state.status === 'available' && state.install) fetchNow();
+  };
+
+  return { state, check, act, setMode, stop: () => { if (timer) clearTimer(timer); timer = null; } };
 }
 
 /** The menu item for what the updater found: the label says what a click does. */
 export function updateMenuItem(state) {
   if (state.status === 'off') return null;
-  if (state.status === 'available' && state.version) return { label: `Download ChromaGlass ${state.version}…` };
+  if (state.status === 'available' && state.version) return { label: state.install ? `Download and Install ChromaGlass ${state.version}…` : `Download ChromaGlass ${state.version}…` };
   if (state.status === 'downloading') return { label: `Downloading ChromaGlass ${state.version} (${state.percent}%)`, enabled: false };
   if (state.status === 'ready') return { label: `Restart to Update to ${state.version}` };
   if (state.status === 'checking') return { label: 'Checking for Updates…', enabled: false };

@@ -30,7 +30,7 @@ import { createServer } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
+import { cleanMode, startUpdates, updateMenuItem, updatesOff } from './updates.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -318,6 +318,18 @@ let updates = null;
 function packedFlags() {
   try { return JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')).chromaglass ?? {}; } catch { return {}; }
 }
+/** Automatic or manual updates, kept in the app's own folder (updates.js). */
+function updateModeFile() { return join(app.getPath('userData'), 'updates.json'); }
+function savedUpdateMode() {
+  if (process.env.CHROMAGLASS_UPDATE_MODE) return cleanMode(process.env.CHROMAGLASS_UPDATE_MODE);
+  try { return cleanMode(JSON.parse(readFileSync(updateModeFile(), 'utf8')).mode); } catch { return cleanMode(undefined); }
+}
+function saveUpdateMode(mode) {
+  try {
+    mkdirSync(dirname(updateModeFile()), { recursive: true });
+    writeFileSync(updateModeFile(), JSON.stringify({ mode }));
+  } catch { /* the choice holds until the app is quit; not worth a box */ }
+}
 function startUpdater() {
   const feed = process.env.CHROMAGLASS_UPDATE_FEED || null;
   const off = updatesOff({ packaged: app.isPackaged, env: process.env });
@@ -326,6 +338,8 @@ function startUpdater() {
     // Squirrel.Mac itself, so Restart to Update waits until macOS has the update (updates.js).
     nativeUpdater: off || process.platform !== 'darwin' ? null : nativeAutoUpdater,
     off,
+    mode: savedUpdateMode(),
+    saveMode: saveUpdateMode,
     version: app.getVersion(),
     signed: !!packedFlags().signed,
     feed,
@@ -345,6 +359,7 @@ function startUpdater() {
   // The profile sheet asks what was found, and its button does what the menu item does.
   ipcMain.handle('chromaglass:update-state', () => ({ ...updates.state, history: undefined }));
   ipcMain.handle('chromaglass:update-act', () => { updates.act(); return { ...updates.state, history: undefined }; });
+  ipcMain.handle('chromaglass:update-mode', (_e, mode) => { updates.setMode(mode); return { ...updates.state, history: undefined }; });
 }
 
 function buildMenu() {
@@ -362,8 +377,15 @@ function buildMenu() {
   const item = updates ? updateMenuItem(updates.state) : null;
   if (item) {
     const entry = { ...item, click: () => updates?.act() };
-    if (isMac) template[0] = { label: app.name, submenu: [{ role: 'about' }, entry, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] };
-    else template.push({ label: 'Help', submenu: [entry] });
+    const modes = {
+      label: 'Updates',
+      submenu: [
+        { label: 'Install Automatically', type: 'radio', checked: updates.state.mode === 'auto', click: () => updates?.setMode('auto') },
+        { label: 'Ask Me First', type: 'radio', checked: updates.state.mode === 'manual', click: () => updates?.setMode('manual') },
+      ],
+    };
+    if (isMac) template[0] = { label: app.name, submenu: [{ role: 'about' }, entry, modes, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] };
+    else template.push({ label: 'Help', submenu: [entry, modes] });
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }

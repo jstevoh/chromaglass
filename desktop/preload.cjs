@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   updates: {
     state: () => ipcRenderer.invoke('chromaglass:update-state'),
     act: () => ipcRenderer.invoke('chromaglass:update-act'),
+    setMode: (mode) => ipcRenderer.invoke('chromaglass:update-mode', String(mode)),
     onChange: (fn) => {
       const listener = (_e, state) => { try { fn(state); } catch { /* the page's own error */ } };
       ipcRenderer.on('chromaglass:update', listener);

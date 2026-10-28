@@ -2823,6 +2823,21 @@ network):
   (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §75.
+  - **13-update-modes** *(shipped, this PR; asked 2026-10-28 after the owner's unsigned
+    1.3.642 said a new version was out and offered no way to take it)*: a signed build
+    takes updates **Automatically** (default: background download, install on quit) or
+    **Ask me first** (it only looks; a new version shows *What's new*, Download and
+    Install fetches it with a percentage, Restart to Update installs it; nothing is
+    installed on quit that was not asked for). The choice is in Profile & Store and under
+    *ChromaGlass → Updates*, kept in `updates.json`; the release notes carry the list.
+    The Mac app is Mac-only, so there is no separate phone feature: on a phone the card
+    still says to open the page on a Mac, and the card's controls carry the
+    `pointer-coarse` sizes for an iPad. An installed unsigned copy (1.3.642) cannot update
+    itself and needs one manual install of a signed release; every signed build from 1.3.692
+    on does the rest. *Measure:* `npm run updates` (modes, notes, switching, failure
+    fallback) and `npm run desktop -- --packaged`'s mode line. *Owed:* two signed releases,
+    the first installed and the second taken by it (`docs/judging.md`), which waits on the
+    owner's yes to publish.
   - **13-update-signed** *(13.1-sign is in, 2026-10-27: the secrets are set, and a PR's
     build was notarised and accepted by Gatekeeper as "Notarized Developer ID"; the
     build job's limit went from 40 to 75 minutes after a run was cancelled at 40 still

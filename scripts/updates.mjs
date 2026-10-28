@@ -28,7 +28,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const { startUpdates, updateMenuItem, updatesOff, downloadUrl, RELEASES, DMG, FIRST_CHECK_MS, RECHECK_MS } =
+const { startUpdates, updateMenuItem, updatesOff, downloadUrl, cleanMode, releaseNotesText, RELEASES, DMG, FIRST_CHECK_MS, RECHECK_MS } =
   await import(pathToFileURL(join(REPO, 'desktop', 'updates.js')).href);
 
 const tmp = mkdtempSync(join(tmpdir(), 'cg-updates-'));
@@ -50,18 +50,21 @@ function fakeUpdater() {
   u.checkForUpdates = async () => { u.calls.check++; return null; };
   u.quitAndInstall = () => { u.calls.install++; };
   u.setFeedURL = (f) => { u.calls.feed = f; };
+  u.downloadUpdate = async () => { u.calls.download = (u.calls.download ?? 0) + 1; return []; };
   return u;
 }
 
 /** Everything else: timers held until fired, and every outward call written down. */
-function harness({ signed = false, feed = null, off = null, quiet = false, squirrel = false } = {}) {
-  const h = { timers: [], notes: [], opened: [], dialogs: [], changes: 0, pushed: [], quiet };
+function harness({ signed = false, feed = null, off = null, quiet = false, squirrel = false, mode } = {}) {
+  const h = { timers: [], notes: [], opened: [], dialogs: [], changes: 0, pushed: [], quiet, saved: [] };
   h.updater = off ? null : fakeUpdater();
   // Squirrel.Mac (Electron's own autoUpdater), which says when macOS has the update.
   h.native = squirrel ? new EventEmitter() : undefined;
   h.u = startUpdates({
     autoUpdater: h.updater,
     off,
+    mode,
+    saveMode: (m) => h.saved.push(m),
     version: '1.3.0',
     signed,
     feed,
@@ -80,6 +83,7 @@ function harness({ signed = false, feed = null, off = null, quiet = false, squir
 
 const RELEASE = {
   version: '1.3.99',
+  releaseNotes: '<p>ChromaGlass 1.3.99 for the Mac.</p><p>Download <strong>x.dmg</strong>.</p><p><strong>What&#39;s new</strong></p><ul><li>Fix the &quot;Blow&quot; tool &amp; its ring</li><li>Lamp warmth</li></ul>',
   files: [{ url: 'ChromaGlass-1.3.99-arm64-mac.zip' }, { url: 'ChromaGlass-mac-arm64.dmg' }],
 };
 
@@ -177,6 +181,84 @@ check('with the check\'s feed, an address off the feed gives the feed\'s fixed l
   check('signed, Squirrel has it: Restart is offered', h.u.state.status === 'ready' && h.notes.length === 1);
 }
 
+// --- What is new, as plain text ----------------------------------------------
+{
+  const notes = releaseNotesText(RELEASE.releaseNotes);
+  check('what is new: the part after "What\'s new", tags and entities gone, one change to a line', notes === 'Fix the "Blow" tool & its ring\nLamp warmth', JSON.stringify(notes));
+  check('what is new: a release that says nothing gives nothing, never its install words', releaseNotesText('<p>Download the dmg.</p>') === '' && releaseNotesText(undefined) === '' && releaseNotesText(null) === '');
+  check('what is new: a markup-laden note cannot reach the page as markup', !/[<>]/.test(releaseNotesText('<b>What\'s new</b><ul><li><img src=x onerror=alert(1)>A change</li></ul>')));
+  check('what is new: a long note is cut, at 8 lines and 600 characters', releaseNotesText(`What's new\n${Array.from({ length: 20 }, (_, i) => `- change ${i}`).join('\n')}`).split('\n').length === 8 && releaseNotesText(`What's new\n${'x'.repeat(2000)}`).length === 600);
+  check('what is new: electron-updater\'s list form reads too', releaseNotesText([{ version: '1.3.99', note: "<p>What's new</p><ul><li>A</li></ul>" }]) === 'A');
+  check('the mode is one of two, and anything else is the default', cleanMode('manual') === 'manual' && cleanMode('auto') === 'auto' && cleanMode('whenever') === 'auto' && cleanMode(undefined) === 'auto');
+}
+
+// --- Signed, Manual: it only looks; the click downloads; the restart installs ---
+{
+  const h = harness({ signed: true, mode: 'manual' });
+  check('manual: nothing downloads by itself, and nothing installs on quit', h.updater.autoDownload === false && h.updater.autoInstallOnAppQuit === false && h.u.state.mode === 'manual');
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  check('manual: a new version is found and left alone', h.u.state.status === 'available' && h.u.state.install === true && h.updater.calls.download === undefined && h.opened.length === 0);
+  check('manual: what is new comes with it', h.u.state.notes === 'Fix the "Blow" tool & its ring\nLamp warmth', h.u.state.notes);
+  check('manual: the menu says Download and Install', updateMenuItem(h.u.state)?.label === 'Download and Install ChromaGlass 1.3.99…', updateMenuItem(h.u.state)?.label);
+  check('manual: one notification, none over a projector', h.notes.length === 1);
+  await h.u.check(true);
+  h.updater.emit('update-available', RELEASE);
+  check('manual: Check for Updates says what is new and that nothing is fetched yet', h.dialogs.length === 1 && /Lamp warmth/.test(h.dialogs[0].detail) && /nothing is downloaded/.test(h.dialogs[0].detail), h.dialogs[0]?.detail);
+  h.u.act();
+  check('manual: the click downloads it in the app, not in the browser', h.updater.calls.download === 1 && h.opened.length === 0 && h.u.state.status === 'downloading', h.u.state.status);
+  check('manual: what was asked for installs on quit', h.updater.autoInstallOnAppQuit === true && h.u.state.onQuit === true);
+  h.updater.emit('download-progress', { percent: 30.2 });
+  check('manual: the percentage shows, and the menu is not a button', h.u.state.percent === 30 && updateMenuItem(h.u.state)?.enabled === false);
+  h.updater.emit('update-downloaded', RELEASE);
+  check('manual: Restart to Update after the download', h.u.state.status === 'ready' && updateMenuItem(h.u.state)?.label === 'Restart to Update to 1.3.99');
+  h.u.act();
+  check('manual: and the restart installs', h.updater.calls.install === 1);
+}
+{
+  // The download failing falls back to the browser, as it does in Automatic.
+  const h = harness({ signed: true, mode: 'manual' });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.updater.downloadUpdate = async () => { throw new Error('net::ERR_FAILED'); };
+  h.u.act();
+  await new Promise((r) => setImmediate(r));
+  check('manual: a download that fails offers the .dmg instead', h.u.state.status === 'available' && h.u.state.install === false && updateMenuItem(h.u.state)?.label === 'Download ChromaGlass 1.3.99…', `${h.u.state.status} ${h.u.state.install}`);
+  h.u.act();
+  check('manual: and that click opens it in the browser', h.opened.length === 1);
+}
+
+// --- Switching modes ---------------------------------------------------------
+{
+  const h = harness({ signed: true, mode: 'manual' });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.u.setMode('auto');
+  check('switch to Automatic with one waiting: it starts fetching, as asked', h.updater.calls.download === 1 && h.u.state.status === 'downloading' && h.updater.autoDownload === true && h.updater.autoInstallOnAppQuit === true);
+  check('the choice is saved, once', h.saved.length === 1 && h.saved[0] === 'auto');
+  h.u.setMode('auto');
+  check('choosing what is already chosen does nothing', h.saved.length === 1 && h.updater.calls.download === 1);
+  h.u.setMode('manual');
+  check('switch to Manual: the fetch under way is left to finish, and the page is told', h.u.state.status === 'downloading' && h.u.state.mode === 'manual' && h.updater.autoDownload === false && h.pushed.at(-1)?.mode === 'manual');
+  h.updater.emit('update-downloaded', RELEASE);
+  check('switch to Manual: what arrives is not installed on quit, only by Restart to Update', h.u.state.status === 'ready' && h.updater.autoInstallOnAppQuit === false && h.u.state.onQuit === false && /Restart to Update/.test(h.notes.at(-1)?.body ?? ''), h.notes.at(-1)?.body);
+  h.u.setMode('whatever');
+  check('a mode that is neither is Automatic', h.u.state.mode === 'auto');
+}
+{
+  const h = harness({ mode: 'manual' });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.u.setMode('auto');
+  check('ad hoc: either mode offers the browser download and never fetches in the app', h.updater.calls.download === undefined && h.u.state.status === 'available' && h.u.state.install === false && h.updater.autoDownload === false);
+  const d = harness({ off: 'run from the repo, not a packed app' });
+  check('off: choosing a mode is harmless', (d.u.setMode('manual'), d.u.state.status === 'off'));
+}
+{
+  const h = harness({ signed: true });
+  check('the default is Automatic', h.u.state.mode === 'auto' && h.updater.autoDownload === true);
+}
+
 // --- Signed, a download that fails: the browser download instead ---------------
 {
   const h = harness({ signed: true });
@@ -249,6 +331,13 @@ check('in the app: an update is a Download button', inApp('available').button ==
 check('in the app: a ready one is Restart to Update', inApp('ready').button === 'Restart to Update');
 check('in the app: downloading has no button', inApp('downloading').button === null && /40%/.test(inApp('downloading').line));
 check('in the app: the version is shown', inApp('none').current === '1.3.0');
+check('in the app: Ask me first with one found says Download and Install', inApp('available', { signed: true, install: true, mode: 'manual' }).button === 'Download and Install');
+check('in the app: an ad hoc copy says Download and tells the choice does nothing for it', inApp('available', { install: false }).button === 'Download 1.3.99' && /not signed/.test(inApp('available', { install: false }).modeNote ?? ''));
+check('in the app: a signed copy has no such note', inApp('available', { signed: true, install: true }).modeNote === null);
+check('in the app: downloading shows a bar at the percentage', inApp('downloading', { signed: true }).progress === 40 && inApp('available', { signed: true, install: true }).progress === null);
+check('in the app: ready fills the bar and says when it installs', inApp('ready', { signed: true, onQuit: true }).progress === 100 && /installs when you quit/.test(inApp('ready', { signed: true, onQuit: true }).line) && !/installs when you quit/.test(inApp('ready', { signed: true, onQuit: false }).line));
+check('in the app: what is new is carried to the sheet', inApp('available', { signed: true, install: true, notes: 'A\nB' }).notes === 'A\nB');
+check('in the app: the sheet shows the mode', inApp('none', { mode: 'manual' }).mode === 'manual' && inApp('none').mode === 'auto');
 // macOS 15 took right-click → Open away for an app it cannot check (the owner's
 // Mac refused 1.3.622, 2026-10-25): the words point at the one way left.
 check('the first-open words name Settings\' Open Anyway, not right-click', /Privacy & Security/.test(MAC_FIRST_OPEN) && /Open Anyway/.test(MAC_FIRST_OPEN) && !/right-click|control-click/i.test(MAC_FIRST_OPEN), MAC_FIRST_OPEN);
