@@ -15,7 +15,8 @@
 //   1. a file that is not in the baseline stays at or under 40 KB (about ten
 //      thousand tokens, what a session can read whole without regret);
 //   2. a file already over 40 KB is in the baseline with its size, and may
-//      not grow past it. New code for it goes in a new module beside it.
+//      not grow past it, nor past its size at the base. New code for it goes
+//      in a new module beside it.
 //
 // The baseline is scripts/sizes.json, and it only shrinks. Against the commit
 // this one is measured from (below), an entry may be lowered or removed, never
@@ -28,10 +29,12 @@
 // touches App.tsx would touch the same line of sizes.json, and the ten or so
 // sessions working at once would conflict there all day (and GitHub runs no CI
 // on a PR that conflicts). So a file may sit up to 4 KB under its ceiling
-// unremarked; past that the check fails until `npm run sizes -- --update`
-// lowers the entry, so a real move out (the solver leaving the visualizer) has
-// to bank what it saved and cannot be quietly regrown. What can come back
-// unannounced is at most 4 KB a file, about a thousand tokens.
+// unremarked; past that a pull request that resized the file fails until
+// `npm run sizes -- --update` lowers the entry, so a real move out (the solver
+// leaving the visualizer) has to bank what it saved. Nothing can grow back
+// into the slack anyway, since no PR may grow the file against its base; the
+// slack only decides when the ceiling has to follow it down. (On main, and
+// for a file a PR did not resize, a stale entry is a note: see judge().)
 //
 // Which files. Every file git tracks, and locally every untracked one it does
 // not ignore (so a new file shows before it is committed), measured in bytes on
@@ -103,20 +106,40 @@ const parse = (text, where) => {
 };
 
 // The rules, on plain data: `sizes` from measure(), `now` the baseline in the
-// tree, `then` the baseline at the base (null when the base has none).
-export function judge(sizes, now, then) {
-  const bad = [];
+// tree, `then` the baseline at the base (null when the base has none), `was`
+// each file's size at the base (null when there is no base), and `pr`, whether
+// this is a pull request's run (or a session's) rather than main's own.
+//
+// Why a ceilinged file is held to its size at the base as well as to its
+// ceiling, and why a stale entry is only red in a pull request that changed
+// the file (the review of #545, both reproduced on the real App.tsx). PRs
+// merge green even when main moved while their checks ran (the owner's rule
+// of 2026-09-28), so each is measured against the main it started from, and
+// two of them land on top of each other. Held to the ceiling alone, main 3 KB
+// under it and two PRs that each add 2 KB are each green and together 1 KB
+// over: main's deploy red with nobody's PR to blame. Held to the base, a PR
+// cannot grow the file at all, and sums of PRs that do not grow it do not
+// either. The other way round, two PRs that each trim 2.5 KB are each inside
+// the slack and together 5 KB under: had that been red wherever it was found,
+// main's deploy and every open PR would have gone red at once. So on main it
+// is a note, and in a pull request it is red only for a file the PR resized,
+// which is the PR that has something to bank.
+export function judge(sizes, now, then, was = null, pr = true) {
+  const bad = [], notes = [];
+  const touched = (f) => !was || was.get(f) !== sizes.get(f);
+  const stale = (f, what) => (pr && touched(f) ? bad : notes).push(['stale', f, what]);
   for (const f of Object.keys(now.ledgers)) {
     if (f in now.files) bad.push(['both', f, `${f} is both a ledger and a ceiling in ${BASELINE}`]);
-    if (!sizes.has(f)) bad.push(['stale', f, `${f} is a ledger but no longer here: take it out of ${BASELINE}`]);
-    else if (sizes.get(f) <= BUDGET) bad.push(['stale', f, `${f} is a ledger at ${kb(sizes.get(f))}, under the ${kb(BUDGET)} budget: take it out of the ledgers`]);
+    if (!sizes.has(f)) stale(f, `${f} is a ledger but no longer here: take it out of ${BASELINE}`);
+    else if (sizes.get(f) <= BUDGET) stale(f, `${f} is a ledger at ${kb(sizes.get(f))}, under the ${kb(BUDGET)} budget: take it out of the ledgers`);
   }
   for (const [f, cap] of Object.entries(now.files)) {
-    const n = sizes.get(f);
-    if (n == null) bad.push(['stale', f, `${f} has a ceiling but is no longer here: \`npm run sizes -- --update\` drops it`]);
+    const n = sizes.get(f), before = was?.get(f);
+    if (n == null) stale(f, `${f} has a ceiling but is no longer here: \`npm run sizes -- --update\` drops it`);
     else if (n > cap) bad.push(['grew', f, `${f} grew to ${n} bytes past its ceiling of ${cap} (+${n - cap}): move the new code into a module beside it`]);
-    else if (n <= BUDGET) bad.push(['stale', f, `${f} is ${kb(n)}, back under the budget: \`npm run sizes -- --update\` drops its ceiling`]);
-    else if (cap - n > SLACK) bad.push(['stale', f, `${f} is ${n} bytes, ${cap - n} under its ceiling of ${cap}: \`npm run sizes -- --update\` banks it`]);
+    else if (before != null && n > before) bad.push(['grew', f, `${f} grew from ${before} bytes at the base to ${n} (+${n - before}): a file over budget does not grow, even under its ceiling`]);
+    else if (n <= BUDGET) stale(f, `${f} is ${kb(n)}, back under the budget: \`npm run sizes -- --update\` drops its ceiling`);
+    else if (cap - n > SLACK) stale(f, `${f} is ${n} bytes, ${cap - n} under its ceiling of ${cap}: \`npm run sizes -- --update\` banks it`);
   }
   for (const [f, n] of sizes) {
     if (n > BUDGET && !(f in now.files) && !(f in now.ledgers)) bad.push(['new', f, `${f} is ${kb(n)} (${n} bytes), over the ${kb(BUDGET)} budget for a file: split it`]);
@@ -130,7 +153,7 @@ export function judge(sizes, now, then) {
       if (!(f in then.ledgers)) bad.push(['raised', f, `${f} is a new ledger: the list of ledgers only shrinks`]);
     }
   }
-  return bad;
+  return { bad, notes };
 }
 
 // Lowers each ceiling to its file's size and drops what has fallen under the
@@ -168,20 +191,27 @@ function baseCommit(root, ref, ci) {
   try { return { sha: git(root, 'merge-base', 'origin/main', 'HEAD').trim() }; } catch { return { none: 'no --base and no origin/main' }; }
 }
 
-export function run(root, { ref = null, ci = !!process.env.GITHUB_ACTIONS } = {}) {
+// `pr`: in CI, whether the run is a pull request's (a deploy's is main's own
+// push, or a run by hand); a session's run is treated as a pull request's.
+export function run(root, { ref = null, ci = !!process.env.GITHUB_ACTIONS, pr = !ci || process.env.GITHUB_EVENT_NAME === 'pull_request' } = {}) {
   const now = parse(fs.readFileSync(path.join(root, BASELINE), 'utf8'), BASELINE);
   const base = baseCommit(root, ref, ci);
-  let then = null, note = null;
-  if (base.error) return { bad: [['base', '', base.error]], now };
-  if (base.none) note = `the baseline's history is not read (${base.none})`;
+  let then = null, was = null;
+  const notes = [];
+  if (base.error) return { bad: [['base', '', base.error]], notes, now };
+  if (base.none) notes.push(['note', '', `the base is not read (${base.none}): neither the baseline's history nor each file's size there`]);
   else {
     try { then = parse(git(root, 'show', `${base.sha}:${BASELINE}`), `${base.sha.slice(0, 9)}:${BASELINE}`); } catch (e) {
-      if (/does not exist|exists on disk, but not in/.test(String(e.stderr ?? e.message))) note = `the base ${base.sha.slice(0, 9)} has no ${BASELINE} yet`;
+      if (/does not exist|exists on disk, but not in/.test(String(e.stderr ?? e.message))) notes.push(['note', '', `the base ${base.sha.slice(0, 9)} has no ${BASELINE} yet`]);
       else throw e;
     }
+    // Every blob's size at the base, one call: `<mode> blob <sha> <size>\t<path>`.
+    was = new Map(git(root, 'ls-tree', '-r', '-l', '-z', base.sha).split('\0').filter(Boolean)
+      .map((l) => l.match(/^\S+ blob \S+ +(\d+)\t(.*)$/s)).filter(Boolean).map((m) => [m[2], +m[1]]));
   }
   const sizes = measure(root);
-  return { bad: judge(sizes, now, then), sizes, now, note, base: base.sha };
+  const j = judge(sizes, now, then, was, pr);
+  return { bad: j.bad, notes: [...notes, ...j.notes], sizes, now, base: base.sha };
 }
 
 // --- The self-test --------------------------------------------------------------
@@ -231,7 +261,7 @@ function selftest() {
     expect('a big binary file passes', () => put('clip.mp4', 200 * 1024, '\0a'), []);
     expect('a package-lock.json in a folder passes', () => put('desktop/package-lock.json', 200 * 1024), []);
     expect('a ledger that grows passes', () => add('PLAN.md', 10 * 1024), []);
-    expect('a ceiling raised to let a grown file through fails', () => { add('src/big.ts', 100); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); }, ['raised src/big.ts']);
+    expect('a ceiling raised to let a grown file through fails', () => { add('src/big.ts', 100); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); }, ['raised src/big.ts', 'grew src/big.ts']);
     expect('a ceiling added for a new big file fails', () => { put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/new.ts': 41 * 1024 } }); }, ['raised src/new.ts']);
     expect('a new big file made a ledger fails', () => { put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x', 'src/new.ts': 'x' }, files: { 'src/big.ts': BIG } }); }, ['raised src/new.ts']);
     expect('a file under its ceiling by the slack passes', () => put('src/big.ts', BIG - SLACK), []);
@@ -244,12 +274,39 @@ function selftest() {
     expect('a ledger under budget fails until it leaves the list', () => put('PLAN.md', 1024), ['stale PLAN.md']);
     // In CI the base is HEAD^1 (the PR's merge commit's first parent), read
     // without a ref: a ceiling raised in the PR's last commit is caught there.
-    reset(); add('src/big.ts', 100); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); g('commit', '-qam', 'raise');
-    const ci = run(dir, { ci: true }).bad.map(([k, f]) => `${k} ${f}`);
+    reset(); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); g('commit', '-qam', 'raise');
+    const ci = run(dir, { ci: true, pr: true }).bad.map(([k, f]) => `${k} ${f}`);
     t(ci.join() === 'raised src/big.ts', 'in CI, a ceiling raised against HEAD^1 fails', ci.join(', '));
     reset();
-    const first = run(dir, { ci: true });
+    const first = run(dir, { ci: true, pr: true });
     t(first.bad.length === 1 && first.bad[0][0] === 'base', 'in CI, a base that cannot be read fails rather than passes', first.bad.map((b) => b[2]).join('; ') || 'passed');
+
+    // PRs land on top of each other (the review of #545). The file in lines,
+    // so git merges two edits at its two ends the way it merges two PRs.
+    const line = (i) => `${String(i).padStart(63, '0')}\n`;
+    const lines = (f, n) => fs.writeFileSync(path.join(dir, f), Array.from({ length: n / 64 }, (_, i) => line(i)).join(''));
+    const drop = (f, head, tail) => { const l = fs.readFileSync(path.join(dir, f), 'utf8').split(/(?<=\n)/); fs.writeFileSync(path.join(dir, f), l.slice(head, l.length - tail).join('')); };
+    const ciKinds = (pr) => { const r = run(dir, { ci: true, pr }); return [r.bad.map(([k, f]) => `${k} ${f}`).sort().join(', '), r.notes.map(([k, f]) => `${k} ${f}`).join(', ')]; };
+    reset(); lines('src/big.ts', BIG); g('commit', '-qam', 'in lines');
+    const lined = g('rev-parse', 'HEAD').trim();
+    g('checkout', '-qb', 'trim-tail'); drop('src/big.ts', 0, 40); g('commit', '-qam', 'PR B trims 2.5 KB');
+    g('checkout', '-q', 'main'); drop('src/big.ts', 40, 0); g('commit', '-qam', 'PR A trims 2.5 KB');
+    g('merge', '-q', '--no-edit', 'trim-tail');
+    const both = fs.statSync(path.join(dir, 'src/big.ts')).size;
+    let [b, n] = ciKinds(false);
+    t(both === BIG - 80 * 64 && b === '' && n === 'stale src/big.ts', 'two PRs each trimming 2.5 KB land 5 KB under the ceiling: main stays green, with a note', `${both} bytes; red [${b}], notes [${n}]`);
+    put('src/other.ts', 100); g('add', '-A'); g('commit', '-qm', 'a PR that does not touch it');
+    [b] = ciKinds(true);
+    t(b === '', 'a later PR that does not resize the file is not asked to bank it', b);
+    drop('src/big.ts', 1, 0); g('commit', '-qam', 'a PR that trims one more line');
+    [b] = ciKinds(true);
+    t(b === 'stale src/big.ts', 'a later PR that resizes it is', b || 'passed');
+    g('reset', '-q', '--hard', lined); drop('src/big.ts', 48, 0); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG } }); g('commit', '-qam', 'main 3 KB under its ceiling');
+    const under = g('rev-parse', 'HEAD').trim();
+    fs.appendFileSync(path.join(dir, 'src/big.ts'), Array.from({ length: 32 }, (_, i) => line(9000 + i)).join('')); g('commit', '-qam', 'PR adds 2 KB');
+    [b] = ciKinds(true);
+    t(b === 'grew src/big.ts', 'main 3 KB under its ceiling: a PR adding 2 KB is red on its own, so two cannot land 1 KB over', b || 'passed');
+    t(run(dir, { ref: under, ci: false }).bad.some(([k]) => k === 'grew'), 'and the same against --base in a session');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -271,7 +328,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   let failed = selftest();
   const r = run(ROOT, { ref });
-  if (r.note) console.log(`note: ${r.note}`);
+  for (const [, , what] of r.notes) console.log(`note: ${what}`);
   for (const [, , what] of r.bad) { console.log(`FAIL ${what}`); failed++; }
   if (r.sizes) {
     const held = Object.keys(r.now.files).length, total = Object.values(r.now.files).reduce((a, b) => a + b, 0);

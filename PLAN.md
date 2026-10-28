@@ -6397,12 +6397,14 @@ the docs PR numbers the series 19ai-1..10). Only 19ai-5 is written here so far.
 
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** A file not in `scripts/sizes.json`
   stays at or under 40 KB; a file already over it (52 on main at a9dd9f2, 4.9 MB between
-  them) may not grow past the bytes recorded beside it, and new code for it goes in a module
-  beside it. The baseline only shrinks against the base (HEAD^1 in CI: the PR's merge
+  them) may not grow past the bytes recorded beside it, nor past its size at the PR's base
+  (so two PRs that each fit under a ceiling cannot land together over it), and new code for it
+  goes in a module beside it. The baseline only shrinks against the base (HEAD^1 in CI: the PR's merge
   commit's first parent, or the main before a deploy's commit): a ceiling raised or added,
   or a new ledger, is red, and a big file renamed is a new file over budget. A file more
-  than 4 KB under its ceiling is red until `npm run sizes -- --update` lowers it, so a real
-  move out banks what it saved, while a PR that trims a few lines does not have to touch the
+  than 4 KB under its ceiling is red, in a PR that resized it, until `npm run sizes -- --update`
+  lowers it (on main, or for a file the PR did not resize, a note: two PRs that each trim
+  2.5 KB must not turn the deploy and every open PR red), so a real move out banks what it saved, while a PR that trims a few lines does not have to touch the
   same line of `sizes.json` as every other PR in flight. Binary files and
   `package-lock.json` are not counted. Six **ledgers** that every PR writes in (PLAN.md,
   `docs/plan-shipped.md`, `docs/judging.md`, `docs/guide.md`, CHANGELOG.md,
