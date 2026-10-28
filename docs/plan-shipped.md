@@ -6054,7 +6054,7 @@ old hook under it, 43.3 / 42.8 (laptop / phone, stick sweeping) and 42.3 / 43.0 
 held) renders a second, now 1.0 on all four; the ring found in 12 of 12 looks, changing
 place, still under a held trigger, on the page.
 
-## 14ab-3, 14ab-5, 14ab-9. The frame's bind groups, its readbacks and thick liquid's share (shipped 2026-10-28, #PRNUM)
+## 14ab-3, 14ab-5, 14ab-9. The frame's bind groups, its readbacks and thick liquid's share (shipped 2026-10-28, #549)
 
 14ab-5. The solver has kept its bind groups since H2c-11, but every pass after it made its
 own again each frame, over a fresh `createView()` of every texture it bound: the plate's
