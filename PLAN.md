@@ -3570,13 +3570,44 @@ for, and the GPU was asked for only after they had arrived and drawn.
   intro took nothing out on any of them, so there is nothing to read yet.
 - **Shipped, 14v-9: the webpage loads only itself first, and leaves the GPU for Play**
   (2026-10-28). `npm run loadtime` 4a to 4d; the story is in `docs/plan-shipped.md` §14v.
-- **14v-10. The plate's opening is 8.75 s of compiling on a cold Mac.** CI's Mac, PR
-  #511's run 40619521397 (2026-10-28): first step 13.44 s, the device given at 4.33 s,
-  56 pipelines built ahead from 4.34 to 13.09 s (25.5 s of compiles over three lanes,
-  median 0.32 s; `fluid/deltaVel:rgba16float` 2.67 s, `fluid/liquidForces:rgba16float`
-  2.66 s, `fluid/squeezeUpdate` 1.40 s, `plate/display` 1.03 s). The two slowest are
-  the next thing to read: why each takes eight times the median, and whether the
-  opening needs them before its first step.
+- **14v-10. The plate's opening is 8.75 s of compiling on a cold Mac: read (2026-10-28),
+  nothing to ship from it.** CI's Mac, PR #511's run 40619521397: first step 13.44 s, the
+  device given at 4.33 s, 56 pipelines built ahead from 4.34 to 13.09 s (25.5 s of compiles
+  over three lanes, median 0.32 s; `fluid/deltaVel:rgba16float` 2.67 s,
+  `fluid/liquidForces:rgba16float` 2.66 s). What was read, and what it says:
+  - *The slow ones are not big.* deltaVel and liquidForces are 5 and 7 kB of source like the
+    rest (their own code 0.6 and 2.5 kB), and are slow on only some runs. What is slow on every
+    cold opening is whatever compute kernel is asked at 6 to 7.7 s, as the last render
+    pipeline settles: the dampGrid kernels on seven of eight CI openings of 2026-10-28 (1.1 to
+    2.8 s, asked within 0.01 s of the end of "held still"), and on all twelve below,
+    `scaleDye`, 0.3 kB of its own code, among them at 2.2 to 2.6 s. It is not the intro
+    starting to move: held still to the end, the same kernels took as long. It lines up with
+    the render pipelines' first draws reaching the GPU (inferred from the times; the plate's
+    first draw on a new device was 1.42 s of GPU time in #181), which is the next thing to
+    time: those first uses handed over after the compute kernels instead.
+  - *Neither way round it opens sooner.* `npm run openingtime` (new; not a check: it opens
+    the show several ways, interleaved, each on an emptied shader cache) on PR #540's run
+    40683027073, three openings each: as shipped, first step 13.91, 14.78, 14.32 s; the intro
+    held still to the end of the opening 14.77, 13.54, 13.65 s; six lanes once no render
+    pipeline is left 14.41, 13.68, 13.57 s; both 13.47, 13.65, 14.31 s. Six lanes doubled
+    every compile (median 0.69 s against 0.36) and built no faster, so the Mac's compiler
+    sets the pace, not the lanes. Both flags were taken out again. And the first step came at 13.5 to 14.8 s
+    on all twelve whether the device came at 0.2 s or 5.5 s: the later the device, the faster
+    the builds (9.1 s from 5.47 s, 11.5 s from 2.17 s), so part of the opening is the GPU
+    process warming up, not this file's compiles. Emptying every `com.apple.metal` cache, as
+    CI does, clears the browser's own shaders too; a returning visitor is never that cold.
+  - *How cold a deploy leaves a returning visitor.* A Mac compiles a pipeline again only when
+    its source text changes. Over the 99 commits to main since 2026-09-27 that changed shader
+    source: 42 changed no fluid kernel, 42 changed one to five, and the median was one. The
+    plate's display (1 to 2 s cold) changed in 38. Ten changed the shared `Sim` struct (a
+    field added, renamed or re-laid), and each of those changed all of the 79 to 119 kernels
+    then, since every kernel starts with `SIM_STRUCT`. Giving each kernel only the helpers it
+    uses would spare the 24 of 124 that never read `S` on those ten. That is not worth the
+    code, since 100 still read the struct.
+  - Left: on the owner's machine (an M4, not CI's virtual GPU), the cold opening and a
+    warm one after a deploy that changed only the display. The first needs the owner's OK
+    to empty the shader cache (`npm run openingtime -- --cold`); the second needs no
+    emptying. What is left to cut is the count of compiles: the item below.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
