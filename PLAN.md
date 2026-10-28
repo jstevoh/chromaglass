@@ -8109,24 +8109,36 @@ Turing Print" work (#331), which also made the reaction grow at all.
     fails on any quoted retired id in src/, so retiring the look trips it on the layer.
     5b learns to tell a preset id from a setting key (named under `Check changes:`, its
     reach unchanged for preset ids), then the look retires.
-  - **28i-2. Give back the black, make the still ones move** (Antigravity, batch 2). Film
-    near black (5th percentile) at least 20% of the time: Classic (and two or more hues),
-    Galaxy, Stardust Collapse (colours at least .3), Jellyfish Bloom (flat at most .4),
-    Bass Drop (peak at least 2.5 × median). Cell Bloom: flat at most .4 and luma at least
-    half its 8 s value at 40 s. Cyberpunk: near black at the 95th percentile at most 60%,
-    three or more hues. Off the white: Turing Print colours at least .3 by 8 s and luma
-    at most .6; Roy flat at most .5, luma at most .6; Red Cabbage luma at most .5 with
-    three hues; Lava Lamp luma at most .6; Milk Marbling's white tamed. Colour: Macro
-    Bead and Lacing Run two or more hues and six colour changes a minute; Chemical Clock
-    six a minute. Microscopic Chaos detail at most half its 10-19 reading. Motion at
-    least .02 at 20 and 40 s: Velvet Underground, Poster 1969, Home Movie, Clock Glass,
-    Crowd Plate, Lava Lamp, Jellyfish, Microscopic Chaos. `gallery` label and
-    `film.yml` (`FILM_ONLY` the looks changed).
-    Also for this batch, found in #408: **Poster, 1969's plate runs at about 16 steps a
-    second on the Mac runner** (`squeeze` read 191, 215 and 327 steps in 12 s on it, 320
-    to 350 on the Fillmore), under the 30 a second where the plate stops flowing and
-    starts stepping (`PINNED_STEP_RATE`, `LiquidVisualizer.tsx`). Find what makes Poster
-    that heavy (its layers, its dye budget, its plate size) before it is made to move.
+  - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2,
+    **shipped** in this PR; story in `docs/plan-shipped.md` 28i-2): all 21 reworked looks
+    meet their gallery (`8/20/40 s`) and film (`90 s`) bars; `jellyfish-bloom` appears once
+    in `evolution.ts`'s `calm` bucket and `poster-1969` appears once in `sequencer.ts`'s
+    `Pace` sequence. `poster-1969` now runs on a single plate (`layerCount: 1`), raising its
+    12 s step rate from `15.9 steps/s` (two 384² plates) to `24.8 steps/s` (one 384² plate);
+    reaching `>= 30 steps/s` (`PINNED_STEP_RATE = 30`) is open as **28i-2a** below.
+  - **28i-2a, open. Poster, 1969's step rate on a single 384² plate.** Measured over 12 s
+    (`squeeze` harness), `poster-1969` on `main` ran `layerCount: 2` (`2 × 384²` thin-gap
+    plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at
+    `15.9 steps/s` (`191 steps / 12 s`, `simMs = 45.2 ms`, `2.05 substeps/frame`, `7.8 fps`).
+    Moving `poster-1969` to a single plate (`layerCount: 1`, matching its 28i-1 description
+    `"Poster, 1969 draws on one plate"`) cuts its GPU solver work in half and raises its
+    12 s step rate by +56% to `24.8 steps/s` (`298 steps / 12 s`, `simMs = 24.1 ms`,
+    `2.00 substeps/frame`, `12.4 fps`), still below `PINNED_STEP_RATE = 30` (`>= 200` steps
+    in a 6.67 s window) because the governor stays on the `384²` rung where each thin-gap
+    step takes ~12 ms on an integrated GPU. Stepping down to the `256²` rung on a single
+    plate reaches `35.2 steps/s` (`422 steps / 12 s`, `simMs = 11.4 ms`, `1.88 substeps/frame`,
+    `18.7 fps`), clearing `30 steps/s` with +17% margin; `governor.ts` needs a step-rate /
+    `simMs` downshift rule (or a `256²` start when `simMs > 16 ms`) so single-plate thin-gap
+    looks reach `PINNED_STEP_RATE = 30`.
+  - **28i-2b, open. The projector check cannot see a left/right shift of 0.2 or less.**
+    `scripts/webgpu-smoke.mjs`'s "the projector places the picture on the wall" probes only the
+    top rows and the middle, so a sideways shift of the picture by 0.2 of the frame or less
+    reaches neither (mutation run in a cloud session on Classic's opening, review of #523: pin
+    ignored, picture 0.2 up or down, half size, 0.3 sideways and a blackout that is ignored
+    all fail; 0.2 sideways passes). The frame is lit by construction now (the LED floor), so
+    a column probe closes it cheaply: the left 4% of columns lit when unpinned and dark when
+    pinned inside the frame, beside the top-rows probe. A check change: name its bar and
+    input in the PR body, and run the same mutations to show 0.2 sideways now fails.
   - **28i-3. Sound on the liquid, not the frame** (batch 3, **open for the film measure**;
     frame fixes on the eight looks and the Milk Marbling dead-patch fix **shipped** in #473,
     story in `docs/plan-shipped.md` 28i-3).
@@ -8178,7 +8190,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
       `clock-glass` (`3.0 swells/min` on 40 s / `0.0` on 30 s, `0.0 colour changes/min`, `r1 = 0.10`),
       `ferro-paint` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.03`),
       `roy` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.08`).
-      28i-2 stays open as briefed.
   - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
     magenta cells, no rainbow); then four or more hues on the film.
 
