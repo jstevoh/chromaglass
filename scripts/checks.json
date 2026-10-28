@@ -1945,6 +1945,17 @@
       ]
     },
     {
+      "name": "How long the opening takes, three ways (temporary, PLAN 14v-10)",
+      "shard": "open",
+      "run": "npm run openingtime -- --runs 3",
+      "why": [
+        "Not a check: it judges nothing and always passes. Twelve cold openings",
+        "(as shipped, ?stillall=1, ?computelanes=6, both), interleaved, so the",
+        "PR that changes how the opening builds can choose by a Mac's numbers.",
+        "Taken out again in the same PR before it merges."
+      ]
+    },
+    {
       "name": "The grain inside the dye, not at its edge",
       "shard": "open",
       "run": "npm run grainedge",
