@@ -158,13 +158,14 @@ const licensePubJwk = await crypto.subtle.exportKey('jwk', licenseEd25519.public
 
 const WEBHOOK_SECRET = 'whsec_test_merchant_secret_23_12';
 const SITE = 'https://chromaglass.web.app';
-const makeEnv = () => ({
+const makeEnv = (extra = {}) => ({
   LICENSE_KV: new FakeKV(),
   WEBHOOK_SECRET,
   LICENSE_PRIVATE_KEY: JSON.stringify(licensePrivJwk),
   LICENSE_PUBLIC_KEY: JSON.stringify(licensePubJwk),
   GOOGLE_JWKS: { keys: [googlePubJwk] },
   FIREBASE_PROJECT_ID: 'chromaglass',
+  ...extra,
 });
 
 async function postWebhook(env, bodyObj, { secret = WEBHOOK_SECRET, sigOverride = undefined } = {}) {
@@ -480,6 +481,66 @@ let bobProToken = '';
     globalThis.fetch = realFetch;
     Date.now = realNow;
   }
+}
+
+// ── 9. Test-mode orders mint nothing; live product ids come from settings ──
+{
+  const lsOrder = (email, orderId, { test, productId = 1450530, name = 'ChromaGlass Home' } = {}) => ({
+    meta: { event_name: 'order_created', ...(test === 'meta' ? { test_mode: true } : {}) },
+    data: {
+      id: orderId,
+      attributes: {
+        user_email: email,
+        ...(test === 'order' ? { test_mode: true } : {}),
+        first_order_item: { product_id: productId, product_name: name, order_id: orderId },
+      },
+    },
+  });
+  const keysOf = async (env, email) => (await (await getKeys(env, await mintFirebaseToken({ email }))).json()).keys ?? [];
+
+  const env = makeEnv();
+  const t1 = await postWebhook(env, lsOrder('eve@example.com', 'ord_eve_1', { test: 'meta' }));
+  const t2 = await postWebhook(env, lsOrder('eve@example.com', 'ord_eve_2', { test: 'order' }));
+  const eveKeys = await keysOf(env, 'eve@example.com');
+  check(
+    '9. a test-mode order (meta or order flag) answers 200 and files no key',
+    t1.status === 200 && t2.status === 200 && eveKeys.length === 0 && env.LICENSE_KV.values.size === 0,
+    `${t1.status}/${t2.status}, ${eveKeys.length} keys, ${env.LICENSE_KV.values.size} in KV`,
+  );
+
+  const allow = makeEnv({ TEST_MODE_EMAILS: 'owner@example.com, Other@example.com' });
+  await postWebhook(allow, lsOrder('owner@example.com', 'ord_own_1', { test: 'meta' }));
+  await postWebhook(allow, lsOrder('stranger@example.com', 'ord_str_1', { test: 'meta' }));
+  const ownerKeys = await keysOf(allow, 'owner@example.com');
+  const strangerKeys = await keysOf(allow, 'stranger@example.com');
+  check(
+    '9b. TEST_MODE_EMAILS lets the owner prove the path with a test order, and only the owner',
+    ownerKeys.length === 1 && strangerKeys.length === 0,
+    `owner ${ownerKeys.length} keys, stranger ${strangerKeys.length}`,
+  );
+
+  const real = await postWebhook(env, lsOrder('frank@example.com', 'ord_frank_1'));
+  const frankKeys = await keysOf(env, 'frank@example.com');
+  check(
+    '9c. a live order (no test flag) still files its key',
+    real.status === 200 && frankKeys.length === 1 && frankKeys[0].tier === 'home',
+    `${real.status}, ${frankKeys.length} keys, tier ${frankKeys[0]?.tier}`,
+  );
+
+  // The live store's products have ids of their own and names that may be reworded; the
+  // settings say which ids are Pro and which is the Upgrade.
+  const live = makeEnv({ LS_PRO_PRODUCT_IDS: '777001', LS_UPGRADE_PRODUCT_IDS: '777002' });
+  await postWebhook(live, lsOrder('gina@example.com', 'ord_gina_1', { productId: 777001, name: 'ChromaGlass' }));
+  await postWebhook(live, lsOrder('hal@example.com', 'ord_hal_1', { productId: 777000, name: 'ChromaGlass' }));
+  const ginaKeys = await keysOf(live, 'gina@example.com');
+  const halKeys = await keysOf(live, 'hal@example.com');
+  await postWebhook(live, lsOrder('hal@example.com', 'ord_hal_2', { productId: 777002, name: 'ChromaGlass' }));
+  const halAfter = await keysOf(live, 'hal@example.com');
+  check(
+    '9d. LS_PRO_PRODUCT_IDS makes a live product Pro, and LS_UPGRADE_PRODUCT_IDS turns Home into Pro',
+    ginaKeys[0]?.tier === 'pro' && halKeys[0]?.tier === 'home' && halAfter.length === 1 && halAfter[0]?.tier === 'pro',
+    `gina ${ginaKeys[0]?.tier}, hal ${halKeys[0]?.tier} then ${halAfter.map((k) => k.tier).join('+')}`,
+  );
 }
 
 const failed = checks.filter((c) => !c.ok);
