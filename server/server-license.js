@@ -177,7 +177,7 @@ export function createServerLicenseManager(options = {}) {
     };
   }
 
-  async function activate(rawKey, rawMachineId, seatConfirmed = false) {
+  async function activate(rawKey, rawMachineId, seatConfirmed) {
     const key = typeof rawKey === 'string' ? rawKey.trim() : '';
     const machineId = typeof rawMachineId === 'string' && rawMachineId.trim()
       ? rawMachineId.trim().slice(0, 128)
@@ -223,7 +223,10 @@ export function createServerLicenseManager(options = {}) {
     }
 
     state.activations[check.id] = existing;
-    if (seatConfirmed) state.seats[check.id] = Date.now();
+    // true files the Worker's yes; false takes it back (the Worker said full to a
+    // Mac that held a seat); undefined leaves it as it was.
+    if (seatConfirmed === true) state.seats[check.id] = Date.now();
+    else if (seatConfirmed === false) delete state.seats[check.id];
     state.active = {
       key,
       tier: check.tier,
@@ -302,7 +305,7 @@ export function createServerLicenseManager(options = {}) {
         sendJson(res, 400, { ok: false, error: 'invalid-json' });
         return;
       }
-      const result = await activate(body?.key, body?.machineId, body?.seatConfirmed === true);
+      const result = await activate(body?.key, body?.machineId, typeof body?.seatConfirmed === 'boolean' ? body.seatConfirmed : undefined);
       sendJson(res, result.status, result.body);
       return;
     }

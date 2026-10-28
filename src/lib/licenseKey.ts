@@ -321,29 +321,48 @@ function seatRefused(a: SeatAnswer): LicenseStatus | null {
 }
 
 /**
- * A key the Worker has not seated here yet, asked again (PLAN.md 23.17g). A key
- * typed in offline opens the app on its signature; this is the next start that
- * is online, or the account sync. "Seated" is filed with the app's server for
- * the starts after; "full" or "revoked" takes the key off this Mac from its
- * next start, never out from under a running show (retireStoredLicenseKey).
+ * The held key's seat, asked for again at every start that is online (PLAN.md
+ * 23.17g; the review of #524). A key typed in offline opens the app on its
+ * signature and is filed as unconfirmed; this seats it. But it also asks for a
+ * seat already held, which the Worker answers as a refresh, because a refund
+ * has to reach a Mac that was seated long ago: the account sync can only retire
+ * a refunded key on a window signed in under the key's own email
+ * (`heldKeyRefunded`), and the door lets a key in without a sign-in.
+ *
+ *  - seated: filed with the app's server, for the starts that are offline.
+ *  - revoked: the key leaves this Mac from its next start.
+ *  - full: a Mac the Worker never seated loses the key the same way; one it
+ *    had seated keeps it and is marked unconfirmed, so a hiccup in the Worker's
+ *    store cannot take the app off a paying Mac, and a seat really lost
+ *    (the Worker's list was emptied by hand) is acted on at the start after.
+ *  - unknown (offline, a failing Worker): nothing changes.
+ *
+ * Nothing here touches the page that asked: a show that started licensed
+ * finishes licensed (retireStoredLicenseKey). Once per page load.
  */
-export async function confirmHeldSeat(): Promise<void> {
+let seatRun: Promise<void> | null = null;
+export function confirmHeldSeat(): Promise<void> {
   const worker = seatWorker();
-  if (!worker) return;
-  const seat = await readSeat();
-  if (!seat || !seat.key || seat.seatConfirmed) return;
-  const answer = await askForSeat(worker, seat.key, seat.seatId, seat.label);
-  if (answer.state === 'seated') {
-    try {
-      await fetch('/license-activate', {
+  if (!worker) return Promise.resolve();
+  seatRun ??= (async () => {
+    const seat = await readSeat();
+    if (!seat || !seat.key) { seatRun = null; return; }
+    const answer = await askForSeat(worker, seat.key, seat.seatId, seat.label);
+    const file = (confirmed: boolean) =>
+      fetch('/license-activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: seat.key, seatConfirmed: true }),
-      });
-    } catch { /* the next start asks again */ }
-  } else if (answer.state === 'full' || answer.state === 'revoked') {
-    await retireStoredLicenseKey(seat.id);
-  }
+        body: JSON.stringify({ key: seat.key, seatConfirmed: confirmed }),
+      }).catch(() => {});
+    if (answer.state === 'seated') {
+      if (!seat.seatConfirmed) await file(true);
+    } else if (answer.state === 'revoked' || (answer.state === 'full' && !seat.seatConfirmed)) {
+      await retireStoredLicenseKey(seat.id);
+    } else if (answer.state === 'full') {
+      await file(false);
+    }
+  })().catch(() => {});
+  return seatRun;
 }
 
 export async function activateLocalLicenseKey(token: string): Promise<LicenseStatus> {
@@ -441,7 +460,7 @@ export async function syncServerLicense(): Promise<LicenseStatus> {
         const verified = await verifyLicenseKey(rawKey);
         if (verified.valid) {
           const machineCount = Array.isArray(info.machines) ? info.machines.length : info.machines;
-          if (info.seatConfirmed === false) void confirmHeldSeat().catch(() => {});
+          void confirmHeldSeat();
           return recordVerifiedLicense(rawKey, verified.payload, machineCount, info.maxMachines);
         }
       }

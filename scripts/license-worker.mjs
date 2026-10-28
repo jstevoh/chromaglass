@@ -17,10 +17,10 @@
  *   6. machine activation enforces two machines per key, refuses a third (409),
  *      and deactivating one frees the slot for the new machine;
  *   7. a refunded key is gone from GET /keys and refused by POST /activate.
- *   9. refunding only an upgrade order gives the buyer their Home key back (PLAN
+ *  11. refunding only an upgrade order gives the buyer their Home key back (PLAN
  *      23.17i): under a new id, so the Pro token dies with the refund; refunding
  *      the Home order itself still takes everything.
- *  10. the Mac app asks this Worker for a seat (PLAN 23.17g): the real page code
+ *  12. the Mac app asks this Worker for a seat (PLAN 23.17g): the real page code
  *      (src/lib/licenseKey.ts, bundled) and the real show server's licence
  *      manager, two to five Macs against one key. A third Mac is refused with
  *      the two named, "Remove from this computer" frees a seat, a Mac offline is
@@ -495,7 +495,7 @@ let bobProToken = '';
   }
 }
 
-// ── 9. Refunding just an upgrade ─────────────────────────────────
+// ── 11. Refunding just an upgrade ─────────────────────────────────
 {
   const e = makeEnv();
   const keysOf = async (email) => (await (await getKeys(e, await mintFirebaseToken({ email }))).json()).keys ?? [];
@@ -513,7 +513,7 @@ let bobProToken = '';
   const proAfter = await postMachine(e, '/activate', { key: pro.token, machineId: 'erin-mac' });
   const homeAfter = back ? await postMachine(e, '/activate', { key: back.token, machineId: 'erin-mac', label: 'Erin MBP' }) : { status: 0 };
   check(
-    '9a. refunding only the upgrade leaves the buyer their Home key, verifiable, with the Home entitlement they bought',
+    '11a. refunding only the upgrade leaves the buyer their Home key, verifiable, with the Home entitlement they bought',
     seatOnPro.status === 200 && refund.status === 200 && after.length === 1 && back?.tier === 'home' && backKey.valid &&
       backKey.payload.tier === 'home' && backKey.payload.email === 'erin@example.com' &&
       back.updatesUntil === home.updatesUntil && back.maxMachines === home.maxMachines && homeAfter.status === 200,
@@ -534,7 +534,7 @@ let bobProToken = '';
   await postWebhook(e, { event: 'order_refunded', email: 'fay@example.com', orderId: 'ord_fay_up' });
   const fay = await keysOf('fay@example.com');
   check(
-    '9c. an upgrade filed before the Worker kept what it replaced still gives the Home key back',
+    '11c. an upgrade filed before the Worker kept what it replaced still gives the Home key back',
     fay.length === 1 && fay[0].tier === 'home',
     `keys=${fay.length} (${fay[0]?.tier})`,
   );
@@ -548,13 +548,13 @@ let bobProToken = '';
   await postWebhook(e, { event: 'order_refunded', email: 'erin@example.com', orderId: 'ord_erin_1' });
   const erin = await keysOf('erin@example.com');
   check(
-    '9d. refunding the Home order itself takes every key (the upgrade stood on it), including a Home refiled by an earlier upgrade refund',
+    '11d. refunding the Home order itself takes every key (the upgrade stood on it), including a Home refiled by an earlier upgrade refund',
     gus.length === 0 && erin.length === 0,
     `gus=${gus.length}, erin=${erin.length}`,
   );
 }
 
-// ── 10. The Mac app asks for a seat ──────────────────────────────
+// ── 12. The Mac app asks for a seat ──────────────────────────────
 {
   const seatEnv = makeEnv();
   const keysOf = async (email) => (await (await getKeys(seatEnv, await mintFirebaseToken({ email }))).json()).keys ?? [];
@@ -623,7 +623,7 @@ let bobProToken = '';
     const boothState = await booth.manager.currentStatus();
     const stored = JSON.parse(await seatEnv.LICENSE_KV.get(`machines:${keyId}`));
     check(
-      '10a. two Macs seat the key at the Worker, filed as confirmed on each; a third is refused with the two named, and the key never reaches its server',
+      '12a. two Macs seat the key at the Worker, filed as confirmed on each; a third is refused with the two named, and the key never reaches its server',
       a.valid && b.valid && !c.valid && c.error === 'machine-limit' &&
         /Studio/.test(c.detail ?? '') && /Laptop/.test(c.detail ?? '') && !boothState.valid &&
         (await studio.manager.currentStatus()).seatConfirmed === true && stored.length === 2,
@@ -637,7 +637,7 @@ let bobProToken = '';
     use(booth);
     const c2 = await booth.page.activateLocalLicenseKey(key.token);
     check(
-      '10b. "Remove from this computer" frees its seat at the Worker, and the refused Mac can then open the key',
+      '12b. "Remove from this computer" frees its seat at the Worker, and the refused Mac can then open the key',
       afterRelease.length === 1 && c2.valid && (await booth.manager.currentStatus()).seatConfirmed === true,
       `seats after release ${afterRelease.length}, third Mac valid=${c2.valid}`,
     );
@@ -655,7 +655,7 @@ let bobProToken = '';
     const t = await attic.page.activateLocalLicenseKey(key.token);
     offline = false;
     check(
-      '10c. a Mac that cannot reach the Worker is let in on the key\'s signature, marked as not yet confirmed',
+      '12c. a Mac that cannot reach the Worker is let in on the key\'s signature, marked as not yet confirmed',
       k.valid && kitchenOffline.valid && kitchenOffline.seatConfirmed === false && t.valid,
       `kitchen valid=${k.valid} confirmed=${kitchenOffline.seatConfirmed}; attic valid=${t.valid}`,
     );
@@ -667,7 +667,7 @@ let bobProToken = '';
     const atticRetired = await waitFor(async () => !(await attic.manager.currentStatus()).valid);
     const atticInMemory = attic.page.getCachedLicenseStatus().valid;
     check(
-      '10d. at its next online start the first offline Mac gets the free seat, and the second (both seats now taken) loses the key from its next start, not from the page it is showing',
+      '12d. at its next online start the first offline Mac gets the free seat, and the second (both seats now taken) loses the key from its next start, not from the page it is showing',
       kitchenSeated && atticRetired && atticInMemory,
       `kitchen confirmed=${kitchenSeated}; attic key retired from its server=${atticRetired}, still verified on the open page=${atticInMemory}`,
     );
@@ -678,7 +678,7 @@ let bobProToken = '';
     use(lodge);
     const l = await lodge.page.activateLocalLicenseKey(key.token);
     check(
-      '10e. a refunded key is refused at the door with the reason, not as an unknown key',
+      '12e. a refunded key is refused at the door with the reason, not as an unknown key',
       !l.valid && l.error === 'revoked' && /refunded/.test(l.detail ?? '') && !(await lodge.manager.currentStatus()).valid,
       `valid=${l.valid} error=${l.error} "${l.detail}"`,
     );
@@ -696,12 +696,56 @@ let bobProToken = '';
       opened.push((await m.page.activateLocalLicenseKey(ik.token)).valid);
     }
     check(
-      '10f. control: the page built for the site never asks the Worker, and a third Mac opens with the same key (what the Mac app did before this check)',
+      '12f. control: the page built for the site never asks the Worker, and a third Mac opens with the same key (what the Mac app did before this check)',
       opened.every(Boolean) && workerCalls.length === before,
       `opened=${opened.join(',')}, Worker calls ${workerCalls.length - before}`,
     );
+    // A Mac that was seated long ago and never signed in: the refund still reaches it (the review of #524).
+    const restart = async (m) => ({ ...m, page: await importPage(pageSource) });
+    await postWebhook(seatEnv, { event: 'order_created', email: 'jo@example.com', orderId: 'ord_jo_1', tier: 'home' });
+    await postWebhook(seatEnv, { event: 'order_upgraded', email: 'jo@example.com', orderId: 'ord_jo_up' });
+    const joPro = (await keysOf('jo@example.com'))[0];
+    const p1 = await mac('JoStudio');
+    const p2 = await mac('JoLaptop');
+    use(p1);
+    await p1.page.activateLocalLicenseKey(joPro.token);
+    use(p2);
+    await p2.page.activateLocalLicenseKey(joPro.token);
+    await postWebhook(seatEnv, { event: 'order_refunded', email: 'jo@example.com', orderId: 'ord_jo_up' });
+    const joP1 = await restart(p1);
+    use(joP1);
+    await joP1.page.syncServerLicense();
+    const joRetired = await waitFor(async () => !(await joP1.manager.currentStatus()).valid);
+    const joP2Untouched = (await p2.manager.currentStatus()).valid; // not restarted yet: nothing mid-show
     check(
-      '10g. a Mac\'s seat id is its own: random, kept in the licence file across restarts, different on every Mac',
+      '12h. a refund reaches a Mac that was seated long ago and never signed in: its next online start takes the Pro key off it (and the Mac not yet restarted keeps it until it is)',
+      joRetired && joP2Untouched,
+      `restarted Mac's key retired=${joRetired}; the other, not yet restarted, still holds it=${joP2Untouched}`,
+    );
+
+    // The Worker saying "full" to a Mac it had seated does not take the app off a paying Mac in one go.
+    await postWebhook(seatEnv, { event: 'order_created', email: 'kim@example.com', orderId: 'ord_kim_1', tier: 'home' });
+    const kimKey = (await keysOf('kim@example.com'))[0];
+    const k1 = await mac('KimStudio');
+    use(k1);
+    await k1.page.activateLocalLicenseKey(kimKey.token);
+    await seatEnv.LICENSE_KV.put(`machines:${kimKey.id}`, JSON.stringify([{ id: 'x', label: 'X' }, { id: 'y', label: 'Y' }]));
+    const k1b = await restart(k1);
+    use(k1b);
+    await k1b.page.syncServerLicense();
+    const kimUnconfirmed = await waitFor(async () => (await k1b.manager.currentStatus()).seatConfirmed === false);
+    const kimStillValid = (await k1b.manager.currentStatus()).valid;
+    const k1c = await restart(k1b);
+    use(k1c);
+    await k1c.page.syncServerLicense();
+    const kimRetired = await waitFor(async () => !(await k1c.manager.currentStatus()).valid);
+    check(
+      '12i. "full" for a Mac the Worker had seated keeps the key and marks it unconfirmed; the start after, still full, takes it off',
+      kimUnconfirmed && kimStillValid && kimRetired,
+      `after one full: unconfirmed=${kimUnconfirmed}, key kept=${kimStillValid}; after the next: retired=${kimRetired}`,
+    );
+    check(
+      '12j. a Mac\'s seat id is its own: random, kept in the licence file across restarts, different on every Mac',
       (await studio.manager.currentStatus()).seatId === (await createServerLicenseManager({ filePath: join(dir, 'Studio.json') }).currentStatus()).seatId &&
         (await studio.manager.currentStatus()).seatId !== (await laptop.manager.currentStatus()).seatId,
       'same file → same id; two files → two ids',
