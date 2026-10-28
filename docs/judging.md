@@ -1650,14 +1650,17 @@ On the laptop in a dark room, and on the phone, with no reading of labels:
 
 On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
 Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
-copy that is there, and open it (the first open still needs System Settings → Privacy &
-Security → Open Anyway until the app is signed). On a phone the same card should say to open
+copy that is there, and open it. Install 1.3.692 or later: it is signed and notarised, so it
+opens on a double-click with no warning, and the card and the landing page no longer tell the
+way round (an older ad hoc copy, 1.3.622 or 1.3.642, still needs System Settings → Privacy &
+Security → Open Anyway). On a phone the same card should say to open
 the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
 release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
 minute: one notification should say the new version is out, the ChromaGlass menu should offer
 Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
-while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
-another, and check that the first downloads it and becomes the new version after a quit.
+while a projector is up. The signed release is out (1.3.692, 2026-10-27), so what is owed is the
+last step: install 1.3.692, make another release, and check that 1.3.692 downloads it and
+becomes the new version after a quit, replacing itself in place.
 
 ## 72. A look saved in Chrome is in the Mac app (PLAN 23.18)
 
@@ -1949,6 +1952,21 @@ Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Tr
 2. Play an album in a streaming app (Apple Music, Spotify, or another app on the Mac). The sound bar in the Sound panel and the plate's motion (kicks, bass, swell) should follow the album in stereo with no microphone bleed from the room.
 3. Quit and reopen the Mac app while the album is still playing: **System audio** is remembered across launches in the Mac app and resumes without asking for a tab.
 4. Turn on **Ambient TV mode (cool & quiet)** from the Sound panel, from **Show → Ambient TV Mode (Cool & Quiet)** (`Cmd+Shift+A`), or from the phone's Play sheet tile: the plate steps at 30 Hz, caps display draws at 60 Hz (`DrawGate`), and stays at or below the opening rung so the Mac stays cool and quiet over a long listening session.
+
+## 88. The plate does not stutter now and then (PLAN 14aa)
+
+Play any look for five minutes on the laptop, then with the wall up, the way a show runs. Watch
+the liquid's own motion, not the music's: before this, a plate on a machine with room to spare
+could stop for a frame and jump two, in bursts of a second or two a few times a minute, worst on a
+120 Hz screen. It should glide evenly the whole time. If it still hitches, say roughly how often,
+whether the wall and the laptop hitch together, and whether the hitch is the liquid or the whole
+picture (the second is a dropped frame, a different thing). Also say if the quality ever visibly
+steps down and back up again: it should do that once at most, early, not every minute and a half.
+
+Measured: `npm run cadence` (the old loop, modelled, stopped or doubled the liquid on 7–40 % of
+frames on 60, 59.94 and 120 Hz displays, by the median of nine seeds; the new clock on none, and
+it keeps time with the wall up at another refresh rate); `npm run encode` (a step's garbage 506 KB → 31 KB);
+`npm run rungs` (a rung the machine cannot hold retried 38 times in half an hour → 10).
 
 ## 89. The melody walks across the plate (PLAN 24.3-place)
 

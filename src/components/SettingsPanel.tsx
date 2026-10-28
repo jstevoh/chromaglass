@@ -3,7 +3,7 @@ import type { MixTakes } from '../lib/mixFade';
 import { X, FlaskConical, Magnet, Waves, Sliders, Zap, Wind, Layers, Activity, Hourglass, Palette, Microscope, Projector, Camera, Film, Clapperboard, Droplets, Lightbulb, Aperture, Video, MonitorPlay, Image, Shapes, Cable, SlidersVertical, ScanEye, RotateCw } from 'lucide-react';
 import { VisualizerSettings, BlendMode, LedMode, SimResolution, SceneFeature, SceneMapping, PatchSource, AudioFeature } from '../types';
 import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../lib/modulators';
-import { SOURCE_NAMES } from '../lib/audioFeatures';
+import { SOURCE_NAMES, type AudioReading } from '../lib/audioFeatures';
 import { HIT_FEATURES, HIT_FEATURE_LABELS } from '../lib/hitSource';
 import { LEARNABLE_SETTINGS, factoryFor, FACTORY_MAPS, curveOf, handValueAt, travelOf, isMapping, MUSIC_SOURCE_LABELS, type FactoryMapId } from '../lib/midi';
 import { PIN_RANGE, type DeskSurface } from '../lib/deskPins';
@@ -13,6 +13,7 @@ import { plateAreas, areaFamily, areaDye } from '../lib/plateAreas';
 import { PRESET_CONTRACTS } from '../presetPlate';
 import { PALETTE } from '../constants';
 import { AreaPicker } from './phone/AreaPicker';
+import { BandStrip } from './phone/BandStrip';
 import { SETTINGS_CATEGORIES, SETTINGS_SECTIONS, SECTION_BY_ID, FIRST_SECTION, sectionMatches, groupOf } from '../lib/settingsMap';
 import type { MidiController } from '../hooks/useMidi';
 import { Info } from './Info';
@@ -194,6 +195,8 @@ interface SettingsPanelProps {
   onTap?: () => void;
   /** The tempo source's reading, for the tap pad's beat light (it polls this itself). */
   readTempo?: () => TempoReading | null;
+  /** The analyser's live reading, polled by the patch bay's spectrum strip (`BandStrip`, PLAN 30a). */
+  readEar?: () => AudioReading | null;
   /** The tempo the dish's Tempo mode is lit by (tapped, clocked or heard), bpm, or 0. */
   spinBpm?: number;
   onTempoClear?: () => void;
@@ -415,7 +418,7 @@ const DEMO_LOOPS = [
   { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
 ] as const;
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, readEar, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -2189,7 +2192,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                         const options = featuresFor(source);
                         const keep = options.some(([v]) => v === m.feature);
                         const next = [...(settings.sceneMappings ?? [])];
-                        next[i] = { ...m, source, feature: (keep ? m.feature : options[0][0]) as SceneMapping['feature'] };
+                        const { band: _dropBand, ...rest } = m;
+                        next[i] = {
+                          ...(source === 'bands' ? m : rest),
+                          source,
+                          feature: (keep ? m.feature : options[0][0]) as SceneMapping['feature'],
+                        };
                         onUpdate({ sceneMappings: next });
                       }}
                       className="min-h-6 w-[58px] shrink-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
@@ -2204,7 +2212,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                       aria-label="Feature"
                       onChange={(e) => {
                         const next = [...(settings.sceneMappings ?? [])];
-                        next[i] = { ...m, feature: e.target.value as SceneMapping['feature'] };
+                        const { band: _dropBand, ...rest } = m;
+                        next[i] = { ...rest, feature: e.target.value as SceneMapping['feature'] };
                         onUpdate({ sceneMappings: next });
                       }}
                       className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
@@ -2301,6 +2310,35 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     <span className="text-[12px] font-mono opacity-50 w-9 text-right">{m.depth.toFixed(2)}</span>
                   </div>
                   {/*
+                    Live spectrum strip for `bands` cords (PLAN 30a): log
+                    frequency 40 Hz–16 kHz, the eight fixed bands marked, and
+                    the gate threshold drawn on the cord's own live reading.
+                    Dragging a band writes `band: [loHz, hiHz]` and updates
+                    `feature` to the named band holding the drag's middle.
+                  */}
+                  {m.source === 'bands' && (
+                    <div className="mt-2">
+                      <BandStrip
+                        band={m.band}
+                        feature={m.feature}
+                        gain={m.gain ?? 1}
+                        threshold={(m.area !== undefined
+                          ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
+                          : m.mode === 'gate')
+                          ? (m.threshold ?? 0.3)
+                          : undefined}
+                        readEar={readEar}
+                        testId={`patch-band-${i}`}
+                        onChange={(band, feature) => {
+                          const next = [...(settings.sceneMappings ?? [])];
+                          const { band: _oldBand, ...rest } = m;
+                          next[i] = band ? { ...rest, band, feature } : { ...rest, feature };
+                          onUpdate({ sceneMappings: next });
+                        }}
+                      />
+                    </div>
+                  )}
+                  {/*
                     Where on the plate (PLAN 25h): on a look with areas of the
                     dish, the cord can work one of them alone. Aiming it at an
                     area turns its control into what a hand does there (Stir,
@@ -2327,54 +2365,101 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
                     </div>
                   )}
                   {/*
-                    The cord's gate (the least of PLAN 30a), on an area cord:
-                    off, it follows its reading as every cord always has; on,
-                    it fires when the reading crosses Gate, swells in over
-                    Rise and lets go over Fall, so the kick that opens a ring
-                    is the kick and not the room.
+                    Shaping the cord (PLAN 30a / 25h-2): gain before the
+                    threshold on sound and band cords, and mode (Follow vs Gate)
+                    with Gate (threshold), Rise (attack) and Fall (release) on
+                    both whole-plate sound/band cords and area cords.
                   */}
-                  {m.area !== undefined && (
-                    <div className="mt-2 flex flex-col gap-1.5" data-testid={`patch-gate-${i}`}>
-                      <label className="flex items-center gap-2 text-[12px] min-h-[32px]">
-                        <input
-                          type="checkbox"
-                          checked={m.threshold !== undefined || m.attack !== undefined || m.release !== undefined}
-                          onChange={(e) => {
-                            const next = [...(settings.sceneMappings ?? [])];
-                            const { threshold: _t, attack: _a, release: _r, ...rest } = m;
-                            next[i] = e.target.checked ? { ...rest, threshold: 0.3, attack: 0.02, release: 0.4 } : rest;
-                            onUpdate({ sceneMappings: next });
-                          }}
-                          className="h-6 w-6 shrink-0 accent-white cursor-pointer"
-                          data-testid={`patch-gate-on-${i}`}
-                        />
-                        Fire on a hit, not the room
-                      </label>
-                      {m.threshold !== undefined && ([
-                        ['threshold', 'Gate', 0, 1, 0.05, (v: number) => v.toFixed(2)],
-                        ['attack', 'Rise', 0, 2, 0.01, (v: number) => `${v.toFixed(2)} s`],
-                        ['release', 'Fall', 0, 4, 0.05, (v: number) => `${v.toFixed(2)} s`],
-                      ] as const).map(([key, label, min, max, step, show]) => (
-                        <div key={key} className="flex items-center gap-2">
-                          <span className="text-[12px] text-white/60 w-9">{label}</span>
-                          <input
-                            type="range" min={min} max={max} step={step}
-                            value={m[key] ?? 0}
-                            aria-label={label}
-                            onChange={(e) => {
-                              const next = [...(settings.sceneMappings ?? [])];
-                              next[i] = { ...m, [key]: parseFloat(e.target.value) };
-                              onUpdate({ sceneMappings: next });
-                            }}
-                            className="set-range flex-1"
-                            style={{ '--fill': `${Math.round(100 * ((m[key] ?? 0) - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
-                            data-testid={`patch-${key}-${i}`}
-                          />
-                          <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
+                  {(m.source === 'sound' || m.source === 'bands' || m.area !== undefined) && (() => {
+                    const isSoundOrBands = m.source === 'sound' || m.source === 'bands';
+                    const isGated = m.area !== undefined
+                      ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
+                      : m.mode === 'gate';
+                    return (
+                      <div className="mt-2 flex flex-col gap-1.5" data-testid={`patch-gate-${i}`}>
+                        {isSoundOrBands && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[12px] text-white/60 w-9">Gain</span>
+                            <input
+                              type="range" min={0} max={4} step={0.05}
+                              value={m.gain ?? 1}
+                              aria-label="Gain"
+                              onChange={(e) => {
+                                const next = [...(settings.sceneMappings ?? [])];
+                                next[i] = { ...m, gain: parseFloat(e.target.value) };
+                                onUpdate({ sceneMappings: next });
+                              }}
+                              className="set-range flex-1"
+                              style={{ '--fill': `${Math.round(100 * (m.gain ?? 1) / 4)}%` } as React.CSSProperties}
+                              data-testid={`patch-gain-${i}`}
+                            />
+                            <span className="text-[12px] font-mono opacity-50 w-12 text-right">{`${(m.gain ?? 1).toFixed(2)}×`}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-2 min-h-[28px]" data-testid={`patch-mode-${i}`}>
+                          <span className="text-[12px] text-white/60">Mode</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              aria-pressed={!isGated}
+                              onClick={() => {
+                                const next = [...(settings.sceneMappings ?? [])];
+                                const { mode: _m, threshold: _t, attack: _a, release: _r, ...rest } = m;
+                                next[i] = rest;
+                                onUpdate({ sceneMappings: next });
+                              }}
+                              className={`min-h-6 px-2.5 rounded text-[12px] font-medium border ${!isGated ? LIT : 'bg-transparent border-white/10'}`}
+                              data-testid={`patch-mode-follow-${i}`}
+                            >
+                              Follow
+                            </button>
+                            <button
+                              type="button"
+                              aria-pressed={isGated}
+                              onClick={() => {
+                                const next = [...(settings.sceneMappings ?? [])];
+                                next[i] = {
+                                  ...m,
+                                  mode: 'gate',
+                                  threshold: m.threshold ?? 0.3,
+                                  attack: m.attack ?? 0.02,
+                                  release: m.release ?? 0.4,
+                                };
+                                onUpdate({ sceneMappings: next });
+                              }}
+                              className={`min-h-6 px-2.5 rounded text-[12px] font-medium border ${isGated ? LIT : 'bg-transparent border-white/10'}`}
+                              data-testid={`patch-gate-on-${i}`}
+                            >
+                              Gate
+                            </button>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        {isGated && ([
+                          ['threshold', 'Gate', 0, 1, 0.05, (v: number) => v.toFixed(2)],
+                          ['attack', 'Rise', 0, 2, 0.01, (v: number) => `${v.toFixed(2)} s`],
+                          ['release', 'Fall', 0, 4, 0.05, (v: number) => `${v.toFixed(2)} s`],
+                        ] as const).map(([key, label, min, max, step, show]) => (
+                          <div key={key} className="flex items-center gap-2">
+                            <span className="text-[12px] text-white/60 w-9">{label}</span>
+                            <input
+                              type="range" min={min} max={max} step={step}
+                              value={m[key] ?? 0}
+                              aria-label={label}
+                              onChange={(e) => {
+                                const next = [...(settings.sceneMappings ?? [])];
+                                next[i] = { ...m, [key]: parseFloat(e.target.value) };
+                                onUpdate({ sceneMappings: next });
+                              }}
+                              className="set-range flex-1"
+                              style={{ '--fill': `${Math.round(100 * ((m[key] ?? 0) - min) / Math.max(1e-9, max - min))}%` } as React.CSSProperties}
+                              data-testid={`patch-${key}-${i}`}
+                            />
+                            <span className="text-[12px] font-mono opacity-50 w-12 text-right">{show(m[key] ?? 0)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

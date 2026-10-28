@@ -6,6 +6,7 @@ import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
+import { StepClock } from '../lib/stepClock';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
 import { dyeRoomOf, lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
@@ -5075,6 +5076,12 @@ interface PlateRenderer {
    */
   gpuFrameMs?(steps: number): number;
   /**
+   * What one solver step costs the GPU, every layer together (ms), from the
+   * same timestamps: the governor predicts a climb's cost from it (PLAN.md
+   * 14aa-3). Absent where `gpuFrameMs` is, 0 until the first timings land.
+   */
+  gpuStepMs?(): number;
+  /**
    * What `?debug` should show about this engine in particular. It is spread
    * into `chromaglassDebug()` at the top level, so a harness reaching for
    * `chromaglassDebug().gl` finds it exactly where it always was.
@@ -5859,7 +5866,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const macroCamRef = useRef(new MacroCamera());
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
-  const simAccumRef = useRef(0);
+  /** Live steps a frame, counted by the refresh where the refresh allows (lib/stepClock.ts); made on the first frame. */
+  const stepClockRef = useRef<StepClock | null>(null);
+  /** The refresh stamp the last frame drew at (ms, `drawGate.lastDraw`), for the interval the step clock is given. */
+  const lastStampRef = useRef(Number.NaN);
   /** Milliseconds the last frame spent in the solver: the catch-up cap adapts to it. */
   const simMsRef = useRef(0);
   /** Solver steps a second, smoothed — 60 when the show is keeping wall-clock time. */
@@ -5871,6 +5881,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const framesDrawnRef = useRef(0);
   /** What the catch-up rule allowed last frame, for the debug readout. */
   const catchUpRef = useRef(4);
+  /**
+   * Live frames by the steps they took: none, one, two, three or more. A
+   * frame of two at sixty steps a second is the liquid stopping and then
+   * jumping, the stutter `npm run stutter` counts (PLAN.md 14aa-3).
+   */
+  const stepFramesRef = useRef([0, 0, 0, 0]);
+  /** Of the frames of two steps or more, those after a missed refresh (an interval over 25 ms). */
+  const lateStepFramesRef = useRef(0);
   const onEngineStatusRef = useRef(onEngineStatus);
   const onBackLookClearedRef = useRef(onBackLookCleared);
   onBackLookClearedRef.current = onBackLookCleared;
@@ -7344,7 +7362,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // A render's frame is exactly 1/fps: the clock's own difference of two
         // large doubles is that to within a last bit, which would still be a
         // different last bit in every uniform downstream.
-        const realDt = rendering ? 1 / rendering.fps : LOCKSTEP ? simStepS : now - lastTimeRef.current;
+        /*
+          Live, the interval is the refresh's, from the stamps the draw gate
+          let through, when that agrees with the wall clock to within 20 ms
+          (lib/stepClock.ts): the browser's refresh timestamp is the display's
+          own clock, where `Date.now()` here counts whole milliseconds read
+          part way into the frame, and that scatter is what made the step
+          count stutter. Everything downstream that integrates over the
+          frame (the wheel, the camera, the chemistry) gets the steadier
+          number too. A frame with no believable stamp, after a pause, or a
+          window whose frames come from a timer, keeps the wall clock.
+        */
+        const stamp = drawGate.lastDraw;
+        const wallDt = now - lastTimeRef.current;
+        const refreshDt = (stamp - lastStampRef.current) / 1000;
+        lastStampRef.current = stamp;
+        const realDt = rendering ? 1 / rendering.fps
+          : LOCKSTEP ? simStepS
+          : refreshDt > 0 && Math.abs(refreshDt - wallDt) < 0.02 ? refreshDt : wallDt;
         lastTimeRef.current = now;
         frameS = realDt;
         // One verdict per frame on whether this is a kick: from the beat
@@ -7551,9 +7586,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const behind = SIM_MAX_CATCHUP > 4 ? SIM_MAX_CATCHUP : frameMsNow > 40 ? 1 : frameMsNow > 24 ? 2 : SIM_MAX_CATCHUP;
         const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
-        simAccumRef.current = Math.min(simAccumRef.current + realDt, simStepS * catchUp);
-        let simSteps = Math.floor(simAccumRef.current / simStepS);
-        simAccumRef.current -= simSteps * simStepS;
+        // Counted by the refresh where the display's rate is a whole ratio of
+        // the step's, by the accumulator elsewhere (`npm run cadence`).
+        const stepClock = stepClockRef.current ??= new StepClock();
+        let simSteps = rendering ? 0 : stepClock.steps(realDt, simStepS, catchUp);
         if (rendering) {
           /*
             A render's steps are counted, not measured: frame i is owed the
@@ -7565,9 +7601,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           */
           const i = rendering.frame;
           simSteps = Math.floor(((i + 1) * rendering.stepRate) / rendering.fps) - Math.floor((i * rendering.stepRate) / rendering.fps);
-          simAccumRef.current = 0;
         }
         stepsThisFrame = simSteps;
+        if (!rendering) {
+          stepFramesRef.current[Math.min(simSteps, 3)]++;
+          // Two steps after an interval past one and a half refreshes is a
+          // refresh missed and caught up (the governor's to prevent); after an
+          // on-time interval it is the step count's own (the clock, 14aa).
+          if (simSteps >= 2 && realDt > 0.025) lateStepFramesRef.current++;
+        }
         /*
           The same elapsed time, counted in sixtieths of a second (H2b).
 
@@ -9311,7 +9353,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 areas are others, which index alone would match them to.
               */
               const own = activeLayerRef.current >= 1 && backDyesRef.current;
-              const acts = hands.step(currentSettings.sceneMappings, own ? null : areasOf(activeLayerRef.current), (m) => cordReading(patchCtx, m, patchNow), simStepS);
+              const acts = hands.step(currentSettings.sceneMappings, own ? null : areasOf(activeLayerRef.current), (m, band) => cordReading(patchCtx, m, patchNow, band), simStepS);
               const af = fluidsRef.current[activeLayerRef.current];
               if (af && acts.length > 0) {
                 const target = dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget);
@@ -10354,8 +10396,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // What this frame cost the GPU, where the engine can say. Without it
         // the budget is JavaScript time, which on the WebGPU path is half a
         // millisecond of encoding and says nothing about the machine's load.
+        //
+        // And what one step costs, apart: at thirty steps a second half the
+        // frames take none, so a frame's cost alone cannot say what sixty
+        // would cost, and the governor climbed into it (PLAN.md 14aa-3).
         const gpuMs = renderer?.gpuFrameMs?.(stepsThisFrame) ?? 0;
-        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current, gpuMs);
+        const gpuStepMs = renderer?.gpuStepMs?.() ?? 0;
+        governorRef.current.sample(frameS, performance.now() - workStart, performance.now() * 0.001, isMouseDownRef.current, gpuMs, gpuStepMs, stepsThisFrame);
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -10397,6 +10444,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     const resetStamps = () => {
       lastTimeRef.current = showEpochS();
+      lastStampRef.current = Number.NaN;
       /*
         Evolve's own stamps, on the show clock like the rest of these: a thin
         and a flood are each held back for a few seconds after the last
@@ -10476,7 +10524,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const resetPlateClocks = () => {
       resetStamps();
       simulationTimeRef.current = 0;
-      simAccumRef.current = 0;
+      stepClockRef.current?.reset();
       wanderClockRef.current = 0;
       loudnessRef.current = 0;
       evolveLoudRef.current = 0;
@@ -10794,6 +10842,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           stepRate: PINNED_STEP_RATE ?? governorRef.current?.stepRate ?? 60,
           catchUp: catchUpRef.current,
           layers: fluidsRef.current.length,
+          stepFrames: [...stepFramesRef.current],
+          lateStepFrames: lateStepFramesRef.current,
         }),
         externalTilt: externalTiltRef.current,
         /** The pointer's Blow since the page loaded: steps as the straw, steps as the wind, and the colour the wind carried. */
@@ -11386,6 +11436,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
        */
       const plate = new WebGPUPlate(s.device, s.format);
       platePass = plate;
+      /** One solver step, every layer: the solver keeps its own profiler, per pass and per step. */
+      const stepMs = (): number => {
+        let ms = 0;
+        for (const f of fluidsRef.current) {
+          if (!(f.gpu instanceof WebGPUFluid)) continue;
+          for (const v of f.gpu.profiler.ms.values()) ms += v;
+        }
+        return ms;
+      };
       const gpuRenderer: PlateRenderer = {
         info: { renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
         maxTexture: s.device.limits.maxTextureDimension2D,
@@ -11797,14 +11856,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (!stage) return 0;
           let ms = 0;
           for (const v of stage.profiler.ms.values()) ms += v;
-          if (steps > 0) {
-            for (const f of fluidsRef.current) {
-              if (!(f.gpu instanceof WebGPUFluid)) continue;
-              for (const v of f.gpu.profiler.ms.values()) ms += v * steps;
-            }
-          }
-          return ms;
+          return steps > 0 ? ms + stepMs() * steps : ms;
         },
+        gpuStepMs: () => (stage ? stepMs() : 0),
         debug: () => ({
           webgpu: stage && {
             label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,

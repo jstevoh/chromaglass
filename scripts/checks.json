@@ -172,6 +172,17 @@
         "gallery runs on its label rather than on every push (PLAN.md 19a).",
         "A rename in one file would quietly undo either."
       ]
+    },    {
+      "name": "Where CI's keys can go",
+      "shard": "logic",
+      "run": "npm run cisecrets",
+      "why": [
+        "The deploy key and the Mac signing set only in jobs that run in their",
+        "main-only environments, the signing set never handed to a pull request's",
+        "run, no tag trigger on the Mac app, every workflow read-only at the top",
+        "and outside actions pinned to a commit (scripts/cisecrets.mjs; the security",
+        "audit of 2026-10-28). Each rule meets a broken copy of the real file first."
+      ]
     },
     {
       "name": "The API scripts keep the token out of their errors",
@@ -357,6 +368,17 @@
         "step down gives something up, and that a rung asking for fewer device",
         "pixels actually gets fewer. That last one was inert for a long while",
         "and nothing looked."
+      ]
+    },
+    {
+      "name": "The step cadence",
+      "shard": "logic",
+      "run": "npm run cadence",
+      "why": [
+        "The plate takes its steps evenly (scripts/cadence.mjs, PLAN.md",
+        "14aa): on a display whose refresh is a whole ratio of the step",
+        "no frame stops or doubles the liquid, dropped refreshes are caught up,",
+        "and the model makes the old loop stutter as its control."
       ]
     },
     {
@@ -600,7 +622,7 @@
     {
       "name": "The sound cords",
       "shard": "logic",
-      "run": "npm run soundcords -- --controls",
+      "run": "npm run soundcords",
       "why": [
         "A sound cord's shape (PLAN 30a): tone bursts in and out of a dragged",
         "band, fires counted against the threshold and timed against the attack",
@@ -755,6 +777,19 @@
         "minutes on a slow runner, and this PR's lab part was cancelled at",
         "the limit twice with this check in it (2026-10-27). About a minute",
         "here, three to four in full: the build's PR weighs where it fits."
+      ]
+    },
+    {
+      "name": "A step asks for nothing it throws away",
+      "shard": "lab",
+      "run": "npm run encode",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
+        "PLAN.md Wave 4.1, H2c-4): the bytes it allocates and the writes it",
+        "makes a dispatch, counted in the page by Chromium's own heap sampler.",
+        "JavaScript's cost, which is the same on SwiftShader as on Metal, so it",
+        "sits here rather than in the Mac queue."
       ]
     },
     {

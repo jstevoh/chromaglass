@@ -158,8 +158,8 @@ with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-
 The owner's account steps sit here too: **S8-on** (switch the crash reports on),
 **19g** (more Mac runners), **12.2** (the store accounts). ~~**13.1-sign**~~ (the Mac app's
 Developer ID and notarisation) is in, 2026-10-27: the five secrets are set and a pull
-request's build came back "Notarized Developer ID"; what is left of it is
-**13-update-signed** (§13), from the first signed release.
+request's build came back "Notarized Developer ID"; it shipped with the
+first signed release, 1.3.692 (**13-update-signed**, §13); judging §75 is owed.
 
 ### Wave 3. Seams in the two big files (one session, in a quiet week)
 
@@ -182,11 +182,16 @@ merge conflicts are the shared documents', which 0.6 ends.
 
 ### Wave 4. The frame budget (lane C, measured with `npm run stages` and `npm run renders`)
 
-- **4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.
+- ~~**4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.~~
+  Shipped with 14aa (`npm run encode`, 512², thin gap: 506 KB allocated a step → 31 KB,
+  249 writes for 267 dispatches → 2, the main thread in `step()` 3.4 ms → 0.4). Story in
+  `docs/plan-shipped.md` §14aa.
 - **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
-  after a step, a heat-aware governor.
+  after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
+- **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
+  video pour's pause and play every frame, shipped with 14ac).
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
@@ -208,7 +213,7 @@ re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering
 music, explored as four directions the same day and all four taken, in this order:
 ~~**25h** areas that listen for themselves~~ (shipped), ~~**24.3-place** the melody walks across the plate~~ (shipped), then **25i**
 colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
-14r read per area); then **30a**'s rest, shaped sound cords (M; its check `soundcords` written 2026-10-26, Antigravity's Brief 8), **14t-pc** Program Change (S), **24.3** notes as voices
+14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
@@ -261,7 +266,7 @@ style (§31).
   **12.7**, **12.8**; **12.4a**; later **12.9**.
 - **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13-win-app** then
   **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out and Link,
-  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, **13-update-signed** (after signing; 13-update shipped ad hoc), then **13.2**
+  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
@@ -2823,17 +2828,16 @@ network):
   (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §75.
-  - **13-update-signed** *(13.1-sign is in, 2026-10-27: the secrets are set, and a PR's
-    build was notarised and accepted by Gatekeeper as "Notarized Developer ID"; the
-    build job's limit went from 40 to 75 minutes after a run was cancelled at 40 still
-    waiting on Apple's notary service. Next: the owner runs the first signed release)*:
-    with the Developer ID secrets in, the
-    same code downloads in the background and installs on quit. Nothing to build;
-    the first signed release is judged by installing the one before it and seeing it
-    replace itself (§75's last step). Signing is also what takes away the first-open
-    warning: set `MAC_APP_NOTARISED` true in `src/lib/macApp.ts` then, and the profile
-    sheet and landing page stop telling the way round (the release notes stop by
-    themselves, from what `spctl` says of the built app).
+  - **13-update-signed** *(shipped 2026-10-27: the first signed and notarised release,
+    1.3.692, went live at 7:12 PM PT; `MAC_APP_NOTARISED` is now true in
+    `src/lib/macApp.ts`, so the profile sheet's Mac app card and the landing page stop
+    telling the Open Anyway way round, and `npm run updates` asserts the flag and that
+    both pages still gate the words on it. The build job's limit went from 40 to 75
+    minutes after a run was cancelled at 40 still waiting on Apple's notary service.
+    Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces
+    it in place)*: with the Developer ID secrets in, the same code downloads in the
+    background and installs on quit. Nothing else to build. The release notes stopped
+    by themselves, from what `spctl` says of the built app.
   - **13-first-open** *(shipped)*: the first release, 1.3.622 (2026-10-25), was refused on
     the owner's Mac ("may harm your Mac"), and the reply sent then said right-click →
     Open, which macOS 15 no longer offers for an app it cannot check. The release notes
@@ -3178,12 +3182,15 @@ widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
   and the readback go on at the display's rate. Read back only on a frame that stepped
   or wrote deltas.
 - *The governor knows nothing of heat.* It climbs whenever frames are fast and
-  retries a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
+  retried a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
   is warming up climbs, drops frames for a second and a half, steps down, and does it
-  again every minute and a half. Every Apple GPU classes as `strong` (`device.ts`), so
+  again every minute and a half. **The doubling shipped with 14aa** (`npm run rungs`,
+  "hunting": 38 rung changes in half an hour → 10, the first retry still at 99 s); what
+  follows on the phone's ladder, the adapter and a cool setting is still open. Every
+  Apple GPU classes as `strong` (`device.ts`), so
   an iPhone opens at 512² and climbs; the phone layout does not touch the ladder; and
   the adapter is always asked for `high-performance`, which wakes the discrete GPU on
-  dual-GPU laptops. Double the wait each time the same rung fails, cap a phone's climb
+  dual-GPU laptops. Cap a phone's climb
   at its starting rung, and consider a "cool / battery" output setting (low-power
   adapter, 30 steps, a capped top rung) that ships with its phone control.
 - *The gamepad* is polled every 16 ms with no pad connected (`useGamepad.ts`); start
@@ -3680,6 +3687,104 @@ Mic or Band pick came back on every launch from `localStorage`.
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
+
+### 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
+
+The owner: "things are a little jittery sometimes"; make sure the GPU is used across
+the code. Three causes, each with its check: the step count stopped and doubled the
+liquid in bursts (`npm run cadence`), each solver step made half a megabyte of garbage
+for the page's collector to stop for (`npm run encode`), and the governor retried a
+rung the machine could not hold every ninety seconds for ever (`npm run rungs`,
+"hunting"). How each was found and measured is in `docs/plan-shipped.md` §14aa.
+
+- ~~**14aa-3**~~ shipped below (2026-10-25).
+- **14aa-1** (open, the owner's eyes): on the owner's 120 Hz laptop and on the wall, does
+  the plate still stutter now and then? `docs/judging.md` §88.
+- ~~**14aa-2**~~ (measured 2026-10-25 on the owner's Mac, Metal, comment on #441): at
+  sixty steps a second (Poster 1969, 256², 60 s) 9.16 % of frames took no step or two
+  before, 0 after. Governed three-minute runs at thirty steps: frames of two steps 1 → 0
+  (Classic) and 2 → 0 (Neon Coral Reef), gaps over 50 ms 2 → 0, and the [1, 0] pattern
+  broken on 0.01 % of on-time pairs. Poster 1969's 136 two-step frames fell in the 14 s
+  the governor tried sixty steps and the frames were slow: catch-up, not cadence (14aa-3).
+
+### 14aa-3. The governor climbs back to sixty steps into a stutter (shipped 2026-10-25)
+
+**Shipped**: the governor measures what a solver step costs apart from the frame's drawing,
+judges each climb on what the state it climbs to would cost, and gives sixty steps up when
+frames keep missing a refresh with the GPU over its budget, where it used to wait for an
+average that sat either side of its line. Poster, 1969 on the owner's Mac held 8.5 to 16.8 s at
+sixty steps after each climb, 82 to 192 frames of two steps; replayed in node, 57 to 1136 such
+frames after the opening on the old governor and none on the new (`npm run rungs`); on the
+GPU, `npm run stutter`. The story is in `docs/plan-shipped.md` under the same number.
+
+Open, found doing it:
+
+- **14aa-4** (open, a named shortcut): a climb's cost is predicted from the cells for a
+  step and the pixels for the drawing. Neither is the machine's own: Poster's step went
+  8.2 → 25.1 ms from 512² to 768² on the owner's Mac, 3.1 times for 2.25 times the cells (the
+  larger grid's textures leave the cache), and part of the drawing does not scale with the
+  pixels at all, so a pixel climb is predicted dearer than it is and a grid climb cheaper.
+  Learn each rung's ratio from the frames it has drawn this session (a step's cost on every
+  grid visited, the drawing's on every pixel share) and predict from that. Two trades this
+  shortcut makes today, both visible next to the old governor (the review of #474): a light
+  look tops out a rung lower (512² at two pixels, where the old governor climbed on to 768²
+  at two pixels and sixty steps, predicted 11.6 ms against the 9 ms budget), and after one
+  busy tab a light look climbs to 768² at thirty steps and sixty never comes back (the old
+  governor had it back in about ninety seconds). The second could also be priced: give up
+  the rung again when that wins back sixty under budget.
+- **14aa-5** (open): the governor's lines are 60 Hz milliseconds (`SLOW_MS`, `FAST_MS`,
+  `MISSED_MS`): on a 120 Hz display a missed refresh is 8.3 ms late and is not seen as one. Take
+  the refresh from the draw gate (`drawGate.refreshMs`) and draw the lines in refreshes.
+- **14aa-6** (open): `npm run stutter` runs by hand on the Mac (the watcher). Whether it joins
+  a Mac shard depends on what the CI runner's GPU makes of Poster, which no run has asked yet.
+
+### 14ab. What else runs on the CPU every frame (found with 14aa, read in the code)
+
+An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show pays.
+
+- ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Shipped
+  with 14ac (#451). `App.tsx`'s
+  frame loop calls `pourVideo` each frame, and `pourVideo` pauses the element it holds
+  and plays it again, which fires `pause` and `play`, which set React state twice a frame
+  and restart the loop. Fix: `pourVideo` does nothing for the video it already pours, and
+  is asked once, on play. Check: a page with a video poured counts `play` events and App
+  renders a second.
+- **14ab-2** *The video pour's optical flow is a CPU loop* over a 192² `getImageData`
+  each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
+  pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
+  belongs in a compute pass beside it.
+- **14ab-3** *Every frame reads both fields back and averages them on the CPU*
+  (`syncFromGpu`, a loop over every cell of each layer for the mean density and colour)
+  where `measure()` on the GPU returns the same means in 32 bytes. With 14j's "read back
+  only on a frame that stepped".
+- **14ab-4** *A CPU pour uploads the whole grid every step* (`flushDeltas`: about 1.3 MB
+  through three to five `writeTexture`s and the upsamples), for a few changed cells.
+  Splat records on the GPU (`applySplats`) are the path; what still goes through the
+  delta grids is the bubbles' rims, the hands, the breath and the room stir.
+- **14ab-5** *The plate, post chain, camera, output and particles make their bind groups
+  and views every frame* (10–20 `createBindGroup`, 40–60 `createView`); the solver
+  caches its own (H2c-11).
+- **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
+  gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
+- **14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
+  `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort
+  on their history. A ring and a selection median.
+- **14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
+  object each tick) and sets `connected` on every poll through a stale closure (with
+  14j's timer line).
+- **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
+  sixty steps (`speciesShare`); a ring like the readback's.
+- **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
+  tools shard, two attempts on one head were each red on one line of 224, a different line
+  each time. Attempt 1 failed "both windows animating, 0.25 of a refresh behind", which read
+  1.1x, against a bar of 1.05: 21.9 drawn against 20.4 served, with displays at 19.4 and
+  30.1 Hz. Attempt 2 failed "both windows were handed the same refreshes", which read 1.154x
+  (17.2 served against 14.9), over its bar of 1.15. The PR changes neither `drawGate.ts` nor the place frames are offered
+  to it. The runner was handing each window 11 to 30 of its 60 refreshes. Green runs that
+  night handed 13 to 40, and #461's green run read 1.13x on the same line. The lines' own
+  comments say a starved runner's late timers part the two windows' frames by themselves. Find
+  a measure of the gate's fault that holds at a quarter of the display's refreshes, or a
+  starvation reading that sets the line aside and says so. The bar itself stays where it is.
 
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 
@@ -6193,6 +6298,21 @@ Not a gate and no bar: a rate depends on what was pushed.
   buy is a cheaper re-run of a startup red (half a shard), and that is better bought by
   fixing startup. Revisit if a shard's median passes about 15 minutes (the 19w rule).
 
+- **19ad-5. `bottles` goes red when one splatter fling lands at the stroke's mirror.**
+  PR #525 (a copy and constant change that cannot reach the pour) failed `Every tool lays
+  the bottle` twice running on the same head, 2026-10-28, on a different bottle each time
+  and no other line: `splatter with the Oil bottle lays oil along the stroke`
+  (31 pours, 1 at the mirror) and `splatter with the Ferrofluid bottle lays ferrofluid
+  along the stroke, and not at its mirror` (30 pours, 1 at the mirror, three strays 0.12–0.13
+  from the hand). Pour and spray with both bottles read 0 at the mirror every time. Both
+  lines require `mirror === 0` of a stroke whose splatter flings drop within 0.14 of the
+  plate from the hand, so any fling that crosses the middle can land inside `rad` of the
+  mirrored path: the check asks the scatter's reach to stay clear of the mirror, which
+  it does not promise. Do not loosen the bar first: count the flings that land at the
+  mirror over a run of shards (`npm run flakes`) against how many a stroke's geometry
+  allows, then state the bar as that (the mirror reading should be the hand's own
+  flipped path, not the fling's reach). Seeded or recorded flings would settle it.
+
 ### 19ae. A phone check reads its dye across a plate rebuild and calls it a fault
 
 - **19ae-1. `npm run phone`'s "two fingers holding Drop lay dye under both" picks its
@@ -7059,6 +7179,7 @@ once the login works (23.14).*
 - **23.17i** (**shipped**, this PR): refunding just an upgrade order takes the buyer's Home key back to them. Found in the review of #494: an upgrade files the Pro key over the Home one under the same id, so the refund of the upgrade dropped the only record and revoked the id, and 23.17d then took the Mac app off the buyer at the next start. The upgrade now keeps what it replaced (`replaces` on the Pro record) and the refund files the Home key again (`refileHome`, `server/license-worker.js`), signed afresh with the Home entitlement (`issuedAt`, `updatesUntil`, `maxMachines`) the buyer bought, rebuilt from the Pro record when it predates `replaces`. It gets a new id (`<proId>_home_<upgradeOrderId>`), not the Pro key's: the Pro token verifies offline for ever, and a Mac holding it keeps it while `/keys` lists its id (`heldKeyRefunded`), so the id has to leave the list and be revoked. Refunding the Home order itself, which the upgrade stood on, still takes every key. *Measured:* `npm run license-worker` 11a–11d; on the old Worker 11a–11c fail (`keys after=0`) and 12a fails for want of the Macs' names (4 of 26 red, 22/26), with the new Worker 26/26. The Worker is deployed by hand from the owner's Mac (the owner's OK first); until it is, the live Worker still refunds as before. An upgrade filed before this change has no `replaces`, and its refund rebuilds the Home key from the Pro record (11c).
 - **23.17j. A `?cast` page runs the plate with no licence.** The door is for the show (`main.tsx`, `show` excludes `?remote` and `?cast`); a cast mirrors the show's canvas, but in a browser where it cannot it asks for its own GPU and draws, so `http://localhost:3000/?cast` on the app's server is a plate with no key. Hold a cast with no show to mirror behind the same door. *Measure:* `npm run desktop` opens `?cast` in a plain browser on a keyless app and finds no plate.
 - **23.17k. Electron's fuses, with 13.1-sign.** The packed app still honours `ELECTRON_RUN_AS_NODE`, `--inspect` and an edited `app.asar`; Electron's fuses (`RunAsNode`, `EnableNodeCliInspectArguments`, `EnableEmbeddedAsarIntegrityValidation`, `OnlyLoadAppFromAsar`) close them, and the integrity one needs the signed build. *Measure:* `npm run desktop -- --packaged` reads the fuses off the binary.
+- **23.17-cikeys** (**shipped**, this PR; the security audit of 2026-10-28): the Mac app's build handed the owner's Developer ID certificate, its password and the Apple notarisation password to every same-repo pull request's run (`desktop.yml` on `pull_request` with `CSC_FOR_PULL_REQUEST`), beside that branch's own build config, npm scripts and dependencies; and any workflow a branch wrote could read them, and the site's deploy key, as repository secrets. Now the build signs only on a Run workflow on main, in the `mac-signing` environment, with each signing secret passed under that condition; a pushed `desktop-v*` tag no longer releases (its run is the tag's own copy of the file); the deploy runs in `firebase-live`; every workflow is read-only at its top; the Firebase deploy action is pinned to a commit. *Measure:* `npm run cisecrets` (Measure · logic), each rule red on a broken copy of the real file first; `npm run updates` holds the release to main. *Owner, in Settings → Environments:* create `mac-signing` and `firebase-live`, each with deployment branches "main" only and no reviewers, add the five signing secrets to the first and `FIREBASE_SERVICE_ACCOUNT` to the second, then delete the repository copies (desktop/README.md). Until then the files already keep the signing set out of pull requests' runs, but a branch that edits a workflow could still read the repository copies. *Open:* a pull request no longer proves the signed path (hardened runtime, entitlements, notarisation); the next Run workflow on main does. If that gap bites, a signed check after each merge that touches `desktop/` is the fix, at about 40 Mac minutes a time.
 
 **Against VS** (2026-10-11, §30). Imaginando's VS 2 is €129 on desktop (plugin and
 standalone, NDI, Syphon and Spout out, a 4K60 recorder), a paid iPad app, and free
@@ -7302,10 +7423,7 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     and until 18f-2 lands the ring there is the kick's own hand and the soap's. When 18f-2
     lands, `npm run areacords` should add a heat cord that opens the well's surface on a
     level plate, against the same cord with the heat off.
-  - **25h-2. The gate on every cord, and the rest of 30a.** The threshold, attack and
-    release are read on area cords only (lib/areaCords.ts CordGate); a whole-plate cord
-    still follows its reading. Folding the gate into the patch bay's fold (a state per cord,
-    by what the cord is), and 30a's curves, are 30a's.
+  - ~~**25h-2. The gate on every cord, and the rest of 30a.**~~ Shipped with 30a (`PatchBay.fold` holds a `CordGate` per whole-plate cord keyed by what the cord is and clocked from `fold`'s `now`, while area cords keep `CordGate` in `AreaHands`; `npm run soundcords`).
   - **25h-3. Area cords on the back plate.** They work on the plate the music plays, in its
     areas; a back plate with its own look has that look's areas (25d) but the front look's
     cords do not reach them, and the panel greys Plate for an area cord. With 25d.
@@ -8589,7 +8707,7 @@ The gap is in how a sound or a note is shaped before it reaches a setting.
 check written first and built by Antigravity. None moves the whole frame by default
 (the owner's rule), and every reading is a fast one (the owner's rule for sound patches).
 
-1. **30a**, below: shape each sound cord.
+1. ~~**30a**, below: shape each sound cord.~~ (Shipped; `npm run soundcords`.)
 2. **14t-pc**: Program Change picks a look or a set-list item.
 3. **24.3**, moved up: notes as voices, with an envelope per note and notes as a source.
 4. **13.5-link** before **13.5-osc**: Link first.
@@ -8612,39 +8730,39 @@ as before: the shader editor and imports, the feedback layer, and anything that 
 the frame; VS's oscilloscope and audio-visualizer shaders are 34c and 34d's (the
 analyzer look; Chladni figures, real physics). Pricing was left out at the owner's word.
 
-### 30a. A sound cord has only a depth
+### ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
 
-A patch whose source is `sound` or `bands` carries a depth and nothing else, so a kick
-patch that fires on every boom of a live room, or a swell too slow for a ballad, cannot
-be tuned at the gig except by moving the depth, which changes how far it goes and not
-when. Add to each such patch a mode (*follow*: the reading rides the setting, as today;
-*gate*: a crossing fires a shaped pulse), a threshold, a gain, an attack and a release;
-and let a `bands` patch take its edges from a drag across a live spectrum in the panel
-rather than the eight fixed bands (`BAND_EDGES_HZ`, `audioFeatures.ts`), heard against
-its own recent range as the named bands are. Absent fields read as today's patch (follow,
-no threshold, gain 1, no smoothing beyond the feature's own), so every saved look and
-preset loads unchanged. On the phone, the patch's view carries the same controls and
-the spectrum strip. *Measure:* a new check fed synthetic tone bursts in and out of a
-dragged band: crossings counted against the threshold (equal, none doubled, none from
-outside the band), and the patch's rise and fall timed within 10% of its attack and
-release.
-
-*Check written first (2026-10-26):* `npm run soundcords` (`scripts/soundcords.mjs`), red on
-main in its 30a lines and green on a sketch of the build. Its header is the contract: the
-cord's fields (`mode`, `threshold`, `gain` before the threshold, `attack`, `release`, `band`
-as `[loHz, hiHz]` winning over `feature`), read through `songAudioTrack` and `PatchBay.fold`
-with the gate's clock from `fold`'s `now`. Attack and release are the 2%-to-98% times of
-the cord's rise and fall, and a gate rises to the hit's height (the most the reading times
-the gain reached while open), as an area cord's does. A whole-plate cord with no `mode`
-follows even if it carries a threshold, attack or release (it ignores them today); an area
-cord keeps its own rule. CI runs it with `--controls` (the
-tape, the counter on today's `CordGate`, the judge rejecting three wrong gates, every saved
-cord folding as before) until the build's PR drops the flag. 31c's two lines join it when 31c is built.
-- **30a-1. The dragged band on the cast display and the phone remote.** The cast display
-  rebuilds `AudioData` from the wire with no spectrum behind it (`liveValue`, sceneMap.ts),
-  so a dragged-band cord there reads nothing, as a `bands` cord does today. Whether the
-  wire carries the cord's reading or the projector just shows the laptop's fold is the
-  build's to decide and say.
+Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Each `sound` or `bands`
+cord on `SceneMapping` (`src/types.ts`) now carries `mode` (`'follow' | 'gate'`, absent =
+`'follow'` on whole-plate cords even when `threshold`, `attack` or `release` are present;
+area cords keep `CordGate`'s rule), `gain` (absent = 1, applied to the reading before the
+threshold in both modes), `threshold`, `attack`, `release`, and on `bands` cords a custom
+dragged `band` (`[loHz, hiHz]`, winning over `feature` while the panel writes `feature` as
+the named band holding the drag's middle for fallback). `BandRange` (`src/lib/audioFeatures.ts`)
+hears `[loHz, hiHz]` from `AudioReading`'s spectrum with the same `binsFor`, reference floor
+and `AutoRange` (6 dB minimum, 30 dB cap) as `band1`..`band8`, and `PatchBay.fold`
+(`src/lib/sceneMap.ts`) steps a `CordGate` per gated whole-plate cord clocked from `fold`'s
+`now` (closing **25h-2**). The patch bay editor (`src/components/SettingsPanel.tsx`) and
+`src/components/phone/BandStrip.tsx` draw the mode, gain, threshold, rise and fall controls
+and the live log-frequency spectrum strip on both the desk and the phone. Story in
+`docs/plan-shipped.md` §30a.
+- **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
+  on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the
+  projector mirrors `#liquid-canvas` directly, so it shows the laptop's fold (including
+  dragged-band cords) frame for frame. A standalone network `CastReceiver` rebuilds
+  `AudioData` from `CastAudio` on the wire with no spectrum behind it (`liveValue`,
+  `sceneMap.ts`), so `sound` cords fold and gate there while `bands` cords (fixed or
+  dragged) read nothing, matching fixed `bands` cords today. Carrying evaluated `bands`
+  cord readings over `CastAudio` if standalone receivers need `bands` patches remains open here.
+- **30a-2. Found in the review of #511.** (a) Shipped with it: an area cord on a dragged
+  band read 0 for the whole of a look fade (the range was kept per mapping object and a
+  fade builds every object again each frame); `AreaHands` now keeps the `BandRange` with
+  the cord's gate, and `areacords -- --node` holds it. Open: (b) `soundcords` has no line
+  that holds the drag's `AutoRange` minimum span against a quiet, narrow band (its tape's
+  band5 always swings far over 12 dB, so a 12 dB span passes); (c) `BandStrip` never
+  resets its `BandRange` when the band changes, so after a drag its live level reads
+  against the old band's range until it catches up; (d) the rule for when a cord gates is
+  written out twice in `SettingsPanel.tsx` beside `gated()` in `areaCords.ts`; import `gated`.
 
 ### 30b. The LFOs and envelopes are fixed
 
