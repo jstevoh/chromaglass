@@ -27,6 +27,12 @@
  *   one wave             a single gesture: how fast it arrives, how far it gets
  *
  * Exits non-zero if any of them fails, so it can stand in a check.
+ *
+ *   npm run scene -- --slow 5
+ *
+ * runs the room sensor's analysis five times a frame (four more sensors fed the
+ * same frames, inside the timed push), so a slowdown of the analysis itself can
+ * be shown to turn the two cost bars red; PLAN 19k-7 has what each factor read.
  */
 
 import { SceneSense } from '../src/lib/sceneSense.ts';
@@ -38,6 +44,8 @@ const N = 96;
 const FRAMES = 40;
 const DT = 1 / 20;
 const OPTS = { deadzone: 0.25, smooth: 0.2, people: true };
+const slowAt = process.argv.indexOf('--slow');
+const SLOW = slowAt < 0 ? 1 : Math.max(1, Math.round(Number(process.argv[slowAt + 1]) || 1));
 
 /** A frame of flat grey with a little sensor noise, as RGBA. */
 function room(seed) {
@@ -74,8 +82,46 @@ function meanFlow(r) {
   return w > 0 ? { x: fx / w, y: fy / w } : { x: 0, y: 0 };
 }
 
+/**
+ * The main thread's own CPU time so far, in ms: this thread's, not the
+ * process's, so V8's compiler and collector working on their own threads are
+ * not counted as the analysis (see the cost in `run`).
+ *
+ * The `process.cpuUsage()` first is not a reading. Linux keeps a running
+ * thread's CPU time up to date only at the scheduler's tick (4 ms here, 250 Hz),
+ * so `threadCpuUsage()` on its own steps 0 or 4 ms and a 0.5 ms frame reads 0;
+ * the whole process's reading brings the calling thread's time up to the
+ * nanosecond on the way (the kernel's `thread_group_cputime`), and the thread
+ * reading after it is then exact. Measured: alone, steps of 1.8 to 4 ms; after
+ * the process reading, 1 to 50 microseconds, and a 1 ms busy wait reads 1.01.
+ * The check below asserts that, so a kernel that does not do it is red rather
+ * than a cost of zero.
+ */
+function threadMs() {
+  process.cpuUsage();
+  const t = process.threadCpuUsage();
+  return (t.user + t.system) / 1000;
+}
+
+/** The finest step the thread clock takes over a tight loop, in ms. */
+function threadClockStep() {
+  let finest = Infinity, was = threadMs();
+  for (let i = 0; i < 200000 && finest > 0.01; i++) {
+    const now = threadMs();
+    if (now > was) finest = Math.min(finest, now - was);
+    was = now;
+  }
+  return finest;
+}
+
+if (typeof process.threadCpuUsage !== 'function') {
+  console.error(`FAIL  the room's cost is read with process.threadCpuUsage(), which Node ${process.version} does not have; a newer Node 22 does`);
+  process.exit(1);
+}
+
 function run(name, paint) {
   const sense = new SceneSense();
+  const shadows = Array.from({ length: SLOW - 1 }, () => new SceneSense());
   let energy = 0, flow = { x: 0, y: 0 }, samples = 0;
   const cpu = [];
   const ids = new Map();
@@ -84,27 +130,46 @@ function run(name, paint) {
   for (let f = 0; f < FRAMES; f++) {
     const px = room(f * 7919 + 13);
     paint(px, f / (FRAMES - 1), f);
-    // The cost is the process's CPU time over the push, and a room's is its
-    // median frame, not the sensor's own wall-clock `r.ms` averaged. A machine
-    // with the cores taken (a runner, a session running its checks side by
-    // side) deschedules the process mid-frame and the wall time doubles with
-    // nothing slower in the analysis, and one cold frame (the optimiser's
-    // first pass, a collection) is 12 ms in a mean of thirty. Measured on 4
-    // cores, PLAN 19k-5: the mean of `r.ms` was 1.23 ms alone and 2.46 ms
-    // with twelve busy loops beside it, red against the 2 ms bar in 2 s; the
-    // median frame's CPU time is 0.2 to 0.5 ms in either, with the worst
-    // frame 11 to 15 ms alone and loaded (always the first room's, the
-    // optimiser's first pass), so the worst frame has its own bar below, 20 ms:
-    // a steady slowdown of the analysis goes red at about 1.4x on it where the
-    // mean went red at 1.5x, and a stall in a warm room (4 to 9 ms measured) at
-    // 2x.
-    const c0 = process.cpuUsage();
+    // The cost is the main thread's own CPU time over the push, and a room's
+    // is its median frame. Not the sensor's wall-clock `r.ms`: a machine with
+    // its cores taken (a runner, a session running its checks side by side)
+    // deschedules the process mid-frame and the wall time doubles with nothing
+    // slower in the analysis (PLAN 19k-5: the mean of `r.ms` was 1.23 ms alone
+    // and 2.46 ms beside twelve busy loops on 4 cores). And not the process's
+    // CPU time either, which is what this measured until PLAN 19k-7: that sums
+    // every thread, and V8 optimises a hot function on its background threads,
+    // so the frame on which the analysis is first compiled was charged for the
+    // compiler's work on another core as well as for its own. On #540, a PR
+    // that changed nothing this runs, that read 22.5 ms against the 20 ms bar,
+    // and once a median of 2.01 against 2. Measured in a cloud session, 4
+    // cores, twenty runs each (`scratch/`, not kept): the process's worst frame
+    // was 9.6 to 13.8 ms alone and 8.6 to 24.7 beside twelve busy loops, its
+    // worst median 2.29; the main thread's own worst frame was 4.5 to 7.1 alone
+    // and 4.6 to 7.3 loaded, its worst median 1.14, and with the wall clock
+    // beside it alone the two agree to a tenth (the frame is the main thread's
+    // work and nothing waits on the compiler). What a frame of analysis costs
+    // the show is what it keeps the main thread from doing, so that is what
+    // is counted now, against the same two bars.
+    //
+    // What that costs the bars, shown with `--slow k` (the analysis run k
+    // times a frame), five runs a factor: the costliest frame read 4.7 to 5.4
+    // ms at 1x, 9 to 16 at 2x, 14 at 3x, 18.5 to 25.7 at 4x (red in 3 of 5)
+    // and 23 to 30 at 5x and 6x (red in all); the process's reading, run the
+    // same way with one other process beside it, was 13.7 to 20.3 at 1x (red
+    // in 1 of 5, on nothing) and red in all from 2x. So the worst-frame bar now
+    // catches a slowdown of four to five times where it caught two, because
+    // half of what it read before was the compiler; it still catches a stall,
+    // and it no longer fires on an unchanged tree. The median bar went red at
+    // five to six times either way (1.6 to 3.0 ms at 5x and 6x). A tighter
+    // worst-frame bar is PLAN 19k-7a, to be set from CI's readings.
+    const t0 = threadMs();
+    for (const s of shadows) s.push(px, N, N, DT, f * DT * 1000, OPTS);
     const r = sense.push(px, N, N, DT, f * DT * 1000, OPTS);
-    const c1 = process.cpuUsage(c0);
+    const ms = threadMs() - t0;
     if (!r.ready) continue;
     // The first frames are the background model settling; judge the rest.
     if (f < FRAMES * 0.25) continue;
-    cpu.push((c1.user + c1.system) / 1000);
+    cpu.push(ms);
     energy += r.energy;
     const mf = meanFlow(r);
     flow.x += mf.x; flow.y += mf.y;
@@ -139,11 +204,11 @@ const results = [
 
 const pad = (s, n) => String(s).padEnd(n);
 const num = (v, n = 2) => (v >= 0 ? ' ' : '') + v.toFixed(n);
-console.log(`${pad('room', 8)} ${pad('energy', 7)} ${pad('flow x', 7)} ${pad('flow y', 7)} ${pad('people', 7)} ${pad('ids', 4)} ${pad('hold', 6)} ms (median CPU)  worst`);
+console.log(`${pad('room', 8)} ${pad('energy', 7)} ${pad('flow x', 7)} ${pad('flow y', 7)} ${pad('people', 7)} ${pad('ids', 4)} ${pad('hold', 6)} ms (median, thread)  worst`);
 for (const r of results) {
   console.log(
     `${pad(r.name, 8)} ${pad(num(r.energy), 7)} ${pad(num(r.fx), 7)} ${pad(num(r.fy), 7)} ` +
-    `${pad(r.people, 7)} ${pad(r.ids, 4)} ${pad(num(r.hold), 6)} ${pad(r.ms.toFixed(2), 16)}${r.worst.toFixed(1)}`,
+    `${pad(r.people, 7)} ${pad(r.ids, 4)} ${pad(num(r.hold), 6)} ${pad(r.ms.toFixed(2), 21)}${r.worst.toFixed(1)}`,
   );
 }
 
@@ -276,6 +341,9 @@ row('a fan in the corner', carEarly, (carEarly + carLate) / 2, carLate);
 console.log(`one wave               reaches the plate after ${waveOnset ? `${(waveOnset.t * 1000).toFixed(0)} ms` : 'never'}, peak ${wavePeak.toFixed(4)}`);
 
 const by = Object.fromEntries(results.map(r => [r.name, r]));
+const costliest = results.reduce((a, b) => (b.ms > a.ms ? b : a));
+const stalliest = results.reduce((a, b) => (b.worst > a.worst ? b : a));
+const clockStep = threadClockStep();
 const checks = [
   ['a still room reads as still', by.still.energy < 0.25],
   ['a still room has no flow', Math.abs(by.still.fx) < 0.05 && Math.abs(by.still.fy) < 0.05],
@@ -285,9 +353,10 @@ const checks = [
   ['a walker is one person', by.walker.people === 1],
   ['a walker keeps one id', by.walker.ids <= 2 && by.walker.hold > 0.7],
   ['a strobe is not a crowd', by.strobe.people <= 1],
-  ['the cost was read (CPU time over each push, above zero)', Math.min(...results.map(r => r.ms)) > 0],
-  ['analysis costs under 2 ms a frame, the median frame of each room', Math.max(...results.map(r => r.ms)) < 2],
-  ['and the costliest frame of each room, the cold first one included, is under 20 ms', Math.max(...results.map(r => r.worst)) < 20],
+  [`the cost was read (the main thread's CPU time over each push, above zero; its clock steps ${clockStep.toFixed(3)} ms, under 0.1)`,
+    Math.min(...results.map(r => r.ms)) > 0 && clockStep < 0.1],
+  [`analysis costs under 2 ms a frame, the median frame of each room (${costliest.ms.toFixed(2)} ms, ${costliest.name})`, costliest.ms < 2],
+  [`and the costliest frame of each room, the first optimised one included, is under 20 ms (${stalliest.worst.toFixed(1)} ms, ${stalliest.name})`, stalliest.worst < 20],
   ['a camera on itself finds a ceiling', loopLate < loopMid * 1.25],
   ['and the ceiling is a plate, not a wall', loopLate < 20],
   ['a fan in the corner still drives the plate', carLate > carEarly * 0.5],

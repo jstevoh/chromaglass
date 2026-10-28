@@ -3403,6 +3403,31 @@ the cores and is not known; it was not reproduced in this run or in the eight-lo
 goes red beside others again, `quick` writes its log to `scratch/quick/` and 19k-5 is reopened
 with that log.
 
+*19k-7 (2026-10-28).* `scene`'s two cost bars went red twice on one head of #540, a PR that
+changed nothing the check runs: the costliest frame 22.5 ms against 20 (the still room's first
+optimised frame; 18.7 on the run before), and once the strobe room's median 2.01 ms against 2.
+19k-5 had moved the reading from the sensor's wall clock to `process.cpuUsage()`, which sums every
+thread, and V8 compiles a hot function on background threads, so the frame on which the analysis
+was first optimised was charged for the compiler's work on another core too. Reproduced in a
+4-core cloud session, twenty runs each: the process's worst frame 9.6 to 13.8 ms alone and 8.6 to
+24.7 beside twelve busy loops (22.1 and 24.7 among them, red), its worst median 2.29 alone (red).
+
+The push is now timed with the main thread's own CPU time, `process.threadCpuUsage()`. On Linux
+that alone steps at the scheduler's tick (4 ms, so a 0.5 ms frame read 0); a `process.cpuUsage()`
+call first brings the calling thread's time up to date in the kernel, and the thread reading is
+then exact (steps of 1 to 50 microseconds; a 1 ms busy wait reads 1.01). The check asserts the
+clock's step is under 0.1 ms, so a kernel that does not do that is red, not a cost of zero. Read
+the same way: worst frame 4.5 to 7.1 ms alone and 4.6 to 7.3 loaded, worst median 1.14; with the
+final script, ten runs beside twelve busy loops, 4.7 to 6.0 ms and 0.53. Both bars unchanged, and
+each FAIL line now prints its reading and its room.
+
+Still red on a real slowdown: `npm run scene -- --slow k` runs the analysis k times a frame inside
+the timed push. Five runs a factor, the worst frame read 4.7 to 5.4 ms at 1x, 9 to 16 at 2x, 14 at
+3x, 18.5 to 25.7 at 4x (red in 3 of 5) and 23 to 30 at 5x and 6x (red in all); the median went red
+at 5 to 6x (1.6 to 3.0 ms). The old reading, the same sweep with one other process beside it, was
+13.7 to 20.3 at 1x (red in 1 of 5) and red in all from 2x. So the worst-frame bar is quieter on an
+unchanged tree and coarser on a slow one, which 19k-7a is to tighten from CI's numbers.
+
 *The two nits on #504.* `checks.mjs`'s walk detector (which makes a Measure check that walks
 `scripts/` an `always` entry) knew `walk('scripts')` and `walk(join(root, 'scripts'))` only; a
 `walk(\`${ROOT}/scripts\`)` or `readdirSync(ROOT + '/scripts/')` slipped past, so it now takes any

@@ -5615,6 +5615,16 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   `deploygate.sh` and the guard read the part names from `shards.measure`. Open: the browser part
   is now the slowest of the five at 19:14, and holeline alone is 9.3 min; read both in `npm run flakes`
   / the job summary over the next merges and split the browser part next if it passes 21.
+- **19k-7** (S): **shipped**, `npm run scene`'s cost bars time the main thread, not the process.
+  They went red on #540 (22.5 ms worst frame, 2.01 ms median) with nothing changed, because
+  `process.cpuUsage()` counted V8's background compiler; `--slow k` shows the bars still go red
+  when the analysis does more work. (#540 filed this as 19k-6, a number already used.) The story
+  is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
+  - **19k-7a** (S): the costliest-frame bar of 20 ms now catches a 4 to 5x slowdown of the
+    analysis where it caught 2x (half of what it read was the compiler). Read the worst frame on
+    Measure's runners over the next ten runs (it is on the line now) and, if it stays under about
+    8 ms there as here, move the bar to about 12 ms (`--slow 2` read 9 to 16 here). A tighter
+    bar, never a looser one, and named under `Check changes:`.
 
 ### 19l. App frames readable in a cloud session
 
