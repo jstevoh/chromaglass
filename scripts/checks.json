@@ -371,6 +371,17 @@
       ]
     },
     {
+      "name": "The step cadence",
+      "shard": "logic",
+      "run": "npm run cadence",
+      "why": [
+        "The plate takes its steps evenly (scripts/cadence.mjs, PLAN.md",
+        "14aa): on a display whose refresh is a whole ratio of the step",
+        "no frame stops or doubles the liquid, dropped refreshes are caught up,",
+        "and the model makes the old loop stutter as its control."
+      ]
+    },
+    {
       "name": "The liquids",
       "shard": "logic",
       "run": "npm run liquids",
@@ -754,6 +765,19 @@
         "minutes on a slow runner, and this PR's lab part was cancelled at",
         "the limit twice with this check in it (2026-10-27). About a minute",
         "here, three to four in full: the build's PR weighs where it fits."
+      ]
+    },
+    {
+      "name": "A step asks for nothing it throws away",
+      "shard": "lab",
+      "run": "npm run encode",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
+        "PLAN.md Wave 4.1, H2c-4): the bytes it allocates and the writes it",
+        "makes a dispatch, counted in the page by Chromium's own heap sampler.",
+        "JavaScript's cost, which is the same on SwiftShader as on Metal, so it",
+        "sits here rather than in the Mac queue."
       ]
     },
     {
@@ -1942,17 +1966,6 @@
         "of its own, because it empties the Mac's shader cache, and one after",
         "another check would find it warm; depth, first on the tools shard,",
         "is how the nine-second freeze was found and still sees it cold."
-      ]
-    },
-    {
-      "name": "How long the opening takes, three ways (temporary, PLAN 14v-10)",
-      "shard": "open",
-      "run": "npm run openingtime -- --runs 3",
-      "why": [
-        "Not a check: it judges nothing and always passes. Twelve cold openings",
-        "(as shipped, ?stillall=1, ?computelanes=6, both), interleaved, so the",
-        "PR that changes how the opening builds can choose by a Mac's numbers.",
-        "Taken out again in the same PR before it merges."
       ]
     },
     {

@@ -3,7 +3,7 @@
  * How long the plate's opening takes, one way against another, on a cold
  * shader cache (PLAN 14v-10).
  *
- *   npm run openingtime -- --cold --runs 3 --variants ",stillall=1,computelanes=6"
+ *   npm run openingtime -- --cold --runs 3 --variants ",lanes=2,lanes=6"
  *
  * Not a check: it judges nothing and is in no shard. It is the instrument
  * for choosing how the opening builds its pipelines, which `npm run startup`
@@ -14,9 +14,17 @@
  * apart takes several openings of each, interleaved so a runner that slows
  * down slows both.
  *
- * Each variant is a query string added to the opening's address
- * (`gpu/prepare.ts` reads `lanes`, `computelanes` and `stillall`; empty is
- * the opening as it ships). Each opening gets its own browser, and on a Mac
+ * What it found first (PR #540's run 40683027073, CI's Mac, three cold
+ * openings of each): the intro held still to the end of the opening, and six
+ * lanes once the render pipelines were done, each opened within the spread of
+ * the opening as it ships (first step 13.47 to 14.77 s for all twelve). Six
+ * lanes doubled every compile (median 0.69 s against 0.36) and built no
+ * faster: the Mac's compiler, not the lanes, sets the pace. PLAN 14v-10 has
+ * the numbers; the two flags were taken out again.
+ *
+ * Each variant is a query string added to the opening's address (any the
+ * app reads, `lanes` in `gpu/prepare.ts` among them; empty is the opening as
+ * it ships). Each opening gets its own browser, and on a Mac
  * the compiled-shader cache is emptied before it with `--cold` (and on CI),
  * the same emptying as `npm run startup`'s: it costs every app on the machine
  * one slow start, so on the owner's machine it is asked for, never assumed.
@@ -41,7 +49,7 @@ const arg = (name, fallback) => {
   return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : fallback;
 };
 const RUNS = Number(arg('runs', '3'));
-const VARIANTS = arg('variants', ',stillall=1,computelanes=6,stillall=1&computelanes=6').split(',');
+const VARIANTS = arg('variants', ',lanes=2,lanes=6').split(',');
 const COLD = process.argv.includes('--cold') || !!process.env.CI;
 const PORT = 4363;
 

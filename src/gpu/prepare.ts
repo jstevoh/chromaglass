@@ -176,35 +176,6 @@ const OPENING_LANES = (() => {
   return asked !== null && Number.isInteger(asked) && asked >= 1 && asked <= 8 ? asked : 3;
 })();
 
-/*
-  Two ways of running the opening, from the query string alone, for timing
-  against the way it ships (PLAN 14v-10; `npm run openingtime` runs them
-  side by side on a cold Mac). Neither is a setting: an opening without
-  them is the opening as it was.
-
-  `?computelanes=N` (1 to 12): once the last render pipeline has settled, N
-  lanes take the compute kernels left, not `lanes`. Render pipelines were
-  why the lanes are few (all at once held the page for 8.6 s, and three
-  render compiles at once queued in the GPU process and held Chromium's
-  start behind them, `buildInTurn`); a compute kernel's compile was not seen
-  to hold a frame. On PR #511's cold Mac run (40619521397) the last render
-  pipeline settled at 6.67 s and the 6.4 s after it, to 13.09 s, was
-  compute kernels alone, three at a time.
-
-  `?stillall=1`: the intro held still until the whole opening is built, not
-  only its fills and render pipelines. On the same run the two slowest
-  kernels of the opening, `fluid/deltaVel` and `fluid/liquidForces` (2.67 and
-  2.66 s against a median of 0.32 s, 5 and 7 kB of source like the rest),
-  were both asked at 6.67 s, the moment the intro began to move again.
-*/
-const queryInt = (name: string, lo: number, hi: number): number | null => {
-  let asked: number | null = null;
-  try { asked = Number(new URLSearchParams(window.location.search).get(name) ?? NaN); } catch { /* no window */ }
-  return asked !== null && Number.isInteger(asked) && asked >= lo && asked <= hi ? asked : null;
-};
-const COMPUTE_LANES = queryInt('computelanes', 1, 12);
-const STILL_ALL = queryInt('stillall', 1, 1) === 1;
-
 /**
  * `builds`, `lanes` at a time (above), until they are done, the device is
  * gone or PREPARE_TIMEOUT_MS has passed (in the opening, since it began;
@@ -268,11 +239,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   // The page held still across the opening's first fills and render compiles
   // (`Quiet`, below): asked once, before the first of them, and let go when the
   // last has settled.
-  let quietLeft = quiet ? builds.filter((b) => STILL_ALL || isFill(b) || b.kind === 'render').length : 0;
-  // `?computelanes` (above): the lanes past `lanes` wait here until no render pipeline is left.
-  let renderLeft = builds.filter((b) => b.kind === 'render').length;
-  let rendersDone: (() => void) | null = null;
-  const rendersOver: Promise<void> = renderLeft === 0 ? Promise.resolve() : new Promise((r) => { rendersDone = r; });
+  let quietLeft = quiet ? builds.filter((b) => isFill(b) || b.kind === 'render').length : 0;
   const take = (): Prep | undefined => {
     if (fillLeft > 0) {
       const i = queue.findIndex(isFill);
@@ -293,8 +260,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     compiling, whichever count of lanes ran.
   */
   let lastSettled = t0;
-  const lane = async (index: number) => {
-    if (index >= lanes) await rendersOver;
+  const lane = async () => {
     while (queue.length && !gone && !timedOut) {
       /*
         The opening's half has the whole PREPARE_TIMEOUT_MS between them,
@@ -334,11 +300,8 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       } else if (prep.kind === 'render') {
         renderBusy = waited.then(() => {
           renderBusy = null;
-          if (--renderLeft === 0) rendersDone?.();
           if (quiet && --quietLeft === 0) quiet.go();
         });
-      } else if (STILL_ALL && quiet) {
-        void waited.then(() => { if (--quietLeft === 0) quiet.go(); });
       }
       const settled = await waited;
       const now = performance.now();
@@ -360,12 +323,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     frames present before the first fill is asked of the GPU.
   */
   if (quietLeft > 0) await quiet?.still().catch(() => undefined);
-  const laneCount = stage === 'opening' && COMPUTE_LANES !== null ? Math.max(lanes, COMPUTE_LANES) : lanes;
-  const lanesRun = Array.from({ length: Math.max(1, Math.min(laneCount, builds.length)) }, (_, i) => lane(i));
-  // The extra lanes are let go too once the first ones are done, however they
-  // ended (gone, timed out with a render pipeline never taken), or they wait for good.
-  await Promise.all(lanesRun.slice(0, lanes)).finally(() => rendersDone?.());
-  await Promise.all(lanesRun);
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
   // Gone, timed out or a build that never settled: never left held still.
   if (quiet && quietLeft > 0) quiet.go();
   /*
