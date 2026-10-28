@@ -562,7 +562,7 @@ Where each batch stands, as of 2026-09-27:
 | 21 | Looks after painters | Roy, 1963 and its Ben-Day Dots control **shipped** (`npm run benday`, lab); not yet judged on the Mac; 21a–21d open |
 | 22 | Spin the plate | Asked 2026-09-28: the dish turned on command and by itself, at a rate or with the tempo. 22a, the Spin tool, Auto Spin (Off, Rate, Tempo) and Reverse Spin, with the liquid dragged round by the glass through the gap, **shipped** (#223; `npm run dish`, `npm run turntable`), not yet judged on the Mac (`docs/judging.md` §28). 22h, the look's own turning (motor, music, flick) on the same dish, so a flicked plate of water trails the glass, **shipped** (#252; `npm run turntable`, `npm run flick`); 22j, the motor's stir in the middle replaced by the dish and the looks' motors retuned to match, **shipped** (#261; `npm run turntable` 15); 22k, what the swirl costs on the looks it now runs on, measured on the Mac and cut to a third on a thin plate, **shipped** (#258; `npm run swirlcost`); 22b–22g, 22i, 22l, 22m open |
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
-| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-2 to 34a-5 open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
+| 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-5's words shipped; 34a-2 to 34a-4 and the share card open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 | 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
@@ -9101,9 +9101,10 @@ a grid of generic stock thumbnails: ours are the plate itself.
   prices and says "Buying opens soon". When 23's webhook issues a key from a test purchase, the
   tier cards get Buy buttons (`CHECKOUT_HOME_URL`, `CHECKOUT_PRO_URL` in `lib/tierGates.ts`) and
   the "opens soon" line goes. Until a test purchase has been made, no button.
-- **34a-5. The owner's words and the share card.** *(S; owner.)* "From the maker" and the refund
-  line are drafts in plain words for the owner to rewrite or sign. `og-card.png` is still the old
-  card; a new one would be the hero's frame with the name and the one line.
+- **34a-5. The owner's words and the share card.** *The words shipped (2026-10-28, the owner's OK
+  on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
+  the old card; a new one would be the hero's frame with the name and the new headline. The maker
+  note goes unsigned unless the owner says otherwise.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
