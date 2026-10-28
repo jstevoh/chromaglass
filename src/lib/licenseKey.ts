@@ -1,5 +1,7 @@
 // Client-side Ed25519 licence key verification and state (PLAN.md §23: 23.2, 23.4, 23.5, 23.6, 23.11, 23.12).
 
+import { askForSeat, releaseSeat, seatRefusal, type SeatAnswer } from './macSeat';
+
 export type LicenseTier = 'free' | 'home' | 'pro';
 
 export interface LicensePayload {
@@ -23,6 +25,8 @@ export interface LicenseStatus {
   machines?: number;
   maxMachines?: number;
   error?: string;
+  /** A sentence for the door when `error` alone is not enough: which Macs hold the seats (PLAN.md 23.17g). */
+  detail?: string;
 }
 
 const STORAGE_KEY_TOKEN = 'chromaglass:license-key';
@@ -284,6 +288,64 @@ export async function retireStoredLicenseKey(id: string | null): Promise<void> {
   }
 }
 
+/**
+ * The licence Worker's address when this page is the Mac app's, and only then
+ * (PLAN.md 23.17g): the app is the one thing sold per machine, and the site's
+ * keys have never been seat-counted. Null on the site, in a local build with no
+ * Worker, and in a check that has not set one.
+ */
+function seatWorker(): string | null {
+  if (import.meta.env?.VITE_MAC_APP !== '1') return null;
+  const url = import.meta.env?.VITE_FIREBASE_LICENSES_URL as string | undefined;
+  return url ? url : null;
+}
+
+/** This Mac's name for the Worker's seat count, from the app's own server (server-license.js). */
+async function readSeat(): Promise<{ seatId: string; label: string; key: string | null; id: string | null; seatConfirmed: boolean } | null> {
+  try {
+    const res = await fetch('/license-info.json', { cache: 'no-store' });
+    if (!res.ok) return null;
+    const info = (await res.json()) as { seatId?: string; label?: string; key?: string | null; id?: string | null; seatConfirmed?: boolean };
+    return typeof info.seatId === 'string' && info.seatId
+      ? { seatId: info.seatId, label: typeof info.label === 'string' ? info.label : 'this Mac', key: info.key ?? null, id: info.id ?? null, seatConfirmed: info.seatConfirmed === true }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function seatRefused(a: SeatAnswer): LicenseStatus | null {
+  const detail = seatRefusal(a);
+  if (!detail) return null;
+  return { ...FREE_STATUS, error: a.state === 'full' ? 'machine-limit' : 'revoked', detail };
+}
+
+/**
+ * A key the Worker has not seated here yet, asked again (PLAN.md 23.17g). A key
+ * typed in offline opens the app on its signature; this is the next start that
+ * is online, or the account sync. "Seated" is filed with the app's server for
+ * the starts after; "full" or "revoked" takes the key off this Mac from its
+ * next start, never out from under a running show (retireStoredLicenseKey).
+ */
+export async function confirmHeldSeat(): Promise<void> {
+  const worker = seatWorker();
+  if (!worker) return;
+  const seat = await readSeat();
+  if (!seat || !seat.key || seat.seatConfirmed) return;
+  const answer = await askForSeat(worker, seat.key, seat.seatId, seat.label);
+  if (answer.state === 'seated') {
+    try {
+      await fetch('/license-activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: seat.key, seatConfirmed: true }),
+      });
+    } catch { /* the next start asks again */ }
+  } else if (answer.state === 'full' || answer.state === 'revoked') {
+    await retireStoredLicenseKey(seat.id);
+  }
+}
+
 export async function activateLocalLicenseKey(token: string): Promise<LicenseStatus> {
   const res = await verifyLicenseKey(token);
   if (!res.valid) {
@@ -291,11 +353,27 @@ export async function activateLocalLicenseKey(token: string): Promise<LicenseSta
   }
   let machines = 1;
   let maxMachines = res.payload.maxMachines;
+  // Ask the Worker for this Mac's seat before the key is filed (PLAN.md 23.17g).
+  let seated = false;
+  const worker = seatWorker();
+  if (worker) {
+    const seat = await readSeat();
+    if (seat) {
+      const answer = await askForSeat(worker, token.trim(), seat.seatId, seat.label);
+      const refused = seatRefused(answer);
+      if (refused) return refused;
+      if (answer.state === 'seated') {
+        seated = true;
+        machines = answer.machines;
+        maxMachines = answer.maxMachines;
+      }
+    }
+  }
   try {
     const srv = await fetch('/license-activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: token.trim() }),
+      body: JSON.stringify({ key: token.trim(), ...(seated ? { seatConfirmed: true } : {}) }),
     });
     if (srv.ok) {
       const body = (await srv.json()) as {
@@ -327,6 +405,14 @@ export async function activateLocalLicenseKey(token: string): Promise<LicenseSta
 }
 
 export async function deactivateLocalLicenseKey(): Promise<void> {
+  // Give the Worker's seat back first (PLAN.md 23.17g), or the key would stay
+  // counted against a Mac it no longer opens, and the buyer's third Mac be
+  // refused for a seat nobody holds.
+  const worker = seatWorker();
+  if (worker) {
+    const seat = await readSeat();
+    if (seat?.key) await releaseSeat(worker, seat.key, seat.seatId);
+  }
   try {
     await fetch('/license-deactivate', { method: 'POST' });
   } catch {
@@ -344,6 +430,7 @@ export async function syncServerLicense(): Promise<LicenseStatus> {
         tier?: LicenseTier;
         key?: string | null;
         token?: string | null;
+        seatConfirmed?: boolean;
         payload?: LicensePayload | null;
         machines?: string[] | number;
         maxMachines?: number;
@@ -354,6 +441,7 @@ export async function syncServerLicense(): Promise<LicenseStatus> {
         const verified = await verifyLicenseKey(rawKey);
         if (verified.valid) {
           const machineCount = Array.isArray(info.machines) ? info.machines.length : info.machines;
+          if (info.seatConfirmed === false) void confirmHeldSeat().catch(() => {});
           return recordVerifiedLicense(rawKey, verified.payload, machineCount, info.maxMachines);
         }
       }
