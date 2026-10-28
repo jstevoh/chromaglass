@@ -5926,6 +5926,13 @@ commit. *Size:* S.
 ### 19w. A fifth Mac shard, so no shard runs near its timeout
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
 
+#### 19w-2. The plate shard is back near its timeout (2026-10-28)
+The plate shard took 18.5 minutes on PR #540's run 40683027073 and 16.7 on main's deploy
+40655786829, against `timeout-minutes: 20`. On #540's run 40697987644 it was cancelled at
+20:21, inside `npm run fx`, with nothing red before it, on a PR that changed no file the shard
+runs. That is past 19w's "about 15 minutes" line. Even the shards again from `scripts/checks.json`
+(`npm run macqueue` for the times) before a sixth.
+
 #### 19w-1. The deploy gate counts the fifth shard
 **Shipped** (2026-10-17): `deploygate.sh` wanted exactly four green shards by name, so after 19w it trusted no PR run and every deploy re-ran the whole Mac, about 55 minutes from merge to live. It now reads the shard names from `checks.yml`'s matrix; replayed on the last 20 merges, the deploys it trusts went from 0 (plus 2 by rule 5) to 4 (plus 1). The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
