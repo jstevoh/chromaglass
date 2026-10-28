@@ -112,13 +112,53 @@ jobs:
   # `disjoint`, when the PR's run passed the Mac on an older main and the site
   # files it changed are not ones main changed since. Then Measure runs on the
   # exact tree and the Mac shards do not; the reasons are in deploygate.sh.
+  #
+  # Since PLAN.md 19ah the Mac shards can run on the owner's own Mac (a
+  # self-hosted runner labelled `owner-mac`) instead of GitHub's, when `mac`
+  # below finds it online and idle. On the 13 deploys of the fortnight to
+  # 2026-10-28 that ran the Mac shards, a shard waited a mean 50 minutes for a
+  # GitHub Mac (the slowest of the five, 80), for about 17 minutes of work, and
+  # such a deploy took 124 minutes from push to live. `checks` waits for the
+  # answer but never for the Mac: a probe that fails, finds no token, or finds
+  # the Mac asleep or busy names no shards, and every shard runs on GitHub's.
+  mac:
+    name: Is the owner's Mac free
+    needs: verified
+    if: ${{ needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' && needs.verified.outputs.tested != 'disjoint' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Where MAC_RUNNER_PROBE lives: an environment that only main can use, as
+    # firebase-live is, so a branch's workflow cannot read the token. It reads
+    # the repository's runners (fine-grained, this repository only,
+    # Administration: read) and nothing else; it cannot register a runner.
+    environment: mac-runner
+    permissions:
+      contents: read
+    outputs:
+      shards: ${{ steps.probe.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: probe
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.MAC_RUNNER_PROBE }}
+          MAC_SHARDS: ${{ vars.OWNER_MAC_SHARDS }}
+        run: node scripts/macrunner.mjs
+
   checks:
     name: Checks
-    needs: verified
-    if: ${{ needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' }}
+    needs: [verified, mac]
+    # Written out with `!cancelled()` because `mac` is skipped whenever the
+    # Mac shards will not run, and a job whose need was skipped is skipped
+    # with it unless its condition says otherwise. `verified` must still have
+    # succeeded, as the implicit condition required before.
+    if: >-
+      ${{ !cancelled() && needs.verified.result == 'success' &&
+          needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' }}
     uses: ./.github/workflows/checks.yml
     with:
       mac: ${{ needs.verified.outputs.tested != 'disjoint' }}
+      local: ${{ needs.mac.outputs.shards || '[]' }}
 
   deploy:
     name: Build and deploy

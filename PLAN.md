@@ -6390,6 +6390,32 @@ advisories.
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
 
+### 19ah. The owner's Mac runs main's deploy shards (2026-10-28)
+
+Asked 2026-10-28: the owner's Mac helping CI as much as it safely can. A deploy that reaches
+the GPU waited a mean 50 minutes per Mac shard for GitHub's macOS machines (13 such deploys
+in 14 days, slowest shard's wait 80 minutes, 17 minutes of work per shard), 124 minutes
+push to live. Built: a probe job in `deploy.yml` (`scripts/macrunner.mjs`, a fine-grained
+token with Administration: Read in the main-only `mac-runner` environment) lists the
+shards the owner's Mac may take when a runner labelled `owner-mac` is online and idle;
+`checks.yml` sends those to it, never a pull request's run; each such shard first waits for
+the harness ports (`scripts/macports.sh`); `scripts/macrunner-setup.sh` installs the runner
+in `~/actions-runner` as the owner; `npm run macqueue` reports deploys by where their shards
+ran. How it works and how to pause it: `docs/mac-runner.md`.
+
+- **19ah-1. Open: measure it, then decide on a second machine.** After a week of deploys,
+  `npm run macqueue -- --hours 168` against the baseline above: push to live, and how often
+  the Mac was free. A second machine (the same script, a second runner on the same label)
+  pays off if deploys still wait for the Mac or go to GitHub's queue while it is busy.
+- **19ah-2. Open: a separate macOS user for the runner.** Jobs run as the owner and can read
+  the owner's signing keys and `gh` sign-in. Only main's reviewed workflow runs there, but a
+  user of its own (logged in, for the GPU) would take the reach away.
+- **19ah-3. Open: a shard queued for a Mac that went to sleep after the probe.** It waits
+  until the Mac wakes, or a day. A watchdog job that cancels and re-dispatches the deploy on
+  GitHub's machines after, say, 20 minutes in the queue would close it.
+- **19ah-4. Open: the by-hand Mac workflows** (`gallery`, `controls`, `pixels`, `film`) could
+  take the same probe and lane; they are the longest Mac jobs and queue the same way.
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show
