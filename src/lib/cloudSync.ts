@@ -28,7 +28,7 @@
  *
  * What does not sync, on purpose: what belongs to the machine and not to the
  * player. The projector's layout (`chromaglass-output`), the audio input and
- * source, MIDI ports, the desk's mode, the phone's screen, the licence and the
+ * source, MIDI ports, which desk tab is up, the phone's screen, the licence and the
  * sign-in. Nor the song memory in IndexedDB (fingerprints, song maps, recorded
  * performances), which is large and per room (PLAN 23.18-music).
  *
@@ -46,6 +46,7 @@ import { SEQUENCES_KEY } from './sequencer';
 import { SETS_KEY, SHOWS_KEY } from './songShows';
 import { CUSTOM_LIQUIDS_KEY } from './liquidFile';
 import { TOOL_AMOUNTS_KEY } from './toolAmount';
+import { TABS_KEY } from './deskTabs';
 
 export interface SyncStoreSpec {
   /** The store's name on the wire (server/cloud-sync.js SYNC_STORES). */
@@ -77,6 +78,13 @@ export const SYNC_STORES: SyncStoreSpec[] = [
   { name: 'toolAmounts', key: TOOL_AMOUNTS_KEY, kind: 'one' },
   { name: 'musicSettings', key: 'chromaglass-music-settings', kind: 'one' },
   { name: 'followSongs', key: 'chromaglass-follow-songs', kind: 'one' },
+  // The desk's tabs and the panels in each (PLAN 8-tabs-a), kept whole, in order: a
+  // venue's Setup tab made on the laptop is the phone's too. Which tab is up
+  // (`chromaglass-desk-mode`) is not in it, that is the machine's. Whole, because
+  // the order of the chips is part of it and a list kept by id would lose that;
+  // the price is that two tab lists edited on two devices before either synced
+  // leave the later one (PLAN 8-tabs-a-1).
+  { name: 'deskTabs', key: TABS_KEY, kind: 'one' },
 ];
 
 export const SYNC_META_KEY = 'chromaglass-cloud-sync';

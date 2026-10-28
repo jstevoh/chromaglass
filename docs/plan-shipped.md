@@ -1090,6 +1090,25 @@ follows a source at a depth through the patch bay (`sceneMap.ts`), and an action
 on a source's onset, on the predicted beat once the clock is locked (64 ms ahead of the
 heard kick on the test song; `npm run learn`, 30/30). A beat cannot press a toggle.
 
+#### 8-tabs-a. The tabs go with the account (2026-10-28)
+
+The desk's tab list (`chromaglass-desk-tabs`) is a synced store, `deskTabs`, in
+`src/lib/cloudSync.ts` and `server/cloud-sync.js`, so a Setup tab made for a venue on
+the laptop is the phone's and the Mac app's. Nothing in the desk learned about the
+cloud: the sync scan stamps the key like any other and `useDeskTabs` reads it again
+when the cloud writes it (`useCloudSyncReload`), because a list held in state and
+saved over the new one would read, to the next scan, as this device overruling it.
+It is kept whole, as one value, not a list by tab id: the order of the chips is part
+of it, and a list by id would lose the order. The price is that two tab lists edited
+on two devices before either syncs leave the later one (8-tabs-a-1). The tab that is
+up (`chromaglass-desk-mode`) stays each machine's own: the phone is on Perform while
+the laptop is on Setup. The shipped three are stored as nothing, so "Put the shipped
+tabs back" removes the key and that is a deletion the cloud takes and the other
+devices follow. `npm run cloudsync` 14a to 14c: renamed, moved and added tabs arrive
+on a second device in order and with the same panels, which tab is up does not
+travel, the reset travels, and a value that is not tabs loads as the shipped three.
+Judging §89.
+
 #### 8-v2. Desk v2: one desk, three layouts (2026-10-10)
 
 `src/components/desk/Desk.tsx`, `DeskPanels.tsx`, `PanelBrowser.tsx` (new),

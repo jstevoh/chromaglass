@@ -35,6 +35,9 @@
  *  11. a record stamped a day ahead cannot win for ever;
  *  13. a look too large for the cloud is reported, not re-sent every manifest,
  *      and goes once it is edited down; an item with the id `toString` syncs;
+ *  14. the desk's tabs (PLAN 8-tabs-a): a renamed, reordered and added tab on A
+ *      is the same list on B, and a reset to the shipped three travels too; which
+ *      tab is up stays each machine's own;
  *  12. every synced key is still the key its module saves under, every store the
  *      device sends is one the server takes, and every key held in React state
  *      is read again when the cloud writes it (cloudSync.ts says why that matters).
@@ -49,6 +52,7 @@ import { loadSetList, saveSetList, SETLIST_KEY } from '../src/lib/setList.ts';
 import { loadUserSequences, saveUserSequences } from '../src/lib/sequencer.ts';
 import { loadMidiMap, saveMidiMap, MIDI_FORMAT } from '../src/lib/midi.ts';
 import { loadToolAmounts, saveToolAmounts } from '../src/lib/toolAmount.ts';
+import { loadTabs, saveTabs, renameTab, moveTab, addTab, defaultTabs, TABS_KEY, TAB_KEY } from '../src/lib/deskTabs.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
 const results = [];
@@ -355,13 +359,55 @@ check(
   );
 }
 
+// ── 14. The desk's tabs travel with the account ───────────────────────────
+
+{
+  const C = device('laptop');
+  const D = device('phone');
+  C.use();
+  let t = renameTab(loadTabs(), 'setup', 'Venue');
+  t = moveTab(t, 'setup', -2);
+  t = addTab(t, { name: 'Late set', copyOf: 'perform' }).tabs;
+  saveTabs(t);
+  C.storage.setItem(TAB_KEY, 'sequence');
+  D.use();
+  D.storage.setItem(TAB_KEY, 'perform');
+  await C.sync.sync(true);
+  await D.sync.sync(true);
+  D.use();
+  const onD = loadTabs();
+  const shape = (l) => l.map((x) => `${x.id.startsWith('tab-') ? 'new' : x.id}:${x.name}`).join(' | ');
+  const copied = onD.find((x) => x.name === 'Late set');
+  const arrived = shape(onD) === shape(t) && JSON.stringify(copied?.layout) === JSON.stringify(t.find((x) => x.name === 'Late set').layout);
+  check(
+    "14a. tabs renamed, moved and added on A are the same list, in the same order, with the same panels, on B; which tab is up stays B's own",
+    arrived && D.storage.getItem(TAB_KEY) === 'perform' && C.storage.getItem(TAB_KEY) === 'sequence',
+    `A ${shape(t)}; B ${shape(onD)}; B up ${D.storage.getItem(TAB_KEY)}`,
+  );
+  // Back to the shipped three on A: storage holds nothing, and that goes to B.
+  C.use();
+  saveTabs(defaultTabs());
+  await sleep(5);
+  await C.sync.sync(true);
+  await D.sync.sync(true);
+  D.use();
+  check(
+    '14b. putting the tabs back to the shipped three on A puts them back on B',
+    C.storage.getItem(TABS_KEY) === null && D.storage.getItem(TABS_KEY) === null && shape(loadTabs()) === shape(defaultTabs()),
+    `B ${shape(loadTabs())}, B stored ${D.storage.getItem(TABS_KEY)}`,
+  );
+  // A list the cloud holds that is not a list of tabs is read as the shipped three, not a crash.
+  D.storage.setItem(TABS_KEY, '{"v":1,"tabs":"junk"}');
+  check('14c. a tabs value that is not tabs loads as the shipped three', shape(loadTabs()) === shape(defaultTabs()));
+}
+
 // ── 12. The wiring ────────────────────────────────────────────────────────
 
 {
   // Bundled into node_modules/.cache, so paths are from the repository root, where npm runs it.
   const read = (p) => readFileSync(p, 'utf8');
   const app = read('src/App.tsx');
-  const sources = ['src/App.tsx', 'src/hooks/useUserPresets.ts', 'src/hooks/useShowSequencer.ts', 'src/hooks/useMidi.ts'].map(read).join('\n');
+  const sources = ['src/App.tsx', 'src/hooks/useUserPresets.ts', 'src/hooks/useShowSequencer.ts', 'src/hooks/useMidi.ts', 'src/hooks/useDeskLayout.ts'].map(read).join('\n');
   const reloadBlocks = [...sources.matchAll(/useCloudSyncReload\(\{([\s\S]*?)\}\);/g)].map((m) => m[1]).join('\n');
   // The keys App.tsx keeps to itself are still the keys it saves under.
   const appKeys = ['chromaglass-music-settings', 'chromaglass-follow-songs'].filter((k) => app.includes(`'${k}'`));
@@ -369,7 +415,7 @@ check(
   const keyNames = {
     presets: 'USER_PRESETS_KEY', sequences: 'SEQUENCES_KEY', sets: 'SAVED_SETS_KEY', setlist: 'SETLIST_KEY',
     songShows: 'SHOWS_KEY', actionSets: 'SETS_KEY', liquids: 'CUSTOM_LIQUIDS_KEY', midiMap: 'MIDI_MAP_KEY',
-    toolAmounts: 'TOOL_AMOUNTS_KEY', musicSettings: 'MUSIC_SETTINGS_KEY', followSongs: "'chromaglass-follow-songs'",
+    toolAmounts: 'TOOL_AMOUNTS_KEY', musicSettings: 'MUSIC_SETTINGS_KEY', followSongs: "'chromaglass-follow-songs'", deskTabs: 'TABS_KEY',
   };
   const unreloaded = SYNC_STORES.filter((s) => !reloadBlocks.includes(`[${keyNames[s.name]}]`) && !reloadBlocks.includes(`${keyNames[s.name]}:`)).map((s) => s.name);
   const notServed = SYNC_STORES.map((s) => s.name).filter((n) => !SERVER_STORES.includes(n));

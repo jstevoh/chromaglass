@@ -1940,3 +1940,17 @@ Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Tr
 4. Bad: a control you used under Build, Gig, Load-in, Sequence or Sound that you cannot find now on any tab or in
    + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
 5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?
+
+## 89. A tab made on the laptop is on the phone (PLAN 8-tabs-a)
+
+Signed in to the Pro account on two devices (the laptop and the Mac app, or the phone):
+
+1. On the laptop, press the pencil beside the tabs, rename Setup to the venue's name, move it first, and add a tab
+   with a panel or two on it.
+2. On the second device, press *Sync now* in Profile & Store (or wait a minute). The chips are the same, in the same
+   order, with the same panels. The tab that was up on each device is still the one that was up.
+3. On the phone: More › Tabs shows the same list.
+4. On the laptop, "Put the shipped tabs back": the other device is back to Perform, Sequence, Setup.
+
+Bad: a tab that comes back after being deleted, the other device jumping to another tab while it is in use, or the
+plate stuttering when the list lands mid-show.

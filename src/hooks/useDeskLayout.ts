@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DeskLayout } from '../lib/deskLayout';
+import { useCloudSyncReload } from '../lib/cloudSyncApp';
 import {
-  TAB_KEY, addTab, baseLayout, defaultTabs, deleteTab, loadTabId, loadTabs, moveTab, renameTab, saveTabs, setTabLayout,
+  TABS_KEY, TAB_KEY, addTab, baseLayout, defaultTabs, deleteTab, loadTabId, loadTabs, moveTab, renameTab, saveTabs, setTabLayout,
   type DeskTab,
 } from '../lib/deskTabs';
 
@@ -37,6 +38,18 @@ export function useDeskTabs() {
     setTabs(next);
     return next;
   }, []);
+
+  // The account's tabs, written into storage by the cloud (lib/cloudSync.ts): read
+  // again, or the next edit here would save the old list over them, and the scan
+  // would read that as this device overruling the new one. The tab that is up
+  // stays up if the new list still has it, else `current` below picks the first.
+  useCloudSyncReload({
+    [TABS_KEY]: () => {
+      const next = loadTabs();
+      latest.current = next;
+      setTabs(next);
+    },
+  });
 
   // A tab taken away under the one that is up hands over to its neighbour.
   const current = tabs.some(t => t.id === tab) ? tab : tabs[0].id;
