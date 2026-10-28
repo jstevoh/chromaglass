@@ -20,7 +20,7 @@
  * and where it came from; the page credits the CC BY ones under the clip), and
  * only the few seconds each clip uses leave this script. The full tracks are
  * fetched from the Internet Archive into `landing-takes/music/` the first time
- * (checked by size), served for the take at `/music/landing/`, and never added
+ * (checked by size), handed to the player as a visitor's own file, and never added
  * to the repository: the show's own shelf (`musicLibrary.ts`) is not changed.
  * `LF_MUSIC=/dir` uses tracks already there instead of downloading them.
  *
@@ -43,7 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { launchChromium } from './chromium.mjs';
 import { engineQuery } from './frame.mjs';
-import { AUTOPLAY, withBand, recordTake, untilRunning } from './recorder.mjs';
+import { AUTOPLAY, withBand, recordTake, untilRunning, viaPalette } from './recorder.mjs';
 
 const PORT = Number(process.env.LF_PORT ?? 4361);
 const TAKES = path.resolve(process.env.LF_OUT ?? 'landing-takes');
@@ -85,7 +85,7 @@ const CLIPS = [
   { id: 'hero', look: 'jellyfish-bloom', track: 'sun', from: 255, seconds: 12, fold: 2, loop: true, width: 1280, crf: 38, crfMp4: 27, seed: 3 },
   { id: 'ferrofluid', look: 'ferro-paint', track: 'beat', from: 100, seconds: 8, width: 960, crf: 42, crfMp4: 31, seed: 5 },
   { id: 'dye-pour', look: 'poster-1969', track: 'aria', from: 150, seconds: 8, width: 960, crf: 42, crfMp4: 31, seed: 2 },
-  { id: 'macro', look: 'macro-bead', track: 'fire', from: 232, seconds: 8, width: 800, fps: 20, crf: 58, crfMp4: 38, seed: 1 },
+  { id: 'macro', look: 'macro-bead', track: 'fire', from: 232, seconds: 8, width: 800, fps: 20, crf: 61, crfMp4: 38, seed: 1 },
 ];
 
 /** Fetch whatever of TRACKS is not in MUSIC yet, holding each to its size. */
@@ -174,9 +174,6 @@ if (ENCODE_ONLY) {
 
 const wanted = [...new Set(CLIPS.filter(c => !ONLY || ONLY.includes(c.id)).map(c => c.track))];
 await fetchTracks(wanted);
-// vite preview serves dist/ as it is on disk, so the tracks go in beside the build.
-fs.mkdirSync('dist/music/landing', { recursive: true });
-for (const k of wanted) fs.copyFileSync(path.join(MUSIC, TRACKS[k].file), path.join('dist/music/landing', TRACKS[k].file));
 
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
@@ -211,11 +208,18 @@ try {
       if (!running.ok) throw new Error('the show never ran steadily');
       // The music, from where the clip wants it; a new song must not cue another look over this one.
       await page.evaluate(() => window.chromaglassSettings?.({ onNewSong: 'off' }));
-      // Start the app's own player (any shelf track), then put the clip's piece in its audio element: the
-      // analyser is wired to that element, so the plate hears the swapped-in file.
-      await page.evaluate(() => window.chromaglassMusic('/music/ambisphere-c.mp3'));
-      await page.waitForFunction(() => { const a = document.querySelector('audio'); return a && !a.paused && a.currentTime > 0; }, null, { timeout: 20000 });
-      await page.evaluate(async (src) => { const a = document.querySelector('audio'); a.src = src; await a.play(); }, `/music/landing/${TRACKS[clip.track].file}`);
+      // The clip's piece goes in the way a visitor's own file does, through the
+      // Sound sheet's file input (Settings: Sound, then its "Change in Sound…";
+      // the player bar's own input is not mounted at the laptop size), so the app captures the element's stream after the
+      // piece is in it. It used to start a shelf track and then swap the
+      // element's src underneath the app: Chrome's captured stream then carries
+      // both sources' audio tracks, and MediaRecorder given two audio tracks
+      // hands back an empty file, so every take failed with "no download"
+      // (measured 2026-10-28: tracks audio, audio, video; one dataavailable).
+      await viaPalette(page, 'Settings: Sound');
+      await page.getByRole('button', { name: 'Change in Sound…' }).click();
+      await page.locator('[data-testid="sound-file-input"]').setInputFiles(path.join(MUSIC, TRACKS[clip.track].file));
+      for (let i = 0; i < 3 && await page.locator('[data-testid="sound-panel"]').count(); i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
       await page.waitForFunction(() => { const a = document.querySelector('audio'); return a && !a.paused && a.currentTime > 0; }, null, { timeout: 20000 });
       await page.evaluate((s) => { const a = document.querySelector('audio'); if (a) a.currentTime = s; }, clip.from);
       await page.waitForTimeout(WARM * 1000);
