@@ -73,7 +73,7 @@ function sniff(buf) {
 
 export async function appPart(check) {
   const server = await serve();
-  const browser = await launchChromium(chromium, { headless: true, present: true });
+  const browser = await launchChromium(chromium, { headless: true, present: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   const dir = process.env.CLIP_KEEP ? (fs.mkdirSync(process.env.CLIP_KEEP, { recursive: true }), process.env.CLIP_KEEP) : fs.mkdtempSync(path.join(os.tmpdir(), 'clip-'));
   try {
     /**
@@ -90,6 +90,33 @@ export async function appPart(check) {
           if (o) localStorage.setItem('chromaglass-recorder-options', JSON.stringify(o));
           localStorage.setItem('chromaglass-desk-mode', 'perform');
         } catch { /* */ }
+        /*
+          The microphone, stood in for: a stream from a page AudioContext. The
+          Mac's headed Chromium has no fake capture device the way the Linux
+          one does, so a clip recorded there had no audio track and the check
+          read "silent"; the sound being in the file is what is asserted, not
+          which device it came from.
+        */
+        // And the app's remembered microphone opens only where the browser says it is already granted.
+        const query = navigator.permissions?.query?.bind(navigator.permissions);
+        if (query) navigator.permissions.query = async (d) => (d?.name === 'microphone' ? { state: 'granted', onchange: null } : query(d));
+        const md = navigator.mediaDevices;
+        const real = md.getUserMedia.bind(md);
+        md.getUserMedia = async (c) => {
+          if (c && c.audio && !c.video) {
+            const ac = new AudioContext();
+            const dest = ac.createMediaStreamDestination();
+            // A quiet room's hiss, as clicks.mjs stands one in: a track that carries samples.
+            const noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+            const d = noise.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = 0.01 * (Math.random() * 2 - 1);
+            const hiss = ac.createBufferSource();
+            hiss.buffer = noise; hiss.loop = true; hiss.connect(dest); hiss.start();
+            void ac.resume();
+            return dest.stream;
+          }
+          return real(c);
+        };
       }, options);
       await page.goto(URL + (phone ? '&phone=1' : '') + (free ? '&tierGates=1' : ''), { waitUntil: 'networkidle' });
       const canvasShape = () => page.evaluate(() => {
