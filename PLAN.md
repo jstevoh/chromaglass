@@ -5926,7 +5926,9 @@ commit. *Size:* S.
   pass`, `adapter: apple`, a heading over quoted lines, a CI job id beside the command), so a
   printed line now also counts in those forms, and by being in the command's own script's
   source; a sentence of the writer's own ("it passed on 2026-10-26", "24 checks green")
-  still does not. Found by the review: run over `scripts/checkguard.mjs` itself, `npm run
+  still does not. The code lives in `scripts/measured.mjs` (and the API reads in
+  `scripts/checkguard-api.mjs`), so `checkguard.mjs` stays inside its size ceiling (19ai-5).
+  Found by the review: run over `scripts/checkguard.mjs` itself, `npm run
   checkguard` still reads "it passed on 2026-10-26" as printed, because the self-test holds
   that sentence in a string literal; the lookup cannot tell a script's fixtures from what it
   prints (the other scripts' fixtures are the same risk, small, and the reviewer's re-run is
