@@ -280,7 +280,10 @@ const releaseJob = wf.slice(jobAt('release'));
 const create = /gh release create[^\n]*\\\n[^\n]*/.exec(releaseJob)?.[0] ?? '';
 check('the build job runs the check on the packed app', jobAt('build') > 0 && /\n\s+run: node scripts\/desktop\.mjs --packaged\n/.test(buildJob));
 check('the release job waits for the build job, check and all', jobAt('release') > jobAt('build') && /\n    needs: build\n/.test(releaseJob));
-check('it publishes only when asked, from main or a desktop-v tag', /\n    if: \$\{\{ \(inputs\.release && github\.ref == 'refs\/heads\/main'\) \|\| startsWith\(github\.ref, 'refs\/tags\/desktop-v'\) \}\}\n/.test(releaseJob));
+// Main only, since 2026-10-28: a pushed desktop-v tag no longer releases (its run
+// is the tag's own copy of the workflow, which no environment rule can trust;
+// `npm run cisecrets` holds the trigger).
+check('it publishes only when asked, from main', /\n    if: \$\{\{ inputs\.release && github\.ref == 'refs\/heads\/main' \}\}\n/.test(releaseJob));
 // What each job's token may do: its own permissions block, or else the
 // workflow's, or else (neither) the repository's default, which can be write.
 const top = wf.slice(0, wf.indexOf('\njobs:\n'));
