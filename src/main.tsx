@@ -4,8 +4,10 @@ import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
 import { isPhoneApp } from './lib/appLink';
 import { SHOW_PATH, isLandingAddress } from './lib/showPath';
+import { macAppLicensed } from './lib/macApp';
 import { requestGpuEarly } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
+import { installTitleTips } from './lib/titleTips';
 import {
   isSignedInCached,
   hasEmailSignInLink,
@@ -14,6 +16,7 @@ import {
   hasStoredLicenseCandidateSync,
   verifyStoredLicenseOnLoad,
   requiresDesktopSignInSync,
+  requiresPaidLicenceSync,
   stripEmailSignInParams,
   clearPendingEmail,
 } from './lib/authFlag';
@@ -33,6 +36,10 @@ if (show) requestGpuEarly();
 // The intro `index.html` painted, listened to from here on: a key or a press
 // on it takes it away, and the plate's first frame does (lib/intro.ts).
 installIntro(show);
+// Every `title=` waits the app's hover delay, not the browser's (PLAN.md 8j-3);
+// here rather than in App so the landing page and sign-in get it too. The
+// remote and the cast page are for a phone or a wall and keep what they have.
+if (show) installTitleTips(document);
 // The phone loads only the control surface — no visualizer, no solver.
 const Root = params.has('remote')
   ? lazy(() => import('./components/RemoteControl'))
@@ -44,6 +51,7 @@ const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./components/SignInScreen'))
   : null;
 const LazyLicenseGate = lazy(() => import('./components/LicenseGate'));
+const LazyAppLicenceGate = lazy(() => import('./components/AppLicenceGate'));
 // The page a first visit meets before the sign-in (PLAN.md 34a). Its own chunk,
 // with no Firebase and no engine in it.
 const LazyLanding = lazy(() => import('./components/Landing'));
@@ -216,7 +224,36 @@ function Loading() {
 
 const orSignIn = () => (hasValidLicenseSync() || isSignedInCached() ? 'app' : 'signin');
 
+/**
+ * The Mac app, and a browser on its server: the show opens on a Home or Pro
+ * key and on nothing less (PLAN.md 23.17d, components/AppLicenceGate.tsx). A
+ * licensed launch never sees the gate, not even for a frame: the key the app's
+ * shell verified at launch is read here, synchronously.
+ */
+function PaidGate() {
+  const [phase, setPhase] = useState<'app' | 'verifying-license' | 'gate'>(() =>
+    macAppLicensed() ? 'app' : hasStoredLicenseCandidateSync() ? 'verifying-license' : 'gate');
+  // A key in this browser's storage is checked against its signature before
+  // anything is drawn, so a licensed start shows the loading screen for that
+  // moment and never the gate (`npm run tiers` 7).
+  useEffect(() => {
+    if (phase !== 'verifying-license') return;
+    let cancelled = false;
+    void verifyStoredLicenseOnLoad()
+      .then(() => { if (!cancelled) setPhase(macAppLicensed() ? 'app' : 'gate'); })
+      .catch(() => { if (!cancelled) setPhase('gate'); });
+    return () => { cancelled = true; };
+  }, [phase]);
+  if (phase === 'app') return <Root />;
+  if (phase === 'verifying-license') return <Loading />;
+  return <LazyAppLicenceGate onUnlocked={() => setPhase('app')} />;
+}
+
 function Gate() {
+  return show && requiresPaidLicenceSync() ? <PaidGate /> : <SiteGate />;
+}
+
+function SiteGate() {
   const gateActive =
     show && (Boolean(import.meta.env.VITE_FIREBASE_API_KEY) || requiresDesktopSignInSync());
   const [phase, setPhase] = useState<'app' | 'verifying-license' | 'completing-link' | 'signin'>(() => {

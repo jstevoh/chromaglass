@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Sheet } from './ui';
+import { Sheet, LIT } from './ui';
 import { Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
 import { PRESETS, livePresetId, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
@@ -37,6 +37,8 @@ interface SequencerPanelProps {
   currentSong?: SongRef | null;
   onBindSong?: (seq: ShowSequence, song: SongRef | null) => void;
   onClose: () => void;
+  /** Drawn in a desk panel rather than as a sheet (`Sheet embed`). */
+  embed?: boolean;
 }
 
 /**
@@ -61,7 +63,7 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 const inputCls = 'bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none focus:border-white/40';
 
 export const SequencerPanel: React.FC<SequencerPanelProps> = ({
-  sequences, selectedId, onSelect, status, onPlay, onPause, onStop, onNext, onPrev, onGoTo, onSave, onRemove, hasSections, onClose,
+  sequences, selectedId, onSelect, status, onPlay, onPause, onStop, onNext, onPrev, onGoTo, onSave, onRemove, hasSections, onClose, embed = false,
   presets = PRESETS, onExport, onImportFile, currentSong = null, onBindSong,
 }) => {
   const selected = useMemo(() => sequences.find(q => q.id === selectedId) ?? sequences[0], [sequences, selectedId]);
@@ -121,7 +123,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
   // modes, so it opens in the middle of the screen rather than sliding in
   // over the cue list it is about to drive.
   return (
-    <Sheet title={<><Clapperboard size={16} /> Sequence</>} onClose={onClose} testId="sequencer-panel">
+    <Sheet embed={embed} title={<><Clapperboard size={16} /> Sequence</>} onClose={onClose} testId="sequencer-panel">
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide p-6">
       <p className="text-[10px] leading-relaxed opacity-40 mb-5">
         A script for the show instead of dice: stages that change the plate over a song or a set, each gliding into the next on a clock or when the song moves to a new section.
@@ -168,7 +170,7 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
               aria-checked={current || (editable && editIndex === i)}
               onClick={() => (isRunningThis ? onGoTo(i) : editable ? setEditIndex(editIndex === i ? null : i) : undefined)}
               className={`relative overflow-hidden text-left rounded-lg border px-3 py-2 transition-colors ${
-                current ? 'border-white/60 bg-white/10' : editIndex === i && editable ? 'border-white/40 bg-white/5' : 'border-white/10 bg-white/5 hover:bg-white/10'
+                current ? LIT : editIndex === i && editable ? 'border-lit bg-elevated' : 'border-white/10 bg-white/5 hover:bg-white/10'
               }`}
               data-testid={`seq-stage-${i}`}
             >

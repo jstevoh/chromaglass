@@ -931,6 +931,19 @@ try {
       check('every tab of the phone\'s Settings rail takes a tap where it is drawn',
         railCovered.tabs > 20 && railCovered.covered.length === 0,
         `${railCovered.tabs} tabs; ${railCovered.covered.length ? `covered: ${railCovered.covered.join(', ')}` : 'none covered'}`);
+      /*
+        And the strip names its groups (PLAN 35b). The seven headings were
+        drawn on the desk and hidden on a phone (`hidden ... sm:block`), so the
+        phone's rail was one flat run of tabs. Each heading is asked for its box
+        and its words, since a heading that is `display: none` has neither.
+      */
+      const headings = await page.evaluate(() => [...document.querySelectorAll('[data-testid^="rail-heading-"]')].map(h => {
+        const r = h.getBoundingClientRect();
+        return { id: h.dataset.testid.replace('rail-heading-', ''), w: Math.round(r.width), h: Math.round(r.height), text: h.textContent };
+      }));
+      check('the phone\'s Settings strip names the seven groups, each heading drawn',
+        headings.map(x => x.text).join() === 'Play,Pour,Feed,Motion,Chemistry,Look,Stage' && headings.every(x => x.w > 20 && x.h > 8),
+        headings.map(x => `${x.text} ${x.w}×${x.h}`).join(' · ') || 'no headings');
       await tap(page, 'settings-nav-patches');
       const mappings = () => page.evaluate(() => window.chromaglassDebug?.().settings?.sceneMappings ?? null);
       const patchesBefore = (await mappings())?.length ?? null;
@@ -1082,6 +1095,38 @@ try {
         gone && stillGone && (await visible(page, 'phone-dock')),
         !gone ? 'nothing was hidden' : !stillGone ? 'a drag brought them back' : '');
 
+      /*
+        The desk's tabs on the phone (PLAN 8-tabs): More › Tabs has the same
+        chips, each tab's panels stacked in the sheet. Setup's Wall is drawn in
+        place (its section, not a frame with nothing in it); Perform's bottles
+        are a button to the phone's own Dye sheet; a panel taken off goes, and
+        one put on from the list comes, and both are the desk's: the stored
+        tabs say so.
+      */
+      await tap(page, 'phone-open-more');
+      await tap(page, 'phone-tabs');
+      await page.waitForTimeout(400);
+      const chips = await page.locator('[data-testid="phone-sheet-tabs"] [data-testid^="mode-segmented-"]').count();
+      await tap(page, 'mode-segmented-setup');
+      await page.waitForTimeout(600);
+      const wallDrawn = await page.locator('[data-testid="phone-tab-panel-projectors"] [data-section="projectors"]').count();
+      await tap(page, 'phone-tab-remove-projectors');
+      const wallGone = !(await visible(page, 'phone-tab-panel-projectors'));
+      await tap(page, 'phone-tab-add');
+      await tap(page, 'phone-tab-add-projectors');
+      await page.waitForTimeout(400);
+      const wallBack = await visible(page, 'phone-tab-panel-projectors');
+      const stored = await page.evaluate(() => localStorage.getItem('chromaglass-desk-tabs'));
+      await tap(page, 'mode-segmented-perform');
+      await page.waitForTimeout(400);
+      const bottlesButton = await visible(page, 'phone-tab-open-bottles');
+      if (bottlesButton) await tap(page, 'phone-tab-open-bottles');
+      const dyeOpened = await visible(page, 'phone-sheet-dye');
+      if (dyeOpened) await tap(page, 'phone-sheet-scrim');
+      check('More › Tabs has the desk\'s three tabs; Setup draws its Wall in place, takes it off and puts it back; Perform\'s bottles open the Dye sheet',
+        chips === 3 && wallDrawn > 0 && wallGone && wallBack && (() => { try { return JSON.parse(stored).tabs.find(x => x.id === 'setup')?.layout?.deck?.includes('projectors') === true; } catch { return false; } })() && bottlesButton && dyeOpened,
+        `${chips} chips; Wall drawn ${wallDrawn}, off ${wallGone}, back ${wallBack}, stored ${!!stored}; bottles button ${bottlesButton}, Dye ${dyeOpened}`);
+
       // "Full layout" is the laptop's, for the visit.
       await tap(page, 'phone-open-more');
       await tap(page, 'phone-full-layout');
@@ -1154,6 +1199,38 @@ try {
 
     if (label === 'Play, portrait') {
       check('Play: the gesture hint is over the tray on a first visit', await visible(page, 'play-hint'));
+      // Starting and stopping a clip on Play does not widen the Record pill or shift Shuffle beside it (PLAN.md 19v-4).
+      {
+        const measureRec = () => page.evaluate(() => {
+          const b = (id) => { const r = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; };
+          const t = document.querySelector('[data-testid="play-record-timer"]') || document.querySelector('[data-testid="play-record"] span.font-mono');
+          return {
+            rec: b('play-record'),
+            shuf: b('play-shuffle'),
+            look: b('play-look'),
+            on: document.querySelector('[data-testid="play-record"]')?.getAttribute('aria-pressed') === 'true',
+            timer: t ? (t.textContent || '').trim() : null,
+          };
+        });
+        const recBefore = await measureRec();
+        await tap(page, 'play-record');
+        let recDuring = null;
+        for (let i = 0; i < 10; i++) { await page.waitForTimeout(150); recDuring = await measureRec(); if (recDuring.on) break; }
+        await tap(page, 'play-record');
+        let recAfter = null;
+        for (let i = 0; i < 10; i++) { await page.waitForTimeout(150); recAfter = await measureRec(); if (!recAfter.on) break; }
+        const moved = (a, b) => (a && b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y), Math.abs(a.w - b.w), Math.abs(a.h - b.h)) : Infinity);
+        const dr = Math.max(moved(recBefore.rec, recDuring?.rec), moved(recBefore.rec, recAfter?.rec));
+        const ds = Math.max(moved(recBefore.shuf, recDuring?.shuf), moved(recBefore.shuf, recAfter?.shuf));
+        const dl = Math.max(moved(recBefore.look, recDuring?.look), moved(recBefore.look, recAfter?.look));
+        const fmt = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)} ${b.w.toFixed(1)}×${b.h.toFixed(1)}` : 'none');
+        check('Play: Record\'s running timer takes no extra width, so Record, Shuffle and the look stay where they are',
+          !recBefore.on && !!recDuring?.on && /^\d+:\d\d$/.test(recDuring.timer ?? '') && !recAfter?.on
+            && dr <= 0.5 && ds <= 0.5 && dl <= 0.5,
+          `pressed ${recBefore.on} → ${recDuring?.on} (${recDuring?.timer ?? 'no timer'}) → ${recAfter?.on}; `
+          + `Record ${fmt(recBefore.rec)} → ${fmt(recDuring?.rec)} (${dr.toFixed(1)} px); `
+          + `Shuffle ${fmt(recBefore.shuf)} → ${fmt(recDuring?.shuf)} (${ds.toFixed(1)} px)`);
+      }
       // The sheet: from the handle, six sliders in 44 rows, the looks, the two chips, the three buttons.
       await tap(page, 'play-handle');
       const sheetUp = await visible(page, 'play-sheet');
@@ -1315,9 +1392,14 @@ try {
       // One that is not up already, or the pill would read right with nothing done.
       const other = page.locator('[data-testid="play-look-tile"][aria-pressed="false"]').nth(1);
       const name = (await other.locator('span').last().textContent())?.trim();
+      const trayAt = () => page.getByTestId('play-screen').locator('[data-testid="slide-tray"]').getAttribute('data-clicks').then(Number);
+      const trayBefore = await trayAt();
       await other.tap(); await page.waitForTimeout(2500);
       const pill = (await page.getByTestId('play-look').textContent())?.trim();
       check('Play: a look tapped in the strip is the look up', !!name && pill?.startsWith(name), `${name} / ${pill}`);
+      // One slot a push, whatever the distance (PLAN 35g): the changer lifts one slide.
+      const trayAfter = await trayAt();
+      check('Play: and the tray beside Looks clicked one slot for it, not none and not the distance', Math.abs(trayAfter - trayBefore) === 1, `${trayBefore} → ${trayAfter}`);
       const w0 = await page.getByTestId('play-wander').getAttribute('aria-pressed');
       await tap(page, 'play-wander');
       check('Play: Wander on its own turns Evolve on and off', (await page.getByTestId('play-wander').getAttribute('aria-pressed')) !== w0);
@@ -1527,8 +1609,23 @@ try {
       const errorsFrom = pageErrors.length;
       const liftFrom = await lift();
       await touch('touchStart', [{ ...A, id: 5 }]);
-      await settle(600);
-      const whileHeld = await lift();
+      /*
+        "Held" is the plate having pressed within RELEASE_MS (150 ms) of the
+        read, and the plate presses again on each of its steps while the
+        finger is down, so one read at 600 ms is a read of whether a step
+        happened in the last 150 ms: on a Mac stepping 12 to 23 times a
+        second a stall of that length is not rare. Two reds of 177 (10-24 and
+        10-25, both "held false over 10 steps" with the lift laid where the
+        finger was afterwards, so the press had reached the plate) were
+        that. Read six times across the same 600 ms, and held on four of the
+        six: a press laid once and never renewed is held for the first 150
+        ms and reads one or two of six; a stall costs the reads it covers.
+        The rest of the line reads the last sample as it read the one.
+      */
+      const holdReads = [];
+      for (let k = 0; k < 6; k++) { await settle(100); holdReads.push(await lift()); }
+      const whileHeld = holdReads[holdReads.length - 1];
+      const heldReads = holdReads.filter((r) => r.held).length;
       await touch('touchEnd', [{ ...A, id: 5 }]);
       await settle(900);
       const afterLift = await lift();
@@ -1570,9 +1667,9 @@ try {
         const last = afterLift.last;
         const near = !!last && !!ref.A && Math.hypot(last.x - ref.A.x, last.y - ref.A.y) <= 2;
         check('a finger holding the Press lifts nothing until it comes off, then the glass lifts into fingers where it was',
-          whileHeld.held && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
+          heldReads >= 4 && whileHeld.steps === 0 && liftFrom.last === null && whileHeld.last === null
             && afterLift.steps > 0 && near && last.cells > 0,
-          `held ${whileHeld.held} over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
+          `held on ${heldReads} of ${holdReads.length} reads over ${heldSteps} steps; ${afterLift.steps} lift steps after, the last at ${last ? `(${last.x}, ${last.y}), ${last.cells} cells` : 'none'} against the finger at ${ref.A ? `(${ref.A.x}, ${ref.A.y})` : '?'}`);
       }
       await settings({ fingering: 0 });
       await page.getByTestId('phone-tool-dropper').click();
@@ -1659,6 +1756,32 @@ try {
       const stateHeld = await plateState();
       await touch('touchEnd', [{ ...DA, id: 1 }, { ...DB, id: 2 }]);
       await settle(700);
+      /*
+        Not the plate's reader until it has spoken. All four reds of the 172
+        Mac runs from 2026-10-18 to 10-24 (19h-2) show the same thing in the
+        line below: 384² solvers #1 and #2 through the hold, 256² solvers #3
+        and #4 after it, so the governor stepped the grid down in the 700 ms
+        after the lift. A rebuilt solver opens on the plate its predecessor
+        handed it (`handOver`, on the GPU), but the CPU's copy that every
+        reader sees (`readDensity`) is a fresh array until its first
+        readback lands, and the snap below read that: "the plate gained −8
+        of 538" in the same line whose each-plate sums, read a moment later,
+        say 579. The dye was never lost, the check read the plate in the
+        frames before it could be read. So the snap waits for the same
+        solvers on two looks and three readbacks since the first of them (the
+        count is the plate's, and a new solver's first readback is among
+        them), up to three seconds; the bars and the cells are as they were.
+      */
+      {
+        let seen = null;
+        for (let k = 0; k < 30; k++) {
+          const st = await plateState();
+          const key = st.plates.map((p) => p.solver).join('/');
+          if (seen?.key !== key) seen = { key, rb: st.plates[0]?.readbacks ?? -1 };
+          else if ((st.plates[0]?.readbacks ?? -1) - seen.rb >= 3) break;
+          await settle(100);
+        }
+      }
       const after = await snap();
       const rb1 = await readbacks();
       const stateAfter = await plateState();

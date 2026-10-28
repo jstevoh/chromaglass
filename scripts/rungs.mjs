@@ -35,7 +35,8 @@
  * rung costs on a real GPU.
  */
 
-import { qualityLadder, canvasPixelsFor, effectiveLadderTier } from '../src/lib/platform';
+import { qualityLadder, canvasPixelsFor, effectiveLadderTier, isProLicenseUnlocked } from '../src/lib/platform';
+import { getEffectiveTier } from '../src/lib/tierGates';
 import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf, handValueAt } from '../src/lib/midi';
 import { readSetting } from '../src/lib/readout';
 import { QualityGovernor, STEP_RATES } from '../src/lib/governor';
@@ -588,6 +589,59 @@ for (const devicePx of [1, 1.5, 2, 3]) {
   }
 
   {
+    /*
+      Hunting (PLAN.md 14j). A machine that holds one rung and not the one
+      above it: a fill-bound laptop that draws 26 ms frames on its opening
+      rung and 16 ms one below, whatever the step rate. The governor gives
+      the rate up, then the rung, and is fast; ninety seconds on it offers the
+      rung again, drops frames for a second and a half finding it still too
+      slow, and comes back down. With the same ninety seconds every time that
+      was 38 rung changes in half an hour, a grid rebuilt both ways and four
+      seconds of stutter every minute and a half, for ever. Doubling the wait
+      each time the same rung fails again leaves the first retry where it
+      was (a load that went away is won back as soon as before) and makes
+      the fifth a matter of twenty-four minutes.
+    */
+    const hunt = (minutes, cooledAt = Infinity, burst = null) => {
+      const g = new QualityGovernor(rungs, 1, 0);
+      let now = 0;
+      const moves = [];
+      while (now < minutes * 60) {
+        const inBurst = burst !== null && now >= burst && now < burst + 4;
+        const ms = inBurst || (g.rungIndex <= 1 && now < cooledAt) ? 26 : 16;
+        now += ms / 1000;
+        if (g.sample(ms / 1000, 1, now, false, ms - 10)) moves.push({ at: now, index: g.rungIndex });
+      }
+      return { g, moves };
+    };
+    const { moves } = hunt(30);
+    const climbs = moves.filter((m, i) => i > 0 && m.index < moves[i - 1].index).map((m) => m.at);
+    const gaps = climbs.slice(1).map((t, i) => t - climbs[i]);
+    check('a rung that keeps failing is offered less and less often: at most 12 rung changes in 30 minutes',
+      moves.length <= 12, `${moves.length} changes; climbs at ${climbs.map((t) => t.toFixed(0)).join(', ')} s`);
+    check('each retry of it waits about twice the one before',
+      gaps.length >= 2 && gaps.slice(1).every((d, i) => d >= 1.8 * gaps[i]), gaps.map((d) => d.toFixed(0)).join(', ') + ' s apart');
+    check('and the first retry is as soon as it always was (under two minutes)',
+      climbs.length > 0 && climbs[0] < 120, climbs.length ? `${climbs[0].toFixed(0)} s` : 'never retried');
+    // The same machine cooling after ten minutes: the rung is still won back, within the longest wait.
+    const cooled = hunt(40, 600);
+    check('a machine that cooled gets its rung back within the longest wait (24 min)',
+      cooled.g.rungIndex <= 1 && cooled.moves.some((m) => m.at > 600 && m.index <= 1 && m.at < 600 + 24 * 60 + 30),
+      `on rung ${cooled.g.rungIndex} after 40 minutes; climbs after cooling at ${cooled.moves.filter((m) => m.at > 600 && m.index <= 1).map((m) => m.at.toFixed(0)).join(', ')} s`);
+    /*
+      And it forgets. The same hunt for half an hour, the machine cooling,
+      an hour held on the rung, then one four-second burst (a tab, a held
+      tool): the first version of the doubling remembered the half hour and
+      waited 24 minutes to climb back (the check-skeptic's model). Ten
+      minutes held clears the count, so it is the first retry's wait again.
+    */
+    const burst = hunt(100, 1800, 5400);
+    const back = burst.moves.find((m) => m.at > 5404 && m.index <= 1);
+    check('a rung held for an hour and lost to a 4 s burst is back within 150 s',
+      back !== undefined && back.at - 5400 <= 150, back ? `back ${(back.at - 5400).toFixed(0)} s after the burst` : 'not back in 100 minutes');
+  }
+
+  {
     // `?rung=` holds the whole rung for measuring. It has to hold the rate
     // too, or a measurement of a rung is a measurement of something else.
     const g = new QualityGovernor(rungs, 1, 0, true);
@@ -763,6 +817,43 @@ for (const devicePx of [1, 1.5, 2, 3]) {
       pro1x[0].grid === 1024,
     `hosted 2x top=${hostedRetina[0].grid}²@${hostedRetina[0].dpr}x, Pro 2x top=${proRetina[0].grid}²@${proRetina[0].dpr}x, Pro 1x top=${pro1x[0].grid}²@${pro1x[0].dpr}x`,
   );
+}
+
+// ── Every Pro gate reads the tier the Account pill reads (the owner, 2026-10-25) ──
+// The Mac app's pill said PRO while the Simulation card beside it sold him Pro:
+// the pill asked getEffectiveTier(), the card and the ladder asked for a
+// licence key alone. The page is stood in for by a bare `window` carrying what
+// each build has: nothing gated (the Mac app, a local show), a gated site with
+// no key, and a gated site whose native bridge holds a Pro licence. In each,
+// the gate the panel asks (`isProLicenseUnlocked`), the pill's tier and the
+// ladder the governor climbs must say the same thing, and the answers must
+// differ between the builds, or this would pass for want of anything to tell
+// apart. (The panel's own card is a one-line `!isProLicenseUnlocked()`; a
+// browser check of it stalled on the forced step-down not holding on software
+// WebGPU, so it is read here, at the function the card calls.)
+{
+  const saved = globalThis.window;
+  const builds = [
+    ['nothing gated, no key', {}, 'pro', 'local'],
+    ['gated site, no key', { __CHROMAGLASS_NATIVE__: { license: { valid: false, tier: 'free', enforced: true } } }, 'free', 'hosted'],
+    ['gated app holding a Pro licence', { __CHROMAGLASS_NATIVE__: { license: { valid: true, tier: 'pro', enforced: true } } }, 'pro', 'local'],
+    ['gated app holding a Home licence', { __CHROMAGLASS_NATIVE__: { license: { valid: true, tier: 'home', enforced: true } } }, 'home', 'hosted'],
+  ];
+  const seen = [];
+  for (const [name, bridge, tier, ladder] of builds) {
+    globalThis.window = { location: { search: '' }, ...bridge };
+    const pill = getEffectiveTier();
+    const gate = isProLicenseUnlocked();
+    const climbs = effectiveLadderTier('hosted');
+    const top = ladderAt(climbs, 'strong', 2).rungs[0];
+    seen.push(`${name}: pill=${pill} gate=${gate} ladder=${climbs} ${top.grid}²`);
+    check(
+      `${name}: the pill reads ${tier}, the Pro gate says ${tier === 'pro'} and the hosted ladder is ${ladder}`,
+      pill === tier && gate === (tier === 'pro') && climbs === ladder && top.grid === (ladder === 'local' ? 768 : 512),
+      seen[seen.length - 1],
+    );
+  }
+  globalThis.window = saved;
 }
 
 let failed = 0;

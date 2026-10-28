@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 
 import { User } from 'lucide-react';
 import { getCachedEmail } from '../lib/authFlag';
 import CloudSyncCard from './CloudSyncCard';
+import { MacAppCard } from './MacAppCard';
 import { cloudSync } from '../lib/cloudSyncApp';
 import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
 import { allowAccountKeys, declineAccountKey, lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
@@ -40,6 +41,11 @@ async function loadFirebaseAuth() {
 // App's chunk apart (`preloadApp: no chunk for src/App.tsx`).
 const LazySignInForm = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./SignInScreen').then((m) => ({ default: m.SignInForm })))
+  : null;
+
+// How the account signs in, and confirming its email: fetched like the form above.
+const LazySignInMethods = import.meta.env.VITE_FIREBASE_API_KEY
+  ? lazy(() => import('./AccountSignInMethods'))
   : null;
 
 interface AccountSheetProps {
@@ -326,6 +332,17 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
             </div>
           )}
 
+          {signedIn && LazySignInMethods && (
+            <Suspense fallback={null}>
+              <LazySignInMethods
+                onConfirmed={async () => {
+                  await syncAccountLicense(true);
+                  refreshLicenseState();
+                }}
+              />
+            </Suspense>
+          )}
+
           {signedIn && !licenseInfo.valid && accountKey.state === 'declined' && (
             <button
               type="button"
@@ -466,6 +483,8 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
           )}
 
           {signedIn && email && <CloudSyncCard tier={currentTier} email={email} />}
+
+          <MacAppCard tier={currentTier} />
 
           {/* Signed out, the sign-in form above carries its own opt-in. */}
           {(!ACCOUNTS_ON || signedIn || unsubscribedBanner) && (

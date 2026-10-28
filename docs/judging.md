@@ -257,7 +257,7 @@ drift with time as the rainbow's hue did.
 
 ## 12. Ferro Paint's colour pushed by the black
 
-Pushes Dye (Squish Plate, under the ferrofluid) is on full in Ferro Paint:
+Pushes Dye (Ferrofluid, under Phase Edge) is on full in Ferro Paint:
 where the black grows the colour leaves, and it packs as a bright line along
 the black's edges instead of sitting still under it. Seen only in the lab,
 on software WebGPU at 256². Two things to look at: whether the packed edge
@@ -987,7 +987,7 @@ in your hand and nothing on the plate.
 
 ## 34. A clear film that tears into lace (Clear Film, PLAN 20b)
 
-Settings → Squish Plate → Physics & chemistry → **Clear Film** (also MIDI, the desks,
+Settings → Oil & Soap → **Clear Film** (also MIDI, the desks,
 the remote and the phone's Dye sheet). 0 in every look. Up, a clear oil film is laid
 over the plate, that thick (1 is most of the gap), and it tears open by itself: thin
 parts and the dish's specks of dust first, and wherever a drop of Alcohol or Soap
@@ -1632,7 +1632,34 @@ With a second camera plugged in (a USB webcam, a capture card or OBS's Virtual C
   switch it on; the film's camera should stay what it was.
 - On the phone, both pickers are on the Settings sheet's Film and Motion camera tabs.
 
-## 71. A look saved in Chrome is in the Mac app (PLAN 23.18)
+## 70. On reads on (PLAN 35a)
+
+On the laptop in a dark room, and on the phone, with no reading of labels:
+
+- **Film.** Load a demo loop with Film: its Film button and Video file in Source should be lit
+  violet, the row should say "playing as film", and Off should not be. Pour another: its Pour
+  lights too. Say whether you can tell which loop is doing what from across the room.
+- **The desk.** The layout switch, the tools, the layers, the bottles and the palette list: the
+  chosen one is a solid violet now, not a lighter grey. Blackout is grey until pressed, then
+  solid red. Say whether the violet is too loud anywhere, or
+  whether anything that is on still looks off.
+- **The phone and the remote.** The dock's open sheet, the tools, Looks and the Motion sheet's
+  tiles. Pause is lit while the plate is paused. The remote's Blackout is grey until it is on.
+
+## 75. The Mac app downloads, and finds its own updates (PLAN 13-update)
+
+On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
+Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
+copy that is there, and open it (the first open still needs System Settings → Privacy &
+Security → Open Anyway until the app is signed). On a phone the same card should say to open
+the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
+release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
+minute: one notification should say the new version is out, the ChromaGlass menu should offer
+Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
+while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
+another, and check that the first downloads it and becomes the new version after a quit.
+
+## 72. A look saved in Chrome is in the Mac app (PLAN 23.18)
 
 Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to the Pro account:
 
@@ -1649,3 +1676,282 @@ Once the licence Worker is deployed with `/sync` (23.18-deploy), signed in to th
 
 Bad: a look that comes back after being deleted, a set list replaced by an empty one, or the
 plate stuttering when a sync lands mid-show.
+
+## 73. The seven groups (PLAN 35b)
+
+On the desk, press ⌘P (the panel browser) in Load-in, then in Build, and open Settings (⌘K, All settings…):
+
+1. The panel browser's headings are Play, Pour, Feed, Motion, Chemistry, Look, Stage, in that order,
+   and the desk's own panels (Cues, Rides, Recipe, Score under Play; Bottles, Dyes, Tools under Pour)
+   sit under the same headings as the settings sections. In Build and Gig there is no Stage heading.
+2. Settings' rail shows the same seven. Each section is where you would look for it: Film under Feed,
+   Kaleidoscope under Motion, Lamp & Light under Look.
+3. On the phone, More → Settings: the strip names the same seven above their tabs, and every tab still
+   takes a tap.
+
+Bad: a section where you would not look first (tell me which and where it should be), a heading that
+cuts a name short on the phone, or a saved layout whose panels came back in a different place.
+
+## 74. Squish Plate in five (PLAN 35c)
+
+On the desk, open Settings (⌘K, All settings…) and look under Chemistry and Motion:
+
+1. Chemistry now lists Squish Plate, Oil & Soap, Ferrofluid and Reactions; Motion lists Tilt & Rock
+   beside Kaleidoscope, Automation and Fluid Physics. Squish Plate holds only the glass (pressure,
+   shape, gap, smear, rain, viscosity).
+2. Every control you used to find under Squish Plate is in one of them: Oil Tension, Oil Bodies,
+   Soap Bursts, Clear Film and Polarity in Oil & Soap; the ferrofluid and the magnet in Ferrofluid;
+   pH, BZ, Liesegang and the Turing pattern (it was in Lamp & Light) in Reactions; Gravity, Tilt
+   Direction, Slosh and Plate Rock in Tilt & Rock.
+3. The same on the phone: More → Settings, the Chemistry and Motion tabs. A saved layout that had
+   the Squish Plate or Fluid Physics panel opens with them where they were; Fluid Physics now holds
+   only the flow (its knobs are fewer).
+
+Bad: a control you went looking for in the old place and could not find by the search box, or a
+section with so few controls that it should have been joined to another.
+
+## 75. One home per setting, second half (PLAN 35c-2)
+
+On the desk and on the phone's Settings strip:
+
+1. Motion lists **Plate Spin**: Rotation Speed, the Flick buttons, Auto Spin, Spin Rate, Beats a
+   Turn, Reverse Spin, Spin Direction, Spin Wander, Spin From Music, Flick Strength and Plate Drag.
+   Plates & LED (Stage) keeps only Layers, the blend, and the LED platform. In Build you can dock
+   Plate Spin beside the set.
+2. **Flash Limit** has one switch, in Master. Wall shows a line saying whether it is on, and no
+   switch. Turn it off in Master and the Wall line turns amber.
+3. Each Drive has its Impact under it: Room Drive / Room Impact in the Motion camera, Film Drive /
+   Film Impact in Film, Sound Drive / Sound Impact in Sound. Shapes Impact is the only master left
+   in Patches, which links to the other three.
+4. Build's deck now holds Squish Plate after Fluid Physics (a layout you had saved is unchanged).
+5. Songs: "Stage sequences…" is a button like the ones above it, with a list-music icon.
+6. The track panel's Takes is one button that opens the Record panel, where takes are started,
+   replayed and deleted.
+
+Bad: a control you used all the time that is now in a place you do not expect, or a Build deck that
+runs out of room with Squish Plate in it.
+
+## 76. One home for MIDI on and the audio source (PLAN 35c-3)
+
+On the desk (the phone already had one of each):
+
+1. Settings → Sound: Source shows one line (Off, Mic, System, File, Band or Instrument) and a
+   **Change in Sound…** button. The button closes Settings and opens the Sound sheet, where the six
+   tiles choose. Pick Band there, reopen Settings → Sound, and the line says Band.
+2. The Mic dot still lands on Settings → Sound, with the device picker under the Source line.
+3. Settings → Controller turns MIDI on, picks the port in and the LEDs out, loads a factory map and
+   auto-maps. Plug a controller in and check all four there.
+4. The MIDI dot opens the MIDI sheet. It says "MIDI is on · <controller>" or "MIDI is off", has
+   **Set up…** (opens Settings → Controller), and still teaches: Learn, banks, bindings, the picture,
+   Save and Load file. It no longer has a switch, a port picker, factory chips or Auto-map.
+
+
+## 77. Coloured knob caps, tool keycaps, a snail and a hare (PLAN 35d)
+
+On the desk (Build, with Recipe, Fluid Physics, Lens and Tools open):
+
+1. Every knob's cap wears the colour of its group: Play off-white, Pour blue, Feed orange, Motion
+   green, Chemistry teal, Look yellow, Stage grey. The same colour is the small tick before a panel's
+   title and the dot on a Settings rail heading. Violet still means on and red still means live; no cap
+   should read as either.
+2. Speed and Evolve Speed (and Gel Speed, Chase Speed, Kaleido Spin where you pin them) have a snail
+   at the slow end of the ring and a hare at the fast end, faint until the knob is at that end. Kaleido
+   Spin has a hare at each end, since it turns either way.
+3. The Tools panel is ten keycaps: a drawn picture, the name, the letter in the corner. The held tool
+   is lit violet and sits 2 px lower. Press a letter on the keyboard and the held key moves.
+
+On the phone: the dock's ten tools carry the same pictures (the held one lit and 2 px lower); Motion's
+Evolve speed and Play's Speed have the snail and hare at the ends of the track, and the thumb takes its
+group's colour.
+
+Bad: a cap you read as "on" or "live", a colour you cannot tell from its neighbour at arm's length, a
+picture that does not say what its tool does, or a snail and hare you do not see until you look for them.
+
+
+## 78. Bottles that tip, drops that fall, a bulb in kelvin (PLAN 35e)
+
+On the desk (Build, with Bottles open) and in Settings:
+
+1. Pick a bottle. It leans forward once, with a little overshoot, and stands still; its outline and name
+   stay lit violet. Pour with it for a minute: its level sinks as the plate fills toward the Dye Budget,
+   and rises as the plate empties. Lower Dye Budget and the level drops sooner; raise it and it holds. The
+   other bottles stand full.
+2. In Settings, Viscosity (Squish Plate): hover **thin** and a small drop forms and falls in under a
+   second; hover **thick** and the drop hangs and strings out for about five. Choosing one runs it once.
+   At rest each is a drop hanging at the lip.
+3. In Settings, Lamp & Light, Lamp Warmth has a bulb at the left. At 0 it reads 6500 K and glows white;
+   turn it up and it falls to 5100 K at full, the filament going from white to cream. The figure is the
+   temperature of the grade the slider applies to the picture, not a label.
+
+On the phone: the Dye sheet's picked bottle leans and shows its level, and the dock's dye button holds the
+bottle in hand, leaning while the sheet is open. Settings has the same drops and bulb.
+
+Bad: a level that sits still while the plate fills, a lean that keeps moving, a drop that falls in the same
+time on both buttons, a bulb whose number does not follow the slider, anything that moves with reduced
+motion on, or a violet or red that is not "on" or "live". Decide too: the 5100 K top is what the grade does
+today; if you would rather it reached a 3200 K halogen, that is PLAN 35e-2.
+
+## 79. The Splodascope, and Film Hold (PLAN 28k)
+
+Open the Splodascope look on the lamp, with the owner's photograph beside it (in the project's
+shared files, `references/splodascope-2026-10-25.png`).
+
+1. A crowd of round drops of yellow, green, red and magenta oil in a cobalt water, from small to
+   cells a fifth of the plate across, a few with a drop of another colour inside a ring of water.
+2. Leave it a minute: drops press against one another and stay two, with a thin dark wall between
+   them. Some merge, slowly; the crowd should still be a crowd after a minute, not a few big blobs.
+3. With music: a kick presses the glass and now and then breaks a wall so two neighbours run
+   together. Nothing moves the frame as a whole.
+4. Settings → Oil & Soap → Film Hold to 0: the drops run together within a few seconds (that is the
+   plate as it was). Back to 1: the drops laid from then on hold again.
+
+On the phone: the look in the list, and Film Hold under Oil Bodies in Settings → Oil & Soap.
+
+Bad: walls between drops so thick the crowd reads as a lattice; drops that jitter against each
+other; colours going brown or black inside the drops; or a crowd that has merged into blobs within
+half a minute with no music playing.
+
+today (widened in §80).
+
+## 80. Lamp Warmth reaches a 3200 K halogen (PLAN 35e-2)
+
+In Settings, Lamp & Light, on any look with some colour on the plate (the bulb is also on the phone's Settings):
+
+1. Lamp Warmth now runs from 6500 K at 0 to 3200 K at the right-hand end, and the bulb's figure follows it, even
+   steps of colour all the way. The old 0 to 1 is the first quarter and looks as it did.
+2. Drag it slowly to the end. The picture should go from white through cream and amber to the orange of an old
+   overhead projector's lamp; blues and violets should die away first, as under a real tungsten lamp, and reds
+   and oranges hold. The warm end is dimmer on purpose; Exposure brings it back.
+3. Bad: a jump or a band as you drag, a look that changed colour with the slider where it was, a bulb figure that
+   does not follow, a dark corner that gets worse beyond the old end (the vignette is meant to stop at 1).
+4. Decide: Home Movie (0.45) and Velvet Underground (0.25) kept their colour. Try Home Movie at 2 or 3, which is
+   what an old projector's lamp is; say if you want it, and if you want the end held at the same brightness
+   instead of dimmer (PLAN 35e-3).
+
+## 81. Tape reels, a tap pad, a VU needle, a lens cap, a strobe ring (PLAN 35f)
+
+On the desk and the phone, with a band or a microphone playing:
+
+1. Press R (or Record). Two small reels appear in the button beside the clock. The left one starts full and
+   turns slowly, the right one starts bare and turns about twice as fast; over several minutes the left
+   empties onto the right and the two turn rates come together and cross. Stop and they stop. On the phone,
+   the Play screen's Record pill shows the same two reels, still while it waits, turning while it records,
+   the clock under them, and the pill is red while it runs.
+2. Settings, Audio Input, Tempo: tap the Tap pad four times. The four pips fill, the tempo shows in segment
+   digits, and a small light on the pad blinks on the beat you tapped, staying with your tap if you tap a
+   fifth time a little late. On the phone it is in the Sound sheet. Listen clears it.
+3. The Sound sheet (desk and phone) has a small dial. With a source playing, the needle swings up on each
+   kick, about a third of a second to arrive and a soft fall; stop the sound and it lies on its stop; unplug a
+   USB input and the dial says "deaf". It is the only thing here that moves with sound.
+4. Blackout (header on the desk, Settings, the remote, Draw): off it is a bare lens; on, a cap snaps over the
+   lens once and the button is solid red. Draw's off state is no longer red. The remote has one Blackout now,
+   in the bar under the thumb.
+5. Settings, Plate Spin, above Auto Spin: a ring of dots. In Rate it turns at the dish's speed. In Tempo
+   with a tempo tapped or heard, and Beats a Turn at 16, the dots stand still while the dish turns. Set
+   Beats a Turn to 48 and they creep backward slowly (the alias). Off, the ring is dim and still.
+
+Bad: reels that turn at one speed, a beat light that drifts off your taps, a needle that jumps or sticks
+after the sound stops, a cap that is red when the room is lit, a ring that turns while locked, anything that
+moves with reduced motion on (the reels and ring stop and the needle shows the number instead), or a violet
+or red that is not "on" or "live". Decide too: the VU dial is the plate's own 0 to 100 volume, not decibels
+(PLAN 35f-2).
+
+## 82. Looks as slides in a tray (PLAN 35g)
+
+On the desk and the phone:
+
+1. Click the preset name at the top left. Every look in the menu is a small square slide: cardboard mount, one
+   clipped corner, a landscape window with the look's two colours on the film. The slide is the same cardboard
+   on every row; the look you are on keeps its violet row, nothing about the slide itself changes colour.
+2. Open the set list. Each row is a slide where the little colour square was. Cue a look: the cue bar shows the
+   one on stage as a slide, a round tray to its left, and the cued one as a slide behind the arrow.
+3. Press Go. The tray clicks one slot, a quick turn with a small overshoot, and settles; nothing else moves.
+   Go to a look earlier in the list and it clicks back; to a look far away and it still clicks only one slot.
+4. On the phone: the look button at the top shows the slide, the look's name and a small tray that clicks
+   when the look changes. The Looks sheet lists slides. On the Play screen the Looks strip is a row of slides
+   you flick; each flick stops on one slide (it cannot coast past several), the one up has the violet ring and
+   its name in the lit chip, and the tray beside "Looks" clicks when you tap one.
+5. With reduced motion on, the tray does not turn.
+
+Bad: a slide whose mount turns violet or red, a tray that spins freely or turns on the beat, a strip that
+coasts past slides, a ring clipped at the slide's corner, a click that is a slide-sized jump of the layout, or a
+tray on a screen that shows no look. Decide too: ten slots on the drum, a real tray has eighty (PLAN 35g-2).
+
+
+## 83. The Mac app opens only on a Home or Pro licence (PLAN 23.17d)
+
+After the next Mac release (Actions → Mac app → Run workflow, release ticked), on a Mac:
+
+1. Install the new app over the old one and open it. If this Mac already had a key, the show opens at once,
+   with no screen in front of it. Otherwise a sign-in screen is drawn where the plate would be, and nothing
+   plays behind it.
+2. Sign in with the email and password of an account that has bought nothing. The screen asks you to confirm
+   your email if the account is new, then offers Buy Home and Buy Pro. The show does not open.
+3. Sign out, and choose Continue with Google. Your own browser opens on the app's address (localhost), you
+   sign in there, that tab says you can go back to the app, and the app's window opens the show by itself
+   within a few seconds. The tier in the profile sheet is the one you bought.
+4. Quit, turn Wi-Fi off and open the app again. It still opens straight to the show.
+5. With the app open, open `http://localhost:` and the app's port in Chrome on the same Mac. Chrome shows the
+   same sign-in screen, not the show.
+
+Bad: the show visible for a frame before the sign-in screen, a Google sign-in that opens inside the app's
+window and is refused, a browser tab that signs in but the app never notices, a licensed app that asks again
+with Wi-Fi off, or Chrome on localhost playing the show free. Decide too: offline, a refunded key keeps working
+until the app next goes online (no grace period, PLAN 23.17h).
+
+## 84. Home Movie on a Super 8 lamp, and the warm end as bright as the white (PLAN 35e-4)
+
+1. Open Home Movie. It should now be the amber of a home-movie projector, lamp reading 3560 K (Settings, Lamp &
+   Light), with orange and coral held and the teal gone dark and quiet, not a brown wash.
+2. Drag Lamp Warmth from 1 to the end on any look. The picture should change colour and not get darker; before, it
+   lost a third of its light by the end. Exposure still dims it if you want a dim lamp.
+3. Bad: a bright red or coral that goes flat and clipped at the warm end (the red is multiplied up to 1.36 at Home Movie, 1.48 at the end), a step
+   in brightness at 1, or Velvet Underground, Lucky or any look under 1 that changed.
+4. Decide: is 3 (3560 K) the right amber for Home Movie, or the full 3.75 (3200 K)? And is the red clipping on
+   hot reds acceptable, or should the end hold only half the brightness back?
+
+## 85. The colour cartoons (PLAN 14ac, 14ac-4)
+
+Five cartoons in colour on the Cartoons shelf (the desk's Dye panel, the phone's dye sheet), marked "colour":
+Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Travels.
+
+1. **Pour** Jack Frost on Classic, then on a pale look. The dye should be the picture's own colours (the blues of
+   the winter forest, the orange of the autumn), not grey.
+2. **Film** Balloon Land and Fiddlesticks with Film Mix at its default and at full. Fiddlesticks is a two-colour
+   print, orange and teal with no true blue or yellow; say whether it reads as a feature of the plate or as a
+   brown wash (14ac-5).
+3. **Gulliver's Travels** is 74 minutes. Pick it on the phone over mobile data: it should start within a few
+   seconds and not stall, since the file streams. Say whether a feature is wanted on the shelf at all (14ac-6).
+4. Bad: a colour cartoon that pours grey, Pour or Film that does not start on a colour one, or a picture so
+   muddy at 384 px that you cannot tell what it is.
+5. Decide: do you want the palette to tint them (Film's grade can already), and is there a colour cartoon you
+   expected that is not here?
+
+## 86. The tabs across the top are yours (PLAN 8-tabs)
+
+1. Open the desk on a laptop. The chips should read Perform, Sequence, Setup, with a pencil beside them. Perform has
+   the set list, bottles, rides, dyes, tools and the knobs Build had; Sequence the set list, Songs, Sequences and the
+   score; Setup the controller, Sound, Music & Drone, the Wall and Mapping.
+2. Press the pencil. Rename Setup to the venue's name, move it first, add a New tab and put two panels on it with
+   + Panel, then reload: all of it should come back as you left it. Delete the new tab (two presses), and "Put the
+   shipped tabs back" puts the three back.
+3. On the phone: More › Tabs shows the same three, each tab's panels stacked; Setup's Wall and Sound draw in place,
+   Perform's bottles and set list are buttons to the phone's own Dye and Looks sheets.
+4. Bad: a control you used under Build, Gig, Load-in, Sequence or Sound that you cannot find now on any tab or in
+   + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
+5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?
+
+## 87. The plate does not stutter now and then (PLAN 14aa)
+
+Play any look for five minutes on the laptop, then with the wall up, the way a show runs. Watch
+the liquid's own motion, not the music's: before this, a plate on a machine with room to spare
+could stop for a frame and jump two, in bursts of a second or two a few times a minute, worst on a
+120 Hz screen. It should glide evenly the whole time. If it still hitches, say roughly how often,
+whether the wall and the laptop hitch together, and whether the hitch is the liquid or the whole
+picture (the second is a dropped frame, a different thing). Also say if the quality ever visibly
+steps down and back up again: it should do that once at most, early, not every minute and a half.
+
+Measured: `npm run cadence` (the old loop, modelled, stopped or doubled the liquid on 7–40 % of
+frames on 60, 59.94 and 120 Hz displays, by the median of nine seeds; the new clock on none, and
+it keeps time with the wall up at another refresh rate); `npm run encode` (a step's garbage 506 KB → 31 KB);
+`npm run rungs` (a rung the machine cannot hold retried 38 times in half an hour → 10).

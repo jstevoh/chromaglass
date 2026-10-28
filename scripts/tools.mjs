@@ -32,7 +32,7 @@
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { engineQuery } from './frame.mjs';
+import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
 const PORT = 4346;
 const checks = [];
@@ -48,7 +48,8 @@ process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
 await new Promise((r) => setTimeout(r, 2500));
 
-const browser = await launchChromium(chromium);
+// `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
+const browser = await launchChromium(chromium, { present: true });
 /*
   Set once the page exists, and run in the `finally` below: `page` itself is
   scoped to the `try`, so the restore cannot reach it from there.
@@ -60,6 +61,7 @@ try {
   page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
   await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=classic${engineQuery()}`, { waitUntil: 'load' });
   await page.waitForTimeout(8000);
+  await waitForEngine(page);
 
   // A calm plate: nothing moves the dye but the hand. The music would pour,
   // the turbulence and the turning would carry, the drips would streak.
@@ -76,8 +78,9 @@ try {
     await page.evaluate((want) => window.chromaglassTool?.(want), t);
     await page.waitForFunction((want) => window.chromaglassDebug?.().tool?.() === want, t, { timeout: 10000 });
   };
-  const clear = async () => { await page.evaluate(() => window.chromaglassAction?.('clear')); await page.waitForTimeout(2500); };
-  const settle = (ms) => page.waitForTimeout(ms);
+  const clear = async () => { await page.evaluate(() => window.chromaglassAction?.('clear')); await settle(2500); };
+  // The wall clock on a GPU; in software, its share of the steps too (`settlePlate`, PLAN.md 19l).
+  const settle = (ms) => settlePlate(page, ms);
 
   /** The lead plate's density, and where the pointer is on it (grid cells). */
   const snap = (keep) => page.evaluate((keep) => {
@@ -584,7 +587,24 @@ try {
         const rb0 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
         const w0p = await snap('wind0');
         const t0 = Date.now();
-        await stroke('blow', from, to, 1500);
+        /*
+          The stroke takes 3000 ms of waiting (4.1 to 4.6 s with its 30 pointer
+          round trips), not 1500 (2.6 to 3.3 s). What the Blow's push follows is the
+          solver steps the wind is laid on, not the pool or the clock: over the
+          28 strokes of 14 Mac runs it correlates 0.73 with the wind steps (-0.22
+          with the pool's size, -0.32 with the moves' time), and the CI Macs step
+          only 12 to 23 times a second, so a stroke of fixed wall time got 38 to
+          71 wind steps and the push read -0.07% to +1.64% against +0.15% to beat.
+          The four reds in those runs each had a stroke of 41 to 53 wind steps
+          and read -0.07% to +0.05%. One Mac run (#465) drew nine strokes at
+          three paces: 45 to 53 wind steps read +0.46% to +0.79% (750 ms of
+          waiting), 67 to 70 read +0.92% to +1.64%, and the slowest paces, 92 and
+          112 wind steps, +1.55% and +2.97% (those at 3000), at 14 to 29
+          solver steps a second, with no straw step in any (the moves 140 to 155 ms apart at 3000, where
+          the straw is a hand held still for three frames). Twice the time gave
+          about twice the wind steps and a push six to twenty times the bar's.
+        */
+        await stroke('blow', from, to, 3000);
         const strokeMs = Date.now() - t0;
         await settle(700);
         await snap('wind1');

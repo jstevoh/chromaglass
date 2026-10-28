@@ -179,11 +179,11 @@ try {
     }
     return -1;
   };
-  /** Open the desk at `base` and bring Load-in up, where the Phone · iPad panel lives. */
+  /** Open the desk at `base` and bring Setup up, where the Phone · iPad panel is as it ships. */
   const openDesk = async (base) => {
     await page.goto(`${base}/?debug&look=classic&dpr=0.35`, { waitUntil: 'networkidle' });
-    for (let i = 0; i < 40 && (await page.getByTestId('mode-segmented-loadin').count()) === 0; i++) await settle(300);
-    await clickAt(page, 'mode-segmented-loadin');
+    for (let i = 0; i < 40 && (await page.getByTestId('mode-segmented-setup').count()) === 0; i++) await settle(300);
+    await clickAt(page, 'mode-segmented-setup');
     // The panel asks the relay for its address when it mounts; give it the answer.
     for (let i = 0; i < 40; i++) {
       const p = await panel();
@@ -447,8 +447,8 @@ try {
       const words = () => textOf(fpage, 'phone-link');
       const openAt = async (base) => {
         await fpage.goto(`${base}/?debug&look=classic&dpr=0.35`, { waitUntil: 'load' });
-        for (let i = 0; i < 120 && (await fpage.getByTestId('mode-segmented-loadin').count()) === 0; i++) await fpage.waitForTimeout(300);
-        if (await fpage.getByTestId('mode-segmented-loadin').count()) await clickAt(fpage, 'mode-segmented-loadin');
+        for (let i = 0; i < 120 && (await fpage.getByTestId('mode-segmented-setup').count()) === 0; i++) await fpage.waitForTimeout(300);
+        if (await fpage.getByTestId('mode-segmented-setup').count()) await clickAt(fpage, 'mode-segmented-setup');
         for (let i = 0; i < 40 && (!(await words()) || /looking/i.test(await words())); i++) await fpage.waitForTimeout(300);
         await fpage.waitForTimeout(3000);
       };

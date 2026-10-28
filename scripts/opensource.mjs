@@ -77,11 +77,10 @@ const shown = async (screen, page) => {
     return lit;
   }
   await page.getByTestId('dot-sound').click();
-  await page.getByTestId('audio-source-none').waitFor({ state: 'visible' });
-  for (const [id, name] of [['none', 'off'], ['microphone', 'mic'], ['system', 'system'], ['simulated', 'band']]) {
-    if ((await page.getByTestId(`audio-source-${id}`).getAttribute('aria-selected')) === 'true') return name;
-  }
-  return 'nothing selected';
+  // Settings' Sound section says what is listening (the choosing is in the Sound sheet: PLAN 35c-3).
+  const state = page.getByTestId('audio-source-state');
+  await state.waitFor({ state: 'visible' });
+  return ({ none: 'off', microphone: 'mic', system: 'system', simulated: 'band' })[await state.getAttribute('data-source')] ?? 'nothing selected';
 };
 
 /** Close what `shown` opened, so the plate is clickable again. */
@@ -98,7 +97,8 @@ const pickBand = async (screen, page) => {
     await page.getByTestId('phone-sound-band').first().tap();
   } else {
     await page.getByTestId('dot-sound').click();
-    await page.getByTestId('audio-source-simulated').click();
+    await page.getByTestId('audio-source-open').click();
+    await page.getByTestId('sound-source-simulated').click();
   }
   await page.waitForTimeout(300);
 };

@@ -60,6 +60,30 @@ const HUGE_MS = 500;
  */
 const RETRY_AFTER_S = 90;
 const HELD_RETRY_AFTER_S = 30;
+/**
+ * And each time the same thing fails again, the wait before it is offered
+ * again doubles, up to sixteen times (24 minutes) (PLAN.md 14j).
+ *
+ * Ninety seconds every time was a governor that never stopped hunting. A
+ * machine that holds one rung and not the one above (a warm laptop, a phone)
+ * climbed every minute and a half, dropped frames for the second and a half
+ * it takes to judge a rung slow, stepped down and settled again: a grid
+ * rebuilt twice and four seconds of stutter, 38 rung changes in half an hour
+ * (`npm run rungs`, "hunting"). The first retry is as soon as it was, since a
+ * load that went away (another tab, a held tool) should be won back quickly;
+ * a rung that has failed four times is a fact about the machine. A failure
+ * while a tool was held does not count toward the doubling: a press costs a
+ * burst of work that says less about the rung.
+ */
+const RETRY_DOUBLINGS = 4;
+/**
+ * And it forgets: ten minutes on one rung, step rate and post level with no
+ * move, and the counts for those and everything easier go back to nothing.
+ * Without this a show that hunted early and then held its rung for an hour
+ * lost it to one four-second burst and waited 24 minutes to have it back
+ * (the check-skeptic's model of the first version; `npm run rungs`).
+ */
+const FORGIVE_AFTER_S = 600;
 
 /**
  * How many solver steps a second to ask for (H2b, docs/roadmap.md).
@@ -119,6 +143,8 @@ export class QualityGovernor {
   private readonly start: number;
   /** Rung index → when it last failed (seconds). */
   private readonly failed = new Map<number, number>();
+  /** How many times each rung, post level and step rate has failed with no tool held: the doubling's count. */
+  private readonly failCounts = { rung: new Map<number, number>(), post: new Map<number, number>(), steps: new Map<number, number>() };
   private emaFrame = 16.7;
   private emaWork = 4;
   /**
@@ -138,6 +164,8 @@ export class QualityGovernor {
   private droppingSince: number | null = null;
   private fastSince: number | null = null;
   private settleUntil: number;
+  /** When it last moved anything (seconds), for `FORGIVE_AFTER_S`. */
+  private lastMoveAt: number;
   private everSteppedDown = false;
   private hugeStreak = 0;
   private post: PostLevel = 0;
@@ -173,6 +201,7 @@ export class QualityGovernor {
     this.pinned = pin;
     this.settleUntil = now + SETTLE_S;
     this.costRung = this.rung;
+    this.lastMoveAt = now;
   }
 
   get rung(): QualityRung {
@@ -328,6 +357,7 @@ export class QualityGovernor {
     this.missShare += ((frameMs > MISSED_MS ? 1 : 0) - this.missShare) * MISS_K;
 
     if (now < this.settleUntil) return false;
+    if (now - this.lastMoveAt >= FORGIVE_AFTER_S) this.forgive();
 
     /*
       Frames that keep missing a refresh with the GPU over its budget: give
@@ -362,6 +392,7 @@ export class QualityGovernor {
       this.droppingSince ??= now;
       if (now - this.droppingSince >= DOWN_AFTER_S) {
         this.stepsFailed.set(this.steps, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
+        this.counted('steps', this.steps, held);
         this.steps += 1;
         return this.moved(now, 'dropping');
       }
@@ -390,6 +421,7 @@ export class QualityGovernor {
       */
       if (now - this.slowSince >= DOWN_AFTER_S && this.steps < STEP_RATES.length - 1) {
         this.stepsFailed.set(this.steps, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
+        this.counted('steps', this.steps, held);
         this.steps += 1;
         return this.moved(now, 'slow');
       }
@@ -397,11 +429,13 @@ export class QualityGovernor {
       // shrink the solver, and those passes are fill-bound.
       if (now - this.slowSince >= DOWN_AFTER_S && this.heavyPost && this.post < 2) {
         this.postFailed.set(this.post, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
+        this.counted('post', this.post, held);
         this.post = (this.post + 1) as PostLevel;
         return this.moved(now, 'slow');
       }
       if (now - this.slowSince >= DOWN_AFTER_S && this.index < this.rungs.length - 1) {
         this.failed.set(this.index, held ? now - (RETRY_AFTER_S - HELD_RETRY_AFTER_S) : now);
+        this.counted('rung', this.index, held);
         this.index += 1;
         this.everSteppedDown = true;
         return this.moved(now, 'slow');
@@ -424,7 +458,7 @@ export class QualityGovernor {
         // a stutter (PLAN.md 14aa-3).
         const above = this.index - 1;
         const failedAt = this.failed.get(above);
-        const rungFree = above >= 0 && (failedAt === undefined || now - failedAt >= RETRY_AFTER_S)
+        const rungFree = above >= 0 && (failedAt === undefined || now - failedAt >= this.retryAfter('rung', above))
           && this.workAt(this.rungs[above], this.stepRate) < WORK_BUDGET_MS;
         if (rungFree && this.index > this.start) {
           this.index = above;
@@ -432,7 +466,7 @@ export class QualityGovernor {
         }
         const better = this.post - 1;
         const postFailedAt = this.postFailed.get(better);
-        if (this.heavyPost && better >= 0 && (postFailedAt === undefined || now - postFailedAt >= RETRY_AFTER_S)) {
+        if (this.heavyPost && better >= 0 && (postFailedAt === undefined || now - postFailedAt >= this.retryAfter('post', better))) {
           this.post = better as PostLevel;
           return this.moved(now, 'fast');
         }
@@ -456,7 +490,7 @@ export class QualityGovernor {
         const stepsFailedAt = this.stepsFailed.get(faster);
         const pictureWhole = this.index <= this.start && this.post === 0;
         const fasterWork = faster >= 0 ? this.workAt(this.rung, STEP_RATES[faster]) : 0;
-        if (faster >= 0 && pictureWhole && (stepsFailedAt === undefined || now - stepsFailedAt >= RETRY_AFTER_S)
+        if (faster >= 0 && pictureWhole && (stepsFailedAt === undefined || now - stepsFailedAt >= this.retryAfter('steps', faster))
           && fasterWork < WORK_BUDGET_MS) {
           this.steps = faster;
           return this.moved(now, 'fast', fasterWork);
@@ -538,7 +572,29 @@ export class QualityGovernor {
     this.emaDraw += (draw - this.emaDraw) * 0.1;
   }
 
+  /** A failure of `which` at `at`, counted toward its doubling unless a tool was held. */
+  private counted(which: 'rung' | 'post' | 'steps', at: number, held: boolean): void {
+    if (held) return;
+    const m = this.failCounts[which];
+    m.set(at, (m.get(at) ?? 0) + 1);
+  }
+
+  /** How long `which` at `at` waits after its last failure before it is offered again (seconds). */
+  retryAfter(which: 'rung' | 'post' | 'steps', at: number): number {
+    const n = this.failCounts[which].get(at) ?? 0;
+    return RETRY_AFTER_S * 2 ** Math.min(RETRY_DOUBLINGS, Math.max(0, n - 1));
+  }
+
+  /** What it holds now has held: its counts, and those of everything easier, start again. */
+  private forgive(): void {
+    for (const [which, at] of [['rung', this.index], ['post', this.post], ['steps', this.steps]] as const) {
+      const m = this.failCounts[which];
+      for (const k of m.keys()) if (k >= at) m.delete(k);
+    }
+  }
+
   private moved(now: number, why: GovernorMove['why'], predictedMs: number | null = null): boolean {
+    this.lastMoveAt = now;
     this.moveLog.push({ at: now, why, rung: this.index, stepRate: STEP_RATES[this.steps], post: this.post, workMs: this.emaWork, predictedMs });
     if (this.moveLog.length > MOVE_LOG) this.moveLog.splice(0, this.moveLog.length - MOVE_LOG);
     this.settleUntil = now + SETTLE_S;

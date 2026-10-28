@@ -3700,7 +3700,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.lampWarmth > 0.001) {
     let vc = (uv - 0.5) * vec2f(aspect, 1.0);
     let vig = 1.0 - smoothstep(0.45, 1.05, length(vc) * 1.25) * 0.45;
-    outColor = mix(outColor, outColor * vec3f(1.06, 0.9, 0.7) * vig, U.lampWarmth);
+    // The tint is the lamp's own colour (the blackbody at the temperature the slider names), already
+    // the whole grade at this setting. The vignette is the dish's and is blended as it always was,
+    // 1 - w + w*g*vig, which is tint - (tint - (1 - w)) * (1 - vig); past the old end of the travel
+    // (w above 1) it stays full, tint * vig. Multiplying the tint by a separately blended vignette
+    // was 4 to 6% too dark in the corners at the shipped looks (the pre-push review).
+    let tint = vec3f(U.lampTintR, U.lampTintG, U.lampTintB);
+    outColor = outColor * (tint - (tint - vec3f(1.0 - min(U.lampWarmth, 1.0))) * (1.0 - vig));
   }
 
   // ── The dish ─────────────────────────────────────────────────────

@@ -53,6 +53,9 @@ import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
 const AIR_CAPACITY = 512;
 
 /** What `handOver` copies out: the fields, on the device they were copied on. */
+/** One step of `groupAt`'s walk: what it found here, and where each next object leads. */
+type GroupNode = { kids: Map<unknown, GroupNode>; group?: GPUBindGroup };
+
 interface FieldCarry extends SolverCarry {
   readonly device: GPUDevice;
   readonly phase: GPUTexture | null;
@@ -191,6 +194,21 @@ const LAMP_HEAT = 6;
 const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 const CH_SUBSTEPS = 4;
+/*
+  Film Hold at 1, as a chemical potential: what the water in a film one
+  cell thick costs the oil, against the double well's own height (1/16)
+  and its steepest pull (0.19 at a fifth full). Set in the lab against
+  the packed splodascope plate (npm run filmhold): see there.
+*/
+const FILM_MU = 0.6;
+/*
+  Film Hold at 1, as a push (mixFilm): the force on an edge with another
+  edge touching it across the water, as a curvature, in the capillary
+  force's own units (σκ∇c̃), so it scales with Oil Tension as the pull it
+  answers does. The spurious pull across a film is the curvature of the
+  waist the blur reads, up to about one over a cell.
+*/
+const FILM_PUSH = 1.5;
 /*
   The clear film (PLAN §20b, wgsl/film.ts), on a grid of its own.
 
@@ -546,13 +564,18 @@ export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * (REST_GAP * PLATE_METRES) ** 2 /
 */
 export const DYE_LAYER = 3.55e-4;
 /*
-  The explicit slump's limits (wgsl/slump.ts, "The one shortcut"): a face
-  moves at most SLUMP_FACE of the difference across it in a substep (¼ is
-  the edge of stability on a square grid), in at most SLUMP_SUBSTEPS
-  substeps a step. Six passes of five reads each at 768² is the price.
+  The explicit slump's limits (wgsl/slump.ts, "The shortcuts (PLAN 18m-1,
+  18m-1a)"): a face moves at most SLUMP_FACE of the difference across it in
+  a substep (¼ is the edge of stability on a square grid), in at most
+  SLUMP_SUBSTEPS substeps a step. At 1024² with Heavy dye at 1 (g′ = 1.47 m/s²)
+  a cell at DYE_CAP (2.13 mm in a 6 mm gap) has an inertial bound of 4.57 a
+  frame at 60 Hz, which asks for ceil(4.57 / 0.24) = 20 substeps (15 at 768²;
+  6 in water at Dye Weight 0 on 768²; 2 on the default light-oil Thickness).
 */
 const SLUMP_FACE = 0.24;
-const SLUMP_SUBSTEPS = 6;
+const SLUMP_SUBSTEPS = 20;
+/** The Froude number for a gravity current front in the slumping regime (Huppert and Simpson 1980). */
+const FROUDE_FRONT = 1.19;
 /** The dye's cap per cell (decayDye), the deepest layer the slump has to be ready for. */
 const DYE_CAP = 6;
 /*
@@ -797,7 +820,7 @@ export class WebGPUFluid {
   private readonly simF = new Float32Array(this.simData);
   private readonly simI = new Int32Array(this.simData);
   /** One small uniform for each call site that needs its own numbers within a step. */
-  private readonly args = new Map<string, GPUBuffer>();
+  private readonly args = new Map<string, { buf: GPUBuffer; last: Float32Array; written: boolean }>();
   private readonly sampler: GPUSampler;
 
   private readonly rbRow: number;
@@ -1041,6 +1064,8 @@ export class WebGPUFluid {
   private phaseMuT: GPUTexture | null = null;
   /** The ferrofluid blurred once a step (phaseBlur), for phaseCompress's edge normal. */
   private phaseBlurT: GPUTexture | null = null;
+  /** The ferrofluid's own phase velocity (phaseVelocity), for phaseAdvect and phaseCompress on a thin gap. */
+  private phaseVelT: GPUTexture | null = null;
   /*
     The ferrofluid standing up under a close magnet (standing.ts, PLAN §9t):
     the film, made the first time a magnet is that close, and the window the
@@ -1135,6 +1160,8 @@ export class WebGPUFluid {
       // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
       ['addSlosh', [VEL], false],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
+      ['dampGridCurv', [dye], true],
+      ['dampGridLimit', [dye], true],
       ['dampGrid', [dye], true],
       // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
       ['jacobi', [VEL, dye], true],
@@ -1244,6 +1271,7 @@ export class WebGPUFluid {
       ['phaseMu', [RG32], open.phase],
       ['phaseCH', [R32], open.phase],
       ['phaseCHVolume', [R32], open.phase && open.thinGap],
+      ['phaseVelocity', [VEL], open.phase && open.thinGap],
       ['phaseForce', [VEL], open.phase],
       ['phaseMomentum', [VEL], open.phase],
       ['mazeForce', [VEL], open.maze],
@@ -1255,6 +1283,10 @@ export class WebGPUFluid {
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
       ['mixForce', [VEL], open.gravity],
+      // Film Hold's push: built behind the show, as the oil's other kernels
+      // are (no look opens with it in its first steps' set; startup fails one
+      // waited for and never run).
+      ['mixFilm', [VEL], false],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
@@ -1486,20 +1518,118 @@ export class WebGPUFluid {
 
   // ── Plumbing ──────────────────────────────────────────────────────
 
+  /**
+   * A dispatch's eight numbers, in a buffer of their own under `name`, written
+   * only when they differ from what that buffer was last given (H2c-4).
+   *
+   * It made a `Float32Array` and a slice and wrote the buffer on every call:
+   * a write a dispatch, about 250 a step at 512², when most of those numbers
+   * (a sweep's parity, a level's size, `none`) are the same every step of a
+   * show. Skipping the write when the numbers match changes nothing the GPU
+   * sees. A `writeBuffer` lands on the queue in call order, ahead of the next
+   * submit, so what a buffer holds when a step's commands run is whatever was
+   * written to it last, and that is exactly what `last` remembers. (Which is
+   * also why one name must not carry two values in one step: both dispatches
+   * read the second. That was so before, and this keeps it so, no worse.)
+   */
   private arg(name: string, values: number[]): GPUBuffer {
-    let buf = this.args.get(name);
-    if (!buf) {
-      buf = this.disposer.track(this.device.createBuffer({ label: `args ${name}`, size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
-      this.args.set(name, buf);
-    }
-    const v = new Float32Array(8);
-    v.set(values.slice(0, 8));
-    this.device.queue.writeBuffer(buf, 0, v);
-    return buf;
+    const v = this.argScratch;
+    const n = Math.min(8, values.length);
+    for (let i = 0; i < 8; i++) v[i] = i < n ? values[i] : 0;
+    return this.argWrite(name);
   }
 
+  /**
+   * `arg` with four numbers and no array to carry them: for the multigrids'
+   * sweeps, the most asked of all, where the array literal a call is written
+   * with was most of what was left of a step's garbage (`npm run encode`).
+   */
+  private arg4(name: string, x: number, y = 0, z = 0, w = 0): GPUBuffer {
+    const v = this.argScratch;
+    v[0] = x; v[1] = y; v[2] = z; v[3] = w; v[4] = 0; v[5] = 0; v[6] = 0; v[7] = 0;
+    return this.argWrite(name);
+  }
+
+  /** `argScratch` into the buffer under `name`, if it differs from what that buffer holds. */
+  private argWrite(name: string): GPUBuffer {
+    let a = this.args.get(name);
+    if (!a) {
+      const buf = this.disposer.track(this.device.createBuffer({ label: `args ${name}`, size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+      a = { buf, last: new Float32Array(8), written: false };
+      this.args.set(name, a);
+    }
+    const v = this.argScratch;
+    let same = a.written;
+    for (let i = 0; same && i < 8; i++) same = Object.is(v[i], a.last[i]);
+    if (!same) {
+      a.last.set(v);
+      a.written = true;
+      this.device.queue.writeBuffer(a.buf, 0, a.last);
+    }
+    return a.buf;
+  }
+
+  private readonly argScratch = new Float32Array(8);
+
+  /**
+   * The pipeline for a kernel and the format it writes, asked on every
+   * dispatch: the `name:format` it is cached under made once, not a new
+   * string each time (`npm run encode`).
+   */
   private pipeline(name: string, format: GPUTextureFormat): GPUComputePipeline | null {
-    return this.pipelines.computePipeline(`${name}:${format}`, kernel(name, format));
+    let byFormat = this.pipelineKeys.get(name);
+    if (!byFormat) { byFormat = new Map(); this.pipelineKeys.set(name, byFormat); }
+    let key = byFormat.get(format);
+    if (key === undefined) { key = `${name}:${format}`; byFormat.set(format, key); }
+    return this.pipelines.computePipeline(key, kernel(name, format));
+  }
+
+  private readonly pipelineKeys = new Map<string, Map<string, string>>();
+
+  /** `pipeline`'s key for a kernel built under a suffix of its own (`hsRun`'s `:thin`), made once. */
+  private pipelineKey(name: string, suffix: string): string {
+    let bySuffix = this.pipelineKeys.get(name);
+    if (!bySuffix) { bySuffix = new Map(); this.pipelineKeys.set(name, bySuffix); }
+    let key = bySuffix.get(suffix);
+    if (key === undefined) { key = `${name}:${suffix}`; bySuffix.set(suffix, key); }
+    return key;
+  }
+
+  /**
+   * The names the multigrids ask for on every sweep (`mg smooth 3 1`,
+   * `hsSmooth:3:1`), each made once. A template literal is a new string every
+   * time it runs, and the map it is looked up in hashes it again: the two
+   * V-cycles a step asked for some two hundred of each (`npm run encode`).
+   * Each prefix is used with one separator, so the prefix alone keys the table.
+   */
+  private nameOf(prefix: string, b: number, sep?: string, c?: number): string {
+    let byB = this.names.get(prefix);
+    if (!byB) { byB = new Map(); this.names.set(prefix, byB); }
+    let byC = byB.get(b);
+    if (!byC) { byC = new Map(); byB.set(b, byC); }
+    const k = c ?? -1;
+    let name = byC.get(k);
+    if (name === undefined) { name = c === undefined ? `${prefix}${b}` : `${prefix}${b}${sep}${c}`; byC.set(k, name); }
+    return name;
+  }
+
+  private readonly names = new Map<string, Map<number, Map<number, string>>>();
+
+  /**
+   * The dispatches' bind groups, found by the very objects they bind rather
+   * than by a key string spelled out from their labels on every dispatch
+   * (`run`, `runPressed`, `runThinFaced`): a walk down maps keyed by the
+   * pipeline, the target, the args and each texture read, which makes nothing
+   * once the step has been seen. By object, too, where the labels only stood
+   * for the objects: a texture made again under the same label could never be
+   * served a group that binds the one it replaced. Cleared with `groups`.
+   */
+  private groupRoot: GroupNode = { kids: new Map() };
+
+  private groupAt(node: GroupNode, k: unknown): GroupNode {
+    let n = node.kids.get(k);
+    if (!n) { n = { kids: new Map() }; node.kids.set(k, n); }
+    return n;
   }
 
   /** A dispatch: the kernel, its args, the textures it reads, the one it writes, and a sampler if it wants one. */
@@ -1513,11 +1643,12 @@ export class WebGPUFluid {
   ): void {
     const pipe = this.pipeline(name, dst.format);
     if (!pipe) return;
-    const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => (r instanceof GPUTexture ? r.label : 'sampler')).join(',')}:${args.label}`;
-    let group = this.groups.get(key);
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupRoot, pipe), dst), args);
+    for (const r of reads) at = this.groupAt(at, r);
+    let group = at.group;
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...reads.filter((r) => r instanceof GPUTexture) as GPUTexture[], dst, ...reads.filter((r) => !(r instanceof GPUTexture)) as GPUSampler[]]);
-      this.groups.set(key, group);
+      at.group = group;
     }
     pass.setPipeline(pipe);
     pass.setBindGroup(0, group);
@@ -1529,11 +1660,12 @@ export class WebGPUFluid {
   private runPressed(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, reads: GPUTexture[], args: GPUBuffer): void {
     const pipe = this.pipeline(name, dst.format);
     if (!pipe) return;
-    const key = `${name}:${dst.format}:${dst.label}:${reads.map((r) => r.label).join(',')}:${args.label}:press`;
-    let group = this.groups.get(key);
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'press'), pipe), dst), args);
+    for (const r of reads) at = this.groupAt(at, r);
+    let group = at.group;
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, ...reads, dst, this.press]);
-      this.groups.set(key, group);
+      at.group = group;
     }
     pass.setPipeline(pipe);
     pass.setBindGroup(0, group);
@@ -1550,11 +1682,12 @@ export class WebGPUFluid {
     const pipe = this.pipeline(name, dst.format);
     if (!pipe) return;
     const ride = this.ride();
-    const key = `${name}:${dst.format}:${dst.label}:${src.label}:${args.label}:${this.squeeze.read.label}:${ride.label}`;
-    let group = this.groups.get(key);
+    const at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'thin faced'), pipe), dst), src), args), this.squeeze.read);
+    const last = this.groupAt(at, ride);
+    let group = last.group;
     if (!group) {
       group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.squeeze.read, this.hsMob!]);
-      this.groups.set(key, group);
+      last.group = group;
     }
     pass.setPipeline(pipe);
     pass.setBindGroup(0, group);
@@ -1570,6 +1703,9 @@ export class WebGPUFluid {
     return this.phaseGap;
   }
 
+  /** The ferrofluid's carry velocity on a thin gap (phaseVelocity), or the mixture's off it. */
+  private phaseVel(thin = true): GPUTexture { return thin && this.phaseVelT ? this.phaseVelT : this.ride(); }
+
   /**
    * phaseAdvect: runPressed's bindings, then the gap, the gap the phase last
    * saw, and the thin solve's pressure and mobility (a stand-in for each until
@@ -1579,7 +1715,14 @@ export class WebGPUFluid {
     const pipe = this.pipeline('phaseAdvect', this.phase.write.format);
     if (!pipe) return;
     const thin = !!this.hsP && !!this.hsMob;
-    const ride = this.ride();
+    /*
+      The ferrofluid's own velocity only on a step that wrote it: hsP and
+      hsMob outlive Thin Gap, so keyed off them alone, a plate whose Thin Gap
+      was switched off kept carrying the ferrofluid on the last thin step's
+      phaseVelT, frozen (a dragged drop, magnet off, slid on 0.0425 of the
+      plate in 120 steps and smeared to no half-full cell; PLAN 29c-8).
+    */
+    const ride = this.phaseVel(thin && this.thinLive);
     const key = `phaseAdvect:${this.phase.read.label}:${this.squeeze.read.label}:${args.label}:${thin}:${ride.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1602,7 +1745,7 @@ export class WebGPUFluid {
   private runPhaseCompress(pass: GPUComputePassEncoder, stand: GPUTexture, args: GPUBuffer): void {
     const pipe = this.pipeline('phaseCompress', this.phase.write.format);
     if (!pipe) return;
-    const reads = [this.phase.read, this.phaseBlurT!, this.ride(), this.squeeze.read, stand];
+    const reads = [this.phase.read, this.phaseBlurT!, this.phaseVel(), this.squeeze.read, stand];
     const key = `phaseCompress:${this.phase.write.label}:${reads.map((r) => r.label).join(',')}:${args.label}`;
     let group = this.groups.get(key);
     if (!group) {
@@ -1639,19 +1782,19 @@ export class WebGPUFluid {
     pass.setBindGroup(0, group);
     pass.dispatchWorkgroups(1);
     const gap = this.ensurePhaseGap();
-    const there = this.phase.read, back = this.phase.write;
+    const there = this.phase.read, back = this.phase.write, ride = this.phaseVel();
     for (let j = 0; j < CARRY_SUBSTEPS; j++) {
-      const a = this.arg(`phase advect plan ${j}`, [1, j, 0, REST_GAP, 0, disp, 1, 0]);
-      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${this.ride().label}`;
+      const a = this.arg(this.nameOf('phase advect plan ', j), [1, j, 0, REST_GAP, 0, disp, 1, 0]);
+      const ka = `phaseAdvectPlan:${there.label}:${this.squeeze.read.label}:${a.label}:${stand.label}:${ride.label}`;
       let ga = this.groups.get(ka);
       if (!ga) {
-        ga = bindGroup(this.device, adv, [this.sim, a, there, this.ride(), back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
+        ga = bindGroup(this.device, adv, [this.sim, a, there, ride, back, this.press, this.squeeze.read, gap, this.hsP!, this.hsMob!, stand, this.phaseSub!]);
         this.groups.set(ka, ga);
       }
       pass.setPipeline(adv);
       pass.setBindGroup(0, ga);
       pass.dispatchWorkgroupsIndirect(this.phaseInd!, 12 * j);
-      const g = this.arg(`phase grid plan ${j}`, [j, 0, 0, 0]);
+      const g = this.arg4(this.nameOf('phase grid plan ', j), j);
       const kg = `phaseGridPlan:${back.label}:${this.squeeze.read.label}:${g.label}:${stand.label}`;
       let gg = this.groups.get(kg);
       if (!gg) {
@@ -1912,6 +2055,7 @@ export class WebGPUFluid {
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       }));
       this.groups.clear();
+      this.groupRoot = { kids: new Map() };
     }
     q.writeBuffer(this.splatBuf, 0, list.records);
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
@@ -1953,6 +2097,7 @@ export class WebGPUFluid {
       if (this.splatBuf) this.disposer.release(this.splatBuf);
       this.splatBuf = this.disposer.track(this.device.createBuffer({ label: 'splats', size: 1024, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
       this.groups.clear();
+      this.groupRoot = { kids: new Map() };
     }
     this.device.queue.writeBuffer(this.splatBuf, 0, rec);
     this.simF[0] = this.N; this.simF[1] = this.L;
@@ -2368,11 +2513,11 @@ export class WebGPUFluid {
       if (rb) {
         const half = Math.ceil((this.N * (this.N / 2)) / 64);
         for (let k = 0; k < SQUEEZE_SWEEPS; k++) {
-          for (const parity of [0, 1]) {
+          for (let parity = 0; parity < 2; parity++) {
             const key = `squeezeRedBlack:${parity}:${this.squeeze.read.label}`;
             let group = this.groups.get(key);
             if (!group) {
-              group = bindGroup(this.device, rb, [this.sim, this.arg(`squeeze ${parity}`, [parity, 0, 0, 0]), this.squeeze.read, this.spress]);
+              group = bindGroup(this.device, rb, [this.sim, this.arg4(this.nameOf('squeeze ', parity), parity), this.squeeze.read, this.spress]);
               this.groups.set(key, group);
             }
             pass.setPipeline(rb);
@@ -2551,6 +2696,13 @@ export class WebGPUFluid {
       if (thin) this.run(pass, 'rimLaplace', rim, [smooth], args, 1);
       this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth, rim], args);
       this.vel.swap();
+      // Film Hold's push: the film between two drops holds them apart (mixFilm).
+      const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
+      if (hold > 0.001 && oil > 0.001) {
+        this.run(pass, 'mixFilm', this.vel.write, [this.vel.read, mix!.read, smooth],
+          this.arg('mix film', [oil * OIL_TENSION * perSecond * N * N * FILM_PUSH * hold, OIL_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
+        this.vel.swap();
+      }
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
     /*
       On a thin gap, Rain Drip's heavy dye, Plate Rock's tilt, Updraft's
@@ -2949,13 +3101,15 @@ export class WebGPUFluid {
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
-      this.run(pass, 'dampGrid', this.dye.write, [this.dye.read], k);
-      this.dye.swap();
+      const damp = (field: PingPong) => {
+        this.run(pass, 'dampGridCurv', this.scratchA, [field.read], k);
+        this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
+        this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
+        field.swap();
+      };
+      damp(this.dye);
       // The oil's share has the same grid in it, from the same faces.
-      if (bodiesOn) {
-        this.run(pass, 'dampGrid', this.oilDye!.write, [this.oilDye!.read], k);
-        this.oilDye!.swap();
-      }
+      if (bodiesOn) damp(this.oilDye!);
     }, gridTop > 0.002);
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
@@ -3033,6 +3187,23 @@ export class WebGPUFluid {
         as lines every other cell through the black.
       */
       const grid = this.arg('phase grid', [0, 0, 0, 0]);
+      /*
+        Two-phase carry on the thin gap (phaseVelocity in wgsl/fluid.ts,
+        PLAN 29c-8): reconstructs the coherent drop's ferrofluid velocity
+        at the trailing rim so the oil's dipole return flow cannot sweep it
+        backward into the wake, while stepping aside when a labyrinth or
+        standing-spike field parts the pool into narrow valleys.
+      */
+      if (thin) {
+        if (!this.phaseVelT) {
+          this.phaseVelT = this.disposer.track(this.device.createTexture({
+            label: 'phase vel', size: [this.N, this.N], format: VEL,
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+          }));
+        }
+        const cohere = !this.filmHeld ? Math.max(0, 1 - 2 * maze) * (1 - spikeAmt) : 0;
+        this.run(pass, 'phaseVelocity', this.phaseVelT, [this.ride(), this.phase.read], this.arg('phase vel', [cohere, 0, 0, 0]));
+      }
       /*
         Carried as a volume, in as many substeps as the step's flow needs,
         never fewer than these (phasePlan in wgsl/fluid.ts, and why: a kick's
@@ -3184,8 +3355,10 @@ export class WebGPUFluid {
           many the oil takes.
         */
         const subs = oil > 0 ? CH_SUBSTEPS : 1;
+        // Film Hold: the water film between two drops pushes back (FILM_WGSL).
+        const film = oil > 0 ? this.arg('mix mu', [FILM_MU * Math.max(0, Math.min(1, p.filmHold ?? 0)), 0, 0, 0]) : none;
         for (let k = 0; k < subs; k++) {
-          this.run(pass, 'mixMu', m.write, [m.read], none);
+          this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
             ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), 0.08, Math.pow(0.1, (p.magnetSeconds ?? 1 / 60) / 10), 0.04])
@@ -3370,7 +3543,7 @@ export class WebGPUFluid {
       const rate = this.ensureSlump();
       const oilMix = mix && this.mixLive ? mix.read : this.blank('rgba');
       this.run(pass, 'slumpRate', rate, [this.dye.read, this.squeeze.read, oilMix],
-        this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), 0, 0, 0, 0]));
+        this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), slump!.inertRate, 0, 0, 0]));
       const args = this.arg('slump', [SLUMP_FACE, 0, 0, 0]);
       for (let k = 0; k < slump!.substeps; k++) {
         this.run(pass, 'slump', this.dye.write, [this.dye.read, rate], args);
@@ -3785,7 +3958,8 @@ export class WebGPUFluid {
     this.run(pass, 'mixSplat', m.write, [m.read],
       this.arg('mix splat', [x, y, radius, 1, what.oil ?? 0, what.soap ?? 0, what.acid ?? 0, 0]));
     // Flat to its edge (mixSplat), so a disc's worth; the clamp at full is not counted.
-    this.oilPoured += Math.max(0, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius;
+    // A negative oil cuts a hole (a compound drop's, oilLay.ts), and is taken off.
+    this.oilPoured = Math.max(0, this.oilPoured + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
     m.swap();
     pass.end();
     this.device.queue.submit([enc.finish()]);
@@ -3907,7 +4081,7 @@ export class WebGPUFluid {
    * glycerine a pool takes minutes to spread a millimetre), and the pass is
    * skipped.
    */
-  private slumpPlan(p: GpuStepParams): { rate: number; substeps: number } | null {
+  private slumpPlan(p: GpuStepParams): { rate: number; substeps: number; inertRate: number } | null {
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
     const nu = thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS);
     // Stood up by θ (Gravity, 0 flat to 1 upright), only cos θ of g is through the glass.
@@ -3920,10 +4094,16 @@ export class WebGPUFluid {
     const b = REST_GAP * PLATE_METRES;
     // η³(1 − η/b)³ rises to its peak at half the gap.
     const e = Math.min(eta, b / 2);
-    const most = perStep * e * e * e * Math.pow(1 - e / b, 3);
+    const open = 1 - e / b;
+    const mostVisc = perStep * e * e * e * open * open * open;
+    // The inertial Froude current's maximum speed √(g′e(1 - e/b)) (Huppert and Simpson 1980).
+    const mostInert = FROUDE_FRONT * (seconds / dx) * Math.sqrt(gPrime * e * open);
+    const most = Math.min(mostVisc, mostInert);
     if (most < 1e-4) return null;
     const substeps = Math.max(1, Math.min(SLUMP_SUBSTEPS, Math.ceil(most / SLUMP_FACE)));
-    return { rate: perStep / substeps, substeps };
+    const dtSub = seconds / substeps;
+    const inertRate = FROUDE_FRONT * (dtSub / dx) * Math.sqrt(gPrime);
+    return { rate: perStep / substeps, substeps, inertRate };
   }
 
   private ensureOilDye(): PingPong {
@@ -4354,8 +4534,8 @@ export class WebGPUFluid {
     if (!pipe) return;
     const half = Math.ceil((this.N * (this.N / 2)) / 64);
     for (let k = 0; k < sweeps; k++) {
-      for (const parity of [0, 1]) {
-        const args = this.arg(`pressure ${parity}`, [parity, 0, 0, 0]);
+      for (let parity = 0; parity < 2; parity++) {
+        const args = this.arg4(this.nameOf('pressure ', parity), parity);
         const key = `pressureRedBlack:${parity}`;
         let group = this.groups.get(key);
         if (!group) {
@@ -4409,8 +4589,8 @@ export class WebGPUFluid {
       if (level === 0) { this.smooth0(pass, sweeps); return; }
       const lv = this.mg[level - 1];
       for (let k = 0; k < sweeps; k++) {
-        for (const parity of [0, 1]) {
-          this.dispatchBuf(pass, 'mgSmooth', `mgSmooth:${level}:${parity}`, this.arg(`mg smooth ${level} ${parity}`, [lv.n, parity, 0, 0]),
+        for (let parity = 0; parity < 2; parity++) {
+          this.dispatchBuf(pass, 'mgSmooth', this.nameOf('mgSmooth:', level, ':', parity), this.arg4(this.nameOf('mg smooth ', level, ' ', parity), lv.n, parity),
             [lv.b, lv.p], lv.n * Math.ceil(lv.n / 2));
         }
       }
@@ -4422,16 +4602,16 @@ export class WebGPUFluid {
       this.dispatchBuf(pass, 'mgRestrict0', 'mgRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.press, below.b], below.n * below.n);
     } else {
       const here = this.mg[l - 1];
-      this.dispatchBuf(pass, 'mgRestrict', `mgRestrict:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [here.p, here.b, below.b], below.n * below.n);
+      this.dispatchBuf(pass, 'mgRestrict', this.nameOf('mgRestrict:', l), this.arg4(this.nameOf('mg level ', l), here.n), [here.p, here.b, below.b], below.n * below.n);
     }
-    this.dispatchBuf(pass, 'mgZero', `mgZero:${l + 1}`, this.arg(`mg zero ${l + 1}`, [below.n * below.n, 0, 0, 0]), [below.p], below.n * below.n);
+    this.dispatchBuf(pass, 'mgZero', this.nameOf('mgZero:', l + 1), this.arg4(this.nameOf('mg zero ', l + 1), below.n * below.n), [below.p], below.n * below.n);
     this.vcycle(pass, l + 1);
     if (l === 0) {
       // Into level 0's packed buffer (A.a.y = 1): `mgProlong` in wgsl/fluid.ts.
       this.dispatchBuf(pass, 'mgProlong', 'mgProlong0', this.arg('mg prolong 0', [this.N, 1, 0, 0]), [below.p, this.press], this.N * this.N);
     } else {
       const here = this.mg[l - 1];
-      this.dispatchBuf(pass, 'mgProlong', `mgProlong:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [below.p, here.p], here.n * here.n);
+      this.dispatchBuf(pass, 'mgProlong', this.nameOf('mgProlong:', l), this.arg4(this.nameOf('mg level ', l), here.n), [below.p, here.p], here.n * here.n);
     }
     smooth(l, MG_SWEEPS);
   }
@@ -4831,7 +5011,7 @@ export class WebGPUFluid {
 
   /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */
   private hsRun(pass: GPUComputePassEncoder, name: string, key: string, args: GPUBuffer, resources: (GPUBuffer | GPUTexture)[], count?: number): void {
-    const pipe = this.pipelines.computePipeline(`${name}:thin`, kernel(name, 'rgba16float'));
+    const pipe = this.pipelines.computePipeline(this.pipelineKey(name, 'thin'), kernel(name, 'rgba16float'));
     if (!pipe) return;
     let group = this.groups.get(key);
     if (!group) {
@@ -4915,7 +5095,7 @@ export class WebGPUFluid {
       // Level 0 has no face buffer (its faces are its cells' harmonic means), so its
       // cells fill the slot too: read twice is allowed, read and written in one dispatch is not.
       const faces = l === 0 ? mob : this.hsFaceC[l - 1];
-      this.hsRun(pass, 'hsCoarsen', `hsCoarsen:${l}`, this.arg(`thin coarsen ${l}`, [fineN, l === 0 ? 1 : 0, 0, 0]),
+      this.hsRun(pass, 'hsCoarsen', this.nameOf('hsCoarsen:', l), this.arg4(this.nameOf('thin coarsen ', l), fineN, l === 0 ? 1 : 0),
         [cells, faces, this.hsMobC[l], this.hsFaceC[l]], this.mg[l].n * this.mg[l].n);
     }
     /*
@@ -4944,12 +5124,12 @@ export class WebGPUFluid {
     const mob = this.hsMob!;
     const smooth = (level: number, sweeps: number) => {
       for (let k = 0; k < sweeps; k++) {
-        for (const parity of [0, 1]) {
+        for (let parity = 0; parity < 2; parity++) {
           if (level === 0) {
-            this.hsRun(pass, 'hsSmooth0', `hsSmooth0:${parity}`, this.arg(`pressure ${parity}`, [parity, 0, 0, 0]), [this.div, this.hsP!, mob], this.N * (this.N / 2));
+            this.hsRun(pass, 'hsSmooth0', this.nameOf('hsSmooth0:', parity), this.arg4(this.nameOf('pressure ', parity), parity), [this.div, this.hsP!, mob], this.N * (this.N / 2));
           } else {
             const lv = this.mg[level - 1];
-            this.hsRun(pass, 'hsSmooth', `hsSmooth:${level}:${parity}`, this.arg(`mg smooth ${level} ${parity}`, [lv.n, parity, 0, 0]),
+            this.hsRun(pass, 'hsSmooth', this.nameOf('hsSmooth:', level, ':', parity), this.arg4(this.nameOf('mg smooth ', level, ' ', parity), lv.n, parity),
               [lv.b, lv.p, this.hsMobC[level - 1], this.hsFaceC[level - 1]], lv.n * Math.ceil(lv.n / 2));
           }
         }
@@ -4962,15 +5142,15 @@ export class WebGPUFluid {
       this.hsRun(pass, 'hsRestrict0', 'hsRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.hsP!, mob, below.b], below.n * below.n);
     } else {
       const here = this.mg[l - 1];
-      this.hsRun(pass, 'hsRestrict', `hsRestrict:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [here.p, here.b, this.hsMobC[l - 1], this.hsFaceC[l - 1], below.b], below.n * below.n);
+      this.hsRun(pass, 'hsRestrict', this.nameOf('hsRestrict:', l), this.arg4(this.nameOf('mg level ', l), here.n), [here.p, here.b, this.hsMobC[l - 1], this.hsFaceC[l - 1], below.b], below.n * below.n);
     }
-    this.dispatchBuf(pass, 'mgZero', `mgZero:${l + 1}`, this.arg(`mg zero ${l + 1}`, [below.n * below.n, 0, 0, 0]), [below.p], below.n * below.n);
+    this.dispatchBuf(pass, 'mgZero', this.nameOf('mgZero:', l + 1), this.arg4(this.nameOf('mg zero ', l + 1), below.n * below.n), [below.p], below.n * below.n);
     this.hsCycle(pass, l + 1);
     if (l === 0) {
       this.hsRun(pass, 'hsProlong0', 'hsProlong0', this.arg('none', [0, 0, 0, 0]), [below.p, this.hsP!, mob], this.N * this.N);
     } else {
       const here = this.mg[l - 1];
-      this.hsRun(pass, 'hsProlong', `hsProlong:${l}`, this.arg(`mg level ${l}`, [here.n, 0, 0, 0]), [below.p, here.p, this.hsMobC[l - 1]], here.n * here.n);
+      this.hsRun(pass, 'hsProlong', this.nameOf('hsProlong:', l), this.arg4(this.nameOf('mg level ', l), here.n), [below.p, here.p, this.hsMobC[l - 1]], here.n * here.n);
     }
     smooth(l, MG_SWEEPS);
   }
@@ -5278,5 +5458,6 @@ export class WebGPUFluid {
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();
+    this.groupRoot = { kids: new Map() };
   }
 }

@@ -24,11 +24,25 @@ module.exports = {
   appId: 'app.chromaglass.desktop',
   productName: 'ChromaGlass',
   copyright: 'Copyright © jstevoh',
-  // The app's version is the site's: one number for what is inside it.
-  extraMetadata: { version: root.version },
+  // The app's version is the site's (one number for what is inside it), and a
+  // release's is set by desktop.yml: the site's major and minor and the run's
+  // number, so every release is newer than the last without a version bump in
+  // a pull request first (electron-updater only offers a higher version). And
+  // whether it was signed, which is what lets main.js install an update in place
+  // (desktop/updates.js).
+  //
+  // And `checkKey`: the public half of a key pair desktop.yml makes for each
+  // build and throws away with the runner, so the check of the built app can
+  // open the show on a key it signs itself (PLAN.md 23.17d). Nobody holds the
+  // private half once the job ends, so the shipped app trusts it for nothing.
+  extraMetadata: {
+    version: process.env.DESKTOP_VERSION || root.version,
+    chromaglass: { signed, ...(process.env.CHROMAGLASS_BUILD_CHECK_KEY ? { checkKey: JSON.parse(process.env.CHROMAGLASS_BUILD_CHECK_KEY) } : {}) },
+  },
   directories: { output: 'release', buildResources: 'resources' },
   files: [
     'main.js',
+    'updates.js',
     'preload.cjs',
     'package.json',
     { from: '../dist', to: 'dist', filter: ['**/*'] },
@@ -38,8 +52,14 @@ module.exports = {
   // and imports the server (an ES module) from inside it. `npm run desktop --
   // --packaged` is what says so.
   asar: true,
-  // No auto-update feed: a new build is a new download (desktop/README.md).
-  publish: null,
+  // Where the app looks for its next version (desktop/updates.js): this repo's
+  // GitHub Releases, which desktop.yml publishes to when the owner asks for a
+  // release. electron-builder writes this into the app as app-update.yml and
+  // writes latest-mac.yml beside the download; it never uploads anything itself
+  // (`--publish never` in package.json), so a pull request's build cannot make a
+  // release. The repository's newest release must be the app's: another kind of
+  // release on this repo would be made with `--latest=false`.
+  publish: { provider: 'github', owner: 'jstevoh', repo: 'chromaglass', releaseType: 'release' },
   mac: {
     target: [{ target: 'dmg', arch: ['arm64'] }, { target: 'zip', arch: ['arm64'] }],
     category: 'public.app-category.entertainment',
@@ -56,7 +76,10 @@ module.exports = {
       NSLocalNetworkUsageDescription: 'ChromaGlass serves the show to phones (the remote) and network displays on this network, and hears OSC and Art-Net.',
     },
   },
-  dmg: { title: 'ChromaGlass ${version}' },
+  // The .dmg keeps one name in every release, so the site's "Download for Mac"
+  // (src/lib/macApp.ts) is one fixed link to the newest; the zip, which is what
+  // an in-place update downloads, keeps its version in its name.
+  dmg: { title: 'ChromaGlass ${version}', artifactName: 'ChromaGlass-mac-${arch}.${ext}' },
   // For the check in a Linux cloud session (`npm run desktop -- --packaged`); not shipped.
   linux: { target: 'dir', icon: '../public/icon-512.png', category: 'AudioVideo' },
 };

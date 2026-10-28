@@ -55,7 +55,7 @@ export function LaptopLinkForm() {
                 <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
                 <span className="truncate">{show.name}</span>
               </span>
-              <span className="shrink-0 text-[12px] font-bold uppercase tracking-wider text-amber-300">Join</span>
+              <span className="shrink-0 text-[12px] font-bold uppercase tracking-wider text-accent-text">Join</span>
             </button>
           ))}
         </div>

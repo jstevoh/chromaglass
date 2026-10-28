@@ -2,8 +2,9 @@ import type { CartoonShelfProps } from '../CartoonShelf';
 import type { ReactNode, Ref } from 'react';
 import type { MixTakes } from '../../lib/mixFade';
 import type { LiquidType, VisualizerSettings } from '../../types';
-import type { DeskLayout, LayoutName } from '../../lib/deskLayout';
-import type { DeskDots, DeskMode } from './DeskHeader';
+import type { DeskLayout } from '../../lib/deskLayout';
+import type { TabEdit } from '../../hooks/useDeskLayout';
+import type { DeskDots } from './DeskHeader';
 import type { SongScoreProps } from '../SongScore';
 
 /**
@@ -40,13 +41,22 @@ export type ControlKind = 'fader' | 'encoder';
  * bottles, dyes and recipe from Design. Grouped by the panel that reads them.
  */
 export interface DeskProps {
-  // ── Which layout, and its panels ───────────────────────────────────
-  layoutName: LayoutName;
+  // ── Which tab, and its panels ──────────────────────────────────────
+  /** The owner's tabs, in order (lib/deskTabs.ts). */
+  tabs: { id: string; name: string }[];
+  /** The one that is up. */
+  tab: string;
+  onTab: (id: string) => void;
+  /** Rename, move, delete, add (empty or a copy of one), or put the three back. */
+  onTabEdit: (e: TabEdit) => void;
   layout: DeskLayout;
   onLayout: (change: (l: DeskLayout) => DeskLayout) => void;
   onResetLayout: () => void;
-  mode: DeskMode;
-  onMode: (m: DeskMode) => void;
+  /**
+   * The three that were screens of their own, as panels (`Sheet embed`):
+   * the song shows, the sequences, and the music player with the drone.
+   */
+  screens: { songs: ReactNode; sequences: ReactNode; player: ReactNode };
   /**
    * A settings section drawn whole, for a panel (`SettingsPanel embed`).
    * Not drawn while `sheetOpen`: the sheet has every section in the page, and
@@ -70,8 +80,6 @@ export interface DeskProps {
   onSearch: () => void;
   onOpenSettings: () => void;
   onOpenAccount?: () => void;
-  /** Gig's breadcrumb: the show and the look that is up. */
-  showCrumb: ReactNode;
   /** `song`: following a known song's map by ear, and how sure (lib/followedPlace.ts `followLine`; PLAN.md 28g-2). */
   status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null; song?: string | null };
   onBlackout: () => void;
@@ -173,6 +181,8 @@ export interface DeskProps {
   dyeBottles: LiquidType[];
   behaviourBottles: LiquidType[];
   bottleId: string;
+  /** What is left of the Dye Budget, 0 to 1, read off the plate when asked (the picked bottle polls it). */
+  dyeRoom?: () => number;
   onBottle: (id: string) => void;
   swatches: { hex: string; name: string }[];
   dye: string | null;

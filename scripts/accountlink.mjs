@@ -308,11 +308,11 @@ try {
   await showPage.goto(SHOW_URL);
   const showSignedIn = await signInByEmail(showPage, SHOW_EMAIL, ORIGIN);
 
-  // Switch desk to Load-in mode where Phone · iPad lives
-  for (let i = 0; i < 40 && (await showPage.getByTestId('mode-segmented-loadin').count()) === 0; i++) {
+  // Switch the desk to the Setup tab, where Phone · iPad is as it ships
+  for (let i = 0; i < 40 && (await showPage.getByTestId('mode-segmented-setup').count()) === 0; i++) {
     await showPage.waitForTimeout(300);
   }
-  await clickAt(showPage, 'mode-segmented-loadin');
+  await clickAt(showPage, 'mode-segmented-setup');
 
   const qrAndStatus = await waitFor(
     async () =>

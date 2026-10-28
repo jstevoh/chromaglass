@@ -6,11 +6,12 @@ import { createNoise2D } from 'simplex-noise';
 import { AudioData } from '../hooks/useAudioAnalyzer';
 import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
+import { StepClock } from '../lib/stepClock';
 import { VisualizerSettings, LiquidType, SimResolution } from '../types';
-import { lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
+import { dyeRoomOf, lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, AUTO_DOSE, WORKING_DYES, dyesOnPlate } from '../presetPlate';
-import { clockGlassBodies, clockGlassCell } from '../lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../lib/oilLay';
 import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, pointInArea, pickArea, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
 import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
@@ -675,6 +676,35 @@ const SIM_MAX_CATCHUP = (() => {
   const warp = Number(new URLSearchParams(window.location.search).get('warp'));
   return Number.isFinite(warp) && warp >= 1 ? Math.min(240, Math.round(warp)) : 4;
 })();
+/*
+  `?lockstep=1` (diagnostic, the checks' software runs only): a frame is one
+  solver step long, whatever the wall clock says.
+
+  Live, a frame's elapsed time is the wall clock's, and on a GPU that is a
+  sixtieth of a second and a step. On a cloud session's software WebGPU a
+  frame is one step and two to fifteen seconds (PLAN.md 19l), and everything
+  the frame loop moves by elapsed time moved all of it: the lamp's wander,
+  the gel wheel, the plate's rotation, the phrasing. Measured 2026-10-27 with
+  `npm run bubbles`' two photographs of a slowed plate: 21.5% of its pixels
+  moved across one step taking 7.4 s, 26.8% across three steps in 15 s, 34.3%
+  across six in 23 s; the Mac, in its 1.2 s and 72 steps, moves 4 to 8%. What
+  moved was the wall clock, not the liquid. So the software plate was a Mac
+  plate with every wall-clock thing on it run fast, and a check that read it
+  read neither.
+
+  With the flag each frame's elapsed time is exactly the step it takes, so a
+  software plate is the Mac's plate in slow motion: `npm run bubbles`' plate
+  developed for 540 steps is the plate the Mac develops in nine seconds. What
+  it does not reach: the show's own intervals (Evolve's six-second drift, the
+  sequencer) and whatever stamps `showNow()`, which stay the wall clock's,
+  and sound, which plays in real time. A harness asks for it through
+  `engineQuery({ lockstep: true })` (scripts/frame.mjs), which a GPU never
+  sends, so nothing a Mac measures moves.
+*/
+const LOCKSTEP = (() => {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('lockstep') === '1';
+})();
 
 /*
   The show's dice, one stream per purpose (lib/rng.ts).
@@ -874,6 +904,8 @@ export interface LiquidVisualizerHandle {
   /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
   /** What is on each live layer: how full it is, and the colour of it. */
   layerReport: () => { index: number; fill: number; colour: string }[];
+  /** What is left of the Dye Budget on the layer in hand, 0 to 1: the bottle's level (PLAN 35e). */
+  dyeRoom: () => number;
   describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
   /**
    * Take on a preset's dyes, injection style and liquids without clearing the
@@ -2903,6 +2935,29 @@ class FluidSimulation {
         break;
       }
 
+      case 'splodascope': {
+        /*
+          The splodascope's crowd (src/lib/oilLay.ts, and why): a blue water
+          across the dish and a packed crowd of oil drops in it, each with
+          one of the other dyes, a few big ones holding a drop of another
+          colour in a ring of water. The look's Film Hold keeps them apart
+          where they touch, and Oil Bodies keeps each one's colour its own.
+        */
+        const water = col(0);
+        const discs = splodascopeDiscs(this.rng.float, harmony.length);
+        const g = this.gpu;
+        for (const d of discs) g?.addMix?.(d.x, d.y, d.r, { oil: d.oil });
+        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+          const cell = splodascopeCell((x + 0.5) / S, (y + 0.5) / S, S, discs);
+          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
+          if (cell.dye > 0) {
+            const c = col(discs[cell.disc].dye);
+            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
+          }
+        }
+        break;
+      }
+
       // Boyle's bench starts from clean glass, as Turing Print does now that the
       // Sensual Laboratory is retired (PLAN 28i-1): the pattern is the subject,
       // not a seed of blobs, and its colour is the reaction's alone (depositChem).
@@ -4213,6 +4268,7 @@ class FluidSimulation {
       vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
       oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
+      filmHold: Math.max(0, Math.min(1, settings.filmHold ?? 0)),
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
       // The front plate only: the display reads the film from the front
       // plate's packed view alone, so a film on the back plate would be
@@ -5627,7 +5683,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const macroCamRef = useRef(new MacroCamera());
   const macroShotRef = useRef<MacroShot>({ cx: 0.5, cy: 0.5, zoom: 1, whip: 0 });
   const filmHistRef = useRef(new Uint32Array(FILM_BINS));
-  const simAccumRef = useRef(0);
+  /** Live steps a frame, counted by the refresh where the refresh allows (lib/stepClock.ts); made on the first frame. */
+  const stepClockRef = useRef<StepClock | null>(null);
+  /** The refresh stamp the last frame drew at (ms, `drawGate.lastDraw`), for the interval the step clock is given. */
+  const lastStampRef = useRef(Number.NaN);
   /** Milliseconds the last frame spent in the solver: the catch-up cap adapts to it. */
   const simMsRef = useRef(0);
   /** Solver steps a second, smoothed — 60 when the show is keeping wall-clock time. */
@@ -6254,6 +6313,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       fill: Math.max(0, Math.min(1, (f?.meanDensity ?? 0) / 0.35)),
       colour: f ? rgbToHex(f.meanColor[0], f.meanColor[1], f.meanColor[2]) : '#000000',
     })),
+    /*
+      The same target the regulator holds the plate to (`stepDecay`), without
+      the hand bank, read against the plate's mean density: a few reads a
+      second from the picked bottle, nothing per frame.
+    */
+    dyeRoom: () => {
+      const f = fluidsRef.current[activeLayerRef.current];
+      if (!f) return 1;
+      const st = settingsRef.current;
+      const budget = dyeLookTarget(f.seedMean, st.dyeBudget ?? 0.85, f.seedBudget);
+      return dyeRoomOf(f.meanDensity, budget + (0.28 - budget) * macroAmountOf(st));
+    },
     describePlate: () => ({
       contract: presetContractRef.current ? [...presetContractRef.current] : null,
       injectStyles: [...injectStyleRef.current],
@@ -6770,6 +6841,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     let throwFrames = 0;
     /** `stepDownFrames(n)`: a rung lost on each of the next n frames — swaps faster than a readback lands (S3, S6). */
     let stepDownFrames = 0;
+    /*
+      What `forceStepDown` asked for, kept across frames. It used to set the
+      engine status once and let the next frame's own status overwrite it, and
+      on a one-rung ladder (software WebGPU in a cloud session: classifyAdapter
+      says 'software', so qualityLadder has one rung) `failRung` has nowhere to
+      go, `governor.steppedDown` stays false, and `npm run tiers` lost the
+      step-down nudge before it could read it (Measure · lab, "locator.textContent:
+      Timeout 30000ms", PLAN 19aa-10). On a real ladder the governor does move
+      and agrees with this anyway.
+    */
+    let forcedStepDown = false;
     /** `errorStorm(n)`: an invalid GPU call on each of the next n frames, for the storm rebuild (S6). */
     let stormFrames = 0;
     /*
@@ -7095,7 +7177,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // A render's frame is exactly 1/fps: the clock's own difference of two
         // large doubles is that to within a last bit, which would still be a
         // different last bit in every uniform downstream.
-        const realDt = rendering ? 1 / rendering.fps : now - lastTimeRef.current;
+        /*
+          Live, the interval is the refresh's, from the stamps the draw gate
+          let through, when that agrees with the wall clock to within 20 ms
+          (lib/stepClock.ts): the browser's refresh timestamp is the display's
+          own clock, where `Date.now()` here counts whole milliseconds read
+          part way into the frame, and that scatter is what made the step
+          count stutter. Everything downstream that integrates over the
+          frame (the wheel, the camera, the chemistry) gets the steadier
+          number too. A frame with no believable stamp, after a pause, or a
+          window whose frames come from a timer, keeps the wall clock.
+        */
+        const stamp = drawGate.lastDraw;
+        const wallDt = now - lastTimeRef.current;
+        const refreshDt = (stamp - lastStampRef.current) / 1000;
+        lastStampRef.current = stamp;
+        const realDt = rendering ? 1 / rendering.fps
+          : LOCKSTEP ? simStepS
+          : refreshDt > 0 && Math.abs(refreshDt - wallDt) < 0.02 ? refreshDt : wallDt;
         lastTimeRef.current = now;
         frameS = realDt;
         // One verdict per frame on whether this is a kick: from the beat
@@ -7290,9 +7389,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         const behind = SIM_MAX_CATCHUP > 4 ? SIM_MAX_CATCHUP : frameMsNow > 40 ? 1 : frameMsNow > 24 ? 2 : SIM_MAX_CATCHUP;
         const catchUp = Math.min(behind, simMsRef.current > 10 ? 1 : simMsRef.current > 6 ? Math.min(2, SIM_MAX_CATCHUP) : SIM_MAX_CATCHUP);
         catchUpRef.current = catchUp;
-        simAccumRef.current = Math.min(simAccumRef.current + realDt, simStepS * catchUp);
-        let simSteps = Math.floor(simAccumRef.current / simStepS);
-        simAccumRef.current -= simSteps * simStepS;
+        // Counted by the refresh where the display's rate is a whole ratio of
+        // the step's, by the accumulator elsewhere (`npm run cadence`).
+        const stepClock = stepClockRef.current ??= new StepClock();
+        let simSteps = rendering ? 0 : stepClock.steps(realDt, simStepS, catchUp);
         if (rendering) {
           /*
             A render's steps are counted, not measured: frame i is owed the
@@ -7304,7 +7404,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           */
           const i = rendering.frame;
           simSteps = Math.floor(((i + 1) * rendering.stepRate) / rendering.fps) - Math.floor((i * rendering.stepRate) / rendering.fps);
-          simAccumRef.current = 0;
         }
         stepsThisFrame = simSteps;
         if (!rendering) {
@@ -7556,8 +7655,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             grid: lead?.gpu ? lead.gpu.N : 0,
             dpr: dprRef.current,
             tier, gpu: renderer?.info.gpuClass ?? 'weak', renderer: renderer?.info.renderer ?? '',
-            governed,
-            steppedDown: governed && governor.steppedDown,
+            governed: governed || forcedStepDown,
+            steppedDown: forcedStepDown || (governed && governor.steppedDown),
             gpuUnavailable,
             frameMs: governor.frameMs,
             simMs: simMsRef.current,
@@ -10130,6 +10229,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     */
     const resetStamps = () => {
       lastTimeRef.current = showEpochS();
+      lastStampRef.current = Number.NaN;
       /*
         Evolve's own stamps, on the show clock like the rest of these: a thin
         and a flood are each held back for a few seconds after the last
@@ -10207,7 +10307,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const resetPlateClocks = () => {
       resetStamps();
       simulationTimeRef.current = 0;
-      simAccumRef.current = 0;
+      stepClockRef.current?.reset();
       wanderClockRef.current = 0;
       loudnessRef.current = 0;
       evolveLoudRef.current = 0;
@@ -10678,6 +10778,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         simulateOutOfMemory: () => outOfMemory(fluidsRef.current[0]?.gpu?.N ?? governorRef.current?.rung.grid ?? 0, 'simulated (chromaglassDebug)'),
         stepDownFrames: (n: number) => { stepDownFrames = Math.max(0, n | 0); },
         forceStepDown: (steppedDown = true) => {
+          forcedStepDown = steppedDown;
           if (steppedDown) governorRef.current?.failRung(performance.now() * 0.001);
           const prev = engineStatusRef.current;
           const next: EngineStatus = {

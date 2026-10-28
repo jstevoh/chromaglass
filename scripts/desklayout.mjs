@@ -1,23 +1,30 @@
 /**
- * `npm run desklayout`: the desk's layouts (src/lib/deskLayout.ts), in node.
+ * `npm run desklayout`: the desk's layouts and tabs (src/lib/deskLayout.ts,
+ * src/lib/deskTabs.ts), in node.
  *
  * Desk v2 made the two desks one, filled from a layout: which panels are out,
  * in which column or the deck, floating, folded. That model is what every
  * layout on screen is drawn from, so it is checked here, without a browser,
  * on the things that would quietly break a desk:
  *
- *  - The shipped layouts name panels that exist, each once, and keep the
- *    Stage panels (the room and the machine) to Load-in, as the design does.
+ *  - The shipped tabs (Perform, Sequence, Setup) name panels that exist,
+ *    each once, and between them hold every panel that was behind a chip
+ *    before the tabs were the owner's: Build's, Gig's and Load-in's panels,
+ *    and the Sequence and Sound screens. A chip taken away with nothing in
+ *    its place would have been controls nobody could reach.
+ *  - The tab editor's operations (rename, move, delete, add, copy) keep
+ *    the list sound: ids once, a name always, never no tab at all.
  *  - Every settings section is a panel, so the panel browser reaches all of
  *    what the Settings sheet did. A section left out of `PANELS` would be a
  *    control that is only in the sheet again.
- *  - A layout nobody has touched is not stored. This is the rides' lesson
+ *  - Tabs nobody has touched are not stored. This is the rides' lesson
  *    (deskPins.ts): stored on first sight, a layout would pin everyone to
  *    the day they first opened the desk, and a better shipped one would
  *    never reach them.
  *  - A stored layout from an older build, or a hand edit, cannot break the
- *    desk: unknown and doubled panels go, a Stage panel outside Load-in goes,
- *    a floating rectangle is clamped to one that can be grabbed.
+ *    desk: unknown and doubled panels go, a floating rectangle is clamped to
+ *    one that can be grabbed. An old layout somebody rearranged is kept as a
+ *    tab of its own, once, and an old desk mode opens the tab it became.
  *  - Every operation keeps a panel in exactly one place.
  *
  * What it cannot see: the desk drawn. That is `npm run layout` (the panels in
@@ -25,11 +32,15 @@
  */
 import {
   LAYOUT_NAMES, PANELS, PANEL_BY_ID, SHIPPED, FLOAT_SIZE,
-  closePanel, collapseAll, dockPanel, floatPanel, isStagePanel, loadLayout, openPanel, openPanels,
-  panelAllowed, placeFloating, raiseFloating, sameLayout, sanitizeLayout, saveLayout, shippedLayout,
-  toggleCollapsed, whereIs, DESK_MODE_OF, LAYOUT_OF_MODE,
+  closePanel, collapseAll, dockPanel, floatPanel, isStagePanel, openPanel, openPanels,
+  placeFloating, raiseFloating, sameLayout, sanitizeLayout, shippedLayout,
+  toggleCollapsed, whereIs,
 } from '../src/lib/deskLayout.ts';
-import { SETTINGS_SECTIONS } from '../src/lib/settingsMap.ts';
+import {
+  DEFAULT_TABS, TABS_KEY, TAB_KEY, TABS_MAX, TAB_NAME_MAX, addTab, baseLayout, defaultTabs, deleteTab, loadTabId, loadTabs, moveTab,
+  renameTab, sanitizeTabs, saveTabs, setTabLayout, storedForm, tabForStored,
+} from '../src/lib/deskTabs.ts';
+import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, groupOf } from '../src/lib/settingsMap.ts';
 import { PINNABLE } from '../src/lib/deskPins.ts';
 const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
@@ -59,32 +70,125 @@ const placesOf = (l) => {
 
 // ── What ships ──────────────────────────────────────────────────────
 console.log('\n What ships');
-for (const name of LAYOUT_NAMES) {
-  const l = SHIPPED[name];
+for (const t of DEFAULT_TABS) {
+  const l = t.layout;
   const { all, doubled } = placesOf(l);
   const unknown = all.filter(id => !PANEL_BY_ID.has(id));
-  const notAllowed = all.filter(id => !panelAllowed(name, id));
-  check(`${name} names panels that exist, each once, all allowed in it`,
-    all.length > 0 && unknown.length === 0 && doubled.length === 0 && notAllowed.length === 0,
-    `${all.length} panels${unknown.length ? `; unknown ${unknown}` : ''}${doubled.length ? `; doubled ${doubled}` : ''}${notAllowed.length ? `; not allowed ${notAllowed}` : ''}`);
-  check(`and sanitising ${name} changes nothing`, sameLayout(sanitizeLayout(name, structuredClone(l)), l));
+  check(`${t.name} names panels that exist, each once`,
+    all.length > 0 && unknown.length === 0 && doubled.length === 0,
+    `${all.join(', ')}${unknown.length ? `; unknown ${unknown}` : ''}${doubled.length ? `; doubled ${doubled}` : ''}`);
+  check(`and sanitising ${t.name} changes nothing`, sameLayout(sanitizeLayout(structuredClone(l), baseLayout(t.id)), l));
 }
-check('Build and Gig keep the Stage panels off; Load-in has them',
-  ['build', 'gig'].every(n => openPanels(SHIPPED[n]).every(id => !isStagePanel(id)))
-  && openPanels(SHIPPED.loadin).some(isStagePanel),
-  `Load-in: ${openPanels(SHIPPED.loadin).filter(isStagePanel).join(', ')}`);
-// Build is the old Design desk and holds the show off while a look is built
-// (`designing` in App is the plate in Preview); Gig and Load-in are the show.
-check('Build ships in Preview, Gig and Load-in Live',
-  SHIPPED.build.plateMode === 'preview' && SHIPPED.gig.plateMode === 'live' && SHIPPED.loadin.plateMode === 'live');
-// The old desks' halves, where the checks and the owner's hands expect them.
-check('Gig is the Perform desk (cues left, rides right); Build has the bench and the recipe',
-  SHIPPED.gig.left[0] === 'cues' && SHIPPED.gig.right[0] === 'rides'
-  && ['bottles', 'dyes', 'tools'].every(id => whereIs(SHIPPED.build, id) === 'right') && whereIs(SHIPPED.build, 'recipe') === 'deck');
-check('the old desk modes and the layouts map both ways',
-  LAYOUT_NAMES.every(n => LAYOUT_OF_MODE(DESK_MODE_OF[n]) === n) && LAYOUT_OF_MODE(null) === 'build' && LAYOUT_OF_MODE('garbage') === 'build');
-check('a shipped layout handed out is a copy, not the one that ships',
-  (() => { const c = shippedLayout('gig'); c.left.push('rides'); return SHIPPED.gig.left.length === 1; })());
+check('the three that ship are Perform, Sequence and Setup, in that order',
+  DEFAULT_TABS.map(t => `${t.id}:${t.name}`).join() === 'perform:Perform,sequence:Sequence,setup:Setup');
+/*
+  The old chips folded into the three. Every panel that was out in Build, Gig
+  or Load-in is on one of them, and so are the two screens (the Sequence
+  chip's Songs and Sequences, the Sound chip's player and drone), now panels.
+*/
+const onDefaults = new Set(DEFAULT_TABS.flatMap(t => openPanels(t.layout)));
+const wasBehindChips = [...new Set([...LAYOUT_NAMES.flatMap(n => openPanels(SHIPPED[n])), 'songs', 'sequences', 'player'])];
+const lost = wasBehindChips.filter(id => !onDefaults.has(id));
+check('every panel the old chips had out, and the Sequence and Sound screens, is on a shipped tab',
+  lost.length === 0, lost.length ? `not on any: ${lost.join(', ')}` : `${wasBehindChips.length} panels`);
+check('Perform is the show: the set list to go to the next look, the bottles, the rides and the tools, Live',
+  whereIs(DEFAULT_TABS[0].layout, 'cues') === 'left' && ['bottles', 'rides', 'dyes', 'tools'].every(id => whereIs(DEFAULT_TABS[0].layout, id))
+  && DEFAULT_TABS[0].layout.plateMode === 'live');
+check('Sequence holds the set, the song shows, the sequences and the score, Live so a sequence reaches the plate',
+  ['cues', 'songs', 'sequences', 'score'].every(id => whereIs(DEFAULT_TABS[1].layout, id)) && DEFAULT_TABS[1].layout.plateMode === 'live');
+check('Setup holds the room: the controller, the sound in, the player, the wall and its mapping',
+  ['midi', 'audio-input', 'player', 'projectors', 'mapping'].every(id => whereIs(DEFAULT_TABS[2].layout, id)) && openPanels(DEFAULT_TABS[2].layout).some(isStagePanel));
+check('a shipped tab handed out is a copy, not the one that ships',
+  (() => { const c = defaultTabs(); c[0].layout.left.push('rides'); c[0].name = 'x'; return DEFAULT_TABS[0].layout.left.length === 1 && DEFAULT_TABS[0].name === 'Perform'; })());
+
+// ── Editing the tabs ────────────────────────────────────────────────
+console.log('\n Editing the tabs');
+{
+  let t = defaultTabs();
+  t = renameTab(t, 'perform', '  The   show  ');
+  check('a rename keeps the id and cleans the name', t[0].id === 'perform' && t[0].name === 'The show', t[0].name);
+  check('an empty name or one too long is not a name', renameTab(t, 'perform', '   ') === t
+    && renameTab(t, 'perform', 'x'.repeat(60))[0].name.length === TAB_NAME_MAX);
+  t = moveTab(t, 'setup', -2);
+  check('a move puts it where it was asked, and past the end is the end', t.map(x => x.id).join() === 'setup,perform,sequence'
+    && moveTab(t, 'setup', 5).map(x => x.id).join() === 'perform,sequence,setup' && moveTab(t, 'sequence', 5) === t, t.map(x => x.id).join());
+  const added = addTab(t, { id: 'mine' });
+  check('a new tab is empty, last, and named so it is not mistaken for another',
+    added.id === 'mine' && added.tabs[3].name === 'New tab' && openPanels(added.tabs[3].layout).length === 0
+    && addTab(added.tabs, { id: 'mine' }).tabs[4].name === 'New tab 2' && addTab(added.tabs, { id: 'mine' }).id !== 'mine');
+  const copy = addTab(added.tabs, { id: 'cp', copyOf: 'perform', after: 'perform' });
+  check('a copy has the panels of the tab it copies, beside it, and moving them does not move the original',
+    copy.tabs[2].id === 'cp' && sameLayout(copy.tabs[2].layout, t[1].layout)
+    && setTabLayout(copy.tabs, 'cp', l => closePanel(l, 'cues')).find(x => x.id === 'perform').layout.left.join() === 'cues');
+  let full = defaultTabs();
+  for (let i = 0; i < 20; i++) full = addTab(full, { id: `t${i}` }).tabs;
+  check(`no more than ${TABS_MAX} tabs`, full.length === TABS_MAX && addTab(full).id === '');
+  let one = defaultTabs();
+  one = deleteTab(deleteTab(one, 'perform'), 'sequence');
+  check('a tab can be deleted, but never the last one', one.length === 1 && deleteTab(one, 'setup') === one);
+}
+
+// ── Keeping the tabs ────────────────────────────────────────────────
+console.log('\n Keeping the tabs');
+store.clear();
+saveTabs(defaultTabs());
+check('tabs nobody has touched are not stored', store.size === 0 && storedForm(defaultTabs()) === null, `${store.size} stored`);
+{
+  const renamed = renameTab(defaultTabs(), 'setup', 'Load-in');
+  saveTabs(renamed);
+  const kept = JSON.parse(store.get(TABS_KEY) ?? '{}').tabs ?? [];
+  check('a rename is stored, and a shipped tab not rearranged is stored by its name alone',
+    kept.length === 3 && kept.every(x => !('layout' in x)) && loadTabs()[2].name === 'Load-in', JSON.stringify(kept));
+  const moved = setTabLayout(renamed, 'perform', l => dockPanel(l, 'rides', 'left'));
+  saveTabs(moved);
+  check('a rearranged one is stored with its layout, and loads as it was left',
+    sameLayout(loadTabs()[0].layout, moved[0].layout) && 'layout' in JSON.parse(store.get(TABS_KEY)).tabs[0]);
+  saveTabs(defaultTabs());
+  check('and put back as they shipped, nothing is stored any more', store.size === 0);
+  store.set(TABS_KEY, '{not json');
+  check('stored tabs that are not JSON load as shipped', loadTabs().map(x => x.id).join() === 'perform,sequence,setup');
+  store.clear();
+}
+{
+  const s = sanitizeTabs({ v: 1, tabs: [{ id: 'perform', name: '' }, { id: 'perform', name: 'Again' }, { name: 'no id' }, null,
+    { id: 'mine', name: 'Mine', layout: { left: ['cues', 'no-such'], right: [], deck: [], floating: [], collapsed: [], deckCollapsed: false, plateMode: 'preview' } }] });
+  check('a stored list loses doubled and id-less tabs, names an unnamed one, and sanitises a layout',
+    s.map(x => `${x.id}:${x.name}`).join() === 'perform:Perform,mine:Mine' && s[1].layout.left.join() === 'cues' && s[1].layout.plateMode === 'preview'
+    && sameLayout(s[0].layout, DEFAULT_TABS[0].layout), s.map(x => `${x.id}:${x.name}:${x.layout.left}`).join(' | '));
+  check('and anything that is not a list of tabs is the shipped three',
+    [null, 3, 'x', [], { tabs: [] }].every(v => sanitizeTabs(v).map(x => x.id).join() === 'perform,sequence,setup'));
+}
+{
+  // An older build's rearranged Gig and the Load-in it left the desk on.
+  store.clear();
+  const gig = dockPanel(shippedLayout('gig'), 'rides', 'left');
+  store.set('chromaglass-desk-layout:gig', JSON.stringify(gig));
+  store.set(TAB_KEY, 'perform');
+  const t = loadTabs();
+  check('an old layout somebody rearranged is kept as a tab of its own, after the three, under its old name',
+    t.map(x => `${x.id}:${x.name}`).join() === 'perform:Perform,sequence:Sequence,setup:Setup,gig:Gig' && sameLayout(t[3].layout, gig),
+    t.map(x => x.id).join());
+  check('once: the old key goes and the list is stored, so deleting that tab does not bring it back',
+    !store.has('chromaglass-desk-layout:gig') && store.has(TABS_KEY)
+    && (saveTabs(deleteTab(t, 'gig')), loadTabs().map(x => x.id).join() === 'perform,sequence,setup'));
+  check('the old desk mode opens the tab it became: Gig\'s own if it was kept, else Perform; Load-in is Setup',
+    loadTabId(t) === 'gig' && tabForStored(defaultTabs(), 'perform') === 'perform' && tabForStored(defaultTabs(), 'design') === 'perform'
+    && tabForStored(defaultTabs(), 'loadin') === 'setup' && tabForStored(defaultTabs(), null) === 'perform' && tabForStored(defaultTabs(), 'sequence') === 'sequence',
+    `${loadTabId(t)}`);
+  // All three at once, the desk left on Load-in: kept in the old order, each as it was, Build still in Preview.
+  store.clear();
+  const build = closePanel(shippedLayout('build'), 'patches'), loadin = dockPanel(shippedLayout('loadin'), 'phone', 'left');
+  store.set('chromaglass-desk-layout:build', JSON.stringify(build));
+  store.set('chromaglass-desk-layout:gig', JSON.stringify(gig));
+  store.set('chromaglass-desk-layout:loadin', JSON.stringify(loadin));
+  store.set(TAB_KEY, 'loadin');
+  const all = loadTabs();
+  check('all three old layouts are kept, in their old order, as they were (Build in Preview), and Load-in left up opens Load-in',
+    all.map(x => x.id).join() === 'perform,sequence,setup,build,gig,loadin' && sameLayout(all[3].layout, build) && all[3].layout.plateMode === 'preview'
+    && sameLayout(all[5].layout, loadin) && loadTabId(all) === 'loadin',
+    `${all.map(x => x.id).join()}; up ${loadTabId(all)}`);
+  store.clear();
+}
 
 // ── The panels ──────────────────────────────────────────────────────
 console.log('\n The panels');
@@ -98,6 +202,26 @@ const panelSrc = readFileSync('src/components/SettingsPanel.tsx', 'utf8');
 const unkept = SETTINGS_SECTIONS.filter(s => !new RegExp(`\\{keep\\('${s.id}'\\) && \\(\\s*<section[^>]*data-section="${s.id}"`).test(panelSrc));
 check('every settings section is a panel the browser can open, with its markup kept for it', unkept.length === 0 && SETTINGS_SECTIONS.every(s => PANEL_BY_ID.has(s.id)),
   unkept.length ? `not kept: ${unkept.map(s => s.id).join(', ')}` : `${SETTINGS_SECTIONS.length} sections`);
+/*
+  The seven groups (PLAN 35b), one vocabulary for the rail, the panel browser,
+  the sections' own `data-group` and the desk's own panels. What could drift is
+  each of those four being edited alone: a panel left on a retired group name
+  would sort to the top of the browser under a heading nobody drew, and a
+  section's `data-group` is a string in the markup the map knows nothing about.
+  And the Stage group is also a gate (`isStagePanel`: Build and Gig keep it in
+  the Stage sheet), so the regroup must not move a panel in or out of it.
+*/
+const GROUPS = ['play', 'pour', 'feed', 'motion', 'chemistry', 'look', 'stage'];
+check('the groups are the seven, in order', SETTINGS_CATEGORIES.map(c => c.id).join() === GROUPS.join(), SETTINGS_CATEGORIES.map(c => c.name).join(' · '));
+const offGroup = PANELS.filter(p => !GROUPS.includes(p.category));
+check('every panel, the desk\'s own included, is in one of them', offGroup.length === 0, offGroup.map(p => `${p.id} → ${p.category}`).join(', ') || `${PANELS.length} panels`);
+const wrongMarkup = SETTINGS_SECTIONS.filter(s => !new RegExp(`data-group=\\{groupOf\\('${s.id}'\\)\\} data-section="${s.id}"`).test(panelSrc));
+check('and a section\'s markup takes its data-group from the map, not a word of its own', wrongMarkup.length === 0 && groupOf('film') === 'feed',
+  wrongMarkup.map(s => s.id).join(', ') || `${SETTINGS_SECTIONS.length} sections`);
+const STAGE_NOW = ['layers', 'mapping', 'mark', 'phone', 'projectors', 'simulation'];
+check('and Stage is the same panels as before (the Stage sheet\'s)',
+  PANELS.filter(p => isStagePanel(p.id)).map(p => p.id).sort().join() === STAGE_NOW.join(),
+  PANELS.filter(p => isStagePanel(p.id)).map(p => p.id).sort().join());
 const idsOnce = new Set(PANELS.map(p => p.id)).size === PANELS.length;
 check('and no panel id is used twice (a desk panel cannot shadow a section)', idsOnce, `${PANELS.length} panels`);
 // A knob panel draws the section's pinnable controls; a section whose point is
@@ -113,22 +237,8 @@ check('the sections that are not numbers are drawn whole, the rest as knobs',
 check('every panel has a width in the deck it can be drawn at',
   PANELS.every(p => p.deckWidth >= 240 && p.deckWidth <= 400));
 
-// ── Storage ─────────────────────────────────────────────────────────
-console.log('\n Storage');
-store.clear();
-for (const name of LAYOUT_NAMES) saveLayout(name, shippedLayout(name));
-check('a layout nobody has touched is not stored', store.size === 0, `${store.size} stored`);
-{
-  const moved = dockPanel(shippedLayout('gig'), 'rides', 'left');
-  saveLayout('gig', moved);
-  check('a changed one is', store.size === 1 && sameLayout(loadLayout('gig'), moved), [...store.keys()].join(', '));
-  saveLayout('gig', shippedLayout('gig'));
-  check('and put back as it shipped, it is not stored any more (Reset layout)', store.size === 0);
-  check('nothing stored loads as shipped', LAYOUT_NAMES.every(n => sameLayout(loadLayout(n), SHIPPED[n])));
-  store.set('chromaglass-desk-layout:build', '{not json');
-  check('a stored layout that is not JSON loads as shipped', sameLayout(loadLayout('build'), SHIPPED.build));
-  store.clear();
-}
+// ── A stored layout ─────────────────────────────────────────────────
+console.log('\n A stored layout');
 {
   const raw = {
     left: ['cues', 'cues', 'no-such-panel', 7, 'projectors'],
@@ -139,10 +249,10 @@ check('a layout nobody has touched is not stored', store.size === 0, `${store.si
     deckCollapsed: 'yes',
     plateMode: 'sideways',
   };
-  const s = sanitizeLayout('gig', raw);
+  const s = sanitizeLayout(raw, shippedLayout('gig'));
   const { doubled } = placesOf(s);
-  check('a stored layout loses unknown and doubled panels and the Stage ones outside Load-in',
-    s.left.join() === 'cues' && s.right.join() === 'rides' && s.deck.join() === 'dyes' && doubled.length === 0,
+  check('a stored layout loses unknown and doubled panels, and keeps a Stage panel wherever it was put',
+    s.left.join() === 'cues,projectors' && s.right.join() === 'rides' && s.deck.join() === 'dyes' && doubled.length === 0,
     `left ${s.left} · right ${s.right} · deck ${s.deck}`);
   const t = s.floating.find(f => f.id === 'tools');
   check('and a floating panel is clamped to one that can be grabbed',
@@ -151,8 +261,7 @@ check('a layout nobody has touched is not stored', store.size === 0, `${store.si
   check('and folds only what is out, a deck flag only when true, a plate mode only when real',
     s.collapsed.join() === 'rides' && s.deckCollapsed === false && s.plateMode === 'live');
   check('and anything that is not a layout is the shipped one',
-    [null, 3, 'x', []].every(v => sameLayout(sanitizeLayout('build', v), SHIPPED.build)));
-  check('but Load-in keeps its Stage panels', sanitizeLayout('loadin', structuredClone(SHIPPED.loadin)).right.join() === SHIPPED.loadin.right.join());
+    [null, 3, 'x', []].every(v => sameLayout(sanitizeLayout(v, baseLayout('perform')), DEFAULT_TABS[0].layout)));
 }
 
 // ── The operations ──────────────────────────────────────────────────
@@ -221,11 +330,11 @@ console.log('\n The operations');
     panel they went into, in the same place, folded if it was folded; and
     where that panel is out already, the old one is not a second copy.
   */
-  const old = sanitizeLayout('build', { left: [], right: ['heat'], deck: ['recipe', 'audio-mappings', 'macro'], floating: [], collapsed: ['audio-mappings'], deckCollapsed: false, plateMode: 'preview' });
+  const old = sanitizeLayout({ left: [], right: ['heat'], deck: ['recipe', 'audio-mappings', 'macro'], floating: [], collapsed: ['audio-mappings'], deckCollapsed: false, plateMode: 'preview' }, baseLayout('perform'));
   check('a saved layout\'s Sound Mappings opens Sound in its place, and Heat Slide opens Fluid Physics',
     old.deck.join() === 'recipe,audio-input,macro' && old.right.join() === 'physics' && old.collapsed.join() === 'audio-input',
     `deck ${old.deck.join()} · right ${old.right.join()} · folded ${old.collapsed.join()}`);
-  const both = sanitizeLayout('build', { left: ['physics'], right: [], deck: ['heat'], floating: [{ id: 'audio-mappings', x: 10, y: 10, w: 300, h: 300 }], collapsed: [], deckCollapsed: false, plateMode: 'preview' });
+  const both = sanitizeLayout({ left: ['physics'], right: [], deck: ['heat'], floating: [{ id: 'audio-mappings', x: 10, y: 10, w: 300, h: 300 }], collapsed: [], deckCollapsed: false, plateMode: 'preview' }, baseLayout('perform'));
   check('and one already out is not drawn twice; a floating one floats as the merged panel',
     both.left.join() === 'physics' && both.deck.length === 0 && both.floating.map(f => f.id).join() === 'audio-input' && placesOf(both).doubled.length === 0,
     `left ${both.left.join()} · deck ${both.deck.join()} · floating ${both.floating.map(f => f.id).join()}`);

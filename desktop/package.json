@@ -10,10 +10,11 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-builder --config electron-builder.config.cjs --dir",
-    "dist": "electron-builder --config electron-builder.config.cjs"
+    "pack": "electron-builder --config electron-builder.config.cjs --dir --publish never",
+    "dist": "electron-builder --config electron-builder.config.cjs --publish never"
   },
   "dependencies": {
+    "electron-updater": "^6.8.10",
     "ws": "^8.18.0"
   },
   "devDependencies": {
