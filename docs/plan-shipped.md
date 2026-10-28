@@ -1107,6 +1107,17 @@ tabs back" removes the key and that is a deletion the cloud takes and the other
 devices follow. `npm run cloudsync` 14a to 14c: renamed, moved and added tabs arrive
 on a second device in order and with the same panels, which tab is up does not
 travel, the reset travels, and a value that is not tabs loads as the shipped three.
+The first time a device meets the account's list it joins it, not loses to it
+(`mergeFirst` on the store, `mergeStoredTabs` in `src/lib/deskTabs.ts`): a device that
+held its own tabs before it ever synced is stamped the oldest there is, and with the
+tabs kept whole the cloud's list won that tie and took every tab the device had made;
+the review of #531 measured it with the laptop and the Mac app each renaming a different
+tab, and on an account whose list had once been put back to shipped (the cloud then holds
+a deletion with a real time). The cloud's list is the base and its order stands; a tab
+only this device has is added, a shipped tab arranged here that the cloud holds as
+shipped takes the cloud's place for it, a tab arranged on both is the cloud's with this
+device's kept beside it as "(here)", and a shipped tab never touched and absent from the
+cloud is not brought back. `npm run cloudsync` 14d to 14g (all three fail without it).
 Judging §89.
 
 #### 8-v2. Desk v2: one desk, three layouts (2026-10-10)

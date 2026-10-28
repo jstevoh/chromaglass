@@ -1951,6 +1951,9 @@ Signed in to the Pro account on two devices (the laptop and the Mac app, or the 
    order, with the same panels. The tab that was up on each device is still the one that was up.
 3. On the phone: More › Tabs shows the same list.
 4. On the laptop, "Put the shipped tabs back": the other device is back to Perform, Sequence, Setup.
+5. Joining: on a device that has never synced and already has a renamed or added tab, sign in to an account whose
+   tabs were made on another. Both devices end with both sets of tabs; a tab renamed on both shows twice, one marked
+   "(here)", to delete.
 
 Bad: a tab that comes back after being deleted, the other device jumping to another tab while it is in use, or the
 plate stuttering when the list lands mid-show.

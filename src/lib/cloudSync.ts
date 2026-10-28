@@ -46,7 +46,7 @@ import { SEQUENCES_KEY } from './sequencer';
 import { SETS_KEY, SHOWS_KEY } from './songShows';
 import { CUSTOM_LIQUIDS_KEY } from './liquidFile';
 import { TOOL_AMOUNTS_KEY } from './toolAmount';
-import { TABS_KEY } from './deskTabs';
+import { TABS_KEY, mergeStoredTabs } from './deskTabs';
 
 export interface SyncStoreSpec {
   /** The store's name on the wire (server/cloud-sync.js SYNC_STORES). */
@@ -56,6 +56,15 @@ export interface SyncStoreSpec {
   /** A JSON array of items with ids, or one value kept whole. */
   kind: 'list' | 'one';
   idOf?: (item: Record<string, unknown>) => unknown;
+  /**
+   * For a `one` store whose value a person builds up on every device (the desk's
+   * tabs): what to keep when this device meets the account's value for the first
+   * time, while its own is still the unsent one it held before it ever synced.
+   * Without it the cloud's value wins that tie, and a second device's whole
+   * value is lost the one time it can never be got back. The merged value is
+   * written and sent as an ordinary edit.
+   */
+  mergeFirst?: (local: string, incoming: string) => string;
 }
 
 const byId = (item: Record<string, unknown>) => item.id;
@@ -84,7 +93,7 @@ export const SYNC_STORES: SyncStoreSpec[] = [
   // the order of the chips is part of it and a list kept by id would lose that;
   // the price is that two tab lists edited on two devices before either synced
   // leave the later one (PLAN 8-tabs-a-1).
-  { name: 'deskTabs', key: TABS_KEY, kind: 'one' },
+  { name: 'deskTabs', key: TABS_KEY, kind: 'one', mergeFirst: mergeStoredTabs },
 ];
 
 export const SYNC_META_KEY = 'chromaglass-cloud-sync';
@@ -101,6 +110,8 @@ interface Stamp {
   del?: boolean;
   /** Changed here and not yet taken by the cloud. */
   dirty?: boolean;
+  /** Held here from before this device first synced, and not edited or replaced since (see `mergeFirst`). */
+  first?: boolean;
   /** The cloud refused this version (too large, or the store full); sent again only once edited. */
   refused?: boolean;
 }
@@ -283,7 +294,7 @@ export function createCloudSync(deps: SyncDeps) {
         const h = contentHash(spec, v);
         const s = own(stamps, id);
         if (s && !s.del && s.h === h) continue;
-        stamps[id] = { t: first ? 0 : clock(m), h, dirty: true };
+        stamps[id] = first ? { t: 0, h, dirty: true, first: true } : { t: clock(m), h, dirty: true };
         touched = true;
       }
       for (const [id, s] of Object.entries(stamps)) {
@@ -329,6 +340,27 @@ export function createCloudSync(deps: SyncDeps) {
         const mine = own(stamps, id);
         // Newest wins; the cloud's on a tie (server/cloud-sync.js `newer`).
         if (mine && mine.t > rec.t) continue;
+        // A value built up on every device, held here from before this device
+        // synced: joined with the cloud's, not lost to it. It may have been sent
+        // already (the push that this answer is to), and lost the tie.
+        if (spec.mergeFirst && mine && !mine.del && mine.first) {
+          const local = items.get(id);
+          if (typeof local === 'string') {
+            if (rec.del) {
+              // The cloud's copy was put back to shipped, once; this device's own tabs are newer than that to it.
+              stamps[id] = { t: clock(m), h: mine.h, dirty: true };
+              continue;
+            }
+            if (typeof rec.d !== 'string') continue;
+            const merged = spec.mergeFirst(local, rec.d);
+            if (merged !== rec.d) {
+              items.set(id, merged);
+              wrote = true;
+              stamps[id] = { t: clock(m), h: contentHash(spec, merged), dirty: true };
+              continue;
+            }
+          }
+        }
         if (rec.del) {
           if (items.has(id)) { items.delete(id); wrote = true; }
           stamps[id] = { t: rec.t, h: '', del: true };

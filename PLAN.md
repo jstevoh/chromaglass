@@ -1155,9 +1155,13 @@ Open from it:
   have their own~~ (shipped: `deskTabs`, a synced store in `src/lib/cloudSync.ts`, read
   again in `useDeskTabs`; which tab is up stays the machine's; `npm run cloudsync` 14;
   judging §89; story in `docs/plan-shipped.md` §8).
-  - **8-tabs-a-1** (S) The list syncs as one value, newest edit wins, so two devices
-    editing different tabs before either syncs lose one of the edits. Merge by tab id
-    (each tab an item, the order its own item) once someone loses a tab to it.
+  - **8-tabs-a-1** (S) The list syncs as one value, newest edit wins, and every touch of
+    a layout (raising a floating panel, folding the deck) is an edit of the whole list,
+    so two devices editing at once lose one of the edits: a rename on one followed by a
+    deck fold on the other before it has pulled (about a minute, pulls come once a
+    minute while the window is visible) loses the rename on both. Merge by tab id (each
+    tab an item, the order its own item) once someone loses a tab to it. The first
+    meeting is not this: that merges (`mergeStoredTabs`, check 14d to 14g).
 - **8-tabs-b** (S) The phone draws a desk-own panel (bottles, set list, rides) as a
   button to its own sheet, not the panel itself. Draw them in place once each has a
   touch-sized body, so a tab on the phone is the whole tab.
