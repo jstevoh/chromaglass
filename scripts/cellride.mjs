@@ -54,6 +54,8 @@ const source = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'u
 const PLATE_WGSL = source('src/gpu/wgsl/plate.ts');
 const PACK_WGSL = source('src/gpu/wgsl/pack.ts');
 const SHOW = source('src/components/LiquidVisualizer.tsx');
+// The CPU solver's step, which hands the GPU solver its parameters (PLAN 19ai-3 moved it out of the component).
+const SOLVER = source('src/sim/fluidSimulation.ts');
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -214,7 +216,7 @@ const PATTERNS = [
   check('the flow reaches the shader in the solver\'s own units, packed raw and read back raw',
     /return tex2\(vtex, fuv\)\.rg \* U\.flowRate;/.test(flow)
       && /textureLoad\(vel, vec2i\(id\.xy\), 0\)\.xy;/.test(packVel) && !/0\.5 \+ 0\.5|velRange/.test(packVel));
-  const step = /const p = this\.deriveStep\([^]*?this\.gpu\.step\(p/.exec(SHOW)?.[0] ?? '';
+  const step = /const p = this\.deriveStep\([^]*?this\.gpu\.step\(p/.exec(SOLVER)?.[0] ?? '';
   check('every solver step advances the lead plate\'s cell clock by the dye\'s own travel, before it runs',
     /this\.cellClock = advanceCellClock\(this\.cellClock, stepDisplacement\(p\.dt, p\.advection, /.test(step));
   check('and the frame hands the shader that clock and a constant rate, nothing measured from a frame',

@@ -767,6 +767,7 @@ console.log('\nWiring');
   const hook = src('src/hooks/useShowSequencer.ts');
   const app = src('src/App.tsx');
   const vis = src('src/components/LiquidVisualizer.tsx');
+  const solver = src('src/sim/fluidSimulation.ts');
   check('the sequencer plays each stage through the scene player, coming up from the dark on the same rule',
     /scene: new ScenePlayer\(stage, stream\('show\.pacing'\)\.float\)\.enter\(pacing, fromDark\)/.test(hook)
     && /paceSentRef\.current\.dim < FROM_DARK_BELOW/.test(hook)
@@ -790,7 +791,7 @@ console.log('\nWiring');
     && /paceNowRef\.current = approachPace\(paceNowRef\.current, paceTargetRef\.current, realDt\)/.test(vis));
   check('the plate draws in the paced light', /dimmerGain: flashGainRef\.current \* paceNowRef\.current\.dim/.test(vis));
   check('the plate runs its clock and its automation at the paced activity', /f\.paceMul = paceNowRef\.current\.activity/.test(vis)
-    && /dynamicSpeed \*= Number\.isFinite\(this\.paceMul\) \? this\.paceMul : 1/.test(vis) && /ph\.drive \* paceNowRef\.current\.activity/.test(vis));
+    && /dynamicSpeed \*= Number\.isFinite\(this\.paceMul\) \? this\.paceMul : 1/.test(solver) && /ph\.drive \* paceNowRef\.current\.activity/.test(vis));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -6390,6 +6390,40 @@ advisories.
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
 
+### 19ai. Smaller files for a session to read: the solver out of the visualizer, the checks' hooks declared (2026-10-28)
+
+The owner's plan for smaller sessions (the 2026-10-28 review of how much a session has to
+read to find its place) ranked the splits of the code by context saved per unit of effort.
+Its items 3 and 5 are here, as one PR of pure moves.
+
+- **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
+  was module code above the component: the CPU solver `class FluidSimulation` (3,900 lines)
+  and the constants, switches and helpers around it. They are in `src/sim/` now, unchanged
+  (every non-import line of the old file is in the new files, counted line by line): the
+  solver in `fluidSimulation.ts`, the grid and the solver's constants in `constants.ts`, the
+  hands' and bottles' helpers in `tools.ts`, the step and its query-string switches in
+  `stepping.ts`, the dice and the palette window in `dice.ts`, and the frame's shapes
+  (`FrameView`, `PlateRenderer`, `VisualizerRender`, `FrameDigest`, the song shape) in
+  `frameTypes.ts`. The component is 441,458 bytes. `hooks/useSongRender.ts` imports its
+  types from `sim/frameTypes.ts` and no longer imports the component. Six checks read the
+  solver's source as text from the component and now read it where it went: `cellride`
+  (the step's cell clock), `oillift` (the step's rock), `pacing` (the paced clock),
+  `panel` (the per-layer list against the solver), `plate` (the CPU gate, the closeup's
+  ramp, and the retired looks' exemption, which follows `seedPreset`) and `turing` (the
+  drift rates).
+- **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
+  reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
+  whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
+- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
+  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
+  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
+- **19ai-3a. Found along the way.** The review said `lib/stir`, `squish`, `plateRock` and
+  `turntable` import types from the component; they only name it in comments. The one
+  importer was `hooks/useSongRender.ts`. And 26 checks read `LiquidVisualizer.tsx` as text:
+  a later split of the frame loop (the review's item 11) moves code those checks grep, so
+  each piece moved has to be held against them the way this one was (a pattern that matched
+  the old file and no longer matches the new one is a check that moved with the code).
+
 ## 20. Lace and holes: a pale film torn open over colour
 
 Asked 2026-09-28. The owner sent a still from another performer's liquid light show

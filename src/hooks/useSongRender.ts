@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { AudioData } from './useAudioAnalyzer';
-import type { FrameDigest, VisualizerRender } from '../components/LiquidVisualizer';
+import type { FrameDigest, VisualizerRender } from '../sim/frameTypes';
 import { beginFixedClock, endFixedClock, tickFixedClock } from '../lib/showClock';
 import { setShowSeed, showSeed } from '../lib/rng';
 import { decodeSong, SongEar, type DecodedSong } from '../lib/songTrack';
