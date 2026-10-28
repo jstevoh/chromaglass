@@ -191,12 +191,12 @@ function writeShowFile(patch) {
 */
 // CHROMAGLASS_OSC_PORT moves the port the menu opens (the check cannot rely on 9000 being free); OSC_PORT, below, decides outright.
 const OSC_DEFAULT_PORT = Number(process.env.CHROMAGLASS_OSC_PORT) || 9000;
-const OSC_HOSTS = { local: '127.0.0.1', network: '0.0.0.0' };
+const OSC_BINDS = { local: '127.0.0.1', network: '0.0.0.0' };
 function oscSettings() {
   if (process.env.OSC_PORT !== undefined) {
     const port = Number(process.env.OSC_PORT);
     if (!(port > 0)) return { mode: 'off', port: OSC_DEFAULT_PORT };
-    return { mode: process.env.OSC_HOST === OSC_HOSTS.local ? 'local' : 'network', port };
+    return { mode: process.env.OSC_BIND === OSC_BINDS.local ? 'local' : 'network', port };
   }
   let saved = null;
   try { saved = readShowFile().osc; } catch { /* first launch */ }
@@ -551,9 +551,9 @@ function startUpdater() {
 async function setOscMode(mode) {
   show.oscMode = mode;
   writeShowFile({ osc: mode });
-  const state = await showServer?.setOsc?.(mode === 'off' ? 0 : show.osc, OSC_HOSTS[mode]);
+  const state = await showServer?.setOsc?.(mode === 'off' ? 0 : show.osc, OSC_BINDS[mode]);
   process.env.OSC_PORT = String(mode === 'off' ? 0 : show.osc);
-  process.env.OSC_HOST = OSC_HOSTS[mode] ?? OSC_HOSTS.local;
+  process.env.OSC_BIND = OSC_BINDS[mode] ?? OSC_BINDS.local;
   globalThis.__chromaglassOsc = { mode, state };
   buildMenu();
   // A port that is taken says so, rather than leaving a menu that claims OSC is on.
@@ -658,7 +658,7 @@ async function start() {
   process.env.PORT = String(show.port);
   process.env.SHOW_KEY = show.key;
   process.env.OSC_PORT = String(show.oscMode === 'off' ? 0 : show.osc);
-  process.env.OSC_HOST = OSC_HOSTS[show.oscMode] ?? OSC_HOSTS.local;
+  process.env.OSC_BIND = OSC_BINDS[show.oscMode] ?? OSC_BINDS.local;
   const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);
   const licenseMgr = createServerLicenseManager({ filePath: licenseFile });
   await licenseMgr.initFromEnv();

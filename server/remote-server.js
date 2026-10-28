@@ -129,12 +129,12 @@ const WS_PATH = '/remote-ws';
  * OSC_PORT=0 turns it off. UDP has no show key, so anyone on the same network
  * who can send a packet drives the show (the security audit of 2026-10-28,
  * finding 4): the terminal server keeps hearing the LAN, as it always has, and
- * OSC_HOST=127.0.0.1 narrows it to this machine. The Mac app starts with it
+ * OSC_BIND=127.0.0.1 narrows it to this machine. The Mac app starts with it
  * off and turns it on from its Show menu, on this Mac or on the network, by
  * `setOsc` below (desktop/main.js).
  */
 const OSC_PORT = Number(process.env.OSC_PORT ?? 9000);
-const OSC_HOST = process.env.OSC_HOST ?? '0.0.0.0';
+const OSC_BIND = process.env.OSC_BIND ?? '0.0.0.0';
 const INFO_PATH = '/remote-info.json';
 
 const MIME = {
@@ -592,7 +592,7 @@ export function setOsc(port, host = '127.0.0.1') {
 }
 /** What the OSC socket is doing (`setOsc` resolves to the same words once it has bound or failed), for the Mac app's menu: `off`, `off (EADDRINUSE)` or `udp host:port`. */
 export const oscState = () => oscStatus;
-setOsc(OSC_PORT, OSC_HOST);
+setOsc(OSC_PORT, OSC_BIND);
 
 // ── Art-Net ─────────────────────────────────────────────
 //
@@ -684,7 +684,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`  Laptop (the show):  http://localhost:${PORT}/`);
   if (artnet) console.log(`  Art-Net out:        ${artnetStatus}  (${artnet.count} x ${artnet.order} from channel ${artnet.start}, ${artnet.rate} fps)`);
   if (ARTNET_IN.size > 0) console.log(`  Art-Net in:         udp port ${ARTNET_PORT}${ARTNET_IN_UNIVERSE === null ? '' : ` universe ${ARTNET_IN_UNIVERSE}`}  (${[...ARTNET_IN].map(([c, m]) => `${c}->${m.key}`).join(', ')})`);
-  if (OSC_PORT > 0) console.log(`  OSC in:             udp port ${OSC_PORT}${OSC_HOST === '0.0.0.0' ? '' : ` on ${OSC_HOST}`}  (/chromaglass/setting/<key> <n>, /chromaglass/action/<name>, /chromaglass/preset <id>, /blow /drop /press /tilt /dye)`);
+  if (OSC_PORT > 0) console.log(`  OSC in:             udp port ${OSC_PORT}${OSC_BIND === '0.0.0.0' ? '' : ` on ${OSC_BIND}`}  (/chromaglass/setting/<key> <n>, /chromaglass/action/<name>, /chromaglass/preset <id>, /blow /drop /press /tilt /dye)`);
   if (hosts.length === 0) {
     console.log('  No LAN address found — is this machine on a network?');
   } else {

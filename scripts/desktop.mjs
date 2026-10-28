@@ -963,7 +963,7 @@ try {
   const dir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-osc-'));
   const oscPort = await freePort('udp');
   const oscEnv = { ...env, PORT: String(await freePort('tcp')), CHROMAGLASS_USER_DATA: dir, CHROMAGLASS_OSC_PORT: String(oscPort) };
-  for (const k of ['OSC_PORT', 'OSC_HOST', 'CHROMAGLASS_UPDATE_FEED', 'CHROMAGLASS_QUERY']) delete oscEnv[k];
+  for (const k of ['OSC_PORT', 'OSC_BIND', 'CHROMAGLASS_UPDATE_FEED', 'CHROMAGLASS_QUERY']) delete oscEnv[k];
   const open = () => electron.launch({ executablePath: app.executablePath, args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], env: oscEnv, timeout: 60_000 });
   const stateOf = async (a) => {
     for (let i = 0; i < 300; i++) {
