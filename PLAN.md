@@ -8783,6 +8783,23 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   resets its `BandRange` when the band changes, so after a drag its live level reads
   against the old band's range until it catches up; (d) the rule for when a cord gates is
   written out twice in `SettingsPanel.tsx` beside `gated()` in `areaCords.ts`; import `gated`.
+- **30a-3. The plate at Beat Squeeze 0.8 stepped a quarter slower on the Mac runner from
+  the first runs carrying #511 (found 2026-10-28, #541).** `npm run squeeze`'s fifth-shard
+  log on 42 runs: the window at 0.8 read 220–309 steps in 12 s on every base without
+  864b4e2 and 170–217 on every base with it, two of them before the governor (#474)
+  merged; the window at 0 right after read the same throughout (208–354, then 302–359).
+  One branch whose own diff did not move read 299 on f85afa6 and 210 on a24bf12. #541's
+  timeline: warm, 241 steps at 0.8 against 326 at 0, the frames halving (about 25 a second
+  against 50) while the squeeze is up. Not seen on the owner's M4 (360 steps in every
+  window either side of #511, 2026-10-28). Nothing #511 changed is on the press's path
+  that reading finds (`pressKick`, `KickRelease`, `flushDeltas`, the slosh dish's
+  presses); its per-reading `spectrum` copy (`AudioFeatures.update`) and the patch bay's
+  per-cord state are what it adds every frame. *Measure:* the squeeze's cost on the
+  runner, a frame's CPU and GPU time with the squeeze up and down (`timestamp-query`), on
+  7230f0c and on 864b4e2; then make the dear part cheaper, and the window at 0.8 back
+  near the window at 0. #541 made the check's warm-up wait for the rate over three
+  seconds of the page's clock (it took one second of the harness's, which ran long), so
+  the window no longer opens on a plate still climbing; the bar is unchanged.
 
 ### 30b. The LFOs and envelopes are fixed
 

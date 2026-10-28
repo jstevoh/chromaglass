@@ -72,7 +72,8 @@ try {
     the Mac runner where it had read 220-310, while the window at 0 after it
     read as it always had (300-360), so the two windows' totals alone cannot
     say whether the squeeze got dearer or the first window started on a plate
-    still coming up to speed. The timeline says which second lost them.
+    still coming up to speed. The timeline says which second lost them: it
+    times the warm-up below, and is printed when a window falls short.
   */
   await page.evaluate(() => {
     const log = window.__squeezeLog = [];
@@ -123,11 +124,34 @@ try {
     a second at a time and at most thirty, until one second holds that
     rate (200 in 12 s). A plate that never gets there is still read and
     still fails that line; a warm one passes this at once.
+
+    Held over three seconds of the page's own clock, not one second of the
+    harness's (2026-10-28). The second was timed here, between two reads
+    that each wait on a busy page, so it ran long, and a plate stepping 12
+    times a second could count 17 in it. On #541's run on the Mac runner the
+    page's timeline read 12, 12 and 12 steps in the seconds before the
+    window at 0.8 opened, and 13, 12 and 15 in its first three: the window
+    took 208 steps while the plate climbed, and the same look at the same
+    0.8 read 241 in a window opened half a minute later, warm. On every run
+    whose base carries #511 the runner's plate at 0.8 runs nearer the bar
+    (about 20 steps a second warm, against 27 at 0; why is PLAN 30a-3), so
+    the climb alone took deploys under it (194, 170). Three seconds of the page's clock at the rate is the plate there,
+    and still the bar the window is held to: the window itself still needs
+    200 steps in 12 s, and a plate that never holds the rate is read after
+    thirty seconds and is red.
   */
+  const heldRate = () => page.evaluate(() => {
+    const rows = window.__squeezeLog.filter((r) => typeof r[1] === 'number');
+    const last = rows[rows.length - 1];
+    for (let i = rows.length - 2; i >= 0; i--) {
+      const ms = last[0] - rows[i][0];
+      if (ms >= 3000) return (last[1] - rows[i][1]) * 1000 / ms;
+    }
+    return 0;
+  });
   for (let k = 0; k < 30; k++) {
-    const a = (await read()).steps;
+    if (await heldRate() >= 200 / 12) break;
     await page.waitForTimeout(1000);
-    if ((await read()).steps - a >= 200 / 12) break;
   }
   /*
     The beat, tapped in at 150 bpm, four taps a beat apart (the Tap Tempo
@@ -216,16 +240,6 @@ try {
   const { clock, tempo } = await page.evaluate(() => ({ clock: window.chromaglassDebug().beat, tempo: window.chromaglassTempo() }));
   console.log(`  Bass Drop: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
 
-  /*
-    And 0.8 again after the window at 0, asked nothing: if this third window
-    steps as the one at 0 did, the first window's missing steps were the plate
-    coming up to speed; if it steps as the first did, the squeeze costs them.
-  */
-  await settings({ beatSqueeze: 0.8 });
-  await page.waitForTimeout(1000);
-  await mark('again');
-  const again = await window_(12000);
-  console.log(`  and at ${again.squeeze} again: ${again.kicks} kicks, ${again.steps} steps in ${again.seconds.toFixed(0)} s`);
   const timeline = await page.evaluate(() => window.__squeezeLog);
   let last = null;
   const lines = [];
@@ -234,7 +248,7 @@ try {
     if (last) lines.push(`${((row[0] - timeline[0][0]) / 1000).toFixed(1).padStart(5)} s  steps +${row[1] - last[1]}  frames +${row[2] - last[2]}  kicks +${row[3] - last[3]}  squeeze ${row[4]}`);
     last = row;
   }
-  console.log(`  timeline, a second a line:\n    ${lines.join('\n    ')}`);
+  const showTimeline = () => console.log(`  timeline, a second a line:\n    ${lines.join('\n    ')}`);
 
   if (errors.length) {
     check('the page runs without errors while the band plays', false, errors[0].slice(0, 200));
@@ -257,6 +271,8 @@ try {
     check('on Bass Drop at Beat Squeeze 0.8, then at 0, the plate stepping throughout',
       on.squeeze === 0.8 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
       `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
+    // Which seconds lost the steps, when they are short: the climb, a stall, or the squeeze's own cost.
+    if (on.steps < 200 || off.steps < 200) showTimeline();
     /*
       At the tapped 150 bpm the clock beats every 400 ms, and still does
       after both windows: tapped, the tempo stays until it is cleared. (Its
