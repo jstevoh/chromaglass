@@ -6460,11 +6460,11 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   (the solver, 194,508 bytes in one class, out of the visualizer) read as a new file over
   budget, and the owner did not want the solver cut into 40 KB pieces to pass a number (a
   class is not split by moving lines). So a pull request may add a ceiling the base does not
-  have when the ceilings in all do not grow (the bytes came out of another file in the same
-  PR) and the new entry is the file's own size. A file that appears over budget with nothing
+  have when the new entries hold no more than the bytes that left the base's over-budget
+  files in the same PR, and each new entry is its file's own size. A file that appears over budget with nothing
   written in still fails as new, and an entry added with nothing taken out still fails as
   raised; what it lets through that the first rule did not is a rename that moves its entry
-  with it, which costs a session the same. Four self-tests hold it. Whether 40 KB is the right
+  with it, which costs a session the same. Five self-tests hold it, one the review of #548's exploit: the credit is the bytes that actually left the base's over-budget files in the PR, not the sum of their ceilings, so slack under a ceiling funds nothing. Whether 40 KB is the right
   budget for a new file at all is the owner's question, raised 2026-10-28 ("40kb seems
   somewhat arbitrary. I don't want quality to go down because of this").
 - **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
