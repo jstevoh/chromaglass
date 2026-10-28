@@ -43,7 +43,7 @@ when no open PR touches the file.
 | 3 | 19ai-2 | a `README.md` per folder: what it owns, its entry files, its contracts, its checks (shipped) | S |
 | 4 | 19ai-3 | `FluidSimulation` and the module-level helpers out of `LiquidVisualizer.tsx`; its shared types to a types file | S |
 | 5 | 19ai-4 | the checks' `window` hooks declared in one typed file | S |
-| 6 | 19ai-5 | `npm run sizes`: a new file under 40 KB, a file over budget may not grow | S |
+| 6 | 19ai-5 | `npm run sizes`: a new file under 40 KB, a file over budget may not grow (shipped) | S |
 | 7 | 19ai-6 | `src/gpu/wgsl/fluid.ts` split by pass | M |
 | 8 | 19ai-7 | `src/gpu/fluid.ts` split into setup and per-pass encoding | M |
 | 9 | 19ai-8 | `App()` into domain hooks: account and licence, set list, cast and projector, MIDI | M-L |

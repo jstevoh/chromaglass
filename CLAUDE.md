@@ -104,8 +104,8 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 ## Size budgets
 
 - A new file stays under 40 KB (about 10k tokens). New code for a file already over
-  40 KB goes in a new module beside it, which the big file imports (a ratchet check is
-  PLAN.md 19ai-5).
+  40 KB goes in a new module beside it, which the big file imports. `npm run sizes`
+  holds this (PLAN.md 19ai-5).
 - Changing something inside the visualizer's frame loop, first move that piece to its
   own module (a function taking the frame's state, no per-frame allocation) in its own
   commit, then change it (19ai-10).
