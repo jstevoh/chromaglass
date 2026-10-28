@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  The hardened runtime's exceptions, for a signed build. The first three are
-  what Electron's V8 and its frameworks need; the last two let macOS ask for
-  the microphone (sound in) and the camera (the scene camera).
+  The hardened runtime's exceptions, for a signed build. The first is what
+  Electron's V8 needs (JIT); the other two let macOS ask for the microphone
+  (sound in) and the camera (the scene camera).
+
+  Two that electron-builder's own template carries are left out on purpose
+  (the security audit of 2026-10-28, finding 13), because each lets a program
+  that is not ours run inside a process that holds the microphone and camera:
+  `disable-library-validation` (any dylib may be loaded, signed or not, by
+  anyone) and `allow-unsigned-executable-memory` (writable-and-executable
+  pages without the JIT's own entitlement; V8 asks for JIT pages through
+  `allow-jit` alone, as Chrome itself ships). If a signed build ever fails to
+  start with a "code signature" or "library not loaded" line in Console, put
+  `disable-library-validation` back first and say why here; the packed desktop check
+  on the Mac (the one named in PLAN 23.17m) starts the app as it ships. (No double
+  hyphens inside this comment: XML forbids them, and codesign stopped on one.)
 -->
 <plist version="1.0">
 <dict>
   <key>com.apple.security.cs.allow-jit</key>
-  <true/>
-  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-  <true/>
-  <key>com.apple.security.cs.disable-library-validation</key>
   <true/>
   <key>com.apple.security.device.audio-input</key>
   <true/>
