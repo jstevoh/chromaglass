@@ -4,6 +4,8 @@ Start with the [full guide](guide.md): every feature, control and setup, and how
 
 **Working on ChromaGlass**
 - [handoff.md](handoff.md): how work is claimed and handed between tools, and the block every PR body carries
+- [architecture.md](architecture.md): how the code is split so a session loads one domain at a time, and the splits still to do
+- [checks-map.md](checks-map.md), [ci.md](ci.md): which checks to run for which files, and how CI and the deploy gate work
 - [judging.md](judging.md): what only the owner can judge, on a real GPU
 - [roadmap.md](roadmap.md): the engine's order of work (the whole plan is `../PLAN.md`; what shipped is in [plan-shipped.md](plan-shipped.md))
 - [evaluation-2026-09.md](evaluation-2026-09.md), [showreel-findings.md](showreel-findings.md): the September evaluation, and what rendering every look under music found

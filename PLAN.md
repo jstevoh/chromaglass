@@ -101,6 +101,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   least-privilege workflows, hidden source maps, `engines`.
 - **0.13** **19t** (E, S): the owner's judging sheet, generated, with a link per item.
 - **0.14** **19f** (F, S): the rest of the docs out of step with the code.
+- **0.15** **19ai** (F, S then M): one domain loaded at a time. The rules and the folder maps
+  shipped (19ai-1, 19ai-2); the splits go in the order of `docs/architecture.md`, one PR each.
 
 ### Wave 1. Nothing at a gig can stop the show or hand it to a stranger
 
@@ -6389,6 +6391,42 @@ advisories.
   `Strict-Transport-Security` itself); the Mac app's own server sends none of these headers
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
+
+### 19ai. One domain loaded at a time: the rules, the maps, and the splits (2026-10-28)
+
+The owner asked for coding sessions that use less context. Measured on a9dd9f2: `PLAN.md`
+is 810 KB (about 200k tokens, more than a session's window), `LiquidVisualizer.tsx` 671 KB,
+`App.tsx` 373 KB, the solver and its WGSL 291 and 290 KB, `SettingsPanel.tsx` 204 KB, and
+`CLAUDE.md` 17 KB loaded on every step. The measurements and the ranking are in
+`docs/architecture.md`; the rules every session follows are in `CLAUDE.md`.
+
+- **19ai-1. Shipped.** `CLAUDE.md` gains *Where things live*, *Boundaries*, *Size budgets*
+  and *Planning a change*; its checks table and CI account move to `docs/checks-map.md`
+  and `docs/ci.md` with pointers left. 17.0 to 13.8 KB loaded on every step.
+- **19ai-2. Shipped.** A `README.md` in `src/gpu`, `src/gpu/wgsl`, `src/lib`, `src/hooks`,
+  `src/components/desk`, `src/components/phone`, `server` and `scripts`: what each owns,
+  its entry files, its contracts and its checks. A PR that changes an export updates its
+  folder's README. Open: a check that each README names only files that exist; and
+  `reach` and `quick` count a `README.md` under `src/` as a site file, so a PR that only
+  edits one runs every Mac shard and deploys (this one did). Teach both that Markdown under
+  `src/` is not built into the site.
+- **19ai-3** (S). `class FluidSimulation` (192 KB) and the other module-level helpers out
+  of `LiquidVisualizer.tsx` into `src/sim/`, and `FrameDigest` and `VisualizerRender` into a
+  types file so `lib/stir`, `squish`, `plateRock` and `turntable` stop importing the component.
+- **19ai-4** (S). The 38 `window.chromaglass*` and `__cg*` hooks the checks drive the app
+  through, declared in one typed file with a line each.
+- **19ai-5** (S). `npm run sizes`: a new file under 40 KB, a file over budget may not
+  grow. One `scripts/checks.json` entry, Measure only.
+- **19ai-6** (M). `src/gpu/wgsl/fluid.ts` split by pass, as `thinGap`, `slump`, `spikes`
+  and `film` already were.
+- **19ai-7** (M). `src/gpu/fluid.ts` split into pipeline setup and per-pass encoding.
+- **19ai-8** (M-L). `App()` into domain hooks: account and licence, set list, cast and
+  projector, MIDI wiring, and the checks' hooks after 19ai-4.
+- **19ai-9** (M). `SettingsPanel.tsx` one file per section, on the contract the phone uses.
+- **19ai-10** (standing rule, no PR of its own). The frame loop (one `useEffect` of 5,469
+  lines) moves out a piece at a time: a PR that changes something inside it first moves
+  that piece to its own module, a function taking the frame's state with no per-frame
+  allocation, in its own commit.
 
 ## 20. Lace and holes: a pale film torn open over colour
 
