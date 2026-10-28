@@ -17,9 +17,10 @@
  * frame, from one set of objects kept as the app keeps them: the particles'
  * splat, the plate, the camera, the test effect reaching three frames back
  * into the post chain's ring, the film stock, the finish, a projector source
- * drawn again and the projector's pass over the two. The solver steps one and
- * then two steps between frames, so the dye the plate reads is one and then
- * the other of its ping-pong pair, as a show's uneven frames hand it; and
+ * drawn again and the projector's pass over the two. The solver steps between
+ * frames, and every other frame its dye's ping-pong pair is turned round, so
+ * the plate is handed one and then the other texture (a step alone always
+ * ends on the same one: the review of this check found it never changed); and
  * half way through the size changes, which makes every target again.
  *
  * Three such chains draw each frame, from the same solver at the same moment
@@ -73,7 +74,12 @@ try {
     const out = [];
     for (const size of sizes) {
       for (let k = 0; k < frames; k++) {
-        await lab.step(1 + (k % 2), params);
+        await lab.step(1, params);
+        // A step swaps the dye an even number of times, so it always ends on
+        // the same one of the pair; every other frame the pair is turned
+        // round by hand, so the plate is handed the other texture, as a
+        // rebuilt or carried solver hands it a new one.
+        if (k % 2) lab.solver().dye.swap();
         const row = { size, k };
         for (const [mode, id] of Object.entries(ids)) row[mode] = await lab.chainDraw(id, size, mode);
         row.diff = lab.chainDiff(ids.cached, ids.fresh);

@@ -6069,7 +6069,7 @@ Rooted at the pipeline because `layout: 'auto'` hands out a new layout object on
 ring. `npm run framegroups` draws the app's chain in the lab (particles, plate, camera, the
 test effect three frames back in the ring, stock, finish, a projector source and the
 projector's pass) from three sets of objects each frame, at two sizes with the solver
-stepping one and two steps between frames: made fresh as before, 12 bind groups and 64 views
+stepping between frames and the dye's ping-pong pair turned round every other frame: made fresh as before, 12 bind groups and 64 views
 a frame; cached, 0 and 0 once a size's first frames are past, every frame equal to the fresh
 chain's byte for byte; and a cache keyed by the pipeline alone draws another picture
 (the control). The plate's pack argument (the grid) is written when the grid changes, not
