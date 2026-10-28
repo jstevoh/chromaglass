@@ -133,6 +133,14 @@ interface Meta {
   /** Server clock minus this device's, measured on each answer. */
   skew: number;
   seeded: Record<string, boolean>;
+  /**
+   * Ask the cloud for everything on the next answer, not only what changed since
+   * `rev`: set when a store is seeded on a device that has synced before, which
+   * is a build gaining a store after an earlier build already moved `rev` past
+   * what another device pushed to it (the review of #531), cleared by the first
+   * answer that arrives.
+   */
+  refetch?: boolean;
   stamps: Record<string, Record<string, Stamp>>;
 }
 
@@ -434,7 +442,9 @@ export function createCloudSync(deps: SyncDeps) {
   async function round(full: boolean): Promise<SyncState> {
     if (!isOn()) { setStatus({ state: 'off' }); return 'off'; }
     const m = readMeta();
+    const unseeded = SYNC_STORES.filter((spec) => !m.seeded[spec.name]);
     scanInto(m);
+    if (m.rev > 0 && unseeded.some((spec) => m.seeded[spec.name])) m.refetch = true;
     setStatus({ state: 'syncing' });
     try {
       let rounds = 0;
@@ -467,9 +477,9 @@ export function createCloudSync(deps: SyncDeps) {
         }
         let r;
         if (!sent.length && !wantManifest) {
-          r = await call('GET', undefined, m.rev);
+          r = await call('GET', undefined, m.refetch ? 0 : m.rev);
         } else {
-          r = await call('POST', { since: m.rev, stores, ...(wantManifest ? { manifest: manifestOf(m) } : {}) });
+          r = await call('POST', { since: m.refetch ? 0 : m.rev, stores, ...(wantManifest ? { manifest: manifestOf(m) } : {}) });
         }
         if (!r.res || !r.res.ok || !r.data) {
           scanInto(m);
@@ -495,6 +505,7 @@ export function createCloudSync(deps: SyncDeps) {
         }
         const changed = apply(m, r.data.stores as WireStores | undefined);
         if (Number.isFinite(r.data.rev)) m.rev = r.data.rev as number;
+        delete m.refetch;
         let wanted = 0;
         const want = r.data.want as Record<string, string[]> | undefined;
         if (want) {

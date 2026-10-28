@@ -1117,7 +1117,13 @@ a deletion with a real time). The cloud's list is the base and its order stands;
 only this device has is added, a shipped tab arranged here that the cloud holds as
 shipped takes the cloud's place for it, a tab arranged on both is the cloud's with this
 device's kept beside it as "(here)", and a shipped tab never touched and absent from the
-cloud is not brought back. `npm run cloudsync` 14d to 14g (all three fail without it).
+cloud is not brought back. `npm run cloudsync` 14d to 14g (the first three fail without it). The rollout order is
+covered too (14h): the site updates before the Mac app, so a device on the build before
+`deskTabs` syncs after another pushed its tabs, its `rev` moves past that record, and
+when it updates its seeding tied with the cloud and the answer held nothing to merge;
+the next edit there then wiped the other's tabs. A store seeded on a device that has
+synced before sets `refetch` in its meta, and the next answer is asked for from `since
+0` (one full download, kept until an answer arrives, so offline does not lose it).
 Judging §89.
 
 #### 8-v2. Desk v2: one desk, three layouts (2026-10-10)

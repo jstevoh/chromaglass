@@ -42,6 +42,8 @@
  *      keep both's tabs on both (the review of #531 lost one device's whole list);
  *      the same holds on an account whose list was once put back to shipped, and
  *      a tab arranged on both is kept as two, not one;
+ *  14h. the rollout order: a device still on the build before `deskTabs` syncs after
+ *      another has pushed its tabs, then updates; both devices' tabs survive on both;
  *  12. every synced key is still the key its module saves under, every store the
  *      device sends is one the server takes, and every key held in React state
  *      is read again when the cloud writes it (cloudSync.ts says why that matters).
@@ -452,6 +454,25 @@ check(
     '14f. one tab arranged on both before either synced is kept as two, in the same order on both',
     has(I, 'Venue A', 'Venue B (here)') && has(J, 'Venue A', 'Venue B (here)') && sameOn(I, J),
     `I ${(I.use(), shape(loadTabs()))}; J ${(J.use(), shape(loadTabs()))}`,
+  );
+
+  // The site updates before the Mac app: B pushes its tabs, A (the old build, which has
+  // no `deskTabs`) syncs and moves its rev past B's record, then A updates.
+  await fileKey('tabs-g@example.com', 'pro');
+  const K = device('old mac app', 'tabs-g@example.com');
+  const N = device('new site', 'tabs-g@example.com');
+  K.use(); saveTabs(renameTab(loadTabs(), 'perform', 'OnK'));
+  N.use(); saveTabs(renameTab(loadTabs(), 'setup', 'OnN'));
+  await round(N);
+  const at = SYNC_STORES.findIndex((x) => x.name === 'deskTabs');
+  const [gone] = SYNC_STORES.splice(at, 1);
+  await round(K);
+  SYNC_STORES.splice(at, 0, gone);
+  await round(K, N, K, N, K);
+  check(
+    '14h. a device that synced on the build before desk tabs, after another pushed its tabs, and then updated: both devices\' tabs are on both',
+    has(K, 'OnK', 'OnN') && has(N, 'OnK', 'OnN') && sameOn(K, N),
+    `K ${(K.use(), shape(loadTabs()))}; N ${(N.use(), shape(loadTabs()))}`,
   );
 
   // And the merge itself, unit by unit, so a lost tab is named.
