@@ -7175,8 +7175,8 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   - **24.3-place-2. The notes the ear misses.** Under a kick on every beat and a snare on
     the backbeat, 10 of the scale's 15 notes were called (14 of 15 with no drums): the
     note onset (55 to 1000 Hz) is a rise against the band's recent loudness, and a note
-    arriving in a kick's tail rises less (a kick 30 ms before the note: 6 of 15 notes; on the
-    note, 12; 30 ms after, 13; the review of #537 found the case). Not fixed here; the walk is honest about it
+    arriving in a kick's tail rises less (a kick 8 dB over the lead: on the note, 12 of 15; 30 ms after it, 13;
+    30 ms BEFORE it, 1, its tail hiding the note's rise; the review of #537 found the case). Not fixed here; the walk is honest about it
     (a melody under a hard kick has gaps). A note onset read from the tonal (median-
     filtered) spectrum, which the kick has been taken out of, would hear them.
   - **24.3-place-3. A snare called on a lead's own attack.** The snare source fired at

@@ -135,11 +135,13 @@ export const SETTLE_DEFAULT_S = 0.15;
 /** The longest a drop waits for its pitch, however slowly the ear reads. */
 export const SETTLE_MAX_S = 0.45;
 /**
- * The lowest note laid, a semitone under the ear's own search floor (the
- * melody's pitch looks from `MELODY_LOW_HZ`, about A2: audioFeatures.ts says
- * why). Under it a bin is an octave wide and a kick's body is the loudest
- * thing there, so there is no note to place; a bass line below A2 draws
- * nothing, it has its hands.
+ * The lowest note laid: A2 and the first bin above the melody's search floor
+ * (`MELODY_LOW_HZ`, 110 Hz, MIDI 45; audioFeatures.ts says why it starts
+ * there). It is a second line behind the ear's own peak test, which already
+ * reads 0 where there is no peak (silence, a kick's skirt): the bin at the
+ * floor reads 47.8, so this is a guard on a note the ear did read, not the
+ * thing keeping the floor out. A bass line below A2 draws nothing; it has its
+ * hands.
  */
 export const MELODY_LOW = 46;
 /** An onset this close to a kick's or a snare's is, or may be, the drum's. */
