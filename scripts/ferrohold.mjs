@@ -18,7 +18,7 @@
  * 10 steps from step 60 to step 120, and the mean of the seven readings.
  *
  * Since 29c-8 (#495) the trailing rim holds to the end of the drag
- * (`phaseVelocity`; `ferrodrag` 4/4, in CI since 29c-10), and the window
+ * (`phaseVelocity`; `ferrodrag`'s drag lines in CI since 29c-10), and the window
  * runs to step 180, the mean of thirteen readings. Read over the old window
  * after #495, the passes were worth less there: the compression pass's
  * margin fell from 25.7 cells to 15.0 on Metal and 13.4 on software WebGPU,

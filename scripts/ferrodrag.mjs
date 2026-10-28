@@ -18,13 +18,14 @@
  *     within 15% of its start.
  *  3. With no magnet, the drop does not move: its centroid stays within half
  *     a cell of rest over the same 180 steps, and the drop is still there.
- *  4. (`npm run ferrodrag -- --thinoff`, not in CI: PLAN 29c-11) With Thin
+ *  4. (`npm run ferrodrag -- --thinoff`, as CI runs it) With Thin
  *     Gap switched off after the drag, and the magnet gone, the dragged drop
  *     stays where it was put down and stays a drop: over 120 steps on the
  *     deep plate its centroid moves less than one drop radius and it keeps
- *     at least half its half-full cells.
+ *     at least half its half-full cells, and all 120 steps ran deep.
  *  5. (the same) And the control in the run: on a lab whose deep plate rides
- *     the thin gap's last velocity, line 4 is red, by half a radius more.
+ *     the thin gap's last velocity, all 120 steps deep too, line 4 is red,
+ *     by half a radius more.
  *
  * Why the fourth (PLAN 29c-8's review, 29c-10). The trailing rim is carried
  * on the ferrofluid's own velocity (`phaseVelocity`, written to phaseVelT)
@@ -49,15 +50,21 @@
  * motion from the drag, and viscosity takes that away: 0.0029 of the 0.0035
  * moved in the first 30 steps (half a second), 0.0002 in the last 30.
  *
- * Why it is not in CI (PLAN 29c-11). On Metal (the show shard, #521's runs
- * 40592589582 and 40595560209) the real plate and the control read the same
- * movement, 0.70R (cx 0.6201 → 0.6341 0.6350 0.6352 0.6354, both), so the
- * line could not tell the fix from its absence there. And the half-full count
- * followed the order the labs were opened in, not the program: the first lab
- * of the run read 106 → 74 both times (the real plate in the first run, the
- * control in the second) and the second lab 106 → 90. Until that is
- * understood on a Mac, lines 4 and 5 run by hand; lines 1 to 3 are the CI
- * check, 3/3 on Metal.
+ * Why "all 120 steps ran deep" (PLAN 29c-11). On Metal (the show shard,
+ * #521's runs 40592589582 and 40595560209) the real plate and the control
+ * first read the same movement, 0.70R (cx 0.6201 → 0.6341 0.6350 0.6352
+ * 0.6354, both), and the half-full count followed the order the labs were
+ * opened in. A solver that ran thin and is asked for the old plate stays
+ * thin while the old plate's pipelines build off the frame (thinGapOn), and
+ * on Metal that build lasted dozens of steps: counted in #528's run
+ * 40628207753, the real plate ran 57 of its 120 steps deep and the control,
+ * the first lab of the process with Metal's shader cache cold, none. Those
+ * thin steps carried the drop on a freshly written phaseVelT while it
+ * coasted to rest, so by the time the deep plate took over the stale
+ * velocity had nothing left in it to carry. The lab now builds the old
+ * plate before such a step (`lab.step`, as it builds the thin gap's), and
+ * both lines require every step deep, so a lab that slips back to thin is
+ * red by name rather than green or red for the wrong plate.
  *
  * Lab only: software WebGPU in headless Chrome, or Metal on the Mac CI
  * runner (`WebGPU (macOS) · show`, `scripts/checks.json`).
