@@ -656,7 +656,8 @@ console.log('\nWiring');
     /songShapeRef\.current\.update\(heard, songClockRef\.current\);\s*barGridRef\.current\.update\(heard, songClockRef\.current\);/.test(vis)
     && /songShapeRef\.current\.reset\(\);[\s\S]{0,200}barGridRef\.current\.reset\(\);\s*accentRef\.current\.reset\(\);/.test(vis));
   check('each kick is weighed by the accent, at the beat the clock means, with the setting',
-    /const accentAt = songClockRef\.current \+ \(kickRef\.current\.predicted \? Math\.max\(0, currentSettings\.beatLead \?\? 0\) \/ 1000 : 0\);\s*const accent = kickStep \? accentRef\.current\.kick\(barGridRef\.current, accentAt, currentSettings\.beatAccent \?\? 0\) : 1;/.test(vis));
+    /plateKickRef\.current = \{ owed: true, fresh: true, at: songClockRef\.current, predicted: kickRef\.current\.predicted, ms: nowMs \};/.test(vis)
+    && /const accentAt = plateKick\.at \+ \(plateKick\.predicted \? Math\.max\(0, currentSettings\.beatLead \?\? 0\) \/ 1000 : 0\);\s*const accent = kickStep \? accentRef\.current\.kick\(barGridRef\.current, accentAt, currentSettings\.beatAccent \?\? 0\) : 1;/.test(vis));
   /*
     The rock's shove and the squeeze's depth moved into src/lib/plateRock.ts
     and src/lib/squish.ts (PLAN 27a, 27b), so the lab's `npm run rides` could
