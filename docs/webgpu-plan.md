@@ -690,7 +690,10 @@ What to try, largest saving first:
 3. **`mgZero` folded into the first sweep** of a level, as a zero guess: 28 fewer.
 4. **Constant arguments written once**, when they are made, and `kernel(name, format)`
    cached with its pipeline: about 440 fewer `writeBuffer` calls and 880 fewer
-   allocations a step.
+   allocations a step. *Shipped 2026-10-24 (PLAN 14aa, `npm run encode`):
+   an argument is written only when its numbers change, and the kernel sources, names
+   and bind groups are found without making anything: 249 writes a step → 2, 506 KB
+   allocated a step → 31 KB, at 512² on a thin gap.*
 5. **First-order velocity.** The CPU solver's own comment says MacCormack "costs a third
    of the step on a field nobody sees directly", and it transports velocity first
    order; the GPU still runs MacCormack on it (`advect velocity`). Two full-grid passes.

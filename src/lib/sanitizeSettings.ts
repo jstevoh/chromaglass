@@ -146,9 +146,20 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
           : Number.isInteger(m.area) && m.area >= 0 && m.area < 8 && isAreaTarget(m.setting)) &&
         typeof m.depth === 'number' && Number.isFinite(m.depth) &&
         (m.layer === undefined || m.layer === 'all' || (typeof m.layer === 'number' && Number.isFinite(m.layer))) &&
-        [m.threshold, m.attack, m.release].every(v => v === undefined || (typeof v === 'number' && Number.isFinite(v)))
+        (m.mode === undefined || m.mode === 'follow' || m.mode === 'gate') &&
+        (m.band === undefined || (Array.isArray(m.band) && m.band.length === 2 &&
+          typeof m.band[0] === 'number' && typeof m.band[1] === 'number' &&
+          Number.isFinite(m.band[0]) && Number.isFinite(m.band[1]) &&
+          m.band[0] > 0 && m.band[1] > m.band[0])) &&
+        [m.gain, m.threshold, m.attack, m.release].every(v => v === undefined || (typeof v === 'number' && Number.isFinite(v)))
       ).map(m => {
         const out = { ...m, depth: Math.max(-100, Math.min(100, m.depth)) };
+        if (m.gain !== undefined) out.gain = Math.max(0, Math.min(10, m.gain));
+        if (m.band !== undefined) {
+          const lo = Math.max(20, Math.min(20000, m.band[0]));
+          const hi = Math.max(lo + 1, Math.min(20000, m.band[1]));
+          out.band = [lo, hi];
+        }
         // The gate's three, each in its range: a threshold is a share of the reading, the times are seconds.
         if (m.threshold !== undefined) out.threshold = Math.max(0, Math.min(1, m.threshold));
         if (m.attack !== undefined) out.attack = Math.max(0, Math.min(10, m.attack));

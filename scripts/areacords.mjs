@@ -258,6 +258,42 @@ const DT = 1 / 60;
   const b2 = cordReading(ctx, { source: 'bands', feature: 'band2', setting: 'areaPour', area: 0, depth: 1 }, 0);
   const b7 = cordReading(ctx, { source: 'bands', feature: 'band7', setting: 'areaPour', area: 0, depth: 1 }, 0);
   check('a cord on band 2 hears a burst in band 2, and a cord on band 7 does not', b2 === 0.8 && b7 === 0, `band 2 reads ${b2}, band 7 ${b7}`);
+  /*
+    An area cord on a dragged band reads through a look fade (the review of
+    #511). A fade builds every cord's object again each frame
+    (lookFade.ts crossfadePatches, `{ ...m, depth }`), and a dragged band's
+    BandRange used to be kept per mapping object, so each frame heard through a
+    range made new, which reads 0 on its first read: the cord was silent for
+    the whole fade. AreaHands now keeps the range with the cord's gate, keyed
+    as the gate is. Ten loud frames in every sixty on [650, 1070] Hz, the cord
+    held and then made new each frame: the area's amount must peak alike. The
+    control is the old path (a read that is handed no range, on a fresh object
+    each frame), which must stay silent, or the line proves nothing.
+  */
+  {
+    const HZ = 43, BINS = 512, FLOOR = -100, DTF = 1 / 60;
+    const areas1 = [{ x: 0.5, y: 0.5, r: 0.1, liquid: 'water', dye: 0, band: 'any' }];
+    const spec = new Float32Array(BINS);
+    const spectrumReading = { bands: new Array(8).fill(0), spectrum: spec, hzPerBin: HZ, floor: FLOOR, silent: false, time: 0 };
+    const dragCtx = { ...ctx, sound: { features: spectrumReading } };
+    const drag = { source: 'bands', feature: 'band5', band: [650, 1070], setting: 'areaPour', area: 0, depth: 1 };
+    const peakOf = (fresh, handsRange) => {
+      const hands = new AreaHands();
+      let peak = 0;
+      for (let f = 0; f < 180; f++) {
+        spec.fill(-70);
+        if (f % 60 < 10) for (let k = Math.round(650 / HZ); k <= Math.round(1070 / HZ); k++) spec[k] = -20;
+        spectrumReading.time = f * DTF;
+        const m = fresh ? { ...drag } : drag;
+        const acts = hands.step([m], areas1, handsRange ? (c, band) => cordReading(dragCtx, c, 0, band) : (c) => cordReading(dragCtx, c, 0), DTF);
+        peak = Math.max(peak, ...acts.map(a => a.amount));
+      }
+      return peak;
+    };
+    const held = peakOf(false, true), fresh = peakOf(true, true), old = peakOf(true, false);
+    check('an area cord on a dragged band reads alike held and made new every frame, as a look fade makes it (and the old path, handed no range, stays silent)',
+      held > 0.9 && Math.abs(fresh - held) < 0.02 && old < 0.1, `peak ${held.toFixed(3)} held, ${fresh.toFixed(3)} new each frame; old path ${old.toFixed(3)}`);
+  }
   check('the patch bay offers the hand\'s four acts', AREA_TARGETS.map(t => t.key).join() === 'areaHeat,areaStir,areaPour,areaHue');
 }
 

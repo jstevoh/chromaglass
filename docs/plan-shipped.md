@@ -2073,6 +2073,25 @@ compiles of the app's shaders) is no longer counted here; its length is held by 
 and 1b and the first step's cap. Weighed and not taken: one automatic re-run (about 4%
 red instead of 21%, and it hides a real one-in-five), warming Chromium's GPU in a page
 before the measured one (untested, and #396's warm in the same page did not help).
+- **Shipped, 14v-9: the webpage loads only itself first, and leaves the GPU for Play**
+  (2026-10-28, asked by the owner the same day: "speed up the first load"). Measured
+  against the live site from a cloud browser: chromaglass.art fetched 811 kB, 590 kB of
+  it the show's own chunks (App, castProtocol and four more, preloaded by the page for a
+  show the visitor had not opened), while the webpage's own chunk (4 kB) was asked only
+  once the entry had arrived and run, at 1.40 s, and its pictures at 1.67 s; and
+  `main.tsx` asked for the GPU at once, whose start holds the page's thread (0.6 to
+  4.5 s on CI's Mac, `npm run startup`'s "held" line) while a visitor reads. Now the
+  page's preload script (vite.config.ts) tells the webpage's address the way
+  `landingFirst` does and preloads the webpage's chunk there; `main.tsx` asks for the
+  app once the webpage's eager pictures are in (4 s at most) and for the GPU when a
+  pointer or the keyboard reaches Play, or at Play itself. `npm run loadtime` 4a to 4d,
+  on a second build with a demo sign-in (on today's code 4a, 4b and 4c are red; on a
+  10 Mb/s, 100 ms line the first picture is in at 0.46 s, from 0.83 s). Also: the
+  webpage's pictures, the intro's drawings and `/video/` were served `no-store`, so
+  every visit fetched them again; they are now cached for an hour (firebase.json).
+  Named cost: a visitor who presses Play without the pointer resting on it first waits
+  for Chromium's GPU start (1.8 to 4.3 s cold on CI's Mac) inside the intro, where
+  before the webpage had paid it while being read.
 
 ### 14m. Anyone on the venue's network can drive the show
 
@@ -2249,6 +2268,69 @@ playing, the beat clock fired 303 kicks for the band's 258 and fires 257; in the
 on the Perform desk 10 kicks for 10 presses and none, on the phone 9 for 9 taps and
 none, while knocks with no hand on anything are still all heard.
 
+### 14aa. The plate stutters in bursts on a machine with room to spare (shipped 2026-10-24)
+
+Asked: "things are a little jittery sometimes", and the GPU used across the code. No GPU
+in the session that did it, so what was measurable without one was measured, and what
+needs the owner's eyes is `docs/judging.md` §64.
+
+**The step count.** The loop turned time into solver steps with an accumulator,
+`floor(acc / step)`, and read the time from `Date.now()`: whole milliseconds, part way
+into the frame, after a varying amount of work. On a display whose refresh matches the
+step, the remainder sits wherever the frame's work puts its clock read, and when that
+is near a step's edge the scatter carries it back and forth: a frame with no step, then
+one with two. On a 59.94 Hz panel the remainder drifts through the edge every so often,
+so it comes in bursts. `npm run cadence` models both loops on seeded displays (a refresh
+stamp a few microseconds either side of the refresh, 3.5 ± 1.5 ms of work before the old
+loop's clock read, 0.4 % of refreshes missed): the old loop's median over nine seeds
+left 40 % of a 60 Hz display's runs uneven (1.7 to 51 % by seed: where the remainder
+sits is luck), 7 % at 59.94 Hz, 19 % at 120 Hz with sixty steps, 18 % at thirty; the
+new one none. It is a model, not a GPU run (14aa-2). `src/lib/stepClock.ts` now takes
+the refresh's own stamp (the draw gate's `lastDraw`, whichever window's refresh drew),
+judges the refresh from a median of the last 32 intervals, and when the step is a whole
+ratio of it (to half a percent) and this interval is a whole number of refreshes (to 6 %),
+takes the interval as exactly that many refreshes of the step's rate, so one accumulator
+holds whole and half steps exactly, as the film render's integer count always has. A
+missed refresh is the refreshes it was, so steps are still caught up within the old
+cap. Everything else, a 90 or 144 Hz panel, a 61 Hz monitor, an interval from the
+laptop's refresh to the projector's, keeps its own time in the same accumulator. The
+check-skeptic's pass found the first version, which kept two clocks and reset one when
+the other ran, running a 60 Hz show beside a 50 Hz wall at 50 steps a second; the
+cadence check now draws two clocks through the real DrawGate (60 beside 48, 50, 60, 75
+and 120 Hz) and holds each to the wall clock within 0.5 %. Every other per-frame
+integrator in the loop gets the steadier interval too.
+
+**The step's garbage (Wave 4.1, H2c-4).** `npm run encode` steps the real solver in the
+lab, 512² on a thin gap, and reads the page's allocations with Chromium's sampling heap
+profiler (collected objects included). Before: 506 KB a step, 1,939 B a dispatch, 249
+`writeBuffer` calls for 267 dispatches, 3.4 ms median of main thread in `step()`. Where
+it went: `kernel()`'s `replaceAll` over the source on every dispatch, re-hashed by the
+pipeline cache's map (`get`, 207 KB); the failure check's `split` and template strings
+(65 KB); the bind group keys spelled from labels; `arg()`'s array and write. Now: kernel
+sources made once per format; the pipeline cache answers a name it answered a moment
+ago from a hot map (dropped whenever any pipeline fails, and bypassed while a harness
+listens, so `npm run startup`'s ledger still sees every ask); `arg()` writes only when
+its eight numbers changed (what a buffer holds when the step runs is the last write, so
+skipping an equal one changes nothing the GPU sees); the multigrids' names made once;
+bind groups found by the objects they bind. After: 31 to 36 KB a step, 120 to 140 B a
+dispatch, 2 writes a step and none a repeat, no bind group made, 0.4 to 0.5 ms. The
+remainder is the array literals the dispatches are written with.
+
+**The governor's hunting (14j's governor line).** A machine that holds one rung and not
+the one above was retried every ninety seconds for ever: in `npm run rungs`'s model, 38
+rung changes in half an hour, each retry a grid rebuilt twice and four seconds of
+stutter. The wait now doubles each time the same rung, post level or step rate fails
+with no tool held, up to sixteen times: 10 changes, retries 191, 367 and 727 s apart,
+the first still at 99 s, and a machine that cools gets its rung back. And it forgets:
+ten minutes held with no move clears the counts for what it holds and everything easier,
+so a show that hunted early and then held its rung for an hour gets it back 92 s after a
+four-second burst, not 24 minutes (the check-skeptic's case).
+
+Found along the way and written in as 14ab: the video pour's pause and play every frame,
+its CPU optical flow, the CPU field means, the whole-grid delta upload, per-frame bind
+groups outside the solver, the beads' canvas, the ear's allocations, the gamepad, the
+thick liquid's share.
+
 
 ### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped 2026-10-24)
 
@@ -2278,6 +2360,46 @@ Measured (`npm run cameras`, two stand-in cameras behind `navigator.mediaDevices
 31, desk and phone. The film opens `cam-usb` by id when picked (main could only ask for
 `environment`), switches live, comes off on unplug and back on replug, and each camera's
 choice survives a reload apart.
+
+### 14aa-3. The governor climbs back to sixty steps into a stutter (shipped 2026-10-25)
+
+Found by Antigravity on the owner's Mac (Metal, main at fd20c71, Poster, 1969 run 3 × 180 s;
+`?steps=30` and Classic clean as controls), after 14aa-2 put Poster's 136 two-step frames in
+the 14 s the governor tried sixty steps. Three causes, each in the governor:
+
+1. **The budget was read off a frame, not a step.** At thirty steps on a 60 Hz display half the
+   frames take no step, and `gpuFrameMs(0)` leaves the solver out, so the work the governor
+   averaged was 7.6–8.7 ms, under the 9 ms it climbs on. That was a fair average of what was
+   spent, and no guide at all to what sixty would spend.
+2. **A climb was not priced.** Sixty steps adds half a step to every frame, and 768² roughly
+   triples a step (8.2 → 25.1 ms). After the climb the GPU spent 15.6–16 ms a frame, or about
+   27.6 at 768².
+3. **Stepping down read only the average frame.** It needed the average over 22 ms for a second
+   and a half, and the average of one 33 ms frame in five sat either side of 22, each dip
+   starting the second and a half over.
+
+**Changed** (`src/lib/governor.ts`): the loop hands the governor what one step costs (every
+layer, from the solver's own timestamps, `gpuStepMs`) and how many steps the frame took, so it
+keeps a step's cost and the drawing's apart; `workAt` predicts a state's cost from them (the
+step scaled by the cells, the drawing by the pixels, never less than now), and every climb,
+rung or rate, must be predicted under the budget. And a share of frames missing a refresh (over
+25 ms, followed over about forty frames), with the GPU over its budget, gives the step rate up
+after a second and a half; once begun the verdict holds to half its line, and it is judged
+ahead of the average's own, which could otherwise start it over. Only the rate: at thirty a
+missed refresh takes no second step, and the rungs, which cost a picture, keep the average's
+line. The governor logs its moves (`moveLog`: why, and the predicted cost of a climb), and the
+loop counts live frames by their steps (`solver().stepFrames`).
+
+**Measured**: `npm run rungs` replays Poster's measured costs (drawing 4.0 ms, a step 8.2 at
+thirty and 9.8 at sixty, 25.1 at 768²; frames over 13 ms miss one refresh in eight, five or
+three) through the loop's own accumulator, three seeds a share. Old governor: 57 to 1136
+two-step frames after the opening, sixty held 6.5 to 26.9 s or never given up, a climb to
+sixty and to two pixels undone every ninety seconds. New: none, sixty given up at 4.0 s every
+time, no climb undone. Controls: a light plate keeps sixty and climbs to the sharpest rung its
+costs fit; a busy tab takes sixty and the plate has back as much or better within 100 s; a
+plate over the climb budget with every frame on time (Classic's costs) keeps sixty and does not
+move. On the GPU, `npm run stutter` counts two-step frames per look and climbs undone within
+10 s, from the governor's own log.
 
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped 2026-10-24)
 
@@ -4952,6 +5074,20 @@ two lines, one over every retired id against the end of its own chain, written o
 check and not taken from `livePresetId`, and one that a chain is followed the whole way.
 With the resolver cut to one hop both are red (`sunny-side-up → nothing (wanted classic)`).
 
+### 28i-2. Give back the black, make the still ones move (this PR)
+
+Reworked the 21 looks named in PLAN 28i-2 across `src/presets.ts`, `src/presetPlate.ts` and `src/components/LiquidVisualizer.tsx` (`seedPreset`), plus the preset-list cleanups in `src/lib/evolution.ts` (duplicate `jellyfish-bloom` removed from `calm`) and `src/lib/sequencer.ts` (`poster-1969` appears once in `Pace`, with `classic` on stage 1 and `oil-and-water` on stage 5):
+
+- **Film near black (5th pct ≥ 20%):** `classic` (`dyeBudget: 0.18`, `evaporationRate: 0.012`, `gooeyEffect: 0.78`, `hueJourney: 2`: film near black `28%–37%`, `6 hues`), `galaxy` (`dyeBudget: 0.24`, `evaporationRate: 0.006`, `ledPlatform: false`, compact two-arm spiral seed: film near black `57%–62%`, `3 hues`), `stardust-collapse` (`dyeBudget: 0.24`, `evaporationRate: 0.011`, `hueJourney: 2`, four-colour spiral seed: gallery colours `0.384 / 0.509 / 0.552 ≥ 0.3`, film near black `43%–71%`, `3 hues`), `jellyfish-bloom` (`rotationSpeed: 0.115`, `automateRate: 0.22`, `gooeyEffect: 0.28`, `evaporationRate: 0.003`, default `0.85` budget, radial-weighted dome/tentacle seed with `seedMean ≈ 0.45 < 0.85`, keeping #454's area cords: gallery flat `0.178 / 0.237 / 0.258 ≤ 0.4`, motion `0.0779 / 0.0545 / 0.0355 ≥ 0.02`, film near black `42%–57%`, `3 hues`), and `bass-drop` (`globalSpeed: 0.022`, `advection: 0.62`, `damping: 0.82`, `platePressure: 0.05`, `turbulenceScale: 0.08`, `evaporationRate: 0.020`, `dyeBudget: 0.24`, `beatSqueeze: 0.8`, `beatAccent: 1.0`, `kickBloom: 0.06`, `frameSway: 0.35`, default `plateRock` `0.45` with `kickHit → plateRock 0.5` keeping `npm run framesway` peak slide at `0.343%` as on `main`, `glassSmear: 0.0` resting under the `0.20` smear gate until `bands:hats 0.15` and `hits:hatsHit 0.16` open it together in the chorus, `kickHit → areaPour[1] 0.45`, keeping #454's area cords: film near black `49%–88% ≥ 20%`, `peak × median = 3.1 ≥ 2.5`, `4.0 swells/min`).
+- **Cell Bloom (`flat ≤ 0.4`, `luma(40s) ≥ 0.5 × luma(8s)`):** `centerGravity: 0.75`, `buoyancy: 0.05`, `evaporationRate: 0.0`, `dyeBudget: 0.85`, `automateRate: 0.35`, `rotationSpeed: 0.18`, and two concentric rings of multi-hue cellular drops around the area pools in `seedPreset`: gallery `8/20/40 s` `L0.427 F0.185 | L0.333 F0.175 | L0.314 F0.056` (`flat ≤ 0.185 ≤ 0.4`, `luma(40s) = 0.314 ≥ 0.214 = 0.5 × luma(8s)`).
+- **Cyberpunk (`95th-pct near black ≤ 60%`, `≥ 3 hues`):** `evaporationRate: 0.005` (was `0.05` on treble density, which dried the dish to 99% black and 1 blue hue), `dyeBudget: 0.70`, `density: 'bass'`, `hueJourney: 2`, `automateRate: 0.26`, and 8 neon arcs across pink, cyan, purple and lime: film near black `18%–48%` (`95th pct = 48% ≤ 60%`) and `3 hues`.
+- **Off-white grounds (`turing-print`, `roy`, `red-cabbage`, `lava-lamp`, `milk-marble`):** `turing-print` keeps `lampGround: 1`, `ledPlatform: true`, `ledColor: '#ffffff'`, `chemistry: 1`, `chemistryPattern: 1`, `turingPrint: 1`, `turingDrift: 0.7`, `exposure: 0.7`, `automateRate: 0.16`, `rotationSpeed: 0.035`, sets `PRESET_CONTRACTS['turing-print'] = [16, 19, 8, 22]`, and seeds 8 four-colour CIMA spots in `seedPreset`: gallery `8/20/40 s` `L0.089 C0.485 | L0.070 C0.420 | L0.086 C0.437` (`colours ≥ 0.42 ≥ 0.3` by 8 s, `luma ≤ 0.089 ≤ 0.6`); `roy` sets `dyeBudget: 0.68`, `automateRate: 0.28`, `evaporationRate: 0.0006`, `centerGravity: 0.28`, `buoyancy: 0.28`, `advection: 0.42`, `platePressure: 0.38`, and adds 6 primary comic shapes around its 3 core pools with blue kept apart from red and yellow so `royopen` holds `0.2%` stain (`6/6`): gallery `8/20/40 s` `L0.537 F0.273 | L0.501 F0.305 | L0.515 F0.280` (`flat ≤ 0.305 ≤ 0.5`, `luma ≤ 0.537 ≤ 0.6`); `red-cabbage` sets `lampGround: 1`, `ledPlatform: true`, `ledColor: '#e8dff5'`, `phIndicator: 1`, `exposure: 0.75`, `dyeBudget: 1.1`, `automateRate: 0.24`, `rotationSpeed: 0.085`, `evaporationRate: 0.001`, `hueJourney: 2`, and seeds five additional anthocyanin pH zones around its two acid/base wells: gallery `luma = 0.189 / 0.199 / 0.232 ≤ 0.5` and film `5 hues ≥ 3`; `lava-lamp` sets `lampGround: 1`, `ledPlatform: true`, `ledColor: '#b58c5c'`, `exposure: 0.46`, `centerGravity: 0.32`, `buoyancy: 0.42`, `advection: 0.48`, `automateRate: 0.30`, `dyeBudget: 0.65`, and seeds eight translucent wax plumes (`seedMean ≈ 0.37` with initial thermal rise and sink so convection is visible by 8 s without Beer-Lambert blackout): gallery `8/20/40 s` `L0.374 C0.978 M0.0739 | L0.471 C0.993 M0.0462 | L0.500 C1.000 M0.0313` (`luma ≤ 0.500 ≤ 0.6`, `motion ≥ 0.0313 ≥ 0.02`); `milk-marble` sets `lampGround: 1`, `exposure: 0.72`, `dyeBudget: 1.1`, `automateRate: 0.14`, and reduces the white milk base in `seedPreset` from `3.5` to `2.1` while enlarging the six colour spots: gallery `luma = 0.340 / 0.398 / 0.459 ≤ 0.6` (`0%` white blowout).
+- **Colour (`macro-bead`, `lace-run`, `chemical-clock` ≥ 6 colour changes/min):** `macro-bead` (`macroCamera: 'auto'`, `macroZoom: 2.1`, `macroHold: 2.5`, `globalSpeed: 0.06`, `automateRate: 0.45`, `rotationSpeed: 0.14`, `hueJourney: 2`, 6-hue ring seed: film `3 hues ≥ 2`, `11.2 colour changes/min ≥ 6/min`), `lace-run` (`macroCamera: 'auto'`, `macroZoom: 2.1`, `macroHold: 2.4`, `globalSpeed: 0.07`, `automateRate: 0.45`, `rotationSpeed: 0.16`, `hueJourney: 2`, 6-hue ring seed: film `2 hues ≥ 2`, `9.9 colour changes/min ≥ 6/min`), and `chemical-clock` (`lampGround: 1`, `ledPlatform: true`, `ledColor: '#fbf6ee'`, `bzReaction: 0.78`, `exposure: 0.58`, `dyeBudget: 0.75`, `evaporationRate: 0.004`, `automateRate: 0.28`, `rotationSpeed: 0.22`, `hueJourney: 1`, `bands:tonalLow → bzReaction -0.58` and `bands:tonalMid → bzReaction -0.55`, 6 translucent indicator pools with `seedMean ≈ 0.65` so `t = 8 s` reads `L0.129 C0.742 M0.0655` and `40 s` `L0.256 C0.828 M0.0683`: film `5 hues`, `11.2 colour changes/min ≥ 6/min`).
+- **Microscopic Chaos (`detail ≤ half of 10-19`, `motion ≥ 0.02` at 20/40 s):** `lampGround: 1`, `ledPlatform: true`, `ledColor: '#f1ebf5'`, `boundaryContrast: 0.0`, `beads: 0.0`, `cells: 0.0`, `gooeyEffect: 0.15`, `postBlurRadius: 1.0`, `rotationSpeed: 0.30`, `exposure: 0.22`, `saturationBoost: 1.05`, `dyeBudget: 0.72`, and broad overlapping soft blobs in `seedPreset`: gallery detail `0.0073 / 0.0128 / 0.0127` vs 10-19's `0.0199 / 0.0475 / 0.0525` (`≤ 37%` at 8 s, `27%` at 20 s, `24%` at 40 s, all well under half) and motion `0.0202 / 0.0516 / 0.0573 ≥ 0.02`.
+- **Gallery motion ≥ 0.02 at 20 and 40 s (`velvet-underground`, `poster-1969`, `home-movie`, `clock-glass`, `crowd-plate`, `lava-lamp`, `jellyfish-bloom`, `microscopic-chaos`):** `velvet-underground` (`layerCount: 1`, `rotationSpeed: 0.27`, `gooeyEffect: 0.55`, `exposure: 0.78`, `automateRate: 0.16`, `dyeBudget: 0.42`, keeping #454's area cords: `0.0335 / 0.0424`), `poster-1969` (`layerCount: 1`, `rotationSpeed: 0.095`, `automateRate: 0.22`, `globalSpeed: 0.022`, `advection: 0.65`, `dyeBudget: 1.1`: `0.0527 / 0.0998`), `home-movie` (`rotationSpeed: 0.165`, `automateRate: 0.20`, `globalSpeed: 0.019`, `buoyancy: 0.48`, `advection: 0.55`: `0.0433 / 0.0541`), `clock-glass` (`rotationSpeed: 0.19`, `automateRate: 0.20`, `globalSpeed: 0.022`, `buoyancy: 0.38`, `advection: 0.45`: `0.0324 / 0.0501`), `crowd-plate` (`rotationSpeed: 0.095`, `automateRate: 0.18`, `globalSpeed: 0.022`, `buoyancy: 0.45`, `advection: 0.60`, 6-spot swirled seed: `0.0327 / 0.0544`), `lava-lamp` (`0.0462 / 0.0313`), `jellyfish-bloom` (`0.0545 / 0.0355`), `microscopic-chaos` (`0.0516 / 0.0573`).
+- **The projector check no longer reads the dish's weather:** `scripts/webgpu-smoke.mjs`'s "the projector places the picture on the wall" asked that over half of the frame's top rows be lit before the pin, and read them off whatever the opening look had grown. Classic's opening is dark by design here, the Mac read 49% on 05ee5f1 (show shard red), one point under a bar that is about the projector. The bar is unchanged; the check now turns the LED floor on for its measurements and puts it back, so the picture under the mapping fills the frame by construction (cloud run of the check's own block, Classic's opening: top rows 83-88% lit as it comes, 100% with the floor, pinned edge 0%, blackout 0%).
+- **Poster, 1969 step-rate investigation:** Measured on this Mac over 12 s (`squeeze` harness), `poster-1969` ran `layerCount: 2` (`2 × 384²` thin-gap plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at `15.9 steps/s` (`191 steps / 12 s`, `simMs = 45.2 ms`). Moving `poster-1969` to a single plate (`layerCount: 1`, matching its 28i-1 description `"Poster, 1969 draws on one plate"`) cuts its GPU solver work in half and raises its 12 s step rate by **+56%** to `24.8 steps/s` (`298 steps / 12 s`, `simMs = 24.1 ms`). Reaching `>= 30 steps/s` (`PINNED_STEP_RATE`, as `1 × 256²` does at `35.2 steps/s`, `422 steps / 12 s`, `simMs = 11.4 ms`) is tracked as open item `PLAN 28i-2a`.
+
 ### 28i-3. Sound on the liquid, not the frame: the eight rotation looks and Milk Marbling's dead patch (#473, with 28f-3 and 28i-6(d); 28i-3b and 28f-2 remain open in PLAN.md)
 
 Asked in PLAN 28i-3 and 28f-3: move the eight looks that still drove `audioMappings.rotation` from sound onto liquid targets (`rotation: 'none'`), fix Milk Marbling's dead `treble → airVelocity` patch (`0.02`), and give every look that hears sound two or three fast liquid patches or area cords from `hits` and `bands` only (`docs/sound-patches.md`), using 25h's area cords (`lib/areaCords.ts`) where parts of the plate answer on their own.
@@ -5564,6 +5700,24 @@ Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is
 comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
 returning visit nor for `?remote` and `?cast`.
 
+### 34a-5. The page's words, rewritten (2026-10-28)
+
+Asked: the owner wanted the landing page's words looked at again, and decided there is no free
+beta of the paid app. The page never said "beta", but it did not say the free website was more
+than a taste, never named the $164 upgrade, and its maker note and refund line gave no way to
+reach anyone ("say so and I will make it right").
+
+What changed, each line approved by the owner from a draft that put the old and new words side
+by side with a reason: the headline says the show is played, not only that it moves ("A liquid
+light show you play to your music."); the subline names both audiences, a gig and a living room;
+the line under the buttons and the pricing paragraph say the website is free for good and not a
+trial; the pricing paragraph names the upgrade's $164; the maker note and the refund line link
+support@chromaglass.art; "the solver" became "the app" for a home listener; the search and share
+descriptions follow the headline. The layout, tier lists, steps and look lines are untouched.
+
+Measured: `npm run signin` 28/28 (the landing's own lines among them), `layout` 81/81; at 390 ×
+844 and 1440 × 900 the page has 0 px of sideways overflow and the new headline fits the hero.
+
 ## 35. Clear controls: on reads on, one name for one thing
 
 ### 35a. One look for on, every name unique (2026-10-24)
@@ -5819,3 +5973,27 @@ a session or no change (`stepOf`). It holds only its count of pushes, turns in 1
 and settle, and has no loop and no timer. It is on the cue bar and beside the phone's look name and the Looks
 heading. Under reduced motion it does not turn. Held by `npm run panel` ("Looks as slides in a tray"). Judging
 §82.
+
+### 30a. Shaped sound cords and dragged spectrum bands (shipped 2026-10-26)
+
+From §30 (Imaginando VS / VS 2): a patch cord whose source is `sound` or `bands` (`SceneMapping` in `src/types.ts`)
+now shapes its reading with `mode` (`'follow' | 'gate'`, absent = `'follow'` on whole-plate cords even when
+`threshold`, `attack` or `release` are present; area cords keep `CordGate`'s rule), `gain` (absent = 1, applied to
+the reading and clamped to `0..1` before the threshold in both modes), `threshold`, `attack` and `release`, and on
+a `bands` cord a custom `band` (`[loHz, hiHz]`) dragged across a live log-frequency spectrum strip (`40 Hz`–`16 kHz`).
+When `band` is present on a `bands` cord it wins over `feature`, while the panel writes `feature` as the named band
+(`bandForHz`, `src/lib/audioFeatures.ts`) holding the drag's geometric middle so an older build falls back cleanly.
+`AudioReading` carries the frame's spectrum (`db.slice(0, this.top + 1)`), `hzPerBin`, reference `floor`
+(`this.ref - FLOOR_BELOW_REF_DB`) and `silent` flag, and `BandRange` (`src/lib/audioFeatures.ts`) hears `[loHz, hiHz]`
+with the exact same `binsFor`, reference floor and `AutoRange` (6 dB minimum span, 30 dB cap) as `band1`..`band8`, so
+a dragged band on `band5`'s edges matches `band5` to 0.000 across the track on both the live analyser and
+`songAudioTrack`. `PatchBay.fold` (`src/lib/sceneMap.ts`) steps a `CordGate` per gated whole-plate cord (closing
+**25h-2**), keyed by what the cord is (with twin numbering, matching `AreaHands`) and clocked from `fold`'s `now`
+(never a frame count or `performance.now` inside). A cord with none of 30a's fields folds to the bit across all
+2394 preset-cord frames. On the desk and the phone, the patch bay cord editor (`src/components/SettingsPanel.tsx`)
+and `src/components/phone/BandStrip.tsx` draw the mode, gain, threshold, rise and fall controls and the live
+spectrum strip with pointer/finger dragging and the threshold line drawn on the cord's own live reading. On a
+laptop's second screen (`StageMirror` in `CastDisplay.tsx`), the projector mirrors `#liquid-canvas` directly and
+displays the laptop's fold; a standalone network `CastReceiver` rebuilds `AudioData` from `CastAudio` with no
+spectrum behind it, so `sound` cords fold and gate there while `bands` cords read nothing as before (30a-1).
+Held by `npm run soundcords` (34/34 lines in `scripts/checks.json`).

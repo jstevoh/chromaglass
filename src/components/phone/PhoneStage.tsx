@@ -347,6 +347,8 @@ export interface PhoneStageProps {
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
   onOpenAccount?: () => void;
+  ambientMode?: boolean;
+  onAmbientMode?: (on: boolean) => void;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
@@ -1052,6 +1054,9 @@ export function PhoneStage(p: PhoneStageProps) {
             <Tile icon={Lightbulb} label={p.show.running ? 'Stop the show' : p.show.paused ? 'Resume' : 'Light show'} on={p.show.running} onPress={p.show.onToggle} testId="phone-show" />
             {p.tilt.supported && (
               <Tile icon={Smartphone} label={p.tilt.on ? 'Tilting' : 'Tilt'} on={p.tilt.on} onPress={p.tilt.onToggle} testId="phone-tilt" />
+            )}
+            {p.onAmbientMode && (
+              <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
             )}
           </div>
           {(p.show.running || p.show.paused) && (

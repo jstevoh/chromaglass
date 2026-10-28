@@ -171,11 +171,11 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
       const res = await activateLocalLicenseKey(trimmed);
       if (res.valid && macAppLicensed()) { open(); return; }
       setError(
-        res.error === 'expired'
+        res.detail ?? (res.error === 'expired'
           ? 'This licence key has expired.'
           : res.error === 'machine-limit'
             ? 'This licence key is already active on 2 machines.'
-            : 'That is not a ChromaGlass licence key.',
+            : 'That is not a ChromaGlass licence key.'),
       );
     } catch {
       setError('Could not check the licence key.');

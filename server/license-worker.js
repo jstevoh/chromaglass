@@ -233,6 +233,20 @@ async function handleWebhook(request, env, cors) {
       updatesUntil,
       maxMachines,
       upgradeFrom: target?.id ?? null,
+      // What the upgrade overwrote, for a refund of just the upgrade to put
+      // back (PLAN.md 23.17i). The Home record shares the Pro key's id, so
+      // nothing else in KV remembers it.
+      ...(target
+        ? {
+            replaces: {
+              id: target.id,
+              orderId: target.orderId ?? null,
+              issuedAt: target.issuedAt,
+              updatesUntil: target.updatesUntil,
+              maxMachines: target.maxMachines,
+            },
+          }
+        : {}),
       revoked: false,
     };
 
@@ -260,15 +274,32 @@ async function handleWebhook(request, env, cors) {
       const remaining = existing.filter(
         (k) => !((targetId && k.id === targetId) || (orderId && k.orderId === orderId)),
       );
+      // Refunding only an upgrade order: the buyer still has the Home they
+      // paid for (PLAN.md 23.17i). Refunded before, the upgrade took the Home
+      // key with it, because an upgrade files the Pro key over the Home one
+      // under the same id, and the buyer ended with nothing. The Home comes
+      // back under a new id, never the Pro key's: a Mac holding the Pro token
+      // keeps it as long as /keys lists its id (`heldKeyRefunded`,
+      // accountLicense.ts), and the Pro token stays valid offline, so the id
+      // must leave /keys and be revoked. Refunding the Home order itself (the
+      // key's own id, not the upgrade's order) takes both, as before.
+      const refiled = [];
+      for (const r of removed) {
+        if (r.tier === 'pro' && r.upgradeFrom && orderId && r.orderId === orderId) {
+          refiled.push(await refileHome(env, r, orderId, privateJwk));
+        }
+      }
+      remaining.push(...refiled);
       await env.LICENSE_KV.put(`keys:${targetEmail}`, JSON.stringify(remaining));
       for (const r of removed) {
         await env.LICENSE_KV.put(`key:${r.id}`, JSON.stringify({ ...r, revoked: true }));
         await env.LICENSE_KV.delete?.(`machines:${r.id}`);
       }
+      for (const h of refiled) await env.LICENSE_KV.put(`key:${h.id}`, JSON.stringify(h));
       if (!removed.length && targetId) {
         await env.LICENSE_KV.put(`key:${targetId}`, JSON.stringify({ id: targetId, revoked: true }));
       }
-      return json({ ok: true, refunded: removed.map((r) => r.id) }, 200, cors);
+      return json({ ok: true, refunded: removed.map((r) => r.id), refiled: refiled.map((h) => h.id) }, 200, cors);
     }
 
     if (targetId) {
@@ -280,6 +311,35 @@ async function handleWebhook(request, env, cors) {
   }
 
   return json({ error: 'unknown event' }, 400, cors);
+}
+
+/**
+ * The Home key an upgrade replaced, filed again after the upgrade alone is
+ * refunded. Signed afresh: the old token carries the Pro key's id. A record
+ * from before `replaces` existed is rebuilt from the Pro one (its order id is
+ * the key id without the `key_` the webhook puts on it).
+ */
+async function refileHome(env, pro, upgradeOrderId, privateJwk) {
+  const was = pro.replaces ?? {};
+  const id = `${pro.id}_home_${upgradeOrderId}`;
+  const issuedAt = typeof was.issuedAt === 'number' ? was.issuedAt : pro.issuedAt;
+  const updatesUntil = typeof was.updatesUntil === 'number' ? was.updatesUntil : pro.updatesUntil;
+  const maxMachines = typeof was.maxMachines === 'number' ? was.maxMachines : pro.maxMachines;
+  const token = await signLicenseKey(
+    { id, tier: 'home', email: pro.email, issuedAt, updatesUntil, maxMachines },
+    privateJwk,
+  );
+  return {
+    id,
+    orderId: was.orderId || String(pro.upgradeFrom).replace(/^key_/, ''),
+    tier: 'home',
+    email: pro.email,
+    token,
+    issuedAt,
+    updatesUntil,
+    maxMachines,
+    revoked: false,
+  };
 }
 
 // ── GET /keys ────────────────────────────────────────────────────
@@ -405,7 +465,14 @@ async function handleActivate(request, env, cors, activate) {
 
   if (machines.length >= maxMachines) {
     return json(
-      { ok: false, error: 'machine limit reached', machines: machines.length, maxMachines },
+      {
+        ok: false,
+        error: 'machine limit reached',
+        machines: machines.length,
+        maxMachines,
+        // So the door can say which Macs hold the seats (PLAN.md 23.17g).
+        labels: machines.map((m) => m.label || 'another Mac'),
+      },
       409,
       cors,
     );
