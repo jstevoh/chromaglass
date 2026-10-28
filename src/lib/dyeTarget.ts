@@ -71,3 +71,27 @@ export const sparseDark = (lampGround: number | undefined, target: number): bool
  */
 export const dyeRoomOf = (mean: number, target: number): number =>
   Math.max(0, Math.min(1, 1 - (Number.isFinite(mean) ? mean : 0) / Math.max(0.06, target)));
+
+/** The bottle's level moves in twentieths: finer than that a 20 px bottle cannot show. */
+export const ROOM_STEP = 1 / 20;
+
+/**
+ * The level the bottle shows, given what it showed and a new reading.
+ *
+ * It was the reading rounded to a twentieth, which re-rendered only when the
+ * rounded level changed. On the Mac runner, where the plate draws and its
+ * mean density is read back from the GPU, a plate at rest reads a level that
+ * wobbles by a few thousandths, and one sitting on a rounding boundary flips
+ * the bottle between two twentieths on every other poll. Once the Perform tab
+ * put the bottles beside a Live plate (PLAN 8-tabs), `npm run renders` saw it:
+ * 2.0 commits a second against the App's 1.3 on the Perform desk with no sound.
+ * So the level holds until the reading is three quarters of a step away from
+ * it, then lands on the nearest twentieth: a wobble inside that never
+ * re-renders, a real pour or drain moves it a step at a time as before, and
+ * the bottle still reaches full and empty. The cost is a level at most three
+ * quarters of a step behind the reading rather than half of one.
+ */
+export function shownRoom(shown: number, reading: number): number {
+  const r = Math.max(0, Math.min(1, Number.isFinite(reading) ? reading : 1));
+  return Math.abs(r - shown) > 0.75 * ROOM_STEP ? Math.round(r / ROOM_STEP) * ROOM_STEP : shown;
+}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../../lib/settingsMap';
 import { PINNABLE } from '../../lib/deskPins';
-import { PANELS, panelAllowed, whereIs, type DeskLayout, type LayoutName } from '../../lib/deskLayout';
+import { PANELS, whereIs, type DeskLayout } from '../../lib/deskLayout';
 
 /**
  * The panel browser (⌘P), Desk v2's way to every panel.
@@ -12,8 +12,9 @@ import { PANELS, panelAllowed, whereIs, type DeskLayout, type LayoutName } from 
  * called (`sectionMatches`, the sheet's own search, so "bass boost" finds
  * Sound and "keystone" finds the Wall). A row opens the section as a panel,
  * docked in the deck (⏎) or floating over the plate (⇧⏎), instead of a sheet
- * over everything. Stage sections are offered only in Load-in; elsewhere the
- * footer goes to the Stage sheet (⌘,), where the room and the machine live.
+ * over everything. Every panel can go on every tab (the tabs are the
+ * owner's, lib/deskTabs.ts), the Stage sections too; the footer still goes to
+ * the Stage sheet (⌘,), where the room and the machine are all in one place.
  */
 
 const CONTROLS = new Map<string, number>();
@@ -21,8 +22,7 @@ for (const p of PINNABLE) CONTROLS.set(p.section, (CONTROLS.get(p.section) ?? 0)
 
 const GROUP_NAME: Record<string, string> = Object.fromEntries(SETTINGS_CATEGORIES.map(c => [c.id, c.name]));
 
-export function PanelBrowser({ layoutName, layout, at, onDock, onFloat, onStage, onClose }: {
-  layoutName: LayoutName;
+export function PanelBrowser({ layout, at, onDock, onFloat, onStage, onClose }: {
   layout: DeskLayout;
   /** Where to hang it: under the + Panel button, right-aligned to it. */
   at: { top: number; right: number };
@@ -39,14 +39,13 @@ export function PanelBrowser({ layoutName, layout, at, onDock, onFloat, onStage,
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return PANELS
-      .filter(p => panelAllowed(layoutName, p.id))
       .filter(p => {
         if (!q) return true;
         const sec = SECTION_BY_ID.get(p.id);
         return sec ? sectionMatches(sec, q) : q.split(/\s+/).every(w => p.name.toLowerCase().includes(w));
       })
       .sort((a, b) => SETTINGS_CATEGORIES.findIndex(c => c.id === a.category) - SETTINGS_CATEGORIES.findIndex(c => c.id === b.category));
-  }, [query, layoutName]);
+  }, [query]);
   useEffect(() => { setSel(0); }, [query]);
 
   const act = (i: number, float: boolean) => {
@@ -111,7 +110,7 @@ export function PanelBrowser({ layoutName, layout, at, onDock, onFloat, onStage,
             );
           })}
         </div>
-        {layoutName !== 'loadin' && (
+        {
           <button
             onClick={() => { onClose(); onStage(); }}
             className="flex h-10 shrink-0 items-center justify-between border-t border-border px-3 text-left text-[12px] text-muted hover:bg-hover hover:text-text"
@@ -120,7 +119,7 @@ export function PanelBrowser({ layoutName, layout, at, onDock, onFloat, onStage,
             <span>Stage · wall, mapping, logo, plates, simulation</span>
             <span className="font-mono text-[11px] text-faint">⌘,</span>
           </button>
-        )}
+        }
       </div>
     </>,
     document.body,

@@ -140,7 +140,12 @@ as repository secrets (Settings → Secrets and variables → Actions):
 
 With them the workflow signs with the hardened runtime and notarizes; without them
 (and on every pull request from a fork) it signs ad hoc, which is what lets an Apple
-silicon Mac open it at all. The first signed release is also the first that can
+silicon Mac open it at all. Notarising adds a wait on Apple's notary service to
+every signed run, from a few minutes to over half an hour (the first ones, on
+2026-10-27, took about 30), which is why the build job allows 75 minutes. The
+`.p12` and its key are kept off the repository; lose them and a new Developer ID
+certificate is made on developer.apple.com and the two `CSC_` secrets replaced.
+The first signed release is also the first that can
 update itself in place; apps installed from ad hoc releases keep offering the
 download, once more, and update in place from then on.
 

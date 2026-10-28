@@ -9,7 +9,7 @@
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
     "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","lab"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","lab","lab2"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -442,6 +442,17 @@
       ]
     },
     {
+      "name": "The dish that boils",
+      "shard": "logic",
+      "run": "npm run boil",
+      "why": [
+        "Heat the performer rides (PLAN 36e): the lamp's hot spot through the dye,",
+        "warm water rising by its real density on an upright plate and not at all on",
+        "a level one, a nucleation superheat per site, a boil where a hand blocks the",
+        "air that holds near 100 °C, and calm within seconds of letting go."
+      ]
+    },
+    {
       "name": "A row's fade",
       "shard": "logic",
       "run": "npm run rowfade",
@@ -695,7 +706,7 @@
     },
     {
       "name": "Lamp Ground 0 is the plate before the lamp",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run lampzero",
       "why": [
         "Lamp Ground 0 is the plate as it was before the lamp, byte for byte,",
@@ -709,7 +720,29 @@
         "Its own part: `logic` has no Chromium (this step's first run failed",
         "there on the launch, 2026-10-12), and `browser` already runs twelve of",
         "its fifteen minutes. About five minutes; the lamp's physics stay on",
-        "the open shard (`lamp`)."
+        "the open shard (`lamp`). Since the lab part split in two (below, `lab2`",
+        "is lampzero, bubblelook and the four account checks) it shares a runner",
+        "with those, about ten minutes, and `lab` keeps the slosh dish, the soap",
+        "film and holeline, about twelve."
+      ]
+    },
+    {
+      "name": "Looks on a lit stage",
+      "shard": "browser",
+      "run": "npm run litstage -- --controls",
+      "why": [
+        "A look keeps its contrast over a projector's black lifted by a stage",
+        "wash (PLAN 36a): every look over a floor of 5 and 10% of white added",
+        "as light, its dye against the field behind it held with Lit stage on,",
+        "and byte for byte the plate without the grade at 0. Written before",
+        "the build, so only its controls run until 36a lands (the measure, the",
+        "floor's cost with nothing done); the build's PR drops `--controls`.",
+        "On SwiftShader for lampzero's reason (b3 compares two compiled",
+        "programs, which is the CPU rasteriser's to judge), but in `browser`,",
+        "not beside it in `lab`: the lab part already runs 23-24 of its 25",
+        "minutes on a slow runner, and this PR's lab part was cancelled at",
+        "the limit twice with this check in it (2026-10-27). About a minute",
+        "here, three to four in full: the build's PR weighs where it fits."
       ]
     },
     {
@@ -736,7 +769,7 @@
         "in the GPU solver's contract through every scenario and bar of soapgpu.",
         "In Measure's lab part rather than logic because soapgpu.mjs opens the lab",
         "page in Chromium and requests a WebGPU adapter before running the solver,",
-        "and checks.yml installs Chromium only on the browser and lab parts."
+        "and checks.yml installs Chromium only on the browser, lab and lab2 parts."
       ]
     },
     {
@@ -759,7 +792,7 @@
     },
     {
       "name": "A bubble's middle is the plate",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run bubblelook",
       "why": [
         "A bubble's clear middle is the plate (PLAN.md 33e, scripts/bubblelook.mjs).",
@@ -774,7 +807,7 @@
     },
     {
       "name": "Sign-in",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run signin",
       "why": [
         "Sign-in and account management (PLAN.md 23.10, scripts/signin.mjs):",
@@ -784,7 +817,7 @@
     },
     {
       "name": "One address",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run onehost",
       "why": [
         "One address (PLAN.md 23.16, scripts/onehost.mjs): chromaglass.web.app and",
@@ -797,7 +830,7 @@
     },
     {
       "name": "Linking devices by account",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run accountlink",
       "why": [
         "Linking devices by account (PLAN.md 23.14, scripts/accountlink.mjs):",
@@ -809,13 +842,30 @@
     },
     {
       "name": "Licensing and tiers",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run tiers",
       "why": [
         "Licensing and tiers (PLAN.md 23.2, 23.4, 23.5, 23.6, 23.11,",
         "scripts/tiers.mjs): offline Ed25519 signature verification, 2-machine",
         "limit, Home->Pro upgrade, unlicensed gate, free-tier tiles, 15s/720p",
         "caps + corner mark, and logo mark lock."
+      ]
+    },
+    {
+      "name": "The dish that boils on the GPU (control)",
+      "shard": "lab2",
+      "run": "npm run boilgpu -- --selftest",
+      "timeout": 6,
+      "why": [
+        "The dish that boils, the GPU check against its CPU control (PLAN 36e-2,",
+        "scripts/boilgpu.mjs --selftest, scripts/boilgpu-cpu.ts): the CPU reference",
+        "in the GPU solver's contract, its fields stored in float32, through every",
+        "dish and bar of boilgpu, so each bar is shown to be one the model meets.",
+        "In a Measure lab part because boilgpu.mjs opens the lab page in Chromium",
+        "and asks for a WebGPU adapter before it runs the solver; lab2, the lighter",
+        "of the two since #517 (10:55 against 14:22). About 80 s in a cloud session.",
+        "`npm run boilgpu` itself, on Metal, joins the plate shard with the GPU",
+        "build (36e-2): until then it is red by design, as soapgpu was before 32c."
       ]
     },
     {
@@ -1335,6 +1385,23 @@
       ]
     },
     {
+      "name": "The liquids on the GPU plate",
+      "shard": "plate",
+      "run": "npm run liquidsgpu",
+      "timeout": 6,
+      "why": [
+        "Soap, glycerine, milk and silicone on the GPU solver's own liquid fields",
+        "(PLAN 15e, scripts/liquidsgpu.mjs): the stand-in's four scenes from",
+        "`npm run liquids` laid on the thin gap the looks use, each held to the",
+        "stand-in's bar and to its size within a factor of two, with a fold of",
+        "the deltas every step and on a still plate, and soap's and silicone's",
+        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-1 to",
+        "15e-5 print and do not fail until they pass. Here on Metal, about a",
+        "minute: on the Linux lab part it took 4 min 26 s, and that part ran",
+        "24 of its 25 minutes before signin without it (#513's first run)."
+      ]
+    },
+    {
       "name": "The seed on the GPU, and in the app",
       "shard": "plate",
       "run": "npm run seed -- --lab --app",
@@ -1515,8 +1582,7 @@
         "degenerate mobility in phaseCHVolume holds its half-full core and",
         "halo against Ostwald ripening into the clear oil, conserves Σc·h, and",
         "does not move without a field, and sheds its half-full cells more",
-        "slowly in a second window (steps 200 to 380). `npm run ferrodrag` stays",
-        "out of CI as known red until PLAN 29c-8."
+        "slowly in a second window (steps 200 to 380)."
       ]
     },
     {
@@ -1541,13 +1607,28 @@
         "The dragged drop while it is dragged (PLAN 29c-8's neighbour): the",
         "ferrofluid carried along itself (phaseMomentum) and what the moving",
         "edge's limiter withheld paid back (phaseCompress), each held on its own",
-        "over steps 60 to 120 of `ferrodrag`'s scene, a window before the trailing",
-        "rim is lost to the oil's return flow. `ferrodrag` reads at three seconds,",
-        "red with both passes and without them, so it could not tell. The script",
+        "over steps 60 to 180 of `ferrodrag`'s scene (to 120 until 29c-8 kept the",
+        "trailing rim to the end of the drag; 29c-10). `ferrodrag` read at three",
+        "seconds, red with both passes and without them, so it could not tell. The script",
         "runs the scene three times (as given, phaseMomentum off, phaseCompress",
         "off) and requires each pass to be worth a margin, so the control is in",
         "the run and not done by hand once. On the fifth shard with",
-        "`magnetgain`: three scenes of 120 steps."
+        "`magnetgain`: three scenes of 200 steps."
+      ]
+    },
+    {
+      "name": "The dragged ferrofluid drop follows the magnet",
+      "shard": "show",
+      "run": "npm run ferrodrag",
+      "why": [
+        "The closeup's ferrofluid drop dragged 0.3 of the plate in three",
+        "seconds (PLAN 29c, 29c-8): it follows the magnet within two radii and",
+        "keeps its half-full body within 15%, which the two-phase carry of its",
+        "trailing rim (phaseVelocity) made true on Metal, 3/3 (out of CI as",
+        "known red until then). With no magnet the drop does not move. Its",
+        "Thin-Gap-off lines run by hand (`-- --thinoff`, PLAN 29c-11): on Metal",
+        "they read the same with the review's fix and without it. On the show",
+        "shard, the lightest on #495's run (14.2 minutes of 20); 39 s there."
       ]
     },
     {

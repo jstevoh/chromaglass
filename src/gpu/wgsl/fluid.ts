@@ -1537,6 +1537,133 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    Two-phase carry of a coherent drop's rim on a thin gap (PLAN 29c-8;
+    a named shortcut for the rim's ferrofluid velocity, with PLAN 29c-9 to
+    replace the local window reconstruction by a coupled two-fluid velocity
+    solve).
+
+    What was reported and measured: on \`npm run ferrodrag\` (384², a drop of
+    radius R = 0.025 dragged 0.3 of the plate in 3 s, 180 steps), after
+    phaseMomentum and phaseCompress (29c-1) and degenerate Cahn–Hilliard
+    mobility (29c-7), the drop still shed its trailing rim into a long wake
+    (cells over 0.01: 324 → 1238, half-full cells: 100 → 0) and fell behind
+    the magnet (lag 3.24R against the 2.0R bar, 1/3 checks).
+
+    Physics, and why two-phase carry was chosen over a Korteweg or contact-line
+    force before projection: the drop is an immiscible ferrofluid bead in clear
+    oil in a thin gap. As the magnet drags the bead forward, the displaced oil
+    closes in behind it in a 2D dipole return flow. Across the diffuse
+    Cahn–Hilliard rim, a cell's projected velocity u_mix = φ·u_ff + (1 − φ)·u_oil
+    blends the forward-moving ferrofluid column with the backward-moving oil.
+    Where the back rim thins below half full, (1 − φ)·u_oil turns u_mix to zero
+    and then backward into the wake; phaseAdvectPlan then carried faint
+    ferrofluid into the wake, and phaseCompress (reading u_mix for its face
+    Courant number) saw c_s ≈ 0 at the reversal line and compressed the shed
+    tail along the wake instead of back into the drop. A real drop's back edge
+    moves with the drop because surface tension holds the meniscus together and
+    the ferrofluid column has its own phase velocity u_ff distinct from u_oil.
+    Adding a Korteweg or sub-grid force before hsProject still leaves a single
+    projected cell velocity u_mix shared by both phases (and any curl-free edge
+    force is removed by the pressure projection). Carrying the ferrofluid phase
+    with its own velocity here (read by phaseAdvect, phaseAdvectPlan and
+    phaseCompress, while this.vel stays the mixture velocity for the dye, oil
+    and phaseMomentum) gives the rim its phase velocity directly.
+
+    Why each guard is here, measured against the checks 29c-4's body-carry
+    attempts broke:
+    - Pressed pools (\`npm run ferropress\`): under a press the radial squeeze
+      speed |u(r)| = ½|dh/dt|/h · r grows linearly with r. A φ-weighted window
+      round a rim cell has its centre of mass x_m shifted inward toward smaller
+      r where |u| is slower; replacing v when v is already faster along u_m
+      (dot(v.xy, um) >= dot(um, um)) held back the outward squeeze flow and
+      overfilled the middle of the pressed paraboloid pool (0.968 → 1.183, 3/7).
+      Leaving v untouched whenever dot(v.xy, um) >= u2 makes the pass a no-op
+      on radial squeeze flows (ferropress 7/7, middle 0.968 → 0.981, worst ring
+      0.012).
+    - Two-liquid Darcy speed (\`npm run magnetgain\`) and the momentum and
+      compression controls (\`npm run ferrohold\`): inside a diffuse drop the
+      centre cells (φ ≈ 0.98) move ~30% faster than the drop's Taylor–Saffman
+      two-liquid Darcy speed 2·c_clear/(c_ff + c_clear). Replacing v across the
+      whole drop with the peak core speed sped the centroid up by 46%
+      (magnetgain 4/5) and erased the leading-edge shear that phaseCompress
+      acts on (ferrohold 4/5, half-full difference 8.3 against 13). Sampling the
+      half-full body (φ >= 0.50) and weighting the carry by position along the
+      drop's motion (along = dot(xm, um) / |um|: full carry up to φ = 0.96 on
+      the trailing side along > 0 where the oil return flow turns backward, and
+      only the outer toe φ < 0.49 on the leading side along < 0 so the front
+      half-full contour keeps its Darcy velocity and MUSCL shear) holds
+      magnetgain to 5/5 (+2% weak, +3% strong), ferrohold to 5/5 (lag 1.69R vs
+      1.93R without momentum, +0.24R; half-full 107.6 vs 92.6 without
+      compression, +15.0), and ferrodrag to 3/3 (lag 1.82R, 324 → 378 cells
+      over 0.01, 100 → 106 half-full cells, stationary 0.010 cells).
+    - Labyrinth and standing spikes (\`npm run spikes\`, \`maze\`, \`fingers\`,
+      \`domes\`): when a labyrinth field (ferroLabyrinth > 0) or a close magnet
+      past SPIKE_ONSET (spikeAmt > 0, filmHeld) is on, dipole repulsion
+      (mazeForce) and the standing film (standing.ts) part the pool into narrow
+      fingers and domes separated by 2–4 cell valleys; an 11-cell window across
+      those valleys glued the domes into 3 pieces (spikes 4/6). A.a.x scales the
+      carry by (1 − 2·maze)·(1 − spikeAmt) and zeroes it while filmHeld, so the
+      pass steps aside on labyrinth and spike scenes (spikes 6/6, maze 4/4,
+      fingers 4/4, domes 4/4).
+  */
+  phaseVelocity: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var phase: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+const phaseBody: f32 = 0.50;
+const phaseFull: f32 = 0.96;
+const phaseReach: i32 = 11;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let v = textureLoad(vel, p, 0);
+  let own = clamp(textureLoad(phase, p, 0).r, 0.0, 1.0);
+  if (own >= phaseFull || A.a.x <= 1e-4) { textureStore(dst, p, v); return; }
+  var near = own;
+  if (near <= 1e-4) {
+    for (var j = -1; j <= 1; j++) {
+      for (var i = -1; i <= 1; i++) {
+        let q = clamp(p + vec2i(i, j), vec2i(0), vec2i(n - 1));
+        near = max(near, textureLoad(phase, q, 0).r);
+      }
+    }
+  }
+  if (near <= 1e-4) { textureStore(dst, p, v); return; }
+  var s = 0.0;
+  var mu = vec2f(0.0);
+  var mx = vec2f(0.0);
+  let reach = min(phaseReach, n - 1);
+  for (var j = -reach; j <= reach; j++) {
+    for (var i = -reach; i <= reach; i++) {
+      let q = p + vec2i(i, j);
+      if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
+      let pq = clamp(textureLoad(phase, q, 0).r, 0.0, 1.0);
+      if (pq < phaseBody) { continue; }
+      let r2 = f32(i * i + j * j);
+      let b = (pq - phaseBody) / (1.0 - phaseBody);
+      let w = b * exp(-r2 / 64.0);
+      let uq = textureLoad(vel, q, 0).xy;
+      s += w;
+      mu += w * uq;
+      mx += w * vec2f(f32(i), f32(j));
+    }
+  }
+  if (s <= 0.0) { textureStore(dst, p, v); return; }
+  let um = mu / s;
+  let u2 = dot(um, um);
+  if (u2 <= 1e-12 || dot(v.xy, um) >= u2) { textureStore(dst, p, v); return; }
+  let xm = mx / s;
+  let along = dot(xm, um) / sqrt(u2);
+  let front = 0.72 * (1.0 - smoothstep(0.28, 0.49, own));
+  let back = 1.0 - smoothstep(0.88, phaseFull, own);
+  let trail = A.a.x * mix(front, back, smoothstep(-1.0, 2.0, along));
+  if (trail <= 0.0) { textureStore(dst, p, v); return; }
+  let u = mix(v.xy, um, trail);
+  textureStore(dst, p, safeVel(vec4f(u, v.z, v.w)));
+}`,
+
+  /*
     phaseSeparate's grid-scale filter alone, for the ferrofluid carried as a
     volume under Thin Gap (phaseAdvect's A.a.x). The filter exchanges share
     between neighbours, which keeps Σc; but under a press the plate's

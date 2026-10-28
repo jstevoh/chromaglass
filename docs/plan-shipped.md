@@ -2337,6 +2337,24 @@ plate and projector let go. It runs in CI's browser part.
 Measured: `npm run cartoons` 16/16 (no GPU and `PW_WEBGPU=1`), `layout` 77/77, `phone`
 357/357, `desk` 48/48, `panel` 197/197, `lint` clean.
 
+**Colour (2026-10-27).** The owner: "the out of copyright cartoons we added are all black and
+white - we need some color ones please." Five more, whole and looping, on the same shelf and the
+phone's dye sheet, each with a `colour` flag in `lib/cartoons.ts` and a "colour" tag in its row:
+*Fiddlesticks* (1930; two-colour), *Jack Frost* (1934) and *Balloon Land* (1935) (Ub Iwerks'
+ComiColors, Cinecolor), *Somewhere in Dreamland* (1936; a Fleischer Color Classic) and *Gulliver's
+Travels* (1939; the Fleischer feature in Technicolor, title and End cards cut, 74 minutes).
+Finding free ones took the renewal records, not the dates: a film from 1931 on is free only if
+nobody renewed it in its 28th year, and the Copyright Office's *Catalog of Copyright Entries*
+(on the Internet Archive as text) showed nine of the 1933 to 1934 ComiColors *were* renewed
+(Exclusive Pictures, 1961 to 1962), so those are not here, while Jack Frost, Balloon Land,
+Somewhere in Dreamland and Gulliver's Travels have none. Fiddlesticks is free by date: renewed in
+1959, which does not extend a 1930 film past 95 years. What was left off, and why, is in
+`SOURCES.md`. The colour cost bits: 4.2 to 7.3 MB a short against 1.5 to 8.1 grey, and the feature
+27 MB; the check's bars moved to match (a feature up to 30 MB, the shelf under 80). The pour
+already lays each pixel's own colour, so no drawing code changed; `npm run cartoons` now decodes
+each file in the browser and holds its flag to its picture (0.0 colourfulness for each grey one,
+30 to 82 for the colour ones).
+
 ### 15i. Picking a bottle pours nothing (shipped)
 
 **Shipped.** The owner, 2026-10-04: "when I pick the ferrofluid liquid - it deposits a
@@ -2496,6 +2514,21 @@ a press and lift; carrying the volume on the cells' filtered velocities emptied 
 0.53, because that flux carried 18% more out of it than the glass displaced. Only the
 solve's own face flux (the mean of two cells' h·u plus the second difference of
 M_f·ΔP) keeps both.
+
+### 15e. The liquids' own forces on the GPU plate (the check, shipped 2026-10-27)
+
+`npm run liquids` held soap, glycerine, milk and silicone to what each is for on a 96²
+stand-in, and nothing held the solver the app draws, which has carried the liquids in two
+textures of its own (`addLiquidDrop`, `liquidForces`) since they were ported. The stand-in
+and its four scenes moved into `scripts/liquidStandIn.mjs` (liquids.mjs prints the same
+lines to the digit, its ceiling and cost sections aside, which are random and timed), and
+`npm run liquidsgpu` lays those scenes on the lab's GPU solver on the thin gap the looks
+use, the stand-in's pools cell for cell at its 96-cell logical grid. Two runs of a scene:
+the deltas folded every step, and folded only on the pour's frame, as the app folds them
+only on a frame something is laid in. A control (a stirred pool with no liquid, folded
+every step and not) reads the same to the bit, so the fold itself moves nothing. What it
+found is PLAN 15e-1 to 15e-9; the lines those items owe print as owed and fail the run
+the day they pass.
 
 ## 16. Many plates: each projector its own source (rig-plan R1)
 
@@ -3239,6 +3272,25 @@ The intro did not go red under CPU load alone: with eight busy loops on 4 cores 
 cores) Switches read 992 of 992 and The intro 13 of 13, so what turned them red beside the
 others in the first run is not the cores; `quick` keeps their logs in `scratch/quick/` and
 19k-5 stays open for the next red one.
+
+*19k-5, closed (2026-10-27).* `npm run check` on a 4-core cloud session, all of Measure side by
+side: 95 of 95 green in 52 min 55 s, Switches (1:56) and The intro (42 s) among them, so the two
+reds seen beside others in the first `quick` run did not come back, and nothing was left to fix or
+file. With eight busy loops they had already read 992 of 992 and 13 of 13, so the cause was never
+the cores and is not known; it was not reproduced in this run or in the eight-loop run. If one
+goes red beside others again, `quick` writes its log to `scratch/quick/` and 19k-5 is reopened
+with that log.
+
+*The two nits on #504.* `checks.mjs`'s walk detector (which makes a Measure check that walks
+`scripts/` an `always` entry) knew `walk('scripts')` and `walk(join(root, 'scripts'))` only; a
+`walk(\`${ROOT}/scripts\`)` or `readdirSync(ROOT + '/scripts/')` slipped past, so it now takes any
+text after the call's open bracket on the same statement with `scripts` between quotes or slashes (nested brackets such as `join(process.cwd(), 'scripts')` too; a path built in a variable first is still not seen), and the
+selftest holds both new spellings and a `walk(join(root, 'src'))` followed by another walk, which
+must not borrow the later one. `deploygate.sh`'s `measurepartial` ran `jq | grep | head || true`
+over the reach job's annotations, so a body that was not JSON (a 502 page, a cut read) or was an
+error object (`{"message":"rate limited"}`) gave an empty answer, which reads as "ran in full";
+it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
+function (2 FAIL) and green on the new.
 
 ### 19r. Smaller, for the same pass: the open shard evened
 
@@ -5160,6 +5212,59 @@ and the script runs both off-scenes itself and requires each pass worth half its
 (`0.13R`, `13` cells), with a solver-read start guard (centroid over `0.40`); `ferrorest` line 5 is
 signed (a second window that gains over 3 cells is red too) and line 3 also holds Σc·h at step 380;
 `docs/judging.md` §54 says what the rim pull and `phaseMomentum` look like.
+
+**29c-8. Two-phase carry at the trailing rim (#495).** Chosen fix: a **two-phase carry**
+(`phaseVelocity` in `src/gpu/wgsl/fluid.ts`, writing `this.phaseVelT` read by `phaseAdvect`,
+`phaseAdvectPlan` and `phaseCompress` while `this.vel` remains the mixture velocity for the dye, oil
+and `phaseMomentum`), chosen over a pre-projection Korteweg or sub-grid contact-line force because
+any force added before `hsProject` still leaves a single projected cell velocity
+`u_mix = φ·u_ff + (1 − φ)·u_oil` shared by both phases (and any curl-free edge force is removed by
+the pressure projection). Where the back rim of a dragged drop thins below half full, the displaced
+oil's dipole return flow dominates `u_mix` and turns it backward into the wake; carrying the
+ferrofluid phase with its own velocity `u_ff` keeps the trailing rim moving with the drop.
+Named shortcut: instead of solving two coupled momentum and Darcy-projection equations for `u_ff`
+and `u_oil` across the diffuse interface (queued as `PLAN.md` **29c-9**), `phaseVelocity`
+reconstructs the local drop velocity `u_m` and centre-of-mass offset `x_m` from the half-full body
+(`φ >= 0.50`) within an 11-cell Gaussian window (`w = ((φ − 0.50)/0.50)·exp(−r²/64)`), gated off on
+labyrinth and standing-spike scenes (`cohere = (1 − 2·maze)·(1 − spikeAmt)` while `!filmHeld`) so an
+11-cell window never bridges the 2–4 cell valleys between standing domes or labyrinth fingers
+(`spikes` 6/6, `maze` 4/4, `fingers` 4/4, `domes` 4/4). Leaving `v` untouched whenever
+`dot(v.xy, u_m) >= |u_m|²` makes the pass a no-op on radial squeeze flows under a press where
+`|u(r)| ∝ r` (`ferropress` 7/7: middle `0.968 → 0.981`, worst ring `0.012`), and weighting the
+carry by `along = dot(x_m, u_m)/|u_m|` carries the trailing rim (`along > 0`, `φ < 0.96`) at `u_m`
+while carrying only the outer leading toe (`along < 0`, `φ < 0.49`) so the front half-full contour
+keeps its Taylor–Saffman two-liquid Darcy speed (`magnetgain` 5/5: `+2%` weak, `+3%` strong) and
+MUSCL shear (`ferrohold` 5/5: mean lead `1.69R` vs `1.93R` with `phaseMomentum` off, `+0.24R` against
+`0.13R`; mean half-full `107.6` vs `92.6` with `phaseCompress` off, `+15.0` against `13`). On the Mac
+GPU, `npm run ferrodrag` reaches **3/3** (lag `1.82R` against `2.0R`, half-full cells `100 → 106`,
+`106.0%` kept against `±15%`, cells over `0.01` `324 → 378` vs `1238` on `main`, stationary control
+`0.010` cells). Per the 29c-8 brief, `ferrodrag` was not added to `checks.yml` in #495.
+The review found one hole, fixed in the same PR: `runPhaseAdvect` chose `phaseVelT` whenever the thin
+solve's buffers existed, and they outlive Thin Gap, so with Thin Gap switched off after a drag the deep
+plate kept carrying the ferrofluid on the last thin step's velocity (magnet off, the drop slid `0.0425`
+of the plate in 120 steps and smeared to `0` half-full cells). It now asks the step's own `thinLive`
+(`0.6206 → 0.6241`, `104 → 94` half-full); the check for it is PLAN 29c-10.
+
+**29c-10. `ferrodrag` in CI, and `ferrohold` over the whole drag (#521).** `npm run ferrodrag` is an
+entry in `scripts/checks.json` on the `show` shard (the lightest on #495's run, 14.2 minutes of 20;
+the check takes 39 s there): on Metal lag `1.82R`, `106.0%` kept, stationary `0.010` cells, 3/3.
+
+A fourth line was written for the review's `runPhaseAdvect` fix: the dragged drop at step 180, Thin
+Gap off and the magnet away, 120 deep steps, the drop held to less than one radius of movement and at
+least half its half-full cells, with a fifth that runs the same on a lab built with `runPhaseAdvect`
+keyed off `hsP` alone (#495's head before its review) and requires it red. On software WebGPU the two
+separate: real `0.16R`, `104 → 94` (cx `0.6235 0.6237 0.6239 0.6241` every 30 steps); control `1.93R`,
+`104 → 0` (half-full `100 78 8 0`). On Metal both read `0.70R`, so the two lines run by hand
+(`-- --thinoff`) until PLAN 29c-11 finds why.
+
+`ferrohold`'s window was steps 60 to 120 because the rim used to go in the second half of the drag.
+Read there after #495, both absolute bars were passed by the runs they were set to fail (lead `1.93R`
+with `phaseMomentum` off against `2.15R`; `92.6` half-full with `phaseCompress` off against `47`), and
+the compression pass's margin was `15.0` cells on Metal and `13.4` on software against `13`. Over steps
+60 to 180: lead `1.72R` on, `2.06R` with `phaseMomentum` off; half-full `105.8` on, `82.0` with
+`phaseCompress` off (software; Metal `1.74R`, `2.07R`, `105.8`, `82.2`). The window is now the drag,
+`LAG_BAR` `2.15 → 1.89` and `HALF_BAR` `47 → 94` (midway), `DLAG_BAR` `0.13 → 0.16` (half the gap),
+`DHALF_BAR` kept at `13` (gap `23.8`).
 
 ## 32. The soap film: a draining film seen in reflection
 

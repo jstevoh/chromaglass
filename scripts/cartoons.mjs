@@ -12,9 +12,18 @@
  *               before its picture (so it plays while it arrives: a file whose
  *               `moov` is at the end has to arrive whole before a frame shows),
  *               with an H.264 track and no sound track, as long as the list
- *               says within a second, under 10 MB, and the four under 25 MB.
+ *               says within a second, under 10 MB (30 MB for a feature, a film
+ *               over a quarter of an hour), and the shelf under 80 MB.
  *               The sizes are the web's budget (PLAN 14v): nothing here is
  *               fetched at load, but a phone pays for the one it picks.
+ *   colour      each cartoon's `colour` flag is what its decoded picture
+ *               shows: five frames across the film, read back in the browser,
+ *               the middle one's mean colourfulness (the spread of red,
+ *               green and blue in a pixel) over 15 for a colour cartoon and
+ *               under 1 for a grey one. Measured 2026-10-27 on the shelf
+ *               (0.0 for every grey cartoon, 30 to 82 for the colour ones),
+ *               so the bars sit in the gap. It holds the file to what the
+ *               list says, and fails a colour print that was encoded grey.
  *   recorded    `public/video/cartoons/SOURCES.md` names every file, so no
  *               cartoon ships without its source and licence written down.
  *   the pour    on a phone, the dye sheet lists every cartoon with a Pour and
@@ -82,6 +91,8 @@ function mp4(buf) {
 }
 
 const sources = readFileSync('public/video/cartoons/SOURCES.md', 'utf8');
+// A feature (over a quarter of an hour) is allowed three times a short's size.
+const capMB = (c) => (c.seconds > 900 ? 30 : 10);
 let total = 0;
 for (const c of CARTOONS) {
   const path = `public${c.src}`;
@@ -90,12 +101,12 @@ for (const c of CARTOONS) {
   total += bytes;
   const m = mp4(readFileSync(path));
   const moovFirst = m.order.indexOf('moov') >= 0 && m.order.indexOf('moov') < m.order.indexOf('mdat');
-  check(`${c.title}: an H.264 MP4 with its index first and no sound, as long as the list says, under 10 MB`,
-    moovFirst && m.avc && m.handlers.includes('vide') && !m.handlers.includes('soun') && Math.abs(m.seconds - c.seconds) <= 1 && bytes <= 10 * MB,
+  check(`${c.title}: an H.264 MP4 with its index first and no sound, as long as the list says, under ${capMB(c)} MB`,
+    moovFirst && m.avc && m.handlers.includes('vide') && !m.handlers.includes('soun') && Math.abs(m.seconds - c.seconds) <= 1 && bytes <= capMB(c) * MB,
     `${m.order.join(' ')}; tracks ${m.handlers.join(',')}; ${m.seconds.toFixed(1)} s (listed ${c.seconds}); ${(bytes / MB).toFixed(1)} MB`);
   check(`${c.title}: its source and licence are written in SOURCES.md`, sources.includes(c.src.split('/').pop()));
 }
-check('the cartoons together are under 25 MB', total <= 25 * MB, `${(total / MB).toFixed(1)} MB`);
+check('the cartoons together are under 80 MB', total <= 80 * MB, `${(total / MB).toFixed(1)} MB`);
 
 // ── In a browser ───────────────────────────────────────────────────
 const PORT = Number(process.env.CARTOONS_PORT ?? 4191);
@@ -190,6 +201,42 @@ try {
     return v ? { paused: v.paused } : null;
   }, src);
   const tail = (u) => (u ? u.split('/').pop() : String(u));
+
+  /*
+    Colour. Each cartoon is decoded by a video element of its own (never the
+    plate's) and read back at five places across it; the middle reading's
+    mean colourfulness has to agree with the list's `colour` flag.
+  */
+  const chroma = await page.evaluate(async (list) => {
+    const out = {};
+    for (const c of list) {
+      const v = document.createElement('video');
+      v.muted = true; v.preload = 'auto'; v.src = c.src;
+      await new Promise((res) => { v.onloadedmetadata = res; v.onerror = res; });
+      const readings = [];
+      if (Number.isFinite(v.duration)) {
+        const cv = document.createElement('canvas'); cv.width = 64; cv.height = 48;
+        const g = cv.getContext('2d', { willReadFrequently: true });
+        for (const at of [0.15, 0.3, 0.5, 0.7, 0.9]) {
+          await new Promise((res) => { v.onseeked = res; v.currentTime = v.duration * at; });
+          g.drawImage(v, 0, 0, 64, 48);
+          const d = g.getImageData(0, 0, 64, 48).data;
+          let sum = 0;
+          for (let i = 0; i < d.length; i += 4) sum += Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]);
+          readings.push(sum / (d.length / 4));
+        }
+      }
+      readings.sort((a, b) => a - b);
+      out[c.id] = readings.length ? readings[2] : NaN;
+      v.removeAttribute('src'); v.load();
+    }
+    return out;
+  }, CARTOONS.map(c => ({ id: c.id, src: c.src })));
+  for (const c of CARTOONS) {
+    const x = chroma[c.id];
+    check(`${c.title}: the picture is ${c.colour ? 'in colour' : 'grey'}, as the list says`,
+      Number.isFinite(x) && (c.colour ? x > 15 : x < 1), `mean colourfulness ${Number.isFinite(x) ? x.toFixed(1) : 'unread'}`);
+  }
 
   const pourId = CARTOONS[0].id;
   await page.getByTestId(`cartoon-pour-${pourId}`).tap();

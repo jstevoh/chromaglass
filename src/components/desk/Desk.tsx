@@ -10,7 +10,7 @@ import { LEFT_WIDTH, PanelBody, RIDES_WIDTH, panelMeta } from './DeskPanels';
 import { PanelBrowser } from './PanelBrowser';
 import { PanelWindow, openPanelWindow } from './PanelWindow';
 import {
-  LAYOUT_LABEL, PANEL_BY_ID, closePanel, collapseAll, dockPanel, floatPanel, openPanel, openPanels,
+  PANEL_BY_ID, closePanel, collapseAll, dockPanel, floatPanel, openPanel, openPanels,
   placeFloating, raiseFloating, toggleCollapsed, whereIs,
   type DeskLayout, type Slot,
 } from '../../lib/deskLayout';
@@ -41,10 +41,23 @@ import type { DeskProps } from './deskProps';
  * drawn into the body, above the plate's layer, not inside the desk.
  */
 
-/** The deck's height (the design's): taller in Build, where the knobs are the work. */
-const DECK_H = { build: 268, gig: 236, loadin: 236 } as const;
+/**
+ * The deck's height (the design's): taller where knobs are the work, as they
+ * were in Build. A tab's deck with a panel of knobs in it gets the knobs' room.
+ */
+const DECK_H = { knobs: 268, other: 236 } as const;
 const STRIP_H = 36;
+const SCREENS = new Set(['songs', 'sequences', 'player']);
 const COLUMN_W = { left: LEFT_WIDTH, right: RIDES_WIDTH } as const;
+/**
+ * A side column: as wide as the widest panel in it asks (`columnWidth`), at
+ * least the column's own, and never more than 28% of the window. Uncapped, a
+ * Songs panel's 420 beside a 272 set list left a 1024 window a plate 332 wide
+ * and the zoom chip ran off it (`npm run layout`); the screens stack their
+ * columns when narrow, so the plate keeps the room.
+ */
+const columnWidth = (slot: 'left' | 'right', ids: string[], windowW: number): number =>
+  Math.max(COLUMN_W[slot], Math.min(Math.round(windowW * 0.28), Math.max(0, ...ids.map(id => PANEL_BY_ID.get(id)?.columnWidth ?? 0))));
 
 /** What is being dragged by its grip, and where the pointer is. */
 interface Drag { id: string; x: number; y: number; x0: number; y0: number; moved: boolean }
@@ -54,6 +67,12 @@ export function Desk(p: DeskProps) {
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
   const set = p.onLayout;
+  const [windowW, setWindowW] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const on = () => setWindowW(window.innerWidth);
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
   const [browser, setBrowser] = useState<{ top: number; right: number } | null>(null);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -61,7 +80,7 @@ export function Desk(p: DeskProps) {
   const [floatsHidden, setFloatsHidden] = useState(false);
   // A panel floated, or another layout, shows them again: hidden floats are
   // easy to forget, and a panel just floated that does not appear reads as broken.
-  useEffect(() => { setFloatsHidden(false); }, [l.floating.length, p.layoutName]);
+  useEffect(() => { setFloatsHidden(false); }, [l.floating.length, p.tab]);
   /**
    * A floating panel being moved or resized, held here until the hand lets
    * go. Written to the layout on every pointer move it re-rendered the whole
@@ -118,7 +137,7 @@ export function Desk(p: DeskProps) {
   useEffect(() => {
     const id = requestAnimationFrame(() => onRelayout?.());
     return () => cancelAnimationFrame(id);
-  }, [l, p.layoutName, onRelayout]);
+  }, [l, p.tab, onRelayout]);
 
   // ── Keys ────────────────────────────────────────────────────────────
   /*
@@ -126,8 +145,8 @@ export function Desk(p: DeskProps) {
     which re-renders whenever the sound does, and an effect keyed on them took
     the listener off and put it back nearly every frame.
   */
-  const latest = useRef({ onMode: p.onMode, onStage: p.onStage, openBrowser, set, floats: l.floating.length, bare: !!p.bare });
-  latest.current = { onMode: p.onMode, onStage: p.onStage, openBrowser, set, floats: l.floating.length, bare: !!p.bare };
+  const latest = useRef({ tabs: p.tabs, onTab: p.onTab, onStage: p.onStage, openBrowser, set, floats: l.floating.length, bare: !!p.bare });
+  latest.current = { tabs: p.tabs, onTab: p.onTab, onStage: p.onStage, openBrowser, set, floats: l.floating.length, bare: !!p.bare };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = latest.current;
@@ -137,9 +156,10 @@ export function Desk(p: DeskProps) {
       // The ⌘ keys work from a text field, as App's ⌘K and ⌘S do: the panel
       // browser's own search has the focus while it is open, and ⌘P there
       // has to close it, not print the page.
-      if (mod && !e.shiftKey && !e.altKey && ['1', '2', '3'].includes(e.key)) {
+      // ⌘1 to ⌘9: the tabs in the order they are in, whatever they are called.
+      if (mod && !e.shiftKey && !e.altKey && /^[1-9]$/.test(e.key) && k.tabs[Number(e.key) - 1]) {
         e.preventDefault();
-        k.onMode(e.key === '1' ? 'design' : e.key === '2' ? 'perform' : 'loadin');
+        k.onTab(k.tabs[Number(e.key) - 1].id);
         return;
       }
       if (mod && (e.key === 'p' || e.key === 'P') && !e.shiftKey) { e.preventDefault(); k.openBrowser(); return; }
@@ -283,6 +303,8 @@ export function Desk(p: DeskProps) {
         floating={opts.floating}
         collapsed={collapsed}
         className={`${opts.className ?? ''} ${drag?.moved && drag.id === id ? 'opacity-40' : ''}`}
+        // A screen drawn in a panel brings its own padding and scrolling.
+        bodyClassName={SCREENS.has(id) ? 'px-0! pb-0! overflow-hidden!' : ''}
         style={opts.style}
         onFloat={() => set(x => floatPanel(x, id))}
         onDock={() => set(x => dockPanel(x, id, 'deck'))}
@@ -322,10 +344,13 @@ export function Desk(p: DeskProps) {
     );
   };
 
-  const deckH = l.deck.length === 0 ? 44 : l.deckCollapsed ? STRIP_H : DECK_H[p.layoutName];
+  const deckH = l.deck.length === 0 ? 44 : l.deckCollapsed ? STRIP_H
+    : DECK_H[l.deck.some(id => PANEL_BY_ID.get(id)?.kind === 'knobs') ? 'knobs' : 'other'];
   const left = l.left.length > 0, right = l.right.length > 0;
   const live = l.plateMode === 'live';
-  const plateName = p.layoutName === 'gig' ? (p.liveName ?? '—') : (p.lookName ?? 'Untitled');
+  // Live, the plate is the wall's look; in Preview, the look being built.
+  const plateName = live ? (p.liveName ?? p.lookName ?? '—') : (p.lookName ?? 'Untitled');
+  const tabName = p.tabs.find(t => t.id === p.tab)?.name ?? '';
   const nPanels = openPanels(l).length;
 
   const windows = Object.entries(popped).map(([id, win]) => (
@@ -341,20 +366,23 @@ export function Desk(p: DeskProps) {
     <div
       className="fixed inset-0 z-10 grid bg-bg text-text"
       style={{
-        gridTemplateColumns: `${left ? `${COLUMN_W.left}px ` : ''}minmax(0, 1fr)${right ? ` ${COLUMN_W.right}px` : ''}`,
+        gridTemplateColumns: `${left ? `${columnWidth('left', l.left, windowW)}px ` : ''}minmax(0, 1fr)${right ? ` ${columnWidth('right', l.right, windowW)}px` : ''}`,
         gridTemplateRows: `48px minmax(0, 1fr) ${deckH}px 28px`,
       }}
-      // The old desks' ids, so everything that asks which desk is up still can:
-      // Build is the Design desk's job and Gig the Perform desk's.
-      data-testid={p.layoutName === 'build' ? 'design-desk' : p.layoutName === 'gig' ? 'perform-desk' : 'loadin-desk'}
+      // The tab's id, which a rename never changes: `perform-desk`,
+      // `sequence-desk`, `setup-desk`, or a tab of the owner's own.
+      data-testid={`${p.tab}-desk`}
       data-desk="v2"
-      data-layout={p.layoutName}
+      data-layout={p.tab}
       data-plate-mode={l.plateMode}
     >
       <DeskHeader
-        breadcrumb={p.layoutName === 'gig' ? p.showCrumb : <DocMenu p={p} crumb={p.layoutName === 'loadin' ? 'Stage' : 'Look'} />}
-        mode={p.mode}
-        onMode={p.onMode}
+        breadcrumb={<DocMenu p={p} crumb="Look" />}
+        tabs={p.tabs}
+        tab={p.tab}
+        onTab={p.onTab}
+        onTabEdit={p.onTabEdit}
+        onAddPanel={openBrowser}
         dots={p.dots}
         midiName={p.midiName}
         onSound={p.onSound}
@@ -413,7 +441,7 @@ export function Desk(p: DeskProps) {
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: live ? 'var(--color-live)' : 'var(--color-accent)' }} />
             <span className="truncate text-[16px] font-medium" data-testid="plate-name">{plateName}</span>
             <span className="hidden shrink-0 whitespace-nowrap font-mono text-[12px] text-dim 2xl:inline">
-              {live ? (p.layoutName === 'gig' ? `live · ${p.liveFor}` : 'live') : 'preview · not on wall'}
+              {live ? `live · ${p.liveFor}` : 'preview · not on wall'}
             </span>
           </span>
           <RecordControls
@@ -424,7 +452,7 @@ export function Desk(p: DeskProps) {
             performance={p.performance}
             onOptions={p.onRecordOptions ?? (() => {})}
           />
-          <Layers p={p} report={p.layoutName === 'build'} />
+          <Layers p={p} report={!live} />
           <span className="flex shrink-0 items-center gap-2">
             {/*
               Live | Preview: the whole of the old Perform/Design split.
@@ -565,6 +593,24 @@ export function Desk(p: DeskProps) {
               )}
             </button>
           )}
+          {/*
+            The desk's way into every setting, on every tab. It was in the
+            Rides panel's pinned footer (and the bench's, without the rides),
+            which a tab of the owner's may not have, or may stack under
+            another panel in a column that scrolls: on Perform, the first
+            tabs measured it 1,201 px down a 900 px window, and on Setup it
+            was not there at all (the Mac's `qa`). The status bar is on every
+            tab and never scrolls.
+          */}
+          <button
+            type="button"
+            onClick={p.onOpenSettings}
+            className="inline-flex h-6 shrink-0 items-center rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+            title="Every setting, by group (the Settings sheet)"
+            data-testid="open-all-settings"
+          >
+            All settings…
+          </button>
           <span className="truncate" data-testid="status-hearing">
             {p.status.audio}
             {p.status.sequence && ` · ${p.status.sequence}`}
@@ -573,7 +619,7 @@ export function Desk(p: DeskProps) {
         </span>
         <span className="flex items-center gap-3 truncate">
           <span className="truncate" data-testid="status-running">
-            {`layout ${LAYOUT_LABEL[p.layoutName]} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}
+            {`tab ${tabName} · ${nPanels} panel${nPanels === 1 ? '' : 's'}`}
             {l.floating.length > 0 && ` · ${l.floating.length} floating`}
             {p.status.phone > 0 ? ` · ${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked` : ''}
             {p.status.rec ? ` · rec ${p.status.rec}` : ''}
@@ -635,7 +681,6 @@ export function Desk(p: DeskProps) {
       )}
       {browser && (
         <PanelBrowser
-          layoutName={p.layoutName}
           layout={l}
           at={browser}
           onDock={(id) => set(x => openPanel(x, id, 'deck'))}
