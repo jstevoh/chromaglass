@@ -6410,11 +6410,17 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 - **19ah-2. Open: a separate macOS user for the runner.** Jobs run as the owner and can read
   the owner's signing keys and `gh` sign-in. Only main's reviewed workflow runs there, but a
   user of its own (logged in, for the GPU) would take the reach away.
-- **19ah-3. Open: a shard queued for a Mac that went to sleep after the probe.** It waits
-  until the Mac wakes, or a day. A watchdog job that cancels and re-dispatches the deploy on
-  GitHub's machines after, say, 20 minutes in the queue would close it.
+- **19ah-3. Shipped (with 19ah): a shard queued for a Mac that went to sleep after the
+  probe.** `deploy.yml`'s `Watchdog` (`scripts/macwatch.mjs`) starts the deploy again with
+  `hosted` and cancels the stalled run after 15 minutes queued with none running. Still
+  open: it holds an ubuntu runner for the length of the shards (free on a public
+  repository); a shorter way would be a watchdog that wakes on a schedule.
 - **19ah-4. Open: the by-hand Mac workflows** (`gallery`, `controls`, `pixels`, `film`) could
   take the same probe and lane; they are the longest Mac jobs and queue the same way.
+- **19ah-5. Open: the job-started hook is copied by hand.** `macrunner-setup.sh` installs
+  `scripts/macrunner-hook.sh` from the checkout it runs in; a change to the hook on `main`
+  reaches the Mac only when the owner runs setup again. A check that the installed copy
+  matches `main`'s (the probe could read a hash the hook prints) would say when it is stale.
 
 ## 20. Lace and holes: a pale film torn open over colour
 

@@ -47,6 +47,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      hosted:
+        description: "Every Mac shard on GitHub's Macs, none on the owner's (what the watchdog's re-run asks for)"
+        type: boolean
+        default: false
 
 # Never let two deploys race each other onto the live channel.
 # Read-only unless a job says otherwise; what the deploy gate and the checks
@@ -124,7 +129,7 @@ jobs:
   mac:
     name: Is the owner's Mac free
     needs: verified
-    if: ${{ needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' && needs.verified.outputs.tested != 'disjoint' }}
+    if: ${{ !inputs.hosted && needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' && needs.verified.outputs.tested != 'disjoint' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Where MAC_RUNNER_PROBE lives: an environment that only main can use, as
@@ -144,6 +149,34 @@ jobs:
           GH_TOKEN: ${{ secrets.MAC_RUNNER_PROBE }}
           MAC_SHARDS: ${{ vars.OWNER_MAC_SHARDS }}
         run: node scripts/macrunner.mjs
+
+  # The probe's answer can go stale: the Mac can sleep in the minute between
+  # "free" and the jobs, and a self-hosted job then queues for up to a day,
+  # holding every deploy behind it (PLAN.md 19ah-3). Beside the checks, this
+  # reads the run's jobs; a shard queued for the owner's Mac with none running
+  # for 15 minutes starts this workflow again with `hosted` (every shard on
+  # GitHub's Macs) and cancels this run. It never fails the deploy: it is not a
+  # need of `deploy`, and its step carries on past an error.
+  watchdog:
+    name: Watchdog
+    needs: mac
+    if: ${{ needs.mac.outputs.shards != '' && needs.mac.outputs.shards != '[]' }}
+    runs-on: ubuntu-latest
+    # Five shards of about 17 minutes in series, with room; it stops as soon
+    # as every one of them has started.
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      # To start deploy.yml again (a workflow_dispatch, which GITHUB_TOKEN may
+      # start) and to cancel this run. Nothing else.
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+      - continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARDS: ${{ needs.mac.outputs.shards }}
+        run: node scripts/macwatch.mjs
 
   checks:
     name: Checks

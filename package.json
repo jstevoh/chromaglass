@@ -151,6 +151,7 @@
     "macqueue": "node scripts/macqueue.mjs",
     "flakes": "node scripts/flakes.mjs",
     "ghapi": "node scripts/ghapi.mjs --selftest",
+    "macguard": "bash scripts/macrunner-hook.sh --selftest && node scripts/macwatch.mjs --selftest",
     "physics": "node scripts/physics.mjs",
     "heat": "node scripts/heat.mjs",
     "bodies": "node scripts/bodies.mjs",

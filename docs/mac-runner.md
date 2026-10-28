@@ -12,10 +12,19 @@ Mac is free, and on GitHub's machines as before when it is not.
 
 - **Only `main`'s deploys.** `checks.yml` sends a shard to the label `owner-mac` only when
   the run is not a pull request's and the deploy listed that shard. A pull request's run,
-  a fork's included, always asks for `macos-15`. The repository is public: a fork's pull
-  request also brings its own workflow, which could ask for the label itself, so pull
-  requests from every outside contributor wait for the owner's approval before anything
-  runs (Settings → Actions → General; the setup script sets it).
+  a fork's included, always asks for `macos-15`.
+- **The runner refuses everything else itself.** Which runner a job asks for is up to the
+  workflow, and any branch pushed here can carry a workflow of its own that asks for
+  `owner-mac`. So before every job the runner runs a job-started hook
+  (`scripts/macrunner-hook.sh`, installed by the setup script as
+  `~/.chromaglass-runner/job-started.sh` and named in `~/actions-runner/.env`), which fails
+  the job before its first step unless it is `deploy.yml` on `main`, started by a push or
+  by hand. A `pull_request_target`, `workflow_run` or scheduled run also has `main` as its
+  ref, hence the event as well. `bash scripts/macrunner-hook.sh --selftest` runs it
+  against each of those. The hook lives outside the runner's folder so neither a job nor a
+  runner update can rewrite it. As well, pull requests from every outside contributor wait
+  for the owner's approval before anything runs (Settings → Actions → General; the setup
+  script sets it): a fork's pull request brings its own workflow too.
 - **A probe decides, before the shards queue.** A job that asks for a self-hosted label
   waits up to a day for it, and the queue counts toward no timeout, so a deploy cannot
   simply try the Mac and fall back. `deploy.yml`'s job `Is the owner's Mac free` asks
@@ -31,6 +40,11 @@ Mac is free, and on GitHub's machines as before when it is not.
 - **Ports.** The harnesses listen on fixed ports. On the Mac, the shard's first step
   (`scripts/macports.sh`) waits up to ten minutes for those ports to be free of another
   session's run and then fails with the process that holds them.
+- **A watchdog, for a Mac that sleeps after the probe said free.** The shards would wait for
+  it, and every deploy behind them. `deploy.yml`'s `Watchdog` job (`scripts/macwatch.mjs`)
+  reads the run's jobs; when a shard has been queued for the owner's Mac for 15 minutes with
+  none running, it starts `deploy.yml` again with `hosted` set (every shard on GitHub's
+  Macs) and cancels the stalled run, which the new one replaces in the queue.
 
 ## Setting it up (at the Mac, once)
 
@@ -39,14 +53,19 @@ bash scripts/macrunner-setup.sh
 ```
 
 It sets the approval policy, downloads GitHub's runner into `~/actions-runner` (checked
-against the release's checksum), registers it with the repository as `owner-mac`, starts
+against the release's checksum), registers it with the repository as `owner-mac`, installs
+the job-started hook (run it from an up-to-date `main`: the hook is copied from the
+checkout; run it again after a change to the hook), starts
 it as a LaunchAgent (as the owner, not root, so Chromium has the GPU), makes the
 `mac-runner` environment and asks for the probe's token at a hidden prompt. Each step is
 skipped when already done. The last line is what a deploy would do now.
 
 Keep the Mac awake on power (System Settings → Energy: "Prevent automatic sleeping when
-the display is off"). A Mac that sleeps after the probe said free leaves the shards
-queued: stop it with Cancel workflow, then re-run with the Mac awake or the runner stopped.
+the display is off"). A Mac that sleeps after the probe said free costs the watchdog's 15
+minutes and then a GitHub queue. To move a stalled deploy sooner by hand: Cancel workflow,
+then **Re-run all jobs** (the probe asks again) or Run workflow with `hosted` ticked.
+Never **Re-run failed jobs**: it keeps the probe's old answer and sends the shards to the
+sleeping Mac again.
 
 ## For a show, or anything else that wants the GPU
 

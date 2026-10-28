@@ -59,11 +59,42 @@ else
   echo "   already registered"
 fi
 
-echo "4. Started now and at every login (a LaunchAgent, as you)"
-./svc.sh status 2> /dev/null | grep -q 'Started' || { ./svc.sh install > /dev/null 2>&1 || true; ./svc.sh start; }
+echo "4. The runner refuses every job but main's deploy"
+# Any branch pushed here can bring a workflow that asks for this runner by
+# name, and the approval in step 1 covers forks only. So the runner itself
+# checks each job before it starts (scripts/macrunner-hook.sh): a push to main
+# or a run by hand on main, of deploy.yml, or the job fails before its first
+# step. The copy that runs lives in ~/.chromaglass-runner, outside the runner's
+# folder, where no job's checkout and no runner update writes; it is copied
+# from this checkout, so run this script from main.
+HOOKDIR="$HOME/.chromaglass-runner"
+mkdir -p "$HOOKDIR"
+install -m 755 "$here/scripts/macrunner-hook.sh" "$HOOKDIR/job-started.sh"
+bash "$HOOKDIR/job-started.sh" --selftest | tail -1
+restart=0
+if ! grep -qx "ACTIONS_RUNNER_HOOK_JOB_STARTED=$HOOKDIR/job-started.sh" .env 2> /dev/null; then
+  touch .env
+  grep -v '^ACTIONS_RUNNER_HOOK_JOB_STARTED=' .env > .env.new || true
+  echo "ACTIONS_RUNNER_HOOK_JOB_STARTED=$HOOKDIR/job-started.sh" >> .env.new
+  mv .env.new .env
+  restart=1
+  echo "   hook set in $DIR/.env"
+else
+  echo "   hook already set"
+fi
+
+echo "5. Started now and at every login (a LaunchAgent, as you)"
+# The runner reads .env when it starts, so a running one is restarted when
+# step 4 changed it.
+if ./svc.sh status 2> /dev/null | grep -q 'Started'; then
+  [ "$restart" = 0 ] || { ./svc.sh stop; ./svc.sh start; }
+else
+  ./svc.sh install > /dev/null 2>&1 || true
+  ./svc.sh start
+fi
 ./svc.sh status | grep -E 'Started|Stopped|not installed' || true
 
-echo "5. The deploy's probe can see the runner"
+echo "6. The deploy's probe can see the runner"
 # The environment only main can use, so a branch's workflow cannot read it.
 gh api -X PUT "repos/$REPO/environments/mac-runner" --input - > /dev/null <<< '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
 gh api "repos/$REPO/environments/mac-runner/deployment-branch-policies" --jq '.branch_policies[].name' | grep -qx main ||
@@ -81,5 +112,5 @@ else
   unset probe
 fi
 
-echo "6. What a deploy would do now"
+echo "7. What a deploy would do now"
 GH_TOKEN=$(gh auth token) node "$here/scripts/macrunner.mjs" --dry

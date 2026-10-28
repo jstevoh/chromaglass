@@ -360,9 +360,11 @@ jobs:
     # probe named. The repository is public, so a self-hosted runner must
     # never take a pull request's job: anyone's fork can open one, and its
     # workflow is the fork's. Hence the event test as well as the input,
-    # which a pull request cannot set: a PR that edited this line to reach
-    # the runner still needs the owner's approval to run at all (Settings →
-    # Actions → approval for every outside contributor, docs/mac-runner.md).
+    # which a pull request cannot set. This line is not the guard, though: a
+    # branch can edit it, or bring its own workflow asking for `owner-mac`.
+    # The runner itself refuses any job that is not deploy.yml on main from
+    # a push or a run by hand (its job-started hook, scripts/macrunner-hook.sh),
+    # and a fork's PR waits for the owner's approval (docs/mac-runner.md).
     # Only `owner-mac` is asked for, not `macOS`, so `npm run macqueue` keeps
     # GitHub's Macs and the owner's apart.
     runs-on: ${{ github.event_name != 'pull_request' && contains(fromJSON(inputs.local || '[]'), matrix.shard) && fromJSON('["self-hosted","owner-mac"]') || 'macos-15' }}
