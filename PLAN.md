@@ -158,8 +158,8 @@ with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-
 The owner's account steps sit here too: **S8-on** (switch the crash reports on),
 **19g** (more Mac runners), **12.2** (the store accounts). ~~**13.1-sign**~~ (the Mac app's
 Developer ID and notarisation) is in, 2026-10-27: the five secrets are set and a pull
-request's build came back "Notarized Developer ID"; what is left of it is
-**13-update-signed** (§13), from the first signed release.
+request's build came back "Notarized Developer ID"; it shipped with the
+first signed release, 1.3.692 (**13-update-signed**, §13); judging §75 is owed.
 
 ### Wave 3. Seams in the two big files (one session, in a quiet week)
 
@@ -261,7 +261,7 @@ style (§31).
   **12.7**, **12.8**; **12.4a**; later **12.9**.
 - **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13-win-app** then
   **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out and Link,
-  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, **13-update-signed** (after signing; 13-update shipped ad hoc), then **13.2**
+  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
@@ -2823,17 +2823,16 @@ network):
   (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
   (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
   Judged on the owner's Mac: `docs/judging.md` §75.
-  - **13-update-signed** *(13.1-sign is in, 2026-10-27: the secrets are set, and a PR's
-    build was notarised and accepted by Gatekeeper as "Notarized Developer ID"; the
-    build job's limit went from 40 to 75 minutes after a run was cancelled at 40 still
-    waiting on Apple's notary service. Next: the owner runs the first signed release)*:
-    with the Developer ID secrets in, the
-    same code downloads in the background and installs on quit. Nothing to build;
-    the first signed release is judged by installing the one before it and seeing it
-    replace itself (§75's last step). Signing is also what takes away the first-open
-    warning: set `MAC_APP_NOTARISED` true in `src/lib/macApp.ts` then, and the profile
-    sheet and landing page stop telling the way round (the release notes stop by
-    themselves, from what `spctl` says of the built app).
+  - **13-update-signed** *(shipped 2026-10-27: the first signed and notarised release,
+    1.3.692, went live at 7:12 PM PT; `MAC_APP_NOTARISED` is now true in
+    `src/lib/macApp.ts`, so the profile sheet's Mac app card and the landing page stop
+    telling the Open Anyway way round, and `npm run updates` asserts the flag and that
+    both pages still gate the words on it. The build job's limit went from 40 to 75
+    minutes after a run was cancelled at 40 still waiting on Apple's notary service.
+    Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces
+    it in place)*: with the Developer ID secrets in, the same code downloads in the
+    background and installs on quit. Nothing else to build. The release notes stopped
+    by themselves, from what `spctl` says of the built app.
   - **13-first-open** *(shipped)*: the first release, 1.3.622 (2026-10-25), was refused on
     the owner's Mac ("may harm your Mac"), and the reply sent then said right-click →
     Open, which macOS 15 no longer offers for an app it cannot check. The release notes

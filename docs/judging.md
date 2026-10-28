@@ -1650,14 +1650,17 @@ On the laptop in a dark room, and on the phone, with no reading of labels:
 
 On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
 Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
-copy that is there, and open it (the first open still needs System Settings → Privacy &
-Security → Open Anyway until the app is signed). On a phone the same card should say to open
+copy that is there, and open it. Install 1.3.692 or later: it is signed and notarised, so it
+opens on a double-click with no warning, and the card and the landing page no longer tell the
+way round (an older ad hoc copy, 1.3.622 or 1.3.642, still needs System Settings → Privacy &
+Security → Open Anyway). On a phone the same card should say to open
 the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
 release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
 minute: one notification should say the new version is out, the ChromaGlass menu should offer
 Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
-while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
-another, and check that the first downloads it and becomes the new version after a quit.
+while a projector is up. The signed release is out (1.3.692, 2026-10-27), so what is owed is the
+last step: install 1.3.692, make another release, and check that 1.3.692 downloads it and
+becomes the new version after a quit, replacing itself in place.
 
 ## 72. A look saved in Chrome is in the Mac app (PLAN 23.18)
 

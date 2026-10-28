@@ -34,7 +34,7 @@ const { startUpdates, updateMenuItem, updatesOff, downloadUrl, RELEASES, DMG, FI
 const tmp = mkdtempSync(join(tmpdir(), 'cg-updates-'));
 const out = join(tmp, 'macApp.mjs');
 await build({ entryPoints: [join(REPO, 'src', 'lib', 'macApp.ts')], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { macAppRow, onMacComputer, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN } = await import(pathToFileURL(out).href);
+const { macAppRow, onMacComputer, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, MAC_APP_NOTARISED } = await import(pathToFileURL(out).href);
 rmSync(tmp, { recursive: true, force: true });
 
 let failed = 0;
@@ -252,6 +252,14 @@ check('in the app: the version is shown', inApp('none').current === '1.3.0');
 // macOS 15 took right-click → Open away for an app it cannot check (the owner's
 // Mac refused 1.3.622, 2026-10-25): the words point at the one way left.
 check('the first-open words name Settings\' Open Anyway, not right-click', /Privacy & Security/.test(MAC_FIRST_OPEN) && /Open Anyway/.test(MAC_FIRST_OPEN) && !/right-click|control-click/i.test(MAC_FIRST_OPEN), MAC_FIRST_OPEN);
+
+// 1.3.692 (2026-10-27) is the first release Apple notarised: the way round the
+// warning is gone from the profile sheet and the landing page, and both still
+// gate it on the flag, so a build the notary ever refuses can turn it back on.
+check('the flag says the download is notarised, and both pages gate the first-open words on it',
+  MAC_APP_NOTARISED === true
+    && /\{!MAC_APP_NOTARISED && .*MAC_FIRST_OPEN/.test(readFileSync(join(REPO, 'src', 'components', 'MacAppCard.tsx'), 'utf8'))
+    && /\{!MAC_APP_NOTARISED && .*MAC_FIRST_OPEN/.test(readFileSync(join(REPO, 'src', 'components', 'Landing.tsx'), 'utf8')));
 
 // --- The three files agree on where a release is ------------------------------
 const require = createRequire(import.meta.url);
