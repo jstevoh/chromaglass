@@ -3680,6 +3680,25 @@ Mic or Band pick came back on every launch from `localStorage`.
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
 
+### 14ab (partly). Per-frame CPU work found with 14aa: 14ab-7 and 14ab-8 shipped (2026-10-28)
+
+The rest of 14ab (the list found with 14aa, 2026-10-24) is written with 14aa in #441; these two
+did not touch the files that PR and #474 do, so they went first. The story is in
+`docs/plan-shipped.md` under the same numbers.
+
+- ~~**14ab-7** *The ear allocates every frame.*~~ **Shipped** (#533): the seventeen onset
+  detectors keep their second of flux in two rings and take the median and its deviation by
+  partial sort, to the same number to the bit; the live ear no longer copies its two byte
+  arrays into every reading; the fifteen-frame median's scratch is kept. `AudioFeatures.update`
+  0.5–0.6 → 0.30 ms and 227.65 → 5.7 KB an update, readings identical. `npm run eargc`.
+- ~~**14ab-8** *The gamepad renders the App at 30 Hz while its ring shows.*~~ **Shipped**
+  (#533): the ring (`GamepadRing`) listens to a store in the hook and moves itself; the App
+  renders 43 → 1.0 times a second with the ring up (`npm run renders`' gamepad phase), and
+  the poll sets `connected` once, not on every tick.
+- **14ab-7b** *What the ear still makes per reading* is the reading itself, 5.7 KB: seventeen
+  onset objects, three arrays and the chroma. Smaller if a caller that keeps readings
+  (`recent`, the song render) is given one to fill, not worth doing until a Mac profile asks.
+
 ### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 
 **Shipped** (2026-10-24): four public domain cartoons, each the whole film looping, poured as
@@ -6123,6 +6142,17 @@ Not a gate and no bar: a rate depends on what was pushed.
   tap now prints it ("handled N ms apart"); the old red implied up to about 400 ms on a
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
   measurement on the Mac, not from this line.
+
+- **19ac-3. `bottles` counts the look's own pours as the hand's, and goes red on one at the
+  mirror.** `WebGPU (macOS) · tools` failed `bottles` twice on one head (#533, which changes
+  neither the bottle nor the tools), on two different lines: "splatter with the Oil bottle"
+  (39 pours, 1 at the mirror) and "splatter with the Ferrofluid bottle" (37 pours, 1 at the
+  mirror; the hand's flings 0.13 from the hand, nothing near the mirror), and passed on the
+  third run. The stroke's mirror is 0.4 of the plate from it and a splatter's fling reaches
+  about 0.07, so the pour is not the hand's: read it from `__bottleLog` with the call's
+  `auto` flag and the look's lays, and count the hand's alone. Until then a lone pour at
+  the mirror is this, not a flipped coordinate (that puts every pour there). Not yet shown
+  from the log.
 
 ### 19ad. The `open` shard flakes on four unrelated faults
 

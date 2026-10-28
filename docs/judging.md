@@ -1952,3 +1952,18 @@ Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Tr
 2. Play an album in a streaming app (Apple Music, Spotify, or another app on the Mac). The sound bar in the Sound panel and the plate's motion (kicks, bass, swell) should follow the album in stereo with no microphone bleed from the room.
 3. Quit and reopen the Mac app while the album is still playing: **System audio** is remembered across launches in the Mac app and resumes without asking for a tab.
 4. Turn on **Ambient TV mode (cool & quiet)** from the Sound panel, from **Show → Ambient TV Mode (Cool & Quiet)** (`Cmd+Shift+A`), or from the phone's Play sheet tile: the plate steps at 30 Hz, caps display draws at 60 Hz (`DrawGate`), and stays at or below the opening rung so the Mac stays cool and quiet over a long listening session.
+
+## 89. The game controller's ring, and the ear after its detectors changed (PLAN 14ab-7, 14ab-8)
+
+Both are meant to look and sound as before; this is the look at that, on a real pad and a
+real song. (§88 is held by the Mac app's updates; take the next free number if it moved.)
+
+1. Plug in or pair a controller. Push the left stick: a ring should follow the plate under it, as smooth as the
+   mouse's pointer, and swell and tint when you hold the right trigger. Let go and it should fade after about
+   two and a half seconds. On the phone nothing changes (no ring without a pad).
+2. With the pad connected, open the Perform desk's clock and the meters: nothing else on the page should be
+   busier than with the pad unplugged.
+3. Play a song with clear drums. The kick and snare triggers (Sound › patch bay, the plate's kick bloom) should
+   land on the same hits as before this change: the readings are the same to the bit on the checks' songs.
+4. Bad: a ring that lags behind the stick, jumps to a corner when it first appears, or stays after the stick is
+   released; a beat that used to fire and does not.
