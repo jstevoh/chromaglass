@@ -181,11 +181,11 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
         refreshLicenseState();
       } else {
         setLicenseError(
-          res.error === 'expired'
+          res.detail ?? (res.error === 'expired'
             ? 'This licence key has expired.'
             : res.error === 'machine-limit'
               ? 'This licence key is already active on 2 machines.'
-              : 'That is not a valid licence key.',
+              : 'That is not a valid licence key.'),
         );
       }
     } catch {
