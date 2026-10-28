@@ -8129,6 +8129,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
     plate reaches `35.2 steps/s` (`422 steps / 12 s`, `simMs = 11.4 ms`, `1.88 substeps/frame`,
     `18.7 fps`), clearing `30 steps/s` with +17% margin; `governor.ts` needs a step-rate /
     `simMs` downshift rule (or a `256²` start when `simMs > 16 ms`) so single-plate thin-gap
+    looks reach `PINNED_STEP_RATE = 30`.
   - **28i-2b, open. The projector check cannot see a left/right shift of 0.2 or less.**
     `scripts/webgpu-smoke.mjs`'s "the projector places the picture on the wall" probes only the
     top rows and the middle, so a sideways shift of the picture by 0.2 of the frame or less
@@ -8138,7 +8139,6 @@ Turing Print" work (#331), which also made the reaction grow at all.
     a column probe closes it cheaply: the left 4% of columns lit when unpinned and dark when
     pinned inside the frame, beside the top-rows probe. A check change: name its bar and
     input in the PR body, and run the same mutations to show 0.2 sideways now fails.
-    looks reach `PINNED_STEP_RATE = 30`.
   - **28i-3. Sound on the liquid, not the frame** (batch 3, **open for the film measure**;
     frame fixes on the eight looks and the Milk Marbling dead-patch fix **shipped** in #473,
     story in `docs/plan-shipped.md` 28i-3).
