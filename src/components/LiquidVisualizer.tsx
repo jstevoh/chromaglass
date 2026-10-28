@@ -701,6 +701,15 @@ const SIM_MAX_CATCHUP = (() => {
   `engineQuery({ lockstep: true })` (scripts/frame.mjs), which a GPU never
   sends, so nothing a Mac measures moves.
 */
+/*
+  How long a kick waits for the plate's next step before it is let go
+  (`plateKickRef`): a tenth of a second, past one step's interval at the
+  governor's floor of thirty steps a second (33 ms) and at the nineteen a
+  second the Mac runner reached under the squeeze (53 ms), and short enough
+  that a press laid after it would be the beat's ghost, not the beat. A software plate's one step takes seconds, so there a kick lands only
+  on a frame that steps as it is decided, as before.
+*/
+const KICK_OWED_MS = 100;
 const LOCKSTEP = (() => {
   if (typeof window === 'undefined') return false;
   return new URLSearchParams(window.location.search).get('lockstep') === '1';
@@ -5697,6 +5706,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const kickRef = useRef<{ kick: boolean; predicted: boolean }>({ kick: false, predicted: false });
   /** Every kick since the plate started, for a show that acts on every Nth one. */
   const kickCountRef = useRef(0);
+  /*
+    A kick the plate has still to take (PLAN 30a-3).
+
+    The clock decides a kick once a frame, and everything a kick does to the
+    plate (Beat Squeeze's press, Plate Rock's lean, the bloom's ring, the
+    bubbles, the bass moving on to its next area) is laid inside the step
+    loop on its first step, `simStep === 0`. A frame that takes no step has
+    no first step, so its kick was dropped without a word. That is most
+    frames once the plate steps slower than the display refreshes: at thirty
+    steps a second on a 120 Hz screen three frames in four take none, and in
+    the squeeze check's window on the Mac runner 16 of 41 kicks pressed. A
+    projectionist's hand on the glass doesn't wait for a solver step; the
+    plate feels the press on the next step it takes. So the kick is held
+    here, with the song time and the lead it was decided at (the accent asks
+    where in the bar it fell, and the bar has moved on by the next step),
+    until a frame steps, and let go if no step comes within `KICK_OWED_MS`
+    (a stalled or paused plate, where a press laid a second late is not the
+    beat's).
+  */
+  const plateKickRef = useRef<{ owed: boolean; at: number; predicted: boolean; ms: number }>({ owed: false, at: 0, predicted: false, ms: 0 });
+  /** Kicks the plate took on a step, and kicks let go untaken (`npm run squeeze` asks every kick is one or the other). */
+  const plateKicksRef = useRef({ taken: 0, lost: 0 });
   /**
    * Every kick onset the ear handed the clock, once each (`npm run kicks`,
    * and the Mac's checks, compare it with the kicks the clock fired and the
@@ -7408,6 +7439,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           */
           const heard = isActiveRef.current ? currentAudioData?.features ?? null : null;
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
+          if (kickRef.current.kick) {
+            // A kick still owed when the next is decided is one the plate never stepped for.
+            if (plateKickRef.current.owed) plateKicksRef.current.lost++;
+            plateKickRef.current = { owed: true, at: songClockRef.current, predicted: kickRef.current.predicted, ms: nowMs };
+          }
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
           hitSourceRef.current.update(heard, songClockRef.current);
@@ -8141,6 +8177,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
 
 
+        // The kick this frame's first step lays, if it has one (`plateKickRef`).
+        const plateKick = plateKickRef.current;
+        const kickLate = plateKick.owed && showNow() - plateKick.ms > KICK_OWED_MS;
+        const kickNow = plateKick.owed && !kickLate && simSteps > 0;
+        if (kickNow) plateKicksRef.current.taken++;
+        if (kickLate) plateKicksRef.current.lost++;
+        if (kickNow || kickLate) plateKick.owed = false;
         for (let simStep = 0; simStep < simSteps; simStep++) {
           // The room stirs the lead plate: it is ambient, not a tool, so it
           // goes where the show is rather than onto whichever layer happens to
@@ -9069,7 +9112,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // A kick moves the bass on to its next area (when the look
                   // has several) before anything of this kick lands, so its
                   // ring, its burst and Beat Squeeze's press all land together.
-                  if (musicAreas && kickRef.current.kick && simStep === 0) areaKicksRef.current++;
+                  if (musicAreas && kickNow && simStep === 0) areaKicksRef.current++;
                   const bassArea = musicAreas ? areaForBand(musicAreas, 'bass', areaKicksRef.current) : null;
                   const bassAt = bassArea ? areaCentre(bassArea, GRID_SIZE) : null;
                   const bassX = bassAt ? Math.floor(bassAt.x) : centerX;
@@ -9152,7 +9195,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     look but Bass Drop.
                   */
                   const bloomGain = Math.max(0, Math.min(1.5, currentSettings.kickBloom ?? 1));
-                  if (kickRef.current.kick && simStep === 0 && bloomGain > 0) {
+                  if (kickNow && simStep === 0 && bloomGain > 0) {
                     // Against its pool: the cycle half way round, so the ring is the other of the area's two dyes.
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
                     // In an area the ring is the area's size: a third of it out on a soft kick, most of it on a hard one.
@@ -9345,7 +9388,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const rock = rockRef.current;
             const R = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
-            const kickStep = kickRef.current.kick && simStep === 0;
+            const kickStep = kickNow && simStep === 0;
             /*
               Accent the One (lib/barGrid.ts): this kick's weight by where it
               falls in the bar, the one pressed hardest, two and four let go.
@@ -9362,7 +9405,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               so turning Accent up in detection-only mode all but stopped the
               squeeze (measured with the real grid on the club songs).
             */
-            const accentAt = songClockRef.current + (kickRef.current.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
+            const accentAt = plateKick.at + (plateKick.predicted ? Math.max(0, currentSettings.beatLead ?? 0) / 1000 : 0);
             const accent = kickStep ? accentRef.current.kick(barGridRef.current, accentAt, currentSettings.beatAccent ?? 0) : 1;
             /*
               The hand's lean and sway, the slider applied once (lib/plateRock.ts,
@@ -10857,6 +10900,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }),
         /** Kicks heard since the plate started: whether the beat is reaching the rides that follow it. */
         kicks: () => kickCountRef.current,
+        /** Of those, the ones the plate took on its next step and the ones let go untaken (`plateKickRef`, PLAN 30a-3). */
+        plateKicks: () => ({ ...plateKicksRef.current }),
         /** Kick onsets the ear handed the beat clock, each once: what it heard, before the clock's own beats. */
         heardKicks: () => heardKicksRef.current.n,
         /** The music's chances to release air and what it did with them (see `musicBubblesRef`): none released at Audio Impact 0. */

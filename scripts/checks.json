@@ -927,6 +927,20 @@
       ]
     },
     {
+      "name": "The spectrum strips draw only on screen",
+      "shard": "browser",
+      "run": "node scripts/stripdraw.mjs",
+      "why": [
+        "The patch bay's spectrum strip on a band cord (PLAN 30a-3): off screen,",
+        "as the desk mounts it, it draws nothing while the page animates; on",
+        "screen it draws live; off again, it stops. Each strip ran its own",
+        "animation loop from mount, and Bass Drop's two, off to the side of the",
+        "window, cost its plate about a quarter of its steps under Beat Squeeze",
+        "on the Mac runner. Needs no GPU: the loop and the observer are the",
+        "browser's."
+      ]
+    },
+    {
       "name": "Preview's copy",
       "shard": "browser",
       "run": "node scripts/draftwall.mjs",
