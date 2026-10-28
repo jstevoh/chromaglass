@@ -7409,6 +7409,12 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
     of their own; every other look takes a straight line across the middle if Melody
     Walk is turned up. Which looks next, and a way to drag the line on the desk (the
     way an area is placed), wait for the owner's eyes on these two (judging §91).
+  - **24.3-place-6. `npm run shelf` is red on main, found while checking this.**
+    It clicks a desk button whose text is "Sound" and finds none ("there is a
+    Sound tab on the desk"), the same on an unmodified main at a68de68. It is
+    not a manifest entry, so no PR sees it. Either the tab's label changed with
+    the custom desk tabs (PLAN 8-tabs) and the check wants its new one, or the
+    check should be a manifest entry once it reads the tab the way a hand does.
 - **24.4** *CV out* (after 24.1b). The plate back into the rack through the interface's
   DC-coupled outputs: how much dye is moving, where the brightest pool sits on the plate
   (x and y), the colour under a point, and a trigger when a drop lands. Then the liquid

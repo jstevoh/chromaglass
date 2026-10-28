@@ -48,29 +48,10 @@
 import { AutoRange } from './audioCalibration.ts';
 import { fft } from './fft.ts';
 import { ChromaEar } from './chroma.ts';
+import { finePitch } from './pitchFine.ts';
+import { AnalyserEmulator } from './analyserEmulator.ts';
 
-/**
- * The live analyser's settings, owned here so the hook and the offline path
- * cannot drift apart. A render analysed with a different window or smoothing
- * from the show would react to a different song.
- *
- * 1024 points: ~47 Hz bins at 48 kHz, enough to keep a kick (50–100 Hz) in
- * bins of its own apart from a snare's body (~200 Hz), with a 21 ms window,
- * little more than one video frame at 60 fps, so a hit is visible in the first
- * or second frame after it lands.
- */
-export const ANALYSER_FFT_SIZE = 1024;
-/** Where the melody's pitch starts looking, Hz: above a kick's body, at about A2. */
-export const MELODY_LOW_HZ = 110;
-/** The AnalyserNode's own time smoothing (`smoothingTimeConstant`). */
-export const ANALYSER_SMOOTHING = 0.6;
-/**
- * How often that smoothing is applied live: the node smooths once per read,
- * and the hook reads once per animation frame. The offline path scales the
- * constant to its own frame rate against this, so a render at 30 fps smooths
- * over the same stretch of time as the show does at 60.
- */
-export const ANALYSER_RATE_HZ = 60;
+export { ANALYSER_FFT_SIZE, ANALYSER_SMOOTHING, ANALYSER_RATE_HZ, AnalyserEmulator } from './analyserEmulator.ts';
 
 /** The named sources, in the order a UI should list them. */
 export const SOUND_SOURCES = ['level', 'kick', 'bass', 'snare', 'hats', 'note', 'tonalLow', 'tonalMid', 'tonalHigh'] as const;
@@ -196,20 +177,9 @@ export interface AudioReading {
   tonalHigh: number;
   pitch: number;
   pitchClass: number;
-  /**
-   * How long a new note takes to win the pitch: the median it is read from
-   * spans fifteen readings, so a note holds it from the eighth after it
-   * starts. That many of the ear's own intervals (smoothed), in seconds;
-   * about 0.13 at sixty readings a second, 0.27 at thirty. 0 before two
-   * readings have been seen. Whatever places a note by its pitch waits this
-   * long after the note's onset (`melodyWalk.ts`).
-   */
+  /** Seconds a new note takes to win `pitch` (eight of the ear's intervals); melodyWalk.ts waits this long after an onset. 0 before two readings. */
   pitchSettleS?: number;
-  /**
-   * The pitch read between the analyser's bins (a parabola through the peak
-   * and its neighbours), in MIDI notes with a fraction; 0 with none. `pitch`
-   * is a bin's, 43 Hz wide; this is the one a melody is placed by.
-   */
+  /** The pitch between the bins, MIDI notes with a fraction; 0 with none (lib/pitchFine.ts). `pitch` is a bin's. */
   pitchFine?: number;
   /**
    * The twelve notes sounding, C first, summed to 1 (all zero in silence):
@@ -768,55 +738,8 @@ export class AudioFeatures {
     if (bestBin >= 1 && maxHps > -Infinity) {
       const f0 = bestBin * this.hzPerBin;
       this.pitch = 69 + 12 * Math.log2(f0 / 440);
-      /*
-        The melody's pitch (melodyWalk.ts), kept apart from `pitch` above
-        because the colour of the music follows that one's class (True
-        Synesthesia) and would move if the note were read differently. Two
-        differences, both measured by `npm run melody` on a scale of known
-        notes with a kick on every beat:
-
-        Between the bins. The pitch above is a bin's, 43 Hz wide at 1024
-        points and 44.1 kHz: two to three semitones at middle C and an octave
-        across C2 to C3, so a scale read through it climbs in steps of a bin
-        rather than of a note. The peak's neighbours, in the same summed
-        decibels, say which side of the bin the note sits, as a parabola
-        through the three (the Hann window's main lobe is a parabola near its
-        top in decibels).
-
-        Out of the kick's reach. The product above searches from 55 Hz, where
-        a kick's body (45 to 120 Hz) is the loudest thing there is, and under
-        a kick on each beat the median's pitch read the drum for half of every
-        beat (28.8 where the notes were 57 to 81). The melody's search starts
-        at MELODY_LOW_HZ, above the body, so the drum is not in its product
-        at the fundamental; its harmonics at 2 to 4 times are, and are the
-        weaker.
-      */
-      const sum = (b: number) => {
-        let h = hDb[b];
-        if (2 * b <= this.top) h += hDb[2 * b];
-        if (3 * b <= this.top) h += hDb[3 * b];
-        if (4 * b <= this.top) h += hDb[4 * b];
-        return h;
-      };
-      const fineLo = Math.max(2, Math.ceil(MELODY_LOW_HZ / this.hzPerBin));
-      let fineBin = -1, fineBest = -Infinity;
-      for (let b = fineLo; b <= maxHpsBin; b++) {
-        const h = sum(b);
-        if (h > fineBest) { fineBest = h; fineBin = b; }
-      }
-      /*
-        A peak, and only a peak. In silence, and under a kick's skirt, the
-        product is flat or climbs to the search's own floor, and "the highest"
-        of a flat run is its first bin: 47.8, the floor's note, read for
-        silence and laid as a drop (the review of #537). A reading counts only
-        where the product is strictly above both neighbours.
-      */
-      if (fineBin > 1 && fineBin < this.top && sum(fineBin - 1) < fineBest && sum(fineBin + 1) < fineBest) {
-        const a = sum(fineBin - 1), c = sum(fineBin + 1);
-        const den = a - 2 * fineBest + c;
-        const delta = den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0;
-        this.pitchFine = 69 + 12 * Math.log2(((fineBin + delta) * this.hzPerBin) / 440);
-      } else this.pitchFine = 0;
+      // The melody's own pitch, between the bins and above a kick's body (lib/pitchFine.ts).
+      this.pitchFine = finePitch(hDb, this.top, this.hzPerBin, maxHpsBin);
       this.pitchClass = Math.round(this.pitch) % 12;
       if (this.pitchClass < 0) this.pitchClass += 12;
     } else {
@@ -979,76 +902,6 @@ export class BandRange {
 }
 
 // ── Offline ───────────────────────────────────────────────────────────────
-
-/**
- * The Web Audio AnalyserNode, in arithmetic, so a song file can be heard the
- * way the show hears the room.
- *
- * The spec's frequency-domain steps: the most recent fftSize samples, a
- * Blackman window (alpha 0.16, over N rather than N-1, as the spec writes
- * it), an FFT, magnitudes scaled by 1/N, smoothed against the previous
- * frame's by the time constant, then 20·log10. That is what
- * `getFloatFrequencyData` returns, and so what the live path passes in.
- *
- * `dtSec` is the time since the previous frame: live, the smoothing constant
- * is applied once per ANALYSER_RATE_HZ tick, so offline it is raised to the
- * number of ticks the frame spans, and a 30 fps render smooths over the same
- * 33 ms that two live frames would.
- */
-export class AnalyserEmulator {
-  readonly fftSize: number;
-  readonly sampleRate: number;
-  private readonly smoothing: number;
-  private readonly window: Float32Array;
-  private readonly re: Float32Array;
-  private readonly im: Float32Array;
-  private readonly smoothed: Float64Array;
-  private readonly out: Float32Array;
-  private readonly outTimeDomain: Uint8Array;
-
-  constructor(sampleRate: number, fftSize = ANALYSER_FFT_SIZE, smoothing = ANALYSER_SMOOTHING) {
-    this.sampleRate = sampleRate;
-    this.fftSize = fftSize;
-    this.smoothing = smoothing;
-    this.window = new Float32Array(fftSize);
-    const a = 0.16, a0 = (1 - a) / 2, a1 = 0.5, a2 = a / 2;
-    for (let i = 0; i < fftSize; i++) {
-      const x = i / fftSize;
-      this.window[i] = a0 - a1 * Math.cos(2 * Math.PI * x) + a2 * Math.cos(4 * Math.PI * x);
-    }
-    this.re = new Float32Array(fftSize);
-    this.im = new Float32Array(fftSize);
-    this.smoothed = new Float64Array(fftSize / 2);
-    this.out = new Float32Array(fftSize / 2);
-    this.outTimeDomain = new Uint8Array(fftSize);
-  }
-
-  /**
-   * The spectrum of the fftSize samples ending just before sample `end`
-   * (samples before 0 are silence), in dB. The returned arrays are reused by
-   * the next call.
-   */
-  frame(pcm: Float32Array, end: number, dtSec: number): { bins: Float32Array, timeDomainData: Uint8Array } {
-    const N = this.fftSize;
-    const start = end - N;
-    for (let i = 0; i < N; i++) {
-      const s = start + i;
-      const v = s >= 0 && s < pcm.length ? pcm[s] : 0;
-      this.re[i] = v * this.window[i];
-      this.im[i] = 0;
-      // getByteTimeDomainData scales [-1, 1] to [0, 255]
-      this.outTimeDomain[i] = Math.max(0, Math.min(255, Math.round(128 + v * 128)));
-    }
-    fft(this.re, this.im);
-    const tau = Math.pow(this.smoothing, Math.max(0, dtSec) * ANALYSER_RATE_HZ);
-    for (let k = 0; k < N / 2; k++) {
-      const m = Math.hypot(this.re[k], this.im[k]) / N;
-      this.smoothed[k] = tau * this.smoothed[k] + (1 - tau) * m;
-      this.out[k] = this.smoothed[k] > 0 ? 20 * Math.log10(this.smoothed[k]) : -Infinity;
-    }
-    return { bins: this.out, timeDomainData: this.outTimeDomain };
-  }
-}
 
 /**
  * A song's readings, one per video frame, from its mono samples.

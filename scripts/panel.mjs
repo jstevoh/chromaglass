@@ -285,15 +285,14 @@ check('and every MIDI range is in the registry as it is',
 const remote = readFileSync(join(root, 'src/components/RemoteControl.tsx'), 'utf8');
 check('the phone keeps no range of its own',
   !/<Slider label="[^"]+" field="[A-Za-z0-9_]+"[^>]*\bmin=\{/.test(remote)
-  && /PIN_RANGE\.get\(String\(field\)\)/.test(remote));
+  && /PIN_RANGE\.get\(String\(field\)\)/.test(readFileSync(join(root, 'src/components/RemoteSlider.tsx'), 'utf8')));
 /*
   And every field it draws is a control the registry knows.
 
-  "Keeps no range of its own" is only half of it. The phone reads
-  `PIN_RANGE.get(String(field)) ?? { min: 0, max: 1 }` — so a field that is
-  not in the registry does not fail, it silently becomes a 0-to-1 slider.
-  Speed would run to 1 where the control stops at 0.3, and the fader would
-  look perfectly normal doing it.
+  "Keeps no range of its own" is only half: RemoteSlider.tsx reads
+  `PIN_RANGE.get(String(field)) ?? { min: 0, max: 1 }`, so a field missing
+  from the registry silently becomes a 0-to-1 slider (Speed would run to 1,
+  not stop at 0.3, the fader looking normal).
 */
 {
   const fields = [...new Set([...remote.matchAll(/field="([A-Za-z0-9_]+)"/g)].map(m => m[1]))];

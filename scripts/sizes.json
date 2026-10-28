@@ -52,21 +52,21 @@
     "src/components/desk/Desk.tsx": 44167,
     "src/components/desk/DeskPanels.tsx": 53253,
     "src/components/GuidePanel.tsx": 58766,
-    "src/components/LiquidVisualizer.tsx": 670805,
+    "src/components/LiquidVisualizer.tsx": 660909,
     "src/components/phone/PhoneStage.tsx": 71008,
-    "src/components/RemoteControl.tsx": 63272,
-    "src/components/SettingsPanel.tsx": 204371,
+    "src/components/RemoteControl.tsx": 60901,
+    "src/components/SettingsPanel.tsx": 198197,
     "src/components/ui/index.tsx": 52614,
     "src/gpu/fluid.ts": 291064,
     "src/gpu/kit.ts": 47293,
     "src/gpu/wgsl/fluid.ts": 290108,
     "src/gpu/wgsl/plate.ts": 193897,
     "src/gpu/wgsl/thinGap.ts": 52275,
-    "src/lib/audioFeatures.ts": 43848,
+    "src/lib/audioFeatures.ts": 41096,
     "src/lib/beads.ts": 56642,
-    "src/lib/midi.ts": 65526,
+    "src/lib/midi.ts": 62148,
     "src/lib/slosh.ts": 45993,
-    "src/presets.ts": 92322,
-    "src/types.ts": 69308
+    "src/presets.ts": 92311,
+    "src/types.ts": 60616
   }
 }
