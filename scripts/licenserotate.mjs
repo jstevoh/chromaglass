@@ -31,10 +31,11 @@
  *   2. `plan`, read it, post it to the owner.
  *   3. In one sitting, straight after the site deploy: `apply`;
  *      `npx wrangler secret put LICENSE_PRIVATE_KEY --config <toml>` from the key file;
- *      `npx wrangler deploy --config <toml>` (the Worker reads the new public key from
- *      the code; a `LICENSE_PUBLIC_KEY` setting on the Worker, if there is one, must be
- *      removed or set to the new key); `npx wrangler deploy` for the song-ID Worker
- *      (it verifies Home keys against the same public key).
+ *      and, the live Worker having a `LICENSE_PUBLIC_KEY` secret that overrides the code's
+ *      `DEFAULT_PUBLIC_JWK` (found 2026-10-28), `npx wrangler secret put LICENSE_PUBLIC_KEY`
+ *      with the new public JWK (or delete it so the code's applies); then
+ *      `npx wrangler deploy --config <toml> --keep-vars`; then `npx wrangler deploy` for the
+ *      song-ID Worker (it verifies Home keys against the code's public key).
  *   4. A Mac release (Actions → Mac app → Run workflow, release ticked): the installed
  *      app trusts the old public key until it updates.
  *   Rollback: `npx wrangler rollback` of the licence Worker to the version noted before
