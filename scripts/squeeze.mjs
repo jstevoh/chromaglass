@@ -65,6 +65,25 @@ try {
   });
   await page.goto(`http://localhost:${PORT}/?debug&look=bass-drop`, { waitUntil: 'load' });
   await page.waitForFunction(() => typeof window.chromaglassDebug === 'function' && window.chromaglassDebug().fluids?.length > 0, null, { timeout: 60_000 });
+  /*
+    A timeline, one line a second from the page's own clock: the lead plate's
+    steps, the loop's frames, the show's kicks and the squeeze it runs at.
+    Since about 11:17Z on 2026-10-28 the window at 0.8 read 170-217 steps on
+    the Mac runner where it had read 220-310, while the window at 0 after it
+    read as it always had (300-360), so the two windows' totals alone cannot
+    say whether the squeeze got dearer or the first window started on a plate
+    still coming up to speed. The timeline says which second lost them.
+  */
+  await page.evaluate(() => {
+    const log = window.__squeezeLog = [];
+    const tick = () => {
+      const d = window.chromaglassDebug();
+      log.push([Math.round(performance.now()), d.fluids[0].stepCount, d.frames, d.kicks(), d.settings.beatSqueeze]);
+    };
+    tick();
+    setInterval(tick, 1000);
+  });
+  const mark = (name) => page.evaluate((n) => window.__squeezeLog.push([Math.round(performance.now()), n]), name);
   const settings = (patch) => page.evaluate((p) => {
     if (typeof window.chromaglassSettings !== 'function') throw new Error('window.chromaglassSettings is gone');
     window.chromaglassSettings(p);
@@ -173,7 +192,9 @@ try {
       released: b.released - a.released, pressedKicks: b.pressedKicks - a.pressedKicks, owed: b.owed, total: b,
     };
   };
+  await mark('on');
   const on = await window_(12000);
+  await mark('off');
   await settings({ beatSqueeze: 0 });
   /*
     Until the setting has reached the loop and the last kick pressed before
@@ -186,6 +207,7 @@ try {
     const d = window.chromaglassDebug();
     return d.settings.beatSqueeze === 0 && d.fluids[0].kickRelease.size === 0;
   }, null, { timeout: 10_000 }).catch(() => {});
+  await mark('off window');
   const off = await window_(12000);
   // The clock and the tempo source it is handed, read together. No optional
   // chaining on the hook: a page without it throws here rather than reading
@@ -193,6 +215,26 @@ try {
   // could not explain.
   const { clock, tempo } = await page.evaluate(() => ({ clock: window.chromaglassDebug().beat, tempo: window.chromaglassTempo() }));
   console.log(`  Bass Drop: ${on.kicks} kicks and ${on.steps} plate steps in ${on.seconds.toFixed(0)} s at Beat Squeeze ${on.squeeze}; ${off.kicks} kicks, ${off.steps} steps in ${off.seconds.toFixed(0)} s at 0`);
+
+  /*
+    And 0.8 again after the window at 0, asked nothing: if this third window
+    steps as the one at 0 did, the first window's missing steps were the plate
+    coming up to speed; if it steps as the first did, the squeeze costs them.
+  */
+  await settings({ beatSqueeze: 0.8 });
+  await page.waitForTimeout(1000);
+  await mark('again');
+  const again = await window_(12000);
+  console.log(`  and at ${again.squeeze} again: ${again.kicks} kicks, ${again.steps} steps in ${again.seconds.toFixed(0)} s`);
+  const timeline = await page.evaluate(() => window.__squeezeLog);
+  let last = null;
+  const lines = [];
+  for (const row of timeline) {
+    if (typeof row[1] === 'string') { lines.push(`--- ${row[1]}`); continue; }
+    if (last) lines.push(`${((row[0] - timeline[0][0]) / 1000).toFixed(1).padStart(5)} s  steps +${row[1] - last[1]}  frames +${row[2] - last[2]}  kicks +${row[3] - last[3]}  squeeze ${row[4]}`);
+    last = row;
+  }
+  console.log(`  timeline, a second a line:\n    ${lines.join('\n    ')}`);
 
   if (errors.length) {
     check('the page runs without errors while the band plays', false, errors[0].slice(0, 200));
