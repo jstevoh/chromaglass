@@ -172,6 +172,17 @@
         "gallery runs on its label rather than on every push (PLAN.md 19a).",
         "A rename in one file would quietly undo either."
       ]
+    },    {
+      "name": "Where CI's keys can go",
+      "shard": "logic",
+      "run": "npm run cisecrets",
+      "why": [
+        "The deploy key and the Mac signing set only in jobs that run in their",
+        "main-only environments, the signing set never handed to a pull request's",
+        "run, no tag trigger on the Mac app, every workflow read-only at the top",
+        "and outside actions pinned to a commit (scripts/cisecrets.mjs; the security",
+        "audit of 2026-10-28). Each rule meets a broken copy of the real file first."
+      ]
     },
     {
       "name": "The API scripts keep the token out of their errors",

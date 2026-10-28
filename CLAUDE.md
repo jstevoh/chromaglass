@@ -96,7 +96,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
 | a new or changed check in `scripts/` | that check, and the `check-skeptic` agent; a new one is an entry in `scripts/checks.json` (its shard, its command, why), never a step in `checks.yml`, then `npm run checks` |
 | `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `npm run actionlint` |
-| `.github/workflows/checks.yml`, `scripts/reach.mjs`, `scripts/checks.mjs`, `scripts/checks.json` | `npm run checks`, `npm run reach`, `npm run closedruns`, `npm run actionlint` (a pinned release, fetched on first use); `npm run macqueue -- --hours 24` for the Mac time before and after |
+| `.github/workflows/checks.yml`, `scripts/reach.mjs`, `scripts/checks.mjs`, `scripts/checks.json` | `npm run checks`, `npm run reach`, `npm run closedruns`, `npm run cisecrets` (any workflow: keys only in main's environments, read-only tokens, pinned outside actions), `npm run actionlint` (a pinned release, fetched on first use); `npm run macqueue -- --hours 24` for the Mac time before and after |
 | a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/gpu/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
 

@@ -59,6 +59,14 @@ concurrency:
   group: checks-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 }}
 
+# Read-only, written out rather than left to the repository's default, which a
+# settings change could widen (the security audit of 2026-10-28).
+permissions:
+  contents: read
+  # reach.mjs reads this PR's earlier runs, checkguard.mjs the PR's commits and body.
+  actions: read
+  pull-requests: read
+
 jobs:
   # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
   # push of only PLAN.md, the docs, the sessions' skills, a workflow that
