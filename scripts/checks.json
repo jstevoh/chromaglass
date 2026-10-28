@@ -1006,6 +1006,21 @@
       ]
     },
     {
+      "name": "The security headers",
+      "shard": "browser",
+      "run": "node scripts/csp.mjs",
+      "why": [
+        "The site's security headers (scripts/csp.mjs, PLAN.md 19ag): firebase.json's",
+        "CSP (frame-ancestors, object-src, base-uri, form-action enforced; the",
+        "rest report-only), Referrer-Policy, Permissions-Policy and nosniff,",
+        "served on the built site and opened as the show, the remote, a cast",
+        "and the static pages with a blob worker, blob media and the lookups",
+        "the app makes tried on top: nothing reported, the controls reported,",
+        "another origin cannot frame it. No GPU. The site \"The load\" just",
+        "built (`npm run csp` builds first, for a run by hand)."
+      ]
+    },
+    {
       "name": "The intro",
       "shard": "browser",
       "run": "node scripts/intro.mjs",

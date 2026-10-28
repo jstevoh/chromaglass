@@ -5855,9 +5855,31 @@ fn main() {
   psub[1] = f32(m);
 }`;
 
+/**
+ * `kernel`'s answers, kept, with the source each was made from.
+ *
+ * `kernel` is asked on every dispatch, about five hundred a step a layer, for
+ * the source its pipeline is cached by. It made a new string each time, a
+ * `replaceAll` over 2 to 10 KB, which the pipeline cache's map then had to
+ * flatten and hash again to find a pipeline it already had: half a megabyte of
+ * garbage a step at 512², most of what the step allocated (`npm run encode`),
+ * and the page's collector stopping it to sweep that up is a hitch on the
+ * plate with the GPU idle. The same string every time is hashed once and
+ * compared by identity after. The source is kept beside the answer so a
+ * kernel whose text changed (a harness that swaps one) is made again rather
+ * than served stale.
+ */
+const formatted = new Map<string, Map<string, { src: string; out: string }>>();
+
 /** A kernel's source with its storage format filled in (WGSL has no format generics). */
 export function kernel(name: string, dstFormat: string): string {
   const src = KERNELS[name];
   if (!src) throw new Error(`no such fluid kernel: ${name}`);
-  return src.replaceAll('DYE_FORMAT', dstFormat);
+  let byFormat = formatted.get(name);
+  if (!byFormat) { byFormat = new Map(); formatted.set(name, byFormat); }
+  const hit = byFormat.get(dstFormat);
+  if (hit && hit.src === src) return hit.out;
+  const out = src.replaceAll('DYE_FORMAT', dstFormat);
+  byFormat.set(dstFormat, { src, out });
+  return out;
 }
