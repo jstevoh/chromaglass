@@ -243,6 +243,16 @@ jobs:
           if [ "$GATEKEEPER" != accepted ]; then
             printf '\n%s\n' "**The first time you open it**, macOS says it cannot check ChromaGlass for malicious software, because this build is not yet notarised by Apple. Click **Done**, then open **System Settings → Privacy & Security**, scroll to **Security** and click **Open Anyway** beside ChromaGlass. After that it opens like any app." >> notes.md
           fi
+          # What is new since the last release: the installed apps show it in
+          # their update box and the profile sheet (desktop/updates.js reads
+          # the part after "What's new"), so a performer choosing Download and
+          # Install sees what they are getting. One line per merged change,
+          # and last in the notes, so nothing after it is read as one.
+          prev=$(git tag --list 'desktop-v*' --sort=-v:refname | head -1)
+          if [ -n "$prev" ]; then
+            changes=$(git log --first-parent --pretty='- %s' "$prev..$GITHUB_SHA" | sed -E 's/ \(#[0-9]+\)$//' | head -8)
+            if [ -n "$changes" ]; then printf '\n**What'"'"'s new**\n\n%s\n' "$changes" >> notes.md; fi
+          fi
           gh release create "$tag" --target "$GITHUB_SHA" --title "ChromaGlass $VERSION for Mac" --notes-file notes.md --latest \
             release/ChromaGlass-mac-arm64.dmg release/*.zip release/*.blockmap release/latest-mac.yml
           echo "Released $tag: https://github.com/$GH_REPO/releases/tag/$tag"

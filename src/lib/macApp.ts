@@ -33,11 +33,21 @@ export const MAC_APP_NOTARISED = false;
 /** The first open of an app macOS cannot check, in the words of its own Settings. */
 export const MAC_FIRST_OPEN = 'The first time, macOS says it cannot check the app. Click Done, then open System Settings → Privacy & Security and click Open Anyway beside ChromaGlass.';
 
+export type UpdateMode = 'auto' | 'manual';
+
 /** What desktop/updates.js says, as the preload hands it over. */
 export interface DesktopUpdateState {
   status: 'off' | 'idle' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error';
   current: string;
   signed: boolean;
+  /** How a signed build takes an update (desktop/updates.js): by itself, or when the performer clicks. */
+  mode: UpdateMode;
+  /** True when Download and Install fetches it in the app; false when the button opens the .dmg in the browser. */
+  install: boolean;
+  /** Whether what is downloaded installs when the app is quit. */
+  onQuit: boolean;
+  /** What is new in the version found, plain text, one change to a line; empty when the release says nothing. */
+  notes: string;
   version: string | null;
   url: string | null;
   percent: number;
@@ -47,6 +57,7 @@ export interface DesktopUpdateState {
 export interface DesktopUpdates {
   state: () => Promise<DesktopUpdateState>;
   act: () => Promise<DesktopUpdateState>;
+  setMode: (mode: UpdateMode) => Promise<DesktopUpdateState>;
   onChange: (fn: (s: DesktopUpdateState) => void) => () => void;
 }
 
@@ -74,21 +85,25 @@ export type MacAppRow =
   | { kind: 'download'; href: string }
   | { kind: 'on-a-mac' }
   | { kind: 'with-a-licence' }
-  | { kind: 'in-app'; current: string; line: string; button: string | null };
+  | { kind: 'in-app'; current: string; line: string; button: string | null; notes: string; progress: number | null; mode: UpdateMode; modeNote: string | null };
 
 export function macAppRow(tier: string, mac: boolean, update: DesktopUpdateState | null, inApp: boolean): MacAppRow {
   if (inApp) {
     const s = update;
     const current = s?.current ?? '';
-    if (!s) return { kind: 'in-app', current, line: '…', button: null };
-    if (s.status === 'off') return { kind: 'in-app', current, line: 'Updates are off in this copy.', button: null };
-    if (s.status === 'available') return { kind: 'in-app', current, line: `ChromaGlass ${s.version} is out.`, button: `Download ${s.version}` };
-    if (s.status === 'downloading') return { kind: 'in-app', current, line: `Downloading ${s.version} (${s.percent}%). It installs when you quit.`, button: null };
-    if (s.status === 'ready') return { kind: 'in-app', current, line: `${s.version} is ready. It installs when you quit.`, button: 'Restart to Update' };
-    if (s.status === 'checking') return { kind: 'in-app', current, line: 'Checking for updates…', button: null };
-    if (s.status === 'none') return { kind: 'in-app', current, line: 'This is the newest version.', button: 'Check for Updates' };
-    if (s.status === 'error') return { kind: 'in-app', current, line: 'Could not reach the releases just now.', button: 'Check for Updates' };
-    return { kind: 'in-app', current, line: 'It looks for new versions by itself.', button: 'Check for Updates' };
+    const mode: UpdateMode = s?.mode ?? 'auto';
+    // An ad hoc build cannot install over itself (macOS refuses it), so the choice does nothing there and the card says so.
+    const modeNote = s && s.status !== 'off' && !s.signed ? 'This copy is not signed, so it cannot update itself: it offers the download either way.' : null;
+    const row = (line: string, button: string | null, progress: number | null = null): MacAppRow => ({ kind: 'in-app', current, line, button, notes: s?.notes ?? '', progress, mode, modeNote });
+    if (!s) return row('…', null);
+    if (s.status === 'off') return row('Updates are off in this copy.', null);
+    if (s.status === 'available') return row(`ChromaGlass ${s.version} is out.`, s.install ? 'Download and Install' : `Download ${s.version}`);
+    if (s.status === 'downloading') return row(`Downloading ${s.version}… ${s.percent}%`, null, s.percent);
+    if (s.status === 'ready') return row(s.onQuit ? `${s.version} is ready. It installs when you quit.` : `${s.version} is ready.`, 'Restart to Update', 100);
+    if (s.status === 'checking') return row('Checking for updates…', null);
+    if (s.status === 'none') return row('This is the newest version.', 'Check for Updates');
+    if (s.status === 'error') return row('Could not reach the releases just now.', 'Check for Updates');
+    return row('It looks for new versions by itself.', 'Check for Updates');
   }
   if (!(MAC_APP_TIERS as ReadonlyArray<string>).includes(tier)) return { kind: 'with-a-licence' };
   return mac ? { kind: 'download', href: MAC_DOWNLOAD_URL } : { kind: 'on-a-mac' };

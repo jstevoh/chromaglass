@@ -1940,3 +1940,25 @@ Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Tr
 4. Bad: a control you used under Build, Gig, Load-in, Sequence or Sound that you cannot find now on any tab or in
    + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
 5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?
+
+## 88. The Mac app updates itself, or asks first (PLAN 13-update-modes)
+
+Needs two signed releases (Actions → Mac app → Run workflow, release ticked, twice), and a Mac
+with the first installed in Applications. A copy that is not signed (1.3.642 and before) cannot
+do any of this: install a signed release over it by hand once, from the release page.
+
+1. Profile & Store, Mac app card, inside the app: it shows the version, a line saying it looks
+   by itself, and an **Updates** switch with *Automatic* (selected) and *Ask me first*. The same
+   two choices are under *ChromaGlass → Updates*.
+2. With *Automatic*: publish the second release, wait for the app's next look (or *Check for
+   Updates…*). The card shows a bar and a percentage while it downloads, then "is ready" with
+   *Restart to Update*. Quit the app: opening it again is the new version, with no browser and no
+   dragging.
+3. Choose *Ask me first* and publish a third release. The app looks and offers *Download and
+   Install ChromaGlass <version>…*, listing what is new; nothing downloads (Activity Monitor
+   shows no transfer). Click it: the bar fills, then *Restart to Update* installs it. Quit
+   without restarting before the click: the old version opens again.
+4. Switch back to *Automatic* with one waiting: it starts fetching at once.
+
+Bad: anything that restarts the app by itself, a download in Ask me first before the click, a
+notification or box while a projector window is open, or a card with no bar during a download.

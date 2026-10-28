@@ -48,7 +48,9 @@
  *                 after the show opens, finds the new version, and offers it in
  *                 the app's menu and to the page's profile sheet, unasked for
  *                 nothing else (PLAN 13-update; `npm run updates` asks the
- *                 rest of what desktop/updates.js promises, in plain Node)
+ *                 rest of what desktop/updates.js promises, in plain Node);
+ *                 and Automatic is the default, with Manual set from the page
+ *                 kept in the app's folder and shown in the menu
  *   quits         closing the show window, with the projector open, quits
  *                 the app and frees the port
  *   licence       the run above opened on a Pro key (signed for this run); the
@@ -608,6 +610,25 @@ try {
     check('updates: the app finds a new release and offers it, in the menu and to the page',
       found && offered && !!asked && pageSees?.version === '999.0.0' && pageSees?.current === up?.current && pushed,
       `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}, and was told ${pushes?.length ? pushes.join(' → ') : 'nothing'}`);
+  }
+
+  // The choice between Automatic and Manual (PLAN 13-update-modes): the page
+  // sets it through the bridge, the app keeps it in its own folder, and the
+  // menu's radio items show it. Put back after, so the rest of the run is
+  // what a first launch is.
+  if (feed) {
+    const modeOf = () => page.evaluate(() => window.__CHROMAGLASS_NATIVE__?.updates?.state?.().then((s) => s.mode).catch(() => null)).catch(() => null);
+    const radios = () => electronApp.evaluate(({ Menu }) => (Menu.getApplicationMenu()?.items ?? []).flatMap((i) => i.submenu?.items ?? []).flatMap((i) => (i.label === 'Updates' ? i.submenu.items : [])).map((i) => `${i.label}:${i.checked}`)).catch(() => []);
+    const before = await modeOf();
+    const after = await page.evaluate(() => window.__CHROMAGLASS_NATIVE__?.updates?.setMode?.('manual').then((s) => s.mode).catch(() => null)).catch(() => null);
+    await sleep(300);
+    let saved = null;
+    try { saved = JSON.parse(readFileSync(join(profile, 'updates.json'), 'utf8')).mode; } catch { /* not written */ }
+    const menu = await radios();
+    await page.evaluate(() => window.__CHROMAGLASS_NATIVE__?.updates?.setMode?.('auto')).catch(() => {});
+    check('updates: Automatic is the default, and Manual crosses the bridge, is kept in the app\'s folder and shows in the menu',
+      before === 'auto' && after === 'manual' && saved === 'manual' && menu.includes('Ask Me First:true') && menu.includes('Install Automatically:false'),
+      `default ${before}; after the page chose Manual: ${after}; saved ${saved}; menu ${menu.join(', ') || 'has no Updates item'}`);
   }
 
   // ── network off, the whole run ────────────────────────────────────

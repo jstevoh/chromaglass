@@ -53,6 +53,27 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
       {row.kind === 'in-app' && (
         <>
           <p className="mt-1 text-[13px] text-text" data-cg-mac-update={state?.status ?? 'off'} aria-live="polite">{row.line}</p>
+          {row.progress !== null && (
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={row.progress}
+              aria-label="Update download"
+              data-cg-mac-update-progress={row.progress}
+              className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-border"
+            >
+              <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${row.progress}%` }} />
+            </div>
+          )}
+          {row.notes && row.button && (
+            <div data-cg-mac-update-notes="" className="mt-2">
+              <div className={label}>New in {state?.version}</div>
+              <ul className="mt-1 list-disc pl-4 text-[12px] leading-snug text-text-2">
+                {row.notes.split('\n').map((l, i) => <li key={i}>{l}</li>)}
+              </ul>
+            </div>
+          )}
           {row.button && (
             <button
               type="button"
@@ -63,6 +84,30 @@ export const MacAppCard: React.FC<{ tier: string }> = ({ tier }) => {
               {row.button}
             </button>
           )}
+          <div className="mt-3">
+            <div className={label} id="cg-mac-update-mode-label">Updates</div>
+            <div role="radiogroup" aria-labelledby="cg-mac-update-mode-label" data-cg-mac-update-mode={row.mode} className="mt-1 grid grid-cols-2 gap-1">
+              {([['auto', 'Automatic'], ['manual', 'Ask me first']] as const).map(([mode, name]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={row.mode === mode}
+                  data-cg-mac-update-set={mode}
+                  onClick={() => { updates?.setMode(mode).then(setState).catch(() => {}); }}
+                  className={`min-h-9 pointer-coarse:min-h-12 rounded-lg border px-2 text-[12px] font-medium transition-colors ${row.mode === mode ? 'border-accent-border bg-accent-bg text-text' : 'border-border text-text-2 hover:bg-hover'}`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+            <p className={note}>
+              {row.mode === 'auto'
+                ? 'New versions download in the background and install when you quit ChromaGlass, or sooner with Restart to Update.'
+                : 'ChromaGlass only looks. A new version shows what is in it, and downloads when you click Download and Install.'}
+            </p>
+            {row.modeNote && <p className={note} data-cg-mac-update-unsigned="">{row.modeNote}</p>}
+          </div>
         </>
       )}
     </div>

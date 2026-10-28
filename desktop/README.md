@@ -93,6 +93,15 @@ newer version:
   ChromaGlass <version>…* (or the button in Profile & Store) opens the new download;
   drag it over the old one in Applications.
 
+A signed app takes its updates **Automatically** (the default, as above) or **Ask me
+first**, chosen in Profile & Store or under *ChromaGlass → Updates*, and kept in
+`updates.json` in the app's folder (`CHROMAGLASS_UPDATE_MODE=manual` sets it for a
+check). Ask me first only looks: a new version shows what is in it (the release notes'
+*What's new* list, which `desktop.yml` writes from the merged changes since the last
+release), and nothing is fetched until *Download and Install* is clicked; it then
+downloads with a percentage and *Restart to Update* installs it. What was not asked for
+never installs on quit. An ad hoc build has only the browser download, in either mode.
+
 Either way it never restarts, opens a window or asks anything by itself during a
 show: one notification on the laptop at most, and none while a projector window is
 open. *ChromaGlass → Check for Updates…* looks now. `CHROMAGLASS_NO_UPDATES=1`
