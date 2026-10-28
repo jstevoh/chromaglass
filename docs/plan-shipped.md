@@ -5245,6 +5245,27 @@ plate kept carrying the ferrofluid on the last thin step's velocity (magnet off,
 of the plate in 120 steps and smeared to `0` half-full cells). It now asks the step's own `thinLive`
 (`0.6206 → 0.6241`, `104 → 94` half-full); the check for it is PLAN 29c-10.
 
+**29c-10. `ferrodrag` in CI, and `ferrohold` over the whole drag (#521).** `npm run ferrodrag` is an
+entry in `scripts/checks.json` on the `show` shard (the lightest on #495's run, 14.2 minutes of 20;
+the check takes 39 s there): on Metal lag `1.82R`, `106.0%` kept, stationary `0.010` cells, 3/3.
+
+A fourth line was written for the review's `runPhaseAdvect` fix: the dragged drop at step 180, Thin
+Gap off and the magnet away, 120 deep steps, the drop held to less than one radius of movement and at
+least half its half-full cells, with a fifth that runs the same on a lab built with `runPhaseAdvect`
+keyed off `hsP` alone (#495's head before its review) and requires it red. On software WebGPU the two
+separate: real `0.16R`, `104 → 94` (cx `0.6235 0.6237 0.6239 0.6241` every 30 steps); control `1.93R`,
+`104 → 0` (half-full `100 78 8 0`). On Metal both read `0.70R`, so the two lines run by hand
+(`-- --thinoff`) until PLAN 29c-11 finds why.
+
+`ferrohold`'s window was steps 60 to 120 because the rim used to go in the second half of the drag.
+Read there after #495, both absolute bars were passed by the runs they were set to fail (lead `1.93R`
+with `phaseMomentum` off against `2.15R`; `92.6` half-full with `phaseCompress` off against `47`), and
+the compression pass's margin was `15.0` cells on Metal and `13.4` on software against `13`. Over steps
+60 to 180: lead `1.72R` on, `2.06R` with `phaseMomentum` off; half-full `105.8` on, `82.0` with
+`phaseCompress` off (software; Metal `1.74R`, `2.07R`, `105.8`, `82.2`). The window is now the drag,
+`LAG_BAR` `2.15 → 1.89` and `HALF_BAR` `47 → 94` (midway), `DLAG_BAR` `0.13 → 0.16` (half the gap),
+`DHALF_BAR` kept at `13` (gap `23.8`).
+
 ## 32. The soap film: a draining film seen in reflection
 
 ### 32a. The CPU reference (#403)

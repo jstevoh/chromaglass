@@ -8335,8 +8335,8 @@ the code's entry points, the checks to add and the scenes to match, in
   resting-drop check `npm run ferrorest` (5/5, with a second window), the dragged drop held
   while it is dragged by `npm run ferrohold` (each pass switched off by hand turns its own line red;
   `phaseCompress` is a lab-only step option, 1 by default), and two-phase carry of a coherent drop's
-  trailing rim on the thin gap (`phaseVelocity`, 29c-8; `npm run ferrodrag` 3/3 on the Mac GPU,
-  `ferrohold` 5/5). If the closeup's camera ever follows the drop, it follows smoothly and never with the
+  trailing rim on the thin gap (`phaseVelocity`, 29c-8; `npm run ferrodrag` 3/3 and in CI since
+  29c-10, its Thin-Gap-off lines by hand until 29c-11; `ferrohold` 5/5 over the whole drag). If the closeup's camera ever follows the drop, it follows smoothly and never with the
   sound (the sway work's `frameSway`, default 0, stays the only way sound moves the frame). Still
   open:
   - **29c-1. The moving edge is compressed back to the grid's width, and the deep plate keeps
@@ -8464,11 +8464,26 @@ the code's entry points, the checks to add and the scenes to match, in
     Thin Gap was switched off (`runPhaseAdvect` keyed off `hsP`, which outlives Thin Gap): the dragged
     drop, magnet off, slid on another `0.0425` of the plate in 120 steps and smeared to `0` half-full
     cells; keyed off the step's own `thinLive` it stays (`0.6206 → 0.6241`, `104 → 94` half-full).
-  - **29c-10. `ferrodrag` joins CI, with a Thin-Gap-off line.** Now 3/3 on Metal, `npm run ferrodrag`
-    goes into `scripts/checks.json` (Claude wires it, per the 29c-8 brief), with a line that turns
-    Thin Gap off after the drag and holds the drop still with no magnet (the stale `phaseVelT` above
-    moved it `1.9R`), and `ferrohold`'s two bars re-read against the whole drag (the compression
-    pass's margin is `15.0` against `13` since #495, from `25.7`).
+  - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (this PR; story in `docs/plan-shipped.md` §29c):
+    `npm run ferrodrag` on the show shard (lines 1 to 3, 3/3 on Metal in 39 s), and `ferrohold` read
+    over the whole drag (steps 60 to 180) with its bars between the runs again (5/5 on Metal: lead
+    `1.74R` vs `2.07R`, half-full `105.8` vs `82.2`). The Thin-Gap-off line is written but held out
+    of CI, under **29c-11**.
+  - **29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**
+    `npm run ferrodrag -- --thinoff` takes the dragged drop, switches Thin Gap off and the magnet away,
+    and runs 120 deep steps (line 4: moves under `1R`, keeps half its half-full cells), with a control
+    lab whose `runPhaseAdvect` rides `phaseVelT` on the deep plate (line 5: the control must fail line 4
+    by `0.5R` more). On software WebGPU it separates cleanly (real `0.16R`, `104 → 94`; control
+    `1.93R`, `104 → 0`). On Metal (#521's show shard, runs 40592589582 and 40595560209) both read
+    `0.70R` (cx `0.6201 → 0.6341 0.6350 0.6352 0.6354` on each: most of it in the first 30 steps, then
+    still), so riding the stale velocity makes no difference there, and the half-full count followed the
+    order the labs were opened in rather than the program (the first lab of the run `106 → 74` in both
+    runs, the real plate first and then the control first; the second lab `106 → 90`). Find, on a Mac,
+    why the deep plate moves the drop five times further on Metal than on SwiftShader in its first
+    half-second, why `phaseVelT` is not what carries it there, and what differs between the first and
+    second lab of a process; then put lines 4 and 5 in CI with bars from Metal's numbers. Also: once
+    `phaseCompress` moves onto the deep plate (29c-1), `phaseVel()`'s `thin = true` default must be
+    keyed off `thinLive`, or the stale `phaseVelT` comes back there.
   - **29c-9. Replace `phaseVelocity`'s local window reconstruction with a coupled two-fluid velocity
     solve.** `phaseVelocity` (29c-8) is a named shortcut: instead of solving two coupled momentum
     and Darcy-projection equations for `u_ff` and `u_oil` across the diffuse interface (with
