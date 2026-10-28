@@ -3561,6 +3561,15 @@ for, and the GPU was asked for only after they had arrived and drawn.
   week's `stillIdle` on the line before deciding whether the cap should be per gap; in the 37
   Mac runs since 14v-7 merged the longest wait for a frame was 0.8 to 1.6 s and the still
   intro took nothing out on any of them, so there is nothing to read yet.
+- **Shipped, 14v-9: the webpage loads only itself first, and leaves the GPU for Play**
+  (2026-10-28). `npm run loadtime` 4a to 4d; the story is in `docs/plan-shipped.md` §14v.
+- **14v-10. The plate's opening is 8.75 s of compiling on a cold Mac.** CI's Mac, PR
+  #511's run 40619521397 (2026-10-28): first step 13.44 s, the device given at 4.33 s,
+  56 pipelines built ahead from 4.34 to 13.09 s (25.5 s of compiles over three lanes,
+  median 0.32 s; `fluid/deltaVel:rgba16float` 2.67 s, `fluid/liquidForces:rgba16float`
+  2.66 s, `fluid/squeezeUpdate` 1.40 s, `plate/display` 1.03 s). The two slowest are
+  the next thing to read: why each takes eight times the median, and whether the
+  opening needs them before its first step.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
