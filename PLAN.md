@@ -6183,6 +6183,21 @@ Not a gate and no bar: a rate depends on what was pushed.
   buy is a cheaper re-run of a startup red (half a shard), and that is better bought by
   fixing startup. Revisit if a shard's median passes about 15 minutes (the 19w rule).
 
+- **19ad-5. `bottles` goes red when one splatter fling lands at the stroke's mirror.**
+  PR #525 (a copy and constant change that cannot reach the pour) failed `Every tool lays
+  the bottle` twice running on the same head, 2026-10-28, on a different bottle each time
+  and no other line: `splatter with the Oil bottle lays oil along the stroke`
+  (31 pours, 1 at the mirror) and `splatter with the Ferrofluid bottle lays ferrofluid
+  along the stroke, and not at its mirror` (30 pours, 1 at the mirror, three strays 0.12–0.13
+  from the hand). Pour and spray with both bottles read 0 at the mirror every time. Both
+  lines require `mirror === 0` of a stroke whose splatter flings drop within 0.14 of the
+  plate from the hand, so any fling that crosses the middle can land inside `rad` of the
+  mirrored path: the check asks the scatter's reach to stay clear of the mirror, which
+  it does not promise. Do not loosen the bar first: count the flings that land at the
+  mirror over a run of shards (`npm run flakes`) against how many a stroke's geometry
+  allows, then state the bar as that (the mirror reading should be the hand's own
+  flipped path, not the fling's reach). Seeded or recorded flings would settle it.
+
 ### 19ae. A phone check reads its dye across a plate rebuild and calls it a fault
 
 - **19ae-1. `npm run phone`'s "two fingers holding Drop lay dye under both" picks its
