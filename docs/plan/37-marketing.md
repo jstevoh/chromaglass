@@ -36,9 +36,9 @@ These come from the launch runway (2026-10-28) and the go-live order: a visitor 
 a post sees them in the first minute.
 
 - The store live with Buy buttons on the landing page (#526, #560, the live webhook, #561).
-- The share card: `og-card.png` is still the old card (34a-5). Every link posted to Reddit,
-  HN, iMessage or Slack shows it, so it is replaced first: the hero's frame, the name and the
-  headline, 1200 × 630.
+- The share card (34a-5, shipped 2026-10-29): every link posted to Reddit, iMessage or Slack
+  unfurls into the landing's headline over a frame of a look, with the name and the address,
+  1200 × 630 (`public/og-card.jpg`).
 - The filmed hero with its music (34a-2), from the same Mac sitting as the look videos.
 - Smooth frames (14aa, #441, #474) and the first load after a deploy (14v): a screen
   recording catches a stutter before anything else.

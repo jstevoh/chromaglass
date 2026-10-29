@@ -50,10 +50,11 @@ a grid of generic stock thumbnails: ours are the plate itself.
   prices and says "Buying opens soon". When 23's webhook issues a key from a test purchase, the
   tier cards get Buy buttons (`CHECKOUT_HOME_URL`, `CHECKOUT_PRO_URL` in `lib/tierGates.ts`) and
   the "opens soon" line goes. Until a test purchase has been made, no button.
-- **34a-5. The owner's words and the share card.** *The words shipped (2026-10-28, the owner's OK
-  on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
-  the old card; a new one would be the hero's frame with the name and the new headline. The maker
-  note goes unsigned unless the owner says otherwise.
+- **34a-5. The owner's words and the share card.** *Shipped (the words 2026-10-28, the card
+  2026-10-29; story in `docs/plan-shipped.md` §34a-5).* The maker note goes unsigned unless the
+  owner says otherwise. When a better frame is filmed (34a-2's sitting, or a new look worth
+  leading with), it replaces `scripts/brand/card-frame.jpg` and `npm run brand` redraws the card;
+  `npm run sharecard` holds the tags and the picture.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
