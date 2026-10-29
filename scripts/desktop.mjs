@@ -31,6 +31,15 @@
  *                 On a Mac (CI's runner, Metal) this must pass; on a Linux box
  *                 with software WebGPU the app's readbacks come back empty
  *                 (CLAUDE.md), and it is reported as skipped
+ *   live          the page's live stream (PLAN.md 37x-4b) reaches the app's
+ *                 RTMP client over IPC and a local listener records it: a
+ *                 key kept by name in the app's keychain store where the
+ *                 machine has one (a Mac), the stream started from the
+ *                 page's console API on that name, the AVC header and sixty
+ *                 or more frames at the listener in four seconds, the key
+ *                 removed after. The stream itself (its rate, its audio, its
+ *                 sync) is `npm run live`'s; this is the plumbing only the
+ *                 app has
  *   not throttled the show window minimised, and covered by another window,
  *                 still counts as seen and keeps its frames and timers; each
  *                 judged only where a window in a bare Electron (Chromium's
@@ -87,6 +96,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signLicenseKey } from '../server/license-key.js';
+import { startRtmpListener, summarize } from './rtmpListener.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DESKTOP = join(REPO, 'desktop');
@@ -381,6 +391,46 @@ try {
     : `${engine ?? 'no engine'}; ${started ? 'no painted frame read back' : 'the plate never drew 120 frames'}`;
   if (isMac || first) check('lit plate: the plate draws, lit, in colour and moving, with the network off', lit, plateDetail);
   else skip('lit plate', `software WebGPU gives the app no readback here (CLAUDE.md); CI's Mac measures it. Here: ${plateDetail}`);
+
+  // ── live ──────────────────────────────────────────────────────────────
+  /*
+    The live stream's plumbing (PLAN.md 37x-4b): the page's encoder
+    (src/lib/liveStream.ts) hands packets to the preload's bridge, main.js's
+    `wireLive` to the RTMP client (desktop/live.js), the client to the
+    socket. `npm run live` measures the stream itself in the lab, over a
+    Playwright bridge; what only the app can show is that its IPC carries the
+    same packets, and that a key kept by name is what the client publishes
+    with. The key store is Electron's safeStorage: on a Mac it encrypts
+    through the login Keychain; on a Linux box with no keyring it refuses,
+    and the repo's app (never the packed one) takes the key itself, as the
+    check does here. With no sound source open the stream is video only.
+  */
+  {
+    const listener = await startRtmpListener();
+    let pub = null;
+    listener.on('publish', (st) => { pub = st; });
+    const started = await page.evaluate(async (url) => {
+      const live = window.__cgLive;
+      if (!live) return { error: 'no __cgLive on the page' };
+      let keychain;
+      try { await live.keys.set('check', 'desktop-check-key'); keychain = 'kept'; } catch (e) { keychain = `refused: ${e.message}`; }
+      const names = (await live.keys.list().catch(() => [])).map((k) => k.name);
+      try {
+        const st = await live.start(keychain === 'kept' ? { url, keyName: 'check', width: 640, height: 360, fps: 30 } : { url, key: 'desktop-check-key', width: 640, height: 360, fps: 30 });
+        return { state: st, keychain, names };
+      } catch (e) { return { error: e.message, keychain, names }; }
+    }, listener.url).catch((e) => ({ error: e.message }));
+    await sleep(4000);
+    const stopped = await page.evaluate(() => window.__cgLive?.stop()).catch(() => null);
+    const removed = await page.evaluate(() => window.__cgLive?.keys.remove('check')).catch(() => null);
+    const sum = pub ? summarize(pub) : null;
+    const viaKeychain = started.keychain === 'kept';
+    const keyOk = pub?.key === 'desktop-check-key' && (!viaKeychain || (started.names?.includes('check') && removed === true));
+    const framesOk = !!sum && sum.video.header && sum.video.frames >= 60 && (stopped?.transport?.videoFrames ?? -1) === sum.video.frames;
+    check(`live: the page streams the plate through the app to a listener${viaKeychain ? ', on a key kept by name in its keychain store' : ''}`, !started.error && keyOk && framesOk,
+      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s, ${stopped?.transport?.videoFrames ?? '?'} sent, ${stopped?.transport?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped; key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
+    await listener.close();
+  }
 
   // ── not throttled ───────────────────────────────────────────────────
   /*

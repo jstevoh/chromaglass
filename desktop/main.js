@@ -23,7 +23,7 @@
  */
 
 import inspector from 'node:inspector';
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell, systemPreferences } from 'electron';
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, safeStorage, screen, session, shell, systemPreferences } from 'electron';
 import electronUpdater from 'electron-updater';
 import { randomInt } from 'node:crypto';
 import { createSocket } from 'node:dgram';
@@ -33,6 +33,8 @@ import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
+import { wireLive } from './live.js';
+import { makeKeyStore } from './keys.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -651,6 +653,15 @@ async function start() {
     if (typeof url !== 'string' || !isOurs(url) || new URL(url).protocol !== 'http:') return false;
     void shell.openExternal(url);
     return true;
+  });
+  // The live stream (PLAN.md 37x-4b): the page encodes, this process speaks
+  // RTMPS (live.js), and the stream keys stay in the keychain store (keys.js),
+  // where a packed app alone can read them. Headless until the panel (37x-4d):
+  // the page's `window.__cgLive` drives it from the console and the check.
+  wireLive(ipcMain, {
+    keys: makeKeyStore({ file: join(app.getPath('userData'), 'live-keys.json'), safeStorage }),
+    isPackaged: app.isPackaged,
+    send: (channel, payload) => { if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send(channel, payload); },
   });
   const licenseFile = process.env.CHROMAGLASS_LICENSE_FILE ?? join(app.getPath('userData'), 'license.json');
   process.env.CHROMAGLASS_LICENSE_FILE = licenseFile;

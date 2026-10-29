@@ -1999,3 +1999,24 @@ real song. (§88 is the stutter, §89 the headers.)
    land on the same hits as before this change: the readings are the same to the bit on the checks' songs.
 4. Bad: a ring that lags behind the stick, jumps to a corner when it first appears, or stays after the stick is
    released; a beat that used to fire and does not.
+
+## 91. The live stream, to an unlisted YouTube broadcast (PLAN 37x-4b)
+
+The lab streams to its own server and measures the stream; only a real platform can say it
+takes ours, and only a camera can say the sound and the plate agree after the Mac's
+system-audio path. Unlisted, never public, until you say so.
+
+1. In YouTube Studio, Go live → Stream, an **unlisted** broadcast; copy the stream key. Open the
+   Mac app, the console (View → Toggle Developer Tools), and `docs/live-show.md`'s four lines
+   with that key. Within thirty seconds Studio's preview should show the plate, "Excellent
+   connection", no dropped frames in `__cgLive.state()`.
+2. Open the album in Qobuz or YouTube Music with the app's sound source on *System audio*.
+   Watch the broadcast on a phone (it runs twenty or so seconds behind): a hit in the music
+   should bloom the plate right after the hit, as it does on the laptop, not before it.
+3. Clap once in front of the laptop's camera with the microphone as the source: in the
+   broadcast, the clap and the plate's bloom should fall together within a frame or two.
+4. Stop with `__cgLive.stop()`; the broadcast should end cleanly in Studio within a few seconds.
+5. Bad: Studio never shows a picture (the key or the RTMPS path), the sound runs ahead of or
+   behind the plate by more than a frame or two (the Mac's clock, the plan's note under
+   37x-4b), frames dropped with a good upload, or the app's frame rate falling while live
+   (`npm run stutter`'s two-step frames, 37x-4c).

@@ -350,15 +350,28 @@ rest is routine and the owner's calls.
     150 followers), that simulcasting is allowed everywhere since Twitch dropped its rule
     in 2023, and the three designs weighed. YouTube's first enable takes up to 24 hours,
     so the owner enables it before the first show.
-  - **37x-4b. The encoder and one destination.** *(build, M.)* `desktop/live.js`: an RTMPS
-    client (handshake, AMF0 `connect`/`createStream`/`publish`, FLV audio and video tags in
-    RTMP chunks, the AVC and AAC sequence headers from the encoders' descriptions) fed over
-    IPC by a `LiveMuxer` in `lib/render.ts` that takes the Record encoders' packets instead
-    of a file; a `live` check in the lab against a local RTMP listener (the check's own
-    `scripts/rtmpListener.mjs`, pure node) that records what arrives as FLV and measures
-    the audio seconds, the frame rate and the sync; the keys in the Keychain
-    (`desktop/keys.js`). Headless: a `chromaglass:live-*` IPC the panel (37x-4d) will call,
-    driven first from the console and the check.
+  - **37x-4b. The encoder and one destination.** *(shipped 2026-10-29, #PR.)* `desktop/live.js`
+    (the RTMPS client), `desktop/rtmp.js` (the wire), `desktop/keys.js` (the key store),
+    `src/lib/liveStream.ts` (the wall-clock encoder), `window.__cgLive` in the Mac app, and
+    `npm run live` against `scripts/rtmpListener.mjs`; story in `docs/plan-shipped.md` §37x-4b.
+    Found building it, for the parts after:
+    - *The picture is the plate's canvas.* `__cgLive` streams `#liquid-canvas`, the laptop's
+      plate, not the projector's pass (§31's Wall output, the mixer's stack). A show with a
+      projector up should be able to stream what the wall shows; 37x-4c or 37x-4d takes the
+      output pass as the source when one is running.
+    - *The sound's clock, on the Mac.* The stream stamps the audio on the track's own
+      timestamps, which Chromium puts on `performance.now()`'s clock (measured, the lab);
+      the Mac's system-audio path (#550) schedules each captured chunk into a context 5 to
+      60 ms after it was heard, so the stream's sound may sit that far behind the plate's
+      reaction to it. Measure on the Mac with a clap on camera (judging §91), and if it
+      shows, stamp the tap's chunks with the time they were captured.
+    - *The encoder's own keyframes.* OpenH264 (the lab) starts a new group whenever the
+      picture changes a lot, on top of the one asked for every two seconds; the check allows
+      it. VideoToolbox should not; `npm run live` on the Mac shard says.
+    - *Dropping on a slow upload is counted, not yet measured.* The client drops video to
+      the next keyframe past 1.5 MB waiting on the socket; the lab's socket never falls
+      behind. 37x-4c's listener needs a throttle (read slowly) to measure the drop and the
+      recovery, and that no audio packet is lost.
   - **37x-4c. Several destinations, and a vertical one.** *(build, M.)* The same packets
     written to N sockets, a socket that falls behind dropping its own frames (never the
     others'), a reconnect with the key still held; a second encode of a 9:16 crop for
