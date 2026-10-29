@@ -1,7 +1,7 @@
 // A pull request that moves a check's bar or input says so (PLAN.md 19x).
 // Run with `npm run checkguard` (the self-test), or against a branch:
 //
-//   npm run checkguard -- --base origin/main --body-file body.md
+//   npm run checkguard -- --base origin/main --body-file body.md [--branch antigravity/x]
 //   npm run checkguard -- --history 60      what the last 60 merges would have had to name
 //
 // What was reported. On 2026-10-11 the review of the session that builds
@@ -99,6 +99,7 @@
 // it fires on ordinary work; over the 50 merges before it shipped, 9 would
 // have had to name something, every one a real edit of a check.
 //
+// It also holds an Antigravity PR's Measured lines (scripts/measured.mjs).
 // It never relaxes anything: it adds one way to be red and none to be green.
 // In CI it is its own job, "Check changes named", and the required "Measure"
 // is red when it is. It reads the pull request's body live from the API, so
@@ -109,6 +110,8 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { reportMeasured, measuredSelftest } from './measured.mjs';
+import { prCommits, livePr } from './checkguard-api.mjs';
 
 // ─── Reading code ──────────────────────────────────────────────────────────
 
@@ -689,38 +692,6 @@ function report(changes, body) {
   return unnamed;
 }
 
-async function api(path) {
-  const repo = process.env.GITHUB_REPOSITORY || 'jstevoh/chromaglass';
-  const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'chromaglass-checkguard' };
-  if (process.env.GH_TOKEN) headers.Authorization = `Bearer ${process.env.GH_TOKEN}`;
-  const res = await fetch(`https://api.github.com/repos/${repo}/${path}`, { headers, signal: AbortSignal.timeout(20_000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-// The pull request's own commits (GitHub's list: in the head, not in the
-// base), with how many there are counting merges, for the fetch's depth.
-async function prCommits(pr) {
-  const all = [];
-  for (let page = 1; page <= 3; page++) {
-    const got = await api(`pulls/${pr}/commits?per_page=100&page=${page}`);
-    all.push(...got);
-    if (got.length < 100) break;
-  }
-  return { total: all.length, shas: all.filter((c) => (c.parents ?? []).length === 1).map((c) => c.sha) };
-}
-
-async function liveBody() {
-  const pr = process.env.PR_NUMBER;
-  if (!pr) return null;
-  try {
-    return (await api(`pulls/${pr}`)).body ?? '';
-  } catch (e) {
-    console.log(`(the pull request's body could not be read live, ${e.message}; using the one the run started with)`);
-    return null;
-  }
-}
-
 // ─── Self-test ─────────────────────────────────────────────────────────────
 
 function hunksOf(a, b) {
@@ -917,6 +888,8 @@ function selftest() {
   c = manifestChanges(base, mf({ name: 'The app, now every look', shard: 'b', run: qa.run, timeout: 15, env: qa.env }, other));
   t(c.length === 1 && c[0].removed, 'a renamed check reads as the old name removed', c.map((x) => x.what).join('; '));
   t(manifestChanges('not json', base).length === 0 && manifestChanges(base, '{').length === 0, 'a manifest that does not parse is another check\'s to refuse');
+
+  measuredSelftest(t);
   return failed;
 }
 
@@ -939,7 +912,9 @@ if (!main) {
     console.log(`FAIL the checkout is not GitHub's merge of the pull request (parents ${parents.slice(1).join(' ')})`);
     process.exit(1);
   }
-  const body = (await liveBody()) ?? process.env.PR_BODY ?? '';
+  const live = await livePr();
+  const body = live?.body ?? process.env.PR_BODY ?? '';
+  const branch = live?.head?.ref ?? process.env.PR_BRANCH ?? '';
   const net = changesBetween('HEAD^1', 'HEAD');
   let flips;
   try {
@@ -951,7 +926,7 @@ if (!main) {
     process.exit(1);
   }
   const seen = new Set(net.map((c) => `${c.file}|${c.code}`));
-  process.exit(report([...net, ...flips.filter((f) => !seen.has(`${f.file}|${f.code}`))], body) ? 1 : 0);
+  process.exit(report([...net, ...flips.filter((f) => !seen.has(`${f.file}|${f.code}`))], body) + reportMeasured(branch, body, 'HEAD^1') ? 1 : 0);
 } else if (arg('--history')) {
   const n = Number(arg('--history'));
   const commits = git('log', '--first-parent', '--format=%H %s', `-${n}`, arg('--ref') ?? 'origin/main').trim().split('\n');
@@ -971,7 +946,7 @@ if (!main) {
   const net = changesBetween(base, 'HEAD');
   const shas = git('rev-list', '--no-merges', '--reverse', `${base}..HEAD`).trim().split('\n').filter(Boolean);
   const seen = new Set(net.map((c) => `${c.file}|${c.code}`));
-  process.exit(report([...net, ...flipsIn(shas).filter((f) => !seen.has(`${f.file}|${f.code}`))], body) ? 1 : 0);
+  process.exit(report([...net, ...flipsIn(shas).filter((f) => !seen.has(`${f.file}|${f.code}`))], body) + reportMeasured(arg('--branch') ?? git('rev-parse', '--abbrev-ref', 'HEAD').trim(), body, base) ? 1 : 0);
 } else {
   const failed = selftest();
   console.log(failed ? `\n${failed} FAILED` : '\nall ok');

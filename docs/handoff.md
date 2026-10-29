@@ -68,12 +68,43 @@ session reads instead of the conversation that wrote it:
 ```
 Plan item: 0-tap (PLAN.md §0, Order of work 0.3)
 Done: what changed, in a sentence or two
-Measured: the npm scripts run, where they ran (Mac GPU / cloud / CI) and the numbers
+Measured: each npm script run, where it ran (Mac GPU / cloud / CI), and the line it printed, quoted
 Controls: each check-skeptic control run and what it read (red where it should be)
 Review owed: the .claude agents only followed by hand, or "none"
 Check changes: "none", or one list line per change to a check's bar or input (below)
 Left: the next concrete step, if the work stops here
 ```
+
+**Measured quotes what the command printed.** Every line under `Measured:` in an
+Antigravity PR (a branch `antigravity/…`) gives the command and, in backticks beside it,
+the line that command printed, not a verdict (the owner's rule, 2026-10-26: overclaims
+were in 6 of the 8 first reviews sent back since that tool returned):
+
+```
+Measured:
+- Mac GPU: `npm run grating` → `ok 24/24 pressed plate 4.15e-3 against 6.28e-3`
+- `npm run lint` → `exit 0`
+```
+
+CI fails the PR when a command has no printed line after it on its line (`npm run lint`
+clean, `npm run panel` 197/197, "CI green"), when a group names no command, when the
+script is not in `package.json`, or when there is no `Measured:` at all; the guard is the
+same job as `Check changes:` (`npm run checkguard`), so after editing the body, re-run the
+failed jobs; no push is needed. A printed line is two words or more and a number or the
+word a check puts first (`ok …`, `FAIL …`, `PASS …`, `all ok`, `✓ …`, a `36/36 checks
+passed` count, npm's own `> node scripts/x.mjs` for that command's script), or words the command's own script prints
+(`all lines pass`, `adapter: apple`: the guard looks for them in the script's string literals, not its comments, and a label such as `name:` does not carry a verdict after it);
+"passed", "green" and "clean" are not, anywhere in the span unless it begins as a check's
+line does. The CI job a command ran in may stand between it and its line
+(`` (`npm run grating`, job `121955921102`) → `ok …` ``). A command that prints nothing when it
+passes (`npm run lint` is `tsc --noEmit`) is quoted by its exit status, `exit 0`. Write
+the lines inline in backticks, not in a code block. A list item may have the numbers the
+check printed nested under it as detail, and a header item may hold several commands, each
+quoted on its own line. A PR that changes only Markdown may say `Measured: none`. Claude
+Code PRs are not held to it, though the block is the same. The guard reads the form and
+cannot know the quoted line is the one printed, so the reviewer still runs one of the
+scripts (step 4 below) and compares. A claim PR opened as a draft before it has run
+anything is red on this until its first command is quoted.
 
 **Check changes.** CI fails a PR that moves what a check measures against or with and does
 not say so (`npm run checkguard`, the "Check changes named" job, under the required

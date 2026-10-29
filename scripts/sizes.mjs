@@ -20,9 +20,12 @@
 //
 // The baseline is scripts/sizes.json, and it only shrinks. Against the commit
 // this one is measured from (below), an entry may be lowered or removed, never
-// raised or added: otherwise the way to get a grown App.tsx green would be to
-// write its new size in, and the check would be a form to fill in. A big file
-// renamed is a new file over budget, so a rename does not launder it either.
+// raised: otherwise the way to get a grown App.tsx green would be to write its
+// new size in, and the check would be a form to fill in. An entry is added only
+// for bytes a move carried out of a file the base already held over budget
+// (judge(), "A move out carries its ceiling"): no more than left those files in
+// the same pull request, measured on the files, not on their ceilings. A big
+// file renamed without its entry is a new file over budget.
 //
 // Why there is slack below a ceiling and none above it. If a file that shrinks
 // at all had to have its entry lowered in the same PR, nearly every PR that
@@ -145,8 +148,41 @@ export function judge(sizes, now, then, was = null, pr = true) {
     if (n > BUDGET && !(f in now.files) && !(f in now.ledgers)) bad.push(['new', f, `${f} is ${kb(n)} (${n} bytes), over the ${kb(BUDGET)} budget for a file: split it`]);
   }
   if (then) {
+    /*
+      A move out carries its ceiling (the owner, 2026-10-28, on #548). The
+      first PR to make a split this rule exists for, the CPU solver leaving
+      the visualizer (19ai-3), moved one 190 KB class into a file of its own,
+      and the rule as first written read that file as new code over budget:
+      the visualizer's ceiling fell by 229 KB and the move was still red. The
+      owner did not want the solver cut into 40 KB pieces to satisfy a number
+      ("I don't want quality to go down because of this"), and a class is not
+      split by moving lines: its methods would have to be pulled apart into
+      files that reach each other's private state.
+
+      So an entry the base does not have is allowed for bytes that moved: the
+      new entries together may hold no more than actually left the files the
+      base's baseline held over budget, in this pull request (each such file's
+      size at the base less its size now, a deleted one counting whole). That
+      is measured on the files and not on their ceilings, because a ceiling
+      can sit above its file: slack banked by an earlier `--update`, or an
+      entry dropped for a file that had already shrunk, is not bytes this PR
+      moved, and crediting the sum of ceilings let a fresh 41.5 KB file and a
+      big file renamed and grown 3 KB through together (the review of #548,
+      reproduced in a scratch repository). The new entry is the file's own
+      size, no slack in it, so it cannot grow from the day it is written. A
+      file that simply appears over budget still fails as new (nothing in
+      sizes.json names it). What this lets through that the first rule did
+      not is a rename that moves its entry with it, unchanged; a session's
+      cost is the same either way, which is what the budget is for.
+    */
+    const moved = was ? Object.keys(then.files).reduce((a, f) => a + Math.max(0, (was.get(f) ?? 0) - (sizes.get(f) ?? 0)), 0) : 0;
+    const added = Object.keys(now.files).filter((f) => !(f in then.files) && !(f in then.ledgers));
+    const carrying = added.reduce((a, f) => a + (sizes.get(f) ?? 0), 0);
     for (const [f, cap] of Object.entries(now.files)) {
-      if (!(f in then.files) && !(f in then.ledgers)) bad.push(['raised', f, `${f} has a ceiling the base's ${BASELINE} does not: the baseline only shrinks`]);
+      if (!(f in then.files) && !(f in then.ledgers)) {
+        if (carrying > moved) bad.push(['raised', f, `${f} has a ceiling the base's ${BASELINE} does not, and the new entries hold ${carrying} bytes where ${moved} left the files the base held over budget: a new ceiling only carries bytes moved out of another`]);
+        else if (cap !== sizes.get(f)) bad.push(['raised', f, `${f}'s new ceiling of ${cap} is not its size (${sizes.get(f) ?? 'gone'}): a carried ceiling is the bytes that moved, with no slack`]);
+      }
       else if (f in then.files && cap > then.files[f]) bad.push(['raised', f, `${f}'s ceiling went up from ${then.files[f]} to ${cap}: the baseline only shrinks`]);
     }
     for (const f of Object.keys(now.ledgers)) {
@@ -263,6 +299,10 @@ function selftest() {
     expect('a ledger that grows passes', () => add('PLAN.md', 10 * 1024), []);
     expect('a ceiling raised to let a grown file through fails', () => { add('src/big.ts', 100); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); }, ['raised src/big.ts', 'grew src/big.ts']);
     expect('a ceiling added for a new big file fails', () => { put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/new.ts': 41 * 1024 } }); }, ['raised src/new.ts']);
+    expect('a move out of a big file carries its ceiling to the new file', () => { put('src/big.ts', BIG - 41 * 1024); put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - 41 * 1024, 'src/new.ts': 41 * 1024 } }); }, ['stale src/big.ts']);
+    expect('a carried ceiling with slack in it fails', () => { put('src/big.ts', BIG - 41 * 1024 - 2048); put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - 41 * 1024 - 2048, 'src/new.ts': 41 * 1024 + 1024 } }); }, ['raised src/new.ts', 'stale src/big.ts']);
+    expect('a carried ceiling bigger than what moved out fails', () => { put('src/big.ts', BIG - 41 * 1024); put('src/new.ts', 42 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - 41 * 1024, 'src/new.ts': 42 * 1024 } }); }, ['raised src/new.ts', 'stale src/big.ts']);
+    expect('a big file renamed with its entry moved passes', () => { g('mv', 'src/big.ts', 'src/moved.ts'); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/moved.ts': BIG } }); }, []);
     expect('a new big file made a ledger fails', () => { put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x', 'src/new.ts': 'x' }, files: { 'src/big.ts': BIG } }); }, ['raised src/new.ts']);
     expect('a file under its ceiling by the slack passes', () => put('src/big.ts', BIG - SLACK), []);
     expect('a file further under its ceiling fails until lowered', () => put('src/big.ts', BIG - SLACK - 1), ['stale src/big.ts']);
@@ -272,6 +312,15 @@ function selftest() {
     expect('a file back under budget fails until its ceiling goes', () => put('src/big.ts', 1024), ['stale src/big.ts']);
     expect('and passes once lowering drops it', () => { put('src/big.ts', 1024); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); }, []);
     expect('a ledger under budget fails until it leaves the list', () => put('PLAN.md', 1024), ['stale PLAN.md']);
+    // The review of #548: credited on the sum of ceilings, a ceiling sitting
+    // above its file at the base (slack, or an entry for a file that has
+    // already shrunk) paid for a fresh file over budget with no bytes moved.
+    reset(); put('src/slack.ts', 45 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/slack.ts': 60 * 1024 } }); g('add', '-A'); g('commit', '-qm', 'a base with slack');
+    const slackBase = g('rev-parse', 'HEAD').trim();
+    put('src/slack.ts', 30 * 1024); put('src/fresh.ts', 41 * 1024 + 512);
+    baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/fresh.ts': 41 * 1024 + 512 } });
+    const funded = run(dir, { ref: slackBase, ci: false }).bad.map(([k, f]) => `${k} ${f}`).sort().join(', ');
+    t(funded === 'raised src/fresh.ts', 'slack under a base ceiling cannot fund a fresh file: only the 15 KB that moved counts, not the 60 KB ceiling', funded || 'passed');
     // In CI the base is HEAD^1 (the PR's merge commit's first parent), read
     // without a ref: a ceiling raised in the PR's last commit is caught there.
     reset(); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); g('commit', '-qam', 'raise');
