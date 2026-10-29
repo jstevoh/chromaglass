@@ -20,11 +20,10 @@ import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
-import { DEFAULT_RIDES } from './components/desk/DeskPanels';
 import type { Cue, SetAction, SetItemAction, ControlKind } from './components/desk/deskProps';
 import { useDeskTabs } from './hooks/useDeskLayout';
 import { closePanel, isSectionPanel, openPanel, openPanels } from './lib/deskLayout';
-import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
+import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { luckyLook } from './lib/lucky';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
@@ -4893,7 +4892,7 @@ export default function App() {
         saveLook();
         return;
       }
-      // ⌘⏎ is Send to wall, which every layout's plate bar carries now.
+      // ⌘⏎ is Send to wall, as the header's Wall is on every tab.
       if (deskUp && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         sendToWallRef.current();
@@ -6684,7 +6683,6 @@ export default function App() {
           edited={docDirty}
           dirty={docDirty}
           onSendToWall={() => sendToWallRef.current()}
-          onOpenWall={() => { void startCast('window'); }}
           onSave={saveLook}
           onSaveOver={docId ? replaceLook : undefined}
           onNew={newLook}

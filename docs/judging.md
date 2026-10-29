@@ -1286,8 +1286,9 @@ to the monitor:
 
 With the projector window up (or a cast), put the plate bar on **Preview** and change the
 look: pick another, ride a few sliders, clear the plate. The wall should carry on with
-the look it had, while the desk's preview shows the copy. Then press **Send to wall**
-(⌘⏎): the wall should fade to the copy's look over the Go's fade.
+the look it had, while the desk's preview shows the copy. Then click **Wall** in the
+header (or ⌘⏎; the plate bar's Send to wall button went in PLAN 35c-4): the wall should
+fade to the copy's look over the Go's fade.
 
 - Does the wall stay exactly as it was while you build? The dimmer, the mixer and the
   music still move it on purpose; nothing else should.
