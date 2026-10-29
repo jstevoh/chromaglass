@@ -53,6 +53,7 @@
  * 3% from the middle of the frame, where it sat 27% off.
  */
 import { stream, type Rng } from './rng';
+import { MACRO_FULL_ZOOM } from '../sim/constants';
 
 export interface MacroField {
   /** Total dye density per cell. */
@@ -445,11 +446,29 @@ export class MacroCamera {
     if (this.landPending) {
       const plate = this.plateMean(field);
       if (plate > EMPTY_PLATE) {
-        this.landPending = false;
-        const atX = mode === 'follow' && !first ? this.beadX : ax, atY = mode === 'follow' && !first ? this.beadY : ay;
-        if (this.frameMean(field, atX, atY, halfCellsX, halfCellsY) < BARE_SHARE * plate) {
+        /*
+          Asked again on every frame of a zoom still on its way in. A pinch
+          or the slider comes in from 1x a notch at a time, and at 1.01x the
+          frame is nearly the whole plate and holds the plate's average: asked
+          only then, it was never asked again, and the pinch went on into the
+          bare middle (the review's ramp, 1.01x to 4x over a second, ended on
+          0.5, 0.5). Fully in, the answer stands.
+        */
+        if (opts.zoom >= MACRO_FULL_ZOOM) this.landPending = false;
+        const following = mode === 'follow' && !first;
+        const atX = following ? this.beadX : Number.isFinite(this.landX) ? this.landX : ax;
+        const atY = following ? this.beadY : Number.isFinite(this.landY) ? this.landY : ay;
+        /*
+          And once landed, landed again on each frame of the way in: a frame
+          landed at 1.3x is centred for 1.3x, and a pool by the wall sits
+          where that wide frame was held off the wall, not where a 4x frame
+          is (the same ramp in Hold: 0.42 of a half-frame off at 4x). The
+          first landing is a cut; these follow it in, eased like any move.
+        */
+        const had = Number.isFinite(this.landX);
+        if (had || this.frameMean(field, atX, atY, halfCellsX, halfCellsY) < BARE_SHARE * plate) {
           const l = this.landing(field, ax, ay, halfCellsX, halfCellsY);
-          this.landX = l.x; this.landY = l.y; landed = true;
+          this.landX = l.x; this.landY = l.y; landed = !had;
         }
       }
     }
