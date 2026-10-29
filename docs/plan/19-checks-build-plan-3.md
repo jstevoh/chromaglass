@@ -272,6 +272,40 @@ advisories.
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
 
+## 19ah. The owner's Mac runs main's deploy shards (2026-10-28)
+
+Asked 2026-10-28: the owner's Mac helping CI as much as it safely can. A deploy that reaches
+the GPU waited a mean 50 minutes per Mac shard for GitHub's macOS machines (13 such deploys
+in 14 days, slowest shard's wait 80 minutes, 17 minutes of work per shard), 124 minutes
+push to live. Built: a probe job in `deploy.yml` (`scripts/macrunner.mjs`, a fine-grained
+token with Administration: Read in the main-only `mac-runner` environment) lists the
+shards the owner's Mac may take when a runner labelled `owner-mac` is online and idle;
+`checks.yml` sends those to it, never a pull request's run; each such shard first waits for
+the harness ports (`scripts/macports.sh`); `scripts/macrunner-setup.sh` installs the runner
+in `~/actions-runner` as the owner; `npm run macqueue` reports deploys by where their shards
+ran. How it works and how to pause it: `docs/mac-runner.md`.
+
+- **19ah-1. Open: measure it, then decide on a second machine.** After a week of deploys,
+  `npm run macqueue -- --hours 168` against the baseline above: push to live, and how often
+  the Mac was free. A second machine (the same script, a second runner on the same label)
+  pays off if deploys still wait for the Mac or go to GitHub's queue while it is busy.
+- **19ah-2. Open: a separate macOS user for the runner.** Jobs run as the owner and can read
+  the owner's signing keys and `gh` sign-in. Only main's reviewed workflow runs there, but a
+  user of its own (logged in, for the GPU) would take the reach away.
+- **19ah-3. Shipped (with 19ah): a shard queued for a Mac that went to sleep after the
+  probe.** `deploy.yml`'s `Watchdog` (`scripts/macwatch.mjs`) starts the deploy again with
+  `hosted` and cancels the stalled run after 15 minutes queued with none running. It
+  counts the run finished only when the checks' `WebGPU (macOS)` job has (19ah-3a: every
+  job made so far is briefly finished after `reach`, before the shards' jobs exist). Still
+  open: it holds an ubuntu runner for the length of the shards (free on a public
+  repository); a shorter way would be a watchdog that wakes on a schedule.
+- **19ah-4. Open: the by-hand Mac workflows** (`gallery`, `controls`, `pixels`, `film`) could
+  take the same probe and lane; they are the longest Mac jobs and queue the same way.
+- **19ah-5. Open: the job-started hook is copied by hand.** `macrunner-setup.sh` installs
+  `scripts/macrunner-hook.sh` from the checkout it runs in; a change to the hook on `main`
+  reaches the Mac only when the owner runs setup again. A check that the installed copy
+  matches `main`'s (the probe could read a hash the hook prints) would say when it is stale.
+
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;

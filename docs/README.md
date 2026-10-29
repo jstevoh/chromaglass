@@ -13,6 +13,7 @@ Start with the [full guide](guide.md): every feature, control and setup, and how
 - Presets and sound: [presets-plan.md](presets-plan.md), [sound-patches.md](sound-patches.md), [liquid-format.md](liquid-format.md), [tool-by-liquid.md](tool-by-liquid.md)
 - Stage and rig: [rig-plan.md](rig-plan.md), [two-projectors.md](two-projectors.md), [slide-plan.md](slide-plan.md)
 - Reliability: [stability-plan.md](stability-plan.md), [crash-plan.md](crash-plan.md)
+- CI on the owner's Mac: [mac-runner.md](mac-runner.md)
 
 **Handoffs for finished pieces**: [handoff-signin.md](handoff-signin.md), [handoff-phone-link-qr.md](handoff-phone-link-qr.md), [handoff-switches.md](handoff-switches.md), [handoff-macro-ferro-drop.md](handoff-macro-ferro-drop.md)
 
