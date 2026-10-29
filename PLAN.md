@@ -6435,7 +6435,7 @@ advisories.
 ### 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
-the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves) and 19ai-5.
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5 and 19ai-8.
 
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
   was module code above the component: the CPU solver `class FluidSimulation` (3,900 lines)
@@ -6461,9 +6461,23 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
   reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
   whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
-- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
-  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
-  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
+- **19ai-4a. Shipped with 19ai-8 for App's setters** (the story in `docs/plan-shipped.md`).
+  The plate's setters in `LiquidVisualizer.tsx` still cast, and drop theirs when next edited.
+- **19ai-8. Shipped: `App()` into its domains' hooks** (`src/app/`, 34 hooks; `App.tsx` 372,525
+  → 215,830 bytes; the story in `docs/plan-shipped.md`). A check that reads App's source as
+  text reads `scripts/appSource.mjs`, App and its hooks as one text.
+- **19ai-8a. Open: what stayed in `App()`.** The settings' writers at its heart (the ride,
+  the drift, `updateSettings`, `applyPreset`, the saved-look document, `lookPhase` and
+  `magnetInHand`, the automation's effect: about 30 KB) were left, because they reach
+  forward to `settingsRef`, `setDocDirty` and `lookFadeRef` declared after them, and a
+  verbatim move cannot take them without reordering more than it moves; likewise the
+  overlay's keys (they set panels declared later), the cue functions and `runAction`. Next
+  is the 97 KB JSX return, which is components rather than hooks: the overlay, the desks'
+  props and the phone's props as their own files.
+- **19ai-8b. Open: hooks that take App whole.** A verbatim move keeps every name a run read,
+  so `useCommandPalette` takes 52 parameters, `useRemote` 48, `useWallLook` 37. Once
+  19ai-8a has moved the settings' writers, the ones that read a domain's state and its
+  setters can take that domain's hook result instead of its pieces.
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** A file not in `scripts/sizes.json`
   stays at or under 40 KB; a file already over it (52 on main at b38801e, 4.9 MB between
   them) may not grow past the bytes recorded beside it, nor past its size at the PR's base
