@@ -820,27 +820,6 @@ let bobProToken = '';
   }
 }
 
-// ── 9e. The live store's product ids are built in ────────────────
-{
-  const lsOrder = (email, orderId, productId, name) => ({
-    meta: { event_name: 'order_created' },
-    data: { id: orderId, attributes: { user_email: email, first_order_item: { product_id: productId, product_name: name, order_id: orderId } } },
-  });
-  const env = makeEnv();
-  // Names that match neither "pro" nor "upgrade", so only the id can decide.
-  await postWebhook(env, lsOrder('ida@example.com', 'ord_ida_1', 1479219, 'ChromaGlass'));
-  await postWebhook(env, lsOrder('ivy@example.com', 'ord_ivy_1', 1479217, 'ChromaGlass'));
-  await postWebhook(env, lsOrder('ivy@example.com', 'ord_ivy_2', 1479218, 'ChromaGlass'));
-  const keys = async (email) => (await (await getKeys(env, await mintFirebaseToken({ email }))).json()).keys ?? [];
-  const ida = await keys('ida@example.com');
-  const ivy = await keys('ivy@example.com');
-  check(
-    '9e. with no settings, live Pro (1479219) files a Pro key and live Upgrade (1479218) turns a live Home (1479217) key into Pro',
-    ida[0]?.tier === 'pro' && ivy.length === 1 && ivy[0]?.tier === 'pro',
-    `ida ${ida.map((k) => k.tier).join('+')}, ivy ${ivy.map((k) => k.tier).join('+')}`,
-  );
-}
-
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
 process.exit(failed.length ? 1 : 0);

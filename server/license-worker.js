@@ -129,11 +129,8 @@ async function handleWebhook(request, env, cors) {
   // (1450531 Pro, 1450532 Upgrade), so the live ids are Worker settings rather than a code
   // change at go-live (`LS_PRO_PRODUCT_IDS`, `LS_UPGRADE_PRODUCT_IDS`, comma separated). The
   // product's name still decides when an id is on neither list.
-  // The live store's own ids (read off its dashboard on 2026-10-29: Pro 1479219, Upgrade 1479218)
-  // are built in beside the test-mode ones, so a deploy that forgets the settings still routes
-  // them; the settings add to these lists, they never replace them.
-  const isPro = productIdIn(env.LS_PRO_PRODUCT_IDS, lsProductId, 1450531, 1479219);
-  const isUpgradeProduct = productIdIn(env.LS_UPGRADE_PRODUCT_IDS, lsProductId, 1450532, 1479218);
+  const isPro = productIdIn(env.LS_PRO_PRODUCT_IDS, lsProductId, 1450531);
+  const isUpgradeProduct = productIdIn(env.LS_UPGRADE_PRODUCT_IDS, lsProductId, 1450532);
   const rawEvent = String(body.event || body.meta?.event_name || '');
   const isLsUpgrade =
     rawEvent === 'order_created' &&
@@ -645,9 +642,9 @@ async function getGoogleJwks(env, kid) {
   return jwksInFlight;
 }
 
-function productIdIn(list, id, ...known) {
+function productIdIn(list, id, testId) {
   if (!id) return false;
-  if (known.includes(id)) return true;
+  if (id === testId) return true;
   return String(list || '')
     .split(',')
     .some((v) => Number(v.trim()) === id);
