@@ -23,7 +23,7 @@ import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 
-/** The grid the look was tuned on: `GRID_SIZE` in LiquidVisualizer. */
+/** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -32,7 +32,7 @@ const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 /**
  * The frame, as the uniforms read it.
  *
- * Structurally `FrameView` from LiquidVisualizer, narrowed to the parts the
+ * Structurally `FrameView` from sim/frameTypes.ts, narrowed to the parts the
  * mapping touches and to plain numbers — no DOM, no GL — so this file does not
  * import the component (which imports it), and so a harness can hand it an
  * object it made up. A real `FrameView` satisfies it as it stands.

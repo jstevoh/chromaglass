@@ -43,7 +43,6 @@
  * `shape()`, is what judges whether the plate delivers it.
  */
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   planScene, sampleScene, stepScene, cursorAt, approachPace, endsDark, ScenePlayer,
   PACE_NEUTRAL, STALE_MOMENT, DIM_RATE, FROM_DARK_BELOW, OPEN_SCENE_SECONDS, CUE_STALE, songCueFrom,
@@ -763,10 +762,11 @@ console.log('\nFollowing the song');
 */
 console.log('\nWiring');
 {
-  const src = f => readFileSync(join(process.cwd(), f), 'utf8');
+  const src = f => readFileSync(f, 'utf8');
   const hook = src('src/hooks/useShowSequencer.ts');
   const app = src('src/App.tsx');
   const vis = src('src/components/LiquidVisualizer.tsx');
+  const sim = src('src/sim/fluidSimulation.ts');
   check('the sequencer plays each stage through the scene player, coming up from the dark on the same rule',
     /scene: new ScenePlayer\(stage, stream\('show\.pacing'\)\.float\)\.enter\(pacing, fromDark\)/.test(hook)
     && /paceSentRef\.current\.dim < FROM_DARK_BELOW/.test(hook)
@@ -790,7 +790,7 @@ console.log('\nWiring');
     && /paceNowRef\.current = approachPace\(paceNowRef\.current, paceTargetRef\.current, realDt\)/.test(vis));
   check('the plate draws in the paced light', /dimmerGain: flashGainRef\.current \* paceNowRef\.current\.dim/.test(vis));
   check('the plate runs its clock and its automation at the paced activity', /f\.paceMul = paceNowRef\.current\.activity/.test(vis)
-    && /dynamicSpeed \*= Number\.isFinite\(this\.paceMul\) \? this\.paceMul : 1/.test(vis) && /ph\.drive \* paceNowRef\.current\.activity/.test(vis));
+    && /dynamicSpeed \*= Number\.isFinite\(this\.paceMul\) \? this\.paceMul : 1/.test(sim) && /ph\.drive \* paceNowRef\.current\.activity/.test(vis));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
