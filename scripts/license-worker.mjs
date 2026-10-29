@@ -41,7 +41,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import worker from '../server/license-worker.js';
-import { generatePair, restoreBackup, rotate } from './licenserotate.mjs';
+import { generatePair, restoreBackup, revokeIds, rotate } from './licenserotate.mjs';
 import { verifyLicenseKey } from '../server/license-key.js';
 import { createServerLicenseManager } from '../server/server-license.js';
 
@@ -53,9 +53,8 @@ const check = (name, ok, detail = '') => {
 
 // ── 0. Built-in Ed25519 public key guard ─────────────────────────
 {
-  // The pairs retired so far: the first (rotated out before launch) and the one that signed the
-  // test-mode orders' keys (rotated out 2026-10, 23.12-rotate).
-  const BURNED_PUBLIC_X = ['ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw', 'E_OrBzBgNWzoKgdlDOVjCjqb6CvkE4L0olobNv2u96A'];
+  // The pair retired before launch.
+  const BURNED_PUBLIC_X = ['ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw'];
   const serverKeyText = readFileSync(new URL('../server/license-key.js', import.meta.url), 'utf8');
   const clientKeyText = readFileSync(new URL('../src/lib/licenseKey.ts', import.meta.url), 'utf8');
   const serverX = serverKeyText.match(/DEFAULT_PUBLIC_JWK[\s\S]*?\bx:\s*'([^']+)'/)?.[1] ?? '';
@@ -1093,6 +1092,36 @@ let bobProToken = '';
     '15h. restoring the backup after an apply puts every licence record back as it was',
     rotated16 && snap16() === before16,
     `rotated ${rotated16}, restored ${snap16() === before16}`,
+  );
+  // 15i. Revoking by id, with no rotation (the owner's choice for the two test orders' keys): the Worker then
+  // lists and seats only the owner's, and a revoked key's token is refused at /activate.
+  const env17 = makeEnv();
+  await postWebhook(env17, { event: 'order_created', email: 'owner@example.com', orderId: 'owner-pro-1', tier: 'pro', keyId: 'owner-pro-1' });
+  await postWebhook(env17, { event: 'order_created', email: 'owner@example.com', orderId: 'test_a', tier: 'home' });
+  await postWebhook(env17, { event: 'order_created', email: 'owner@example.com', orderId: 'test_b', tier: 'pro' });
+  const listed17 = (await (await getKeys(env17, await mintFirebaseToken({ email: 'owner@example.com' }))).json()).keys;
+  const testB = listed17.find((k) => k.id === 'key_test_b').token;
+  await postMachine(env17, '/activate', { key: testB, machineId: 'm' });
+  const kv17 = {
+    list: async (prefix) => [...env17.LICENSE_KV.values.keys()].filter((k) => k.startsWith(prefix)),
+    get: (n) => env17.LICENSE_KV.get(n),
+    put: (n, v) => env17.LICENSE_KV.put(n, v),
+    delete: (n) => env17.LICENSE_KV.delete(n),
+  };
+  const snap17 = () => JSON.stringify([...env17.LICENSE_KV.values.entries()].filter(([k]) => /^keys?:/.test(k)).map(([k, v]) => [k, v.value]).sort());
+  const before17 = snap17();
+  const plan17 = await revokeIds({ kv: kv17, ids: ['key_test_a', 'key_test_b'] });
+  const untouched17 = snap17() === before17;
+  await revokeIds({ kv: kv17, ids: ['key_test_a', 'key_test_b'], apply: true });
+  const after17 = (await (await getKeys(env17, await mintFirebaseToken({ email: 'owner@example.com' }))).json()).keys;
+  const act17 = await postMachine(env17, '/activate', { key: testB, machineId: 'm2' });
+  const ownerTok17 = listed17.find((k) => k.id === 'owner-pro-1').token;
+  const ownerAct17 = await postMachine(env17, '/activate', { key: ownerTok17, machineId: 'm3' });
+  await restoreBackup({ kv: kv17, backup: plan17.backup });
+  check(
+    '15i. revoke-by-id: a plan changes nothing; after it /keys lists only the owner\'s, the revoked token is refused (401), the owner\'s still seats, and the backup restores it',
+    untouched17 && after17.map((k) => k.id).join() === 'owner-pro-1' && act17.status === 401 && ownerAct17.status === 200 && snap17() === before17,
+    `plan untouched ${untouched17}, after ${after17.map((k) => k.id).join()}, revoked activate ${act17.status}, owner activate ${ownerAct17.status}, restored ${snap17() === before17}`,
   );
 }
 

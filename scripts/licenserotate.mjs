@@ -26,6 +26,13 @@
  *       emails (an owner's address can hold test orders' keys beside his own); the
  *       rest of that address's records are deleted like anyone's.
  *
+ *   node scripts/licenserotate.mjs revoke-plan|revoke --id key_a,key_b --backup <file> --config <toml>
+ *       Revokes licences by id with no rotation, as a full refund does by hand (the owner's
+ *       choice 2026-10-29 for the two test orders' keys, since nobody but the owner holds
+ *       them). `revoke-plan` only reads. `revoke` writes the backup, reads it back, then
+ *       takes each id out of its address's list, keeps `key:<id>` with `revoked: true` and
+ *       clears its seats. `restore --backup <file>` puts the backup back.
+ *
  * The order of a rotation, by hand on the owner's Mac when the owner says, with a rollback
  * at every step:
  *   1. `generate`; commit the public JWK (this PR), merge; the site deploys with it.
@@ -169,6 +176,49 @@ export async function rotate({ kv, privateJwk, publicJwk, keepEmails, keepIds = 
   return { kept: [...keptNames].filter((n) => n in backup), deleted: doomed, resigned: resign.map((r) => r.record.id), written, backup };
 }
 
+/**
+ * Revokes licences by id without rotating the key: what a full refund does (`order_refunded` in
+ * server/license-worker.js), by hand. Each id leaves its owner's `keys:<email>` list, its
+ * `key:<id>` record is kept with `revoked: true` (so /activate refuses it and /keys omits it)
+ * and its seats are cleared. Returns the backup of every record it read or would change.
+ * A token already on a Mac still verifies offline until that Mac next asks the account; with
+ * the holder known to be the owner alone, that is the whole exposure (the owner's choice
+ * 2026-10-29 over a rotation, which would have cost his own key and a Mac release).
+ */
+export async function revokeIds({ kv, ids, apply = false, log = () => {} }) {
+  const wanted = ids.map((i) => i.trim()).filter(Boolean);
+  if (!wanted.length) throw new Error('--id is required');
+  const backup = {};
+  const edits = [];
+  for (const id of wanted) {
+    const raw = await kv.get(`key:${id}`);
+    if (raw == null) throw new Error(`could not read key:${id}; refusing to go on`);
+    backup[`key:${id}`] = raw;
+    const rec = JSON.parse(raw);
+    if (!rec.email) throw new Error(`key:${id} has no email; not touching it`);
+    const listName = `keys:${rec.email}`;
+    if (!(listName in backup)) {
+      const listRaw = await kv.get(listName);
+      if (listRaw == null) throw new Error(`could not read ${listName}; refusing to go on`);
+      backup[listName] = listRaw;
+    }
+    const machines = await kv.get(`machines:${id}`);
+    if (machines != null) backup[`machines:${id}`] = machines;
+    log(`REVOKE ${id} ${rec.tier} ${rec.email} order ${rec.orderId ?? '-'}${rec.revoked ? ' (already revoked)' : ''}`);
+    edits.push({ id, rec, listName, hasMachines: machines != null });
+  }
+  if (apply) {
+    for (const { id, rec, listName, hasMachines } of edits) {
+      const list = JSON.parse(backup[listName]).filter((k) => k.id !== id);
+      backup[listName] = JSON.stringify(list); // so the next id of this address starts from the shortened list
+      await kv.put(listName, backup[listName]);
+      await kv.put(`key:${id}`, JSON.stringify({ ...rec, revoked: true }));
+      if (hasMachines) await kv.delete(`machines:${id}`);
+    }
+  }
+  return { backup: Object.fromEntries(Object.entries(backup)), revoked: wanted };
+}
+
 /** Puts every record of a backup file's contents back, as they were. Deletes nothing. */
 export async function restoreBackup({ kv, backup }) {
   const names = Object.keys(backup);
@@ -254,6 +304,23 @@ async function main(argv) {
     console.log(`${apply ? 'applied' : 'plan'}: ${plan.resigned.length} re-signed, ${plan.deleted.length} deleted`);
     return;
   }
+  if (cmd === 'revoke-plan' || cmd === 'revoke') {
+    const ids = String(flag(argv, 'id', '')).split(',');
+    const kv = wranglerKv({ config: flag(argv, 'config'), binding: flag(argv, 'binding', 'LICENSE_KV'), remote: !argv.includes('--no-remote') });
+    const plan = await revokeIds({ kv, ids, apply: false, log: console.log });
+    if (cmd === 'revoke') {
+      const backupFile = flag(argv, 'backup');
+      if (!backupFile) throw new Error('revoke needs --backup <file>, written (and read back) before anything changes');
+      writeFileSync(backupFile, JSON.stringify(plan.backup, null, 2), { mode: 0o600 });
+      const back = JSON.parse(readFileSync(backupFile, 'utf8'));
+      const same = Object.keys(plan.backup).every((n) => back[n] === plan.backup[n]) && Object.keys(back).length === Object.keys(plan.backup).length;
+      if (!same) throw new Error(`the backup file ${backupFile} does not match what was read from KV; nothing was changed`);
+      console.log(`backup of ${Object.keys(plan.backup).length} records, read back and matching: ${backupFile}`);
+      await revokeIds({ kv, ids, apply: true });
+    }
+    console.log(`${cmd === 'revoke' ? 'revoked' : 'plan'}: ${plan.revoked.join(', ')}`);
+    return;
+  }
   if (cmd === 'restore') {
     const backupFile = flag(argv, 'backup');
     if (!backupFile) throw new Error('--backup <file> is required');
@@ -262,7 +329,7 @@ async function main(argv) {
     console.log(`restored ${names.length} records from ${backupFile}`);
     return;
   }
-  console.log('usage: licenserotate.mjs generate --out <file> | plan|apply --key <file> --keep-email <email> [--keep-id <id>] --config <toml> | restore --backup <file> --config <toml>');
+  console.log('usage: licenserotate.mjs generate --out <file> | plan|apply --key <file> --keep-email <email> [--keep-id <id>] --config <toml> | revoke-plan|revoke --id <id,id> [--backup <file>] --config <toml> | restore --backup <file> --config <toml>');
   process.exitCode = 2;
 }
 
