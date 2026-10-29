@@ -94,7 +94,7 @@ export function RunLocallyCard({ status }: { status: EngineStatus | null }) {
         automatic quality ladder climb to 768² at 2x and 1024² at 1x
         {status.tier === 'native'
           ? '.'
-          : ', plus OSC and Art-Net / DMX in the Mac app.'}
+          : ', plus cloud sync of your looks, sets and MIDI map.'}
       </p>
       <div className="mb-3 flex items-center gap-2">
         <a

@@ -516,10 +516,13 @@ try {
         // Home opens the Mac app too (PLAN.md 23.17b, 23.17d), so the card
         // sells what Pro alone adds there, never the app itself. It sold
         // "several projectors with edge blending" until PLAN.md 34a-7 found
-        // the app drives one output; OSC and Art-Net are what it names now.
+        // the app drives one output. It names cloud sync now, which a Pro key
+        // alone opens (CloudSyncCard), and not OSC or Art-Net, which a Home
+        // key gets too until 34a-7a gates them.
         !nudgeText.includes('plus the Mac app') &&
         !nudgeText.includes('several projectors') &&
-        nudgeText.includes('OSC and Art-Net') &&
+        !nudgeText.includes('OSC') &&
+        nudgeText.includes('cloud sync') &&
         !nudgeText.includes('git clone') &&
         !nudgeText.includes('Run it locally') &&
         nudgeCtaHref.includes('lemonsqueezy.com/checkout/buy/') &&
