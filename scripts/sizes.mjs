@@ -12,11 +12,30 @@
 // The owner approved a plan that splits them (the separation plan, 19ai), and a
 // split only holds if nothing grows back, so the owner's rule is two lines:
 //
-//   1. a file that is not in the baseline stays at or under 40 KB (about ten
-//      thousand tokens, what a session can read whole without regret);
-//   2. a file already over 40 KB is in the baseline with its size, and may
+//   1. a file that is not in the baseline stays at or under 100 KB (about
+//      25k tokens, what a session reads in one go), and one past 40 KB (about
+//      ten thousand tokens) that a pull request made or grew is a warning;
+//   2. a file already over 100 KB is in the baseline with its size, and may
 //      not grow past it, nor past its size at the base. New code for it goes
 //      in a new module beside it.
+//
+// Why a warning at 40 KB and a failure only at 100 (the owner, 2026-10-29).
+// The rule as first written failed every new file over 40 KB, and the owner
+// asked whether that number was arbitrary and would cost quality. Measured on
+// main at a68de68: a token is about four bytes (PLAN.md, 500 KB, read as 124k
+// tokens); 506 of 677 text files were under 20 KB; the cost sat in 17 files
+// over 100 KB (the visualizer, App, both fluid.ts, SettingsPanel, plate.ts,
+// the big checks and the ledgers), each read whole by a session that needed a
+// twentieth of it. The 40 between 40 and 100 KB were mostly modules that do
+// one job (audioFeatures, slosh, midi, beads, the thin gap's shader, the
+// mixer's and magnet's checks), and a session that needs both halves of a
+// split 60 KB module reads the same bytes. And the repository's long prose
+// comments, which the owner asked for, were 25 to 60% of those files' bytes
+// (audioFeatures 52%, slosh 59%, governor 52%): a 40 KB file was often 20 KB
+// of code, so the cheap ways under a 40 KB bar were cutting the comments or
+// cutting a module where it does not come apart. So 40 KB asks the question
+// (has this file got parts a session would read apart?) and 100 KB, where the
+// monoliths start, is the bar.
 //
 // The baseline is scripts/sizes.json, and it only shrinks. Against the commit
 // this one is measured from (below), an entry may be lowered or removed, never
@@ -52,7 +71,7 @@
 //     manifest of checks). Held to rule 2 they would turn every PR red, since
 //     every PR is asked to write in them. Splitting PLAN.md (19m) is how they
 //     come out; the list may lose names against the base, never gain one, and
-//     a ledger that falls under 40 KB has to leave it.
+//     a ledger that falls under the 40 KB warning has to leave it.
 //
 // The base. In CI (GITHUB_ACTIONS) the check runs on the merge commit GitHub
 // made for the pull request, whose first parent is the branch it merges into,
@@ -75,7 +94,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = 'scripts/sizes.json';
-const BUDGET = 40 * 1024;
+const WARN = 40 * 1024;
+const LIMIT = 100 * 1024;
 const SLACK = 4 * 1024;
 const GENERATED = /(^|\/)package-lock\.json$/;
 const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
@@ -134,18 +154,22 @@ export function judge(sizes, now, then, was = null, pr = true) {
   for (const f of Object.keys(now.ledgers)) {
     if (f in now.files) bad.push(['both', f, `${f} is both a ledger and a ceiling in ${BASELINE}`]);
     if (!sizes.has(f)) stale(f, `${f} is a ledger but no longer here: take it out of ${BASELINE}`);
-    else if (sizes.get(f) <= BUDGET) stale(f, `${f} is a ledger at ${kb(sizes.get(f))}, under the ${kb(BUDGET)} budget: take it out of the ledgers`);
+    else if (sizes.get(f) <= WARN) stale(f, `${f} is a ledger at ${kb(sizes.get(f))}, under the ${kb(WARN)} warning: take it out of the ledgers`);
   }
   for (const [f, cap] of Object.entries(now.files)) {
     const n = sizes.get(f), before = was?.get(f);
     if (n == null) stale(f, `${f} has a ceiling but is no longer here: \`npm run sizes -- --update\` drops it`);
     else if (n > cap) bad.push(['grew', f, `${f} grew to ${n} bytes past its ceiling of ${cap} (+${n - cap}): move the new code into a module beside it`]);
     else if (before != null && n > before) bad.push(['grew', f, `${f} grew from ${before} bytes at the base to ${n} (+${n - before}): a file over budget does not grow, even under its ceiling`]);
-    else if (n <= BUDGET) stale(f, `${f} is ${kb(n)}, back under the budget: \`npm run sizes -- --update\` drops its ceiling`);
+    else if (n <= LIMIT) stale(f, `${f} is ${kb(n)}, back under the ${kb(LIMIT)} limit: \`npm run sizes -- --update\` drops its ceiling`);
     else if (cap - n > SLACK) stale(f, `${f} is ${n} bytes, ${cap - n} under its ceiling of ${cap}: \`npm run sizes -- --update\` banks it`);
   }
+  // A file between the two bars is a warning only where this change made it
+  // or grew it: the forty that sit there already are not news on every run.
   for (const [f, n] of sizes) {
-    if (n > BUDGET && !(f in now.files) && !(f in now.ledgers)) bad.push(['new', f, `${f} is ${kb(n)} (${n} bytes), over the ${kb(BUDGET)} budget for a file: split it`]);
+    if (f in now.files || f in now.ledgers) continue;
+    if (n > LIMIT) bad.push(['new', f, `${f} is ${kb(n)} (${n} bytes), over the ${kb(LIMIT)} limit for a file: split it`]);
+    else if (n > WARN && (!was || n > (was.get(f) ?? 0))) notes.push(['big', f, `${f} is ${kb(n)}, over ${kb(WARN)} (about ${Math.round(n / 4096)}k tokens): if it has parts a session would read apart, give them files of their own`]);
   }
   if (then) {
     /*
@@ -193,14 +217,14 @@ export function judge(sizes, now, then, was = null, pr = true) {
 }
 
 // Lowers each ceiling to its file's size and drops what has fallen under the
-// budget or gone. Never raises one or adds one: a grown file stays red.
+// limit or gone. Never raises one or adds one: a grown file stays red.
 export function lowered(sizes, now) {
   const files = {}, ledgers = {};
   for (const [f, cap] of Object.entries(now.files)) {
     const n = sizes.get(f);
-    if (n != null && n > BUDGET) files[f] = Math.min(cap, n);
+    if (n != null && n > LIMIT) files[f] = Math.min(cap, n);
   }
-  for (const [f, why] of Object.entries(now.ledgers)) if ((sizes.get(f) ?? 0) > BUDGET) ledgers[f] = why;
+  for (const [f, why] of Object.entries(now.ledgers)) if ((sizes.get(f) ?? 0) > WARN) ledgers[f] = why;
   return { about: now.about, ledgers, files };
 }
 
@@ -265,19 +289,21 @@ function selftest() {
   const put = (f, n, fill = 'a') => { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), fill.repeat(n)); };
   const add = (f, n) => fs.appendFileSync(path.join(dir, f), 'b'.repeat(n));
   const baseline = (b) => { fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true }); fs.writeFileSync(path.join(dir, BASELINE), JSON.stringify(b)); };
-  const BIG = 50 * 1024;
+  const BIG = 240 * 1024, NEW = LIMIT + 1024;
   try {
     g('init', '-q', '-b', 'main');
     put('src/small.ts', 1024);
     put('src/big.ts', BIG);
+    put('src/mid.ts', 60 * 1024);
     put('PLAN.md', 60 * 1024);
-    put('song.opus', 100 * 1024, 'a\0');
+    put('song.opus', 300 * 1024, 'a\0');
     put('package-lock.json', 100 * 1024);
     put('.gitignore', 0); fs.writeFileSync(path.join(dir, '.gitignore'), 'scratch/\n');
     baseline({ ledgers: { 'PLAN.md': 'grows by design' }, files: { 'src/big.ts': BIG } });
     g('add', '-A'); g('commit', '-q', '-m', 'base');
     const base = g('rev-parse', 'HEAD').trim();
     const kinds = () => run(dir, { ref: base, ci: false }).bad.map(([k, f]) => `${k} ${f}`).sort();
+    const warned = () => run(dir, { ref: base, ci: false }).notes.filter(([k]) => k === 'big').map(([, f]) => f).sort();
     const reset = () => { g('reset', '-q', '--hard', base); g('clean', '-qfdx'); };
     const expect = (what, setup, want) => {
       reset(); setup();
@@ -287,40 +313,53 @@ function selftest() {
     expect('the tree as recorded passes', () => {}, []);
     expect('a file over budget grown by one byte fails', () => add('src/big.ts', 1), ['grew src/big.ts']);
     expect('the same, committed', () => { add('src/big.ts', 1); g('commit', '-qam', 'grow'); }, ['grew src/big.ts']);
-    expect('a new 41 KB file fails', () => put('src/new.ts', 41 * 1024), ['new src/new.ts']);
-    expect('a new file of exactly 40 KB passes', () => put('src/new.ts', BUDGET), []);
-    expect('a new file one byte over 40 KB fails', () => put('src/new.ts', BUDGET + 1), ['new src/new.ts']);
-    expect('a 41 KB file in a new folder, untracked, fails', () => put('docs/deep/notes.md', 41 * 1024), ['new docs/deep/notes.md']);
-    expect('a 41 KB file git ignores passes', () => put('scratch/big.mjs', 41 * 1024), []);
-    expect('a small file grown past 40 KB fails', () => add('src/small.ts', BUDGET), ['new src/small.ts']);
+    expect('a new 101 KB file fails', () => put('src/new.ts', NEW), ['new src/new.ts']);
+    expect('a new file of exactly 100 KB passes', () => put('src/new.ts', LIMIT), []);
+    expect('a new file one byte over 100 KB fails', () => put('src/new.ts', LIMIT + 1), ['new src/new.ts']);
+    expect('a 101 KB file in a new folder, untracked, fails', () => put('docs/deep/notes.md', NEW), ['new docs/deep/notes.md']);
+    expect('a 101 KB file git ignores passes', () => put('scratch/big.mjs', NEW), []);
+    expect('a small file grown past 100 KB fails', () => add('src/small.ts', LIMIT), ['new src/small.ts']);
+    expect('a file between the bars grown to 100 KB passes', () => put('src/mid.ts', LIMIT), []);
+    // The warning: on what this change made or grew between the bars, and on
+    // nothing else, or forty files would be news on every run.
+    const warns = (what, setup, want) => { reset(); setup(); const got = warned(); t(got.join() === want.join(), what, `wanted [${want.join(', ')}], got [${got.join(', ')}]`); };
+    warns('a new 41 KB file is a warning', () => put('src/new.ts', 41 * 1024), ['src/new.ts']);
+    warns('a new file of exactly 40 KB is not', () => put('src/new.ts', WARN), []);
+    warns('a small file grown past 40 KB is a warning', () => add('src/small.ts', WARN), ['src/small.ts']);
+    warns('a file between the bars that grows is a warning', () => add('src/mid.ts', 1), ['src/mid.ts']);
+    warns('one this change did not grow is not', () => put('src/other.ts', 100), []);
+    warns('nor one it shrank', () => put('src/mid.ts', 50 * 1024), []);
+    warns('a new file over 100 KB fails rather than warns', () => put('src/new.ts', NEW), []);
+    warns('nor does a ledger, or a file with a ceiling', () => { add('PLAN.md', 1); add('src/big.ts', 1); }, []);
     expect('a big file renamed is a new file over budget', () => g('mv', 'src/big.ts', 'src/moved.ts'), ['new src/moved.ts', 'stale src/big.ts']);
     expect('a big binary file passes', () => put('clip.mp4', 200 * 1024, '\0a'), []);
     expect('a package-lock.json in a folder passes', () => put('desktop/package-lock.json', 200 * 1024), []);
     expect('a ledger that grows passes', () => add('PLAN.md', 10 * 1024), []);
     expect('a ceiling raised to let a grown file through fails', () => { add('src/big.ts', 100); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); }, ['raised src/big.ts', 'grew src/big.ts']);
-    expect('a ceiling added for a new big file fails', () => { put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/new.ts': 41 * 1024 } }); }, ['raised src/new.ts']);
-    expect('a move out of a big file carries its ceiling to the new file', () => { put('src/big.ts', BIG - 41 * 1024); put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - 41 * 1024, 'src/new.ts': 41 * 1024 } }); }, ['stale src/big.ts']);
-    expect('a carried ceiling with slack in it fails', () => { put('src/big.ts', BIG - 41 * 1024 - 2048); put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - 41 * 1024 - 2048, 'src/new.ts': 41 * 1024 + 1024 } }); }, ['raised src/new.ts', 'stale src/big.ts']);
-    expect('a carried ceiling bigger than what moved out fails', () => { put('src/big.ts', BIG - 41 * 1024); put('src/new.ts', 42 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - 41 * 1024, 'src/new.ts': 42 * 1024 } }); }, ['raised src/new.ts', 'stale src/big.ts']);
+    expect('a ceiling added for a new big file fails', () => { put('src/new.ts', NEW); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/new.ts': NEW } }); }, ['raised src/new.ts']);
+    expect('a move out of a big file carries its ceiling to the new file', () => { put('src/big.ts', BIG - NEW); put('src/new.ts', NEW); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - NEW, 'src/new.ts': NEW } }); }, []);
+    expect('a carried ceiling with slack in it fails', () => { put('src/big.ts', BIG - NEW - 2048); put('src/new.ts', NEW); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - NEW - 2048, 'src/new.ts': NEW + 1024 } }); }, ['raised src/new.ts']);
+    expect('a carried ceiling bigger than what moved out fails', () => { put('src/big.ts', BIG - NEW); put('src/new.ts', NEW + 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG - NEW, 'src/new.ts': NEW + 1024 } }); }, ['raised src/new.ts']);
     expect('a big file renamed with its entry moved passes', () => { g('mv', 'src/big.ts', 'src/moved.ts'); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/moved.ts': BIG } }); }, []);
-    expect('a new big file made a ledger fails', () => { put('src/new.ts', 41 * 1024); baseline({ ledgers: { 'PLAN.md': 'x', 'src/new.ts': 'x' }, files: { 'src/big.ts': BIG } }); }, ['raised src/new.ts']);
+    expect('a new big file made a ledger fails', () => { put('src/new.ts', NEW); baseline({ ledgers: { 'PLAN.md': 'x', 'src/new.ts': 'x' }, files: { 'src/big.ts': BIG } }); }, ['raised src/new.ts']);
     expect('a file under its ceiling by the slack passes', () => put('src/big.ts', BIG - SLACK), []);
     expect('a file further under its ceiling fails until lowered', () => put('src/big.ts', BIG - SLACK - 1), ['stale src/big.ts']);
     expect('lowered, it passes', () => { put('src/big.ts', BIG - 8 * 1024); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); }, []);
     expect('lowered, it cannot grow back', () => { put('src/big.ts', BIG - 8 * 1024); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); add('src/big.ts', 1); }, ['grew src/big.ts']);
     expect('lowering does not raise a grown file', () => { add('src/big.ts', 10); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); }, ['grew src/big.ts']);
-    expect('a file back under budget fails until its ceiling goes', () => put('src/big.ts', 1024), ['stale src/big.ts']);
-    expect('and passes once lowering drops it', () => { put('src/big.ts', 1024); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); }, []);
-    expect('a ledger under budget fails until it leaves the list', () => put('PLAN.md', 1024), ['stale PLAN.md']);
+    expect('a file back under the limit fails until its ceiling goes', () => put('src/big.ts', 60 * 1024), ['stale src/big.ts']);
+    expect('and passes once lowering drops it', () => { put('src/big.ts', 60 * 1024); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); }, []);
+    expect('a ledger under the warning fails until it leaves the list', () => put('PLAN.md', 1024), ['stale PLAN.md']);
+    expect('a ledger between the bars stays one', () => put('PLAN.md', 41 * 1024), []);
     // The review of #548: credited on the sum of ceilings, a ceiling sitting
     // above its file at the base (slack, or an entry for a file that has
     // already shrunk) paid for a fresh file over budget with no bytes moved.
-    reset(); put('src/slack.ts', 45 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/slack.ts': 60 * 1024 } }); g('add', '-A'); g('commit', '-qm', 'a base with slack');
+    reset(); put('src/slack.ts', 105 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/slack.ts': 120 * 1024 } }); g('add', '-A'); g('commit', '-qm', 'a base with slack');
     const slackBase = g('rev-parse', 'HEAD').trim();
-    put('src/slack.ts', 30 * 1024); put('src/fresh.ts', 41 * 1024 + 512);
-    baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/fresh.ts': 41 * 1024 + 512 } });
+    put('src/slack.ts', 90 * 1024); put('src/fresh.ts', NEW + 512);
+    baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/fresh.ts': NEW + 512 } });
     const funded = run(dir, { ref: slackBase, ci: false }).bad.map(([k, f]) => `${k} ${f}`).sort().join(', ');
-    t(funded === 'raised src/fresh.ts', 'slack under a base ceiling cannot fund a fresh file: only the 15 KB that moved counts, not the 60 KB ceiling', funded || 'passed');
+    t(funded === 'raised src/fresh.ts', 'slack under a base ceiling cannot fund a fresh file: only the 15 KB that moved counts, not the 120 KB ceiling', funded || 'passed');
     // In CI the base is HEAD^1 (the PR's merge commit's first parent), read
     // without a ref: a ceiling raised in the PR's last commit is caught there.
     reset(); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG + 100 } }); g('commit', '-qam', 'raise');
@@ -377,11 +416,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   let failed = selftest();
   const r = run(ROOT, { ref });
-  for (const [, , what] of r.notes) console.log(`note: ${what}`);
+  // A warning is an annotation on the pull request's file as well as a line in
+  // the log (checks.mjs passes the check's output through as it comes).
+  for (const [k, f, what] of r.notes) console.log(k === 'big' && process.env.GITHUB_ACTIONS ? `::warning file=${f},title=Over ${kb(WARN)}::${what}` : `${k === 'big' ? 'warning' : 'note'}: ${what}`);
   for (const [, , what] of r.bad) { console.log(`FAIL ${what}`); failed++; }
   if (r.sizes) {
     const held = Object.keys(r.now.files).length, total = Object.values(r.now.files).reduce((a, b) => a + b, 0);
-    console.log(`${r.bad.length ? 'FAIL' : 'ok  '} ${r.sizes.size} text files: every other one at or under ${kb(BUDGET)}, ${held} over it held at their ceilings (${kb(total)} in all), ${Object.keys(r.now.ledgers).length} ledgers${r.base ? `; baseline read against ${r.base.slice(0, 9)}` : ''}`);
+    console.log(`${r.bad.length ? 'FAIL' : 'ok  '} ${r.sizes.size} text files: every other one at or under ${kb(LIMIT)}, ${held} over it held at their ceilings (${kb(total)} in all), ${Object.keys(r.now.ledgers).length} ledgers${r.base ? `; baseline read against ${r.base.slice(0, 9)}` : ''}`);
   }
   console.log(failed ? `\n${failed} failed` : '\nall passed');
   process.exit(failed ? 1 : 0);
