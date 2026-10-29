@@ -34,15 +34,21 @@
  *   3. In one sitting, straight after the site deploy: `apply`;
  *      `npx wrangler secret put LICENSE_PRIVATE_KEY --config <toml>` from the key file;
  *      and, the live Worker having a `LICENSE_PUBLIC_KEY` secret that overrides the code's
- *      `DEFAULT_PUBLIC_JWK` (found 2026-10-28), `npx wrangler secret put LICENSE_PUBLIC_KEY`
- *      with the new public JWK (or delete it so the code's applies); then
+ *      `DEFAULT_PUBLIC_JWK` (found 2026-10-28), `npx wrangler secret delete LICENSE_PUBLIC_KEY`
+ *      so the code's applies (details below); then
  *      `npx wrangler deploy --config <toml> --keep-vars`; then `npx wrangler deploy` for the
- *      song-ID Worker (it verifies Home keys against the code's public key).
+ *      song-ID Worker.
+ *      The song-ID Worker (`server/fingerprint-worker.js`) verifies Home keys with
+ *      `env.LICENSE_PUBLIC_KEY || DEFAULT_PUBLIC_JWK` too, so run `npx wrangler secret list`
+ *      on BOTH Workers and delete a `LICENSE_PUBLIC_KEY` override from each (deleting is
+ *      preferred to setting it to the new key: one place, the code, holds the key).
  *   4. A Mac release (Actions → Mac app → Run workflow, release ticked): the installed
  *      app trusts the old public key until it updates.
  *   Rollback: `npx wrangler rollback` of the licence Worker to the version noted before
- *   step 3 (its secrets go back with it), `kv key put` of the backup file's records, and
- *   the site's previous release in Firebase Hosting.
+ *   step 3 (its secrets go back with it), `node scripts/licenserotate.mjs restore --backup
+ *   <file> --config <toml>` for the KV records, and the site's previous release in Firebase
+ *   Hosting. `apply` reads its backup file back and compares it to KV before it changes
+ *   anything, and a record it cannot read stops the plan.
  */
 
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -78,7 +84,12 @@ export async function rotate({ kv, privateJwk, publicJwk, keepEmails, keepIds = 
   const names = [];
   for (const prefix of LICENCE_PREFIXES) names.push(...(await kv.list(prefix)));
   const backup = {};
-  for (const n of names) backup[n] = await kv.get(n);
+  for (const n of names) {
+    backup[n] = await kv.get(n);
+    // A name `list` just returned has a value. A null here is a read that failed, and a backup
+    // missing it would let `apply` delete a record nothing can restore (the review of #560).
+    if (backup[n] == null) throw new Error(`could not read ${n}; refusing to plan or apply with a record missing from the backup`);
+  }
 
   const resign = []; // records to write again
   const keptIds = new Set();
@@ -155,6 +166,14 @@ export async function rotate({ kv, privateJwk, publicJwk, keepEmails, keepIds = 
   return { kept: [...keptNames].filter((n) => n in backup), deleted: doomed, resigned: resign.map((r) => r.record.id), written, backup };
 }
 
+/** Puts every record of a backup file's contents back, as they were. Deletes nothing. */
+export async function restoreBackup({ kv, backup }) {
+  const names = Object.keys(backup);
+  if (!names.length || names.some((n) => typeof backup[n] !== 'string')) throw new Error('the backup is empty or has a record that is not text; not restoring');
+  for (const n of names) await kv.put(n, backup[n]);
+  return names;
+}
+
 // ── wrangler as a KV adapter ─────────────────────────────────────
 
 function wranglerKv({ config, binding, remote }) {
@@ -164,12 +183,9 @@ function wranglerKv({ config, binding, remote }) {
     async list(prefix) {
       return JSON.parse(run(base('list', '--prefix', prefix))).map((k) => k.name);
     },
+    // Throws on any failure: a swallowed error read as "no such key" is how a backup misses a record.
     async get(name) {
-      try {
-        return run(base('get', name, '--text'));
-      } catch {
-        return null;
-      }
+      return run(base('get', name, '--text'));
     },
     async put(name, text) {
       const f = join(tmpdir(), `licenserotate-${process.pid}-${Date.now()}.json`);
@@ -225,13 +241,25 @@ async function main(argv) {
     if (apply) {
       const backupFile = flag(argv, 'backup', `${keyFile}.kv-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
       writeFileSync(backupFile, JSON.stringify(plan.backup, null, 2), { mode: 0o600 });
-      console.log(`backup of ${Object.keys(plan.backup).length} records: ${backupFile}`);
+      // Read the file back, and compare it to what was read from KV, before anything is changed.
+      const back = JSON.parse(readFileSync(backupFile, 'utf8'));
+      const same = Object.keys(plan.backup).length > 0 && Object.keys(plan.backup).every((n) => back[n] === plan.backup[n]) && Object.keys(back).length === Object.keys(plan.backup).length;
+      if (!same) throw new Error(`the backup file ${backupFile} does not match what was read from KV; nothing was changed`);
+      console.log(`backup of ${Object.keys(plan.backup).length} records, read back and matching: ${backupFile}`);
       await rotate({ kv, privateJwk, publicJwk, keepEmails: keep, keepIds, apply: true });
     }
     console.log(`${apply ? 'applied' : 'plan'}: ${plan.resigned.length} re-signed, ${plan.deleted.length} deleted`);
     return;
   }
-  console.log('usage: licenserotate.mjs generate --out <file> | plan|apply --key <file> --keep-email <email> --config <toml>');
+  if (cmd === 'restore') {
+    const backupFile = flag(argv, 'backup');
+    if (!backupFile) throw new Error('--backup <file> is required');
+    const kv = wranglerKv({ config: flag(argv, 'config'), binding: flag(argv, 'binding', 'LICENSE_KV'), remote: !argv.includes('--no-remote') });
+    const names = await restoreBackup({ kv, backup: JSON.parse(readFileSync(backupFile, 'utf8')) });
+    console.log(`restored ${names.length} records from ${backupFile}`);
+    return;
+  }
+  console.log('usage: licenserotate.mjs generate --out <file> | plan|apply --key <file> --keep-email <email> [--keep-id <id>] --config <toml> | restore --backup <file> --config <toml>');
   process.exitCode = 2;
 }
 

@@ -41,7 +41,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import worker from '../server/license-worker.js';
-import { generatePair, rotate } from './licenserotate.mjs';
+import { generatePair, restoreBackup, rotate } from './licenserotate.mjs';
 import { verifyLicenseKey } from '../server/license-key.js';
 import { createServerLicenseManager } from '../server/server-license.js';
 
@@ -892,6 +892,23 @@ let bobProToken = '';
     part.status === 200 && partBody.ignored === 'not a full refund' && afterPart.length === 1 && afterFull.length === 0 && patKeys.length === 0,
     `partial ${part.status} ${partBody.ignored}, keys after partial ${afterPart.length}, after full ${afterFull.length}, direct ${patKeys.length}`,
   );
+  // 13e. The paid order_created of an order already refunded, delivered again, files nothing (the review of #560).
+  await postWebhook(env10, lsOrder('rae@example.com', 'ord_rae_1', { productId: 777000 }));
+  await postWebhook(env10, lsOrder('rae@example.com', 'ord_rae_1', { productId: 777000, status: 'refunded', event: 'order_refunded' }));
+  const again = await postWebhook(env10, lsOrder('rae@example.com', 'ord_rae_1', { productId: 777000 }));
+  const againBody = await again.json();
+  // The same for an upgrade: Home, Upgrade, the upgrade refunded (the Home comes back), the Upgrade delivered again.
+  await postWebhook(env10, lsOrder('sal@example.com', 'ord_sal_1', { productId: 777000 }));
+  await postWebhook(env10, lsOrder('sal@example.com', 'ord_sal_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  await postWebhook(env10, lsOrder('sal@example.com', 'ord_sal_up', { productId: 777002, status: 'refunded', event: 'order_refunded' }));
+  await postWebhook(env10, lsOrder('sal@example.com', 'ord_sal_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  const salKeys = await keysOf(env10, 'sal@example.com');
+  check(
+    '13e. an order_created delivered again after its refund files nothing (a Home, or an Upgrade that would turn the refiled Home back into Pro)',
+    againBody.ignored === 'order already refunded' && (await keysOf(env10, 'rae@example.com')).length === 0 &&
+      salKeys.length === 1 && salKeys[0].tier === 'home',
+    `rae ${againBody.ignored}, sal ${salKeys.map((k) => k.tier).join('+')}`,
+  );
 }
 
 // ── 14. /activate and /deactivate are rate-limited (audit finding 15) ─────
@@ -1033,6 +1050,37 @@ let bobProToken = '';
     all.resigned.length === 3 && left.length === 1 && left[0].id === 'owner-pro-1' &&
       remaining.join() === ['key:owner-pro-1', 'keys:owner@example.com'].join() && (await verifyLicenseKey(left[0].token, pair.publicJwk)).valid,
     `without: ${all.resigned.join()}; with: ${left.map((k) => k.id).join()}; KV ${remaining.join()}`,
+  );
+  // 15g/15h. A record that cannot be read stops the plan; a backup puts everything back (the review of #560).
+  const env16 = makeEnv();
+  await postWebhook(env16, { event: 'order_created', email: 'owner@example.com', orderId: 'owner-pro-1', tier: 'pro', keyId: 'owner-pro-1' });
+  await postWebhook(env16, { event: 'order_created', email: 'tester@example.com', orderId: 'ord_t', tier: 'home' });
+  const real16 = {
+    list: async (prefix) => [...env16.LICENSE_KV.values.keys()].filter((k) => k.startsWith(prefix)),
+    get: (n) => env16.LICENSE_KV.get(n),
+    put: (n, v) => env16.LICENSE_KV.put(n, v),
+    delete: (n) => env16.LICENSE_KV.delete(n),
+  };
+  const flaky = { ...real16, get: async (n) => (n === 'key:key_ord_t' ? null : real16.get(n)) };
+  const snap16 = () => JSON.stringify([...env16.LICENSE_KV.values.entries()].map(([k, v]) => [k, v.value]).sort());
+  const before16 = snap16();
+  const pair16 = await generatePair();
+  let unreadable = '';
+  try {
+    await rotate({ kv: flaky, privateJwk: pair16.privateJwk, publicJwk: pair16.publicJwk, keepEmails: ['owner@example.com'], keepIds: ['owner-pro-1'], apply: true });
+  } catch (e) {
+    unreadable = e.message;
+  }
+  check('15g. a record that cannot be read stops the rotation before it changes anything', unreadable.includes('could not read key:key_ord_t') && snap16() === before16, unreadable);
+
+  const planned = await rotate({ kv: real16, privateJwk: pair16.privateJwk, publicJwk: pair16.publicJwk, keepEmails: ['owner@example.com'], keepIds: ['owner-pro-1'] });
+  await rotate({ kv: real16, privateJwk: pair16.privateJwk, publicJwk: pair16.publicJwk, keepEmails: ['owner@example.com'], keepIds: ['owner-pro-1'], apply: true });
+  const rotated16 = snap16() !== before16;
+  await restoreBackup({ kv: real16, backup: planned.backup });
+  check(
+    '15h. restoring the backup after an apply puts every licence record back as it was',
+    rotated16 && snap16() === before16,
+    `rotated ${rotated16}, restored ${snap16() === before16}`,
   );
 }
 

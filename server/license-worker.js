@@ -187,6 +187,17 @@ async function handleWebhook(request, env, cors) {
     if (lsStatus !== 'paid') {
       return await holdOrder(env, cors, keyId, { reason: 'not paid', email, productId: lsProductId, status: lsStatus });
     }
+    // The paid `order_created` of an order already refunded, delivered again (the store retries a
+    // webhook it thinks failed, and its dashboard can resend one), would file the key the refund
+    // took away: the payload still says `paid`, only the order's later events say otherwise
+    // (the review of #560). A refund leaves `refunded:<order>`, and a created order whose key id
+    // is already revoked is the same order; both are held, not filed.
+    const alreadyRefunded =
+      (orderId && (await env.LICENSE_KV.get(`refunded:${orderId}`))) ||
+      (event === 'order_created' && (await readKeyById(env, keyId))?.revoked);
+    if (alreadyRefunded) {
+      return await holdOrder(env, cors, keyId, { reason: 'order already refunded', email, productId: lsProductId, status: lsStatus });
+    }
   }
 
   if (event === 'order_created' || event === 'license_created') {
@@ -297,6 +308,9 @@ async function handleWebhook(request, env, cors) {
       console.log(`licence worker: order_refunded ${orderId || '?'} left alone, order status "${lsStatus || 'missing'}" is not a full refund`);
       return json({ ok: true, ignored: 'not a full refund', status: lsStatus || null }, 200, cors);
     }
+    // Remembered so the same order's `order_created`, delivered again, is not filed (see the
+    // gate above). Written for the owner's direct refund too; only a Lemon Squeezy order reads it.
+    if (orderId) await env.LICENSE_KV.put(`refunded:${orderId}`, JSON.stringify({ at: Date.now() }));
     let targetEmail = email;
     let targetId = typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : orderId ? `key_${orderId}` : '';
 
