@@ -208,6 +208,18 @@
       ]
     },
     {
+      "name": "The owner's Mac takes only main's deploys, and never holds one",
+      "shard": "logic",
+      "run": "npm run macguard",
+      "why": [
+        "The runner's job-started hook (scripts/macrunner-hook.sh) against every way",
+        "a job can arrive: main's push and run by hand taken; a branch, a pull",
+        "request, pull_request_target, workflow_run, a schedule, another workflow",
+        "on main and another repository refused. And the watchdog's stall rule",
+        "(scripts/macwatch.mjs) against made-up runs, between two shards included."
+      ]
+    },
+    {
       "name": "The ear",
       "shard": "sound",
       "run": "npm run music",
