@@ -31,7 +31,7 @@
  * Creative Commons Attribution 4.0: free to use in a film, commercially and
  * on a channel that earns from it, credited. His terms put the credit in the
  * video's description; here it is also under the player. The track, its
- * address and its checksum are what `npm run sitefilms` fetches and checks,
+ * file and its checksum are what `npm run sitefilms` fetches and checks,
  * and public/landing/films/SOURCES.md records why each is free to use. A
  * piece is chosen for its kind, so that the eight films show the plate under
  * eight kinds of music, and each film plays the piece from its start, as a
@@ -48,9 +48,12 @@ export interface SiteFilm {
     artist: string;
     /** The recording's code, from incompetech.com's list: what answers a claim on the channel. */
     isrc: string;
-    /** The file, as the composer's site serves it. */
-    url: string;
-    /** Of the file at `url`, so a changed file is noticed rather than filmed. */
+    /**
+     * The file's name in the composer's library (`INCOMPETECH` in scripts/sitefilms.mjs, which
+     * fetches it on the Mac; the site itself never does, so no address of his is in the site).
+     */
+    file: string;
+    /** Of that file, so a changed file is noticed rather than filmed. */
     sha256: string;
     /** Where the film's minute starts in the piece, in seconds. */
     from: number;
@@ -64,7 +67,6 @@ export interface SiteFilm {
 }
 
 const MACLEOD = 'Kevin MacLeod';
-const INCOMPETECH = 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/';
 
 export const FILM_SECONDS = 60;
 /** The card's loop: this many seconds, the last `LOOP_BLEND_S` of them blended into the first. */
@@ -74,36 +76,36 @@ export const LOOP_BLEND_S = 1;
 export const SITE_FILMS: readonly SiteFilm[] = [
   {
     look: 'ferro-paint', genre: 'dark electronic', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Ethernight Club', artist: MACLEOD, isrc: 'USUAN2100002', url: `${INCOMPETECH}Ethernight%20Club.mp3`, sha256: '40c13873da38bff6da4e1e8d7e2907e05d4c308d25707aa707f3032bffe74064', from: 0 },
+    track: { title: 'Ethernight Club', artist: MACLEOD, isrc: 'USUAN2100002', file: 'Ethernight Club.mp3', sha256: '40c13873da38bff6da4e1e8d7e2907e05d4c308d25707aa707f3032bffe74064', from: 0 },
   },
   {
     look: 'aurora-borealis', genre: 'ambient', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Dreams Become Real', artist: MACLEOD, isrc: 'USUAN1500027', url: `${INCOMPETECH}Dreams%20Become%20Real.mp3`, sha256: 'a8ea5df5f969ed8d898af7fe07eb4712233f03e9d83f7ebcc88d1c851f3171b0', from: 0 },
+    track: { title: 'Dreams Become Real', artist: MACLEOD, isrc: 'USUAN1500027', file: 'Dreams Become Real.mp3', sha256: 'a8ea5df5f969ed8d898af7fe07eb4712233f03e9d83f7ebcc88d1c851f3171b0', from: 0 },
   },
   {
     look: 'cell-bloom', genre: 'chillwave', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Chill Wave', artist: MACLEOD, isrc: 'USUAN1600048', url: `${INCOMPETECH}Chill%20Wave.mp3`, sha256: '7f07fbf89860959ff527f7b74606146dd0b0de263739989a70ce712c7c361614', from: 0 },
+    track: { title: 'Chill Wave', artist: MACLEOD, isrc: 'USUAN1600048', file: 'Chill Wave.mp3', sha256: '7f07fbf89860959ff527f7b74606146dd0b0de263739989a70ce712c7c361614', from: 0 },
   },
   {
     look: 'poster-1969', genre: 'classic rock', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Twisted', artist: MACLEOD, isrc: 'USUAN1400046', url: `${INCOMPETECH}Twisted.mp3`, sha256: '56a2305a7b0356a9e0054fc4d8636a6d86f366578618f7271880136defe7ccda', from: 0 },
+    track: { title: 'Twisted', artist: MACLEOD, isrc: 'USUAN1400046', file: 'Twisted.mp3', sha256: '56a2305a7b0356a9e0054fc4d8636a6d86f366578618f7271880136defe7ccda', from: 0 },
   },
   {
     look: 'macro-bead', genre: 'jazz', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Space Jazz', artist: MACLEOD, isrc: 'USUAN2100030', url: `${INCOMPETECH}Space%20Jazz.mp3`, sha256: '51924be4565a2f101f4daa45998aa4c3577dab05ba5d1067ffb7bc57583ad503', from: 0 },
+    track: { title: 'Space Jazz', artist: MACLEOD, isrc: 'USUAN2100030', file: 'Space Jazz.mp3', sha256: '51924be4565a2f101f4daa45998aa4c3577dab05ba5d1067ffb7bc57583ad503', from: 0 },
   },
   {
     look: 'jellyfish-bloom', genre: 'dub', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Dub Feral', artist: MACLEOD, isrc: 'USUAN1200045', url: `${INCOMPETECH}Dub%20Feral.mp3`, sha256: '0b079ded2a2a9392729a8302cab6bc0d797e63690de60aa9ca6c5a8ae413e34c', from: 0 },
+    track: { title: 'Dub Feral', artist: MACLEOD, isrc: 'USUAN1200045', file: 'Dub Feral.mp3', sha256: '0b079ded2a2a9392729a8302cab6bc0d797e63690de60aa9ca6c5a8ae413e34c', from: 0 },
   },
   {
     // Funkorama opens on ten quiet seconds of a lone drum kit; the minute starts where the band comes in.
     look: 'lace-run', genre: 'funk', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Funkorama', artist: MACLEOD, isrc: 'USUAN1100474', url: `${INCOMPETECH}Funkorama.mp3`, sha256: '6be229815d85a0b99382b944d31098b882702c04ac7ad899e44ab7f8ba89b5ad', from: 8 },
+    track: { title: 'Funkorama', artist: MACLEOD, isrc: 'USUAN1100474', file: 'Funkorama.mp3', sha256: '6be229815d85a0b99382b944d31098b882702c04ac7ad899e44ab7f8ba89b5ad', from: 8 },
   },
   {
     look: 'neon-coral-reef', genre: '80s synth-pop', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Newer Wave', artist: MACLEOD, isrc: 'USUAN2000024', url: `${INCOMPETECH}Newer%20Wave.mp3`, sha256: 'ef26589e066cc2f60f9523f8a3c17e543f57fc9e1145efc3bc46f7e5db92d0bc', from: 0 },
+    track: { title: 'Newer Wave', artist: MACLEOD, isrc: 'USUAN2000024', file: 'Newer Wave.mp3', sha256: 'ef26589e066cc2f60f9523f8a3c17e543f57fc9e1145efc3bc46f7e5db92d0bc', from: 0 },
   },
 ];
 

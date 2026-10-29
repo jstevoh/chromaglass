@@ -81,8 +81,8 @@ const LOOK_IDS = [...landing.slice(landing.indexOf('const LOOKS'), landing.index
     check(`1. ${f.look}: a loop of ${LOOP_SECONDS} s with no sound, as MP4 and WebM under 1.5 MB, and a 640 × 400 still`,
       have && secs !== null && Math.abs(secs - LOOP_SECONDS) < 0.1 && !sound && w?.readUInt32BE(0) === 0x1a45dfa3 && kb < 1536 && size?.[0] === 640 && size?.[1] === 400,
       have ? `${secs?.toFixed(2)} s${sound ? ', has sound' : ''}, ${kb.toFixed(0)} KB, still ${size?.join(' × ') ?? 'unreadable'}` : `missing ${[mp4, webm, still].filter((p) => !existsSync(p)).join(', ')}`);
-    check(`1. ${f.look}: "${f.track.title}" is fetched from the composer's site with a checksum, and SOURCES.md credits it`,
-      /^https:\/\/incompetech\.com\//.test(f.track.url) && /^[0-9a-f]{64}$/.test(f.track.sha256) && sources.includes(`"${f.track.title}"`) && sources.includes(LICENCE.url),
+    check(`1. ${f.look}: "${f.track.title}" is the composer's file with a checksum, and SOURCES.md gives its address and credits it`,
+      /\.mp3$/.test(f.track.file) && sources.includes(`https://incompetech.com/music/royalty-free/mp3-royaltyfree/${encodeURIComponent(f.track.file)}`) && /^[0-9a-f]{64}$/.test(f.track.sha256) && sources.includes(`"${f.track.title}"`) && sources.includes(LICENCE.url),
       sources ? '' : 'no public/landing/films/SOURCES.md');
   }
 }

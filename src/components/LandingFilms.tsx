@@ -148,7 +148,7 @@ function Player({ look, film, onClose }: { look: LookCard; film: SiteFilm; onClo
           />
         </div>
         <p data-cg-credit="" className="mt-2 text-[12px] leading-snug text-white/60">
-          Music: “{film.track.title}” by {film.track.artist} (<a className="underline hover:text-white" href="https://incompetech.com" target="_blank" rel="noopener noreferrer">incompetech.com</a>),
+          Music: “{film.track.title}” by {film.track.artist} (incompetech.com),
           licensed under <a className="underline hover:text-white" href={LICENCE.url} target="_blank" rel="noopener noreferrer">{LICENCE.name}</a>.
         </p>
       </div>

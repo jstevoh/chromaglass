@@ -74,6 +74,9 @@ const BANNER = process.argv.includes('--banner');
 // laptop's screen.
 const LOOP_W = 640, LOOP_H = 400, LOOP_FPS = 30;
 const SITE = path.resolve('public/landing');
+// The composer's library; each film names its file in it (siteFilms.ts) and SOURCES.md records the address.
+const INCOMPETECH = 'https://incompetech.com/music/royalty-free/mp3-royaltyfree/';
+const trackUrl = (f) => INCOMPETECH + encodeURIComponent(f.track.file);
 
 const run = (cmd, args) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] }).toString();
 const ffmpeg = (args) => run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args]);
@@ -96,8 +99,8 @@ async function minuteOf(f) {
   fs.mkdirSync(dir, { recursive: true });
   const whole = path.join(dir, `${f.track.title}.mp3`);
   if (!fs.existsSync(whole)) {
-    const r = await fetch(f.track.url);
-    if (!r.ok) throw new Error(`${f.track.url}: HTTP ${r.status}`);
+    const r = await fetch(trackUrl(f));
+    if (!r.ok) throw new Error(`${trackUrl(f)}: HTTP ${r.status}`);
     fs.writeFileSync(whole, Buffer.from(await r.arrayBuffer()));
   }
   const sum = createHash('sha256').update(fs.readFileSync(whole)).digest('hex');
