@@ -245,10 +245,8 @@ widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
   in each, so a 120 Hz ProMotion MacBook, a 90/120 Hz Android phone or a 144 Hz
   laptop pays for 120–144 draws a second of a liquid that steps at 60 or 30. Cap the
   draw rate at 60, or twice the step rate when the governor has halved it.
-- *A readback every frame, even frozen.* `syncFromGpu()` runs for every layer each
-  frame whatever the solver did; with the plate frozen the solver stops but the draw
-  and the readback go on at the display's rate. Read back only on a frame that stepped
-  or wrote deltas.
+- ~~*A readback every frame, even frozen.*~~ **Shipped with 14ab-3** (#549): the solver
+  reads its fields back only after a submit that may have written them.
 - *The governor knows nothing of heat.* It climbs whenever frames are fast and
   retried a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
   is warming up climbs, drops frames for a second and a half, steps down, and does it

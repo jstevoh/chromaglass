@@ -111,16 +111,11 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
   measurement on the Mac, not from this line.
 
-- **19ac-3. `bottles` counts the look's own pours as the hand's, and goes red on one at the
-  mirror.** `WebGPU (macOS) · tools` failed `bottles` twice on one head (#533, which changes
-  neither the bottle nor the tools), on two different lines: "splatter with the Oil bottle"
-  (39 pours, 1 at the mirror) and "splatter with the Ferrofluid bottle" (37 pours, 1 at the
-  mirror; the hand's flings 0.13 from the hand, nothing near the mirror), and passed on the
-  third run. The stroke's mirror is 0.4 of the plate from it and a splatter's fling reaches
-  about 0.07, so the pour is not the hand's: read it from `__bottleLog` with the call's
-  `auto` flag and the look's lays, and count the hand's alone. Until then a lone pour at
-  the mirror is this, not a flipped coordinate (that puts every pour there). Not yet shown
-  from the log.
+- **19ac-3. `bottles`' "one at the mirror" was the hand's own splatter, the stroke too near
+  the middle (shipped 2026-10-29).** The canvas's (0.25, 0.3) to (0.4, 0.3) lay on the plate
+  0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
+  The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
+  the clearance each run. Story in `docs/plan-shipped/19-checks-build-plan-2.md` §19ac-3.
 
 ## 19ad. The `open` shard flakes on four unrelated faults
 

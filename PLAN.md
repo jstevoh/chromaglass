@@ -160,7 +160,8 @@ merge conflicts are the shared documents', which 0.6 ends.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
   after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
-  video pour's pause and play every frame, shipped with 14ac).
+  video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
+  -5, -9 with #549). Left: 14ab-4, -2, -6, -10.
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
@@ -248,6 +249,14 @@ style (§31).
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
 - **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
   13.1-sign), then **24.4**.
+- **7.7** Marketing (§37), tied to the store going live: before any link is posted, the share
+  card (34a-5) and the hero (34a-2); then **37a** *(owner)*, **37b**, **37c**, **37k**, the
+  launch **37f** (**37g**, **37h**, **37i**), **37l** from the first post, **37n**; **37m** and
+  **37o** are the owner's calls; **37j** the cadence after. The week that runs itself,
+  **37p** to **37s** (37s's API audit filed early: it takes weeks), then the album show:
+  **37x-1** and **37x-2** (the music) from now, the builds **37x-4** (go live from the
+  Mac app; OBS until then) and **37x-3** (the album sheet), each its own thread, then
+  **37x-7**'s routine.
 
 ### One home for work written twice
 
@@ -315,6 +324,7 @@ Where each batch stands, as of 2026-09-27:
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
 | 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-5's words shipped; 34a-2 to 34a-4 and the share card open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 | 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
+| 37 | Marketing and social media | Asked 2026-10-29: who it is for, the channels (YouTube, Shorts, Reels and TikTok, Reddit and the VJ and synth forums, Show HN, Product Hunt), the launch in order from the day the store goes live, a weekly cadence, who makes what and who posts, and how a sale is traced to a channel (37a–37o). The same day: the week that runs itself, the app filming itself, one Monday approval, a scheduler and YouTube's API (37p–37w), and a whole album performed live every week on YouTube from the Mac app, with a family of looks across it (37x-1 to 37x-9). 37x-4a (the live show research, `docs/live-show.md`) shipped 2026-10-29; the rest not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -374,6 +384,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 8 |
 | 35 | Clear controls: on reads on, one name for one thing (asked 2026-10-24) | [`35-clear-controls.md`](docs/plan/35-clear-controls.md) |  | 9 |
 | 36 | What the analog operators could not do (researched 2026-10-27) | [`36-analog-operators.md`](docs/plan/36-analog-operators.md) |  | 12 |
+| 37 | Marketing and social media, and the weekly album show (asked 2026-10-29) | [`37-marketing.md`](docs/plan/37-marketing.md) |  | 30 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 
 ## Not doing

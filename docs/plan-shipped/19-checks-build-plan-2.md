@@ -287,6 +287,27 @@ and a control stamped 0.6 s apart must leave Speed where one tap there puts it. 
 prints how far apart the app handled the lifts (the page's own lag, which no check bounds
 for the phone's sheet yet: 19ac-2).
 
+### 19ac-3. The bottles stroke is far enough off the middle
+
+Shipped 2026-10-29. `npm run bottles`' "splatter with the Ferrofluid bottle lays
+ferrofluid along the stroke, and not at its mirror" (and once the Oil bottle's) went red
+on PRs that touch neither, about one Mac run in sixty, each time with "1 at the mirror".
+PLAN read it as one of the look's own pours. The log of #559's red says otherwise: the
+four pours away from the stroke were all 0.12 to 0.13 from the hand, with the mouse down
+and the look's ring laid no more times, and the one at the mirror, (0.516, 0.484), was
+among them. The look poured nothing. The stroke was the cause. Its ends are fractions of
+the canvas, and the canvas is not the plate: the view shows two thirds of the plate's
+width (`fluidPointAt`'s 1.5), the desk's canvas at 1280x800 is 662x342, and the dish's turn
+rotates the stroke about the centre. On the plate the old stroke ran from (0.31, 0.40) to
+(0.38, 0.49) in one cloud run, its end 0.116 from the centre and 0.232 from its own
+mirror. A splatter flings 3 to 18 cells at the 128 grid (0.14 of the plate) and a pour
+counts at the mirror within 0.12, so a fling from the end toward the centre could count
+both ways. That pour sat 0.123 from the end and 0.10 from its mirror. Moved to (0.1, 0.3)
+to (0.25, 0.3), the stroke reads 0.218 to 0.333 from the centre and 0.436 from its mirror,
+still 0.12 long (0.05 would give 0.51 but fling past the rim). The bar is unchanged (none
+at the mirror). A new line asks every run for the gap between the stroke and its mirror
+to be more than 19/128 + 0.12, so a desk that reshapes the canvas fails by name.
+
 ## Third pass (moved 2026-10-29, 19m)
 
 ### The plan's old header

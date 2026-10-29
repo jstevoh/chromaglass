@@ -22,6 +22,7 @@ import { PLATE_LAYOUT } from './wgsl/plateFields';
 import { DERIVE_WGSL, DISPLAY_MAIN, plateWgsl } from './wgsl/plate';
 import { PACK_KERNELS, PACKED_VEL_FORMAT } from './wgsl/pack';
 import { FerroDrop } from './ferroDrop';
+import { groupOf, viewOf } from './groupCache';
 import { DROP_KERNELS } from './wgsl/ferroDrop';
 
 /** What a layer needs on the way from the solver to the screen. */
@@ -124,6 +125,8 @@ export class WebGPUPlate {
   private readonly sampler: GPUSampler;
   private readonly uniformBuffer: GPUBuffer;
   private readonly packArgs: GPUBuffer;
+  /** The grid `packArgs` holds, so it is written when that changes (0: never written). */
+  private packGrid = 0;
   readonly pack: UniformPack;
   /** The ferrofluid drop's surface in the closeup (PLAN §29a), packed into the lead plate's flow. */
   readonly drop: FerroDrop;
@@ -297,9 +300,12 @@ export class WebGPUPlate {
     const grid = fields[0].dye.width;
     this.ensureLayers(fields.length, grid);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
-    const args = new ArrayBuffer(PACK_ARGS);
-    new Float32Array(args).set([grid, 0, 0, 0]);
-    this.device.queue.writeBuffer(this.packArgs, 0, args);
+    // The pack's one number is the grid, which changes with a rung and not
+    // with a frame: written when it does, not sixty times a second (14ab-5).
+    if (grid !== this.packGrid) {
+      this.device.queue.writeBuffer(this.packArgs, 0, new Float32Array([grid, 0, 0, 0]));
+      this.packGrid = grid;
+    }
 
     // ── Pack ────────────────────────────────────────────────────────
     const packPass = encoder.beginComputePass({ label: 'pack' });
@@ -319,16 +325,7 @@ export class WebGPUPlate {
       const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
       if (pipe) {
         packPass.setPipeline(pipe);
-        packPass.setBindGroup(0, this.device.createBindGroup({
-          layout: pipe.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: this.packArgs } },
-            { binding: 1, resource: fields[0].velForced.createView() },
-            { binding: 2, resource: height.createView() },
-            { binding: 3, resource: leadView!.createView() },
-            { binding: 4, resource: this.layers[0].vel.createView() },
-          ],
-        }));
+        packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
         packPass.dispatchWorkgroups(groups, groups);
       }
     }
@@ -336,29 +333,14 @@ export class WebGPUPlate {
       const pipeDye = this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
       if (pipeDye) {
         packPass.setPipeline(pipeDye);
-        packPass.setBindGroup(0, this.device.createBindGroup({
-          layout: pipeDye.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: this.packArgs } },
-            { binding: 1, resource: fields[i].dye.createView() },
-            { binding: 2, resource: this.layers[i].dye.createView() },
-          ],
-        }));
+        packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, this.layers[i].dye]));
         packPass.dispatchWorkgroups(groups, groups);
       }
       if (i === 0 && height) continue;
       const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
       if (pipeVel) {
         packPass.setPipeline(pipeVel);
-        packPass.setBindGroup(0, this.device.createBindGroup({
-          layout: pipeVel.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: this.packArgs } },
-            { binding: 1, resource: fields[i].velForced.createView() },
-            { binding: 2, resource: this.layers[i].vel.createView() },
-            { binding: 3, resource: (fields[i].species ?? this.blankSpecies).createView() },
-          ],
-        }));
+        packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, fields[i].velForced, this.layers[i].vel, fields[i].species ?? this.blankSpecies]));
         packPass.dispatchWorkgroups(groups, groups);
       }
     }
@@ -370,20 +352,11 @@ export class WebGPUPlate {
       for (let i = 0; i < fields.length; i++) {
         const pass = encoder.beginRenderPass({
           label: `derive ${i}`,
-          colorAttachments: [{ view: this.layers[i].derived.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }],
+          colorAttachments: [{ view: viewOf(this.layers[i].derived), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } }],
         });
         pass.setPipeline(derive);
         const viewTex = fields[i]?.view ?? this.blankU;
-        pass.setBindGroup(0, this.device.createBindGroup({
-          layout: derive.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: this.uniformBuffer } },
-            { binding: 1, resource: this.sampler },
-            { binding: 2, resource: this.layers[i].dye.createView() },
-            { binding: 3, resource: viewTex.createView() },
-            { binding: 4, resource: (fields[i]?.species ?? this.blankSpecies).createView() },
-          ],
-        }));
+        pass.setBindGroup(0, groupOf(this.device, derive, [this.uniformBuffer, this.sampler, this.layers[i].dye, viewTex, fields[i]?.species ?? this.blankSpecies]));
         pass.draw(6);
         pass.end();
       }
@@ -403,7 +376,7 @@ export class WebGPUPlate {
       this.auxSize = [size.width, size.height];
     }
 
-    this.display(encoder, target, this.aux.createView(), this.uniformBuffer, fields, timestamps, toTexture, format);
+    this.display(encoder, target, viewOf(this.aux), this.uniformBuffer, fields, timestamps, toTexture, format);
   }
 
   /** The uniforms for a projector's plate source, to fill with `fillPlateUniforms` before `drawSource`. */
@@ -448,7 +421,7 @@ export class WebGPUPlate {
       }));
       this.sourceAuxSize = [size.width, size.height];
     }
-    this.display(encoder, target, this.sourceAux.createView(), set.buffer, fields, timestamps, true, format);
+    this.display(encoder, target, viewOf(this.sourceAux), set.buffer, fields, timestamps, true, format);
   }
 
   /** Let go of the sources no projector shows any more (their buffers are small; the aux is not). */
@@ -494,29 +467,13 @@ export class WebGPUPlate {
       timestampWrites: timestamps,
     });
     pass.setPipeline(display);
-    pass.setBindGroup(0, this.device.createBindGroup({
-      layout: display.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: uniforms } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: one.dye.createView() },
-        { binding: 3, resource: two.dye.createView() },
-        { binding: 4, resource: one.derived.createView() },
-        { binding: 5, resource: two.derived.createView() },
-        { binding: 6, resource: one.vel.createView() },
-        { binding: 7, resource: two.vel.createView() },
-        { binding: 8, resource: grain(0).createView() },
-        { binding: 9, resource: grain(1).createView() },
-        { binding: 10, resource: this.source('film').createView() },
-        { binding: 11, resource: this.source('mark').createView() },
-        { binding: 12, resource: this.source('beads').createView() },
-        { binding: 13, resource: parts(0).createView() },
-        { binding: 14, resource: parts(1).createView() },
-        { binding: 15, resource: air(0).createView() },
-        { binding: 16, resource: air(1).createView() },
-        { binding: 17, resource: view(0).createView() },
-      ],
-    }));
+    pass.setBindGroup(0, groupOf(this.device, display, [
+      uniforms, this.sampler,
+      one.dye, two.dye, one.derived, two.derived, one.vel, two.vel,
+      grain(0), grain(1),
+      this.source('film'), this.source('mark'), this.source('beads'),
+      parts(0), parts(1), air(0), air(1), view(0),
+    ]));
     pass.draw(6);
     pass.end();
   }

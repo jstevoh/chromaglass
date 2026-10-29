@@ -269,25 +269,22 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
   pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
   belongs in a compute pass beside it.
-- **14ab-3** *Every frame reads both fields back and averages them on the CPU*
-  (`syncFromGpu`, a loop over every cell of each layer for the mean density and colour)
-  where `measure()` on the GPU returns the same means in 32 bytes. With 14j's "read back
-  only on a frame that stepped".
+- ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*~~ **Shipped** (#549, `npm run framereads`: a still plate 60 → 0 readbacks asked in thirty frames). Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ab-3.
 - **14ab-4** *A CPU pour uploads the whole grid every step* (`flushDeltas`: about 1.3 MB
   through three to five `writeTexture`s and the upsamples), for a few changed cells.
   Splat records on the GPU (`applySplats`) are the path; what still goes through the
   delta grids is the bubbles' rims, the hands, the breath and the room stir.
-- **14ab-5** *The plate, post chain, camera, output and particles make their bind groups
-  and views every frame* (10–20 `createBindGroup`, 40–60 `createView`); the solver
-  caches its own (H2c-11).
+  A smaller first step, seen with 14ab-3: upload only the rows the CPU wrote since the
+  last flush together with the rows the last upload wrote (zeros there now), since the
+  fold reads the whole delta texture and a stale row would be folded in again.
+- ~~**14ab-5** *The plate, post chain, camera, output and particles make their bind groups and views every frame*~~ **Shipped** (#549, `npm run framegroups`: 12 groups and 64 views a frame → 0 and 0). Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ab-5.
 - **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
   gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
 - ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort on
   their history.~~ Shipped; story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ab-7 (moved 2026-10-29, 19m).
 - ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows~~ **Shipped** (#533, `npm run renders`' gamepad phase). Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ab-8 (moved 2026-10-29, 19m-2).
-- **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
-  sixty steps (`speciesShare`); a ring like the readback's.
+- ~~**14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every sixty steps~~ **Shipped** (#549, `npm run framereads`: the same share to the bit, no buffer after the first). Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ab-9.
 - **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
   tools shard, two attempts on one head were each red on one line of 224, a different line
   each time. Attempt 1 failed "both windows animating, 0.25 of a refresh behind", which read

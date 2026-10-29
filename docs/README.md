@@ -14,6 +14,7 @@ Start with the [full guide](guide.md): every feature, control and setup, and how
 - Stage and rig: [rig-plan.md](rig-plan.md), [two-projectors.md](two-projectors.md), [slide-plan.md](slide-plan.md)
 - Reliability: [stability-plan.md](stability-plan.md), [crash-plan.md](crash-plan.md)
 - CI on the owner's Mac: [mac-runner.md](mac-runner.md)
+- The live show (where the Mac app can stream, and how): [live-show.md](live-show.md)
 
 **Handoffs for finished pieces**: [handoff-signin.md](handoff-signin.md), [handoff-phone-link-qr.md](handoff-phone-link-qr.md), [handoff-switches.md](handoff-switches.md), [handoff-macro-ferro-drop.md](handoff-macro-ferro-drop.md)
 

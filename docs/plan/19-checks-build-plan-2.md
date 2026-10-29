@@ -86,9 +86,9 @@ moved to the archive (its third pass), now one file a section under `docs/plan-s
   **Shipped** (2026-10-29): about 1,700 lines of shipped stories in 30 section files moved,
   open plan 757 → 631 KB; 28f and 28g folded. Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19m-2
   (moved 2026-10-29, 19m-2).
-- ~~**19m-3. The archive by section**~~ **Shipped** (2026-10-29): `docs/plan-shipped.md`
+- ~~**19m-3. The archive by section**~~ **Shipped** (2026-10-29): `docs/plan-shipped/19-checks-build-plan-3.md`
   (750 KB, a ledger in `scripts/sizes.json`) is 43 files under `docs/plan-shipped/`, one a
-  section under the open plan's names (parts of 31 KB at most; 34 KB for §8), with a
+  section under the open plan's names (none over 35 KB), with a
   README that maps them; every reference in the plan and the docs names the file its item
   is in, and `node scripts/planmove.mjs` carries an open branch's archive edits across.
   Two comments in `src/gpu/wgsl/fluid.ts` still name the old path (§29c): 19ai-6 (#554)

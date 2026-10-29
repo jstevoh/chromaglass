@@ -1469,8 +1469,11 @@ lamp. The lab's numbers are in `docs/plan-shipped/33-bubbles-closeup.md` §33g; 
   field, parallax); the lamp's lowering and the dome gain (×14) are the two numbers to move.
 - Say whether the highlight burns out on a bright pool, and whether a pool's edge reads
   as relief without a drawn outline.
-- `macro-bead`, `cell-bloom` and `lace-run` still draw cells, by name. Say whether they
-  should (PLAN 33g-3).
+- `macro-bead`, `cell-bloom` and `lace-run` draw no cells now either (the owner, 2026-10-29,
+  PLAN 33g-3); Lacing Run alone keeps its dendritic lacing. Open Macro Bead, Cell Bloom
+  and Lacing Run at their own zoom: Cell Bloom should read as three turning pools of
+  silicone and oil, Macro Bead as domed wet beads, Lacing Run as lacing without cells.
+  Say whether Cell Bloom's name should change now that it has none.
 
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
