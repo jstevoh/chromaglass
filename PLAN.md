@@ -6490,6 +6490,19 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   with it, which costs a session the same. Five self-tests hold it, one the review of #548's exploit: the credit is the bytes that actually left the base's over-budget files in the PR, not the sum of their ceilings, so slack under a ceiling funds nothing. Whether 40 KB is the right
   budget for a new file at all is the owner's question, raised 2026-10-28 ("40kb seems
   somewhat arbitrary. I don't want quality to go down because of this").
+- **19ai-5d. Shipped: a warning at 40 KB, a failure at 100 KB** (the owner's pick,
+  2026-10-29). Measured on main at a68de68: about four bytes a token; 506 of 677 text files
+  under 20 KB; the cost in the 17 over 100 KB, each read whole by a session that needs a
+  fraction of it; the 40 between 40 and 100 KB mostly modules that do one job, whose prose
+  comments are 25 to 60% of their bytes (audioFeatures 52%, slosh 59%), so a 40 KB bar was
+  paid for in comments or in modules cut where they do not come apart. Now a file not in
+  `sizes.json` fails only past 100 KB (about 25k tokens), and one a pull request made or
+  grew past 40 KB is a warning (an annotation on the file in CI). Ceilings hold only the
+  files over 100 KB: 40 dropped, 13 left (2.7 MB). Ledgers leave the list under 40 KB, as
+  before. The review found that freeing the 40 files between the bars let two green PRs land
+  one of them over 100 KB on main (presets.ts has 8 KB of room), so a file over the limit with
+  no ceiling is red only in a PR that resized it, and a note on main, as a stale entry is; and
+  four mutations its self-tests missed, now each caught. 21 new self-tests (57 in all).
 - **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
   App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
   such PR now has to move as many bytes out as it adds, wiring lines included. If that turns
