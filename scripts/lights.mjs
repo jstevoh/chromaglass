@@ -15,6 +15,7 @@
  */
 
 import { createSocket } from 'node:dgram';
+import { port } from './ports.mjs';
 import {
   ARTNET_PORT, ORDERS, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx,
   hexToRgb, parseInMap, patchFromUniverse,
@@ -138,16 +139,16 @@ const check = (name, ok, detail = '') => {
 // Everything above is the codec talking to itself. This opens a socket, sends
 // what the server sends, and reads the bytes off the wire.
 {
-  const port = 6460;   // not 6454: a real rig on this machine keeps its port
+  const rig = port(6460);   // not 6454: a real rig on this machine keeps its port
   const got = await new Promise((resolve) => {
     const rx = createSocket({ type: 'udp4', reuseAddr: true });
     const done = (v) => { try { rx.close(); } catch { /* already */ } resolve(v); };
     const timer = setTimeout(() => done(null), 2000);
     rx.on('message', (buf) => { clearTimeout(timer); done(decodeArtDmx(buf)); });
-    rx.bind(port, '127.0.0.1', () => {
+    rx.bind(rig, '127.0.0.1', () => {
       const tx = createSocket({ type: 'udp4' });
       const frame = buildUniverse([{ colour: '#3366ff', fill: 1 }], { count: 2, start: 1, order: 'rgb' });
-      tx.send(encodeArtDmx(7, 1, frame), port, '127.0.0.1', () => tx.close());
+      tx.send(encodeArtDmx(7, 1, frame), rig, '127.0.0.1', () => tx.close());
     });
   });
   check('a universe sent over a real socket arrives as the colour it left as',

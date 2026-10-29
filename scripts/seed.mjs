@@ -504,21 +504,22 @@ if (process.argv.includes('--lab')) {
 if (process.argv.includes('--app')) {
   const { spawn } = await import('node:child_process');
   const { chromium } = await import('playwright');
-  const { launchChromium } = await import('./chromium.mjs');
-  let server = null, port = 4390;
+  const { launchChromium, port } = await import('./chromium.mjs');
+  const BASE = port(4390);
+  let server = null, served = BASE;
   for (let t = 0; t < 6 && !server; t++) {
-    const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(4390 + t), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
+    const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(BASE + t), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
     let died = false;
     child.on('exit', () => { died = true; });
     await new Promise((r) => setTimeout(r, 2500));
-    if (!died) { server = child; port = 4390 + t; }
+    if (!died) { server = child; served = BASE + t; }
   }
-  if (!server) { console.error('the preview did not start on ports 4390-4395 (a busy port, or vite preview failing: its errors are above)'); process.exit(2); }
+  if (!server) { console.error(`the preview did not start on ports ${BASE}-${BASE + 5} (a busy port, or vite preview failing: its errors are above)`); process.exit(2); }
   const browser = await launchChromium(chromium);
   try {
     const seedOf = async (query) => {
       const page = await browser.newPage();
-      await page.goto(`http://localhost:${port}/${query}`, { waitUntil: 'load' });
+      await page.goto(`http://localhost:${served}/${query}`, { waitUntil: 'load' });
       await page.waitForFunction(() => typeof window.__cgSeed === 'number', null, { timeout: 30000 });
       const seed = await page.evaluate(() => window.__cgSeed);
       await page.close();

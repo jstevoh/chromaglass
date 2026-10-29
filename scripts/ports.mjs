@@ -72,13 +72,18 @@ export function port(base, name, env = process.env) {
 
 // What counts as a harness's port in its source: `port(NNNN` is one; a bare
 // number after a name ending in PORT, or after a PORT variable's `??`, or
-// given to `--port` as a literal, is a port that does not move with its
-// runner. The bare forms are what every harness wrote before this.
+// after a variable called `port`, or given to `--port` as a literal or a
+// `String(NNNN + t)`, is a port that does not move with its runner. The
+// bare forms are what every harness wrote before this.
 const ASKED = /\bport\((\d{4,5})\b/g;
 const BARE = [
   /\b[A-Z0-9_]*PORT[A-Z0-9_]*\s*=\s*\d{4,5}\b/g,
   /process\.env\.[A-Z0-9_]*PORT[A-Z0-9_]*\s*\?\?\s*\d{4,5}\b/g,
   /['"]--port['"]\s*,\s*['"]\d{4,5}['"]/g,
+  // And the two the first pass missed, a lower-case `port = 4620` and a
+  // `String(4620 + t)` given to --port (royopen and seed, on the Mac shards).
+  /(?<![\w.$-])port\s*=\s*\d{4,5}\b/g,
+  /['"]--port['"]\s*,\s*String\(\s*\d{4,5}/g,
 ];
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));

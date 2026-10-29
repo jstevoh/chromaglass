@@ -31,7 +31,7 @@ NAME=owner-mac
 RUNNERS=1
 while [ $# -gt 0 ]; do
   case "$1" in
-    --runners) RUNNERS="${2:-}"; shift 2 ;;
+    --runners) RUNNERS="${2:-}"; shift; [ $# -eq 0 ] || shift ;;
     -*) echo "unknown option $1"; exit 1 ;;
     *) NAME="$1"; shift ;;
   esac
