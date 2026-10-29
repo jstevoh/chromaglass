@@ -309,6 +309,13 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   the GPU, a label that keeps it alone. Found along the way: `quick.mjs` keeps checks
   that share a port apart; giving each of its workers a block would let them run side
   by side (they still share `dist/`).
+- **19ah-7. Open: every harness waits for its preview to answer.** Deploy 580 (2026-10-29)
+  lost `tools` to `ERR_CONNECTION_REFUSED` on localhost:4346 9.4 s after `vite preview` was
+  spawned, ports free and vite silent: the harness had slept a fixed 2.5 s. `tools.mjs` now
+  asks `untilServing` (scripts/ports.mjs) and prints how long the server took; sixty other
+  harnesses still sleep a fixed time, and with two shards on one Mac (19ah-6) the start is
+  slower. Move them to `untilServing`, and read the printed times on the Mac first to see
+  how slow a start gets.
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 

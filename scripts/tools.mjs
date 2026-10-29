@@ -30,7 +30,7 @@
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
  */
 import { chromium } from 'playwright';
-import { launchChromium, port } from './chromium.mjs';
+import { launchChromium, port, untilServing } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
@@ -46,7 +46,8 @@ const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PO
 const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch { /* gone */ } };
 process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
-await new Promise((r) => setTimeout(r, 2500));
+// Until vite answers, not a fixed 2.5 s (deploy 580's refused connection; ports.mjs).
+console.log(`  preview answering after ${(await untilServing(PORT, { child: server })).toFixed(1)} s`);
 
 // `present`: on a Linux box with PW_WEBGPU, headed into Xvfb so the plate reads back (chromium.mjs, PLAN.md 19l).
 const browser = await launchChromium(chromium, { present: true });
