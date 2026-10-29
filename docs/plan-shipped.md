@@ -6044,3 +6044,33 @@ laptop's second screen (`StageMirror` in `CastDisplay.tsx`), the projector mirro
 displays the laptop's fold; a standalone network `CastReceiver` rebuilds `AudioData` from `CastAudio` with no
 spectrum behind it, so `sound` cords fold and gate there while `bands` cords read nothing as before (30a-1).
 Held by `npm run soundcords` (34/34 lines in `scripts/checks.json`).
+
+## 14ab-7, 14ab-8. The ear's detectors and the gamepad ring (shipped 2026-10-28, #533)
+
+14ab-7. Each of the ear's seventeen onset detectors kept a second of flux in an array pushed
+to and shifted from, and every frame copied it, sorted it, mapped it to deviations and sorted
+those, for the median and the median absolute deviation its threshold is built from. They
+are two rings (doubling when a faster display fills them) and a partial sort now (`select`
+in `audioFeatures.ts`), which finds the element the sort would have put at the middle, so the
+threshold is the same number. The live ear stopped copying its two byte arrays into every
+reading (nothing in the app reads them); the fifteen-frame median's two scratch arrays are
+kept. `AudioFeatures.update` over 20 s of seeded kicks at 60 readings a second: 0.5–0.6 ms →
+0.30 ms, 227.65 KB → 5.7 KB an update, sha256 of every reading identical. `npm run eargc`
+holds the detector's threshold to the old sort-based detector's, to the bit, every frame at
+60, 144 and 400 refreshes a second, while the display changes under it, over a stall, a reset
+and a flat source (the lower-middle control disagrees on 285 frames), and the garbage to a
+bar with a collection-free window. Two holes the check-skeptic pass found in its first
+version are the reason for its shape: it compared hit booleans (a hit sits far above any
+threshold, so a lower median, ODF_K 2.9 and a 0.9 s window stayed green), and its garbage
+numbers were scavenge leftovers (Node clamps `--min-semi-space-size` to 16 MB; the old way
+read 16 KB a frame, not 230).
+
+14ab-8. The game controller's hook gave the App a new `cursor` object every 33 ms while the
+ring showed, so the App rendered 43 times a second to move a ring, and its poll compared
+against a stale `connected` and set the state on every tick. The cursor is in a store, the
+ring is `GamepadRing` (renders when it appears, goes, or swells under a trigger; moves by a
+style write), the App is told nothing, and the poll no longer spreads the pad list or maps
+the buttons each 16 ms. `npm run renders` gained a gamepad phase on a stand-in pad: with the
+old hook under it, 43.3 / 42.8 (laptop / phone, stick sweeping) and 42.3 / 43.0 (trigger
+held) renders a second, now 1.0 on all four; the ring found in 12 of 12 looks, changing
+place, still under a held trigger, on the page.

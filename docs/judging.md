@@ -1984,3 +1984,18 @@ Measured: `npm run cadence` (the old loop, modelled, stopped or doubled the liqu
 frames on 60, 59.94 and 120 Hz displays, by the median of nine seeds; the new clock on none, and
 it keeps time with the wall up at another refresh rate); `npm run encode` (a step's garbage 506 KB → 31 KB);
 `npm run rungs` (a rung the machine cannot hold retried 38 times in half an hour → 10).
+
+## 90. The game controller's ring, and the ear after its detectors changed (PLAN 14ab-7, 14ab-8)
+
+Both are meant to look and sound as before; this is the look at that, on a real pad and a
+real song. (§88 is the stutter, §89 the headers.)
+
+1. Plug in or pair a controller. Push the left stick: a ring should follow the plate under it, as smooth as the
+   mouse's pointer, and swell and tint when you hold the right trigger. Let go and it should fade after about
+   two and a half seconds. On the phone nothing changes (no ring without a pad).
+2. With the pad connected, open the Perform desk's clock and the meters: nothing else on the page should be
+   busier than with the pad unplugged.
+3. Play a song with clear drums. The kick and snare triggers (Sound › patch bay, the plate's kick bloom) should
+   land on the same hits as before this change: the readings are the same to the bit on the checks' songs.
+4. Bad: a ring that lags behind the stick, jumps to a corner when it first appears, or stays after the stick is
+   released; a beat that used to fire and does not.
