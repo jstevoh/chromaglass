@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Beat Squeeze's slowdown and the kicks the plate missed (PLAN 30a-3)
+
+- A band cord's spectrum strip draws only while it is on screen. Off screen, two of them (Bass Drop's) cost its plate about a quarter of its steps under Beat Squeeze on a slower Mac.
+- A kick that lands on a frame where the plate takes no step is no longer dropped: the press, Plate Rock's lean, the kick's ring, the bubbles and the bass's next area land on the plate's next step.
+
 ### Added — Shaped sound cords and dragged spectrum bands (PLAN 30a)
 
 - Sound and band cords in the patch bay (**Settings → Patches**, on both the desk and the phone) now carry **Mode** (**Follow** or **Gate**), **Gain** (applied before the threshold in both modes), **Gate** (`threshold`), **Rise** (`attack`) and **Fall** (`release`), so whole-plate cords as well as area cords can fire shaped pulses on a hit (`PatchBay.fold` in `src/lib/sceneMap.ts`, closing 25h-2). Absent fields read as before (`follow`, gain `1`), leaving every saved look and preset unchanged.

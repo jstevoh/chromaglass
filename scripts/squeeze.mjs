@@ -89,7 +89,7 @@ try {
     return {
       kicks: d.kicks(), kick: lead.pressedCells.kick, depth: lead.pressedDepth.kick, steps: lead.stepCount, squeeze: d.settings.beatSqueeze,
       released: lead.kickRelease.steps, given: lead.kickRelease.given, pressedKicks: lead.kickRelease.kicks, owed: lead.kickRelease.size,
-      dt: lead.dtSeconds, stepRate: d.solver().stepRate,
+      dt: lead.dtSeconds, stepRate: d.solver().stepRate, plate: d.plateKicks(),
     };
   });
   // Settle into the look and let the band start before counting anything.
@@ -171,6 +171,7 @@ try {
       seconds: (Date.now() - t0) / 1000,
       kicks: b.kicks - a.kicks, cells: b.kick - a.kick, depth: b.depth - a.depth, steps: b.steps - a.steps, squeeze: b.squeeze,
       released: b.released - a.released, pressedKicks: b.pressedKicks - a.pressedKicks, owed: b.owed, total: b,
+      taken: b.plate.taken - a.plate.taken, lost: b.plate.lost - a.plate.lost, stalls: b.plate.stalls - a.plate.stalls,
     };
   };
   const on = await window_(12000);
@@ -266,6 +267,25 @@ try {
       band onsets heard off the tapped grid are kicks too, on top.
     */
     const beats = (w) => w.seconds * 1000 / tapped;
+    /*
+      And every one of those kicks reaches the plate (PLAN 30a-3). The clock
+      decides a kick once a frame, and the plate takes it on its next solver
+      step (lib/plateKick.ts). Until then a kick on a frame that took no step
+      was dropped: the runner draws about 25 frames a second under the squeeze
+      and steps 19, and 16 of 41 kicks pressed in the window at 0.8 (deploy of
+      a9dd9f2). So each kick decided in the window is taken or let go, give or
+      take the one owed across each edge of it, and no more are let go than
+      the plate stalled: a gap between frames that stepped longer than a
+      kick's wait (KICK_OWED_MS), counted by the same hold as it passes the
+      line. A kick let go for want of a step lies in such a gap by
+      construction, so one let go with no stall is a hold dropping kicks
+      again. Not a count of stalls guessed beforehand: the first Metal run
+      let 2 of 40 go at 0.8 (#546), each in a runner stall.
+    */
+    const reached = (w) => Math.abs(w.taken + w.lost - w.kicks) <= 2 && w.lost <= w.stalls;
+    check('and every kick reaches the plate on its next step, or is let go only in a stall',
+      reached(on) && reached(off),
+      `at 0.8: ${on.taken} taken and ${on.lost} let go of ${on.kicks}, ${on.stalls} stalls; at 0: ${off.taken} and ${off.lost} of ${off.kicks}, ${off.stalls} stalls`);
     check('and the show kicks on it', on.kicks >= 0.75 * beats(on) && off.kicks >= 0.75 * beats(off),
       `${on.kicks} and ${off.kicks} kicks in ${on.seconds.toFixed(0)} and ${off.seconds.toFixed(0)} s, of ${beats(on).toFixed(0)} and ${beats(off).toFixed(0)} tapped beats`);
     /*

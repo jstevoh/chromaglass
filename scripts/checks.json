@@ -631,6 +631,18 @@
       ]
     },
     {
+      "name": "The plate takes every kick",
+      "shard": "logic",
+      "run": "npm run platekick",
+      "why": [
+        "A kick decided on a frame with no solver step is laid on the next step",
+        "(lib/plateKick.ts, PLAN 30a-3): every kick laid at thirty steps on a",
+        "120 Hz screen, none dropped by a slow frame, one let go only by a stall,",
+        "and the app's step loop reading the hold. Until it, 16 of 41 kicks",
+        "pressed in the squeeze check's window on the Mac runner."
+      ]
+    },
+    {
       "name": "The sound cords",
       "shard": "logic",
       "run": "npm run soundcords",
@@ -947,6 +959,20 @@
         "SOURCES.md, and on a phone page they pour without the pour pausing",
         "every frame (14ab-1), loop, are what the plate and the projector hold,",
         "and stop. No GPU needed: the hand-over is the same without a plate."
+      ]
+    },
+    {
+      "name": "The spectrum strips draw only on screen",
+      "shard": "browser",
+      "run": "node scripts/stripdraw.mjs",
+      "why": [
+        "The patch bay's spectrum strip on a band cord (PLAN 30a-3): off screen,",
+        "as the desk mounts it, it draws nothing while the page animates; on",
+        "screen it draws live; off again, it stops. Each strip ran its own",
+        "animation loop from mount, and Bass Drop's two, off to the side of the",
+        "window, cost its plate about a quarter of its steps under Beat Squeeze",
+        "on the Mac runner. Needs no GPU: the loop and the observer are the",
+        "browser's."
       ]
     },
     {

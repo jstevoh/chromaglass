@@ -56,6 +56,8 @@ export function BandStrip({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const rangeRef = useRef(new BandRange());
+  /** Frames this strip has drawn, for `npm run stripdraw` (the canvas's `data-drawn`). */
+  const drawn = useRef(0);
   const dragRef = useRef<{
     mode: 'left' | 'right' | 'slide' | 'sweep';
     anchorX: number;
@@ -71,11 +73,39 @@ export function BandStrip({
   const propsRef = useRef({ hasCustomBand, loHz, hiHz, x0, x1, feature, gain, threshold, readEar });
   propsRef.current = { hasCustomBand, loHz, hiHz, x0, x1, feature, gain, threshold, readEar };
 
+  /*
+    The strip draws only while it can be seen, and only when there is
+    something new to draw (PLAN 30a-3).
+
+    It ran its own animation loop and redrew its canvas on every refresh from
+    the moment the patch bay mounted it, seen or not. The desk mounts the
+    patch bay off to the side of the window (its strips measured at x = 2171
+    in the squeeze check's 1060-wide page), and Bass Drop has two band cords,
+    so two strips painted a spectrum nobody could see 60 or 120 times a
+    second, each a canvas the browser rasterises on the same GPU the plate
+    steps on. An IntersectionObserver is the browser's own answer to "is
+    this on screen", hidden panels and scrolled-off rows included, so the
+    loop runs only while it says so. And on screen a frame is drawn only when
+    the ear has handed over a new reading or the cord's drawn values moved:
+    the analyser reads at about sixty a second, and a ProMotion display asked
+    for twice that drew every reading twice.
+  */
   useEffect(() => {
     let raf = 0;
+    let seen = false;
+    let lastReading: AudioReading | null = null;
+    let lastKey = '';
     const draw = () => {
+      raf = 0;
       const cvs = canvasRef.current;
-      if (cvs) {
+      const p = propsRef.current;
+      const reading = p.readEar?.() ?? null;
+      const key = `${p.hasCustomBand}|${p.loHz}|${p.hiHz}|${p.feature}|${p.gain}|${p.threshold}`;
+      if (cvs && (reading !== lastReading || key !== lastKey)) {
+        lastReading = reading;
+        lastKey = key;
+        drawn.current++;
+        cvs.dataset.drawn = String(drawn.current);
         const ctx = cvs.getContext('2d');
         if (ctx) {
           const W = cvs.width;
@@ -89,8 +119,7 @@ export function BandStrip({
             feature: feat,
             gain: g,
             threshold: th,
-            readEar: getEar,
-          } = propsRef.current;
+          } = p;
 
           ctx.clearRect(0, 0, W, H);
           ctx.fillStyle = '#0b0910';
@@ -112,7 +141,6 @@ export function BandStrip({
             ctx.fillText(String(i + 1), sx + 4, 11);
           }
 
-          const reading = getEar?.() ?? null;
           let liveLevel = 0;
           if (reading) {
             if (reading.spectrum && reading.hzPerBin && reading.spectrum.length > 2) {
@@ -190,10 +218,21 @@ export function BandStrip({
           ctx.fillRect(px0 + pw - 3, H / 2 - 8, 3, 16);
         }
       }
-      raf = requestAnimationFrame(draw);
+      if (seen) raf = requestAnimationFrame(draw);
     };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    const cvs = canvasRef.current;
+    if (!cvs || typeof IntersectionObserver === 'undefined') {
+      // No observer to ask (an old browser): draw as it always did.
+      seen = true;
+      raf = requestAnimationFrame(draw);
+      return () => cancelAnimationFrame(raf);
+    }
+    const io = new IntersectionObserver((entries) => {
+      seen = entries[entries.length - 1].isIntersecting;
+      if (seen && !raf) raf = requestAnimationFrame(draw);
+    });
+    io.observe(cvs);
+    return () => { io.disconnect(); cancelAnimationFrame(raf); raf = 0; };
   }, []);
 
   const applySpan = (nx0: number, nx1: number) => {

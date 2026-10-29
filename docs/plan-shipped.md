@@ -6024,6 +6024,46 @@ displays the laptop's fold; a standalone network `CastReceiver` rebuilds `AudioD
 spectrum behind it, so `sound` cords fold and gate there while `bands` cords read nothing as before (30a-1).
 Held by `npm run soundcords` (34/34 lines in `scripts/checks.json`).
 
+### 30a-3. Beat Squeeze's quarter on the Mac runner, and the kicks the plate missed (2026-10-28)
+
+What was reported: from the first runs carrying #511, `npm run squeeze`'s window at Beat
+Squeeze 0.8 on the fifth Mac shard read 170–217 steps in 12 s against 220–309 on every base
+before it, with frames halving under the squeeze, while the owner's M4 read 360 in every window
+(#541 has the 42 logs). Nothing #511 changed sits on the press's own path.
+
+What was measured: a cloud session's MutationObserver and a CPU profile found the patch bay
+mounted off to the side of the window (its strips at x = 2171 in the check's 1060-wide page),
+and on Bass Drop's two `bands` cords two of #511's `BandStrip`s, each with its own
+`requestAnimationFrame` loop redrawing its canvas every refresh, seen or not. Then an A/B on
+one Mac runner, the three builds interleaved twice (#546's diagnostic run), steps in 12 s at
+0.8, 0, 0.8:
+
+| Build | First pass | Second pass |
+|---|---|---|
+| main (a9dd9f2) | 270, 354, 298 | 223, 322, 251 |
+| the strips not drawing | 337, 358, 352 | 352, 328, 274 |
+| #511's `src/` reverted | 355, 306, 358 | 281, 348, 343 |
+
+The strips are the whole of #511's cost: with them off the squeeze runs where #511's parent
+did. Why only under the squeeze is not measured: a canvas is rasterised on the GPU the plate
+steps on, and the squeeze's frames are the heavier ones, where the strips' work tipped the
+runner's GPU over. The strip now runs its loop only while an IntersectionObserver says it is
+on screen, and draws only when the ear hands over a new reading or the cord's drawn values
+change (`npm run stripdraw`: off screen 0 draws in 3 s against the page's 180 frames, was
+181; on screen live; off again 0).
+
+Found on the way, the question of the kicks pressed (16 of 41 in the window at 0.8 on the
+deploy of a9dd9f2): the beat clock decides a kick once a frame, and everything a kick does to
+the plate (the press, Plate Rock's lean, the bloom, the bubbles, the bass's next area) was laid
+on the frame's first step, `simStep === 0`. A frame with no step had no first step, so its kick
+was dropped; on a 120 Hz screen at thirty steps a second, three in four. The kick is now held
+(`plateKickRef`) with the song time and lead it was decided at, the accent read there, until
+the next frame that steps, and let go after `KICK_OWED_MS` (0.1 s) on a stalled plate, counted
+from the frame after the one that decided it, so a slow frame never drops a kick it steps for. The
+squeeze check counts every kick in its windows as taken or let go, and no more let go than the
+plate stalled (gaps between stepping frames past `KICK_OWED_MS`, which the hold counts): its first
+Metal run let 2 of 40 go at 0.8, each in a runner stall.
+
 ## 14ab-7, 14ab-8. The ear's detectors and the gamepad ring (shipped 2026-10-28, #533)
 
 14ab-7. Each of the ear's seventeen onset detectors kept a second of flux in an array pushed

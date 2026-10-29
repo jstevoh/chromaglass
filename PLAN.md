@@ -8892,6 +8892,21 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   resets its `BandRange` when the band changes, so after a drag its live level reads
   against the old band's range until it catches up; (d) the rule for when a cord gates is
   written out twice in `SettingsPanel.tsx` beside `gated()` in `areaCords.ts`; import `gated`.
+- ~~**30a-3. The plate at Beat Squeeze 0.8 stepped a quarter slower on the Mac runner since
+  #511.**~~ **Shipped, this PR:** #511's off-screen spectrum strips, each redrawing every
+  refresh, were the cost (Mac A/B on one runner: 270/298/223/251 steps at 0.8 in 12 s on main,
+  337/352/352/274 with the strips off, 355/358/281/343 with #511 reverted); they draw only on
+  screen now (`npm run stripdraw`). Kicks on a frame with no solver step were dropped; the plate
+  takes them on its next step (`npm run platekick`; `npm run squeeze`, its new "every kick reaches the plate" line).
+  Story in `docs/plan-shipped.md` §30a-3.
+- **30a-4. The patch bay re-renders every frame while it is off screen.** Found with 30a-3: on
+  Bass Drop, with the desk open and the patch bay to the side of the window, React rewrites
+  the cords' inputs about 65 times a second (2,500 DOM attribute writes a second, `name`
+  and `type` on the Depth, Gate, Rise, Fall and Gain inputs, MutationObserver in a cloud
+  session, the same with and without #511). `npm run renders` counts the App's renders (11 a
+  second); this is the settings panel's own. Find what it re-renders on and hold it to the
+  ten-a-second tick the sound already keeps (14f). *Measure:* a DOM-write count over 10 s on
+  Bass Drop with the band, before and after, in `npm run renders`.
 
 ### 30b. The LFOs and envelopes are fixed
 
