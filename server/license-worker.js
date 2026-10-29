@@ -125,39 +125,16 @@ async function handleWebhook(request, env, cors) {
   const lsItem = lsAttr.first_order_item || {};
   const lsProductName = String(lsItem.product_name || lsItem.variant_name || '').toLowerCase();
   const lsProductId = Number(lsItem.product_id || 0);
-  // Lemon Squeezy numbers a store's live products afresh, apart from its test-mode copies
-  // (1450531 Pro, 1450532 Upgrade), so the live ids are Worker settings rather than a code
-  // change at go-live (`LS_PRO_PRODUCT_IDS`, `LS_UPGRADE_PRODUCT_IDS`, comma separated). The
-  // product's name still decides when an id is on neither list.
-  const isPro = productIdIn(env.LS_PRO_PRODUCT_IDS, lsProductId, 1450531);
-  const isUpgradeProduct = productIdIn(env.LS_UPGRADE_PRODUCT_IDS, lsProductId, 1450532);
   const rawEvent = String(body.event || body.meta?.event_name || '');
   const isLsUpgrade =
     rawEvent === 'order_created' &&
-    (isUpgradeProduct || lsProductName.includes('upgrade'));
+    (lsProductId === 1450532 || lsProductName.includes('upgrade'));
   const event = isLsUpgrade ? 'order_upgraded' : rawEvent;
 
   const rawEmail = body.email || lsAttr.user_email || body.meta?.custom_data?.email || '';
   const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
   const rawOrderId = body.orderId || body.data?.id || lsItem.order_id || '';
   const orderId = rawOrderId ? String(rawOrderId).trim() : '';
-
-  // A test-mode order is one nobody paid for: Lemon Squeezy's checkout takes its published test
-  // card, so anyone who finds the buy link could otherwise mint a real signed key for nothing. A
-  // test order (`meta.test_mode`, or the order's own `test_mode`) files nothing unless the buyer's
-  // email is on `TEST_MODE_EMAILS` (comma separated, a Worker secret, never committed), which is
-  // how the owner proves the path end to end. It answers 200 so the store does not retry; a
-  // payload without the flag (our own direct JSON) is untouched. Found in the review of #428
-  // (2026-10-22): until this, the account sheet's Buy buttons (#394) handed a signed key to anyone
-  // who paid with the test card.
-  const flagged = (v) => v === true || v === 'true';
-  if (flagged(body.meta?.test_mode) || flagged(lsAttr.test_mode)) {
-    const allowed = String(env.TEST_MODE_EMAILS || '')
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-    if (!email || !allowed.includes(email)) return json({ ok: true, ignored: 'test mode' }, 200, cors);
-  }
   const keyId =
     (typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : '') ||
     (orderId ? `key_${orderId}` : `key_${Date.now().toString(36)}_${rand(6)}`);
@@ -165,7 +142,7 @@ async function handleWebhook(request, env, cors) {
   if (event === 'order_created' || event === 'license_created') {
     if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);
     const tier =
-      body.tier === 'pro' || isPro || lsProductName.includes('pro')
+      body.tier === 'pro' || lsProductId === 1450531 || lsProductName.includes('pro')
         ? 'pro'
         : 'home';
     const now = typeof body.issuedAt === 'number' ? body.issuedAt : Date.now();
@@ -640,14 +617,6 @@ async function getGoogleJwks(env, kid) {
     return jwksCache.keys;
   })().finally(() => { jwksInFlight = null; });
   return jwksInFlight;
-}
-
-function productIdIn(list, id, testId) {
-  if (!id) return false;
-  if (id === testId) return true;
-  return String(list || '')
-    .split(',')
-    .some((v) => Number(v.trim()) === id);
 }
 
 async function readEmailKeys(env, email) {
