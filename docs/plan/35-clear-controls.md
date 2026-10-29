@@ -10,7 +10,7 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
 
 - ~~**35a** One look for on, every name unique (phase 1).~~ Shipped: the lit token, `Button
   pressed`, the Film section's Source and demo loops, the renames, `npm run states` and the
-  3:1 bar in `npm run switches`. Story in `docs/plan-shipped.md` §35.
+  3:1 bar in `npm run switches`. Story in `docs/plan-shipped/35-clear-controls.md` §35.
 - **35a-2** What phase 1 left, each because it moves a check's input or a layout:
   - Sliders standing in for switches: the phone's Press · thin gap and Two Projectors
     (`phone.mjs` drives the first as a range by keyboard), the remote's three (788, 822,
@@ -31,16 +31,16 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
 - ~~**35b** Regroup the panels into seven.~~ Shipped: Play, Pour, Feed, Motion, Chemistry, Look,
   Stage, one vocabulary for the rail, the panel browser, the sections' `data-group`, the desk's own
   panels and the phone's Settings strip (now with its headings drawn). Story in
-  `docs/plan-shipped.md` §35.
+  `docs/plan-shipped/35-clear-controls.md` §35.
 - **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
   section (35c's work) or a different surface:
   - ~~Plates & LED holds the platform's spin, which is Motion's.~~ Moved to Plate Spin in 35c-2.
   - The pin picker (`PickList`) and the command palette still list by section, not by the seven
     groups; the same headings would find a setting faster there.
-- ~~**35c-1** Squish Plate in five.~~ Story in `docs/plan-shipped.md` §35c-1 (moved
+- ~~**35c-1** Squish Plate in five.~~ Story in `docs/plan-shipped/35-clear-controls.md` §35c-1 (moved
   2026-10-29, 19m).
-- ~~**35c-2** One home per setting, second half.~~ **Shipped**: Flash Limit's one switch, each Impact master under its source's Drive, Plate Spin, Squish Plate in Build's deck, the sequencer button, Takes as a pointer. Story in `docs/plan-shipped.md` §35c-2 (moved 2026-10-29, 19m-2).
-- **35c-3** One home for **MIDI on** and the **audio source**. *Shipped*: Settings' Controller section is MIDI's one home, the Sound sheet the source's. Story in `docs/plan-shipped.md` §35c-3 (moved 2026-10-29, 19m-2). Left from it:
+- ~~**35c-2** One home per setting, second half.~~ **Shipped**: Flash Limit's one switch, each Impact master under its source's Drive, Plate Spin, Squish Plate in Build's deck, the sequencer button, Takes as a pointer. Story in `docs/plan-shipped/35-clear-controls.md` §35c-2 (moved 2026-10-29, 19m-2).
+- **35c-3** One home for **MIDI on** and the **audio source**. *Shipped*: Settings' Controller section is MIDI's one home, the Sound sheet the source's. Story in `docs/plan-shipped/35-clear-controls.md` §35c-3 (moved 2026-10-29, 19m-2). Left from it:
   - The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
     (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.
   - 35b-2's pin picker and command palette still list by section, not by the seven groups.
@@ -48,13 +48,13 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     each becomes one Strength per input is undecided, and 14ad-2 waits on it (from 35c-2's
     first statement, moved 2026-10-29, 19m-2).
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
-  Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
+  Story in `docs/plan-shipped/35-clear-controls.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~
-  Story in `docs/plan-shipped.md` §35e (moved 2026-10-29, 19m).
-- ~~**35e-2** The lamp's grade tops out at 5100 K.~~ Story in `docs/plan-shipped.md` §35e-2
+  Story in `docs/plan-shipped/35-clear-controls.md` §35e (moved 2026-10-29, 19m).
+- ~~**35e-2** The lamp's grade tops out at 5100 K.~~ Story in `docs/plan-shipped/35-clear-controls.md` §35e-2
   (moved 2026-10-29, 19m).
 - ~~**35e-4** Home Movie's lamp, and the warm end's brightness.~~ Story in
-  `docs/plan-shipped.md` §35e-4 (moved 2026-10-29, 19m).
+  `docs/plan-shipped/35-clear-controls.md` §35e-4 (moved 2026-10-29, 19m).
 - **35e-3** What the readings left, none changed because each moves a look or waits on another step:
   - **The lamp's colour is a multiply on the finished picture,** which is the lamp's spectrum times a white
     surface exactly, and the lamp's spectrum times a dye only to the eye's three responses. The real thing is the
@@ -78,9 +78,9 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The legacy bench's bottle list in `App.tsx` (the `liquid-…` test ids) still draws round swatches.
   - The remote has no bottles or bulb (the owner's remote has Dye Budget and Lamp Warmth as sliders).
 - ~~**35f** Show hardware (batch C of the playful-controls choice, 2026-10-25; items 7 to
-  11).~~ Story in `docs/plan-shipped.md` §35f (moved 2026-10-29, 19m).
+  11).~~ Story in `docs/plan-shipped/35-clear-controls.md` §35f (moved 2026-10-29, 19m).
 - ~~**35g** Looks as slides in a tray (item 12 of the playful-controls choice,
-  2026-10-25).~~ Story in `docs/plan-shipped.md` §35g (moved 2026-10-29, 19m).
+  2026-10-25).~~ Story in `docs/plan-shipped/35-clear-controls.md` §35g (moved 2026-10-29, 19m).
 - **35g-2** What the tray left:
   - **The drum has 10 slots, a real tray has 80.** At 28 px 80 slots is a grey ring, so one click turns the
     drawing 36 degrees, not 4.5. Named shortcut of the picture; nothing about any look.

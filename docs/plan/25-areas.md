@@ -1,5 +1,5 @@
 # 25. Areas of interest: several places on one plate
-**Partly shipped**: areas of interest in `src/lib/plateAreas.ts`, with three looks rebuilt on them and Fillmore East filling the screen. What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: areas of interest in `src/lib/plateAreas.ts`, with three looks rebuilt on them and Fillmore East filling the screen. What is open is below. How it was found, built and measured is in [`docs/plan-shipped/25-areas.md`](../plan-shipped/25-areas.md), under the same number.
 
 The owner, 2026-10-04: Velvet Underground "underwhelming", then Lumia, and "I need more
 complexity across presets in general. I want to have multiple areas of interest in
@@ -71,7 +71,7 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
 - ~~**25h. Areas that listen for themselves**~~ (shipped: a cord aimed at one area heats,
   stirs with a paddle, pours or picks a bottle there, on a gate; a colour family per area;
   Velvet Underground, Jellyfish Bloom and Bass Drop on it; `npm run areacords`). Story in
-  `docs/plan-shipped.md` §25. Open, found building it:
+  `docs/plan-shipped/25-areas.md` §25. Open, found building it:
   - **25h-1. A warm spot opens no hole yet (a named shortcut).** An area's heat is real heat
     in kelvin, carried and cooled as the lamp's is, and what it does is what 18f gave warm
     liquid: it rises on an upright plate and thins the water in the gap (18f-4's shortcut).

@@ -12,9 +12,9 @@ Every item keeps the standing rule: nothing moves the frame as a whole from soun
 each feature ships its phone version in the same PR (the plate shader is shared, so the
 phone and the iPad draw what the desk draws; a new control goes on the phone too).
 
-## ~~33a. No stepped ring round a bubble's hole~~ — **Shipped** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33a (moved 2026-10-29, 19m-2).
+## ~~33a. No stepped ring round a bubble's hole~~ — **Shipped** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped/33-bubbles-closeup.md` §33a (moved 2026-10-29, 19m-2).
 
-## ~~33b. The soft glow still left round a hole~~ — **Shipped** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33b (moved 2026-10-29, 19m-2).
+## ~~33b. The soft glow still left round a hole~~ — **Shipped** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped/33-bubbles-closeup.md` §33b (moved 2026-10-29, 19m-2).
 
 Left from it, so none of it is lost:
 - **33b-2. A fixed reach and a wholesale flatten.** `airNear` looks 4.5 cells out and
@@ -61,7 +61,7 @@ the rim's radius found along 64 rays: RMS deviation from a circle under 0.5 scre
 pixel, and the 10–90 % rise of the edge no wider than 1.5 pixels. Today's numbers
 printed first.
 
-## ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`). Story in `docs/plan-shipped.md` §33e (moved 2026-10-29, 19m-2).
+## ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`). Story in `docs/plan-shipped/33-bubbles-closeup.md` §33e (moved 2026-10-29, 19m-2).
 
 Left from it, so none of it is lost:
 - **33e-2. The band's width from the meniscus, for small bubbles too.** The old text
@@ -111,7 +111,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
 
 ## ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped** (Paint Cells and Macro Lacing default to 0; `npm run macroview`; 20c-1 is closed by it)
 
-**Shipped.** Story in `docs/plan-shipped.md` §33g (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
+**Shipped.** Story in `docs/plan-shipped/33-bubbles-closeup.md` §33g (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
 
 - **33g-2. The closeup is still lit, not refracted.** The relief is the dye's own
   gradient read as a dome under a lowered lamp (shortcut: not a physical height field,

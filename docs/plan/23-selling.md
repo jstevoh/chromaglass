@@ -114,7 +114,7 @@ once the login works (23.14).*
   offline for good (23.4). A build with no Firebase config (`npm run dev`, every
   check, a fork's own copy) has no sign-in at all; the source is public and BUSL lets
   anyone run it, so the wall is the hosted site's, as the paid gates are.
-- *Shipped so far*: `npm run signin` (`scripts/signin.mjs`, the Firebase Auth emulator standing in for Google) measures the sign-in, fourteen lines. Story in `docs/plan-shipped.md` §23 Accounts (moved 2026-10-29, 19m-2).
+- *Shipped so far*: `npm run signin` (`scripts/signin.mjs`, the Firebase Auth emulator standing in for Google) measures the sign-in, fourteen lines. Story in `docs/plan-shipped/23-selling.md` §23 Accounts (moved 2026-10-29, 19m-2).
 
 ## Steps
 
@@ -123,13 +123,13 @@ once the login works (23.14).*
 - **23.2** (**shipped**, this PR): a hosted-site build flag (`VITE_FIREBASE_HOSTED_SITE=1`,
   or `?tierGates=1` for checks) that shows each paid feature above as an "In the ChromaGlass
   app" tile with a link (`src/lib/tierGates.ts`, `SettingsPanel.tsx`, `DeskPanels.tsx`), off
-  in a licensed app and in … Story in `docs/plan-shipped.md` §23.2 (moved 2026-10-29, 19m).
+  in a licensed app and in … Story in `docs/plan-shipped/23-selling.md` §23.2 (moved 2026-10-29, 19m).
 - **23.3** (**shipped**, this PR): the song-ID Worker (`server/fingerprint-worker.js`) takes
   an Ed25519-signed `X-ChromaGlass-Key` licence key as well as an allowed origin, and the
-  site's manual tag stays. Story in `docs/plan-shipped.md` §23.3 (moved 2026-10-29, 19m).
+  site's manual tag stays. Story in `docs/plan-shipped/23-selling.md` §23.3 (moved 2026-10-29, 19m).
 - **23.4** (**shipped**, this PR): the key in the Mac app and show server
   (`server/license-key.js`, `server/server-license.js`, `server/remote-server.js`,
-  `src/lib/licenseKey.ts`, `desktop/`) Story in `docs/plan-shipped.md` §23.4 (moved
+  `src/lib/licenseKey.ts`, `desktop/`) Story in `docs/plan-shipped/23-selling.md` §23.4 (moved
   2026-10-29, 19m).
 - **23.5** (**shipped**, this PR): the site's Record capped to a 15-second clip (`FREE_RECORD_MAX_SECONDS = 15`)
   and Render to 720p (`FREE_RENDER_MAX_HEIGHT = 720`), each with a small ChromaGlass corner mark (`useRecorder.ts`, `useSongRender.ts`) the Mixer cannot hide; the app's untouched. *Measure:*
@@ -138,7 +138,7 @@ once the login works (23.14).*
   mark only (`SettingsPanel.tsx` and `DeskPanels.tsx`); your own
   logo is the app's. *Measure:* `npm run tiers` (11/11).
 - **23.8** (**shipped**, this PR, `desktop/`): Home's listening features. Story in
-  `docs/plan-shipped.md` §23.8 (moved 2026-10-29, 19m).
+  `docs/plan-shipped/23-selling.md` §23.8 (moved 2026-10-29, 19m).
 - **23.7** *(owner)*: the free beta (listeners as well as VJs), then charging. Later, if wanted, the same key
   pasted into the site unlocks it there too (bypassable from source, which is fine).
 - **23.9** (**shipped**, owner): in the Firebase console (`chromaglass`), Authentication turned on
@@ -156,25 +156,25 @@ once the login works (23.14).*
 - **23.10** (**shipped**, #394; brief `docs/handoff-signin.md`): the sign-in on the hosted
   site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro` with Google,
   Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`: the email,
-  sign out with confirmation … Story in `docs/plan-shipped.md` §23.10 (moved 2026-10-29,
+  sign out with confirmation … Story in `docs/plan-shipped/23-selling.md` §23.10 (moved 2026-10-29,
   19m).
 - **23.10c** (**shipped**, this PR): a way back in, and a profile sheet that reads (the
   owner, 2026-10-24: signed out while using the app, "there is no way to re-sign in"; "the
-  profile page is garbage"). Story in `docs/plan-shipped.md` §23.10c (moved 2026-10-29,
+  profile page is garbage"). Story in `docs/plan-shipped/23-selling.md` §23.10c (moved 2026-10-29,
   19m).
 - **23.10b** (**shipped**, #430's work, folded into 23.10c's PR): the Profile & Store sheet
-  fits the screen (the owner, 2026-10-22: "a little janky"). Story in `docs/plan-shipped.md`
+  fits the screen (the owner, 2026-10-22: "a little janky"). Story in `docs/plan-shipped/23-selling.md`
   §23.10b (moved 2026-10-29, 19m).
 - **23.11** (**shipped**, this PR): the Mac app with no key asks for the
   same sign-in once (`LicenseGate.tsx`, `src/main.tsx`), online, then runs as the site does;
   with a verified Ed25519 key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
   and signed in, and with none and signed out.
-- **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`); `npm run license-worker`. Story in `docs/plan-shipped.md` §23.12 (moved 2026-10-29, 19m-2).
-  **23.12-url** (**shipped**): `deploy.yml` now passes `VITE_FIREBASE_LICENSES_URL` to the build, so a signed-in site pulls its key from the account. Story in `docs/plan-shipped.md` §23.12-url (moved 2026-10-29, 19m-2).
+- **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`); `npm run license-worker`. Story in `docs/plan-shipped/23-selling.md` §23.12 (moved 2026-10-29, 19m-2).
+  **23.12-url** (**shipped**): `deploy.yml` now passes `VITE_FIREBASE_LICENSES_URL` to the build, so a signed-in site pulls its key from the account. Story in `docs/plan-shipped/23-selling.md` §23.12-url (moved 2026-10-29, 19m-2).
   *Open:* `VITE_FIREBASE_SHOWS_URL`
   is read by `accountShows.ts` and is also not in the build; it falls back to `/account-shows` on the
   same origin, which the hosted site does not serve, so decide with 23.14 where that endpoint lives.
-  **23.12-jwks** (**shipped**, this PR): the Worker fetches Google's published keys for Firebase tokens, and the app asks for the account's key at start and after a sign-in. Story in `docs/plan-shipped.md` §23.12-jwks (moved 2026-10-29, 19m-2).
+  **23.12-jwks** (**shipped**, this PR): the Worker fetches Google's published keys for Firebase tokens, and the app asks for the account's key at start and after a sign-in. Story in `docs/plan-shipped/23-selling.md` §23.12-jwks (moved 2026-10-29, 19m-2).
   *Owed:* `wrangler deploy` of the licence
   Worker from the owner's Mac (its config is not in the repo), then confirm `owner-pro-1` is filed
   under the owner's sign-in email and was signed after the key rotation (the sheet now says so in
@@ -183,11 +183,11 @@ once the login works (23.14).*
   refused by every browser; the Worker could re-sign such records on `GET /keys` with the current
   key (it is the source of truth for what was sold), with a check that a forged token never enters
   KV that way.
-  **23.14-verify** (**shipped**, #467): `server/account-shows.js` now verifies the account token's signature against Google's keys (`server/firebase-token.js`); `npm run accountlink` 1b. Story in `docs/plan-shipped.md` §23.14-verify (moved 2026-10-29, 19m-2).
+  **23.14-verify** (**shipped**, #467): `server/account-shows.js` now verifies the account token's signature against Google's keys (`server/firebase-token.js`); `npm run accountlink` 1b. Story in `docs/plan-shipped/23-selling.md` §23.14-verify (moved 2026-10-29, 19m-2).
 - **23.14** (**shipped**, this PR): linking devices by account (`server/account-shows.js`,
-  `src/lib/accountShows.ts`). Story in `docs/plan-shipped.md` §23.14 (moved 2026-10-29,
+  `src/lib/accountShows.ts`). Story in `docs/plan-shipped/23-selling.md` §23.14 (moved 2026-10-29,
   19m).
-- **23.18** (**shipped**, this PR): cloud sync for Pro (`server/cloud-sync.js`, `src/lib/cloudSync.ts`): a Pro account carries its looks, sets, liquids, MIDI map and settings across every signed-in browser and Mac app; `npm run cloudsync`. Story in `docs/plan-shipped.md` §23.18 (moved 2026-10-29, 19m-2).
+- **23.18** (**shipped**, this PR): cloud sync for Pro (`server/cloud-sync.js`, `src/lib/cloudSync.ts`): a Pro account carries its looks, sets, liquids, MIDI map and settings across every signed-in browser and Mac app; `npm run cloudsync`. Story in `docs/plan-shipped/23-selling.md` §23.18 (moved 2026-10-29, 19m-2).
   **23.18-deploy** (*owner*): `/sync` exists once the licence Worker is deployed by hand from
   the Mac (`npx wrangler deploy`, as for #460); until then a Pro sheet says sync stopped on an
   error and retries, and nothing else changes.
@@ -216,8 +216,8 @@ once the login works (23.14).*
   the next one in the cloud, before the Mac job.
   **23.18-exit** (open): a Mac app quit straight after an edit sends it the next time it opens
   (no send on `pagehide`); a `keepalive` push of the waiting records under 64 KB would close it.
-- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (`APPLE_SIGN_IN` in `SignInScreen.tsx`; `npm run signin` line 4). Story in `docs/plan-shipped.md` §23.10d (moved 2026-10-29, 19m-2).
-- **23.10e** (**shipped**, this PR): email and password accounts beside Google and the emailed link (`SignInForm`, `AccountSignInMethods.tsx`; `npm run signin` 17–21), live since the 2026-10-25 deploy. Story in `docs/plan-shipped.md` §23.10e (moved 2026-10-29, 19m-2).
+- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (`APPLE_SIGN_IN` in `SignInScreen.tsx`; `npm run signin` line 4). Story in `docs/plan-shipped/23-selling.md` §23.10d (moved 2026-10-29, 19m-2).
+- **23.10e** (**shipped**, this PR): email and password accounts beside Google and the emailed link (`SignInForm`, `AccountSignInMethods.tsx`; `npm run signin` 17–21), live since the 2026-10-25 deploy. Story in `docs/plan-shipped/23-selling.md` §23.10e (moved 2026-10-29, 19m-2).
   *Owed by the owner:* the one hand-try the emulator cannot do (Google account,
   Account, Set a password, sign out, sign in with the password, same licence;
   `linkWithCredential` against the real project).

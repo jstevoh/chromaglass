@@ -1,5 +1,5 @@
 # 16. Many plates: each projector its own source (rig-plan R1)
-**Partly shipped**: 16a, 16b, 16c and 16f are shipped (#231, #226, #232, #273). What 16a, 16b and 16c each left undone is listed below in that order, then 16d and 16e, which are open. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: 16a, 16b, 16c and 16f are shipped (#231, #226, #232, #273). What 16a, 16b and 16c each left undone is listed below in that order, then 16d and 16e, which are open. How it was found, built and measured is in [`docs/plan-shipped/16-many-plates.md`](../plan-shipped/16-many-plates.md), under the same number.
 
 Asked for on 2026-09-27 ("Let's build multi-plate next"), after the Mixer's steps 1–5.
 `docs/rig-plan.md` has the why (a light show was several projectors, each its own
@@ -26,6 +26,8 @@ do now. The owner can say otherwise; the ladder is one table.
 
 Each step ships its phone version in the same PR (the rule) and one PR each:
 
+- **16a · The back plate gets its own look.** Shipped (#231); the story is in
+  [`docs/plan-shipped/16-many-plates.md`](../plan-shipped/16-many-plates.md).
   Found while building it, not done:
   - *A render lets the back look go.* A render lays its look on both plates from its
     seed, so the back plate follows the front from the render's start, and after it.
@@ -40,6 +42,8 @@ Each step ships its phone version in the same PR (the rule) and one PR each:
   - *On a one-plate front look, Follow the front drops the plate when the fade lands*
     (a cut of the back plate's picture at the end rather than the start). Fading
     `backLevel` out with it would make that a fade.
+- **16b · A projector picks its source.** Shipped (#226); the story is in
+  [`docs/plan-shipped/16-many-plates.md`](../plan-shipped/16-many-plates.md).
   Found while building it, not done:
   - *A source has no post effects and no closeup camera.* The wall's chain (bloom,
     the photographic presets' lens) runs once, on the wall; a source is the plate as
@@ -58,6 +62,8 @@ Each step ships its phone version in the same PR (the rule) and one PR each:
     each source's cost". Each is the whole display pass again at the canvas's size.
     It needs reading on the owner's Mac (`chromaglassDebug()`, docs/judging.md §21)
     before 16d (four plates), which is where a budget has to be.
+- **16c · Beams add, and the seam goes.** Shipped (#232); the story is in
+  [`docs/plan-shipped/16-many-plates.md`](../plan-shipped/16-many-plates.md).
   Found while building it, not done:
   - *Two projectors of one picture stacked for brightness are blended, not doubled*
     (the same point of the same source is one picture). A stacked pair would need its

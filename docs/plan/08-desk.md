@@ -1,10 +1,10 @@
 # 8. The desk: the laptop is a control surface, not the show
 
-**Shipped**, with the proposals below open. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**, with the proposals below open. How it was built and measured is in [`docs/plan-shipped/08-desk.md`](../plan-shipped/08-desk.md), under the same number.
 
 ~~**8-v2** Desk v2, the owner's design of 2026-10-10: one desk in three layouts (Build,
 Gig, Load-in), every panel docked, floated, folded or closed, knobs for encoders, the
-panel browser (⌘P) and the Stage sheet (⌘,)~~ (shipped; story in `docs/plan-shipped.md`
+panel browser (⌘P) and the Stage sheet (⌘,)~~ (shipped; story in `docs/plan-shipped/08-desk.md`
 §8; checks `npm run desklayout` and `npm run layout`).
 
 ~~**8-tabs** The tabs are the owner's (asked 2026-10-27): every chip across the top is a
@@ -29,7 +29,7 @@ Open from Desk v2, each its own thread (the UI lane):
 - ~~**8-play** (M) Play, the design's screens 3a and 3b: a phone's own screen for
   someone listening, not performing (the plate edge to edge, eight dyes, Drop · Blow ·
   Press, six sliders, the looks, Follow the music, Share clip). A phone opens on it;
-  `/play` is it on an iPad or a laptop~~ (shipped; story in `docs/plan-shipped.md` §8;
+  `/play` is it on an iPad or a laptop~~ (shipped; story in `docs/plan-shipped/08-desk.md` §8;
   check `npm run phone`'s Play part).
 - **8-play-a** (S) The iPhone app's Laptop remote from Play. Play here lands on Play,
   and the way back to the remote is All controls › More › Laptop remote, two taps
@@ -47,8 +47,8 @@ Open from Desk v2, each its own thread (the UI lane):
   (a still photograph) then moves with it; whether such looks should say so on the chip
   instead is the owner's call on a phone.
 - ~~**8-draw** Draw: the phone or iPad as the wall's pad~~ (shipped; story in
-  `docs/plan-shipped.md` §8; check `npm run draw`). Found along the way:
-  - ~~**8-draw-a** The wall under the pad~~ (shipped; story in `docs/plan-shipped.md`
+  `docs/plan-shipped/08-desk.md` §8; check `npm run draw`). Found along the way:
+  - ~~**8-draw-a** The wall under the pad~~ (shipped; story in `docs/plan-shipped/08-desk.md`
     §8-draw-a; check `npm run drawwall`, and `-- --app` on the Mac). Found along the way:
     - **8-draw-a-1** (S) The picture is the canvas after the output pass, so a wall
       corner-pinned or masked in Output shows warped on the pad, while a touch is mapped
@@ -71,7 +71,7 @@ Open from Desk v2, each its own thread (the UI lane):
     shape (8-draw-a), so a 4:3 wall is a 4:3 frame; before the first picture, and with
     an older laptop, it is still 16:9. A dome is another frame. And the design's dashed "+" (an image as dye) has no message yet.
 - ~~**8b** A true Preview: with a wall up, the desk builds on a copy the wall does not
-  see until Send to wall~~ (shipped; story in `docs/plan-shipped.md` §8; check
+  see until Send to wall~~ (shipped; story in `docs/plan-shipped/08-desk.md` §8; check
   `npm run draftwall`). Found along the way:
   - **8b-1** (S) The copy and the wall draw from the same dice. The plate's random
     streams (`DICE` in LiquidVisualizer, `lib/rng.ts`) are module constants, so the
@@ -100,10 +100,10 @@ Open from Desk v2, each its own thread (the UI lane):
     each engine was handed; a picture of the window against a look changed in Preview
     would be the last word (`docs/judging.md` §49 for the owner's eye meanwhile).
   - ~~**8b-6** `draftwall`'s fade line read one moment, 0.4 s after Send~~ (fixed
-    2026-10-11: it watches the whole fade; story in `docs/plan-shipped.md`, 8b).
+    2026-10-11: it watches the whole fade; story in `docs/plan-shipped/08-desk.md`, 8b).
 - ~~**8c** Knobs turn round their ring as well as up and down; a double-click goes back to
   the look's own value (a double tap on Play's sliders)~~ (shipped; story in
-  `docs/plan-shipped.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
+  `docs/plan-shipped/08-desk.md` §8; checks `npm run desk`, `npm run layout`, `npm run phone`).
 - ~~**8d** A control's kind from the controller's profile: the APC40's, the Launch Control
   XL's and the nanoKONTROL2's knobs draw as knobs~~ (shipped; check `npm run desk`).
 - ~~**8e** Load-in's Wall panel: the test pattern and Identify, and Output's Gain and Gamma
@@ -146,7 +146,7 @@ Open from Desk v2, each its own thread (the UI lane):
 - ~~**8i** Fewer panels, each one usable at any window size: Sound Mappings folded into
   Sound and Heat Slide into Fluid Physics (no panel holds one or two knobs), Fade and Go
   in 68px with Back and Freeze left to their keys, and every panel's body scrolls and
-  reflows~~ (shipped; story in `docs/plan-shipped.md` §8; checks `npm run desklayout`
+  reflows~~ (shipped; story in `docs/plan-shipped/08-desk.md` §8; checks `npm run desklayout`
   and `npm run layout`'s "every control in every panel can be reached").
   - **8i-1** (S) A panel floated or popped out narrower than 312px. The reach check
     floats every panel at the size a panel floats at; a hand can drag one down to
@@ -160,11 +160,11 @@ Open from Desk v2, each its own thread (the UI lane):
 - ~~**8j** What a knob is called, and what it does~~ (the owner, 2026-10-22: the names on
   the deck's knobs were cut to the knob's width, and a drag swapped the name for the value
   under a chip laid over the row above, so a hand could not tell which knob it had). Story
-  in `docs/plan-shipped.md` §8j (moved 2026-10-29, 19m).
+  in `docs/plan-shipped/08-desk.md` §8j (moved 2026-10-29, 19m).
   - **8j-1** (S) The remote page (`RemoteControl.tsx`) has its own sliders and no card;
     its names are whole, but the line would help there too.
-  - ~~**8j-2** Cards that stuck and stacked~~ (the owner, 2026-10-24). **Shipped**: a drag ends on a lost capture, a release anywhere, a buttonless move or lost focus, and one card is up at a time (`npm run layout`, `npm run phone`). Which gesture on the owner's Mac swallowed the release is not known. Story in `docs/plan-shipped.md` §8j-2 (moved 2026-10-29, 19m-2).
-  - ~~**8j-3** Hover cards wait much longer~~ (the owner, 2026-10-27). **Shipped** (#509): one `TIP_DELAY_MS` (1.5 s) for the knob cards and the `title=` tips (`src/lib/titleTips.ts`; `npm run layout`, `npm run phone`); the remote and cast pages do not install it. Story in `docs/plan-shipped.md` §8j-3 (moved 2026-10-29, 19m-2).
+  - ~~**8j-2** Cards that stuck and stacked~~ (the owner, 2026-10-24). **Shipped**: a drag ends on a lost capture, a release anywhere, a buttonless move or lost focus, and one card is up at a time (`npm run layout`, `npm run phone`). Which gesture on the owner's Mac swallowed the release is not known. Story in `docs/plan-shipped/08-desk.md` §8j-2 (moved 2026-10-29, 19m-2).
+  - ~~**8j-3** Hover cards wait much longer~~ (the owner, 2026-10-27). **Shipped** (#509): one `TIP_DELAY_MS` (1.5 s) for the knob cards and the `title=` tips (`src/lib/titleTips.ts`; `npm run layout`, `npm run phone`); the remote and cast pages do not install it. Story in `docs/plan-shipped/08-desk.md` §8j-3 (moved 2026-10-29, 19m-2).
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's

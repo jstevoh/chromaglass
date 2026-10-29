@@ -76,21 +76,21 @@ Literature the model sits in: Chomaz, *J. Fluid Mech.* 2001 (the vertical film's
 convection), Gros, Bussonnière and Cantat on marginal regeneration, and Huang and
 colleagues 2020.
 
-**The target.** *Shipped so far*: the prototype's numbers 32a was built to (a 32 × 64 film on 800 nm over 120 s) and the saturation gap 32b tuned toward the photograph's 15%. Story in `docs/plan-shipped.md` §32a (moved 2026-10-29, 19m-2).
+**The target.** *Shipped so far*: the prototype's numbers 32a was built to (a 32 × 64 film on 800 nm over 120 s) and the saturation gap 32b tuned toward the photograph's 15%. Story in `docs/plan-shipped/32-soap-film.md` §32a (moved 2026-10-29, 19m-2).
 
-**The check: `npm run soapfilm`** (`scripts/soapfilm.mjs`, node only, 7 groups C1–C7, 23 lines; its rationale and the three look-alikes it must fail are in the script's header). Open from it: C7 has no upper bound on saturation (`sat > 0.10` only), for a check session to add that bar (32b-1). Story in `docs/plan-shipped.md` §32a (moved 2026-10-29, 19m-2).
+**The check: `npm run soapfilm`** (`scripts/soapfilm.mjs`, node only, 7 groups C1–C7, 23 lines; its rationale and the three look-alikes it must fail are in the script's header). Open from it: C7 has no upper bound on saturation (`sat > 0.10` only), for a check session to add that bar (32b-1). Story in `docs/plan-shipped/32-soap-film.md` §32a (moved 2026-10-29, 19m-2).
 
-## ~~32a. The CPU reference~~ — **Shipped, #403** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a)
+## ~~32a. The CPU reference~~ — **Shipped, #403** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped/32-soap-film.md` §32a)
 
 ## ~~32b. The reflected view~~ — **Shipped, #469** (`soapFilmRgb` in `src/lib/soapFilm.ts`; the colour grade is 32b-1 below)
 
-**Shipped.** Story in `docs/plan-shipped.md` §32b (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
+**Shipped.** Story in `docs/plan-shipped/32-soap-film.md` §32b (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
 
 - **32b-1. Replace the colour grade with the soft box's solid-angle integral and camera gamut mapping.** In 32b, the 4-point path spread (`spread = 0.025`) and dark ground (`ground = 0.0004`) move C7's `t = 120` s saturation by two points (79% → 77%), while the colour grade (`notchFloor = 0.0725`, `chromaRetention = 0.67`) accounts for the rest of the drop from 77% to 13% against the photograph's 15%. Replace that grade with the real phenomenon: integrate the film's Airy reflectance over the soft box's solid angle as a quadrature in `cosI` with s and p Fresnel reflection terms at each angle and the thickness's phase `4π n d cos θ_t / λ` at each angle (which also retires the Fresnel half of shortcut (f)), then map the integrated CIE XYZ tristimulus into the camera's sRGB gamut instead of clamping negative linear channels to zero. *Measure:* the same saturation and hue numbers `npm run soapfilm` C7 prints, with the grade removed (`notchFloor = 0`, `chromaRetention = 1`), showing how much of the 77% → 15% saturation drop the solid-angle integral and camera gamut mapping recover. Also note that check C7 in `scripts/soapfilm.mjs` has no upper bound on saturation (`sat > 0.10` only, so it would pass a film far more saturated than the photograph, such as main's 79% or the ungraded 77%), for a check session to add that bar.
 
 ## ~~32c. The GPU solver~~ — **Shipped, #505** (`src/gpu/soapFilm.ts`, `src/gpu/wgsl/soapFilm.ts`; `npm run soapgpu` 29/29 on Metal)
 
-**Shipped.** Story in `docs/plan-shipped.md` §32c (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
+**Shipped.** Story in `docs/plan-shipped/32-soap-film.md` §32c (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
 
 - **32c-1. The drain's own "a ruptured cell stays black" never fires.** soapfilm.mjs C6 reads
   it on the drain, where measured, the reference with its rupture marks removed refills no cell

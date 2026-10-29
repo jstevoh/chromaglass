@@ -66,9 +66,9 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18m | A drop slumps under its own weight | Large where the liquid is thin: a pool of ink sinks and runs out as a flat, sharp-edged pool, r ∝ t^⅛ | 2 passes on the default Thickness, 7 in water | None. **Shipped** (#364); ~~18m-1~~ (#371, 18m-1a implicit step open), ~~18m-5~~ shipped, 18m-2 to 18m-4 and 18m-5a after |
 
 ## 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
-**Partly shipped**: Thin Gap is built and on in every look (#248), the Press draws the liquid back, and 18a-2 (forces that are forces) is done. What is open is below: the findings along the way, 18a-2's open findings, and the steps left for later PRs. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Thin Gap is built and on in every look (#248), the Press draws the liquid back, and 18a-2 (forces that are forces) is done. What is open is below: the findings along the way, 18a-2's open findings, and the steps left for later PRs. How it was found, built and measured is in [`docs/plan-shipped/18-physics.md`](../plan-shipped/18-physics.md), under the same number.
 
-*Shipped so far* (Thin Gap, on in every look since #248): one velocity field with the gap's implicit drag in place of the clamp, a variable-coefficient projection with an open rim, the noise stirring kept as a declared stir dial. The item as first written (where, the shortcuts it removes, what it takes, cost, what is lost, subsumes, ships as) is in `docs/plan-shipped.md` §18a (moved 2026-10-29, 19m-2).
+*Shipped so far* (Thin Gap, on in every look since #248): one velocity field with the gap's implicit drag in place of the clamp, a variable-coefficient projection with an open rim, the noise stirring kept as a declared stir dial. The item as first written (where, the shortcuts it removes, what it takes, cost, what is lost, subsumes, ships as) is in `docs/plan-shipped/18-physics.md` §18a (moved 2026-10-29, 19m-2).
 
 - **Found along the way, open:**
   - **Depth Drag does nothing on a thin gap** (found with 18a-every). It is the old
@@ -99,7 +99,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     so measure what the 0.45-a-cell clamp leaves behind instead: the pool's edge
     against where its volume puts it. `phaseRelax` still keeps Σc, not Σc·h
     (under 0.1% in that check).
-  - **The app's let-go check read a pool still spreading**: fixed (each pool its own control on the calm plate, the ambient seeding off for its runs). Story in `docs/plan-shipped.md` §18a (moved 2026-10-29, 19m-2).
+  - **The app's let-go check read a pool still spreading**: fixed (each pool its own control on the calm plate, the ambient seeding off for its runs). Story in `docs/plan-shipped/18-physics.md` §18a (moved 2026-10-29, 19m-2).
   - **On the Mac the thin Press barely clears the colour from under the palm.**
     The share of the colour within 0.05 of the palm went 76% → 69% held → 68%
     after the lift (its idle pool 78% → 76% → 72%; Thin Gap off 72% → 1%). The
@@ -214,14 +214,14 @@ its frame rate live. "Free" means no new passes or texture reads.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
-  - **18a-11, the cost measured (shipped).** Measured 2026-10-07 on the Mac with `npm run stages` (`docs/judging.md` §19): Thin Gap needs no look turned off (512², 33 ms/frame; H2b 52 fps), and the in-plane viscosity (18a-10) is 1.52 ms. Story in `docs/plan-shipped.md` §18a-11 (moved 2026-10-29, 19m-2).
-  - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.** The clear is gone and the warm start is the choice, said in `thinProject`. Story in `docs/plan-shipped.md` §18a-12 (moved 2026-10-29, 19m-2). Open: whether `hsCycles` from cold should converge on a grid that is not a power of two.
+  - **18a-11, the cost measured (shipped).** Measured 2026-10-07 on the Mac with `npm run stages` (`docs/judging.md` §19): Thin Gap needs no look turned off (512², 33 ms/frame; H2b 52 fps), and the in-plane viscosity (18a-10) is 1.52 ms. Story in `docs/plan-shipped/18-physics-3.md` §18a-11 (moved 2026-10-29, 19m-2).
+  - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.** The clear is gone and the warm start is the choice, said in `thinProject`. Story in `docs/plan-shipped/18-physics-3.md` §18a-12 (moved 2026-10-29, 19m-2). Open: whether `hsCycles` from cold should converge on a grid that is not a power of two.
   - **18a-13, tilt sloshes the liquid: shipped** (the owner, 2026-10-20: tip it one way
     and then the other and the colour should slop and mix). A shallow-water dish on the
     CPU (`lib/slosh.ts`) fed by the owner's tilt alone, its flow added to the thin solve's
     velocity after the solve, behind a new **Slosh** dial at 0 (the plate as it was, bit
     for bit; `npm run slosh`). How it was found and measured is in
-    [`docs/plan-shipped.md`](docs/plan-shipped.md) §18a-13; the owner's eyes on the pace
+    [`docs/plan-shipped/18-physics.md`](../plan-shipped/18-physics.md) §18a-13; the owner's eyes on the pace
     are `docs/judging.md` §58. Shortcuts, each named in the code, and the items that
     replace them:
     - **18a-13a. Two layers: shipped** (2026-10-22). Oil lenses ride the water at their
@@ -230,7 +230,7 @@ its frame rate live. "Free" means no new passes or texture reads.
       swing tips it where Frame Sway lets the frame move (`rockAccel`; how the rock itself is
       driven is 27f-2's). A kick's glass presses the dish over the same radii it presses the gap
       (`kickPress`: the sheet's one dent off the frame-moving looks). Story in
-      `docs/plan-shipped.md` §18a-13a; `npm run slosh`, `npm run sloshgpu`.
+      `docs/plan-shipped/18-physics.md` §18a-13a; `npm run slosh`, `npm run sloshgpu`.
     - **18a-13b. The rim's boundary layer.** The rim is free-slip; a real dish's wall
       holds a thin layer still and sheds a vortex when the wave turns there. The
       drag too is the covered gap's (12ν/h², Poiseuille between two walls), where a
@@ -252,7 +252,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     - **18a-13d. A shock-capturing scheme: shipped** (2026-10-22). HLL fluxes over
       hydrostatic reconstruction, MUSCL with the MC limiter, Heun in time: a dam
       break runs at Stoker's speed, two cells wide, and no energy is made. Story in
-      `docs/plan-shipped.md` §18a-13d. Still: no Coriolis or centrifugal term, and the
+      `docs/plan-shipped/18-physics.md` §18a-13d. Still: no Coriolis or centrifugal term, and the
       CPU film ignores the slosh.
     - **18a-13e. Hold Gravity's moves out of the slosh.** The dial is hand-only, but the
       tilt it follows is Gravity × Tilt Direction as the plate sees them, so a look
@@ -274,7 +274,7 @@ its frame rate live. "Free" means no new passes or texture reads.
       measures, so it wants the owner's eyes on Beat Squeeze first (27f-3).
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
-**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped/18-physics.md`](../plan-shipped/18-physics.md), under the same number.
 
 - **18b-8. The dishes too deep for the lamp.** Eighteen looks are dishes by their own
   description but fail the rule with the dye they were given for black: on the lamp the

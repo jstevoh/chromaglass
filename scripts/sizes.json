@@ -11,7 +11,6 @@
   ],
   "ledgers": {
     "PLAN.md": "The plan's index since 19m: the order of work and the running order every PR writes in. Its sections are files under docs/plan/, cut into parts of about 30 KB.",
-    "docs/plan-shipped.md": "Every shipped item moves its story here; out when 19m-3 splits the archive by section.",
     "docs/judging.md": "Every PR the owner must look at adds a section here.",
     "docs/guide.md": "Every feature writes what it does here (README.md); to be split by part of the app.",
     "CHANGELOG.md": "Every release adds its entry at the top.",

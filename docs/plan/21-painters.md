@@ -1,5 +1,5 @@
 # 21. Looks after painters
-**Partly shipped**: Roy, 1963, and Ben-Day Dots are in, measured by `npm run benday`; Roy opens as a panel, not a black stain (`npm run royopen`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Roy, 1963, and Ben-Day Dots are in, measured by `npm run benday`; Roy opens as a panel, not a black stain (`npm run royopen`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/21-painters.md`](../plan-shipped/21-painters.md), under the same number.
 
 The owner, 2026-09-27, over a screenshot of Classic at 2.8x covered in red dots on
 white by accident: "kinda cool, Roy Lichtenstein type style ... let's reserve this
@@ -38,7 +38,7 @@ Open:
   after painters (a Warhol screen print's off-register blocks, Riley's black and
   white, Rothko's soft fields); none is planned yet.
 
-*Shipped so far (found along the way, for §14b's owner):* `npm run wall` counts stamp misses apart (`stampMisses`), the draw gate believes a stamp up to one 240 Hz refresh ahead, and the harness checks its own gap (`originGap >= 1000`). Story in `docs/plan-shipped.md` §21 (moved 2026-10-29, 19m-2).
+*Shipped so far (found along the way, for §14b's owner):* `npm run wall` counts stamp misses apart (`stampMisses`), the draw gate believes a stamp up to one 240 Hz refresh ahead, and the harness checks its own gap (`originGap >= 1000`). Story in `docs/plan-shipped/21-painters.md` §21 (moved 2026-10-29, 19m-2).
 Still open for §14b: which clock runs ahead (the show's frames or the wall's converted ones; the
 count is page-wide), and whether the 2.4 ms is a Mac display link stamping the refresh
 a frame is for (inferred, not measured).

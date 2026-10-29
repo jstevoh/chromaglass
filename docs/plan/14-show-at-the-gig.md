@@ -23,7 +23,7 @@ deferred in `docs/webgpu-plan.md`, and the soft edge between projectors is rig R
 
 ## 14a. The show goes deaf when its window is hidden
 
-**Shipped** (#191): the ear keeps hearing behind the wall, and says when it is deaf (`npm run ears`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (#191): the ear keeps hearing behind the wall, and says when it is deaf (`npm run ears`). How it was found, built and measured is in [`docs/plan-shipped/14-show-at-the-gig.md`](../plan-shipped/14-show-at-the-gig.md), under the same number.
 
 *Still owed:* the owner's look on the Mac, covering the show window with another app
 for thirty seconds and reading `chromaglassCastState().ear.reads` before and after
@@ -40,7 +40,7 @@ time instead of gliding. The same worker tick could drive them.
 
 ## 14b. With the wall up, the plate may draw twice a refresh and the governor cannot see it
 
-**Shipped** (#203, #236): one draw a refresh with the wall up, and on a busy machine the wall no longer costs the show its own frames (`npm run wall`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (#203, #236): one draw a refresh with the wall up, and on a busy machine the wall no longer costs the show its own frames (`npm run wall`). How it was found, built and measured is in [`docs/plan-shipped/14-show-at-the-gig.md`](../plan-shipped/14-show-at-the-gig.md), under the same number.
 
 *Still owed:* the owner's look with a real projector on its own display. And stepping down under a wall at all: it is new behaviour, from 14b and
 14c together (the governor fed real intervals now, and a ladder built from the stage),
@@ -78,7 +78,7 @@ and nobody has seen it happen on the Mac.
 
 ## 14c. The projector's resolution comes from the laptop's pixel ratio
 
-**Shipped** (#194): a wall's pixels are the wall's, not the laptop's ratio (`npm run rungs`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (#194): a wall's pixels are the wall's, not the laptop's ratio (`npm run rungs`). How it was found, built and measured is in [`docs/plan-shipped/14-show-at-the-gig.md`](../plan-shipped/14-show-at-the-gig.md), under the same number.
 
 *Still owed, on the Mac:* whether 1024² holds on a 1080p wall. 2.07 Mpx sits between
 what was measured to hold (1.0) and to fail (4.1), so what `npm run ladder` with a
@@ -108,7 +108,7 @@ owner's look at a 0.75 rung on a real projector through the 'high' mirror.
 
 ## 14d. The beat clock hears a smoothed bass level, not the kick
 
-**Shipped** (#199): the clock hears the kick's onset, by its time (`npm run kicks`); counting heard kicks in the app on the Mac is 10.4's. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (#199): the clock hears the kick's onset, by its time (`npm run kicks`); counting heard kicks in the app on the Mac is 10.4's. How it was found, built and measured is in [`docs/plan-shipped/14-show-at-the-gig.md`](../plan-shipped/14-show-at-the-gig.md), under the same number.
 
 ## 14e. The picture and the room disagree about when the kick is
 
@@ -139,9 +139,9 @@ to `film`.
 
 ## 14f. Sound and MIDI reach the plate a frame late, through a whole-app render
 
-**Partly shipped** (#211 for the sound; the MIDI fader on 2026-10-11): the ear keeps every reading in a ref, tells React ten times a second, and the plate hears a reading taken on its own frame; a fader is read by the plate on its frame and shown on the desk ten times a second (`npm run renders`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#211 for the sound; the MIDI fader on 2026-10-11): the ear keeps every reading in a ref, tells React ten times a second, and the plate hears a reading taken on its own frame; a fader is read by the plate on its frame and shown on the desk ten times a second (`npm run renders`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/14-show-at-the-gig.md`](../plan-shipped/14-show-at-the-gig.md), under the same number.
 
-*Shipped so far* (#211, #194): the whole-App render on every reading, what `npm run ears` measured of it, and the fix (the frame loop reads the ear itself, React keeps the meters). Story in `docs/plan-shipped.md` §14f (moved 2026-10-29, 19m-2).
+*Shipped so far* (#211, #194): the whole-App render on every reading, what `npm run ears` measured of it, and the fix (the frame loop reads the ear itself, React keeps the meters). Story in `docs/plan-shipped/14-show-at-the-gig.md` §14f (moved 2026-10-29, 19m-2).
 
 Still open here: the reading's two byte arrays are still new each reading (about 60 KB
 a second), not reused: a listener may hold an older reading, so reusing them needs the
@@ -310,7 +310,7 @@ the checks and the build §19.
 
 ## ~~14m. Anyone on the venue's network can drive the show~~
 
-**Shipped, this PR** (`npm run showkey`: 11 of 33 on the old server, 33 of 33 now). Story in `docs/plan-shipped.md`.
+**Shipped, this PR** (`npm run showkey`: 11 of 33 on the old server, 33 of 33 now). Story in `docs/plan-shipped/14-show-at-the-gig-2.md`.
 Left open from it:
 
 - **14m-guest** (*proposed*, M; moved up by §36f, with a plate per performer): a **guest key**, now that the server has roles: a key
@@ -324,8 +324,8 @@ Left open from it:
   unchanged, which no cloud session can confirm (`npm run showkey` asks it with the
   headers cloudflared is documented to send). *Measure:* on the Mac, a phone through the
   tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
-- ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
+- ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped/14-show-at-the-gig-2.md`.
+- ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped/14-show-at-the-gig-2.md`.
 - **14m-https** (M, found in 14m-lan): a **network display cannot start at an `http://`
   Wi-Fi address**. Browsers give WebGPU only to a secure page (https, or localhost), so
   `http://<laptop-ip>:3000/?cast=true&key=…`, the address the README and the server give
@@ -346,12 +346,12 @@ Left open from it:
 
 ## ~~14n. One malformed message can end the plate~~
 
-**Shipped, #322.** Story in `docs/plan-shipped.md`.
+**Shipped, #322.** Story in `docs/plan-shipped/14-show-at-the-gig-2.md`.
 
 ## ~~14o. The song-ID Worker is open to anyone~~
 
 **Shipped, this PR** (`npm run fingerprint-worker`: 7 of 19 on the old Worker, 19 of 19 now).
-Story in `docs/plan-shipped.md`. Left open from it:
+Story in `docs/plan-shipped/14-show-at-the-gig-2.md`. Left open from it:
 
 - **14o-count** (S): the counters are in Workers KV, which takes one write a second per
   key and, on the free plan, 1000 writes a day; each lookup writes two keys, so the
@@ -359,7 +359,7 @@ Story in `docs/plan-shipped.md`. Left open from it:
   same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
   (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
   plan's quota. *Measure:* the same harness with a store that allows one write a second.
-- ~~**14o-smoke**~~ (S): the deployed Worker, measured from a cloud session on 2026-10-24. Story in `docs/plan-shipped.md` §14o-smoke (moved 2026-10-29, 19m-2). Left: whether a well-known commercial track comes back named, which needs a recording no cloud session should send.
+- ~~**14o-smoke**~~ (S): the deployed Worker, measured from a cloud session on 2026-10-24. Story in `docs/plan-shipped/14-show-at-the-gig-4.md` §14o-smoke (moved 2026-10-29, 19m-2). Left: whether a well-known commercial track comes back named, which needs a recording no cloud session should send.
 
 ## 14p. Show night runs whatever merged last
 

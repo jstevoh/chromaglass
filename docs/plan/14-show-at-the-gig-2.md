@@ -9,7 +9,7 @@ code.**
 
 - *The input picker never changed the input* (**shipped**, 2026-10-05): a pick opens the
   input picked, by its id, and closes the one before (`npm run inputpick`, 2/5 → 5/5).
-  The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) under 14s.
+  The story is in [`docs/plan-shipped/14-show-at-the-gig-2.md`](../plan-shipped/14-show-at-the-gig-2.md) under 14s.
 - *On Safari and iOS, every song after the first is silence to the ear.* Without
   `captureStream`, `musicStream` hands back the one `MediaStreamDestination`'s stream;
   `startMusic`, `handleSourceChange` and `toggleMusic` stop `audioStream`'s tracks, and
@@ -139,19 +139,19 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
 
 ## 14v. The show takes a long time to load on the web
 
-**Partly shipped** (2026-10-04): the opening builds its pipelines three at a time, asks for the app and the GPU earlier, asks for the display first, and an intro covers the black plate (`npm run loadtime`, `npm run intro`, `npm run startup`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (2026-10-04): the opening builds its pipelines three at a time, asks for the app and the GPU earlier, asks for the display first, and an intro covers the black plate (`npm run loadtime`, `npm run intro`, `npm run startup`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/14-show-at-the-gig-2.md`](../plan-shipped/14-show-at-the-gig-2.md), under the same number.
 
-*Shipped so far* (2026-10-04): where the opening's time went on CI's Mac (the plate black 12 to 18 s to its first step, 11 to 14 s of it fifty pipelines compiled one after another; the download a chain). Story in `docs/plan-shipped.md` §14v (moved 2026-10-29, 19m-2).
+*Shipped so far* (2026-10-04): where the opening's time went on CI's Mac (the plate black 12 to 18 s to its first step, 11 to 14 s of it fifty pipelines compiled one after another; the download a chain). Story in `docs/plan-shipped/14-show-at-the-gig-2.md` §14v (moved 2026-10-29, 19m-2).
 
 - **Shipped, 14v-5: the intro starts still, and turns once the opening's render
   pipelines are built** (2026-10-10). Turning, it stopped the Mac's frames while
   Chromium started the GPU (startup's "no stop in the opening" red on about half of
-  10-10's runs); `npm run intro` line 9b. The story is in `docs/plan-shipped.md`.
+  10-10's runs); `npm run intro` line 9b. The story is in `docs/plan-shipped/14-show-at-the-gig-2.md`.
 - **Shipped, 14v-6: the opening asks its first fills before the display, after the mount
-  frames settle** (2026-10-18, this PR). Story in `docs/plan-shipped.md` §14v-6 (moved
+  frames settle** (2026-10-18, this PR). Story in `docs/plan-shipped/14-show-at-the-gig-2.md` §14v-6 (moved
   2026-10-29, 19m).
 
-- **Shipped, 14v-7: a frame gap while the intro is held still counts only the page's own work in it** (2026-10-24, the owner's choice). Story in `docs/plan-shipped.md` §14v-7 (moved 2026-10-29, 19m-2); judged by `npm run flakes -- --check 'no stop in the opening'` over the week after. Named limit: the GPU process's compiles of the app's shaders inside the still stretch are not counted (1, 1b and the first step's cap hold their length).
+- **Shipped, 14v-7: a frame gap while the intro is held still counts only the page's own work in it** (2026-10-24, the owner's choice). Story in `docs/plan-shipped/14-show-at-the-gig-2.md` §14v-7 (moved 2026-10-29, 19m-2); judged by `npm run flakes -- --check 'no stop in the opening'` over the week after. Named limit: the GPU process's compiles of the app's shaders inside the still stretch are not counted (1, 1b and the first step's cap hold their length).
 - **14v-8. Two edges of 14v-7's rule, from its review (#456).** (b) is shipped (2026-10-25):
   three more synthetic openings for the `seenOk` gate (long tasks not observable, the
   timer's median over its bar, no timer reading), each of which must count the gap whole;
@@ -161,7 +161,7 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   Mac runs since 14v-7 merged the longest wait for a frame was 0.8 to 1.6 s and the still
   intro took nothing out on any of them, so there is nothing to read yet.
 - **Shipped, 14v-9: the webpage loads only itself first, and leaves the GPU for Play**
-  (2026-10-28). `npm run loadtime` 4a to 4d; the story is in `docs/plan-shipped.md` §14v.
+  (2026-10-28). `npm run loadtime` 4a to 4d; the story is in `docs/plan-shipped/14-show-at-the-gig-2.md` §14v.
 - **14v-10. The plate's opening is 8.75 s of compiling on a cold Mac.** CI's Mac, PR
   #511's run 40619521397 (2026-10-28): first step 13.44 s, the device given at 4.33 s,
   56 pipelines built ahead from 4.34 to 13.09 s (25.5 s of compiles over three lanes,
@@ -177,7 +177,7 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   restrict and zero) could be one dispatch writing both, which is fewer compiles and
   fewer dispatches a step. Each fusion changes the solver's step, so each wants
   `physics`, `thingap` and the Mac's frame time, not just `startup`.
-- **Changed after it shipped (2026-10-04, #254): one render pipeline compiling at a time.** Story in `docs/plan-shipped.md` §14v (moved 2026-10-29, 19m-2). Still to read: whether it narrows the spread, from the next deploys' readings.
+- **Changed after it shipped (2026-10-04, #254): one render pipeline compiling at a time.** Story in `docs/plan-shipped/14-show-at-the-gig-2.md` §14v (moved 2026-10-29, 19m-2). Still to read: whether it narrows the spread, from the next deploys' readings.
 - *Fewer or smaller opening pipelines.* `plate/display` alone is 1.5–2.2 s cold, and
   every look opens on the same forty-three; a display shader split by what the look
   turns on, or kernels that share one pipeline, would cut the compile itself. Measure
@@ -191,11 +191,11 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
 
 ## 14w. The pointer on the wall (shipped)
 
-**Shipped.** Story in `docs/plan-shipped.md` §14w (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14w (moved 2026-10-29, 19m).
 
 ## 14x. The microphone hears the hand on the laptop (shipped)
 
-**Partly shipped** (2026-10-04): a reading taken just after a press, key or touch on the page calls no onset on the microphone (`npm run clicks`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (2026-10-04): a reading taken just after a press, key or touch on the page calls no onset on the microphone (`npm run clicks`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/14-show-at-the-gig-2.md`](../plan-shipped/14-show-at-the-gig-2.md), under the same number.
 
 *Still open:*
 - *A gesture the page handles after its sound has reached the ear is not gated.* The
@@ -215,28 +215,28 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
 
 ## 14y. The sound Source opens on Off (shipped, asked 2026-10-22)
 
-**Shipped.** Story in `docs/plan-shipped.md` §14y (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14y (moved 2026-10-29, 19m).
 
-- **Measured** (`npm run opensource`) and **check changes** (`qa`'s first-visit line, `kickbubbles`, and the harnesses that set the remembered source). Story in `docs/plan-shipped.md` §14y (moved 2026-10-29, 19m-2).
+- **Measured** (`npm run opensource`) and **check changes** (`qa`'s first-visit line, `kickbubbles`, and the harnesses that set the remembered source). Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14y (moved 2026-10-29, 19m-2).
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
 
 ## 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
 
-**Shipped.** Story in `docs/plan-shipped.md` §14aa (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14aa (moved 2026-10-29, 19m).
 
 - **14aa-1** (open, the owner's eyes): on the owner's 120 Hz laptop and on the wall, does
   the plate still stutter now and then? `docs/judging.md` §88.
 - ~~**14aa-2**~~ (measured 2026-10-25 on the owner's Mac, Metal, comment on #441) Shipped;
-  story in `docs/plan-shipped.md` §14aa-2 (moved 2026-10-29, 19m).
+  story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14aa-2 (moved 2026-10-29, 19m).
 
 ## 14aa-3. The governor climbs back to sixty steps into a stutter (shipped 2026-10-25)
 
 **Shipped**: the governor measures what a solver step costs apart from the frame's drawing,
 judges each climb on what the state it climbs to would cost, and gives sixty steps up when
 frames keep missing a refresh with the GPU over its budget, where it used to wait for an
-average that sat either … Story in `docs/plan-shipped.md` §14aa-3 (moved 2026-10-29, 19m).
+average that sat either … Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14aa-3 (moved 2026-10-29, 19m).
 
 Open, found doing it:
 
@@ -264,7 +264,7 @@ Open, found doing it:
 An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show pays.
 
 - ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Story in
-  `docs/plan-shipped.md` §14ab-1 (moved 2026-10-29, 19m).
+  `docs/plan-shipped/14-show-at-the-gig-3.md` §14ab-1 (moved 2026-10-29, 19m).
 - **14ab-2** *The video pour's optical flow is a CPU loop* over a 192² `getImageData`
   each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
   pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
@@ -284,8 +284,8 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
 - ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort on
-  their history.~~ Shipped; story in `docs/plan-shipped.md` §14ab-7 (moved 2026-10-29, 19m).
-- ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows~~ **Shipped** (#533, `npm run renders`' gamepad phase). Story in `docs/plan-shipped.md` §14ab-8 (moved 2026-10-29, 19m-2).
+  their history.~~ Shipped; story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ab-7 (moved 2026-10-29, 19m).
+- ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows~~ **Shipped** (#533, `npm run renders`' gamepad phase). Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ab-8 (moved 2026-10-29, 19m-2).
 - **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
   sixty steps (`speciesShare`); a ring like the readback's.
 - **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
@@ -305,7 +305,7 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
 **Shipped** (2026-10-24): four public domain cartoons, each the whole film looping, poured
 as dye or played as the film from a Cartoons shelf on the desk's Dye panel and the phone's
 dye sheet (`src/lib/cartoons.ts`, `CartoonShelf.tsx`; sources and licences in
-`public/video/cartoons/SOURCES.md` … Story in `docs/plan-shipped.md` §14ac (moved
+`public/video/cartoons/SOURCES.md` … Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ac (moved
 2026-10-29, 19m).
 
 Open, found building it:
@@ -348,7 +348,7 @@ Open, found building it:
 
 ## 14ae. One Record button (shipped, asked 2026-10-24)
 
-**Shipped.** Story in `docs/plan-shipped.md` §14ae (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ae (moved 2026-10-29, 19m).
 
 - **14ae-1** *Song film still lives in the music player too.* Its film icon stays beside the
   song it renders; the panel's row opens the same sheet. Phase 3 of the Clear Controls audit

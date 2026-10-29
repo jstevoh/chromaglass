@@ -1,10 +1,10 @@
 # 0. The dye a tool makes, and the deploys it is blocking
 
-**Partly shipped** (#152, #225, #238, #250, #251): the dye's advection thins where the flow spreads, a held press no longer sets the whole plate flowing, the band's kicks follow Audio Impact, and the phone's take-button checks and the deploy gate no longer fail on what they did not measure. What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#152, #225, #238, #250, #251): the dye's advection thins where the flow spreads, a held press no longer sets the whole plate flowing, the band's kicks follow Audio Impact, and the phone's take-button checks and the deploy gate no longer fail on what they did not measure. What is open is below. How it was found, built and measured is in [`docs/plan-shipped/00-dye-tools.md`](../plan-shipped/00-dye-tools.md), under the same number.
 
 `src/gpu/wgsl/fluid.ts` (advection), `scripts/tools.mjs`
 
-*Shipped so far* (#449): the Finger's `adds none` was read against the ambient seeder; the seeder is off for the Finger, a `quiet` check, a step-matched control, both bars set from 48 Mac trials. Story in `docs/plan-shipped.md` §0 (moved 2026-10-29, 19m-2).
+*Shipped so far* (#449): the Finger's `adds none` was read against the ambient seeder; the seeder is off for the Finger, a `quiet` check, a step-matched control, both bars set from 48 Mac trials. Story in `docs/plan-shipped/00-dye-tools.md` §0 (moved 2026-10-29, 19m-2).
 
 *Measured (PR #449):* the Finger adds no dye on a genuinely thin pool: twelve trials on
 pools of 39 to 80 landed at most 0.05 outside the bracket. `TOOLS_POOL_MS` shortens the Drop hold to
@@ -75,7 +75,7 @@ own and left as it is: Soap Bursts on the beat (Soap Flow), Rock and the rhythm 
 camera's beat (Macro Sync), and the look's pace (Tempo Sync). Whether any of those
 should also answer to Audio Impact is a later look question, not done here.
 
-*Found 2026-10-04 (#238), **done on the thin gap (#250); open on the old plate** below:* **with the band playing, the ferrofluid poured round Classic's middle drifted into it.** It was the old plate's bubble press ("a still bubble presses the glass", above); `npm run ferrodrift` (#250) holds the thin gap still with the band and asks the old plate to drift, a line that turns round once its bubbles stop pressing. Story in `docs/plan-shipped.md` §0 (moved 2026-10-29, 19m-2).
+*Found 2026-10-04 (#238), **done on the thin gap (#250); open on the old plate** below:* **with the band playing, the ferrofluid poured round Classic's middle drifted into it.** It was the old plate's bubble press ("a still bubble presses the glass", above); `npm run ferrodrift` (#250) holds the thin gap still with the band and asks the old plate to drift, a line that turns round once its bubbles stop pressing. Story in `docs/plan-shipped/00-dye-tools.md` §0 (moved 2026-10-29, 19m-2).
 
 *Found 2026-10-05 (#267, #281 and #287 red on it), **fixed in the ferrodrift control's
 PR:*** **the old-plate line sat on its bar.** Its four bubbles at 0.15, set down 2.5 s
@@ -109,7 +109,7 @@ the page's animation frames, not the stage's drawn ones, and did not wait for th
 to be off; it now waits for both, and the check prints all seven readings in order, so
 the next red says which frame was odd (this PR).
 
-*Shipped so far* (`npm run deploygate`): deploys no longer re-measure a tree its PR already passed; 3 of 5 red deploys on 2026-09-27 were that tree going red the second time. Story in `docs/plan-shipped.md` §0 (moved 2026-10-29, 19m-2).
+*Shipped so far* (`npm run deploygate`): deploys no longer re-measure a tree its PR already passed; 3 of 5 red deploys on 2026-09-27 were that tree going red the second time. Story in `docs/plan-shipped/00-dye-tools.md` §0 (moved 2026-10-29, 19m-2).
 
 *Found 2026-09-27, not yet done:* the checks that went red on deploys that day, on code
 they do not measure (besides the Finger, the mirror and the wall's gain above): Beat Squeeze on two deploys (#190's,
@@ -127,7 +127,7 @@ the product is wrong, from the numbers it prints.
 the show's clock" read the clock against the harness's own stamps of its taps; it now reads
 the tempo source's period (`chromaglassTempo()` under `?debug`) and asks two claims, each on
 one stopwatch (`npm run squeeze`, 400.1 against 400.1 ms, and three controls red where they
-should be). The story is in docs/plan-shipped.md §0.
+should be). The story is in docs/plan-shipped/00-dye-tools.md §0.
 
 *Found 2026-10-06, by 0-tap's controls, not yet done:* **"and the show kicks on it" passes
 on the ear alone.** With the tap switched off, the band's own kicks heard by the ear made 25

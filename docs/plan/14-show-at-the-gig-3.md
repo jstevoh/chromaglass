@@ -6,7 +6,7 @@ Part 3 of 3 of §14; it begins at 14ad. The section starts in `14-show-at-the-gi
 
 **Shipped** (2026-10-24): one camera list (`useCameras`, kept current on `devicechange`) and
 one picker (`CameraPicker.tsx`) in both places a camera opens, desk and phone alike. Story
-in `docs/plan-shipped.md` §14ad (moved 2026-10-29, 19m).
+in `docs/plan-shipped/14-show-at-the-gig-3.md` §14ad (moved 2026-10-29, 19m).
 
 - **14ad-1** (S) *The audio input does not come back either* (14g's first half): the same
   `devicechange` reopen, for the sound's input.
@@ -30,10 +30,10 @@ caught; a quiet bridge can be. It samples at the App's render rate, not the ear'
 and the change is a fixed 2 s fade wherever it lands (`App.tsx`, the On a New Song
 effect). `npm run music` only feeds it synthetic level traces.
 
-- ~~**14z-1**~~ (**shipped**): On a New Song opens on Keep (`npm run music`). Story in `docs/plan-shipped.md` §14z-1 (moved 2026-10-29, 19m-2).
+- ~~**14z-1**~~ (**shipped**): On a New Song opens on Keep (`npm run music`). Story in `docs/plan-shipped/14-show-at-the-gig-4.md` §14z-1 (moved 2026-10-29, 19m-2).
 - **14z-2** (**shipped**): where a song ends and the next begins, measured on real songs.
-  Story in `docs/plan-shipped.md` §14z-2 (moved 2026-10-29, 19m).
-- ~~**14z-3**~~ (**shipped**): the change lands on a hit of the new song. Story in `docs/plan-shipped.md` §14z-3 (moved 2026-10-29, 19m-2). Judged on the owner's GPU: `docs/judging.md` §65.
+  Story in `docs/plan-shipped/14-show-at-the-gig-4.md` §14z-2 (moved 2026-10-29, 19m).
+- ~~**14z-3**~~ (**shipped**): the change lands on a hit of the new song. Story in `docs/plan-shipped/14-show-at-the-gig-4.md` §14z-3 (moved 2026-10-29, 19m-2). Judged on the owner's GPU: `docs/judging.md` §65.
 - **14z-4**: once the owner has judged §65 with their own music, On a New Song opens on
   New preset again (the `music` check's default line moves with it).
 - **14z-5**: the room tracker seeds its floor on the analyser's first frame, and an analyser

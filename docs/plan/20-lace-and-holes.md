@@ -142,7 +142,7 @@ pool on the black ground stays the control.
 lamp and 0% on black. What is left of 20a is the look itself, on Lamp Ground 1.
 
 ## 20b. A clear film that tears (the thin-film equation)
-**Partly shipped** (#259): the Clear Film is built behind `clearFilm` and checked by `npm run lace`. What is left from it, each its own item, is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#259): the Clear Film is built behind `clearFilm` and checked by `npm run lace`. What is left from it, each its own item, is below. How it was found, built and measured is in [`docs/plan-shipped/20-lace-and-holes.md`](../plan-shipped/20-lace-and-holes.md), under the same number.
 
 Left from 20b, each its own item:
 
@@ -218,7 +218,7 @@ least 2:1 before it meets another.
 - **20c-1. Macro closeup cell field is a look-alike shortcut (opt-in since 33g: no look draws it by default; retained pending physical Rayleigh–Bénard / Marangoni simulation).** The procedural `cellField` in `src/gpu/wgsl/plate.ts` (evaluated at 6x zoom and timed on `cellClock`, verified by `npm run cellride`) draws concentric circular Voronoi cells and slides them with a flow map rather than physically simulating buoyancy-driven or Marangoni surface-tension-gradient convection cells and silicone phase separation (§25f). While 20c introduces physical viscous film drag in the Hele-Shaw solver (`thinGap.ts`), the sub-grid macro cellular structure remains a procedural camera-pass effect until physical density-inversion and micro-droplet solver passes are available.
 
 - **20c-2. Settings tabs on the phone (shipped in #348's review).** Story in
-  `docs/plan-shipped.md` §20c-2 (moved 2026-10-29, 19m).
+  `docs/plan-shipped/20-lace-and-holes.md` §20c-2 (moved 2026-10-29, 19m).
 
 - **20c-3** (S, a check in a cloud session): `npm run phone` with `PW_WEBGPU=1` in a cloud session fails "every tab of the phone's Settings rail takes a tap where it is drawn" on main e679e6d, with 23 of 24 tabs covered (all but Master), while a script that opens the rail alone at 390×844 finds none covered. Something an earlier step leaves open lies over the strip in the full run; find what `elementFromPoint` lands on instead and close it in the check's path, or fix the overlay if a phone would meet it too. Found in 14m's PR, which ran it on main to rule its own diff out.
 

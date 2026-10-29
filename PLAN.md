@@ -3,7 +3,7 @@
 This file is the index of the plan: the order of work, where each section stands, and
 the rules. Each section is a file of its own under [`docs/plan/`](docs/plan/), listed in
 "Sections" below, so a session reads this file and the one section its step names, never
-the whole plan. What shipped is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under
+the whole plan. What shipped is in [`docs/plan-shipped/`](docs/plan-shipped/README.md), one file a section under
 the same numbers; each shipped item keeps a one-line stub in its section saying where its
 story went. Find an item from its id with `grep -rn "14ab-4" docs/plan/`.
 
@@ -47,13 +47,14 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   clock (`LiquidVisualizer.tsx`): find what the second press lands on, or what stalls the
   sample, and make the check say which.
 - **0.4** **19r** (E, S): the open shard evened again, **shipped** (the phone's fingers to show;
-  docs/plan-shipped.md 19r).
+  docs/plan-shipped/19-checks-build-plan.md 19r).
 - **0.5** ~~**19k** (E, M): one manifest of checks, so a PR that changes only check scripts runs
   only their shards, a new check edits no shared file, and `npm run quick` runs what
   the diff needs, in parallel.~~ #502; 19k-1, 19k-3, 19k-4 shipped, 19k-2 (measure it over
   the next 25 merges) and the rest of 19k-5 open
 - **0.6** **19m** (F, M, at a quiet moment): ~~this file as an index with one file per
-  section~~ (2026-10-29, the index half: `docs/plan/`); open, the fragment files for the
+  section~~ (2026-10-29, the index half: `docs/plan/`; ~~the archive one file a section~~,
+  19m-3 and 19m-4, `docs/plan-shipped/`); open, the fragment files for the
   shared documents (19m-1); 23 of the last 25 merge conflicts were in `PLAN.md`,
   `docs/judging.md`, the changelog or `package.json`.
 - **0.7** **19l** (E, M): app frames readable in a cloud session (headed Chromium under xvfb), so
@@ -146,14 +147,14 @@ merge conflicts are the shared documents', which 0.6 ends.
   anchor and 11-back come from those rules being scattered); one action table for MIDI,
   the remote, the keyboard and ⌘K.
 - **3.4** **Keep this file small** (F): after 0.6, a batch whose open items are all done moves to
-  `docs/plan-shipped.md` in the PR that closes it.
+  its section's file in `docs/plan-shipped/` in the PR that closes it.
 
 ### Wave 4. The frame budget (lane C, measured with `npm run stages` and `npm run renders`)
 
 - ~~**4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.~~
   Shipped with 14aa (`npm run encode`, 512², thin gap: 506 KB allocated a step → 31 KB,
   249 writes for 267 dispatches → 2, the main thread in `step()` 3.4 ms → 0.4). Story in
-  `docs/plan-shipped.md` §14aa.
+  `docs/plan-shipped/14-show-at-the-gig-3.md` §14aa.
 - **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
@@ -386,7 +387,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 
 The order of work at the top of this file (2026-10-04). It replaces the list that
 stood here, written on 2026-09-26, whose every step has since shipped or moved into
-it. The shipped batches are in `docs/plan-shipped.md`, and 19m is the rest of this
+it. The shipped batches are in `docs/plan-shipped/`, and 19m is the rest of this
 file's split.
 
 ## Operating rules

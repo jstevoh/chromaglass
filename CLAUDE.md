@@ -11,9 +11,11 @@ is a file under `docs/plan/` (`00-dye-tools.md` to `36-analog-operators.md`, a b
 between items into parts of about 30 KB), and `grep -rn '14ab-4' docs/plan/` finds
 an item from its id. Never read every section: the open plan is about 630 KB in all, and
 see "Keeping a session small" for why that matters. What shipped is in
-`docs/plan-shipped.md`, under the same numbers: a section keeps a one-line stub per shipped
+`docs/plan-shipped/`, one file a section under the same names (`grep -rn '14ab-4'
+docs/plan-shipped/` finds a story): a section keeps a one-line stub per shipped
 item and only the open work, so read the archive only when an open item needs the history
-behind it. When an item ships, move its story there in the same PR and leave the stub. A
+behind it. When an item ships, move its story to the end of its section's last file there in the same
+PR and leave the stub. A
 branch that still edits the old one-file `PLAN.md` carries its edits across with
 `node scripts/planmove.mjs` after merging main (19m). The engine's own order is in
 `docs/roadmap.md`.

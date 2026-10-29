@@ -10,13 +10,11 @@ performer would notice first:
 
 ## 15a. Only the Dropper lays the bottle's liquid (shipped)
 
-**Shipped** (#201): every laying tool lays the bottle's liquid (`npm run bottles`); the Splat line's "following the hand" was fixed in #214. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (#201): every laying tool lays the bottle's liquid (`npm run bottles`); the Splat line's "following the hand" was fixed in #214. How it was found, built and measured is in [`docs/plan-shipped/15-tools-on-liquids.md`](../plan-shipped/15-tools-on-liquids.md), under the same number.
 
 ## 15i. Picking a bottle pours nothing (shipped)
 
-**Shipped** (2026-10-04): picking a bottle sets the bottle in the hand and pours nothing (`npm run bottles`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
-
-  Maze, Ferro Paint) carry their own amount and lay their own pour when they load.
+**Shipped** (2026-10-04): picking a bottle sets the bottle in the hand and pours nothing (`npm run bottles`). How it was found, built and measured is in [`docs/plan-shipped/15-tools-on-liquids.md`](../plan-shipped/15-tools-on-liquids.md), under the same number.
 
 ## 15j. Found with 15i
 
@@ -39,7 +37,7 @@ performer would notice first:
 
 ## 15b. A tool's push lasts one step (why Blow and Finger barely move anything)
 
-**Partly shipped** (2026-10-04): the Finger is a solid in the thin layer and moves every liquid (`npm run fingerflow`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (2026-10-04): the Finger is a solid in the thin layer and moves every liquid (`npm run fingerflow`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/15-tools-on-liquids.md`](../plan-shipped/15-tools-on-liquids.md), under the same number.
 
 **Shipped for the Finger on a thin gap (every look; `npm run fingerflow`), not yet
 judged on the Mac (`docs/judging.md` §33).** The owner's OK for the feel change came
@@ -74,13 +72,13 @@ Left, each its own plan item:
 
 ## 15c. Blow's wind erases colour rather than pushing it (shipped)
 
-**Shipped** (#215): Blow's wind carries the colour and the oil the way the hand went, rather than erasing them (`npm run wind`, `npm run tools`). Its follow-ups are 15f and 15g. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (#215): Blow's wind carries the colour and the oil the way the hand went, rather than erasing them (`npm run wind`, `npm run tools`). Its follow-ups are 15f and 15g. How it was found, built and measured is in [`docs/plan-shipped/15-tools-on-liquids.md`](../plan-shipped/15-tools-on-liquids.md), under the same number.
 
-*Shipped so far* (#254): the wind is drawn both ways from the plate's middle and each stroke beats the window before it; the drift after turns round with the wind. Story in `docs/plan-shipped.md` §15c (moved 2026-10-29, 19m-2). Not yet seen: the line failing on a wind with its carry turned off.
+*Shipped so far* (#254): the wind is drawn both ways from the plate's middle and each stroke beats the window before it; the drift after turns round with the wind. Story in `docs/plan-shipped/15-tools-on-liquids.md` §15c (moved 2026-10-29, 19m-2). Not yet seen: the line failing on a wind with its carry turned off.
 
 ## 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
-*Shipped so far* (first part): on a thin gap the moving Blow is the breath's shear on the surface, ½ρ_air C_f U², a body force for as long as the breath goes on (`src/lib/breath.ts`; `npm run airblow`), and its push and its three carries no longer run there. Story in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2). Not yet judged on the Mac (judging §44). Open, each its own PR:
+*Shipped so far* (first part): on a thin gap the moving Blow is the breath's shear on the surface, ½ρ_air C_f U², a body force for as long as the breath goes on (`src/lib/breath.ts`; `npm run airblow`), and its push and its three carries no longer run there. Story in `docs/plan-shipped/15-tools-on-liquids.md` §15g (moved 2026-10-29, 19m-2). Not yet judged on the Mac (judging §44). Open, each its own PR:
 
 - **15g-2 The jet's dimple.** A held puff (a Blow held still that is not the straw:
   a second finger, a plate that is not the lead, a remote's puff) still runs the old
@@ -115,7 +113,7 @@ Left, each its own plan item:
   app pushes colour left during a Blow stroke, or the stroke to the right runs fewer
   steps of breath; the check prints both (wind steps, aired, readings) to find which.
 
-*The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
+*The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped/15-tools-on-liquids.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 
 ## 15f. Found with 15c
 
@@ -136,9 +134,9 @@ Left, each its own plan item:
 
 ## 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
-**Partly shipped** (#210): a press carries the oil with its colour, and a pressed ferrofluid pool keeps its volume under Thin Gap (`npm run pressoil`, `npm run ferropress`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#210): a press carries the oil with its colour, and a pressed ferrofluid pool keeps its volume under Thin Gap (`npm run pressoil`, `npm run ferropress`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/15-tools-on-liquids.md`](../plan-shipped/15-tools-on-liquids.md), under the same number.
 
-*Shipped so far* (#210): the press carries the oil to the dye's ring by one straight-out map (`src/lib/pressRing.ts`; `npm run pressoil` 11/11), and the gap's drag takes the ferrofluid's own viscosity (`FERRO_NU`; `npm run ferropress`). Story in `docs/plan-shipped.md` §15d (moved 2026-10-29, 19m-2). Still owed: the straight-out dye and the ferrofluid's faster answer judged on the Mac (judging §18, §23), and `npm run press`, the only app check of the dye ring's shape, is not in CI: worth bringing into the tools shard.
+*Shipped so far* (#210): the press carries the oil to the dye's ring by one straight-out map (`src/lib/pressRing.ts`; `npm run pressoil` 11/11), and the gap's drag takes the ferrofluid's own viscosity (`FERRO_NU`; `npm run ferropress`). Story in `docs/plan-shipped/15-tools-on-liquids.md` §15d (moved 2026-10-29, 19m-2). Still owed: the straight-out dye and the ferrofluid's faster answer judged on the Mac (judging §18, §23), and `npm run press`, the only app check of the dye ring's shape, is not in CI: worth bringing into the tools shard.
 
 *Open, found building it:*
 - **With Thin Gap off a press still greys the ferrofluid.** The old solver's flow cannot

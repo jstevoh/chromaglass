@@ -9,7 +9,7 @@ reading 14 recent `Checks` runs and 96 `gallery.yml` runs through the Actions AP
 #207.)
 
 ## 19a. `gallery.yml` holds the Mac runners
-**Partly shipped**: `gallery.yml` now runs only by hand or on a PR labelled `gallery`, and `closed.yml` cancels a merged PR's queued runs. The measure after a day's PRs, and more Mac runners (19g), are below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: `gallery.yml` now runs only by hand or on a PR labelled `gallery`, and `closed.yml` cancels a merged PR's queued runs. The measure after a day's PRs, and more Mac runners (19g), are below. How it was found, built and measured is in [`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same number.
 
 *Measure after:* `npm run macqueue` over a like window once a day's PRs have run: the
 gallery's share should be its labelled runs only, and the shards' mean wait below 19
@@ -17,10 +17,10 @@ minutes for the same number of open PRs. Left for the owner, since only a settin
 bill changes it: more Mac runners at once (19g).
 
 ## 19b. Measure is near its timeout, and its first red hides the rest
-**Shipped**: Measure runs as three parts side by side, each step with `!cancelled()`, with `npm run wgsl` and the script syntax check in it. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**: Measure runs as three parts side by side, each step with `!cancelled()`, with `npm run wgsl` and the script syntax check in it. How it was found, built and measured is in [`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same number.
 
 ## 19c. Checks that can pass without measuring, and checks nothing runs
-**Partly shipped**: the `wall`, `startup` and book-pairing reds listed as fixed are mended. The checks that can still pass without measuring, and the open lines, are below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: the `wall`, `startup` and book-pairing reds listed as fixed are mended. The checks that can still pass without measuring, and the open lines, are below. How it was found, built and measured is in [`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same number.
 
 - `crash.mjs` waits 20 s for the GPU to draw, with `.catch(() => false)`; if it does
   not, the screenshot, loss, recovery, stall and fatal checks print `skip`, and the exit
@@ -45,7 +45,7 @@ bill changes it: more Mac runners at once (19g).
   rewall's "frames reach the wall again" line runs in Measure, where no frames are drawn,
   so it prints rather than asks until a Mac shard runs it.
 
-- ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's own next frame on a runner whose two windows are handed different refreshes~~ **Done.** Story in `docs/plan-shipped.md` §19c (moved 2026-10-29, 19m-2).
+- ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's own next frame on a runner whose two windows are handed different refreshes~~ **Done.** Story in `docs/plan-shipped/19-checks-build-plan.md` §19c (moved 2026-10-29, 19m-2).
 - `render-app`'s "the live loop draws again after every render" wants more than 5
   frames in the half second after each render, and read 5 after render M (music
   playing, a blackout near the end) on #236's show shard (2026-10-03), where the last
@@ -53,12 +53,12 @@ bill changes it: more Mac runners at once (19g).
   a moment after a render, so the line judges the runner as well as the loop. What it
   means to ask is whether the loop resumes at all: count frames until a fixed number
   have been drawn, with a long limit, rather than frames in a fixed half second.
-- ~~`startup`'s "no stop in the opening" charges Chromium's hold at the GPU's start to the page~~ **Fixed 2026-10-04** (`scripts/pagehold.mjs`). Story in `docs/plan-shipped.md` §19c (moved 2026-10-29, 19m-2). *Still open:* the
+- ~~`startup`'s "no stop in the opening" charges Chromium's hold at the GPU's start to the page~~ **Fixed 2026-10-04** (`scripts/pagehold.mjs`). Story in `docs/plan-shipped/19-checks-build-plan.md` §19c (moved 2026-10-29, 19m-2). *Still open:* the
   page's code after a GPU promise that ends exactly where Chromium's hold begins, with
   nothing between, still goes to check 4; which promise settled at 1.0 s on that run
   is not known (the opening line now names it); and the rule's cases could run in
   Measure, being pure Node, if #239's owner of the workflows adds them.
-- ~~`startup`'s reds on PRs that never touched the opening, after #242~~ **Fixed 2026-10-04.** Story in `docs/plan-shipped.md` §19c (moved 2026-10-29, 19m-2). *Still open:* 4b's hold, since
+- ~~`startup`'s reds on PRs that never touched the opening, after #242~~ **Fixed 2026-10-04.** Story in `docs/plan-shipped/19-checks-build-plan.md` §19c (moved 2026-10-29, 19m-2). *Still open:* 4b's hold, since
   #249 asked for the display first, is the GPU process compiling it while Chromium
   readies the page (2.92 to 4.00 s on the four runs since #254, against a 4.5 s cap
   and 1.54 to 3.50 s before #249): the page's own compile inside the window 4b excuses
@@ -71,7 +71,7 @@ as `npm run` names. Each new check held red by the `check-skeptic`.
 
 ## 19d. The build and what it ships
 
-- ~~`startup` 1b, "nothing to compare", after #283~~ **Fixed 2026-10-05.** Story in `docs/plan-shipped.md` §19d (moved 2026-10-29, 19m-2). *Still open:* read the first Mac runs' prints to
+- ~~`startup` 1b, "nothing to compare", after #283~~ **Fixed 2026-10-05.** Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19d (moved 2026-10-29, 19m-2). *Still open:* read the first Mac runs' prints to
   see the follow stop (#283's run: 11.27 s from 5.20 s) carries first uses too; if it
   does, the one-second window is that same compile and could go.
 - The main route loads about 527 KB of script gzipped (1.68 MB raw): the App's chunk
@@ -124,9 +124,9 @@ directly, as `checks.yml` already does for some; the strays deleted or wired;
 `actionlint` in Measure.
 
 ## 19f. The plan and the docs, out of step with the code
-**Partly shipped** (#245): the first three notes of docs out of step with the code are fixed. What is left is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#245): the first three notes of docs out of step with the code are fixed. What is left is below. How it was found, built and measured is in [`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same number.
 
-*Shipped so far* (#245, #230): the order of work replaces "What comes next", the openings say what is built, `docs/judging.md`'s numbers are unique, the "one home" table is written. Story in `docs/plan-shipped.md` §19f (moved 2026-10-29, 19m-2).
+*Shipped so far* (#245, #230): the order of work replaces "What comes next", the openings say what is built, `docs/judging.md`'s numbers are unique, the "one home" table is written. Story in `docs/plan-shipped/19-checks-build-plan.md` §19f (moved 2026-10-29, 19m-2).
 
 - The Mac checks that went red once on trees that did not touch them are written in
   both §0 and §11 (the Finger's "adds none", the mirror's "nowhere else", `startup`'s
@@ -161,7 +161,7 @@ the owner's "merge behind main" rule (2026-09-28) trades away; 191 deploy minute
 window above.
 
 ## 19h. What a red PR costs, and which reds were the PR's own
-**Partly shipped**: Measure in three parts, the reach filter for docs-only PRs, the evened shards and the deploy's skip of a second Mac run are in. What is left is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: Measure in three parts, the reach filter for docs-only PRs, the evened shards and the deploy's skip of a second Mac run are in. What is left is below. How it was found, built and measured is in [`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same number.
 
 *Measure after:* the shards' medians and maxima, and the PR runs' red rate by line, over a
 like day (`npm run macqueue -- --hours 24` for the time).
@@ -180,7 +180,7 @@ like day (`npm run macqueue -- --hours 24` for the time).
   laid; `grating`'s §6 holds two Drops at ten moments and reads the old push 0.40 apart,
   today's 1.00. The rarer case of both fingers low at once is still open (batch 11's
   two-finger entry), and `phone` now prints what the plate gained of what it was handed.
-  *Shipped so far:* the 2026-10-05 reading of the two both-low reds (not the touch path; two leads). Story in `docs/plan-shipped.md` §19h-2 (moved 2026-10-29, 19m-2).
+  *Shipped so far:* the 2026-10-05 reading of the two both-low reds (not the touch path; two leads). Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19h-2 (moved 2026-10-29, 19m-2).
   **Cause found 2026-10-25 (4 reds of 169 Mac runs, 10-18 to 10-24): the check read the
   plate in the frames after a rebuild, the dye was not lost.** All four print the same
   states: 384² solvers #1 and #2 through the hold, 256² solvers #3 and #4 after it (the
@@ -193,24 +193,24 @@ like day (`npm run macqueue -- --hours 24` for the time).
   it snaps; no bar, cell or hold moved. Named, not done: for those few frames after a
   resolution change every reader of `readDensity` sees an empty plate (bubbles, the
   regulator's reading); the app could keep the old reading until the new one lands.
-  *Shipped so far* (2026-10-10): the red line prints, before, held and after, the engine, grid, plate, clears, drains and each solver's steps and readbacks. Story in `docs/plan-shipped.md` §19h-2 (moved 2026-10-29, 19m-2).
+  *Shipped so far* (2026-10-10): the red line prints, before, held and after, the engine, grid, plate, clears, drains and each solver's steps and readbacks. Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19h-2 (moved 2026-10-29, 19m-2).
 
 ## 19i. A green Mac result carries across a merge of main
 
 **Shipped** (#429; carrying fixed in 19k, #502, since until then it asked for four shards
-where there were five and so never carried) Story in `docs/plan-shipped.md` §19i (moved
+where there were five and so never carried) Story in `docs/plan-shipped/19-checks-build-plan.md` §19i (moved
 2026-10-29, 19m).
 
 ## 19j. A merge with no site change deploys nothing
-**Shipped** (#253): a merge that changes no site file deploys nothing, checking and publishing nothing and green in seconds (`npm run deploygate`). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (#253): a merge that changes no site file deploys nothing, checking and publishing nothing and green in seconds (`npm run deploygate`). How it was found, built and measured is in [`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same number.
 
 ## 19k. One manifest of checks
-**Shipped** (#502): `scripts/checks.json` holds every check CI runs (180 steps, in order, with their comments), `checks.yml` runs each Measure part and Mac shard from it (`node scripts/checks.mjs --ci <shard>`), a PR whose Mac-reaching change is only check scripts, manifest entries or their npm scripts runs only those checks' shards, and `npm run quick` runs the checks a diff reaches, side by side. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (#502): `scripts/checks.json` holds every check CI runs (180 steps, in order, with their comments), `checks.yml` runs each Measure part and Mac shard from it (`node scripts/checks.mjs --ci <shard>`), a PR whose Mac-reaching change is only check scripts, manifest entries or their npm scripts runs only those checks' shards, and `npm run quick` runs the checks a diff reaches, side by side. The story is in [`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same number.
 
 Found with it: **19k-1** (the guard reads the manifest), **19k-3** (`actionlint` runs in Measure
 from a pinned release), **19k-4** (Measure runs only the checks a diff reaches) and **19k-5** (the
 side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories are in
-[`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
+[`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same numbers). Open:
 
 - **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
   on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
@@ -233,6 +233,6 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   commit's `Checks` run and its jobs' times); a `--prs` mode in `macqueue` would make the next
   reading one command, if 19k-2 stays tedious. `npm run flakes` (2026-10-20 to now, 320 runs)
   still has the startup check's first line red 22 of 203 attempts (11%), unchanged by 19k.
-- **19k-6** (E, S): **shipped**, Measure's lab part split in two (`lab` about 12 min, `lab2` about 10; the required names unchanged). Story in `docs/plan-shipped.md` §19k-6 (moved 2026-10-29, 19m-2). Open: the browser part
+- **19k-6** (E, S): **shipped**, Measure's lab part split in two (`lab` about 12 min, `lab2` about 10; the required names unchanged). Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19k-6 (moved 2026-10-29, 19m-2). Open: the browser part
   is now the slowest of the five at 19:14, and holeline alone is 9.3 min; read both in `npm run flakes`
   / the job summary over the next merges and split the browser part next if it passes 21.

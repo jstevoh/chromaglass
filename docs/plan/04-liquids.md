@@ -1,14 +1,14 @@
 # 4. Liquids that behave differently
 
-**Shipped**, with milk's opacity shipped in 18j (#353). How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**, with milk's opacity shipped in 18j (#353). How it was built and measured is in [`docs/plan-shipped/04-liquids.md`](../plan-shipped/04-liquids.md), under the same number.
 
 **Milk's opacity shipped (#353, 18j).** Optical scattering (Kubelka–Munk diffuse backscattering on black ground, two-flux forward extinction and forward halo on lamp ground) packed into `vel.w` from the advected `species.b` field. Colour sits on the opaque white body of milk as solid vibrant red (reference §4).
 
 # 4a. What is in each preset's dish
 
-**Shipped**: what each preset puts in its dish. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**: what each preset puts in its dish. How it was built and measured is in [`docs/plan-shipped/04-liquids.md`](../plan-shipped/04-liquids.md), under the same number.
 
-**4a-clock. Clock Glass and Ferro Paint after their references** (**shipped**, #280): a purple water round twelve bodies of oil (`src/lib/oilLay.ts`; `npm run clockglass`, `npm run bodies`), and Ferro Paint's patches at 0.09. Story in `docs/plan-shipped.md` §4a-clock (moved 2026-10-29, 19m-2).
+**4a-clock. Clock Glass and Ferro Paint after their references** (**shipped**, #280): a purple water round twelve bodies of oil (`src/lib/oilLay.ts`; `npm run clockglass`, `npm run bodies`), and Ferro Paint's patches at 0.09. Story in `docs/plan-shipped/04-liquids.md` §4a-clock (moved 2026-10-29, 19m-2).
 
 - Open from this: **4a-units**. Roy, 1963 lays its shapes the same way (`S × fr` in
   128-grid units, 1.5 times the size meant); its panel may want them halved, by eye.

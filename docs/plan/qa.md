@@ -13,25 +13,25 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - ~~**QA-2** The mouse pointer shows on the show screen.~~ #271 live.
 - ~~**QA-19** Interacting with settings switches to and maximizes the performance window.~~
   Fixed on main's 5b81f3c (`useCastSession.ts`; #323 superseded). Story in
-  `docs/plan-shipped.md` §QA-19 (moved 2026-10-29, 19m-2).
+  `docs/plan-shipped/qa.md` §QA-19 (moved 2026-10-29, 19m-2).
 - ~~**QA-28** The whole plate slides under the camera with the sound, a jolt on every
   kick: nauseating to watch (the owner, 2026-10-11).~~ **Fixed** (Frame Sway, 27a-7;
-  `npm run framesway`). Story in `docs/plan-shipped.md` §QA-28 (moved 2026-10-29, 19m-2).
+  `npm run framesway`). Story in `docs/plan-shipped/qa.md` §QA-28 (moved 2026-10-29, 19m-2).
 - ~~**QA-29** Choices that did nothing: 20 of the 80 values the menus offer were silently
-  dropped (2026-10-09 to 2026-10-11).~~ Shipped; story in `docs/plan-shipped.md` §QA-29
+  dropped (2026-10-09 to 2026-10-11).~~ Shipped; story in `docs/plan-shipped/qa.md` §QA-29
   (moved 2026-10-29, 19m).
 - ~~**QA-31** The closeup is "even bouncier and twitchier than before": it punches, pumps
   and shivers with the music at Frame Sway 0 (the owner, 2026-10-11).~~ Shipped; story in
-  `docs/plan-shipped.md` §QA-31 (moved 2026-10-29, 19m).
+  `docs/plan-shipped/qa.md` §QA-31 (moved 2026-10-29, 19m).
 
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
   the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
-  are drawn in all, one of them the …~~ Shipped; story in `docs/plan-shipped.md` §QA-30
+  are drawn in all, one of them the …~~ Shipped; story in `docs/plan-shipped/qa.md` §QA-30
   (moved 2026-10-29, 19m).
-- ~~**QA-20** Blow amount isn't sensitive enough.~~ Story in `docs/plan-shipped.md` §QA-20
+- ~~**QA-20** Blow amount isn't sensitive enough.~~ Story in `docs/plan-shipped/qa.md` §QA-20
   (moved 2026-10-29, 19m).
 - **QA-20a** The other tools' Amounts, read the same way: what each lays or moves at
   0.05, 1 and 5 of its Amount, against what the dial's ends should mean (the Spray's
@@ -51,22 +51,22 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   live (PLAN 15i).
 - ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box,
   not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856
-  px² over Record). Story in `docs/plan-shipped.md` §QA-4 (moved 2026-10-29, 19m).
+  px² over Record). Story in `docs/plan-shipped/qa.md` §QA-4 (moved 2026-10-29, 19m).
 - ~~**QA-5** Layers: + appears only on one-plate looks and there is no −.~~ **Shipped**
-  (#273, §16f; a third plate is 16d). Story in `docs/plan-shipped.md` §QA-5 (moved
+  (#273, §16f; a third plate is 16d). Story in `docs/plan-shipped/qa.md` §QA-5 (moved
   2026-10-29, 19m-2).
 - ~~**QA-6** The Magnet lays a fixed grid of spikes.~~ #247 live (9t).
 
 - ~~**QA-12**~~ **Fixed, #296**: switching to Hold writes the camera's own centre into the aim (`holdWhereItIs` in `src/lib/macroCamera.ts`, run by App's `updateSettings`, so the desk's chip, the phone's Hold and the Camera menu all get it). `npm run holdjump`: the frame moved 0.299 (from Auto) and 0.197 (from Follow) of the plate in the second after Hold on main, 0.000 now; `npm run phone` asks it in the app on the Mac shard.
 
 - ~~**QA-16**~~ **Fixed, #293**: a green on Roy, 1963 prints as two inks overprinted
-  (`npm run benday` 7; violet laid flat, 21f). Story in `docs/plan-shipped.md` §QA-16
+  (`npm run benday` 7; violet laid flat, 21f). Story in `docs/plan-shipped/qa.md` §QA-16
   (moved 2026-10-29, 19m-2).
 - ~~**QA-18**~~ **Fixed, this PR** (`npm run saves`, 28 lines, in Measure's browser part;
   main fails "Save asks for a name again with a saved look open"). Story in
-  `docs/plan-shipped.md` §QA-18 (moved 2026-10-29, 19m).
+  `docs/plan-shipped/qa.md` §QA-18 (moved 2026-10-29, 19m).
 - ~~**QA-18a**~~ **Fixed, this PR** (the owner's ask, 2026-10-06; `npm run saves`, 33
-  lines). Story in `docs/plan-shipped.md` §QA-18 (moved 2026-10-29, 19m).
+  lines). Story in `docs/plan-shipped/qa.md` §QA-18 (moved 2026-10-29, 19m).
 
 **Tier 3. On the wall, it looks wrong.**
 
@@ -83,18 +83,18 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - ~~**QA-14** The looks carry too few colours.~~ #281 live (18l; 18l-1..7 open).
 
 - ~~**QA-15**~~ **Fixed, #293**: the seed is a laid-out panel, Dye Budget 0.45; `npm run
-  royopen` 6/6 (main 1/6). Story in `docs/plan-shipped.md` §QA-15 (moved 2026-10-29, 19m).
+  royopen` 6/6 (main 1/6). Story in `docs/plan-shipped/qa.md` §QA-15 (moved 2026-10-29, 19m).
 
 **Tier 4. Polish.**
 
 - ~~**QA-17** The phone's **Looks** tab wore a sparkle, the icon apps use for AI, and the
-  owner wants nothing in the app to read as AI.~~ Shipped; story in `docs/plan-shipped.md`
+  owner wants nothing in the app to read as AI.~~ Shipped; story in `docs/plan-shipped/qa.md`
   §QA-17 (moved 2026-10-29, 19m).
 
 - ~~**QA-11**~~ **Fixed, this PR**: Follow wears a crosshair (locked on one subject) and
   Auto names its cut, "Auto cuts 5s" from Shot Length (`shotLabel`,
   `src/lib/macroCamera.ts`, the same `max(0.5, macroHold ?? 5)` the camera rides for), on
-  the desk's chip and the phone's camera buttons; the … Story in `docs/plan-shipped.md`
+  the desk's chip and the phone's camera buttons; the … Story in `docs/plan-shipped/qa.md`
   §QA-11 (moved 2026-10-29, 19m).
 
 **Checks that went red on a tree they do not measure.** Not seen by the room, but each

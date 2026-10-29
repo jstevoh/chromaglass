@@ -3,7 +3,8 @@
 `PLAN.md` at the root is the index: the order of work, the running order and the rules,
 and a table of these files. Each file here is one section of the plan (a big one cut
 between items into parts), with only its open work and the stubs of what shipped; the
-stories of shipped items are in `docs/plan-shipped.md`, under the same numbers.
+stories of shipped items are in [`docs/plan-shipped/`](../plan-shipped/README.md), one file a section
+under the same names and numbers.
 
 ## Where the old PLAN.md went
 
@@ -16,7 +17,7 @@ Such a hunk goes in the file its old line falls in:
 
 | Old lines | Now |
 |---|---|
-| 1–47 | the old header (Gemini and Claude tracks), retired: `docs/plan-shipped.md`, "The plan's old header" |
+| 1–47 | the old header (Gemini and Claude tracks), retired: `docs/plan-shipped/19-checks-build-plan-2.md`, "The plan's old header" |
 | 48–314 | `PLAN.md`, Order of work (and its table, One home for work written twice) |
 | 315–537 | `docs/plan/qa.md` |
 | 538–577 | `PLAN.md`, Running order |
@@ -60,5 +61,5 @@ Such a hunk goes in the file its old line falls in:
 | 9633–9834 | `docs/plan/36-analog-operators.md` |
 | 9835–9839 | `docs/plan/23-selling.md`, at its end |
 
-A hunk inside a shipped item's story goes to `docs/plan-shipped.md` under "Moved in the
-third pass"; the stub in the section file names the item.
+A hunk inside a shipped item's story goes to that item's file in `docs/plan-shipped/`
+(the archive by section since 19m-3); the stub in the section file names the item.
