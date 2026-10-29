@@ -32,7 +32,9 @@
  *   4. nearest, not fullest: two equal pools, it lands on the one by the aim
  *   5. a hand that moves the aim during the closeup is obeyed, onto bare glass
  *      if that is where it points
- *   6. an empty plate coming in waits on the aim, and lands on the first pour
+ *   6. an empty plate coming in waits on the aim, and lands on the first pour,
+ *      in Hold and in Follow; a zoom ramped in from 1.01x (the pinch, the
+ *      slider) lands too; a switch from Auto to Hold mid-closeup does not
  *   7. out and in again lands again, whatever a hand did last time
  *   8. the button's press (`closeupToggle`, the M key's too) goes in by the
  *      zoom, to 4x, and comes out to the plate with both settings; a look
@@ -42,8 +44,9 @@
  * through the debug hook; at 1x the pool is drawn (the control: a black frame
  * is also what a frame that could not be read gives); the readback's dye in
  * the 4x frame on the aim is under BARE of the plate's (the control for the
- * press); the desk's Close-up button pressed: lit, the knob at 4x, and over
- * LIT_SHARE of the frame's pixels lit; pressed again, out at 1x.
+ * press); the desk's Close-up button pressed: lit, the knob at 4x, over
+ * LIT_SHARE of the frame's pixels lit with the shot on the pool and the aim
+ * still bare; pressed again, out at 1x.
  */
 import { MacroCamera } from '../src/lib/macroCamera.ts';
 import { stream } from '../src/lib/rng.ts';
@@ -144,16 +147,43 @@ if (process.argv.includes('--node')) {
   }
 
   // 6. An empty plate comes in on the aim and lands on the first pour.
-  {
+  for (const mode of ['hold', 'follow']) {
     const f = plate();
     const cam = new MacroCamera(stream('plate.macro'));
     let waited = 0, shot;
-    for (let t = 0; t < 60; t++) { shot = cam.update(f, DT, opts('hold')); waited = Math.max(waited, Math.hypot(shot.cx - 0.5, shot.cy - 0.5)); }
+    for (let t = 0; t < 60; t++) { shot = cam.update(f, DT, opts(mode)); waited = Math.max(waited, Math.hypot(shot.cx - 0.5, shot.cy - 0.5)); }
     pour(f, 0.72, 0.3);
-    shot = cam.update(f, DT, opts('hold'));
+    shot = cam.update(f, DT, opts(mode));
     const r = read(f, shot, 0.72, 0.3);
-    check('an empty plate waits on the aim and lands on the first pour', waited < 1e-6 && r.off < 1 / 3,
+    check(`${mode}, an empty plate waits on the aim and lands on the first pour`, waited < 1e-6 && r.off < 1 / 3,
       `${waited.toExponential(1)} of the plate off the aim while empty (under 1e-6 wanted), then the pour ${fx(r.off)} of a half-frame off the middle the frame it was poured (under 0.333 wanted)`);
+  }
+
+  // 6b. The pinch and the slider come in a notch at a time: 1.01x is
+  // nearly the whole plate, and not bare, so the landing is asked again
+  // until the zoom is fully in (the review's ramp ended on 0.5, 0.5).
+  for (const mode of ['hold', 'follow']) {
+    const cam = new MacroCamera(stream('plate.macro'));
+    let shot;
+    for (let t = 0; t <= 60; t++) shot = cam.update(report, DT, { ...opts(mode), zoom: 1.01 + (ZOOM - 1.01) * Math.min(1, t / 60) });
+    for (let t = 0; t < 30; t++) shot = cam.update(report, DT, opts(mode));
+    const r = read(report, shot, 0.22, 0.30);
+    check(`${mode}, a zoom ramped in from 1.01x lands on the pool`, r.off < 1 / 3 && r.share >= 0.5,
+      `the pool ${fx(r.off)} of a half-frame off the middle (under 0.333 wanted), the frame ${fx(r.share)} of the fullest's dye (0.5 wanted); at ${fx(shot.cx)}, ${fx(shot.cy)}`);
+  }
+
+  // 6c. A switch from Auto to Hold during the closeup is a hand on the
+  // camera, not the closeup coming in: Hold goes to its aim, glass or not
+  // (App writes the camera's centre into the aim as it switches, QA-12, so
+  // in the app this is no move at all; `npm run holdjump`).
+  {
+    const cam = new MacroCamera(stream('plate.macro'));
+    for (let t = 0; t < 60; t++) cam.update(report, DT, opts('auto'));
+    let shot;
+    for (let t = 0; t < 90; t++) shot = cam.update(report, DT, opts('hold'));
+    const miss = Math.hypot(shot.cx - 0.5, shot.cy - 0.5);
+    check('a switch from Auto to Hold mid-closeup is not a landing', miss < 0.005,
+      `the frame ${fx(miss)} of the plate from Hold's aim on bare glass (under 0.005 wanted)`);
   }
 
   // 7. Out and in again lands again.
@@ -231,7 +261,11 @@ if (process.argv.includes('--node')) {
       for (let k = 0; k < rd.length; k++) all += Math.max(0, rd[k]);
       const cx = (s.macroAimX ?? 0.5) * N, cy = (s.macroAimY ?? 0.5) * N;
       for (let j = Math.floor(cy - hy); j <= Math.ceil(cy + hy); j++) for (let i = Math.floor(cx - hx); i <= Math.ceil(cx + hx); i++) { frame += Math.max(0, rd[i + j * N]); n++; }
-      return { onAim: (frame / n) / (all / rd.length), zoom: d.shot.zoom, macroMode: s.macroMode, macroZoom: s.macroZoom };
+      // How far the shot is from the pool, in halves of the frame it shows.
+      const c = document.querySelector('#liquid-canvas') ?? document.querySelector('canvas');
+      const w = c?.width || 16, h = c?.height || 10, maxDim = Math.max(w, h) * 1.5, z = Math.max(1, d.shot.zoom);
+      const off = Math.max(Math.abs(d.shot.cx - 0.22) / (w / maxDim / z * 0.5), Math.abs(d.shot.cy - 0.3) / (h / maxDim / z * 0.5));
+      return { onAim: (frame / n) / (all / rd.length), off, zoom: d.shot.zoom, macroMode: s.macroMode, macroZoom: s.macroZoom };
     });
     let before = null;
     for (let tries = 0; tries < 4 && !(before?.onAim < BARE); tries++) {
@@ -240,8 +274,10 @@ if (process.argv.includes('--node')) {
       before = await state();
     }
     const flat = await lit();
-    check('the control: at 1x the pool is drawn', flat !== null && flat > 0,
-      `${flat === null ? 'no frame read' : fx(flat)} of the frame lit (over 0 wanted: a frame that could not be read is black too)`);
+    // The pool is about half a percent of the plate; measured 0.018 and
+    // 0.026 of the 1x frame lit in two runs.
+    check('the control: at 1x the pool is drawn', flat !== null && flat > 0.005,
+      `${flat === null ? 'no frame read' : fx(flat)} of the frame lit (over 0.005 wanted: a frame that could not be read is black too)`);
     check('the control: the frame on the aim is bare glass', before.onAim < BARE,
       `the 4x frame on the aim holds ${fx(before.onAim)} of the plate's average dye (under ${BARE} wanted)`);
     const button = page.locator('[data-testid="macro-button"]');
@@ -251,8 +287,12 @@ if (process.argv.includes('--node')) {
     const inside = await state();
     const pressed = await button.getAttribute('aria-pressed');
     const close = await lit();
-    check('Close-up lands on the liquid, not on bare glass', close !== null && close > LIT_SHARE,
-      `${close === null ? 'no frame read' : fx(close)} of the 4x frame lit (over ${LIT_SHARE} wanted; 0.000 on the plate's own aim)`);
+    // Lit, and lit by the pool: the shot on it, and the aim still bare, so
+    // a look that poured into the middle meanwhile cannot light the frame
+    // for the old camera.
+    check('Close-up lands on the liquid, not on bare glass',
+      close !== null && close > LIT_SHARE && inside.off < 1 / 3 && inside.onAim < BARE,
+      `${close === null ? 'no frame read' : fx(close)} of the 4x frame lit (over ${LIT_SHARE} wanted), the pool ${fx(inside.off)} of a half-frame off its middle (under 0.333 wanted), the aim's frame still ${fx(inside.onAim)} of the plate's average`);
     check('and the button lights and the zoom reads 4x', pressed === 'true' && inside.macroZoom === 4 && inside.zoom > 3,
       `aria-pressed ${pressed}, Macro Zoom ${inside.macroZoom}, the frame at ${fx(inside.zoom)}x`);
     await button.evaluate((b) => b.click());
