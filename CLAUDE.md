@@ -9,7 +9,7 @@ Before starting anything that is not a bug fix, read `PLAN.md`: it is the plan's
 order, and a table of the sections. Then read only the file your step names: each section
 is a file under `docs/plan/` (`00-dye-tools.md` to `36-analog-operators.md`, a big one cut
 between items into parts of about 30 KB), and `grep -rn '14ab-4' docs/plan/` finds
-an item from its id. Never read every section: the open plan is about 700 KB in all, and
+an item from its id. Never read every section: the open plan is about 630 KB in all, and
 see "Keeping a session small" for why that matters. What shipped is in
 `docs/plan-shipped.md`, under the same numbers: a section keeps a one-line stub per shipped
 item and only the open work, so read the archive only when an open item needs the history
@@ -150,6 +150,13 @@ deploy:
   file the site is built from differs from the commit that is live (a docs, check
   or workflow merge; PLAN.md 19j), the deploy checks and publishes nothing, green in
   seconds. A run started by hand always checks and deploys.
+- **The owner's Mac** takes a deploy's Mac shards when it is online and idle (a probe job
+  in `deploy.yml` asks first; the runner's label is `owner-mac`), otherwise they go to
+  GitHub's macOS machines as before. Never a pull request's run: the runner's job-started
+  hook refuses all but `deploy.yml` on main. A shard stalled on a sleeping Mac moves to
+  GitHub's after 15 minutes (`Watchdog`); by hand, **Re-run all jobs**, never failed jobs.
+  Setup, pausing it for a show, and what a job there can reach: `docs/mac-runner.md`
+  (PLAN.md 19ah).
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured), `pixels.yml` (every

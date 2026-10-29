@@ -12,9 +12,9 @@ Every item keeps the standing rule: nothing moves the frame as a whole from soun
 each feature ships its phone version in the same PR (the plate shader is shared, so the
 phone and the iPad draw what the desk draws; a new control goes on the phone too).
 
-## ~~33a. No stepped ring round a bubble's hole~~ — **Shipped, this PR** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`: the line moved 8.9–18.3 % of the ring round holes of 1.8–14 cells before, 0 % after, and still draws 52.8 % → 52.8 % and 61.1 % → 58.3 % of the band where two dyes meet; story in `docs/plan-shipped.md` §33a)
+## ~~33a. No stepped ring round a bubble's hole~~ — **Shipped** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33a (moved 2026-10-29, 19m-2).
 
-## ~~33b. The soft glow still left round a hole~~ — **Shipped, this PR** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`: the dye 1–6 cells past a hole's rim was 6.0–11.0 levels from the dye 10 cells out before (4.2 at the smallest hole), 2.4–3.2 after, bar 6; Edge Relief moved the first 3 cells 11.9–22.9 levels before, 0.00–0.02 after, bar 1; a pool's edge relief into water kept 16.06 → 16.06; story in `docs/plan-shipped.md` §33b)
+## ~~33b. The soft glow still left round a hole~~ — **Shipped** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33b (moved 2026-10-29, 19m-2).
 
 Left from it, so none of it is lost:
 - **33b-2. A fixed reach and a wholesale flatten.** `airNear` looks 4.5 cells out and
@@ -61,7 +61,7 @@ the rim's radius found along 64 rays: RMS deviation from a circle under 0.5 scre
 pixel, and the 10–90 % rise of the edge no wider than 1.5 pixels. Today's numbers
 printed first.
 
-## ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped, this PR** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`: the middle was 116–195 levels off the plate on the dark ground before, 0 after, and 0–21 on the lamp ground against a tenth-of-the-tint bar; story in `docs/plan-shipped.md` §33e)
+## ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`). Story in `docs/plan-shipped.md` §33e (moved 2026-10-29, 19m-2).
 
 Left from it, so none of it is lost:
 - **33e-2. The band's width from the meniscus, for small bubbles too.** The old text
@@ -109,9 +109,9 @@ glycerine: the speed ratios follow Bretherton's law within 10 %, the drainage ti
 follow μ/σ within 20 %, and (with 33e) the band width oil against water follows u*
 within 15 %; on the plate's own liquid, every number today's check prints unchanged.
 
-## ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped, this PR** (Paint Cells and Macro Lacing now default to 0, so no look draws cells it did not name; the relief is lit by a raking lamp with a rolled-off glint and a thinner boundary line, `src/gpu/wgsl/plate.ts`; `npm run macroview`: the cells' share of the frame was 0.14 at 4x and 0.17 at 6x before, 0 after, bar 0.01; the relief is 0.033–0.051 of the frame, 0.99 of it smooth, and the colour keeps within chroma distance 3.1 of the 1x frame, bar 5; story in `docs/plan-shipped.md` §33g; 20c-1 is closed by it)
+## ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped** (Paint Cells and Macro Lacing default to 0; `npm run macroview`; 20c-1 is closed by it)
 
-**Shipped.** Story in `docs/plan-shipped.md` §33g (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped.md` §33g (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
 
 - **33g-2. The closeup is still lit, not refracted.** The relief is the dye's own
   gradient read as a dome under a lowered lamp (shortcut: not a physical height field,
@@ -120,10 +120,13 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   substrate seen through the surface's normal (refraction), a shallow depth of field
   and the dye's two layers parting in parallax. Each is a camera-pass term; take them
   one at a time with a `look` render, and keep `steadycam` green.
-- **33g-3. Three looks keep their cells by name.** `macro-bead`, `cell-bloom` and
-  `lace-run` set Paint Cells and Macro Lacing themselves, so they still draw cells at
-  the closeup. The owner to say whether they should stay (they are named for them) or
-  lose them too; `macroview` does not ask them.
+- ~~**33g-3. Three looks keep their cells by name.**~~ **Shipped** (the owner, 2026-10-29:
+  "No I don't want cells"). `macro-bead`, `cell-bloom` and `lace-run` now set Paint Cells
+  to 0; Macro Bead and Cell Bloom set Macro Lacing to 0 as well, and Lacing Run keeps its
+  lacing (its subject, dendrites rather than cells). Descriptions, the landing page and
+  the Guide say so, and `macroview` line 1 now audits every look. Open: Cell Bloom's name
+  says cells; the owner to say whether to rename it (its id is in set lists and saved
+  shows, so a rename keeps the id). Story in `docs/plan-shipped.md` §33g.
 - **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
   shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
   old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma

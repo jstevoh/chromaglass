@@ -45,11 +45,7 @@ bill changes it: more Mac runners at once (19g).
   rewall's "frames reach the wall again" line runs in Measure, where no frames are drawn,
   so it prints rather than asks until a Mac shard runs it.
 
-- ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
-  own next frame on a runner whose two windows are handed different refreshes~~ **Done:**
-  built that mutant (`rule: 'half-show'`) as a control in `scripts/wall.mjs` arithmetic,
-  and added an in-app check line on its own clock (`m.gate.frame >= 0.8 * m.hz`) that sees
-  it and fails cleanly if show frames are turned down.
+- ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's own next frame on a runner whose two windows are handed different refreshes~~ **Done.** Story in `docs/plan-shipped.md` §19c (moved 2026-10-29, 19m-2).
 - `render-app`'s "the live loop draws again after every render" wants more than 5
   frames in the half second after each render, and read 5 after render M (music
   playing, a blackout near the end) on #236's show shard (2026-10-03), where the last
@@ -57,46 +53,20 @@ bill changes it: more Mac runners at once (19g).
   a moment after a render, so the line judges the runner as well as the loop. What it
   means to ask is whether the loop resumes at all: count frames until a fixed number
   have been drawn, with a long limit, rather than frames in a fixed half second.
-- ~~`startup`'s "no stop in the opening" charges Chromium's hold at the GPU's start
-  to the page~~ **Fixed 2026-10-04 (this PR):** on main's 997c71f deploy (run
-  37162044666) the adapter took 0.47 to 4.18 s, the page drew nothing from 1.00 to
-  4.17 s, no long task, and a long animation frame over it named no script, exactly as
-  the hold reads on every green run (seven read: 1.6 to 2.4 s from about 1.0 s, 0
-  scripts, no blocking). 4b set it aside as the page's own code because a promise the
-  page fetched had settled within 50 ms of its start, and check 4 read 3.18 s against
-  2. The 50 ms was not the tell. What is (`scripts/pagehold.mjs`): the page's code
-  after an await runs before anything else the page does, so a stretch after a frame
-  or tick that followed the mark is not it; and for a fetch, a body read, an image or
-  an audio decode, Chromium's long animation frames name that code as a script for as
-  long as it runs (tried on each in a cloud session), while its hold names none. The
-  GPU's own promises are named by nothing, so a stretch right after one stays the
-  page's, as before. Frames are now placed by when their callback ran, not their
-  timestamp: a frame begun before a second of the page's code carries the earlier
-  time and made that code look already finished. The check-skeptic found the page's
-  code after a promise the check does not wrap (`enumerateDevices`, `caches.keys()`,
-  a Blob's body, all awaited by the app) read as held under both rules; any stretch
-  the page's scripts or a blocked frame lie in is now the page's. The rule's thirteen
-  cases (this red, the lab's recordings, and the ways it could tell wrong) are a check
-  line on every run (the old 50 ms rule tells four wrong), with a control in the run's
-  own Chromium: 0.7 s of a page's code after a fetch and after a Blob must read as its
-  own and be named as scripts, since that naming was tried on the cloud's Chromium
-  141, not CI's. The 2 s limit and the 4.5 s cap are unchanged. *Still open:* the
+  **After L, done (#549, 2026-10-28):** L (the GPU lost mid-render) counted the frames
+  in the half second 4 s after the render, so it timed the runner's new device: 33 to
+  47 on quick runners, 0, 2, 5, 6 and 11 on slow ones across eleven show jobs on seven
+  branches that day. It now takes the half second again and again for up to 20 s until
+  one draws more than 5 frames the live show heard (`hearing.frames`, which a loop
+  spinning on a lost device does not move), the same bar, and prints how long the loop
+  took to come back; the 20 s limit is unmeasured until those prints are read. The other renders keep the one half second; M's 5 of 2026-10-03 is still
+  open under the same reading.
+- ~~`startup`'s "no stop in the opening" charges Chromium's hold at the GPU's start to the page~~ **Fixed 2026-10-04** (`scripts/pagehold.mjs`). Story in `docs/plan-shipped.md` §19c (moved 2026-10-29, 19m-2). *Still open:* the
   page's code after a GPU promise that ends exactly where Chromium's hold begins, with
   nothing between, still goes to check 4; which promise settled at 1.0 s on that run
   is not known (the opening line now names it); and the rule's cases could run in
   Measure, being pure Node, if #239's owner of the workflows adds them.
-- ~~`startup`'s reds on PRs that never touched the opening, after #242~~ **Fixed
-  2026-10-04 (this PR).** Of the thirteen startup reds of 3-4 October, eleven were a
-  PR's own (#241's, #242's, #261's `spinSwirl`) or read lines since mended (#235,
-  #241, #242, #254). Two were neither. 1b's ratio read 5.28× on #257's run (37216108435):
-  the control asked all 47 inside a 2.02 s stop of its own long task, then its frames
-  stopped 16.27 s from 0.33 s later while the GPU compiled them, a stop no build sat
-  in, so unpriced. A stop begun within a second of one the builds sat in is now the
-  same compile (18.29 s; the show's own 1.36 s held to the control's 0.71 s, 0.58×). Only a priced stop the builds sat in opens that second (#278's check-skeptic, fixed in its follow-up): a stop that only followed no longer passes it on, so runner stalls cannot chain into the control's compile.
-  And the half behind the show ran out of `gpu/prepare.ts`'s thirty seconds with 52 of
-  54 built (37209299356; 21 to 24 s on the other four runs, and growing with the
-  list): that cap is now per build behind the show, so a list nobody waits for is
-  finished rather than left to compile on the frame. *Still open:* 4b's hold, since
+- ~~`startup`'s reds on PRs that never touched the opening, after #242~~ **Fixed 2026-10-04.** Story in `docs/plan-shipped.md` §19c (moved 2026-10-29, 19m-2). *Still open:* 4b's hold, since
   #249 asked for the display first, is the GPU process compiling it while Chromium
   readies the page (2.92 to 4.00 s on the four runs since #254, against a 4.5 s cap
   and 1.54 to 3.50 s before #249): the page's own compile inside the window 4b excuses
@@ -109,18 +79,7 @@ as `npm run` names. Each new check held red by the `check-skeptic`.
 
 ## 19d. The build and what it ships
 
-- ~~`startup` 1b, "nothing to compare", after #283~~ **Fixed 2026-10-05 (this PR).**
-  On #287's merged head (37252828490) the control built its 47 on its first step at
-  3.23 s, its frames kept coming, then stopped 9.98 s from 5.59 s with no build in it
-  and more than a second after them: nothing priced, its own wait 13.80 s, and both 1b
-  lines red. When the frames stop after the builds is the GPU process's business, so
-  no window of time is right. A stop is now also the compile when the first submit to
-  run one of the pipelines built on the frames was handed over before it began and was
-  done as the frames came back (within a quarter second), with the page's own timer
-  running through it: a pipeline cannot run before it is built, the page's thread is
-  free while the GPU compiles, and a runner's stall later has no first use out through
-  it. Line 2 now also needs a one-device control, as line 1 did. Each stop prints its
-  first uses and the page's longest silence in it. *Still open:* read the first Mac runs' prints to
+- ~~`startup` 1b, "nothing to compare", after #283~~ **Fixed 2026-10-05.** Story in `docs/plan-shipped.md` §19d (moved 2026-10-29, 19m-2). *Still open:* read the first Mac runs' prints to
   see the follow stop (#283's run: 11.27 s from 5.20 s) carries first uses too; if it
   does, the one-second window is that same compile and could go.
 - The main route loads about 527 KB of script gzipped (1.68 MB raw): the App's chunk
@@ -175,13 +134,7 @@ directly, as `checks.yml` already does for some; the strays deleted or wired;
 ## 19f. The plan and the docs, out of step with the code
 **Partly shipped** (#245): the first three notes of docs out of step with the code are fixed. What is left is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-*2026-10-04 (#245):* the first three below are fixed (the order of work replaces "What
-comes next"; the openings and §12's table say what is built), `docs/judging.md`'s numbers
-were made unique in #230, and the order of work's "one home" table says where each
-piece of twice-written work lives. Left: the flaky-check notes in §0 and §11 (their home
-is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
-`docs/webgpu-plan.md` and `docs/evaluation-2026-09.md`, and `README.md`. CLAUDE.md's
-"about 38k" tokens for this file, which was about 75k, is corrected here.
+*Shipped so far* (#245, #230): the order of work replaces "What comes next", the openings say what is built, `docs/judging.md`'s numbers are unique, the "one home" table is written. Story in `docs/plan-shipped.md` §19f (moved 2026-10-29, 19m-2).
 
 - The Mac checks that went red once on trees that did not touch them are written in
   both §0 and §11 (the Finger's "adds none", the mirror's "nowhere else", `startup`'s
@@ -235,18 +188,7 @@ like day (`npm run macqueue -- --hours 24` for the time).
   laid; `grating`'s §6 holds two Drops at ten moments and reads the old push 0.40 apart,
   today's 1.00. The rarer case of both fingers low at once is still open (batch 11's
   two-finger entry), and `phone` now prints what the plate gained of what it was handed.
-  **Read 2026-10-05, both-low twice in 350 runs since 10-03** (deploy 37233245217
-  attempt 2, fc7dcc3, 10-04 22:35Z, the open shard; #230's PR run 37134515660, 10-03
-  16:16Z, tools): A 0 and B 0 under the fingers and at their mirrors, yet "each lay it on
-  every step" passed both times (A 28 steps, 222 dye, B 27, 214, 7.9 a step), and the
-  plate gained −10 of the 435 it was handed. So the hands laid and the plate kept none of
-  it: not the touch path. Two leads. The fingers sit at one height (110 px) but land on
-  cells of different heights ((93, 43) and (53, 64); (138, 64) and (97, 43)), so the plate
-  was turned under the view when they were picked; and the 435 went somewhere between the
-  lay and the readback (a clear, a drain or a look's fade landing in the window, or the
-  readback taken off a plate that was rebuilt). The next red should print the plate's
-  turn and the solver's step and clear counts across the window. Too big for the
-  2026-10-05 bundle of small fixes; left open here.
+  *Shipped so far:* the 2026-10-05 reading of the two both-low reds (not the touch path; two leads). Story in `docs/plan-shipped.md` §19h-2 (moved 2026-10-29, 19m-2).
   **Cause found 2026-10-25 (4 reds of 169 Mac runs, 10-18 to 10-24): the check read the
   plate in the frames after a rebuild, the dye was not lost.** All four print the same
   states: 384² solvers #1 and #2 through the hold, 256² solvers #3 and #4 after it (the
@@ -259,22 +201,7 @@ like day (`npm run macqueue -- --hours 24` for the time).
   it snaps; no bar, cell or hold moved. Named, not done: for those few frames after a
   resolution change every reader of `readDensity` sees an empty plate (bubbles, the
   regulator's reading); the app could keep the old reading until the new one lands.
-  **Instrumented 2026-10-10.** The two reds' logs (jobs 111540991031 and
-  111236251946) were read again: both fingers at (45, 110) and (345, 110) px, 0.0 cells
-  from where they were picked, 69 and 89 readbacks, every other line of the phone check
-  green; the PLAN's "different heights" is the dish's resting angle (the two pixels are
-  300 px apart along a row, 45 cells apart on a dish turned about 150° or 210°), not a
-  fault. No line in either job printed the app's rung. The red line now prints, before,
-  while held and after: the engine and grid, which plate the hands lay on
-  (`hands().layer`; Classic has two and the dye check reads plate 0), the clears and
-  drains the loop took (`hands().clears`/`.drains`), each plate's solver (a number per
-  solver object, so a rebuild shows) with its steps and readbacks, and every plate's gain.
-  Leads, for when it next goes red: the other plate (gain on plate 1), a clear or drain in
-  the window, or a governor move: `releaseGpu` rebuilds the dye from `gpu.readback()`,
-  the last readback that *landed*, so every step laid since it is lost, and a solver
-  that never landed one is put back to its seed (`restoreSeed`) whole. That last is a
-  show bug on its own if it reads so (a grid move drops the last readback's worth of
-  dye); a GPU carry of the dye, as `handOver` carries the ferrofluid, would end it.
+  *Shipped so far* (2026-10-10): the red line prints, before, held and after, the engine, grid, plate, clears, drains and each solver's steps and readbacks. Story in `docs/plan-shipped.md` §19h-2 (moved 2026-10-29, 19m-2).
 
 ## 19i. A green Mac result carries across a merge of main
 
@@ -314,12 +241,6 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   commit's `Checks` run and its jobs' times); a `--prs` mode in `macqueue` would make the next
   reading one command, if 19k-2 stays tedious. `npm run flakes` (2026-10-20 to now, 320 runs)
   still has the startup check's first line red 22 of 203 attempts (11%), unchanged by 19k.
-- **19k-6** (E, S): **shipped**, Measure's lab part split in two. A full lab part ran 22:10 of its
-  25 minutes on 2026-10-27 (main's deploys 24:52 and 23:29, a PR's full run cancelled at the
-  limit), so the next full deploy was likely to go red and not publish. `lab` keeps the slosh
-  dish, the soap film's control and `holeline` (about 12 min); the new `lab2` has `lampzero`,
-  `bubblelook` and the four account checks (about 10). Both install Chromium; the timeout stays
-  25; the required names `Measure` and `WebGPU (macOS)` are unchanged, since `reach`, `selectMeasure`,
-  `deploygate.sh` and the guard read the part names from `shards.measure`. Open: the browser part
+- **19k-6** (E, S): **shipped**, Measure's lab part split in two (`lab` about 12 min, `lab2` about 10; the required names unchanged). Story in `docs/plan-shipped.md` §19k-6 (moved 2026-10-29, 19m-2). Open: the browser part
   is now the slowest of the five at 19:14, and holeline alone is 9.3 min; read both in `npm run flakes`
   / the job summary over the next merges and split the browser part next if it passes 21.
