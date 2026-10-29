@@ -172,7 +172,20 @@
         "gallery runs on its label rather than on every push (PLAN.md 19a).",
         "A rename in one file would quietly undo either."
       ]
-    },    {
+    },
+    {
+      "name": "The share card",
+      "shard": "logic",
+      "run": "npm run sharecard",
+      "why": [
+        "What a link to the site unfurls into (PLAN.md 34a-5, scripts/sharecard.mjs):",
+        "index.html's Open Graph tags whole, og:image a chromaglass.art URL to a file",
+        "in public/, that file 1200 x 630 as the tags say and under WhatsApp's 300 KB,",
+        "and the card's headline the landing page's h1 word for word. Each rule meets",
+        "a broken copy first. Plain Node, under a second."
+      ]
+    },
+    {
       "name": "Where CI's keys can go",
       "shard": "logic",
       "run": "npm run cisecrets",

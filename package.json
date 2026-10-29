@@ -147,6 +147,7 @@
     "deploygate": "bash scripts/deploygate.sh",
     "closedruns": "node scripts/closedruns.mjs",
     "cisecrets": "node scripts/cisecrets.mjs",
+    "sharecard": "node scripts/sharecard.mjs",
     "sizes": "node scripts/sizes.mjs",
     "checkguard": "node scripts/checkguard.mjs",
     "reach": "node scripts/reach.mjs",

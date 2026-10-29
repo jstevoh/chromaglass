@@ -63,8 +63,13 @@ const words = {
   capHeight: Math.round(bold.tables.os2.sCapHeight / bold.unitsPerEm * SIZE * 10) / 10,
   chroma: outline(bold, 'Chroma', SIZE, -0.02),
   glass: outline(italic, 'Glass', SIZE, -0.02),
-  // The share card's line, in two lines; the same words the card has always carried.
-  tagline: [outline(regular, 'A psychedelic liquid light show', 40, 0.01), outline(regular, 'that reacts to your music', 40, 0.01)],
+  // The share card's words. The headline is the landing page's own (PLAN.md
+  // 34a-5), broken where it reads aloud, in three short lines so it can be set
+  // large: a card is mostly seen about 500 pixels wide in a feed, where 72 here
+  // is 30 on the screen. The address under it is for the card that travels as
+  // a picture, screenshotted out of the post that carried the link.
+  headline: ['A liquid light show', 'you play to', 'your music.'].map(text => ({ text, ...outline(bold, text, 72) })),
+  address: outline(regular, 'chromaglass.art', 30, 0.04),
 };
 fs.writeFileSync(path.join(HERE, 'words.json'), JSON.stringify(words, null, 1) + '\n');
 console.log(`words.json: Chroma ${words.chroma.width}, Glass ${words.glass.width}, cap height ${words.capHeight}`);

@@ -14,7 +14,8 @@
  *   public/icon-maskable-512.png    full bleed, burst inside Android's safe circle
  *   public/apple-touch-icon.png     full bleed; iOS rounds the corners itself
  *   ios/…/AppIcon-512@2x.png        the iPhone app's icon, 1024 full bleed
- *   public/og-card.png              what a shared link unfurls into
+ *   public/og-card.jpg              what a shared link unfurls into, over the frame in
+ *                                   scripts/brand/card-frame.jpg (a look the app drew)
  *   src/assets/brand/lockup.svg     mark and name, for the headers
  *   src/assets/brand/mark.svg       the dish alone, where the name will not fit
  *   public/intro-*.svg              the intro's burst, hub and name (src/lib/intro.ts),
@@ -35,6 +36,10 @@ import { launchChromium } from './chromium.mjs';
 import { icon, lockup, shareCard, introLayers } from './brand/art.mjs';
 
 const words = JSON.parse(fs.readFileSync('scripts/brand/words.json', 'utf8'));
+// The share card's ground: a frame of a look, filmed from the app on the
+// owner's Mac (a cloud session's software GPU cannot run the app's looks at
+// speed), kept here at twice the card's size so the crop has room.
+const cardFrame = `data:image/jpeg;base64,${fs.readFileSync('scripts/brand/card-frame.jpg').toString('base64')}`;
 
 const write = (file, text) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -64,7 +69,11 @@ const PNG = [
   // The iPhone app's icon (PLAN.md §12): the touch icon's drawing at the one
   // size Xcode asks for. Full bleed and opaque, as the App Store requires.
   ['ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png', icon({ shape: 'square', scale: 0.92 }), 1024, 1024],
-  ['public/og-card.png', shareCard(words), 1200, 630],
+  // A JPEG, where every other picture here is a PNG: the card is now a frame
+  // of a look, which as a PNG is over a megabyte, and WhatsApp drops a link's
+  // picture past about 300 KB. A new name as well as a new picture, because
+  // Facebook, LinkedIn and Slack keep a card by its address for weeks.
+  ['public/og-card.jpg', shareCard(words, cardFrame), 1200, 630],
   ['docs/brand/google-logo-120.png', icon({ shape: 'tile' }), 120, 120],
   ['docs/brand/avatar-800.png', icon({ shape: 'square', scale: 0.8 }), 800, 800],
 ];
@@ -78,7 +87,8 @@ try {
     const sized = svg.replace('<svg ', `<svg width="${w}" height="${h}" `);
     await page.setContent(`<html><body style="margin:0;background:transparent">${sized}</body></html>`);
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    await page.screenshot({ path: file, omitBackground: true, clip: { x: 0, y: 0, width: w, height: h } });
+    const jpeg = file.endsWith('.jpg');
+    await page.screenshot({ path: file, clip: { x: 0, y: 0, width: w, height: h }, ...(jpeg ? { type: 'jpeg', quality: 86 } : { omitBackground: true }) });
     console.log(`  ${file}  ${w}×${h}  ${(fs.statSync(file).size / 1024).toFixed(1)} KB`);
   }
 } finally {

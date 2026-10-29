@@ -11,10 +11,24 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!--
+      The share card (PLAN.md 34a-5; `npm run brand` draws it, `npm run sharecard`
+      checks these tags). The picture's address is whole, not "/og-card.jpg"
+      as it was: the Open Graph protocol asks for a URL, and a crawler that
+      reads the page has no base to resolve a path against except its own
+      guess. Width and height let a service lay out the card before it has
+      fetched the picture, which is what a feed does on a first share.
+    -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="ChromaGlass: a liquid light show you play" />
+    <meta property="og:site_name" content="ChromaGlass" />
+    <meta property="og:url" content="https://chromaglass.art/" />
+    <meta property="og:title" content="ChromaGlass: a liquid light show you play to your music" />
     <meta property="og:description" content="Oil, ink and ferrofluid on a simulated glass plate that moves to your music. Free in your browser; Home $35 and Pro $199 for the Mac app, pay once." />
-    <meta property="og:image" content="/og-card.png" />
+    <meta property="og:image" content="https://chromaglass.art/og-card.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A liquid light show you play to your music: ChromaGlass, over a frame of one of its looks." />
     <meta name="twitter:card" content="summary_large_image" />
     <!--
       The intro (src/lib/intro.ts): up from the first paint until the plate's

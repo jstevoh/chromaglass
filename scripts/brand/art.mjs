@@ -156,23 +156,45 @@ export function lockup(words, { detail = 'medium' } = {}) {
   return svg(`${40 - pad} ${40 - pad} ${r1(end + 40 - 40 + 2 * pad)} ${184 + 2 * pad}`, defs, body);
 }
 
-/** The picture a link unfurls into: the lockup on the ground, a big faint burst behind, the line beneath. */
-export function shareCard(words) {
+/**
+ * The picture a link unfurls into: a frame the app drew, the headline over its
+ * darker left, the lockup above, the address below.
+ *
+ * It used to be the lockup on a dark ground with a big faint burst behind it,
+ * every pixel drawn here, and the line "A psychedelic liquid light show that
+ * reacts to your music". Two things were wrong with it once the landing page
+ * changed its words (PLAN.md 34a-5): the line was no longer the site's, and a
+ * card is the first thing anyone sees of the app in a feed, where a logo on
+ * navy says nothing about what the app looks like. So the ground is now a
+ * frame of a look, filmed on the owner's Mac (`frame` is its data URL), and
+ * the words are set large: a card is mostly shown about 500 pixels wide, so
+ * the headline at 72 here reads at 30 there, and the old line at 28 read at 12.
+ *
+ * The frame is cropped to fill (slice), and a scrim darkens its left two
+ * thirds toward the ink of the lockup's dish so white words hold on any look,
+ * while the right third, where a feed's eye lands after the words, is the
+ * frame as the app drew it. A look whose subject sits on the right is the one
+ * to choose for it.
+ */
+export function shareCard(words, frame) {
   const W = 1200, H = 630;
-  const back = burst({ cx: 980, cy: 330, s: 1.5, id: 'bk', detail: 'high' });
-  // Lockup units to card pixels, and where its origin lands: the block of
-  // mark, name and two lines of text is centred top to bottom.
-  const scale = 0.7, lx = 96, ly = 170;
+  const left = 64;
+  // Lockup units to card pixels: its mark is drawn from (40, 40), so the
+  // origin sits that far up and left of where the mark should land.
+  const scale = 0.42, mark = { x: left, y: 52 };
+  const lx = r1(mark.x - 40 * scale), ly = r1(mark.y - 40 * scale);
   const inner = lockup(words, { detail: 'high' }).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\n$/, '');
-  const [line1, line2] = words.tagline;
-  const textX = r1(lx + 236 * scale);
-  const defs = radial('card', [['0%', '#0a3a5c'], ['60%', '#031627'], ['100%', '#00070f']], 'cx="30%" cy="35%" r="90%"') + back.defs;
-  const body = `<rect width="${W}" height="${H}" fill="url(#card)"/>`
-    + `<g opacity="0.28">${back.body}</g>`
+  const lines = words.headline;
+  const lead = 84, first = 276;
+  const defs = linear('scrim', [0, 0, W, 0], [['0', INK, 0.94], ['0.38', INK, 0.82], ['0.62', INK, 0.35], ['0.8', INK, 0]])
+    + linear('foot', [0, H - 200, 0, H], [['0', INK, 0], ['1', INK, 0.55]]);
+  const body = `<rect width="${W}" height="${H}" fill="${INK}"/>`
+    + `<image href="${frame}" width="${W}" height="${H}" preserveAspectRatio="xMidYMid slice"/>`
+    + `<rect width="${W}" height="${H}" fill="url(#scrim)"/>`
+    + `<rect y="${H - 200}" width="${W}" height="200" fill="url(#foot)"/>`
     + `<g transform="translate(${lx} ${ly}) scale(${scale})">${inner}</g>`
-    + `<g fill="#d9f3f7" opacity="0.72">`
-    + `<path transform="translate(${textX} ${ly + 205})" d="${line1.d}"/>`
-    + `<path transform="translate(${textX} ${ly + 257})" d="${line2.d}"/></g>`;
+    + `<g fill="#ffffff">${lines.map((l, i) => `<path transform="translate(${left - 4} ${first + i * lead})" d="${l.d}"/>`).join('')}</g>`
+    + `<path transform="translate(${left} ${H - 64})" d="${words.address.d}" fill="#bfeef6" opacity="0.85"/>`;
   return svg(`0 0 ${W} ${H}`, defs, body);
 }
 
