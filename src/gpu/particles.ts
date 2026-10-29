@@ -17,7 +17,8 @@
 
 import { PARTICLE_LAYOUT, SEED_WGSL, ADVECT_WGSL, SPLAT_WGSL } from './wgsl/particles';
 import { UniformPack } from './uniforms';
-import { Disposer, PipelineCache, type Prep, bindGroup, layoutFromWgsl, type RenderRecipe } from './kit';
+import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import { groupOf, viewOf } from './groupCache';
 import type { Opening } from './opening';
 
 /** Bytes per particle: `pos`, `born`, `tint` — see the struct in the WGSL. */
@@ -192,12 +193,12 @@ export class WebGPUParticles {
       const pass = enc.beginComputePass({ label: 'particles', timestampWrites: timing?.('particles') });
       if (seed) {
         pass.setPipeline(seed);
-        pass.setBindGroup(0, bindGroup(this.device, seed, [this.uniform, this.buffer, dye]));
+        pass.setBindGroup(0, groupOf(this.device, seed, [this.uniform, this.buffer, dye]));
         pass.dispatchWorkgroups(groups);
       }
       if (advect) {
         pass.setPipeline(advect);
-        pass.setBindGroup(0, bindGroup(this.device, advect, [this.uniform, this.buffer, velForced]));
+        pass.setBindGroup(0, groupOf(this.device, advect, [this.uniform, this.buffer, velForced]));
         pass.dispatchWorkgroups(groups);
       }
       pass.end();
@@ -221,7 +222,7 @@ export class WebGPUParticles {
     const pass = enc.beginRenderPass({
       label: 'particle splat',
       colorAttachments: [{
-        view: this.target.createView(),
+        view: viewOf(this.target),
         loadOp: 'clear',
         storeOp: 'store',
         clearValue: { r: 0, g: 0, b: 0, a: 0 },
@@ -229,7 +230,7 @@ export class WebGPUParticles {
       timestampWrites: timing?.('particle splat'),
     });
     pass.setPipeline(pipeline);
-    pass.setBindGroup(0, bindGroup(this.device, pipeline, [this.uniform, this.buffer]));
+    pass.setBindGroup(0, groupOf(this.device, pipeline, [this.uniform, this.buffer]));
     pass.draw(4, this.live);
     pass.end();
   }

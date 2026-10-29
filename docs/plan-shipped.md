@@ -4162,6 +4162,27 @@ and a control stamped 0.6 s apart must leave Speed where one tap there puts it. 
 prints how far apart the app handled the lifts (the page's own lag, which no check bounds
 for the phone's sheet yet: 19ac-2).
 
+### 19ac-3. The bottles stroke is far enough off the middle
+
+Shipped 2026-10-29. `npm run bottles`' "splatter with the Ferrofluid bottle lays
+ferrofluid along the stroke, and not at its mirror" (and once the Oil bottle's) went red
+on PRs that touch neither, about one Mac run in sixty, each time with "1 at the mirror".
+PLAN read it as one of the look's own pours. The log of #559's red says otherwise: the
+four pours away from the stroke were all 0.12 to 0.13 from the hand, with the mouse down
+and the look's ring laid no more times, and the one at the mirror, (0.516, 0.484), was
+among them. The look poured nothing. The stroke was the cause. Its ends are fractions of
+the canvas, and the canvas is not the plate: the view shows two thirds of the plate's
+width (`fluidPointAt`'s 1.5), the desk's canvas at 1280x800 is 662x342, and the dish's turn
+rotates the stroke about the centre. On the plate the old stroke ran from (0.31, 0.40) to
+(0.38, 0.49) in one cloud run, its end 0.116 from the centre and 0.232 from its own
+mirror. A splatter flings 3 to 18 cells at the 128 grid (0.14 of the plate) and a pour
+counts at the mirror within 0.12, so a fling from the end toward the centre could count
+both ways. That pour sat 0.123 from the end and 0.10 from its mirror. Moved to (0.1, 0.3)
+to (0.25, 0.3), the stroke reads 0.218 to 0.333 from the centre and 0.436 from its mirror,
+still 0.12 long (0.05 would give 0.51 but fling past the rim). The bar is unchanged (none
+at the mirror). A new line asks every run for the gap between the stroke and its mirror
+to be more than 19/128 + 0.12, so a desk that reshapes the canvas fails by name.
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
@@ -5678,6 +5699,16 @@ relief and not an outline. Nothing moves: the camera and its clock are as before
 not a physical height field (33g-2); the thinned boundary line is a taste choice; the
 cells that remain are 20c-1's look-alike, opt-in.
 
+*33g-3 (2026-10-29, the owner: "No I don't want cells").* `macro-bead`, `cell-bloom` and
+`lace-run` set Paint Cells to 0, and Macro Bead and Cell Bloom set Macro Lacing to 0;
+Lacing Run keeps its lacing, which is dendritic filaments and not cells. `macroview` line
+1 was a settings audit that exempted those three; it now asks all looks (33 and the
+defaults) for Paint Cells 0 and for Macro Lacing 0 but in `lace-run`, and fails if
+`lace-run` loses its lacing (the exemption cannot go stale). Lab, SwiftShader: 6/6, cells
+0 in the shipped looks, the old-defaults control still 0.1399 and 0.1697 (the knob is live).
+*Shortcut, named:* the audit reads settings, not pixels, for the three looks; their frames
+are the same shader as `classic` with the knob at 0, which `macroview` measures.
+
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
 and lacing's own contribution to the frame (the frame against the same frame with both
@@ -6053,6 +6084,53 @@ the buttons each 16 ms. `npm run renders` gained a gamepad phase on a stand-in p
 old hook under it, 43.3 / 42.8 (laptop / phone, stick sweeping) and 42.3 / 43.0 (trigger
 held) renders a second, now 1.0 on all four; the ring found in 12 of 12 looks, changing
 place, still under a held trigger, on the page.
+
+## 14ab-3, 14ab-5, 14ab-9. The frame's bind groups, its readbacks and thick liquid's share (shipped 2026-10-28, #549)
+
+14ab-5. The solver has kept its bind groups since H2c-11, but every pass after it made its
+own again each frame, over a fresh `createView()` of every texture it bound: the plate's
+pack, derive and display, the camera, the post chain's effect, push, stock and finish, the
+projector, the particles' and the air's splats, the slosh dish and the ferrofluid drop's
+relaxation. `gpu/groupCache.ts` finds a group by walking `WeakMap`s keyed by the pipeline and
+then each object bound, and a view by its texture. Nothing has to be told to forget: a
+texture made again is a new key, a texture let go is a key the collector takes with every
+group under it, and the dye's ping-pong pair is two keys found again on every frame after.
+Rooted at the pipeline because `layout: 'auto'` hands out a new layout object on each
+`getBindGroupLayout`. The post chain's ring makes a view of each of its 32 layers with the
+ring. `npm run framegroups` draws the app's chain in the lab (particles, plate, camera, the
+test effect three frames back in the ring, stock, finish, a projector source and the
+projector's pass) from three sets of objects each frame, at two sizes with the solver
+stepping between frames and the dye's ping-pong pair turned round every other frame: made fresh as before, 12 bind groups and 64 views
+a frame; cached, 0 and 0 once a size's first frames are past, every frame equal to the fresh
+chain's byte for byte; and a cache keyed by the pipeline alone draws another picture
+(the control). The plate's pack argument (the grid) is written when the grid changes, not
+every frame.
+
+14ab-3. `readbackAsync` asked the GPU for both fields on every call (two downsamples, two
+590 KB copies, two mappings), and the frame calls it every frame for every layer, so a
+120 Hz display stepping at sixty, a governor at thirty or a frozen plate read the same fields
+back again and again. And it returned "fresh" whenever its ring held anything, so
+`syncFromGpu`'s loop over every cell ran each frame on numbers it had, and `rbSeq`, which
+tells the bubbles' rim deposit not to put the same displaced dye back twice, rose on every
+frame instead of on every new mirror. Every solver submit that may write a field goes through
+`submit`, which counts (`ReadGate`, `gpu/readGate.ts`); the readback, `measure`, the share's read and the
+harnesses' reads go through `submitRead`, which does not. The review pass found the two
+delta writers (`applyDeltas`, `applySplats`) submitting on their own and going round the
+count: a pour handed across with no step after it was never read back. They count now,
+and `framereads` pours on a still plate (0 asked before the fix, 1 after).
+`readbackAsync` asks when the count has moved (or a ring has nothing from this epoch, or a
+ring had no free slot last time) and returns fresh only for a landing it has not handed out.
+`npm run framereads`, one call a frame: a still plate, 60 asked and 30 taken in 30 frames →
+0 and 0; a step every other frame, 60 asked for 15 steps → 15; 74 repeats in 148 taken → 0;
+a pour and a clear with no step are still read back; the settled mirror equals the field
+read straight out. The bubbles' rim deposit now runs once a new mirror, as its comment
+meant, which on a 120 Hz display or a governor at thirty is half as often as before. The means stay in the loop that fills the mirror; the rim is a mask.
+
+14ab-9. `speciesShare` went through `readField`: a new MAP_READ buffer, a 590 KB `slice` and
+a 590 KB unpadded copy a read, and a square root a cell. One kept buffer (`gpu/rimRead.ts`), summed where it is
+mapped in the same order, the rim a mask made once (`lib/rimMask.ts`, which the solver's and
+the app's dish areas use too): the share is the same number to the bit
+(`npm run framereads`), and the two reads after the first make no buffer (2 before).
 
 ## Moved in the third pass (2026-10-29, 19m)
 
