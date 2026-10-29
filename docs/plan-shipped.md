@@ -7171,6 +7171,24 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   all 70 looks and show stages, the same press moves the frame 0.17% a frame with it and
   without, a cut lands on the drop's middle, and a drop on still paint moves 0.
 
+- ~~**QA-32** The Close-up button "doesn't seem to do anything besides make the canvas
+  black/empty" (the owner, 2026-10-29, with a screenshot of the Recipe panel).~~ **Fixed,
+  #PRNUM** (`npm run closeupland`): the closeup's camera is Hold by default, aimed at the
+  middle of the plate, and Hold sat on its aim and nowhere else, so on a plate whose
+  middle was bare (a look that pours in pools, a middle a finger had swept, a plate
+  between pours) every way in (the button, M, the zoom, the phone's pinch and Zoom) was a
+  4x view of nothing: the exposure stays under what the frame holds, and the frame held
+  nothing. In the app on software WebGPU, classic cleared to one pool at (0.22, 0.30):
+  the 4x frame's mean 1.4 of 255 and no pixel lit, for as long as it was in. Coming in,
+  Hold and Follow now check their aim; if its frame holds under a tenth of the plate's
+  average dye, they go to the nearest frame holding at least half what the plate's
+  fullest does, centred on the dye in it; an empty plate waits on the aim and lands on
+  the first pour; a hand moving the aim during the closeup is obeyed onto glass, and a
+  mode switch mid-closeup is not a landing (`npm run holdjump`). Same plate: 0.32 of the
+  frame lit before the landing was centred. And the desk's button flipped `macroMode`
+  alone, so the plate went to 4x while the Macro Zoom knob beside it read 1.00x; it is now
+  the M key's press (`closeupToggle`), in by the zoom and out with both.
+
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
   the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles

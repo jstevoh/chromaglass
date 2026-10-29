@@ -17,6 +17,7 @@ import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { encodeQr, qrPath } from '../../lib/qr';
 import { bottleSwatch, isClearLiquid, isNatural } from '../../lib/liquidColour';
 import type { VisualizerSettings } from '../../types';
+import { closeupToggle, macroZoomOf } from '../../sim/constants';
 import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
@@ -569,9 +570,9 @@ function RecipeBody({ p }: { p: DeskProps }) {
         {!ridesOut && <Button full height={32} onClick={p.onOpenSettings} testId="open-all-settings-bench">All settings…</Button>}
         <Button
           height={32}
-          pressed={!!p.settings.macroMode}
+          pressed={macroZoomOf(p.settings) > 1.05}
           title="The closeup camera, in among the drops (M). Lit while it is on."
-          onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
+          onClick={() => p.onSetting(closeupToggle(p.settings))}
           midiKey="action:macro-toggle"
           testId="macro-button"
         >
