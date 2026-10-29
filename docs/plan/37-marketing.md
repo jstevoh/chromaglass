@@ -222,9 +222,10 @@ The owner, 2026-10-29: "I would like to record an entire album every week that i
 on youtube. Each album has a related set of looks that evolve across the album. Each song
 gets its own look, but there should be a common thread that weaves through the
 performance. We could even show these 'live' on youtube and then make them available to
-rewatch." This becomes the channel's centrepiece: one 30-to-60-minute film a week, each
-song a chapter, premiered at a fixed hour and kept as a video. The build items are 37x-3 to
-37x-5 and each gets its own thread; the rest is routine and the owner's calls.
+rewatch." This becomes the channel's centrepiece: one 30-to-60-minute show a week, each
+song a chapter, streamed live at a fixed hour from the owner's Mac (the owner's choice,
+37x-4) and kept as a video. The build items are 37x-3 and 37x-4, each its own thread; the
+rest is routine and the owner's calls.
 
 - **37x-1. Music the show can use.** *(rules; Claude checks each album.)* An album a week,
   whole, on a channel that sells an app, needs a licence that covers syncing the recording
@@ -242,14 +243,15 @@ song a chapter, premiered at a fixed hour and kept as a video. The build items a
     download without CC) is a licence to listen, not to sync or publish, and YouTube
     Music's terms forbid downloading or reusing its tracks. Once an artist has agreed
     (37x-2), a file bought from Qobuz or Bandcamp is the right audio to render from.
-  - *Where the audio comes from, technically.* A Qobuz or Bandcamp purchase downloads as
-    plain FLAC with no copy protection: the owner buys it (their account, their card), it
-    lands in the album's queue folder (37x-7), and the album render (37x-4) reads the
-    files. Qobuz's streaming and YouTube Music give no files: neither has an official way
-    to take the audio out, and the tools that do break their terms and break often. The
-    fallback for anything that plays on the Mac is the Mac app's system-audio input: the
-    album plays in its own app while Record films the plate, in real time, with the Mac
-    tied up and whatever stutters happened in the take, unlike the offline render.
+  - *Where the audio comes from, technically.* The owner's choice (37x-4): the album plays
+    in Qobuz or YouTube Music on the Mac and the app hears it through system audio, live.
+    Neither service gives files (no official way to take the audio out, and the tools that
+    do break their terms and break often), so nothing is rendered offline from them. Their
+    terms license playback for personal listening, so broadcasting it breaks those terms
+    too; the likely cost is the streaming account, while Content ID, not the service,
+    decides what happens to the video. A Qobuz or Bandcamp purchase downloads as plain
+    FLAC, which the offline render (§6) can read when an album needs a file: a Premiere
+    (37x-6) or the clips (37x-9).
   - *Popular albums are not viable on this channel.* The owner asked 2026-10-29 whether a
     licensed album could go up anyway, letting the rights holder take YouTube's earnings.
     Content ID often does exactly that (the label "monetizes" the claim and the video stays
@@ -266,11 +268,12 @@ song a chapter, premiered at a fixed hour and kept as a video. The build items a
     queue plays. Where they go is the owner's pick, made the same day: on a **second
     channel**, so a later manual takedown can
     strike only that channel, while the main channel keeps cleared music and artist
-    collaborations. A claimed album is never streamed live (37x-6): a Premiere of the
-    already-checked upload, only.
+    collaborations. Live, there is no private upload to check first: Content ID listens
+    during the stream and can cut it off partway (37x-6), so a popular album is a gamble
+    each week on the second channel, and an album that was cut off is not tried again.
   - Even a CC track can be claimed, when its artist's distributor registers it in Content
-    ID; uploading private days ahead (37s) shows the claim before the Premiere, and the
-    licence is the dispute.
+    ID; the licence is the dispute, and an artist who agreed (37x-2) can whitelist the
+    channel with their distributor before the show.
 - **37x-2. Artists who say yes.** *(S; Claude finds and drafts, the owner sends.)* The
   draw for an artist is a free visual album to share: their record, each song with its own
   look, a film they may post anywhere, with credit and links both ways. If they want
@@ -304,77 +307,82 @@ song a chapter, premiered at a fixed hour and kept as a video. The build items a
     new dye over the old (`lookFade.ts`), not by a drain, except where the sheet says a
     track opens on black.
   - *One seed lineage.* The album has a seed and each track's seed is drawn from it and the
-    track number (`rng.ts`), so the whole album renders the same twice and a change to one
-    song re-renders only from there.
-  - The sheet starts from a draft Claude writes from the album's own sound (§17's
-    hear-ahead analysis and the offline bands, #154: where each song's peaks and quiet
-    stretches are), and the Design desk opens it for editing. Phone version: the phone's
+    track number (`rng.ts`), so each song starts from the same laid pattern in the
+    rehearsal and on the night, and a clip replayed later (37x-9) starts where the show's
+    song did. A live show is the same decisions, not the same pixels.
+  - The sheet starts from a draft Claude writes from the track list, the songs' lengths
+    and a listen to the album (the Mac app's sound readings over each track, saved from the
+    rehearsal, 37x-5), and the Design desk opens it for editing. Phone version: the phone's
     Play screen shows the album's tracks as its set list and plays it on the laptop's plate
     (the remote), since a phone does not render.
   *Measure:* a lab check on a three-track sheet that the palette's distance between
   neighbouring songs stays under a bar while track 1 and track 3 differ, that the building
   quantity rises monotonically across the album, and that the plate's dye at a song's
   first frame is the previous song's last.
-- **37x-4. Render a whole album to one film.** *(build, M; its own thread; §6.)* Today
-  Render this song makes one film from one song. The album render steps the whole sheet on
-  one show clock: each track's audio in order with the sheet's gaps, the plate carried
-  across them (37x-3), and a chapters file written beside the film (each song's start, for
-  YouTube's description). At 1080p first, 4K when the Mac's time allows. §6 still has a
-  3-minute 1080p render unmeasured on the Mac, so the first step is that number, which
-  says how long an album takes (expected an hour or more for a 45-minute album; to be
-  measured, not assumed). Long renders write to disk as they go (File System Access), and
-  a cancelled or crashed render resumes from its last finished track.
-  *Measure:* `npm run render` extended to a two-track sheet: the film lasts the two tracks
-  plus the gap to the frame, the chapters match the tracks' starts, and the same seed draws
-  the same frames twice.
-- **37x-5. Previews for Monday.** *(build, S; with 37x-4.)* Twenty seconds of each song at
-  its loudest stretch, rendered at 540p, strung into a two-to-four-minute preview reel, so
-  the Monday page (37q) shows the whole album's arc in a few minutes and a change asked for
-  one song re-renders only that song.
-- **37x-6. Showing it "live".** *(the owner's call; recommendation below.)*
-  - **A Premiere (recommended).** The finished film is uploaded private days ahead (37s)
-    and set to premiere at a fixed hour (one click in Studio): a countdown page, the film
-    played to everyone at once with live chat, then it stays as a normal video at full
-    upload quality. Nothing runs on the Mac during the show, nothing can stutter, and
-    Content ID has already looked at it. Cost to the owner: none, or an hour in the chat if
-    they want to be there. Claude drafts a pinned comment with the track list and credits.
-  - **The film streamed as a live event.** The API can schedule a live broadcast and the
-    Mac can stream the finished file into it (`ffmpeg -re` to the stream key), which needs
-    no Studio click at all. But the archive is the stream's recording, at a live bitrate
-    that softens the plate's fine detail, the Mac and its network are tied up for the
-    album's length, and a claim mid-stream cuts it off. Worth it only if the Studio click
-    cannot be made.
-  - **A true live set from the Mac.** The owner plays the album live: the Wall output
-    (§31) captured by OBS and streamed, the owner's hands on the desk or the phone. The
-    real performance, and the only one of the three where the owner can play to the
-    chat. Cost: the owner's evening each time, the show's risk on stage (a stutter, a lost
-    frame, the 19ah deploy runner paused for it), and a stream archive at live bitrate.
-    Best as an occasional event (an artist's release night, 37x-2), not the weekly rhythm.
+- **37x-4. Go live to YouTube from the Mac app.** *(build, M; its own thread.)* The owner
+  chose 2026-10-29 to play the album from a streaming app and capture it live: "I would
+  rather play off of youtube music/qobuz and capture the audio live as the video plays in
+  real time. then chromaglass can just record/send to youtube live video&audio together."
+  The album plays in Qobuz or YouTube Music; the Mac app hears it through its system-audio
+  input (the one-context capture, #550); the album sheet's set list brings each song's look
+  up as the song is identified (`setList.ts`'s "which song brings it up"), with the track
+  order and lengths as the fallback when identification misses; and the app sends the
+  plate's frames and the same audio to YouTube Live itself. A browser page cannot speak
+  RTMP, so this is the Mac app's: the canvas and the audio encoded as for Record (WebCodecs,
+  `render.ts`'s encoders) and handed to a bundled `ffmpeg` that pushes RTMPS to the
+  broadcast's stream key, which 37s creates and binds through the API. Alongside the
+  stream, Record keeps a full-quality Plate video of the same show on disk, for the clips
+  (37x-9). Until it is built, OBS does the same job: the Wall output (§31) captured as a
+  window, the system audio as its input. Phone version: the phone's Play screen shows the
+  album's set list, which song is up and whether the stream is live, and can stop it.
+  *Measure:* a lab check that a 60-second stream to a local RTMP server (a test `ffmpeg`
+  listener) arrives with every second of audio, frames at the stream's rate within a
+  bound, and audio and plate in sync to a frame; on the Mac, `stutter`'s two-step frames
+  while streaming against the same look not streaming.
+- **37x-5. A rehearsal for Monday.** *(S; Claude, with 37x-4.)* There are no files to
+  render a preview from, so the Monday page (37q) shows the album sheet in a sentence, the
+  palette's walk across the tracks as a strip, and a two-to-four-minute rehearsal: the
+  first thirty seconds of a few songs played through the same path, recorded as Plate
+  video, not streamed. A change asked for one song is re-rehearsed for that song only.
+- **37x-6. Showing it live.** *(the owner's choice, made 2026-10-29: live, from the app.)*
+  The weekly show is a scheduled YouTube live stream at a fixed evening hour (Pacific
+  time), with chat, kept by YouTube as a video to rewatch. What it costs, said when it was
+  chosen: the Mac is tied up for the album's length; a stutter or a dropped frame goes out
+  as it happened (14aa's smooth frames matter here more than anywhere); the archive is the
+  stream's recording at live bitrate, softer than an upload; and Content ID listens during
+  the stream, so a matched popular album can be cut off partway. The alternatives stay
+  written down for when they fit: a **Premiere** (a finished film uploaded ahead and played
+  at a set hour; it needs a file, so it suits the albums bought as FLAC and the artists'
+  own), and a **true live set** the owner plays by hand on the desk or the phone (an
+  artist's release night, 37x-2).
 - **37x-7. The weekly routine.** *(Claude, on the owner's Mac; set up once as a weekly
-  routine.)* A queue of cleared albums in `/mnt/project-files/album-show/queue/` (each a
-  folder: the files, the licence page, the artist's permission if any) holds at least
-  three weeks ahead. Each week:
-  - *Thursday*: Claude takes the next album, checks its licence again, writes its album
-    sheet (37x-3) and renders the preview reel (37x-5).
-  - *Monday*: the approval page (37q) shows the reel, the sheet's thread in a sentence, the
-    title, description, chapters and thumbnail, and the week's three vertical cuts.
-  - *Monday night*: on approval, the full render (37x-4) runs while the Mac is idle, with
-    the deploy runner (19ah) paused for it.
-  - *Tuesday*: uploaded private with its chapters and credits (37s), Content ID's result
-    read, the Premiere set for the week's slot (a fixed evening, Pacific time), the three
-    cuts loaded into the scheduler (37r) to post across the week, the artist sent their
-    film.
-  - *The Premiere*, then on Sunday the comments read for requests (37t) and the week's
-    numbers written (37l).
-- **37x-8. What the owner's week costs.** *(estimate.)* Once: the Google Cloud project and
-  its sign-in, the API audit form, the scheduler's connections, and approving the routine
-  (an afternoon, then a wait of days to weeks on YouTube's audit). Weekly: the Monday page
-  (10–20 minutes), the Premiere click if Claude cannot make it, and the artist notes to
-  send (a few minutes). Optional: being in the Premiere's chat, replies, a live set now
-  and then. The Mac's week: the album's render (to be measured, 37x-4) and an hour of
-  Claude's driving; it is the one cost that competes with the deploy runner.
-- **37x-9. The album feeds the rest.** *(Claude.)* The album's three biggest moments
-  become the week's 9:16 cuts (37c), rendered tall from the same seed, not cropped; each
+  routine.)* A queue in `/mnt/project-files/album-show/queue/` holds at least three albums
+  ahead, each a folder with the track list, where it streams from, its licence or rights
+  holder, and the artist's permission if any. Each week:
+  - *Thursday*: Claude takes the next album, writes its album sheet (37x-3) and records the
+    rehearsal (37x-5).
+  - *Monday*: the approval page (37q): the sheet, the rehearsal, the title, description
+    and thumbnail, and last week's three cuts.
+  - *Tuesday*: the broadcast scheduled through the API (37s) on the right channel (37x-1),
+    its stream key bound, the title, description and a pinned comment with the track list
+    and credits ready.
+  - *Show night*: Claude, on the Mac by Remote Control, pauses the deploy runner (19ah),
+    opens the album in the streaming app, starts the stream from the app (37x-4), starts
+    playback, and watches the stream's health until the last track; the owner can be in
+    the chat or not. After it ends, chapters are added to the archive's description from
+    the times each song came up, and the artist is sent the link.
+  - *Sunday*: the three cuts made from the night's Plate video (37x-9) and loaded into the
+    scheduler (37r); the comments read for requests (37t); the week's numbers (37l).
+- **37x-8. What the owner's week costs.** *(estimate.)* Once: the Google Cloud project
+  and its sign-in, the API audit form, the scheduler's connections, the stream permission
+  on both channels (YouTube asks a new channel to wait 24 hours before its first live
+  stream), and the routine approved. Weekly: the Monday page (10–20 minutes), the artist
+  notes to send (a few minutes), and leaving the Mac awake and free on show night. Optional:
+  the chat during the show, replies, and playing a set live by hand now and then.
+- **37x-9. The album feeds the rest.** *(Claude.)* The night's Plate video (37x-4) shows
+  where the album's three biggest moments were; each is played again tall (9:16, 34f's
+  rule, not a crop) from its song's look and seed for 15 to 30 seconds, recorded, and
+  becomes one of the week's cuts (37c); each
   song's chapter is a link in the cuts' captions; the albums are one playlist ("Albums")
   beside 37b's three. The 60-second look videos (37b) continue less often, as the site's
   library.
@@ -384,9 +392,9 @@ song a chapter, premiered at a fixed hour and kept as a video. The build items a
 | Claude makes | The owner does |
 |---|---|
 | Look videos and 9:16 cuts on the Mac, by Remote Control | Owns every account and its password |
-| The weekly album: its sheet, preview, render, upload and Premiere (37x) | Approves the week on Monday's page (37q) |
+| The weekly album: its sheet, rehearsal, broadcast and the show on the night (37x) | Approves the week on Monday's page (37q) |
 | Titles, descriptions, tags, thumbnails, captions, music credits | Connects the scheduler and the YouTube API once (37r, 37s) |
-| Finds cleared albums and drafts the artists' notes (37x-1, 37x-2) | Sends the artists' notes; picks Premiere or live (37x-6) |
+| Finds cleared albums and drafts the artists' notes (37x-1, 37x-2) | Sends the artists' notes; leaves the Mac free on show night (37x-8) |
 | Show HN, Product Hunt, community and creator drafts, each to the place's rules | Answers comments and messages, the same day in launch week |
 | The share card, the press page, the launch video's cut | The room shot (37d); a face or voice if wanted (37e) |
 | The UTM links, the counter's PR, the Monday numbers file | Picks the launch offer (37m) and 37o; signs in to the dashboards |
