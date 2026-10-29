@@ -190,8 +190,8 @@
       #cg-intro { position: fixed; inset: 0; z-index: 5; overflow: hidden; background: #000; pointer-events: none; container-type: size; transition: opacity 0.9s ease-out; }
       #cg-intro.cg-in-plate { position: absolute; z-index: auto; }
       #cg-intro.cg-out { opacity: 0; }
-      /* Held still from the first paint until the opening's render pipelines
-         are built (the markup below starts it with .cg-still; gpu/prepare.ts,
+      /* Held still from the first paint until the opening is built, every
+         pipeline of it (the markup below starts it with .cg-still; gpu/prepare.ts,
          Quiet, lets it go): while Chromium starts the GPU and while those
          compile, a moving picture stopped the page's frames. */
       #cg-intro.cg-still, #cg-intro.cg-still * { animation-play-state: paused !important; }

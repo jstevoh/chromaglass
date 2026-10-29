@@ -28,8 +28,9 @@
  *   6. a browser with no WebGPU sees the failure screen, not the intro
  *   7. the remote and a cast never show it, not even before the app has run
  *   8. an app that never arrives: it leaves when the way out appears
- *   9. it holds still while each of the opening's render pipelines
- *      compiles, and moves again once they are done
+ *   9. it holds still while the opening builds, its render pipelines one
+ *      at a time and its compute kernels after them, and moves again once
+ *      every build has settled
  *   9b. and it is still from the page's first frame until then, through
  *      Chromium starting the GPU
  *
@@ -253,26 +254,34 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
     leftOnStep && faded && goneIn && !after.there,
     `${at.noCount ? 'no stepCount on the lead plate to read; ' : ''}${stepped ? `plate stepped on frame ${at.stepped} (${s(at.steppedAt)}), intro leaving on frame ${at.leaving} (${s(at.leavingAt)}) for "${rec.reason}"` : 'the plate never stepped, or the intro never went'}; ${at.fade ? `a ${at.fade.ms} ms fade on opacity` : 'no fade started'}; gone ${at.removedAt !== undefined ? `${Math.round(at.removedAt - at.leavingAt)} ms after (seen on a frame ${at.goneAt !== undefined ? `${Math.round(at.goneAt - at.leavingAt)} ms after` : 'never'})` : 'never'}`);
   /*
-    Still through the opening's render compiles. What it guards (run
+    Still through the opening, every build of it. What it guards (run
     37233245217): with the intro turning, a frame needs the GPU process, and
     on CI's Mac it waited there behind the display's compile, 2.82 s with
-    no frame at all. Software WebGPU does not stall so, so what is held
-    here is the cause and not the stall: no frame in which anything of the
-    intro was running while one of the opening's render pipelines was
-    compiling, and some such frame seen (a check that saw none measured
-    nothing). The opening's are those asked from its start until it was
-    done (`prepareLog`); what is built later, behind a plate already
-    drawing, is not the intro's to wait for. And it moved again: every
-    stretch it held still was let go, and once the compiles were done it
-    turned on some frame before it left (or left within two frames of the
-    last of them).
+    no frame at all; and once the intro let go at the last render compile,
+    behind the solver's kernels still compiling after it (#540's run
+    40741268086: 2.35 s from 8.70 s, 0.13 s after it let go, PLAN.md 14v-11).
+    Software WebGPU does not stall so, so what is held here is the cause and
+    not the stall: no frame in which anything of the intro was running from
+    the opening's start to its end (`prepareLog`: from its first ask until
+    every build settled and the first uses were paid), and some such frames
+    seen, both while a render pipeline compiled and after the last of them
+    with the compute kernels going on (a check that saw none there measured
+    nothing; the second stretch is the one the hold used to leave). What is
+    built later, behind a plate already drawing, is not the intro's to wait
+    for. Its own record says the same from inside: the hold let go no
+    earlier than the opening's last build settled. And it moved again:
+    every stretch it held still was let go, and once the opening was done
+    it turned on some frame before it left (or left within two frames).
   */
   await waitFor(page, () => !!window.chromaglassDebug?.()?.pipelines?.()?.prepares?.some((x) => x.stage === 'opening'), null, 10000);
   const log = await page.evaluate(() => {
     const d = window.chromaglassDebug?.();
     const all = d?.pipelines?.()?.prepares;
     const p = all?.find((x) => x.stage === 'opening');
-    return { opening: p ? { at: p.at, end: p.at + p.ms } : null, stages: all ? all.map((x) => x.stage) : null, debug: d ? Object.keys(d).length : null, pipelines: typeof d?.pipelines };
+    // The last of its builds to settle: `builds` is [key, from, ms], tiling
+    // the opening's wall time (gpu/prepare.ts, `buildInTurn`).
+    const built = p?.builds?.length ? Math.max(...p.builds.map(([, a, ms]) => a + ms)) : null;
+    return { opening: p ? { at: p.at, end: p.at + p.ms, built } : null, stages: all ? all.map((x) => x.stage) : null, debug: d ? Object.keys(d).length : null, pipelines: typeof d?.pipelines };
   });
   const opening = log.opening;
   if (!opening) console.log(`     no opening to read: ${log.debug ?? 'no'} debug keys, pipelines ${log.pipelines}, prepares ${JSON.stringify(log.stages)}; ${at.renders?.length ?? 0} render compiles seen in all; the app said ${JSON.stringify(page.cgSaid)}`);
@@ -280,17 +289,25 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   const inCompile = (t) => renders.some(([a, e]) => t > a && (e === null || t < e));
   const during = (at.moving ?? []).filter(([t]) => inCompile(t));
   const lastEnd = renders.length && renders.every(([, e]) => e !== null) ? Math.max(...renders.map(([, e]) => e)) : null;
-  const afterward = lastEnd === null ? [] : (at.moving ?? []).filter(([t]) => t > lastEnd);
+  // The opening's whole stretch, and the part of it after the last render
+  // compile, where only compute kernels and the first uses were left.
+  const inOpening = (t) => opening !== null && t > opening.at && t < opening.end;
+  const whole = (at.moving ?? []).filter(([t]) => inOpening(t));
+  const tail = lastEnd === null ? [] : whole.filter(([t]) => t > lastEnd);
+  const afterward = opening === null ? [] : (at.moving ?? []).filter(([t]) => t > opening.end);
   const stills = rec.still ?? [];
   const letGo = stills.length > 0 && stills.every(([, e]) => e !== null);
+  const letGoAt = letGo ? Math.max(...stills.map(([, e]) => e)) : null;
+  // Rounded to the millisecond in the prepare log, so a millisecond's slack.
+  const heldToEnd = letGoAt !== null && opening?.built != null && letGoAt >= opening.built - 1;
   // One at a time, as the opening has always asked for them (`renderBusy` in
   // gpu/prepare.ts): the hold must not let the lanes ask for several at once.
   const sorted = [...renders].sort((a, b) => a[0] - b[0]);
   const overlaps = sorted.filter((r, i) => i > 0 && (sorted[i - 1][1] === null || sorted[i - 1][1] > r[0])).length;
-  check('9. it holds still while the opening\'s render pipelines compile, one at a time, and moves again after',
-    overlaps === 0 && renders.length > 0 && during.length > 0 && during.every(([, m]) => !m) && letGo && lastEnd !== null
+  check('9. it holds still while the opening builds, render pipelines one at a time and kernels after, and moves again once it is built',
+    overlaps === 0 && renders.length > 0 && during.length > 0 && tail.length > 0 && whole.every(([, m]) => !m) && letGo && heldToEnd && lastEnd !== null
       && (afterward.some(([, m]) => m) || afterward.length <= 2),
-    `${renders.length} render compiles in the opening${opening ? '' : ' (no opening in the prepare log)'}, ${overlaps} asked while another compiled; ${during.length} frames up during them, ${during.filter(([, m]) => m).length} of them moving; held still ${stills.map(([a, e]) => `${s(a)}–${e === null ? 'never let go' : s(e)}`).join(', ') || 'never'}; ${afterward.filter(([, m]) => m).length} of ${afterward.length} frames moving after the last`);
+    `${renders.length} render compiles in the opening${opening ? '' : ' (no opening in the prepare log)'}, ${overlaps} asked while another compiled; ${whole.length} frames up in the opening (${opening ? `${s(opening.at)}–${s(opening.end)}, last build settled ${opening.built == null ? 'never' : s(opening.built)}` : 'none'}), ${whole.filter(([, m]) => m).length} of them moving; ${during.length} during the render compiles, ${tail.length} after the last of them (${tail.filter(([, m]) => m).length} moving); held still ${stills.map(([a, e]) => `${s(a)}–${e === null ? 'never let go' : s(e)}`).join(', ') || 'never'}; ${afterward.filter(([, m]) => m).length} of ${afterward.length} frames moving after the opening`);
   /*
     And still before them too, from the first frame the page draws. What it
     guards: on CI's Mac the frames stopped as long while Chromium started the
@@ -299,7 +316,7 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
     three trials each, 2.13 to 2.35 s turning, 0.85 to 1.18 s still from the
     first paint: PLAN.md 14v-5). The same reading as 9, from outside the
     app: no frame with anything of the intro running from the first one to
-    the end of the opening's last render compile, and some frames seen
+    the end of the opening, and some frames seen
     before the first of those compiles was asked, while the GPU was starting
     (a page that drew none there measured nothing). Read from the page's
     very first frame, and still meaning its animations paused, at least the
@@ -307,12 +324,12 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
     or reduced motion) would read as still and prove nothing.
   */
   const firstAsk = sorted.length ? sorted[0][0] : null;
-  const early = lastEnd === null ? [] : (at.moving ?? []).filter(([t]) => t <= lastEnd);
+  const early = opening === null ? [] : (at.moving ?? []).filter(([t]) => t <= opening.end);
   const beforeAsk = firstAsk === null ? [] : early.filter(([t]) => t < firstAsk);
   const pausedLeast = early.length ? Math.min(...early.map(([, , p]) => p)) : 0;
   check('9b. and it is still from the first frame the page draws until then',
-    lastEnd !== null && beforeAsk.length > 0 && early[0][3] === 1 && early.every(([, m, p]) => !m && p >= 4),
-    `${early.length} frames up before the last render compile settled, from frame ${early.length ? early[0][3] : 'none'}, ${early.filter(([, m]) => m).length} of them moving, at least ${pausedLeast} animations paused on each; ${beforeAsk.length} of them before the first was asked (${firstAsk === null ? 'never' : s(firstAsk)}), ${beforeAsk.filter(([, m]) => m).length} moving`);
+    opening !== null && beforeAsk.length > 0 && early[0][3] === 1 && early.every(([, m, p]) => !m && p >= 4),
+    `${early.length} frames up before the opening was built, from frame ${early.length ? early[0][3] : 'none'}, ${early.filter(([, m]) => m).length} of them moving, at least ${pausedLeast} animations paused on each; ${beforeAsk.length} of them before the first was asked (${firstAsk === null ? 'never' : s(firstAsk)}), ${beforeAsk.filter(([, m]) => m).length} moving`);
   // How much of the wait it covered: from the first paint to the plate's
   // first step, it was up from the first paint until it began to leave.
   if (timing.fcp !== undefined && at.steppedAt !== undefined && rec.out !== undefined) {
