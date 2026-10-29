@@ -1,83 +1,12 @@
-// The handle the visualizer gives the app, and the hold a song render takes on the plate:
-// types only, moved out of LiquidVisualizer.tsx (PLAN 19ai, the size ratchet) so the
-// 670 KB file need not be read to learn what the app may ask of it. LiquidVisualizer.tsx
-// re-exports every name here, so no importer changed.
-
-import type { AudioData } from '../hooks/useAudioAnalyzer';
-import type { VisualizerSettings } from '../types';
+// The handle the visualizer gives the app: types only, moved out of LiquidVisualizer.tsx
+// (PLAN 19ai, the size ratchet) so the file need not be read to learn what the app may
+// ask of it. LiquidVisualizer.tsx re-exports it, so no importer changed.
 import type { QualityGovernor } from '../lib/governor';
+import type { VisualizerSettings } from '../types';
+import type { PaceSample } from '../lib/scenePacing';
 import type { SongEvent, SongShapeState } from '../lib/songShape';
 import type { BarNow } from '../lib/barGrid';
-import type { PaceSample } from '../lib/scenePacing';
-
-/** What a look asks of the ferrofluid: how much is drawn (Ferrofluid) and the size it is poured at (Scale). */
-export type LookPhase = { phaseAmount?: number; phaseScale?: number };
-
-/**
- * What a rendered frame was drawn from, apart from its pixels: for
- * `npm run render-app`, which can only be run on a real GPU, and so has to
- * say *why* two renders of the same seed differ, not only that they do.
- *
- * When the owner's Mac reports "240 of 240 frames differ", a hash of each
- * frame says the films are different and nothing else. So each frame, when
- * a check asks (`begin({ digest: true })`, which the render asks for only
- * when it is hashing frames), the numbers the frame is drawn from are kept
- * beside its hash, taken at the moment the plate is handed to the renderer:
- * the clocks, the canvas and the grid, the steps taken, the phrase and the
- * modulators, the rock and the lamp, the dye regulator's reading, the flash
- * guard's gain, the dice drawn so far on each stream, a few cells of the
- * readback, a hash of the settings. The check prints the first of these
- * that differs between two renders, which names the part of the plate that
- * carried something in from before the render, or that reads a clock it
- * should not. Plain numbers and strings, compared exactly: a value that is
- * the same to the last bit prints as the same. Null is "not there" (a
- * stream nothing has asked for yet).
- */
-export type FrameDigest = Record<string, number | string | boolean | null>;
-
-/**
- * A song render's hold on the plate (lib/render.ts, PLAN.md §6).
- *
- * The show normally draws a frame when the browser asks and steps the solver
- * as many times as the wall clock says it owes. A render inverts both: the
- * caller asks for frame i, the plate takes exactly the solver steps that
- * frame is owed at the render's step rate (worked out from i, not from a
- * clock), draws it at the film's size, and hands the drawn canvas back as a
- * VideoFrame in the same task, which is the only moment a WebGPU canvas is
- * guaranteed to still hold what was drawn.
- *
- * The caller owns the show clock (`beginFixedClock` before `begin`,
- * `endFixedClock` before `end`) and the seed (`setShowSeed` before
- * `begin`, which lays the look).
- */
-export interface VisualizerRender {
-  /**
-   * Take the plate: the live loop stops, the canvas becomes width x height,
-   * the solvers are rebuilt fresh at `grid` (the current grid when not
-   * given), the plate's clocks and counters start from zero, and the look is
-   * laid from the seed. Resolves once the laid plate's first readbacks have
-   * landed, so the first frame reads the render's own plate, not the live
-   * one's.
-   */
-  begin: (o: { fps: number; width: number; height: number; stepRate?: number; grid?: number | null; lookId?: string | null; digest?: boolean }) => Promise<{ grid: number; lookId: string; stepRate: number }>;
-  /** Draw the next frame with this frame's sound, and return it as a VideoFrame with these times. */
-  step: (audio: AudioData | null, timestampUs: number, durationUs: number) => VideoFrame;
-  /** The state the last frame was drawn from, when `begin` was asked for digests (the checks); else null. */
-  digest: () => FrameDigest | null;
-  /** Resolves once the GPU has finished the frame and every readback it asked for has landed. */
-  settle: () => Promise<void>;
-  /** Give the plate back to the live loop, at its own size. */
-  end: () => void;
-}
-
-/** What the song's shape tracker has heard, for the app to read (`songShape` on the handle). */
-export interface SongShapeReport {
-  now: SongShapeState;
-  /** Where the beats fall and which is the one (`lib/barGrid.ts`). */
-  bar: BarNow;
-  /** The last few events, oldest first; `seq` counts every event since the plate started. */
-  events: (SongEvent & { seq: number })[];
-}
+import type { LookPhase, FrameDigest, VisualizerRender, SongShapeReport } from '../sim/frameTypes';
 
 export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */

@@ -68,6 +68,7 @@ const root = process.env.INIT_CWD ?? process.cwd();
 const panel = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
 const panel0 = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
 const panel0app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+const sim = readFileSync(join(root, 'src/sim/fluidSimulation.ts'), 'utf8');
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -506,12 +507,9 @@ check('and every factory map has a pattern that finds it',
 // `PER_LAYER` is a written list, because it decides what a dropdown shows. This
 // is what stops it becoming a lie: the solver's own source is read and every
 // name on the list has to appear in it.
-const cls = panel0.indexOf('class FluidSimulation {');
-const solver = cls < 0 ? '' : panel0.slice(cls, (() => {
-  // The class ends at the first line that closes at column zero.
-  const end = panel0.indexOf('\n}', cls);
-  return end < 0 ? panel0.length : end;
-})());
+// The class runs to the end of its own file (src/sim/, PLAN 19ai-3).
+const cls = sim.indexOf('class FluidSimulation {');
+const solver = cls < 0 ? '' : sim.slice(cls);
 check('the solver can be found to read', solver.length > 2000, `${solver.length} characters`);
 
 /*
