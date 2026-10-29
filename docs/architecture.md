@@ -18,7 +18,7 @@ turn a 50 KB hunt into a 2 KB read.
 | File | Size | What is in it |
 |---|---|---|
 | `PLAN.md` | 810 KB, ~200k tokens | More than a session's 200k window. The order of work a session reads first is 38 KB. 14 of 25 recorded merge conflicts (19m) |
-| `src/components/LiquidVisualizer.tsx` | 671 KB | `class FluidSimulation` (lines 1066-4983, 192 KB: each layer's seeding, pours and hand-off to the GPU solver); 63 KB of other module-level helpers; the component (99 KB); the frame loop, one `useEffect` of 5,469 lines (310 KB) |
+| `src/components/LiquidVisualizer.tsx` | 671 KB (441 KB after 19ai-3) | `class FluidSimulation` (lines 1066-4983, 192 KB: each layer's seeding, pours and hand-off to the GPU solver); 63 KB of other module-level helpers; the component (99 KB); the frame loop, one `useEffect` of 5,469 lines (310 KB) |
 | `src/App.tsx` | 373 KB | `App()` is 6,600 lines: 51 `useState`, 54 `useRef`, 70 `useEffect`, 124 imports |
 | `src/gpu/fluid.ts` | 291 KB | the solver, about 95 methods |
 | `src/gpu/wgsl/fluid.ts` | 290 KB | the solver's passes in 7 exports (other passes already have their own files) |
@@ -26,8 +26,8 @@ turn a 50 KB hunt into a 2 KB read.
 | `CLAUDE.md` | 17 KB, now 14 KB | loaded on every step of every session |
 
 Also found: the checks drive the app through 38 `window.chromaglass*` and `__cg*` hooks,
-read by 68 check scripts and declared nowhere; and `lib/stir`, `squish`, `plateRock` and
-`turntable` import types from the visualizer component. Already sound: `src/gpu/` never
+read by 68 check scripts and declared nowhere (44, once counted for 19ai-4); and
+`hooks/useSongRender.ts` imported the visualizer component for its types. Already sound: `src/gpu/` never
 imports components or hooks, and `src/lib/` never imports components.
 
 ## The splits, ranked by context saved per effort
@@ -41,8 +41,8 @@ when no open PR touches the file.
 | 1 | 19m | `PLAN.md` to an index plus one file per section | M |
 | 2 | 19ai-1 | `CLAUDE.md`'s checks table and CI account to `docs/checks-map.md` and `docs/ci.md`; the architecture rules in (shipped) | S |
 | 3 | 19ai-2 | a `README.md` per folder: what it owns, its entry files, its contracts, its checks (shipped) | S |
-| 4 | 19ai-3 | `FluidSimulation` and the module-level helpers out of `LiquidVisualizer.tsx`; its shared types to a types file | S |
-| 5 | 19ai-4 | the checks' `window` hooks declared in one typed file | S |
+| 4 | 19ai-3 | `FluidSimulation` and the module-level helpers out of `LiquidVisualizer.tsx`; its shared types to a types file (shipped: `src/sim/`, the component 671 to 441 KB) | S |
+| 5 | 19ai-4 | the checks' `window` hooks declared in one typed file (shipped: `src/lib/checkHooks.ts`) | S |
 | 6 | 19ai-5 | `npm run sizes`: a new file under 40 KB, a file over budget may not grow (shipped) | S |
 | 7 | 19ai-6 | `src/gpu/wgsl/fluid.ts` split by pass | M |
 | 8 | 19ai-7 | `src/gpu/fluid.ts` split into setup and per-pass encoding | M |

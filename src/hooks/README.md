@@ -12,7 +12,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 
 ## Contracts
 
-- Imports `src/lib`, `src/types`, `presets`, `constants`, React. From components only types (`useSongRender` takes `FrameDigest`, `VisualizerRender` from `LiquidVisualizer`). Never `src/gpu`.
+- Imports `src/lib`, `src/types`, `presets`, `constants`, React. No components (`useSongRender` takes `FrameDigest`, `VisualizerRender` from `sim/frameTypes.ts`). Never `src/gpu`.
 - Mostly called from `App.tsx`. The desk and phone take `useEscape` and the type `TabEdit`; `lib/sceneMap` and `lib/songTrack` take the type `AudioData`.
 
 ## Files

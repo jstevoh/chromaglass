@@ -5916,6 +5916,29 @@ commit. *Size:* S.
   a red check in the last month of `antigravity/` PRs before widening it, since every
   widening costs ordinary physics work a line in the body.
 
+- **19x-3. Measured quotes what it printed.** **Shipped** (2026-10-26, the owner's rule from
+  the scorecard): the `Check changes named` job also fails an Antigravity PR (`antigravity/…`
+  branch) whose `Measured:` has a command with no printed line quoted beside it, a group with
+  no command, a script that is not in `package.json`, or no `Measured:` at all (`npm run
+  checkguard`; the form is in `docs/handoff.md`). It reads the form, not the truth; the
+  reviewer runs one script and compares. Re-based 2026-10-28 (the first draft sat red for two
+  days on two unrelated Mac flakes and fell 35 commits behind): run against the bodies of
+  #505 and #511, the two newest Antigravity PRs, the first version failed 28 and 37 lines
+  that quoted exactly what their checks print (`PASS …`, `36/36 checks passed`, `all lines
+  pass`, `adapter: apple`, a heading over quoted lines, a CI job id beside the command), so a
+  printed line now also counts in those forms, and by being in the command's own script's
+  source; a sentence of the writer's own ("it passed on 2026-10-26", "24 checks green")
+  still does not. The code lives in `scripts/measured.mjs` (and the API reads in
+  `scripts/checkguard-api.mjs`), so `checkguard.mjs` stays inside its size ceiling (19ai-5).
+  Found by the review: run over `scripts/checkguard.mjs` itself, `npm run
+  checkguard` still reads "it passed on 2026-10-26" as printed, because the self-test holds
+  that sentence in a string literal; the lookup cannot tell a script's fixtures from what it
+  prints (the other scripts' fixtures are the same risk, small, and the reviewer's re-run is
+  the guard). Found along the way: `namedLines` does not read a
+  `Check changes:` that is itself a list item (`- **Check changes:**`, how Antigravity's
+  bodies write the whole block), so a named change under that form is not seen. It fails
+  safe (red, never green) but costs a round; read it the way `measuredGroups` does.
+
 ### 19y. Compaction and helper models set from the repo, not the host
 Found 2026-10-17: the 200k compaction window chosen on 10-12 was never in effect. A cloud
 session's environment still carried `CLAUDE_CODE_AUTO_COMPACT_WINDOW=500000` with the
@@ -6422,18 +6445,40 @@ is 810 KB (about 200k tokens, more than a session's window), `LiquidVisualizer.t
 - **19ai-1. Shipped.** `CLAUDE.md` gains *Where things live*, *Boundaries*, *Size budgets*
   and *Planning a change*; its checks table and CI account move to `docs/checks-map.md`
   and `docs/ci.md` with pointers left. 17.0 to 13.8 KB loaded on every step.
-- **19ai-2. Shipped.** A `README.md` in `src/gpu`, `src/gpu/wgsl`, `src/lib`, `src/hooks`,
+- **19ai-2. Shipped.** A `README.md` in `src/gpu`, `src/gpu/wgsl`, `src/lib`, `src/sim`, `src/hooks`,
   `src/components/desk`, `src/components/phone`, `server` and `scripts`: what each owns,
   its entry files, its contracts and its checks. A PR that changes an export updates its
   folder's README. Open: a check that each README names only files that exist; and
   `reach` and `quick` count a `README.md` under `src/` as a site file, so a PR that only
   edits one runs every Mac shard and deploys (this one did). Teach both that Markdown under
   `src/` is not built into the site.
-- **19ai-3** (S). `class FluidSimulation` (192 KB) and the other module-level helpers out
-  of `LiquidVisualizer.tsx` into `src/sim/`, and `FrameDigest` and `VisualizerRender` into a
-  types file so `lib/stir`, `squish`, `plateRock` and `turntable` stop importing the component.
-- **19ai-4** (S). The 38 `window.chromaglass*` and `__cg*` hooks the checks drive the app
-  through, declared in one typed file with a line each.
+- **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
+  was module code above the component: the CPU solver `class FluidSimulation` (3,900 lines)
+  and the constants, switches and helpers around it. They are in `src/sim/` now, unchanged
+  (every non-import line of the old file is in the new files, counted line by line): the
+  solver in `fluidSimulation.ts`, the grid and the solver's constants in `constants.ts`, the
+  hands' and bottles' helpers in `tools.ts`, the step and its query-string switches in
+  `stepping.ts`, the dice and the palette window in `dice.ts`, and the frame's shapes
+  (`FrameView`, `PlateRenderer`, `VisualizerRender`, `FrameDigest`, the song shape) in
+  `frameTypes.ts`. The component is 441,458 bytes. `hooks/useSongRender.ts` imports its
+  types from `sim/frameTypes.ts` and no longer imports the component. Six checks read the
+  solver's source as text from the component and now read it where it went: `cellride`
+  (the step's cell clock), `oillift` (the step's rock), `pacing` (the paced clock),
+  `panel` (the per-layer list against the solver), `plate` (the CPU gate, the closeup's
+  ramp, and the retired looks' exemption, which follows `seedPreset`) and `turing` (the
+  drift rates).
+- **19ai-3a. Found along the way.** The review said `lib/stir`, `squish`, `plateRock` and
+  `turntable` import types from the component; they only name it in comments. The one
+  importer was `hooks/useSongRender.ts`. And 26 checks read `LiquidVisualizer.tsx` as text:
+  a later split of the frame loop (the review's item 11) moves code those checks grep, so
+  each piece moved has to be held against them the way this one was (a pattern that matched
+  the old file and no longer matches the new one is a check that moved with the code).
+- **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
+  reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
+  whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
+- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
+  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
+  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** A file not in `scripts/sizes.json`
   stays at or under 40 KB; a file already over it (52 on main at b38801e, 4.9 MB between
   them) may not grow past the bytes recorded beside it, nor past its size at the PR's base
@@ -6449,6 +6494,17 @@ is 810 KB (about 200k tokens, more than a session's window), `LiquidVisualizer.t
   `docs/plan-shipped.md`, `docs/judging.md`, `docs/guide.md`, CHANGELOG.md,
   `scripts/checks.json`) are exempt by name until split. One manifest entry on the `logic`
   part, `always`; no Mac. Its self-test meets each rule's break in a scratch repository.
+- **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** The ratchet's first real move
+  (the solver, 194,508 bytes in one class, out of the visualizer) read as a new file over
+  budget, and the owner did not want the solver cut into 40 KB pieces to pass a number (a
+  class is not split by moving lines). So a pull request may add a ceiling the base does not
+  have when the new entries hold no more than the bytes that left the base's over-budget
+  files in the same PR, and each new entry is its file's own size. A file that appears over budget with nothing
+  written in still fails as new, and an entry added with nothing taken out still fails as
+  raised; what it lets through that the first rule did not is a rename that moves its entry
+  with it, which costs a session the same. Five self-tests hold it, one the review of #548's exploit: the credit is the bytes that actually left the base's over-budget files in the PR, not the sum of their ceilings, so slack under a ceiling funds nothing. Whether 40 KB is the right
+  budget for a new file at all is the owner's question, raised 2026-10-28 ("40kb seems
+  somewhat arbitrary. I don't want quality to go down because of this").
 - **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
   App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
   such PR now has to move as many bytes out as it adds, wiring lines included. If that turns

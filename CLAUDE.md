@@ -18,7 +18,7 @@ story there in the same PR and leave the stub. The engine's own order is in
 ## Where things live
 
 Before any code, read this table and the folder's `README.md` (`src/gpu`, `src/gpu/wgsl`,
-`src/lib`, `src/hooks`, `src/components/desk`, `src/components/phone`, `server`,
+`src/lib`, `src/sim`, `src/hooks`, `src/components/desk`, `src/components/phone`, `server`,
 `scripts`, `desktop`). A file over 40 KB is never opened whole: grep for the symbol,
 then read about 80 lines around it. A search across many files goes to an Explore
 agent that returns paths and line numbers, never file bodies. Why, and the plan for
@@ -26,7 +26,7 @@ the files that are still too big: `docs/architecture.md`.
 
 | Domain | Owns | Start at |
 |---|---|---|
-| Fluid physics | the fields and how they move | `src/gpu/fluid.ts` (the solver), `src/gpu/wgsl/` (its passes), `FluidSimulation` in `LiquidVisualizer.tsx` (each layer's seeding and pours, handed to the solver), `lib/bubbles`, `beads`, `soapFilm`, `turntable` |
+| Fluid physics | the fields and how they move | `src/gpu/fluid.ts` (the solver), `src/gpu/wgsl/` (its passes), `src/sim/` (`FluidSimulation`: each layer's seeding and pours, handed to the solver; the frame's shapes in `frameTypes.ts`), `lib/bubbles`, `beads`, `soapFilm`, `turntable` |
 | Rendering | how the fields are drawn and projected | `src/gpu/wgsl/plate.ts`, `src/gpu/plate.ts`, `src/gpu/output.ts`, `lib/outputConfig`, `lib/plateSources`, `lib/mixer` |
 | Sound | readings from the audio, and the cords that carry them | `hooks/useAudioAnalyzer.ts`, `lib/audioFeatures`, `lib/earClock`, `lib/sceneMap` (cords), `lib/areaCords`, `lib/plateDrone` |
 | Show | looks, set lists, MIDI, the frame loop | `src/presets.ts`, `lib/lookFade`, `lib/setList`, `lib/midi`, the frame loop in `LiquidVisualizer.tsx` |
@@ -35,7 +35,7 @@ the files that are still too big: `docs/architecture.md`.
 | Accounts and licence | sign-in, keys, tiers, the Workers | `lib/firebaseAuth`, `lib/accountLicense`, `lib/licenseKey`, `lib/tierGates`, `server/` |
 | Mac app | the Electron shell, projector, updates | `desktop/`, `lib/macApp`, `hooks/useProjector`, `hooks/useCastSession` |
 | iPhone app and remote | the Capacitor app, the laptop link | `ios/`, `lib/appLink`, `lib/remoteProtocol`, `components/RemoteControl.tsx`, `server/remote-server.js` |
-| Checks | one script per check | `scripts/checks.json`, `scripts/<name>.mjs`, the app's `window.chromaglass*` and `__cg*` hooks |
+| Checks | one script per check | `scripts/checks.json`, `scripts/<name>.mjs`, the app's `window.chromaglass*` and `__cg*` hooks, declared in `src/lib/checkHooks.ts` |
 
 ## How work is done here
 
@@ -92,8 +92,8 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
   touches keys and tokens; everything else asks `tierGates`.
 - **One owner per piece of state.** App state lives in `App.tsx` and the plate's live
   state in the visualizer's refs; pass values and callbacks down. `window` carries only
-  the checks' hooks and the Mac and iPhone bridges (to be declared in one file, PLAN.md
-  19ai-4). A module-level `let` is for a true singleton (auth, crash log, licence) and
+  the checks' hooks and the Mac and iPhone bridges, declared in `src/lib/checkHooks.ts`
+  (PLAN.md 19ai-4). A module-level `let` is for a true singleton (auth, crash log, licence) and
   says so in the file's header.
 - **No ceremony in the frame.** In the frame loop and the solver, use plain functions
   over typed arrays and refs. Add no new per-frame objects, classes or wrappers: a frame
