@@ -146,6 +146,15 @@ const WHIP_TIME = 0.7;
  * and so barely reaches the lead; a drop's drift is read within a second.
  */
 const LEAD_SECONDS = 0.6;
+/**
+ * A held frame is bare glass when the dye in it is under this share of the
+ * plate's own average (see `landing` for what was reported). A thin wash
+ * reads a fifth to a half of the average and is drawn, since the exposure
+ * comes down to what the frame holds; bare glass reads 0.
+ */
+const BARE_SHARE = 0.1;
+/** A plate whose average dye is under this has nothing to land on yet. */
+const EMPTY_PLATE = 1e-3;
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -183,6 +192,14 @@ export class MacroCamera {
   private lastAimY = NaN;
   /** The grid the camera last ran on, so `centre` can answer in plate uv. */
   private lastSize = 0;
+  /**
+   * Hold and Follow coming in: whether this closeup still has to check that
+   * its aim shows any liquid, and where it landed instead when it did not
+   * (grid cells, NaN for on the aim). See `landing`.
+   */
+  private landPending = true;
+  private landX = NaN;
+  private landY = NaN;
 
   /**
    * The jitter on which drop wins a cut and how long the shot holds. Seeded
@@ -208,6 +225,9 @@ export class MacroCamera {
     this.whipLeft = 0;
     this.lastAimX = NaN;
     this.lastAimY = NaN;
+    this.landPending = true;
+    this.landX = NaN;
+    this.landY = NaN;
   }
 
   /**
@@ -292,6 +312,9 @@ export class MacroCamera {
     const treble = clamp(opts.treble ?? 0, 0, 1);
 
     const mode = opts.mode ?? 'auto';
+    // Auto finds its own subjects; a later switch to Hold or Follow is a hand
+    // on the camera, not the closeup coming in, so it does not land.
+    if (mode === 'auto') this.landPending = false;
     if (mode !== 'auto') return this.aimed(field, step, opts, mode, { move, energy, bass, treble });
 
     // ── Stay on the bead ────────────────────────────────────────────
@@ -413,9 +436,29 @@ export class MacroCamera {
     this.punchLeft = Math.max(0, this.punchLeft - step / 0.6);
     if (opts.beat && m.bass > 0.6) this.punchLeft = Math.max(this.punchLeft, (m.bass - 0.6) * 2.5 * m.move);
 
-    let targetX = ax, targetY = ay;
+    // A hand moving the aim during the closeup is where it wants to look,
+    // liquid or not: it is no longer coming in.
+    if (aimMoved && !first) { this.landPending = false; this.landX = NaN; this.landY = NaN; }
+    const halfCellsX = clamp(opts.spanX / Math.max(1, opts.zoom), 0, 1) * 0.5 * size;
+    const halfCellsY = clamp(opts.spanY / Math.max(1, opts.zoom), 0, 1) * 0.5 * size;
+    let landed = false;
+    if (this.landPending) {
+      const plate = this.plateMean(field);
+      if (plate > EMPTY_PLATE) {
+        this.landPending = false;
+        const atX = mode === 'follow' && !first ? this.beadX : ax, atY = mode === 'follow' && !first ? this.beadY : ay;
+        if (this.frameMean(field, atX, atY, halfCellsX, halfCellsY) < BARE_SHARE * plate) {
+          const l = this.landing(field, ax, ay, halfCellsX, halfCellsY);
+          this.landX = l.x; this.landY = l.y; landed = true;
+        }
+      }
+    }
+    const wantX = Number.isFinite(this.landX) ? this.landX : ax;
+    const wantY = Number.isFinite(this.landY) ? this.landY : ay;
+
+    let targetX = wantX, targetY = wantY;
     if (mode === 'follow') {
-      if (aimMoved) this.lockNear(field, ax, ay);
+      if (aimMoved || landed) this.lockNear(field, wantX, wantY);
       const tracked = this.recenter(field);
       // Lost it (it thinned away, or ran into the wall): find what is nearest
       // where it was, rather than cutting across the plate.
@@ -425,9 +468,9 @@ export class MacroCamera {
       this.beadY = clamp(this.beadY, margin, size - margin);
       [targetX, targetY] = this.leadTarget(step, opts.chase);
     } else {
-      this.beadX = ax; this.beadY = ay;
+      this.beadX = wantX; this.beadY = wantY;
     }
-    if (first) { this.camX = targetX; this.camY = targetY; }
+    if (first || landed) { this.camX = targetX; this.camY = targetY; }
     // A hand on the aim should be answered at once; a follow eases like a rig.
     const rate = mode === 'hold' ? 6 + opts.chase * 6 : 1.0 + opts.chase * 5;
     const k = 1 - Math.exp(-rate * step);
@@ -452,6 +495,116 @@ export class MacroCamera {
     const cy = this.frameClamp((this.camY + this.tremorY) / size, halfY);
     if (!Number.isFinite(cx) || !Number.isFinite(cy)) return { cx: 0.5, cy: 0.5, zoom: Math.max(1, Number.isFinite(this.smoothZoom) ? this.smoothZoom : 1), whip: 0 };
     return { cx, cy, zoom: this.smoothZoom, whip: 0 };
+  }
+
+  /** The plate's average dye inside the walls, on every third cell. */
+  private plateMean(field: MacroField): number {
+    const { density, size } = field;
+    const m = Math.floor(size * EDGE_MARGIN);
+    let sum = 0, n = 0;
+    for (let j = m; j < size - m; j += 3) {
+      for (let i = m; i < size - m; i += 3) { const d = density[i + j * size]; if (d > 0) sum += d; n++; }
+    }
+    return n > 0 ? sum / n : 0;
+  }
+
+  /** The average dye in a frame of half-size (hx, hy) cells about (x, y), on every second cell. */
+  private frameMean(field: MacroField, x: number, y: number, hx: number, hy: number): number {
+    const { density, size } = field;
+    const x0 = Math.max(0, Math.floor(x - hx)), x1 = Math.min(size - 1, Math.ceil(x + hx));
+    const y0 = Math.max(0, Math.floor(y - hy)), y1 = Math.min(size - 1, Math.ceil(y + hy));
+    let sum = 0, n = 0;
+    for (let j = y0; j <= y1; j += 2) {
+      for (let i = x0; i <= x1; i += 2) { const d = density[i + j * size]; if (d > 0) sum += d; n++; }
+    }
+    return n > 0 ? sum / n : 0;
+  }
+
+  /**
+   * Where a closeup coming in on bare glass goes instead: the nearest frame
+   * to the aim that holds at least half the dye the plate's fullest frame
+   * holds. Grid cells.
+   *
+   * What was reported (the owner, 2026-10-29): "this closeup button doesn't
+   * seem to do anything besides make the canvas black/empty". The Close-up
+   * button, the M key, the zoom and the phone's pinch all bring the closeup
+   * in on the camera's mode, and the default mode is Hold, aimed at the
+   * middle of the plate. Hold sat on its aim and nowhere else, so on a plate
+   * whose middle was bare (a look that pours in pools, a middle a finger
+   * had swept, a plate between pours) the frame was four times the size of
+   * nothing: the exposure, kept under what the frame holds, had nothing to
+   * expose, and the picture was the plate's black ground. Measured in the
+   * app (software WebGPU, one pool at a fifth of the way across the plate):
+   * the frame's mean 1.4 of 255 and no pixel lit, for as long as it was in.
+   *
+   * The closeup is the liquid seen closer, so coming in it looks for liquid
+   * when its aim shows none, as a person at a microscope moves the slide
+   * until something is under the lens; once there, Hold holds and Follow
+   * rides, as before. Only coming in: a hand that moves the aim during the
+   * closeup is obeyed onto bare glass if that is where it points, and a
+   * switch of mode mid-closeup is not a landing (`holdWhereItIs`). Nearest
+   * rather than fullest, so a look whose middle has a little in it moves no
+   * further than it must; at least half the fullest, so it lands on a
+   * subject and not on the fringe of one. The frame is the one asked for
+   * (the zoom it is going to), not the one easing in from the plate.
+   */
+  private landing(field: MacroField, ax: number, ay: number, hx: number, hy: number): { x: number; y: number } {
+    const { density, size } = field;
+    const W = size + 1;
+    const sat = new Float64Array(W * W);
+    for (let j = 0; j < size; j++) {
+      let run = 0;
+      for (let i = 0; i < size; i++) {
+        const d = density[i + j * size];
+        run += d > 0 ? d : 0;
+        sat[(j + 1) * W + i + 1] = sat[j * W + i + 1] + run;
+      }
+    }
+    const boxMean = (cx: number, cy: number) => {
+      const x0 = clamp(Math.round(cx - hx), 0, size), x1 = clamp(Math.round(cx + hx), 0, size);
+      const y0 = clamp(Math.round(cy - hy), 0, size), y1 = clamp(Math.round(cy + hy), 0, size);
+      const area = (x1 - x0) * (y1 - y0);
+      return area > 0 ? (sat[y1 * W + x1] - sat[y0 * W + x1] - sat[y1 * W + x0] + sat[y0 * W + x0]) / area : 0;
+    };
+    // Centres the frame can sit on: inside the plate, and its middle off the walls.
+    const m = size * EDGE_MARGIN;
+    const range = (h: number): [number, number] => {
+      const lo = Math.max(h, m), hi = size - Math.max(h, m);
+      return lo <= hi ? [lo, hi] : [size / 2, size / 2];
+    };
+    const [xLo, xHi] = range(hx), [yLo, yHi] = range(hy);
+    const stride = Math.max(1, Math.min(hx, hy) / 2);
+    const cand: { x: number; y: number; v: number }[] = [];
+    let best = 0;
+    for (let y = yLo; y <= yHi + 1e-6; y += stride) {
+      for (let x = xLo; x <= xHi + 1e-6; x += stride) {
+        const v = boxMean(x, y);
+        cand.push({ x, y, v });
+        if (v > best) best = v;
+      }
+    }
+    let pick = { x: ax, y: ay }, near = Infinity;
+    for (const c of cand) {
+      if (c.v < 0.5 * best) continue;
+      const dist = Math.hypot(c.x - ax, c.y - ay);
+      if (dist < near) { near = dist; pick = c; }
+    }
+    // The nearest such frame has its subject in the corner furthest from the
+    // aim (every frame that holds the whole of a pool holds the same dye), so
+    // the subject is put in the middle: the frame goes to the centroid of the
+    // dye it holds, twice, as a cut lands on a drop's middle (`recenter`).
+    let x = pick.x, y = pick.y;
+    for (let pass = 0; pass < 2; pass++) {
+      const x0 = clamp(Math.floor(x - hx), 0, size - 1), x1 = clamp(Math.ceil(x + hx), 0, size - 1);
+      const y0 = clamp(Math.floor(y - hy), 0, size - 1), y1 = clamp(Math.ceil(y + hy), 0, size - 1);
+      let sum = 0, sx = 0, sy = 0;
+      for (let j = y0; j <= y1; j++) {
+        for (let i = x0; i <= x1; i++) { const d = density[i + j * size]; if (d > 0) { sum += d; sx += d * i; sy += d * j; } }
+      }
+      if (!(sum > 0)) break;
+      x = clamp(sx / sum, xLo, xHi); y = clamp(sy / sum, yLo, yHi);
+    }
+    return { x, y };
   }
 
   /**

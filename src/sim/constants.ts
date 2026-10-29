@@ -32,6 +32,18 @@ export function macroZoomOf(s: VisualizerSettings): number {
 }
 
 /**
+ * The one press in and out of the closeup: the desk's Close-up button, the M
+ * key, a pad. In by the zoom, as the slider and the pinch go in, with the flag
+ * riding along; out to the plate with both. The button used to flip the flag
+ * alone, so the plate went to 4x while the Macro Zoom knob beside it still
+ * read 1.00x (the owner's screenshot, 2026-10-29), and a look carrying a zoom
+ * with the flag off was in the closeup with the button unlit.
+ */
+export function closeupToggle(s: VisualizerSettings): Pick<VisualizerSettings, 'macroMode' | 'macroZoom'> {
+  return macroZoomOf(s) > 1.05 ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: MACRO_PRESET_ZOOM };
+}
+
+/**
  * How far into the closeup, 0 at the plate and 1 from MACRO_FULL_ZOOM on,
  * eased at both ends so the first notch of the slider starts it moving
  * rather than starting it at a slope.
