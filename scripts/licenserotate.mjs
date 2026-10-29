@@ -42,6 +42,11 @@
  *      `env.LICENSE_PUBLIC_KEY || DEFAULT_PUBLIC_JWK` too, so run `npx wrangler secret list`
  *      on BOTH Workers and delete a `LICENSE_PUBLIC_KEY` override from each (deleting is
  *      preferred to setting it to the new key: one place, the code, holds the key).
+ *      The same deploy carries the live store's product ids as Worker settings, or every
+ *      live order is held with no key (an id on no list is held): in the toml's [vars],
+ *      LS_HOME_PRODUCT_IDS = "1479217", LS_UPGRADE_PRODUCT_IDS = "1479218",
+ *      LS_PRO_PRODUCT_IDS = "1479219" (Lemon Squeezy's live products; `--keep-vars` keeps
+ *      the vars already set and applies these).
  *   4. A Mac release (Actions → Mac app → Run workflow, release ticked): the installed
  *      app trusts the old public key until it updates.
  *   Rollback: `npx wrangler rollback` of the licence Worker to the version noted before
