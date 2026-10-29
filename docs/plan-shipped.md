@@ -3403,6 +3403,37 @@ the cores and is not known; it was not reproduced in this run or in the eight-lo
 goes red beside others again, `quick` writes its log to `scratch/quick/` and 19k-5 is reopened
 with that log.
 
+*19k-7 (2026-10-28).* `scene`'s two cost bars went red twice on one head of #540, a PR that
+changed nothing the check runs: the costliest frame 22.5 ms against 20 (the still room's first
+optimised frame; 18.7 on the run before), and once the strobe room's median 2.01 ms against 2.
+19k-5 had moved the reading from the sensor's wall clock to `process.cpuUsage()`, which sums every
+thread, and V8 compiles a hot function on background threads, so the frame on which the analysis
+was first optimised was charged for the compiler's work on another core too. Reproduced in a
+4-core cloud session, twenty runs each: the process's worst frame 9.6 to 13.8 ms alone and 8.6 to
+24.7 beside twelve busy loops (22.1 and 24.7 among them, red), its worst median 2.29 alone (red).
+
+The push is now timed with the main thread's own CPU time, `process.threadCpuUsage()`. On Linux
+that alone steps at the scheduler's tick (4 ms, so a 0.5 ms frame read 0); a `process.cpuUsage()`
+call first brings the calling thread's time up to date in the kernel, and the thread reading is
+then exact (steps of 1 to 50 microseconds; a 1 ms busy wait reads 1.01). The check asserts the
+clock's step is under 0.1 ms, so a kernel that does not do that is red, not a cost of zero. Read
+the same way: worst frame 4.5 to 7.1 ms alone and 4.6 to 7.3 loaded, worst median 1.14; with the
+final script, ten runs beside twelve busy loops, 4.7 to 6.0 ms and 0.53. Both bars unchanged, and
+each FAIL line now prints its reading and its room.
+
+Still red on a real slowdown: `npm run scene -- --slow k` runs the analysis k times a frame inside
+the timed push. Against the old 20 ms the worst-frame bar would have gone red only at 4 to 5x
+(18.5 to 25.7 ms at 4x, red in 3 of 5), where on the process's reading it went red from 2x, half
+of that reading being the compiler; keeping the number would have loosened the bar in effect, so
+it is 12 ms. In the cloud session: about 120 runs at 1x read 4.5 to 10.4 ms but one 14.6 (the
+VM's steal time climbing through that batch); fifteen at 2x 9.0 to 16.5 (red in 9); fifteen at
+3x 13.4 to 26.8 (red in all). Measure's runner read 3.6 ms at 1x on #551, so there it goes red
+from a little over 3x. The median bar went red at 5 to 6x on either reading (1.6 to 3.0 ms at 5x
+and 6x), so it stays at 2 ms; one run in fifty here read 2.28 at 1x, the still room's median
+carrying the optimiser's main-thread work (19k-7a). The review (one, as for every check change)
+found the thread reading exact against busy waits of 0.1 to 2 ms and asked for `--slow`'s typos
+to be refused rather than run at 1x, which they are.
+
 *The two nits on #504.* `checks.mjs`'s walk detector (which makes a Measure check that walks
 `scripts/` an `always` entry) knew `walk('scripts')` and `walk(join(root, 'scripts'))` only; a
 `walk(\`${ROOT}/scripts\`)` or `readdirSync(ROOT + '/scripts/')` slipped past, so it now takes any
