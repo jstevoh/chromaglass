@@ -4,14 +4,18 @@ A liquid light show: a WebGPU fluid solver (`src/gpu/`, shaders in `src/gpu/wgsl
 drawn as a projected plate, played from a Perform desk, built on a Design desk,
 driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 
-Before starting anything that is not a bug fix, read `PLAN.md`'s **Order of work**
-(its first section: which step is next, in which lane) and then only the section your
-step names: `grep -n '^##' PLAN.md` for the map, then `sed -n` the section. Not the
-whole file: `PLAN.md` is about 124k tokens (500 KB, 2026-10-17), and see "Keeping a session small" for why
-that matters. What shipped is in `docs/plan-shipped.md`, under the same section numbers:
-`PLAN.md` keeps a one-line stub per shipped item and only the open work, so read the
-archive only when an open item needs the history behind it. When an item ships, move its
-story there in the same PR and leave the stub. The engine's own order is in
+Before starting anything that is not a bug fix, read `PLAN.md`: it is the plan's index
+(about 45 KB): the **Order of work** first (which step is next, in which lane), the running
+order, and a table of the sections. Then read only the file your step names: each section
+is a file under `docs/plan/` (`00-dye-tools.md` to `36-analog-operators.md`, a big one cut
+between items into parts of about 30 KB), and `grep -rn '14ab-4' docs/plan/` finds
+an item from its id. Never read every section: the open plan is about 700 KB in all, and
+see "Keeping a session small" for why that matters. What shipped is in
+`docs/plan-shipped.md`, under the same numbers: a section keeps a one-line stub per shipped
+item and only the open work, so read the archive only when an open item needs the history
+behind it. When an item ships, move its story there in the same PR and leave the stub. A
+branch that still edits the old one-file `PLAN.md` carries its edits across with
+`node scripts/planmove.mjs` after merging main (19m). The engine's own order is in
 `docs/roadmap.md`.
 `docs/judging.md` lists what needs the owner's eyes on a real GPU.
 
@@ -41,7 +45,7 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 70% of their usage was that re-reading, at 200–380k tokens of context each.
 
 - Read the section, not the file. Pipe long output (`npm run check`, a `git diff` of
-  `PLAN.md`, job logs) through `tail` or `grep FAIL`; a long log or a wide search
+  the plan, job logs) through `tail` or `grep FAIL`; a long log or a wide search
   goes to a subagent that returns only the lines that matter.
 - Open the one picture the question needs, not every contact sheet a run wrote.
 - Waiting on CI, the PR subscription wakes the session when the suite completes. Set
@@ -74,7 +78,7 @@ skill: the lab renders the real plate shader on a deterministic plate.
 
 | You touched | Run before pushing |
 |---|---|
-| anything | `npm run lint` (typecheck), `npm run sizes` (no new file over 40 KB, no file already over it grows; PLAN 19ai-5) |
+| anything | `npm run lint` (typecheck), `npm run sizes` (no new file over 100 KB, a warning past 40 KB; no file already over 100 KB grows; PLAN 19ai-5) |
 | `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `disc` (the magnet's field), `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
 | `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), `lampzero` (the before-lamp control finds the lamp's lines by count), `litstage` (each look over a projector's black lifted by a stage wash; `-- --controls` until PLAN 36a is built), and a `look` render |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
@@ -159,8 +163,9 @@ When CI is red, use the `steward` skill.
 ## Branches, PRs, deploys
 
 - One PR per piece of work, a draft until CI is green. Squash-merge.
-- Every PR updates `PLAN.md`: what it shipped marked shipped, and anything found
-  along the way that needs fixing or adding written in as a plan item.
+- Every PR updates the plan: what it shipped marked shipped in its section file under
+  `docs/plan/` (and its row in `PLAN.md`'s running order), and anything found along the
+  way that needs fixing or adding written in as an item in the section it belongs to.
 - Every feature ships its phone version in the same PR.
 - Merge as soon as CI is green; the owner does not need to be asked (2026-09-27).
 - After a PR merges, a branch that carries on is restarted from `main`

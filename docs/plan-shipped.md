@@ -6074,3 +6074,1178 @@ the buttons each 16 ms. `npm run renders` gained a gamepad phase on a stand-in p
 old hook under it, 43.3 / 42.8 (laptop / phone, stick sweeping) and 42.3 / 43.0 (trigger
 held) renders a second, now 1.0 on all four; the ring found in 12 of 12 looks, changing
 place, still under a held trigger, on the page.
+
+## Moved in the third pass (2026-10-29, 19m)
+
+When `PLAN.md` became an index with one file a section under `docs/plan/` (19m), the
+stories of the items marked shipped moved here whole, each under its section, and each
+left a one-line stub in its file. An item that shipped with open work found along the
+way kept that work where it was: only the story above it moved. Nothing was cut.
+
+### The plan's old header
+
+`PLAN.md` opened with a directive from its first days, before the order of work: two
+tracks by tool, each with its "current priority". Every step in it has since shipped or
+moved into a section (the video pour and its optical flow are 14ab and the cartoons, 14ac;
+subtractive mixing is the lamp through the dye, 18b), so it is kept here as written.
+
+
+#### Gemini (Visuals & Physics Track)
+**Focus:** High-impact WebGPU shaders, fluid dynamics, and rendering algorithms.
+**Current Priority: Fully Coupled Advection-Reaction-Diffusion (Moving Chemistry)**
+*This is the highest-impact visual task, moving the static Gray-Scott reactions into the turbulent flow.*
+1. ~~**Prepare the Data:** Modify `src/gpu/fluid.ts` to expose the chemistry PingPong texture (`this.chem`) to the fluid's velocity field.~~
+2. ~~**Write the WGSL Advection:** Add an advection pass for the chemistry texture using the fluid's velocity field (`disp`). This can likely reuse the existing semi-Lagrangian advection logic currently used for dye (`bilerpN` or similar).~~
+3. ~~**Integration:** Run this new advection pass immediately *prior* to the `grayScott` reaction-diffusion step in the pipeline.~~
+4. ~~**Tuning:** Tune the `feed`, `kill`, and diffusion rates. When Turing patterns are sheared by turbulence, they can explode numerically. Tuning is required to ensure visual stability.~~ (Handled via shader clamped constraints)
+6. **Video Injection & Optical Flow:**
+   * Fix `pourVideo` in `LiquidVisualizer.tsx`: It currently drops frames. We need to draw the playing `videoPourRef.current` to an offscreen canvas and call `fluid.injectImage` every frame.
+   * **Luma-keying:** During the canvas extraction, convert brightness to alpha so standard downloaded MP4s act as transparent fluid overlays.
+   * **Physical Interaction:** Calculate basic Optical Flow (frame differencing) on the video canvas and pipe the motion vectors into `fluid.addVelocity()`, allowing motion inside the video to physically push the WebGPU fluids.
+7. **Future Visual Targets:**btractive Mixing (subtractive color physics).
+   ~* Fully Dynamic GPU Ferrohydrodynamics (solving Rosensweig instability natively).*~ (Completed in PR #247 & cleanup completed)
+
+#### Claude (UI & Stability Track)
+**Focus:** React architecture, new UI implementation, bug cleanup, and test stability.
+**Current Priority: Bug Cleanup & New Performance UI**
+* ~~Note from Gemini: Please evaluate and tweak the initial palette colours. The new Ferrohydrodynamics and Chemistry features might benefit from better default dye colours.~~
+  Done (26-colour, this PR). The chemistry first had to grow at all: on the looks with
+  Chemistry on, the GPU Gray–Scott fed nothing (its feed came only from poured reagent,
+  and every random seed wiped the reagent), so Sensual Laboratory and Neon Coral Reef
+  printed an empty plate (lab: 3.6 units of dye in four seconds, 451.6 after). Now a
+  look's Chemistry is a bath that feeds the whole plate, a pour of Turing Reagent feeds
+  and seeds the reaction where it lands on any look, and the field is cleared with the
+  look's other chemistry. Colours: Turing Reagent pours CIMA's pale straw (`#f5e69e`,
+  was a hot pink `#ff88ff`) and, on a look without Chemistry, its pattern prints in
+  starch–iodine indigo (`TURING_PRODUCT`); a look with Chemistry keeps its own palette
+  (the "Refresh preset and colour palettes" work owns those). The ferrofluid's colours
+  were left alone: Ferro Paint's amber, teal and coral and the thickness-drawn black and
+  brown already match Colored I and II.
+  - **26-colour-a** (not doing) and **26-colour-b** (fixed): see §26, with 26d's Turing
+    Print.
+*The owner requires a new UI for live performances, which requires a solid, bug-free foundation.*
+1. **Wave 0 (Infrastructure):** Complete the CI/CD and testing stability tasks to ensure faster iteration times.
+2. **Bug Cleanup:** Resolve critical QA bugs that are currently blocking the performance desk.
+3. **New UI Implementation:** Implement the new UI layer as specified by the owner, ensuring it correctly binds to `LiquidVisualizer.tsx` without disrupting the WebGPU context.
+   *Desk v2 (the owner's design, 2026-10-10) shipped as §8-v2: one desk, three layouts. §8-draw (the remote opens on Draw) and §8-play (Play, the phone's listening screen) shipped after it.*
+
+---
+
+### 1. Sharp liquid, and pigment in it
+
+#### 1a. The grain at the dye's edge made the plate look digital (shipped)
+
+Reported 2026-10-04 on the laptop's web app: "quite a few of the looks seem very
+pixelated ... less like liquids", and "it's always been this way to a point. It just
+looks very digital." `npm run pixels` (new, `pixels.yml` on the Mac, or a PR labelled
+`pixels`) photographed every look at 1440×900 on a Retina panel: every look's dye edges
+were a ragged fringe of single lit and dark flecks, at the governed rung and the top one.
+The cause was granulation (on at 0.5 in every look) scaling the opacity *before* the gooey
+contrast curve, which is steepest at the edge's half opacity, so every grain there became
+fully on or off. **Shipped:** the grain is drawn after the edge, as optical depth
+(`grainedDepth`, wgsl/plate.ts). `npm run grainedge`, seven looks in the lab: flecks (edge pixels
+moved over 40 levels in a channel) 6–35% before, 0–0.61% after, every look held under 2%;
+the bodies keep a grain that is a texture, weaker than before inside thick pools, where
+the dye already stops nearly all the light. The soap film's colour reads the liquid's thickness from before the
+grain (Sunny Side Up 7.1% → 0.25%, Soap Film 3.0% → 0.2% on the edge check). The owner's eyes on a laptop: `docs/judging.md` §40.
+
+Found with it, open:
+
+### 8. The desk: the laptop is a control surface, not the show
+
+- ~~**8j** What a knob is called, and what it does~~ (the owner, 2026-10-22: the names
+  on the deck's knobs were cut to the knob's width, and a drag swapped the name for the
+  value under a chip laid over the row above, so a hand could not tell which knob it
+  had). A hover or focus card with the whole name, one plain line on what it does and
+  the live value, drawn into the body so no panel clips it and never over the knob; it
+  stays up through a drag, and the knob keeps its own name while it is turned. One line
+  for each of the 205 controls in `src/lib/controlHelp.ts` (`npm run panel` fails on a
+  pinnable control without one). On the phone there is no hover: the name is the button,
+  dotted underlined, and a tap or a hold opens the same card (`TouchSlider`, the touch
+  `Slider`, a knob's label on a coarse pointer). Checks: `npm run panel`, `npm run
+  layout` (hover, drag, release), `npm run phone` (the tap). Not changed: what any
+  control does.
+
+### 9. Ferrofluid after the references
+
+- **9t. The ferrofluid stands up as a layer that keeps its volume** (**shipped**).
+  The plate kept the ferrofluid as one number a cell, held at or under full: a plan
+  view that keeps the liquid's area, so a pool under the Magnet could only be packed
+  into domes (spikes.ts's lattice, wells in the separation, a pull eased to half) and
+  84% of the plate within 0.08 of the magnet stayed black, where every reference has
+  black domes with the colour between them. A real layer keeps its volume: a dome
+  standing up takes its height out of the layer round it, and the gaps open by
+  themselves. Now, round each magnet past the onset (the hand's, and the phone's other
+  fingers), a patch of the plate's cells is stepped as a thin film of the Rosensweig
+  instability (`src/gpu/standing.ts`, `wgsl/standing.ts`): tension, gravity, the
+  field's lift as a half-Laplacian through an FFT, the glass's wetting, a cell past
+  full a dome that much taller. The plate's own passes step aside under it (the
+  separation, Cahn–Hilliard, the maze's flow and the magnet's pull), and the
+  water's flow carries only the layer's mean there, the film its shape; its cap at
+  full is raised to the top glass there. The plate draws each dome from
+  the layer's own slope, the white point on the top of each. In the lab on 384², a
+  pool 0.12 in radius under the hand's Magnet: from 84% black to 47% within 0.08 of it, 13
+  domes a median 0.032 apart (2π l_c is 0.04), none made or lost; flat under
+  the onset; back to a pool when the field is turned down (`npm run standing`).
+  `npm run spikes` moved to 384² and reads the domes the layer makes (28 within 0.12 of the hand, 16 with a white point on
+  the top against 1.8 half a pitch off, 6/6). The
+  plate's film beyond a domain's line reads the least of four points on the way out, not
+  one four and a half cells off, which had landed in the next dome and drawn dark dashes
+  on every dome's side facing it.
+  Shortcuts, each still to replace:
+
+- **9x. Picking the Magnet poured the hole itself; a magnet you size and play**
+  (**shipped**). Reported by the owner (2026-10-03), on the build with 9s live:
+  "Magnet still makes a giant black hole as soon as you pick it. That's not what I
+  want. I just want a magnet that I can control the size of that I can interact
+  with." The page is network-first in the service worker, so it was not a stale
+  build: the pour was the hole. Picking the Magnet poured the look's ring
+  (`phasePour`), 22% of the plate in black drops round the middle at Classic's Scale
+  and 27% at Scale 0.8, where the drops run together across it (lab, 256²; the
+  disc 0.12 round the middle 9% black, then 29%). Now picking it changes nothing on
+  the plate. The first touch on a plate with no ferrofluid brings one pool under the
+  hand (`magnetFor`), 0.09 of the plate in radius at the tool's own size, about 1%
+  of the plate; the app turns Ferrofluid up so it is drawn and gives the look its
+  magnet (`onMagnetInHand`), and the pool goes with the hand (lab: laid at 0.30 and
+  dragged to 0.60, its centre ended at 0.58). **Magnet Size** (`magnetSize`, 0–1,
+  0.5 the tool as it was; `lib/magnetSize.ts`) sets how big the hand's magnet is,
+  held and set down: k = 0.5 to 2 times the size, the dipole k times deeper with k³
+  the strength, which is a real magnet scaled (magnetostatics has no length of its
+  own): the same field share over it, reaching k times as far (the pull is weaker
+  than a scaled magnet's at a big Size; since 9v a magnet k times as wide at the same gap), so the spikes' patch and
+  the pool it brings are k times as wide (lab: 0.3%, 1.1% and 4.6% of the plate at k
+  0.5, 1 and 2). It is the performer's, kept across looks (`RIG_KEYS`) and never
+  drifted, on the Settings sheet, the desks' Magnet options (right-click the Magnet)
+  and the phone's Magnet panel (tap the Magnet twice), and MIDI-learnable. The
+  governor's new solver gets the pool back where the magnet is, not the look's ring,
+  and nothing at all while the Magnet is picked and untouched.
+  The tools' options (right-click a tool) opened beneath the plate on the Design desk,
+  only their bottom edge showing under the canvas; they go to the page's body now.
+  `npm run magnet` asks that picking pours nothing and puts no magnet under the
+  plate, nine seconds on too; that the first touch brings one pool under the hand
+  and draws it; that a drag carries it at least half way to where the hand ends;
+  that Size reaches the solver's step as height ×k and strength ×k³; and, on its own
+  page with the governor held at 512² (`rung=2`) and stepped down on purpose
+  (`stepDownFrames`) twice, that a new grid
+  lays nothing on an untouched plate and only the hand's pool, once, at the magnet
+  moved from where the pool was poured (another PR's run caught main's ring laid again by the governor, lays 1 → 2,
+  grid 384² → 256²). `npm run
+  phone` asks that Size is under the Magnet's Amount and moves the setting. The
+  pool still reads as a black disc with domes round its rim, because the plate
+  cannot open gaps between domes yet: that is 9t's standing-domes plate PR.
+
+- **9v. The magnet as a real magnet, not a deepened dipole (shipped).** The
+  solver's magnet was a point dipole, and Magnet Size (9x) sank it k times deeper
+  with k³ the strength: a magnet scaled gap and all, its axis field the same at
+  every Size, and with the liquid's saturation (`MAGNET_BSAT`) a number in the
+  dipole's own units, a big one pulled less at the edge of its reach than the
+  magnet it stood for. Now the magnet is a uniformly magnetised cylinder
+  (`src/gpu/wgsl/magnetDisc.ts`): its field is Derby and Olbert's closed form in
+  Bulirsch's elliptic integral, four rounds of an AGM, handed to a dipole of its
+  volume past six to eight half-sizes. At the tool's own size it is a rod 0.05 of
+  the plate in radius and twice as long (20 mm by 40 mm on the 20 cm dish), its
+  face 0.06 above where the dipole stood (13.5 mm under the liquid held to the
+  glass), so at the default its spikes reach where they did (0.157 of the plate
+  out against 0.156, on its axis 0.952 of the hand's field against 0.954).
+  Flatter shapes were tried first (a 32 by 16 mm disc, 24 by 24, a 20 by 30 mm
+  rod): matched at the spikes' patch, their fields fell away faster past it,
+  and `npm run fingers` lost its reach (the discs 8 to 5 on the 0.12 circle, the
+  short rod 7 to 6 on the 0.09, under the check's 7; on Metal too). This rod's
+  fingers are 10/8/9/5 on the four circles in 7 sectors, main's 12/7/8/3 in 6. Magnet Size sets the radius, k = 0.5 to 2 times it, the gap and
+  strength untouched: a bigger magnet is stronger at the glass (on its axis 0.26,
+  0.95, 2.22 at k 0.5, 1, 2, where the deepened dipole stayed at 0.95) and reaches
+  further (spikes out to 0.050, 0.157, 0.339; the dipole's 0.078, 0.156, 0.312).
+  The saturation is a field on the same scale (`MAGNET_BS`, spikes.ts):
+  ψ = B²/(1 + B/Bs) with B the strength times the magnet's field, so a weaker
+  magnet pulls the far liquid as its square; Ferro Maze's own magnet went 0.3 →
+  0.45 and Ferro Paint's 0.5 → 0.6 to gather as they did. Both constants carry
+  the old ones over at the hand's magnet, so `MAGNET_GAIN` and phaseMu's χ keep
+  their tuning. The radius rides `GpuStepParams.magnetRadius` (`Sim.magRadius`,
+  and the standing layer's `Film.size`); every shader including `SPIKES_WGSL` defines
+  `magnetRadius()`. `npm run disc` (lab, Mac plate shard) runs the shader's own
+  text against a Biot–Savart sum over the side current: within 0.0073% on and
+  off the face and at the rim, 1.24% where it hands over to the dipole (the point
+  dipole there 2.5%), 1.2% past it; at Size 0.9 the pull at the edge of its
+  spikes is the real magnet's (1.000), where main's deepened dipole pulled 0.31
+  of it; the plate's far shortcut (spikeAmp answers far points without the
+  integrals) never drops a spike; every look's own magnet stays under the onset
+  (Magnet Garden 0.148, Ferro Paint 0.099, Ferro Maze 0.023 against 0.18). In the
+  lab on the rod: `spikes` 6/6 (outline 2.83, main 2.85), `fingers` 4/4. `npm run magnet` (Mac)
+  now asks that Size makes the held and the set-down magnet k times as wide with
+  its height and strength as they were. On the phone, Size is the same setting on
+  the Magnet panel and the other fingers' magnets are the same magnet. A saved
+  look with its own magnet at a low Strength pulls as its square now (0.3 pulls
+  about a third as hard as it did). Judging §37.
+
+### 13. ChromaGlass in popular VJ software
+
+- **13-update** (**shipped** ad hoc, asked 2026-10-25; the story is in
+  `docs/plan-shipped.md` §13): a release is Run workflow → *Mac app* with *release*
+  ticked, which builds, checks and publishes a GitHub Release; the site's Download for
+  Mac (Profile & Store for Pro, the landing page) links to its fixed-name .dmg; the app
+  finds new releases itself (electron-updater, `desktop/updates.js`) and, ad hoc,
+  offers the download in its menu and the profile sheet. *Measure:* `npm run updates`
+  (80/80, CI `Measure · logic`), and `npm run desktop -- --packaged`'s "updates" line
+  (the shipped updater against a feed the check serves; 11/11 on the Linux pack).
+  Judged on the owner's Mac: `docs/judging.md` §75.
+
+- ~~`npm run desktop`'s projector line goes red on CI's Mac on PRs that never touched
+  it ("the mirror's canvas missing", #255 and #262 on 2026-10-04)~~ **Fixed 2026-10-04
+  (#263):** the line read the projector once, 2.5 s after its window appeared, and on
+  the Mac the mirror comes up 3.15 s after the projector's page opens (the first run
+  that printed it). Until then the page is `main.tsx`'s black loading fallback: the
+  projector shares the show window's renderer, and the show has just reloaded and is
+  in its opening, so the page's first animation frame is held as long as the show's
+  (in the cloud 0.48–0.58 s with 11–66 ms of script, the mirror at 0.39–0.65 s). The
+  line now waits for the mirror (`#stage-canvas`) up to the app's own 8 s loading bar,
+  prints how long it took and the longest frame the page sat in before it, and reads
+  the click hint 2 s after the mirror came up: the hint is timed from the mirror's
+  mount, so the old read could judge it before it was due. The second read must be of
+  the same page (its `timeOrigin`), at least 1.5 s after the mirror, with the show
+  window still there and one projector window (the `check-skeptic`). Red on a build
+  with no mirror canvas (missing at 8.02 s), on one whose hint ignores full screen,
+  and on that one again with the projector reloading, or closing, 1 s after the mirror.
+
+### 14. The show at the gig: hearing, timing, speed and the picture on the wall
+
+- **Shipped, 14v-6: the opening asks its first fills before the display, after the
+  mount frames settle** (2026-10-18, this PR). The story and numbers are in
+  `docs/plan-shipped.md` §14v; judged over the week after merge against the week
+  before by `npm run flakes -- --check 'no stop in the opening'` (week before,
+  2026-10-11 to 18: 26 FAIL of 167 Mac startup runs, 16%, 11 of them green on the same
+  commit; this PR's first version went red on its own first run, 2.07 s from 2.59 s,
+  with the 200 ms cap below fired before the mount frame had rendered). The week
+  after, 2026-10-17 to 24: 41 FAIL of 193 (21%), on 25 branches and on main, so it did
+  not help; 14v-7 says why and what changed instead.
+  Named shortcuts and retunes: four animation frames is a heuristic for "the mount
+  frames have been presented" (the compositor keeps up to two frames in flight, and
+  the CI Mac's post-mount frames took 0.30–0.39 s over three to four frames), not a
+  signal that the compositor acknowledged them; the cap went 200 ms → 1.5 s and the
+  frame count 2 → 4, so the opening can start up to that much later in a tab whose
+  frames are held; and the desk's preview hole is measured in `useLayoutEffect`
+  instead of `useEffect` (before the first paint, not after).
+  What it was (found with 14v-5, read over 124 Mac runs' logs 2026-10-11 to 18, and
+  diagnosed on PR #396): the "no stop in the opening" line went red on 14 of 124 runs
+  (11%), and every red was 1.3–2.4 s on the adapter or device and then 2.4–4 s on the
+  first compute pipeline while `plate/display` compiled and drew beside it. Warming the
+  compiler at boot (#396: an empty kernel, a built fill-shaped kernel, and that kernel
+  run once) went red on all three Mac runs of its own PR and was taken out; the third
+  run showed `fluid/fill:rgba32float` compiling 4.32 s from 2.64 s beside
+  `plate/display` (2.64 s) while a frame asked at 3.42 s waited on the GPU process
+  until 6.80 s. Now `usePreviewFrame` measures the desk's preview hole in
+  `useLayoutEffect` so the plate and intro mount directly at their preview size
+  without a second full-window-to-preview resize frame, `introStill()` waits four
+  animation frames plus a macrotask (with a 1.5 s cap for a tab hidden mid-wait;
+  a 200 ms cap fired at 2.42 s on run 39189617869 before the post-mount frame at
+  2.50 s had rendered) even when `#cg-intro` starts with `.cg-still` from
+  `index.html`, and `prepareShow` asks the opening's `fluid/fill:*` compute kernels
+  before `plate/display` (which still heads the render pipelines and runs alongside
+  the remaining compute kernels). `npm run startup` prints the page's first compute
+  pipeline ("first compile asked …, given …"), judged by nothing.
+
+#### 14w. The pointer on the wall (shipped)
+
+The owner, 2026-10-04: the mouse cursor must never show on the show, though it may on
+the design screen. The projector window and a cast receiver (`CastDisplay.tsx`)
+showed the arrow on any movement and hid it after 2.5 s (3 s) still, so it was on the
+wall as the window opened and whenever the hand crossed the projector's screen; clean
+screen hid it over the plate's canvas only, so it came back over the letterbox and the
+"needs WebGPU" card. Now a script and a rule in `index.html`'s head put `show-screen`
+on `<html>` of any `?cast=` page before anything else loads, and `.show-screen *` /
+`.overlays-hidden *` are `cursor: none !important` (a child's own cursor, the canvas's
+crosshair, beat an inherited one). Every
+way the show reaches a second screen is that one page: the web projector window
+(StageMirror), the Mac app's projector window, the multi-projector surfaces (drawn into
+that window by `gpu/output.ts`) and a receiver. `npm run showcursor` asks each, as it
+opens, with the mouse sweeping it and later, at a grid of points and on every element,
+and that the design screen keeps its crosshair (12 lines; 9 of them red before the
+change); `npm run desktop` adds "projector: no pointer on the wall". Nothing else is
+drawn at the pointer: the projector copies the plate's canvas only, and no shader marks
+where the mouse is. The gamepad's ring (`App.tsx`), the last thing drawn at a pointer,
+showed on the laptop in clean screen while the sticks moved, so on one screen (or a
+mirrored projector) it was on the show; since 2026-10-05 clean screen hides it and the
+design screen keeps it (`npm run showcursor`, the ring's two lines, 13/14 → 14/14 with
+the fix taken out and put back). The phone needs nothing: a touch screen draws no pointer, and a phone or
+tablet showing `?cast=` gets the same page.
+
+#### 14y. The sound Source opens on Off (shipped, asked 2026-10-22)
+
+The owner: the source should always be None when the app opens, whatever look loads.
+Read as the sound Source (Off / Mic / System / File / Band; the phone's Sound tiles).
+The video Source already opened on Off and a look never sets either (a look carries how
+hard a source drives the plate, never which one is on). What opened on something else
+was the sound: a first visit's first click anywhere started the band, and the last
+Mic or Band pick came back on every launch from `localStorage`.
+
+- **Shipped:** `App.tsx` keeps the pick in `sessionStorage`, so a new tab or a
+  relaunched app opens on Off and a reload of the tab keeps the input (a gig can reload
+  without losing the interface). The first-click band is gone; the Band is one press in
+  the Sound panel and on the phone. `?kiosk=1`, a box with nobody to click, still starts
+  the band on its own. The phone is the same App state, so it opens on Off too.
+
+#### 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
+
+The owner: "things are a little jittery sometimes"; make sure the GPU is used across
+the code. Three causes, each with its check: the step count stopped and doubled the
+liquid in bursts (`npm run cadence`), each solver step made half a megabyte of garbage
+for the page's collector to stop for (`npm run encode`), and the governor retried a
+rung the machine could not hold every ninety seconds for ever (`npm run rungs`,
+"hunting"). How each was found and measured is in `docs/plan-shipped.md` §14aa.
+
+- ~~**14aa-3**~~ shipped below (2026-10-25).
+
+- ~~**14aa-2**~~ (measured 2026-10-25 on the owner's Mac, Metal, comment on #441): at
+  sixty steps a second (Poster 1969, 256², 60 s) 9.16 % of frames took no step or two
+  before, 0 after. Governed three-minute runs at thirty steps: frames of two steps 1 → 0
+  (Classic) and 2 → 0 (Neon Coral Reef), gaps over 50 ms 2 → 0, and the [1, 0] pattern
+  broken on 0.01 % of on-time pairs. Poster 1969's 136 two-step frames fell in the 14 s
+  the governor tried sixty steps and the frames were slow: catch-up, not cadence (14aa-3).
+
+#### 14aa-3. The governor climbs back to sixty steps into a stutter (shipped 2026-10-25)
+
+**Shipped**: the governor measures what a solver step costs apart from the frame's drawing,
+judges each climb on what the state it climbs to would cost, and gives sixty steps up when
+frames keep missing a refresh with the GPU over its budget, where it used to wait for an
+average that sat either side of its line. Poster, 1969 on the owner's Mac held 8.5 to 16.8 s at
+sixty steps after each climb, 82 to 192 frames of two steps; replayed in node, 57 to 1136 such
+frames after the opening on the old governor and none on the new (`npm run rungs`); on the
+GPU, `npm run stutter`. The story is in `docs/plan-shipped.md` under the same number.
+
+- ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Shipped
+  with 14ac (#451). `App.tsx`'s
+  frame loop calls `pourVideo` each frame, and `pourVideo` pauses the element it holds
+  and plays it again, which fires `pause` and `play`, which set React state twice a frame
+  and restart the loop. Fix: `pourVideo` does nothing for the video it already pours, and
+  is asked once, on play. Check: a page with a video poured counts `play` events and App
+  renders a second.
+
+- ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
+  `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort
+  on their history. A ring and a selection median.~~ **Shipped** (#533, 2026-10-28): the
+  detectors keep two rings and take the median and its deviation by partial sort, to the
+  same number to the bit; the live ear stopped copying its byte arrays; the fifteen-frame
+  median's scratch is kept. `AudioFeatures.update` 0.5–0.6 → 0.30 ms, 227.65 → 5.7 KB an
+  update, readings identical (`npm run eargc`). Story in `docs/plan-shipped.md`. What is
+  left (5.7 KB an update) is the reading itself: seventeen onset objects, three arrays and
+  the chroma; not worth a ring of readings until a Mac profile asks.
+
+#### 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
+
+**Shipped** (2026-10-24): four public domain cartoons, each the whole film looping, poured as
+dye or played as the film from a Cartoons shelf on the desk's Dye panel and the phone's dye
+sheet (`src/lib/cartoons.ts`, `CartoonShelf.tsx`; sources and licences in
+`public/video/cartoons/SOURCES.md`; `npm run cartoons`). With it, **14ab-1** (written down
+with 14aa): the video pour no longer pauses and plays its video every frame. And the
+projector's film (a loop, the camera, a window, a cartoon) now survives the plate being
+rebuilt (a lost device, a resolution change), where it used to go dark while the panel still
+said it was playing. The story is in
+`docs/plan-shipped.md` under the same number. The owner's look at them is `docs/judging.md` §66.
+
+**Colour, shipped** (2026-10-27, the owner: "the out of copyright cartoons we added are all black
+and white - we need some color ones please"): five more, in colour, on the same shelf and the
+phone's dye sheet: *Fiddlesticks* (1930, two-colour), *Jack Frost* (1934) and *Balloon Land*
+(1935), both ComiColors in Cinecolor, *Somewhere in Dreamland* (1936, a Fleischer Color Classic) and
+the feature *Gulliver's Travels* (1939, Technicolor, 74 minutes, the whole film). Each one's status
+is in `SOURCES.md` with the catalogue it was checked in; the owner's look is `docs/judging.md` §85.
+`npm run cartoons` now decodes each file and holds its `colour` flag to its picture.
+
+The owner: "can we download a couple videos for inclusion into the app? things that can run
+in the background and be used for visualizations? like silly symphonies, skeleton dance? and
+other early animations?", then "I don't want a short loop, I want the extended cartoon looped."
+
+#### 14ae. One Record button (shipped, asked 2026-10-24)
+
+The owner: "all the various recording options are also confusing and overlapping. What's
+video recording? what's audio? what's recording inputs? what's recording the plate?" Three
+things get recorded, under eight names in five places: a video file of the plate (the
+desk's Video, Canvas Video, Record the plate, the Rec dot, the Guide's Record), a replayable
+take of the hands on the plate (Record performance, Perf, the Performance tab) and a
+frame-exact film of a loaded song (Render this song). Audio was never a recording of its
+own: one switch inside the video's options. Nothing records MIDI, mic or camera input.
+
+Shipped: one Record button (R, MIDI and remote `record-toggle`, the palette, the phone's
+tile and Play pill). `lib/recordChoice.ts` keeps what it makes, **Plate video** (default,
+what R did before), **Take**, or both; a press with anything running stops all of it. T
+still records a Take by itself. One Rec dot with one clock replaces Rec and Perf. The Record
+panel (the sliders button) is one page: the choice and the Record button, Plate video's
+options (Sound is a setting here), Takes, and Song film (a button that opens the song's
+render). The phone's More sheet says what Record makes. `npm run record` is the logic and
+the one-of-each; `take`, `layout` and `phone` run the desk and the phone.
+
+#### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped, asked 2026-10-24)
+
+**Shipped** (2026-10-24): one camera list (`useCameras`, kept current on `devicechange`)
+and one picker (`CameraPicker.tsx`) in both places a camera opens, desk and phone alike: the
+motion camera (was "The Room") and the film's Webcam, which could only ever open the
+browser's "environment" camera. Each choice is remembered apart; a camera pulled out takes
+its source off and says so, and opens again by itself when it is plugged back in; a chosen
+camera that is missing opens the browser's pick, says so, and hands over when it arrives
+(`src/lib/cameras.ts`, `npm run cameras`). The room section is now **Motion camera**,
+its first line says its picture is never shown and points at Webcam, and the film's camera
+line says it shows a picture and points back. Story in `docs/plan-shipped.md`.
+
+- **14z-2** (**shipped**): where a song ends and the next begins, measured on real songs.
+  `npm run songends` joins eight CC-BY songs (`scripts/fixtures/songs`, credits there) with
+  half-second and two-second gaps, gapless and crossfaded, in a quiet room and a noisy one
+  (the room 30 dB under the music), runs the app's own ear over them, and plays each song
+  whole. The old rule, timed against the room tracker: 16 of 48 gaps and gapless joins, 0
+  of 16 crossfades. `SongBoundary` now: 43 of 48, no change inside any whole song; a song's
+  end is a dip 40 dB under its own loud level (over 40 s) or a second on the room's floor,
+  and the next song is sound that carries on for 0.75 s (a last chord after a stop does
+  not). On the lab's twenty-three songs: 65 of 66 gaps, 39 of 44 gapless, no false change
+  in 5.8 h. It is heard on every reading of the ear (`onReading`), not on the App's renders
+  (14u). Crossfades are song identification's: measured, no summary of the sound (harmony,
+  spectral shape, level, hits) moved further between two songs than between a verse and a
+  chorus of one. The local matcher now captures every 6 s, not 12: it names every
+  crossfade's new song with none wrong, 7.9 s in after a 6 s crossfade (9.4 s at 12), 6.7 s
+  gapless in a noisy room. It no longer names songs it has never heard: a held chord made
+  one pair at every frame, and n of them against m in a stored song summed to thousands of
+  votes at one place in it; each pair now votes once per alignment (`localFingerprint.ts`).
+  With each fixture left out of the library in turn, strangers named 38 times before, 0
+  after, and the known songs named in 978 captures of 4 s, not 929. The busy flag can no
+  longer hang on a throw (14s's `finalizeListen`).
+
+### 18. The physics under the look: where the plate imitates a result instead of simulating it
+
+#### 18f. Heat comes from the lamp, and a level plate has no "up"
+
+**Shipped (#352):** In-plane thermal buoyancy is strictly gated on plate uprightness (zero on a level plate) with tanh saturation removed (linear Boussinesq). Heat source couples to the lamp dimmer with Beer–Lambert spectral absorption from the dye (using the plate's `lampThrough` decode) and a central hotspot (`1 / (1 + 2.5 r²)` shortcut). Newton cooling decays per-second with a real physical time constant in the tens of seconds (τ ≈ 12.4s via `heatDecay^(4*dt)`). Oil in `mixForce` is given physical buoyant density below water (ρ_oil ≈ 0.85), rising on an upright plate while wax sinks. Water viscosity drops ~2%/K, increasing thin-gap mobility under gravity. Shipped writeup in `docs/plan-shipped.md` §18f. Verified with `npm run heat` (9/9 checks).
+
+- ~~**18g-1**~~ Flushing, not fading: the open rim (#362). Dye is flushed out over $r \ge 0.5$ on a thin gap as pours add volume (`npm run flush`), with zero-flux Neumann boundary conditions across `OPEN_RIM = 0.5` in `dyeDisperse`, `dampGrid` and `slumpStep` so diffusion and grid damping do not bleed dye across the rim, and a radial zero-gradient boundary condition at `OPEN_RIM` in `hsBody` so the cleared trough does not create a spurious buoyancy step at the rim. The dye-budget regulator is kept as a named safety cap pending 18c-2 (pours add volume).
+
+#### 18j. Milky liquids scatter (shipped)
+
+Shipped in #353 (2026-10-10): optical scattering packed into `vel.w` from species channel 2
+with conserved flux-form advection; Kubelka–Munk diffuse backscattering on black ground
+yielding opaque white milk and pastel food dyes (PLAN §4); two-flux forward extinction
+with Rayleigh-Gans wavelength dependence and narrow aperture loss casting a warm dark
+projector shadow on lamp ground with a soft forward halo; byte-for-byte identity for
+zero-scatter liquids. Story and measurements in `docs/plan-shipped.md` §18j.
+
+### 19. The checks, the build and the plan itself
+
+#### 19i. A green Mac result carries across a merge of main
+**Shipped** (#429; carrying fixed in 19k, #502, since until then it asked for four shards where there were five and so never carried): a run whose tree differs from the PR's last green Mac run only in main's files, or in files no Mac shard reads, skips the shards as "carried", and the deploy gate follows the chain back. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
+#### 19w. A fifth Mac shard, so no shard runs near its timeout
+**Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs, the longest shard went from 18.4 minutes to 15.0. The measure and what moved are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Next time a shard's median passes about 15 minutes, even them again before adding a sixth: each shard is a runner the queue has to find.
+
+#### 19w-1. The deploy gate counts the fifth shard
+**Shipped** (2026-10-17): `deploygate.sh` wanted exactly four green shards by name, so after 19w it trusted no PR run and every deploy re-ran the whole Mac, about 55 minutes from merge to live. It now reads the shard names from `checks.yml`'s matrix; replayed on the last 20 merges, the deploys it trusts went from 0 (plus 2 by rule 5) to 4 (plus 1). The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
+#### 19x. A moved bar names itself
+**Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input, or turns a check to assert the opposite (also commit by commit, #357's case), without naming it in the body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the required `Measure`; the protocol in `docs/handoff.md`). Over the 50 merges before it, 9 would have had to name something, every one a real edit of a check. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19x.
+
+#### 19z. A check that compares two compiled programs on a GPU asks the compiler
+**Shipped** (2026-10-11): `npm run lamp`'s first line, every look at Lamp Ground 0 byte for byte against a lab built with the lamp's lines taken out, read "different: fillmore-1969 2" on the owner's M4 on main at b2ca7d7, the same one pixel on every run, 2 levels of blue, gone with the back plate or its grade off (`node scripts/lampwhere.mjs`), none different on software WebGPU and on the GitHub runner's Mac for the same tree, and none different on the M4 again once #353 had moved the shader. Metal fuses a multiply-add into one FMA when the product has one use; the lamp's back-plate branch keeps a second use of the back plate's values alive in the plain lab and is dead code in the control, so the two programs round the painted path differently, and one ulp crossed a threshold in the grain. The line is now `npm run lampzero`, two labs on SwiftShader (which has drawn them the same on every tree since 2026-10-04 and, as a conformance rasteriser, keeps the operations as written rather than fusing them by use count), in Measure on every PR as its own part, `lab` (the `logic` part has no Chromium, so #386's first run failed there on the launch, and the `browser` part already runs twelve of its fifteen minutes). The line reads back from the adapter that SwiftShader drew both labs, and from the bundles that the control is another program, rather than trusting the flags and the plugin. The lamp's physics stay on the Mac. The story is in the scripts' own comments.
+
+#### 19aa. A flake tracker: each check's reds counted from CI's own logs
+**Shipped** (2026-10-18): `npm run flakes` reads every run of `checks.yml` and `deploy.yml`
+in a window (`--days`, `--since`, `--until`; 7 days by default), every attempt's jobs and
+each job's log, and prints, per check (the runner's system, the command and the check's
+name, since `renders` on Linux and on Metal measure different things), how many times it
+printed FAIL, of how many, how many of those reds printed ok on the same commit in
+another job (a floor on the flakes: the code did not change and the answer did), how
+many were on main, and how many branches the reds came from (twenty-five reds on one
+branch is that branch's change being caught; the same spread over eight is the check).
+A re-run's copied jobs are counted once, jobs cancelled part way are read, and red jobs
+that printed no FAIL line are listed by job. `--check <regex>` lists every attempt of
+the matching checks with its detail. It is the 2026-10-17 audit by hand (657 red checks
+over three weeks, a day of reading) as a script, and it exists now so the startup fix
+(14v-6) can be judged on ordinary pushes. Reading, 2026-10-11 to 18 (219 runs, 1,892
+jobs, about 80 s; logs cached in the temp folder): the magnet's two drag lines 27 and 26
+of 130 over 15 branches (#373's leak), startup's opening 17 of 137 (12%, the audit's
+11%), render-app's same seed 11 of 128, the band's renders lines 10 of 135 on the
+laptop and 7 on the phone, tools' Blow 9 of 131, ferrodrift's "pulled in no more than in
+silence" 7 of 134; Measure's logic job red 16 times with no FAIL line (type errors).
+Not a gate and no bar: a rate depends on what was pushed.
+
+- **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** `renders` waits
+  for the plate to draw fifteen frames in a second before measuring (the band's 8 reds of
+  191 were all first windows at 0 to 14.5 frames a second), and the fader's line asks the
+  Dimmer to change on nine frames in ten that were offered a new value and a quarter more
+  than the desk's, where "twice the desk's" asked for more changes than frames below 20 a
+  second (the first per-frame bar, 0.8 of the frames drawn, sat on the edge of a healthy
+  plate: 0.79 to 0.99 in 48 windows). Story in
+  `docs/plan-shipped.md` §19aa-6.
+
+- **19aa-2. `followview`'s timing (shipped 2026-10-18).** Red on #390's PR and its deploy
+  and about 1 run in 6 in parallel (2 of 12 on main's code), on a line it should not
+  have failed: the track panel's section against the band's. Three readings were taken
+  at moments the check did not mean to measure: across a band section edge (the panel
+  changes 0.0 to 1.8 s after the band, measured over twenty edges on four pages), in
+  the seconds after the follower first locks (the line says 40 to 60% and the section
+  can be the old one, or missing for two readings, until the line passes 75%), and the
+  "at least 50% sure" read at the instant the line first appears (47% in one run in six).
+  The readings now wait for 75% and for a spot 3 s into a section with 6 s left (and with
+  the clock-since-tag section held off the band's, so the clock cannot agree by
+  coincidence), the first reading must agree too (the panel lags the band), and the 50%
+  is read on three further readings a second apart after five seconds. A frozen panel
+  would have passed the single reading, so a new line follows the band into its next
+  section, three readings in three. No bar moved. Over twelve parallel runs the old check
+  was red twice and the new one green twelve times; a panel lagging 4 s went red 3 of 3
+  and a panel frozen on one section 2 of 2. The app was not late: no panel was wrong
+  once the follower had settled. Known limits: the follower's first place is not
+  measured, and a confidence pinned at 100% while sure would pass the 50% line. Not
+  tried: making the follower's first place better than 50-60% trust (the follower's own
+  business, `songfollow`).
+
+- **19ab-1. A slow download no longer reads as a failing check (shipped 2026-10-24).**
+  Every shard fetched its tools inside the same clock as its measuring, so an unbounded
+  download cancelled the harnesses at the job's wall and the red said nothing about the
+  diff. Seen five times across four runs of one PR on 2026-10-22, on three different
+  shards, none of them touching a check that failed:
+
+  | shard | the step | took | warm |
+  |---|---|---|---|
+  | `browser` | Install Chromium | 650s | 33s |
+  | `lab` | Install Chromium | 683s | 33s |
+  | `sound` | ffmpeg (apt) | 1474s, 1471s | 22s |
+
+  Both apt hangs were ended by the 25-minute wall rather than by finishing: between
+  about 19:30 and 20:30 UTC the step did not return at all, and while that lasted **no
+  PR in the repo could go green**, because the sound shard dies before its first sound
+  check runs. The browser shard's own work is about eighteen minutes, so eleven minutes
+  of cold download puts it at twenty-nine against a limit of twenty-five; the sound
+  shard's is about three, so an unbounded apt buries it alone.
+
+  Two changes, because the two halves are different faults. The browser is now cached
+  (`actions/cache` on `~/.cache/ms-playwright`), keyed on the **Playwright version read
+  from the installed package** and deliberately not on the lockfile's hash: the browser
+  a version installs never changes, so the version is the whole of the dependency, while
+  a lockfile key would discard the browser on every unrelated bump and pay the eleven
+  minutes again. And every fetch now carries its own `timeout-minutes` — six for the two
+  Chromium installs, four for apt's ffmpeg, five for the Mac's pip — so a mirror that is
+  not answering fails as itself, with the step's name on it, in minutes rather than
+  cancelling the measuring at the wall. `--with-deps` still runs apt for the system
+  libraries, which the cache does not hold, which is why that step keeps a bound as well
+  as a cache.
+
+  Why bounds and not a bigger limit: raising the job to 35 would have hidden this and
+  made a genuinely hung harness cost ten more minutes before anyone heard about it. 19w
+  moved the *Mac* shards off their timeouts for the same family of reason; the ubuntu
+  shards were never costed the same way, because their own work is steady and nobody
+  counted the downloads in front of it. The Mac fetches were bounded here too, though
+  none has gone slow yet, because the Mac queue is the one that costs.
+
+  What a session should know when this goes red again: a retry is not a fix, and the
+  two cases show it from both ends. The browser's cold install cleared on a re-run, so
+  green by luck read exactly like green by merit; the apt hang never cleared, so three
+  full runs were spent proving the thing that failed was not the diff. Measured by the
+  steps' own seconds over the runs after this merge, and the cold path stays honest
+  because a version bump changes the key.
+  Found while measuring 0-tap (PR #429).
+
+- **19ab-2. apt runs only for a library that is really missing, and a missing one fails
+  by name (shipped 2026-10-24).** Two hours after 19ab-1 merged, `Install Chromium`
+  timed out at its six-minute bound on #429's browser shard (run 40117937609): the
+  mirror was sending 50 to 100 KB/s and had fetched 10 of 17 packages. The browser had
+  come from the cache in 4 s; the 17 were `--with-deps`' apt, 8 upgrades of libraries
+  already on the runner and 9 fonts (Japanese, Chinese, Thai, FreeFont, unifont) that
+  nothing the app draws asks for. The job carried on past the red step and every
+  browser harness after it passed, which is the proof the libraries were there.
+  The two answers on offer were both wrong: `continue-on-error` on the apt step keeps a
+  slow mirror green but lets a truly missing library turn up later as a harness's
+  browser "closed" at launch, nothing naming it; a longer bound waits longer for fonts.
+  Now `Install Chromium` fetches the browser alone, and `scripts/chromiumlibs.mjs`
+  asks the runner what is missing: ldd over every binary of both builds (headless
+  shell and full Chromium), then a launch of each. apt runs only when that fails, and
+  if the check still fails after apt the step is red with the library's name, before
+  the first harness. Found on the way: **Playwright's own check of this does nothing
+  in 1.63** — it looks for binaries in `chrome-linux` while the linux-x64 builds unpack
+  to `chrome-linux64`, and it skips itself for 30 days behind a `DEPENDENCIES_VALIDATED`
+  file that the cache now carries from runner to runner — so before this, a library
+  missing from Chromium's own binary was named only in the first harness's launch error,
+  mid-shard, and one missing from a helper not at all. Measured in a cloud session: 13
+  binaries checked, 3.4 s; with an `ldd` that reports `libatk-1.0.so.0` missing, exit 1
+  naming it in both builds; with an `ldd` that fails, or no build in place, exit 1
+  saying so. The two launches there both start the sandbox's full Chromium
+  (`chromiumPath`), so the headless shell's own launch is first run on CI. The
+  ffmpeg step keeps fetching every run (it is a real need) with apt's own retries
+  and a 30 s stall timeout added.
+
+- **19ab-4. ffmpeg comes from the Actions cache, and a cold fetch skips a slow mirror
+  (shipped 2026-10-26).** 19ab-1's four-minute bound on the sound shard's apt made the
+  outage legible but did not end it: on 2026-10-26 the step ran it out twice in an hour
+  (#495's run 40350041600, #402's run 40358831181), and then `bands`, `songends` and
+  `shape` failed on "no ffmpeg on the path" and `renders` on "no ffprobe on the path",
+  four reds on PRs that touched no sound. Retries and a stall timeout (19ab-2) do nothing
+  for a mirror that is slow rather than silent, and this PR's own first run measured it:
+  the Azure mirror sent the package lists at 11 MB/s and then the 87 packages (62.8 MB)
+  at about 55 KB/s, a second's wait per request, so apt would have needed some nineteen
+  minutes. Now `scripts/debcache.sh` installs the `.deb`s the Actions cache kept (keyed
+  by the runner image) with apt reading an empty source list, so a set that no longer
+  fits (a dependency missing, or a downgrade, refused under `-y`) fails at once rather
+  than downloading. On a miss apt only says which files; curl fetches them eight at a
+  time from the Azure mirror, then archive.ubuntu.com, then us.archive.ubuntu.com,
+  dropping a mirror that sends under 300 KB/s for 20 s and holding each file to apt's
+  size and hash, and a last pass without the floor in case the whole network is slow.
+  Ubuntu's own ffmpeg either way, so the shelf's MP3s are decoded by the decoder the
+  sound checks were measured with. The step then requires `ffmpeg` and `ffprobe` by
+  name. Measured in a cloud session on 24.04 with mpv standing in (14 `.deb`s): cold
+  with the first mirror unreachable, 8.9 s; from the cache 1.5 s, no source asked; one
+  `.deb` taken out, "unmet dependencies" then a cold fetch, 7.5 s; a file whose hash does
+  not match, refused by every mirror and the step red naming it; an older `.deb` than
+  the installed one, exit 100 and nothing changed; the floor, curl exit 28 after 5 s on
+  a 40 KB/s transfer. On CI (#496, run 40365582373) the cold fill fetched the 87 packages,
+  61 MB, in 1 s, installed Ubuntu's ffmpeg and ffprobe 6.1.1, and saved the set; the step
+  took 16 s.
+
+- **19ac-1. The double tap's two taps carry a finger's times (shipped 2026-10-24).**
+  `scripts/phone.mjs`; red on 10 of 173 Mac runs the week to 10-24, always
+  `0.009 → 0.28 → 0.005`, because the harness's taps were stamped when the busy page took
+  them (95 ms apart idle, 466 ms with the page busy 400 ms), past `DOUBLE_TAP_MS` 320.
+  Now stamped 90 ms apart and sent 0.4 s apart, so only the stamps can make it pass, with
+  a control stamped 0.6 s apart that must not reset. Story in `docs/plan-shipped.md` §19ac-1.
+
+#### 19af. The repository's front page: a short README, the guide in docs/, a clean root (shipped 2026-10-25)
+
+- **19af-1. Shipped.** `README.md` was 79 KB of every feature and control, which is what a
+  visitor to the repository met first. It is now the front page (what ChromaGlass is, the
+  live link, four screenshots, how to run it, where things are, the licence); the old text
+  moved whole to `docs/guide.md` (same headings, so a section edited elsewhere moves
+  across), and `docs/README.md` maps the other docs. The root lost thirty-odd one-off
+  scratch files (`patch_*`, `test_dump*`, `scratch*`, `wait_ci*.sh`, `tmp_18.txt` and the
+  like: nothing in `package.json`, a workflow, a script or a doc named any of them, and
+  they stay in git history); `plan_comet.md` moved to `docs/plan-comet.md`. `dc.mjs` stays,
+  because `checks.yml` parses it by that name. New feature and control docs go in
+  `docs/guide.md`, not the README (`setting-auditor` and `CLAUDE.md` say so).
+
+- **19ag-1. Shipped.** `firebase.json` sends, on every path: an **enforced**
+  `Content-Security-Policy` of the four directives that cannot break a page this app serves
+  (`frame-ancestors` for the site's own three names only, which the Auth iframe needs;
+  `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`); a **report-only** policy of
+  everything else (scripts, styles, fonts, images, media, connections, frames, workers),
+  logged in the console and enforced by nothing; `Referrer-Policy: strict-origin-when-cross-origin`;
+  `X-Content-Type-Options: nosniff` (the service worker's note on HTML served under a `.js`
+  URL is the case); and a `Permissions-Policy` that names what the app asks the browser for
+  (camera, microphone, screen capture, MIDI, fullscreen, window management, gamepads,
+  clipboard, tilt) as the site's own and refuses the rest (geolocation, payment, USB, serial,
+  HID, XR). `npm run csp` serves the built site with those headers, opens the show, the
+  remote, a cast and the static pages with a blob worker, blob media and the lookups the
+  app makes tried on top, and judges: nothing reported; the controls (http, eval, `<base>`,
+  `<object>`, a data worker) reported or blocked; another origin cannot frame it; the
+  Permissions-Policy parses in Chromium and allows what the app uses. It caught `bluetooth`,
+  which Chromium does not know. `npm audit` is at zero: `npm audit fix` (vite, postcss,
+  nanoid, browserslist and others), `esbuild` ^0.28.2 (a file read on Windows's dev server),
+  and overrides for `@grpc/grpc-js` (^1.14.6, which Firestore's Node build pulls and the web
+  app never loads) and `uuid` (^11.1.1, which Capacitor's `xcode` pulls). Judging §89.
+
+- **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
+  was module code above the component: the CPU solver `class FluidSimulation` (3,900 lines)
+  and the constants, switches and helpers around it. They are in `src/sim/` now, unchanged
+  (every non-import line of the old file is in the new files, counted line by line): the
+  solver in `fluidSimulation.ts`, the grid and the solver's constants in `constants.ts`, the
+  hands' and bottles' helpers in `tools.ts`, the step and its query-string switches in
+  `stepping.ts`, the dice and the palette window in `dice.ts`, and the frame's shapes
+  (`FrameView`, `PlateRenderer`, `VisualizerRender`, `FrameDigest`, the song shape) in
+  `frameTypes.ts`. The component is 441,458 bytes. `hooks/useSongRender.ts` imports its
+  types from `sim/frameTypes.ts` and no longer imports the component. Six checks read the
+  solver's source as text from the component and now read it where it went: `cellride`
+  (the step's cell clock), `oillift` (the step's rock), `pacing` (the paced clock),
+  `panel` (the per-layer list against the solver), `plate` (the CPU gate, the closeup's
+  ramp, and the retired looks' exemption, which follows `seedPreset`) and `turing` (the
+  drift rates).
+
+- **19ai-5. Shipped: `npm run sizes`, a size ratchet.** A file not in `scripts/sizes.json`
+  stays at or under 40 KB; a file already over it (52 on main at b38801e, 4.9 MB between
+  them) may not grow past the bytes recorded beside it, nor past its size at the PR's base
+  (so two PRs that each fit under a ceiling cannot land together over it), and new code for it
+  goes in a module beside it. The baseline only shrinks against the base (HEAD^1 in CI: the PR's merge
+  commit's first parent, or the main before a deploy's commit): a ceiling raised or added,
+  or a new ledger, is red, and a big file renamed is a new file over budget. A file more
+  than 4 KB under its ceiling is red, in a PR that resized it, until `npm run sizes -- --update`
+  lowers it (on main, or for a file the PR did not resize, a note: two PRs that each trim
+  2.5 KB must not turn the deploy and every open PR red), so a real move out banks what it saved, while a PR that trims a few lines does not have to touch the
+  same line of `sizes.json` as every other PR in flight. Binary files and
+  `package-lock.json` are not counted. Six **ledgers** that every PR writes in (PLAN.md,
+  `docs/plan-shipped.md`, `docs/judging.md`, `docs/guide.md`, CHANGELOG.md,
+  `scripts/checks.json`) are exempt by name until split. One manifest entry on the `logic`
+  part, `always`; no Mac. Its self-test meets each rule's break in a scratch repository.
+
+- **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** The ratchet's first real move
+  (the solver, 194,508 bytes in one class, out of the visualizer) read as a new file over
+  budget, and the owner did not want the solver cut into 40 KB pieces to pass a number (a
+  class is not split by moving lines). So a pull request may add a ceiling the base does not
+  have when the new entries hold no more than the bytes that left the base's over-budget
+  files in the same PR, and each new entry is its file's own size. A file that appears over budget with nothing
+  written in still fails as new, and an entry added with nothing taken out still fails as
+  raised; what it lets through that the first rule did not is a rename that moves its entry
+  with it, which costs a session the same. Five self-tests hold it, one the review of #548's exploit: the credit is the bytes that actually left the base's over-budget files in the PR, not the sum of their ceilings, so slack under a ceiling funds nothing. Whether 40 KB is the right
+  budget for a new file at all is the owner's question, raised 2026-10-28 ("40kb seems
+  somewhat arbitrary. I don't want quality to go down because of this").
+
+- **19ai-5d. Shipped: a warning at 40 KB, a failure at 100 KB** (the owner's pick,
+  2026-10-29). Measured on main at a68de68: about four bytes a token; 506 of 677 text files
+  under 20 KB; the cost in the 17 over 100 KB, each read whole by a session that needs a
+  fraction of it; the 40 between 40 and 100 KB mostly modules that do one job, whose prose
+  comments are 25 to 60% of their bytes (audioFeatures 52%, slosh 59%), so a 40 KB bar was
+  paid for in comments or in modules cut where they do not come apart. Now a file not in
+  `sizes.json` fails only past 100 KB (about 25k tokens), and one a pull request made or
+  grew past 40 KB is a warning (an annotation on the file in CI). Ceilings hold only the
+  files over 100 KB: 40 dropped, 13 left (2.7 MB). Ledgers leave the list under 40 KB, as
+  before. The review found that freeing the 40 files between the bars let two green PRs land
+  one of them over 100 KB on main (presets.ts has 8 KB of room), so a file over the limit with
+  no ceiling is red only in a PR that resized it, and a note on main, as a stale entry is; and
+  four mutations its self-tests missed, now each caught. 21 new self-tests (57 in all).
+
+### 20. Lace and holes: a pale film torn open over colour
+
+- **20c-2. Settings tabs on the phone (shipped in #348's review).** The Settings rail is a strip across the top on a phone, and each tab took its group's whole width and lay under the next group: 13 of the 26 tabs took no tap, Patches among them, so the room's two new patch features (How sudden, How busy lately) could not be reached from a phone. The tabs are full width only in the desk's column now; `npm run phone` taps every tab where it is drawn, and patches each new feature from the phone.
+
+### 23. Selling it: the site free, the app paid
+
+- **23.2** (**shipped**, this PR): a hosted-site build flag (`VITE_FIREBASE_HOSTED_SITE=1`, or `?tierGates=1` for checks) that shows each paid feature
+  above as an "In the ChromaGlass app" tile with a link (`src/lib/tierGates.ts`, `SettingsPanel.tsx`, `DeskPanels.tsx`), off in a licensed app and in a
+  local `npm run dev`. *Measure:* `npm run tiers` (11/11, wired into `checks.yml` `Measure · lab`): loads the gated build and verifies 7 tiles on the free tier, 2 Pro tiles on a Home key, and 0 tiles on a Pro key.
+
+- **23.3** (**shipped**, this PR): the song-ID Worker (`server/fingerprint-worker.js`) takes an Ed25519-signed `X-ChromaGlass-Key` licence key as
+  well as an allowed origin, and the site's manual tag stays. 14o's gates come first
+  and stay (origin, size, per-/64 hour, the day's ceiling, in `npm run
+  fingerprint-worker`); a good key raises the hour's count (`LICENSED_RATE_PER_HOUR = 300`), not skipping the day's (`DAILY_LIMIT = 1000`). *Measure:*
+  `npm run fingerprint-worker` (23/23): no key refused when `REQUIRE_LICENSE_KEY=1`, a bad signature refused before reading the body or calling the service, a good key answered and allowed past the 30/hr cap while stopping at `DAILY_LIMIT`.
+
+- **23.4** (**shipped**, this PR): the key in the Mac app and show server (`server/license-key.js`, `server/server-license.js`, `server/remote-server.js`, `src/lib/licenseKey.ts`, `desktop/`): offline Ed25519 signature check, activation
+  and the two-machine count (`/license-activate`, `/license-deactivate`, `/license-info.json` on loopback), the key's tier (Home or Pro) and the features each
+  opens, Home → Pro upgrade keys, and an unlicensed app that runs as the site does (`requireSignIn=1&tierGates=1`). *Measure:* `npm run tiers` (11/11): verified with a valid Home key, a valid Pro upgrade key, tampered/expired keys, 2-machine cap, and no key.
+
+- **23.8** (**shipped**, this PR, `desktop/`): Home's listening features. The app hears
+  whatever the Mac plays with no tab to share (`desktop/main.js` `setDisplayMediaRequestHandler` with macOS ScreenCaptureKit loopback, `desktop/preload.cjs`, `desktop/electron-builder.config.cjs` `NSAudioCaptureUsageDescription`, `SoundPanel.tsx` `"System audio"` source), and an ambient TV mode (`Show → Ambient TV Mode (Cool & Quiet)`, `SoundPanel.tsx` toggle, `PhoneStage.tsx` Play sheet tile, `ambient.ts` the switch, `governor.ts` the 30 Hz step rate and rung ceiling, `drawGate.ts` the draw cap) runs the plate full screen on the TV for hours with the 60 Hz draw cap, 30 Hz solver step rate cap, and opening rung floor of 14j. *Measure:* in `npm run desktop` (13/13), the System audio source's pipeline reaches the ear and the picker was intercepted, and Ambient TV mode caps the solver at 30 steps/s, caps draws at 60 Hz in the app (`DrawGate`), and holds the opening rung; `npm run rungs` (76/76) and `npm run phone`. On the owner's Mac, an album through a streaming app drives the plate (`docs/judging.md` §87).
+
+- **23.10** (**shipped**, #394; brief `docs/handoff-signin.md`): the sign-in on the
+  hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
+  with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
+  the email, sign out with confirmation, delete the account with confirmation, and links
+  to `/privacy.html` and `/terms.html`) on the desk, the narrow overlay and the phone.
+  Returning visitors start the plate immediately from the local flag while Firebase
+  confirms in the background, `?remote`, `?cast` and builds without `VITE_FIREBASE_*`
+  never load Firebase, and `getFirebaseAuth()` uses `VITE_FIREBASE_AUTH_DOMAIN` directly
+  rather than overriding it with `window.location.hostname` on `.web.app` (which sent an
+  unauthorised `https://chromaglass.web.app/__/auth/handler` redirect URI on returning
+  iPhones kept on `chromaglass.web.app` by `index.html`). *Measure:* `npm run signin` (14/14, wired into `checks.yml`
+  `Measure · lab`), and `startup` on the Mac: a returning visit's first step no later
+  than today's bar.
+
+- **23.10c** (**shipped**, this PR): a way back in, and a profile sheet that reads (the owner,
+  2026-10-24: signed out while using the app, "there is no way to re-sign in"; "the profile page is
+  garbage"). Signed out with the show up, every account button (the desk's status bar, the corner
+  pill, the phone's header and its Play menu) becomes a lit **Sign in** that opens the same sign-in
+  the first visit meets, inside the sheet, over a plate that keeps playing; a sign-in or sign-out
+  here, in another tab, or by the background check redraws them (`authFlag.ts` says so on
+  `cg-auth-changed`, and other tabs are heard through `storage`). The sheet (23.10b's frame) is now
+  one column that answers who you are (email and plan, or the sign-in), what you have (Pro says so;
+  Home is offered the upgrade; Free sees the two plans side by side; a key typed by hand is one
+  row), then the rest: running shows (one quiet line when there are none), the newsletter as one switch, sign
+  out and a small delete at the bottom. The settings shortcut is gone (the desk and the phone each
+  have their own). *Measure:* `npm run signin` 15 (a lit Sign in on the desk and the phone, 44 px on
+  the phone, opening the sign-in over a running plate) and 16 (signing in from the sheet brings the
+  account back); 1–13 unchanged.
+
+- **23.10b** (**shipped**, #430's work, folded into 23.10c's PR): the Profile & Store sheet fits the screen (the owner,
+  2026-10-22: "a little janky"). The sheet was one 955px column centred in a scrolling
+  overlay, so on a 900px laptop and an 844px phone its title and close button sat above the
+  screen with no way to scroll to them. Now the frame stays inside the viewport (`92dvh` on a
+  phone, `100dvh - 2rem` on a laptop), the title and the footer links stay put and only the
+  middle scrolls; two columns from 768px (who you are, the key and the running shows on the
+  left; the store and the newsletter on the right), so a 1280×720 laptop sees the whole sheet
+  at 600px tall with no scroll; on a phone a bottom sheet with the store second and 48px
+  touch rows. Colours are the desk's tokens (violet for what you own and for Pro, red for
+  sign-out's neighbour, white for the primary button) in place of amber, which meant nothing
+  elsewhere; the three "Profile & Store" / "Account" pills lost their amber too. Checkout
+  links, prices and every `data-cg-*` hook are unchanged. *Measure:* sheet height 955 → 600px
+  at 1440×900 and 1280×720, 776px at 390×844 inside the screen (was cut off by 28, 118 and 56px at the top);
+  `panel` 192/192, `layout` 74/74, `phone` 355/355.
+
+- **23.14** (**shipped**, this PR): linking devices by
+  account (`server/account-shows.js`, `src/lib/accountShows.ts`). A signed-in show running
+  with `server/remote-server.js` publishes its LAN relay address and show key to
+  `/account-shows` with its Firebase ID token (90 s TTL, isolated by account UID). A phone,
+  tablet or laptop signed in to the same account sees the account's running shows in a list
+  (on `PhonePlay`, `PhoneStage`, `AccountSheet`, `DeskPanels` `Phone · iPad` and
+  `LaptopLink`) and joins one with a single tap: the account hands over the show's address
+  and key, which #380's QR carries today. The QR stays for a guest's phone or one not signed
+  in, and for a venue whose Wi-Fi has no internet. Once linked, control stays on the local
+  network either way, so the internet going never drops the remote. *Measure:*
+  `npm run accountlink` (6/6, wired into `checks.yml` `Measure · lab`): token/store isolation,
+  two signed-in pages on the same account (one a show, one a phone) where the show is listed
+  and joined with a tap and no address typed while the QR code stays on `Phone · iPad`, a
+  third page on another account sees nothing, and cutting off the internet and account
+  service leaves the local remote socket driving the show.
+
+- **23.16** (**shipped**, this PR): one address. The owner asked (2026-10-24) for
+  `chromaglass.web.app` "to always immediately forward to chromaglass.art"; it moved only a
+  fresh visit, because localStorage belongs to the origin and a plain redirect would have left
+  a returning visitor's licence, presets and set lists behind. `index.html`'s first script now
+  forwards `chromaglass.web.app` and `chromaglass.firebaseapp.com` to the same path, query and
+  fragment on `chromaglass.art`, carrying the old name's `chromaglass*` keys in the fragment;
+  the new name writes them before the app's module runs, only from an old-name referrer, never
+  over a key it has. The old name drops a carry-shaped fragment it is handed and carries once.
+  Left behind: the signed-in flag, account email, pending email link, marketing choice, crash
+  logs, and a signed-in visitor's licence key (one sign-in on the new name; the account gives
+  the key back, 23.12, and the key stays out of browser history). It stays for Firebase's
+  `/__/` pages, offline, a cached show whose network does not reach `chromaglass.art` within
+  4 s, a `?cast` window with an opener, `?cg-stay` by hand, and state over 900,000 characters.
+  Hosting's own redirects match paths, not hosts, so firebase.json cannot do it on one site.
+  *Measure:* `npm run onehost` (25/25; 9/25 on the old page, and the referrer guard, the
+  keep-what-it-has rule, the dropped handed-in fragment, carry-once and the 4 s wait each turn
+  their checks red when taken out), in `Measure · lab`.
+  The address itself was checked the same day: one A record at GoDaddy (Firebase's
+  199.36.158.100), www and http both 301 to `https://chromaglass.art/`, Google Trust Services
+  certificates for both names (2026-10-18, in CT logs).
+
+- **23.17** (**shipped**, this PR): when slower frame rates cause the governor to step down (`status.steppedDown`) or the GPU solver is unavailable (`status.gpuUnavailable`), replace the old "Run it locally" `git clone` card (`src/components/RunLocallyCard.tsx`) and add a matching phone/desk `Fluid Grid` callout (`src/components/SettingsPanel.tsx`) suggesting an upgrade to **ChromaGlass Pro** (`CHECKOUT_PRO_URL` / `CHECKOUT_UPGRADE_URL` and `AccountSheet`), hidden once a Pro key is active; gate the `1024²` `Fluid Grid` option to Pro (`disabled={isTierGatingEnforced() && !isProLicenseUnlocked()}`); and let the automatic quality ladder climb to `768²` at `2x`/`3x` Retina and `1024²` at `1x` with projector `stageLadder` and full WebGPU adapter limits in `src/gpu/device.ts` (falling back first to `maxStorageBufferBindingSize` + `maxBufferSize` and then to defaults) whenever a verified Pro licence is active (`effectiveLadderTier` in `src/lib/platform.ts`, `LiquidVisualizer.tsx`). *Measure:* `npm run tiers` (12/12) and `npm run rungs` (74/74).
+
+- **23.17d** (**shipped**, this PR): the Mac app opens only on a Home or Pro licence (the owner, 2026-10-25: "The Mac app should check the license. The app won't work for free"). It had no sign-in at all (`desktop.yml` built the site with no `VITE_FIREBASE_*`), gated nothing, and read Pro for every download; and the key `desktop/main.js` verified at launch never reached the page (the preload decoded it with a `Buffer` that cannot read base64url in a sandbox, so the bridge always said free). Now `desktop.yml` builds the site with the accounts and `VITE_MAC_APP=1`; a packed app always asks (`app.isPackaged`, no switch opens it free), takes no signing key from its environment, and has no developer tools; the one other key it trusts is its own build's `checkKey`, the public half of a pair `desktop.yml` makes per build and throws away with the runner, so `desktop -- --packaged` can open it on a key nobody else can sign; and the show, in the app's window and in any browser opened on the app's server, waits behind `AppLicenceGate.tsx` until a verified key whose tier is in `MAC_APP_TIERS` (`lib/macApp.ts`) is on the machine. A free account is no longer enough, as it was under 23.11. The door: sign in (email and password in the window; Google and the emailed link finish in the real browser on the app's own server, `?macSignIn=1`, which files the account's key with that server while the window watches `/license-info.json`), confirm a new password's email, Buy Home or Pro with "check again", or type a key. **Offline:** no grace period, by choice. A verified key opens the app at every start with no network and no time limit (a touring set with no Wi-Fi for a month still opens; 14h); online and signed in, the account is asked, and a key filed under that same email that the account no longer lists (refunded) leaves the machine at the next start, never mid-show (`heldKeyRefunded`, `retireStoredLicenseKey`). The cost: a refunded buyer who never goes online again keeps the app, which a timed lease would close (23.17h). *Measure:* `npm run signin` 22–24 (signed out shows the sign-in; a free account gets Confirm, then Buy, and no plate; a Home key opens at Home; a refunded key leaves the machine and the next start asks to buy), 22 and 24 failing on the code before; `npm run desktop` licence lines (11/11 from the repo; 13/13 packed with the site built as the app ships: it opens on its build's key, a self-signed Pro key with `LICENSE_PUBLIC_KEY` and the network refused meets the door, and so does a plain browser on its server); `npm run tiers` 12/12 (its gate lines 5–7 now pass through the new door). Needs a Mac release (Actions → Mac app → Run workflow, release ticked) to reach installed apps. The owner settled the tiers on 2026-10-26 ("Home can open the app"), so the site's copy says so too: the Home price card lists the Mac app, the Mac line under the cards and the profile sheet's Mac row say it comes with Home and Pro, and the sheet offers Home the download (`macAppRow` reads `MAC_APP_TIERS`; `npm run updates` checks Home on a Mac gets the download).
+
+### 27. Every control does something you can see
+
+- **27a. Plate Rock is the plate tipped (shipped, #305).** It went through the
+  half-resolution current as a stir, 0.2 × the spring's swing × tanh of the dye over the
+  mean, and its dial went as its square (the kick's shove × R, then the swing × R). Now
+  the dial is applied once and, on a thin gap, the tilt is the dye's weight down the
+  tipped plate in `hsBody`, with Rain Drip's: a pool slides downhill through the clear
+  liquid at Darcy's speed and an evenly coloured plate does not move (`npm run rides`:
+  forty pools rocked as the app rocks them moved 0.43 at full, 0.028 before; a look's
+  own stir moves them 0.79).
+  - **27a-1. The cover glass slides as the dish tips (shipped in #328, taken out by
+    #340, back with its drift carried exactly).** #328 put it in and main's deploy of
+    10-10 went red: with the band playing `npm run renders` drew 10–21 frames a second
+    on the laptop and 11–15 on the phone against 26–32 before, and the same seed
+    rendered twice differed (`render-app`). Two causes. The glass was not reset when a
+    render starts (`resetPlateClocks` now resets `coverRef` with the rock). And the
+    glass drags the whole film at half its slide, a drift of a few cells a step, and
+    the carries cut a step into as many substeps as their fastest face needs
+    (`CARRY_COURANT`): measured in the lab on the app's 384² solver, Plate Rock 0.2,
+    0.45 and full asked 4.1, 8.0 and 12.2 substeps a step of every carry against 1.0
+    held still. Now the carries ride the flow less the drift (`driftCells` in
+    fluid.ts, `driftOff`), the flow seen from a frame going with the film, and every
+    carried field (the colour and its species, the oil's colour, the poured liquids,
+    the reaction, the mix, the ferrofluid) is moved with the drift (`driftShift`): its
+    whole cells by a shift, which is exact, the fraction by one step of the carries'
+    own limited flux. The drift is a model of the film's speed (hsPrep's drag lag at
+    the rest gap, within 0.03 of a cell of the lab's plate); what it misses the plan
+    carries in substeps, so a wrong guess costs time and never accuracy. And the
+    dish's rim met the grid's wall at the middle of each side, where about ten cells
+    either way were inside the rim and walled: the glass's flow piled against them at
+    3.4 times the plate's speed and set the substeps itself. The rim is open there now
+    (hsPrep), as it is everywhere else, and the substeps follow the faces inside the
+    rim only (27a-6 says what that leaves). Lab, an uneven plate rocked and kicked as
+    the app does it (384², 60 steps): 1.00, 1.03 and 2.17 substeps a step at 0.2, 0.45
+    and full, against 4.1, 8.0 and 12.2 before. `npm run rides` 5c holds the default
+    at the still plate's substeps (1.00) and full under 2.5.
+    What it was: the tilt moves
+    colour only where it is heavier than the plate's mean, so on a look whose colour is
+    spread evenly a rock moved nothing (the Mac's controls run on #305: Rock visible on
+    7 of 23 looks, "nothing" on Boiling Point, Crowd Plate, Red Cabbage, Clock Glass).
+    The top glass rides on the film in the bottom glass's bowl and slides downhill as
+    the pair tips, a damped pendulum (`stepCover`, lib/plateRock.ts: a 20 cm bowl 6½ cm
+    deep, R_c 0.11 m, 2 mm of glass, the film's shear drag ρν/(m_A h) from the look's
+    Thickness, 40 mm of rim room); its slide in m/s joins Glass Smear's glass speed in
+    hsPrep, so the liquid goes at half of it. A shallow clock glass (R_c 0.18, 30 mm)
+    rang the cover out to the rim from Plate Rock 0.2 on, and the dial read 9.4 cells at
+    0.2 and at 0.45. Lab (`npm run rides`): an evenly coloured checker slid 0.0 cells
+    with the tilt alone (and changed 0.157 with its red made heavier); with the glass
+    3.7 cells at 0.2, 8.7 at the default, 13.5 at full, and 18.4 in a liquid 7.9 times
+    thicker, each the way the glass went (gain 0.88–0.96 of half its slide, lagged by
+    the film's drag time; correlation 1.00). The glass rests at R_c sinθ, swings at
+    1.5 Hz on the default oil and creeps back without swinging in glycerine. A phone
+    held tipped slides it too.
+
+- **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't feel
+  like it actually does anything").** The slider multiplied the ranged bass reading, which every
+  hand takes over 70 or 85 and stops: on the band's chorus the reading sat over the press's
+  ceiling 0.00 of the time at 1×, 0.57 at 2× and 0.70 at 3×, so turning it up held the glass flat
+  and the kicks moved it less (the press's change a second 3.06, 1.83, 0.90; its deepest rose
+  only 8%), while the kick detector never saw the slider (29 kicks at every setting). A bass boost
+  on a rig is a gain, more cone excursion for the same line. Now the hand follows the bass with the
+  boost taken back off (`bassRouteValue`) and lays the boost as a gain on its force (`bassPressFor`,
+  the burst's push, the kick's dye and speed): change a second 3.06, 6.12, 9.19, deepest press
+  1.13, 2.25, 3.38, pinned 0.00 at each; in the lab on the thin gap the hand moves 0.240, 0.403 and
+  0.521 of the plate's colour at 1×, 2× and 3×, and gives it back. At 1× it is the hand it was.
+  `npm run bassboost`. The reading itself still carries the boost (the mappings, the meter and the
+  camera follow it, clipped at 100 as before); the phone's Settings is the same panel.
+
+### 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)
+
+- **28b. Colour palettes for the lamp** (**shipped**, #330). Pastel Glow and Galaxy each
+  carried White and Icy Blue, which are 0 and 26 (CIELAB ΔE) from the white lamp, so on
+  a lamp look half their dyes poured invisibly; Lavender replaced White in both. Added,
+  after the 17 so a saved lock keeps its index: Overhead (yellow, magenta, teal,
+  ultramarine: the subtractive dishes), Ink (graphite, midnight, crimson, coffee: the
+  reactions' precipitates), Pantry (the liquids' own colours) and Lava. `npm run plate`
+  holds every palette to three of four colours 40 or more from black and from white
+  (before: Pastel Glow and Galaxy 4/2). A track's music picks among 21 now, so a song
+  identified before may land on a different palette once.
+
+- **28e. A breakdown is quieter on the plate, and Classic is blobs again** (**shipped**,
+  #368; the showreel's first two findings). The music's hands follow how loud the passage
+  is, as an amplitude (`Passage`), and the bass's press reads the band over its ceiling:
+  on the showreel's minute the press changed 1.44× as much a second in the breakdown as
+  in the groove, now 0.54× (`npm run breakdown`). Classic: Dye Budget 0.45, Bubbles 0.05.
+  Story in docs/plan-shipped.md §28e.
+
+### 29. The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11)
+
+- ~~**29c. The drop follows the hand and holds together.**~~ **Shipped** (#373, #495; the story in
+  `docs/plan-shipped.md` §29c): the rim's force read against the ferrofluid's own drag (`phaseForce`),
+  the moving edge compressed back by the flux limiter's deficit from a once-a-step blur (`phaseBlur`,
+  `phaseCompress`, 29c-1), the gain derived in SI and held to the solver (`npm run magnetgain` 5/5, bars 20%, 29c-2), the ferrofluid's momentum carried with it (`phaseMomentum`), degenerate mobility
+  `mob = 4m(1 − m)` in the thin gap's Cahn–Hilliard step (`phaseCHVolume`, 29c-7) with the
+  resting-drop check `npm run ferrorest` (5/5, with a second window), the dragged drop held
+  while it is dragged by `npm run ferrohold` (each pass switched off by hand turns its own line red;
+  `phaseCompress` is a lab-only step option, 1 by default), and two-phase carry of a coherent drop's
+  trailing rim on the thin gap (`phaseVelocity`, 29c-8; `npm run ferrodrag` 3/3 and in CI since
+  29c-10, its Thin-Gap-off lines since 29c-11; `ferrohold` 5/5 over the whole drag). If the closeup's camera ever follows the drop, it follows smoothly and never with the
+  sound (the sway work's `frameSway`, default 0, stays the only way sound moves the frame). Still
+
+### 30. Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11)
+
+#### ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
+
+Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Each `sound` or `bands`
+cord on `SceneMapping` (`src/types.ts`) now carries `mode` (`'follow' | 'gate'`, absent =
+`'follow'` on whole-plate cords even when `threshold`, `attack` or `release` are present;
+area cords keep `CordGate`'s rule), `gain` (absent = 1, applied to the reading before the
+threshold in both modes), `threshold`, `attack`, `release`, and on `bands` cords a custom
+dragged `band` (`[loHz, hiHz]`, winning over `feature` while the panel writes `feature` as
+the named band holding the drag's middle for fallback). `BandRange` (`src/lib/audioFeatures.ts`)
+hears `[loHz, hiHz]` from `AudioReading`'s spectrum with the same `binsFor`, reference floor
+and `AutoRange` (6 dB minimum, 30 dB cap) as `band1`..`band8`, and `PatchBay.fold`
+(`src/lib/sceneMap.ts`) steps a `CordGate` per gated whole-plate cord clocked from `fold`'s
+`now` (closing **25h-2**). The patch bay editor (`src/components/SettingsPanel.tsx`) and
+`src/components/phone/BandStrip.tsx` draw the mode, gain, threshold, rise and fall controls
+and the live log-frequency spectrum strip on both the desk and the phone. Story in
+`docs/plan-shipped.md` §30a.
+
+### 32. The soap film: a draining film seen in reflection (asked 2026-10-18)
+
+#### ~~32b. The reflected view~~ — **Shipped, this PR (#469)** (`soapFilmRgb` reflected view in `src/lib/soapFilm.ts` with Snell path factor `d_eff = h cos θ_t`, 4-point path spread `spread = 0.025`, dark ground `ground = 0.0004`, and colour grade `notchFloor = 0.0725`, `chromaRetention = 0.67` named under shortcut (f) in `PLAN.md` §32 and `src/lib/soapFilm.ts`; `npm run soapfilm` 23/23 with C7 saturation bar unchanged, `npm run filmtable` 8/8; control with the grade off (`notchFloor = 0`, `chromaRetention = 1`) is 77% saturated, 22.7% dark, 9/12 hues at t=120 s, and with the grade on is 13% saturated, 19.4% dark, 8/12 hues at t=120 s (14.8% saturated, 12/12 hues at t=110 s) against the photograph's 15% saturated and 9/12 hues; 3-angle render at 0°/30°/50° shows bands shift down by 13–18 rows while Newton-black lace stays at row 1.00–1.09; story in `docs/plan-shipped.md` §32b; replacing the grade with the real solid-angle integral and camera gamut mapping is 32b-1 below)
+
+#### ~~32c. The GPU solver~~ — **Shipped, this PR (#505)** (`src/gpu/soapFilm.ts` exporting `createSoapFilmGpu`, `src/gpu/wgsl/soapFilm.ts` with `soapSetup`, `soapSorRed`, `soapSorBlack`, `soapProject` and `soapTransport`, and `scripts/checks.json` wiring `npm run soapgpu` on the Mac `plate` shard beside `sloshgpu` and `npm run soapgpu -- --selftest` on Measure's `lab` shard beside `sloshgpu`; `npm run soapgpu` 29/29 on `apple metal-3` — first-step flows 0.195%, first-step thickness 1.116%, 1 s thickness 0.065% at `dt = 0.05` s, 0.022% at `dt = 1/60` s, 0.884% at `zeta = 0.25, dt = 0.2` s with 4 CFL sub-steps, C1 thick +29.41 vs +29.41 and thin −22.56 vs −22.55 rows, C2 drift 7.0e-9, C3 reversed −20.86 vs −20.85 rows, C4 max `|div u|` 1.8e-4 /s, C6 worst quarter mean 0.08%, top black at 115 s vs 115 s, torn hole 0 refilled and 160 vs 160 black cells, 0 of 4785 steps idle, 0 of 514 reads idle, `src/lib/soapFilm.ts` absent from bundle, `cost: 2.44 ms a step at 256 × 256 on apple metal-3`; `npm run soapgpu -- --selftest` 29/29; `npm run soapfilm` 23/23; `npm run wgsl` 142 shaders; `npm run physics` 20/20; `npm run derive` 4/4; story in `docs/plan-shipped.md` §32c)
+
+### 33. Bubbles and the closeup, per liquid (asked 2026-10-19)
+
+#### ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped, this PR** (Paint Cells and Macro Lacing now default to 0, so no look draws cells it did not name; the relief is lit by a raking lamp with a rolled-off glint and a thinner boundary line, `src/gpu/wgsl/plate.ts`; `npm run macroview`: the cells' share of the frame was 0.14 at 4x and 0.17 at 6x before, 0 after, bar 0.01; the relief is 0.033–0.051 of the frame, 0.99 of it smooth, and the colour keeps within chroma distance 3.1 of the 1x frame, bar 5; story in `docs/plan-shipped.md` §33g; 20c-1 is closed by it)
+
+### 35. Clear controls: on reads on, one name for one thing (asked 2026-10-24)
+
+- ~~**35c-1** Squish Plate in five.~~ Shipped: Squish Plate (the glass: pressure, shape, depth drag,
+  Thin Gap and Thickness, Press Lift, smear, rain, viscosity), Oil & Soap, Ferrofluid and Reactions
+  (Chemistry), Tilt & Rock (Motion); Swirl, Dye Weight and Heat Spread went to Fluid Physics, Layer
+  Depth and Spectral Mix to Lamp & Light, and the Turing pattern and its print from Lamp & Light to
+  Reactions. The registry files each pin under the section that draws it (the desk's Fluid Physics
+  panel had been the glass's, the oil's and the magnet's forty knobs), held by `panel`. Story in
+  `docs/plan-shipped.md` §35.
+
+- ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~ Shipped: a knob's
+  cap, the tick in a panel's header, the dot on a rail heading and the phone's touch thumb wear their group's
+  colour (the seven in `index.css`; a setting's group is its section's, `groupOfSetting`); the tools are
+  keycaps on the desk and pictograms on the phone's dock (`ToolGlyph`); a snail and a hare mark the ends of
+  Master Speed, Evolve Speed, Gel Speed, Chase Speed and Kaleido Spin wherever they are drawn as a knob or a
+  slider (`PACE_KEYS`, `PaceTrack`). Judging §77. Story in `docs/plan-shipped.md` §35.
+
+- ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~ Shipped: the
+  bottle in hand on the desk and the phone leans forward and stands filled to what is left of the Dye
+  Budget (`dyeRoom`, `dyeRoomOf`), the others standing full; the Viscosity buttons each let a drop go at
+  the pace of the carrier's viscosity (`dripFallSeconds`, 20 to 1); Lamp Warmth has a bulb whose filament
+  is the blackbody colour at the temperature its grade matches, written in kelvin (`lampKelvin.ts`,
+  6500 K at 0 down to 5100 K at 1). Held by `npm run panel`. Judging §78. Story in `docs/plan-shipped.md` §35.
+
+- ~~**35e-2** The lamp's grade tops out at 5100 K.~~ Shipped (2026-10-25): Lamp Warmth reaches a quartz-halogen
+  projector's 3200 K. The slider is a temperature, even in mireds, and the plate multiplies by the blackbody's
+  own colour at it (`lampTint`, Planck and the CIE fit, worked out once on the CPU and handed in as
+  `lampTintR/G/B`), not a tint mixed in by the slider. It runs 0 to 3.75, and 0 to 1 is still 6500 K to 5100 K
+  (the new tint is the old grade to 1.5% a channel there), so saved looks, the presets and Lucky keep their
+  colour with no migration. The vignette is unchanged (full from 1 on). Held by `npm run panel`. Story in
+  `docs/plan-shipped.md` §35; judging §80.
+
+- ~~**35e-4** Home Movie's lamp, and the warm end's brightness.~~ Shipped (2026-10-27, the owner left both to the
+  session): Home Movie sits at Lamp Warmth 3, 3560 K, and the warm end holds its brightness. A Super 8 projector's
+  lamp is a 3200 to 3400 K halogen, the lamp the film was balanced to be shown by; 3 and not the 3.75 end because the
+  tint is the full blackbody ratio, which a camera records and a room-adapted eye sees less of (35e-3), so the end
+  would over-state the orange. Brightness: colour temperature does not set output (a projector's halogen is as bright
+  as it was built to be, and the lens throws no less light for the lamp being amber); a lamp run cool on a dimmer does
+  lose light, steeply, about the eighth power of its temperature near 3000 K (flux as V^3.4, temperature as V^0.42),
+  but that is Exposure's knob, not the colour's. So `lampTint` keeps the luminance it has at 1 for 1 to 3.75 and 0 to 1
+  is untouched. Cost, named: the red channel rises to 1.48 at 3200 K (1.36 at 3560 K), so a pigment already at full
+  red clips on a multiply of the finished picture, which the six-band lamp spectrum (35e-3) would handle properly.
+  Held by `npm run panel`; judging §84.
+
+- ~~**35f** Show hardware (batch C of the playful-controls choice, 2026-10-25; items 7 to 11).~~ Shipped: Record
+  is two tape reels turning at the tape's speed over their radius, the full one slow and the bare one fast
+  (`tapeReels.ts`: a compact cassette's 4.76 cm/s, hub 0.9 cm, pack 2.1 cm; angle by closed form, so the
+  button holds no clock of its own) on the desk button, the phone's Play pill (a fixed box, so it does not widen,
+  and red while it runs) and the More tile; Tap Tempo is a pad with a beat light on the locked beat, four pips
+  and the tempo in segment digits (`TapPad`; the light runs on the Web Animations clock from the source's period
+  and phase, so the App never re-renders for a beat), on the desk's Tempo row and the phone's Sound sheet; the
+  Sound sheet on both has a VU needle with a moving coil's ballistics, 99% of a steady tone in 300 ms and a
+  1.3% overshoot, falling to its stop and writing "deaf" on the dial when the input stops (`vuMeter.ts`, moved
+  through a ref on its own frame); Blackout is a lens with a red cap on it, one drawing on the desk header,
+  Settings, the remote and Draw, and the remote's two Blackouts are one (the bar under the thumb); Auto Spin has
+  a strobe ring that drifts at the dish's speed in Rate and stands still in Tempo once a tempo is heard
+  (`strobeRing.ts`). Held by `npm run panel`. Judging §81. Story in `docs/plan-shipped.md` §35.
+
+- ~~**35g** Looks as slides in a tray (item 12 of the playful-controls choice, 2026-10-25).~~ Shipped: a look is a
+  35 mm slide at a real mount's proportions with its own palette on the film, on the set list, the cue bar, the
+  preset menu, the saved list and the phone's look button, Looks sheet and Looks strip (now flicked one slide at
+  a time); a round tray clicks one slot when the look on stage changes (`slideTray.ts`, `SlideMount`,
+  `SlideTray`). Held by `npm run panel`. Judging §82. Story in `docs/plan-shipped.md` §35.
+
+### QA list: what the owner found playing it
+
+- ~~**QA-29** Choices that did nothing: 20 of the 80 values the menus offer were
+  silently dropped (2026-10-09 to 2026-10-11).~~ **Fixed** (#322's type-derived lists,
+  held by #367's check): the first `sanitizePatch` kept its own hand-written lists,
+  already behind the types, so Lighter and Exclusion on the blend menu, four of the
+  five LED modes, Off and Random for a new song and the mixer's Multiply and Key were
+  dropped by `updateSettings`, the phone's patches and a saved look. `npm run sanitize`
+  now walks every value of every choice setting (80 kept) and runs in CI's logic part.
+
+- ~~**QA-31** The closeup is "even bouncier and twitchier than before": it punches,
+  pumps and shivers with the music at Frame Sway 0 (the owner, 2026-10-11).~~ **Fixed**
+  (27a-8, `npm run steadycam`): Macro Sync's punch-in on the kick, push with the energy
+  and treble tremor were on at its default of 0.5 outside Frame Sway, so at 6x on a 1440
+  px frame a 120 bpm song swayed the frame 0.42% of its width (6 px) and pumped the zoom
+  3.2% (the frame's edge 23 px) on every beat, and the ear now hears nearly every kick
+  where it heard a third; the lead read one cell's solver velocity, so a press of half a
+  cell a step threw the frame 0.95% (14 px) in a frame; a cut landed on a lattice cell and
+  slid 14% of the frame to the drop; and each drop random-walked 4 px rms a frame. All
+  four are 0 now: the song's hand on the frame is 0.000% at Frame Sway 0 in every mode on
+  all 70 looks and show stages, the same press moves the frame 0.17% a frame with it and
+  without, a cut lands on the drop's middle, and a drop on still paint moves 0.
+
+- ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
+  Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
+  the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
+  are drawn in all, one of them the design's (the owner, 2026-10-11, with a screenshot).~~
+  **Fixed, #381** (the check first, then Antigravity's build, briefed in
+  `docs/handoff-switches.md`): `npm run switches` reads every control that says a state in
+  both states, on the desk's five layouts, every Settings section, the panels the palette
+  opens, the phone with each sheet open, Play with its sheet and the remote, and holds a
+  knob against its track to 3:1, on against off to ΔE 20, a switch's on track to the
+  accent and the switch to saying its state; a switch that will not flip is red, and each
+  surface needs a floor of controls that changed state when clicked. 429 controls and 16
+  under the bar before; after, 451 assertions green, 0 under the bar, 498 controls found
+  (403 on the desk, 86 on the phone, 9 on the remote) and 374 of the desk's flipped.
+  Every switch is now the one `SwitchPill` (`ui/index.tsx`),
+  in `Toggle`'s row or in a row of its own; the phone dock's lit sheet button, the Play
+  screen's pressed pills and the mixer's Graded take the accent trio; the Wall's chips
+  keep their white-when-on style and now say their state; the swatches, the sequencer's
+  stages, the Record panel's tabs and options and the MIDI panel's banks and tabs say
+  theirs with `aria`. Two undeclared changes in the build were put back in review: the
+  desk's tab order, and a Play sheet that opened itself on a `?debug` visit (the check's
+  URL; the app must not know it).
+
+- ~~**QA-20** Blow amount isn't sensitive enough.~~ **Fixed, #346**: the moving wind
+  laid two bubbles every sixth step whatever the Amount (ten spawns a second at 60
+  steps, twenty at 120), and each bubble pumps the colour out from under it; the
+  straw's growth had a floor that made every Amount under about a fifth the same
+  breath. Now the wind takes air in only past the speed the surface tears at (the
+  blowing number ρ_air U²/2√(ρgσ) past 1, 5.4 m/s against a firm breath's 8: Amount
+  0.67), as often as before at the default, 6× at Amount 2 and 44× at 5 (the plate's
+  cover limit bounds it), a rate a second; the straw grows as the breath's speed
+  (`lib/breath.ts` airTaken, strawFlow; `npm run blowrange`). The wind's push already
+  went as the Amount squared, and still does (`npm run airblow` line 6: the pool moved 0.003% at Amount 0.05, 0.085% at 0.25, 2.72% at 1, 14.6% at 2.5 and 16.5% at 5 in software, where the colour goes with the hand). What follows is the report as it was:
+  Blow amount isn't sensitive enough. At its lowest settings it still blows a ton of ink and creates a lot of bubbles. Needs a gentler bottom end (gentle breeze) and a higher top end (hurricane). This lack of dynamic range may apply to other tools/controls too.
+
+- ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box, not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856 px² over Record).
+  Zoomed in, the zoom chip (microscope, − 4.7× +, Hold / Follow / Auto) sits on
+  top of **Record performance** and covers it. Desk, Perform tab, any zoom above 1.05×.
+  The chip is `fixed top-3 … translate-y-9` in `src/App.tsx` (the `macroZoom > 1.05`
+  block, about line 3984) and lands on the desk's top strip, where
+  `PerformanceButton` sits (`PerformDesk.tsx:466`; Design has the same button,
+  `DesignDesk.tsx:291`, check it there too). Not on the phone (the chip is desk-only).
+
+- ~~**QA-18**~~ **Fixed, this PR** (`npm run saves`, 28 lines, in Measure's browser part; main fails "Save asks
+  for a name again with a saved look open"). Save did not let the owner name a new
+  preset from the current settings. Desk. It asked for a name once; after that the look
+  just saved (or any saved look opened) was the document and Save wrote over it, a toast
+  the only sign. Saved presets were in no list on either desk (⌘K found them by name),
+  ⌘S on the Perform desk reached the browser's Save Page, and the save sheet's fields
+  were 200 px wide in a 480 px sheet. Now Save always asks for a name (button, ⌘S on
+  both desks, ⌘K) and makes a new preset; writing over the open one is the sheet's
+  "Replace “name”" button and the look menu's "Save over"; the look menu lists your
+  presets to open or take out. The phone's Looks sheet has the same Save, landing under
+  Yours. The narrow window's preset menu said "Save as file" and promised a download
+  that saving stopped doing; it says Save.
+
+- ~~**QA-18a**~~ **Fixed, this PR** (the owner's ask, 2026-10-06; `npm run saves`, 33
+  lines). The Perform desk had no list of your saved presets of its own (⌘K and the set
+  list's Add found them). It has **Your presets** under the set now: a click cues one
+  (Go names it), a double-click sends it, + puts it in the set, and the list folds to
+  its heading. Go also names a look cued from outside the set (⌘K): it read "Nothing
+  cued", greyed out, while Space would have sent it. Desk.
+
+- ~~**QA-15**~~ **Fixed, #293**: the seed is a laid-out panel, Dye Budget 0.45; `npm run royopen` 6/6 (main 1/6). Story in §21 of `docs/plan-shipped.md`.
+  Roy, 1963 always opens on a giant black stain over flat red, filling most of
+  the dish (the owner's screenshot, 0:09 in). It should read as an abstract, colourful
+  Lichtenstein painting. Wall, desk. The preset is `src/presets.ts` (`'Roy, 1963'`); 21a
+  to 21d hold the rest of its open work. Deferred by the owner: fix later.
+  Cause, found and measured in the lab: Roy's seed (`seedPreset` 'roy' in
+  `LiquidVisualizer.tsx`) passes `splatBlob` radii in cells (`S * fr`), but `splatBlob`
+  takes 128-grid units and scales by `GRID_SCALE` itself, so the four pools come out
+  4 to 5 times too wide, overlap across the plate, and the three inks stacked print
+  black (57 % of the view black, none white, yellow or blue). A fix and a new check
+  (`royopen`, 1 of 6 on main, 6 of 6 with the fix) wait in the shared files under
+  `handoff/roy-black-stain/`; its PLAN hunk for §21 is to be merged with this entry.
+
+- ~~**QA-17** The phone's **Looks** tab wore a sparkle, the icon apps use for AI, and the
+  owner wants nothing in the app to read as AI.~~ Shipped: Looks is a palette; the
+  other sparkles (Random on the desk and the remote, Evolve, Automation, the track's
+  Evolution, "A band in a box") are a shuffle, an hourglass or a drum, and the MIDI
+  auto-map's magic wand is an ear, since it builds the map by listening. Desk, phone,
+  remote. No user-facing text said "AI", "magic" or "smart".
+
+- ~~**QA-11**~~ **Fixed, this PR**: Follow wears a crosshair (locked on one subject) and
+  Auto names its cut, "Auto cuts 5s" from Shot Length (`shotLabel`, `src/lib/macroCamera.ts`,
+  the same `max(0.5, macroHold ?? 5)` the camera rides for), on the desk's chip and the
+  phone's camera buttons; the hover titles say "never cuts away" and "then cuts to another".
+  On the zoom chip, Follow and Auto look like the same thing. They differ in
+  `src/lib/macroCamera.ts`: Follow locks onto the liquid where it is aimed and rides it
+  without ever cutting away; Auto picks its own subject, rides it for Shot Length (5 s
+  by default) and whip-pans to another. Between Auto's cuts both ride one bead, and
+  nothing on the chip says which is which (the difference is only in hover titles).
+  Make it obvious on the chip, for example a mark where Follow is locked and Auto's
+  cuts named in its label; keep both. Desk (`src/App.tsx`, the zoom chip) and phone
+  (`PhoneStage.tsx`, the same three buttons).
+
+### 19m. This file as an index (shipped 2026-10-29)
+
+`PLAN.md` had grown to 819,927 bytes and 9,804 lines (about 200k tokens, more than the
+window a session compacts at), so a session that read it whole paid for it on every step
+after, and every PR that wrote in it conflicted with every other. It is now an index of
+45 KB: the order of work, the running order, a table of sections and the rules. Each
+section is a file under `docs/plan/` (`00-dye-tools.md` to `36-analog-operators.md`, and
+`qa.md` for the QA list); a section over about 38 KB is cut between items into parts,
+so every file has room under the 40 KB at which `npm run sizes` warns. The old header (the
+Gemini and Claude tracks) was retired here, above.
+
+The move was made by a script and checked by another, both kept out of the repository
+since they ran once: every non-blank line of the old file is in the new files, as it was
+apart from a heading's level (the section title is `#` in its own file), except the five
+lines of the old title, intro, header names and order-of-work note; and every one of the
+670 item ids that began an item in the old file still appears in the open plan, as the
+item or its stub. An item moved when its title or first line said shipped or fixed, or
+was struck, and nothing in its story said open, owed, not yet, partly or remaining; one
+that shipped with open work kept that work in place under a stub, and only the story
+above it moved. A review read every moved story for open work and found eleven passages
+(owed checks, a deploy by hand, *Still open:* notes, 23.18's follow-ups); the words they
+used were added to what keeps an item in place, and they stayed. A branch that still edits the old file carries its edits across with
+`node scripts/planmove.mjs` after merging main, and `docs/plan/README.md` maps the old
+line ranges for a hunk it cannot place.
+
+The plan as first written:
+
+> Of 61 merges of main into PR branches, 25 recorded conflicts: `PLAN.md` 14, `docs/judging.md`
+> 7, `CHANGELOG.md` 4, `package.json` 3, `checks.yml` 1, `src/` 2, and none in `App.tsx` or
+> `LiquidVisualizer.tsx`. `PLAN.md` is touched by 29 of 30 merges and is about 75k tokens
+> whole (CLAUDE.md's "about 38k" is half the real figure), so a session that reads it pays for
+> it on every step after.
+>
+> *Fix:* each PR writes its plan, judging and changelog notes as a new file in `plan.d/`,
+> `judging.d/` and `changelog.d/`, which nothing else edits; a small fold puts them in place
+> after merge. And `PLAN.md` becomes this order of work and the running order, with one file
+> per section under `docs/plan/`, so a session reads the index and its section. Done in one
+> PR at a quiet moment, with a table from old line ranges to new files so a branch caught
+> mid-move can re-apply its edit. *Measure:* conflicts recorded per merge of main, and bytes a
+> session reads to start. *Size:* M.
