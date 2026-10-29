@@ -698,7 +698,9 @@ const api = {
         // The plate's clock can be set apart from the solver's, to ask what
         // the picture does with time alone (in `npm run filmlook`, the film's
         // thickness must not drift with it).
-        settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: cam.time ?? l.time,
+        // The camera's Lens rides in the settings as it does in the app, since the
+        // plate reads it there to decide whether to leave its grain to the camera.
+        settings: { ...DEFAULT_SETTINGS, ...over, ...(cam.camera ? { camera: cam.camera.amount ?? 1 } : {}) } as VisualizerSettings, time: cam.time ?? l.time,
         shot: { cx: cam.cx ?? 0.5, cy: cam.cy ?? 0.5, zoom },
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
@@ -711,7 +713,7 @@ const api = {
         film: cam.film ? { kind: 'file', video: { readyState: 4, videoWidth: fw, videoHeight: fh } } : { kind: 'none', video: null },
     };
     const fluids = cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }];
-    fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N, cameraOn: !!cam.camera && (cam.camera.amount ?? 1) > 0.001 });
+    fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N, cameraOn: !!cam.camera });
     const camera = cam.camera ? new WebGPUCamera(device, 'rgba8unorm') : null;
     if (camera) {
       const c = cam.camera!;

@@ -1406,10 +1406,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
           "Lens", not "Camera": the section is called Camera, the room has a
           camera and the film has one too, and this is none of them — it is
           how much of the photograph's sensor look (roll-off, vignette, grain) is
-          over the picture. The five dials under it act on their own: they were
-          greyed out until Lens was up, and a dial that cannot be turned is one
-          nobody finds out does anything. Focus alone waits, for the aperture,
-          since a focal plane with nothing to blur has nothing to show.
+          over the picture. The dials under it act on their own, so none waits
+          for it (a greyed dial is one nobody finds does anything). Focus waits
+          for Aperture: a focal plane with nothing to blur shows nothing.
         */}
         <Slider label="Lens" value={settings.camera ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ camera: v })}
           settingKey="camera"

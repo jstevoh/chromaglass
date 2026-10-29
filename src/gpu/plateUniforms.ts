@@ -133,9 +133,9 @@ export interface PlateContext {
   /** The 192-cell grid the look was tuned on. Only a harness changes it. */
   logicalGrid?: number;
   /**
-   * The camera pass will draw this frame, so the plate leaves the grain to it.
-   * WebGL: the pass exists, is ok, and Camera is above 0.001. Default false,
-   * which is the WebGPU plate today.
+   * The camera pass will draw this frame: the plate is drawn into its 8-bit
+   * scene texture. Whether the plate also leaves its grain to it is Lens's
+   * to say (below). Default false, no camera.
    */
   cameraOn?: boolean;
   /**
@@ -442,7 +442,15 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('grainMix', fluids[0]?.gpu?.grainMix ?? 0);
   pack.set('granulation', gran);
   pack.set('grainScale', clamp(s.grainScale ?? 320, 20, 1200));
-  pack.set('cameraOn', ctx.cameraOn ? 1 : 0);
+  // The camera's grain is part of its sensor look, which Lens mixes in, and
+  // since PLAN 33i the pass also runs for the optics alone (refraction,
+  // aperture, bloom, chromatic aberration) with Lens at 0. Then it adds no
+  // grain, so the plate keeps its own: gated on the pass alone, the frame
+  // lost its grain the moment one of those dials came up. The gate is here,
+  // beside the settings, and not in the caller's `cameraOn`, because that
+  // flag also decides the dither just below, which the camera's 8-bit
+  // texture needs whatever Lens is.
+  pack.set('cameraOn', ctx.cameraOn && (s.camera ?? 0) > 0.001 ? 1 : 0);
 
   // Into the chain's half floats nothing; into the camera's 8-bit texture
   // still a dither, or a dark ramp bands before the camera sees it.

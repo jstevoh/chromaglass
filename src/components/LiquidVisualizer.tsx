@@ -6848,10 +6848,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // all need the finished picture to sample from. Built the first
             // frame it would do anything and dropped when it would not, so
             // a show without a camera never pays for the second target.
-            const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
-            const camWanted = cameraWanted(view.settings);
-            if (camWanted && !camera) { camera = new WebGPUCamera(s.device, s.format); scopeSoon = 2; }
-            else if (!camWanted && camera) { camera.dispose(); camera = null; }
+            if (cameraWanted(view.settings) && !camera) { camera = new WebGPUCamera(s.device, s.format); scopeSoon = 2; }
+            else if (!cameraWanted(view.settings) && camera) { camera.dispose(); camera = null; }
             const cam = camera;
 
             // The post chain, when an effect is on. None exist yet; the
@@ -6891,11 +6889,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               width: canvas.width, height: canvas.height,
               derived: true,
               grid: fields[0].dye.width,
-              // The plate leaves the grain to the camera when it is on, and
+              // The plate leaves the grain to the camera when Lens is up, and
               // still dithers into its 8-bit texture, or a dark ramp bands
               // before the camera ever sees it.
-              // (only the sensor's look brings the grain: the optics alone leave it to the plate)
-              cameraOn: !!cam && camAmt > 0.001,
+              cameraOn: !!cam,
               // With a chain, the finish happens at the end of it instead.
               postChain: !!post,
             });
@@ -6940,7 +6937,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (cam) {
               fillCameraUniforms(cam.pack, {
                 time: view.time,
-                amount: camAmt,
+                amount: view.settings.camera ?? 0,
                 refraction: view.settings.refraction ?? 0,
                 chromatic: view.settings.chromaticAberration ?? 0,
                 focus: view.settings.focus ?? 0.5,
