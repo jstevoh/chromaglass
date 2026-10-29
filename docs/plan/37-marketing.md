@@ -329,16 +329,50 @@ rest is routine and the owner's calls.
   order and lengths as the fallback when identification misses; and the app sends the
   plate's frames and the same audio to YouTube Live itself. A browser page cannot speak
   RTMP, so this is the Mac app's: the canvas and the audio encoded as for Record (WebCodecs,
-  `render.ts`'s encoders) and handed to a bundled `ffmpeg` that pushes RTMPS to the
-  broadcast's stream key, which 37s creates and binds through the API. Alongside the
-  stream, Record keeps a full-quality Plate video of the same show on disk, for the clips
-  (37x-9). Until it is built, OBS does the same job: the Wall output (§31) captured as a
-  window, the system audio as its input. Phone version: the phone's Play screen shows the
-  album's set list, which song is up and whether the stream is live, and can stop it.
-  *Measure:* a lab check that a 60-second stream to a local RTMP server (a test `ffmpeg`
-  listener) arrives with every second of audio, frames at the stream's rate within a
-  bound, and audio and plate in sync to a frame; on the Mac, `stutter`'s two-step frames
-  while streaming against the same look not streaming.
+  `render.ts`'s encoders), and the Mac app's main process speaking RTMPS itself to the
+  broadcast's stream key, which 37s creates and binds through the API. (Researched
+  2026-10-29, `docs/live-show.md`: a bundled `ffmpeg` was weighed and set aside, 80 MB and
+  a pipe of raw frames for what is four hundred lines of FLV and RTMP; a relay such as
+  Restream is one more destination, not the design.) Alongside the stream, Record keeps a
+  full-quality Plate video of the same show on disk, for the clips (37x-9). Until it is
+  built, OBS does the same job: the Wall output (§31) captured as a window, the system
+  audio as its input. Phone version: the phone's Play screen shows the album's set list,
+  which song is up and whether the stream is live, and can stop it.
+  *Measure:* a lab check that a 60-second stream to a local RTMP server arrives with every
+  second of audio, frames at the stream's rate within a bound, and audio and plate in sync
+  to a frame; on the Mac, `stutter`'s two-step frames while streaming against the same
+  look not streaming.
+  The owner widened it the same day: every popular platform, several at once, from a Live
+  Show panel in the Mac app, Pro only. Built in parts, each its own PR:
+  - **37x-4a. The research.** *(shipped 2026-10-29.)* `docs/live-show.md`: which platforms
+    take a stream from software (YouTube, Twitch, Facebook, Kick, X with Premium; Instagram
+    and TikTok with a key per stream, 9:16 and a follower count; LinkedIn through a tool,
+    150 followers), that simulcasting is allowed everywhere since Twitch dropped its rule
+    in 2023, and the three designs weighed. YouTube's first enable takes up to 24 hours,
+    so the owner enables it before the first show.
+  - **37x-4b. The encoder and one destination.** *(build, M.)* `desktop/live.js`: an RTMPS
+    client (handshake, AMF0 `connect`/`createStream`/`publish`, FLV audio and video tags in
+    RTMP chunks, the AVC and AAC sequence headers from the encoders' descriptions) fed over
+    IPC by a `LiveMuxer` in `lib/render.ts` that takes the Record encoders' packets instead
+    of a file; a `live` check in the lab against a local RTMP listener (the check's own
+    `scripts/rtmpListener.mjs`, pure node) that records what arrives as FLV and measures
+    the audio seconds, the frame rate and the sync; the keys in the Keychain
+    (`desktop/keys.js`). Headless: a `chromaglass:live-*` IPC the panel (37x-4d) will call,
+    driven first from the console and the check.
+  - **37x-4c. Several destinations, and a vertical one.** *(build, M.)* The same packets
+    written to N sockets, a socket that falls behind dropping its own frames (never the
+    others'), a reconnect with the key still held; a second encode of a 9:16 crop for
+    Instagram and TikTok; the health readout per destination (bitrate out, frames dropped,
+    seconds behind, reconnects).
+  - **37x-4d. The Live Show panel and the Pro gate.** *(build, M.)* The panel in the Mac
+    app's Perform desk: destinations added by name with a pasted key (the key field never
+    echoes), orientation per destination, a Test (an unlisted YouTube broadcast), Go live
+    and Stop, the health readout, and a warning when the summed bitrate passes the measured
+    upload. Pro only through §23's `canUseProFeature`; absent on the website. Phone: the
+    Play screen's live state and Stop (`remoteProtocol.ts`), through the relay.
+  - **37x-4e. YouTube through the API.** *(build, S; with 37s.)* The broadcast made,
+    bound and transitioned from the panel with 37s's token, so the owner never pastes a
+    YouTube key; Content ID's cut reported in the health readout.
 - **37x-5. A rehearsal for Monday.** *(S; Claude, with 37x-4.)* There are no files to
   render a preview from, so the Monday page (37q) shows the album sheet in a sentence, the
   palette's walk across the tracks as a strip, and a two-to-four-minute rehearsal: the
