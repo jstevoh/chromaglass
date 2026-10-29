@@ -909,6 +909,18 @@ let bobProToken = '';
       salKeys.length === 1 && salKeys[0].tier === 'home',
     `rae ${againBody.ignored}, sal ${salKeys.map((k) => k.tier).join('+')}`,
   );
+  // 13f. The live store's three products are built in: a Worker with no settings files them, and the upgrade turns Home into Pro.
+  const bare = makeEnv();
+  await postWebhook(bare, lsOrder('tia@example.com', 'ord_tia_1', { productId: 1479217 }));
+  await postWebhook(bare, lsOrder('uma@example.com', 'ord_uma_1', { productId: 1479219 }));
+  await postWebhook(bare, lsOrder('tia@example.com', 'ord_tia_up', { productId: 1479218, name: 'ChromaGlass Upgrade' }));
+  const tiaKeys = await keysOf(bare, 'tia@example.com');
+  const umaKeys = await keysOf(bare, 'uma@example.com');
+  check(
+    '13f. the live Home (1479217), Upgrade (1479218) and Pro (1479219) products file their keys with no settings at all',
+    umaKeys.length === 1 && umaKeys[0].tier === 'pro' && tiaKeys.length === 1 && tiaKeys[0].tier === 'pro',
+    `pro ${umaKeys.map((k) => k.tier).join('+')}, home then upgrade ${tiaKeys.map((k) => k.tier).join('+')}`,
+  );
 }
 
 // ── 14. /activate and /deactivate are rate-limited (audit finding 15) ─────

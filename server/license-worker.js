@@ -125,9 +125,10 @@ async function handleWebhook(request, env, cors) {
   const lsItem = lsAttr.first_order_item || {};
   const lsProductId = Number(lsItem.product_id || 0);
   // Lemon Squeezy numbers a store's live products afresh, apart from its test-mode copies
-  // (1450530 Home, 1450531 Pro, 1450532 Upgrade), so the live ids are Worker settings rather
-  // than a code change at go-live (`LS_HOME_PRODUCT_IDS`, `LS_PRO_PRODUCT_IDS`,
-  // `LS_UPGRADE_PRODUCT_IDS`, comma separated). A Lemon Squeezy order files a key only for a
+  // (1450530 Home, 1450531 Pro, 1450532 Upgrade), so the live ones (1479217 Home, 1479219 Pro,
+  // 1479218 Upgrade) are built in beside them, so a deploy that forgets the settings cannot hold
+  // every paid order, and a later store can add its own as Worker settings
+  // (`LS_HOME_PRODUCT_IDS`, `LS_PRO_PRODUCT_IDS`, `LS_UPGRADE_PRODUCT_IDS`, comma separated). A Lemon Squeezy order files a key only for a
   // product on one of the three lists. Until 2026-10-28 an id on none of them fell back to the
   // product's name ("pro", "upgrade") and, failing that, to a Home key, so anything else sold in
   // the store, or a product reworded, would have handed out a Home key for whatever it cost
@@ -138,11 +139,11 @@ async function handleWebhook(request, env, cors) {
   const lsStatus = String(lsAttr.status || '').toLowerCase();
   const productKind = !isLs
     ? null
-    : productIdIn(env.LS_UPGRADE_PRODUCT_IDS, lsProductId, 1450532)
+    : productIdIn(env.LS_UPGRADE_PRODUCT_IDS, lsProductId, [1450532, 1479218])
       ? 'upgrade'
-      : productIdIn(env.LS_PRO_PRODUCT_IDS, lsProductId, 1450531)
+      : productIdIn(env.LS_PRO_PRODUCT_IDS, lsProductId, [1450531, 1479219])
         ? 'pro'
-        : productIdIn(env.LS_HOME_PRODUCT_IDS, lsProductId, 1450530)
+        : productIdIn(env.LS_HOME_PRODUCT_IDS, lsProductId, [1450530, 1479217])
           ? 'home'
           : 'unknown';
   const rawEvent = String(body.event || body.meta?.event_name || '');
@@ -751,9 +752,9 @@ async function holdOrder(env, cors, id, why) {
   return json({ ok: true, ignored: why.reason }, 200, cors);
 }
 
-function productIdIn(list, id, testId) {
+function productIdIn(list, id, builtIn) {
   if (!id) return false;
-  if (id === testId) return true;
+  if (builtIn.includes(id)) return true;
   return String(list || '')
     .split(',')
     .some((v) => Number(v.trim()) === id);
