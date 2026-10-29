@@ -57,11 +57,11 @@
  * than toward the bottom of the plate.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
 
-const PORT = 4351;
+const PORT = port(4351);
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });

@@ -27,9 +27,9 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.SAVES_PORT ?? 4187);
+const PORT = port(4187, 'SAVES_PORT');
 const HEADED = process.argv.includes('--head');
 const KEY = 'chromaglass-user-presets';
 

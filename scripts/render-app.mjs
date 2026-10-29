@@ -51,13 +51,13 @@
  *      playing before the render playing again after it.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, isGpuEngine } from './frame.mjs';
 import { readWebm, readMp4 } from './media-read.mjs';
 import { createHash } from 'node:crypto';
 
-const PORT = 4351;
+const PORT = port(4351);
 const SEED = 7, OTHER_SEED = 8;
 const W = 320, H = 180, FPS = 30, SONG_S = 8;
 let passed = 0, failed = 0;

@@ -54,11 +54,11 @@
  * the bubbles', and the Mac's run is the one that says.
  */
 import { chromium } from 'playwright';
-import { launchChromium, presentsInXvfb } from './chromium.mjs';
+import { launchChromium, presentsInXvfb, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
-const PORT = Number(process.env.KICKBUBBLES_PORT ?? 4363);
+const PORT = port(4363, 'KICKBUBBLES_PORT');
 // A Linux box with PW_WEBGPU presents headed into Xvfb below (chromium.mjs, PLAN.md 19l), so its plate
 // draws too, a frame every few seconds. The listening window is the wall clock's there as on a Mac
 // (`settlePlate` only ever adds steps to it), so the kicks heard in it are as few as its frames: see the

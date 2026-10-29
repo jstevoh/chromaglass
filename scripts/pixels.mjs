@@ -42,7 +42,7 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { installFrameReader, lastFrameRead } from './frame.mjs';
 
@@ -50,7 +50,7 @@ const argOf = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
-const PORT = Number(process.env.PIXELS_PORT ?? 4346);
+const PORT = port(4346, 'PIXELS_PORT');
 const OUT = process.env.PIXELS_OUT ?? 'pixels';
 const ONLY = process.env.PIXELS_ONLY ? process.env.PIXELS_ONLY.split(',').map((s) => s.trim()).filter(Boolean) : null;
 const SECONDS = Number(argOf('seconds', 20)) || 20;

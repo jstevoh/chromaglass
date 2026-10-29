@@ -27,12 +27,12 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { isGpuEngine } from './frame.mjs';
 
-const PORT = 4333;
+const PORT = port(4333);
 const argOf = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;

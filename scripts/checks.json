@@ -220,6 +220,19 @@
       ]
     },
     {
+      "name": "Two runners on one Mac never share a harness port",
+      "shard": "logic",
+      "run": "npm run ports",
+      "always": true,
+      "why": [
+        "Every harness asks scripts/ports.mjs for its port (PLAN.md 19ah-6), which moves it by its runner's",
+        "block (HARNESS_PORT_SHIFT), so two shards on the owner's Mac at once never meet on one. Reads every",
+        "script, so it runs on every diff: a new harness with a bare port fails it. Holds that the blocks cannot",
+        "overlap or reach macOS's own ports, refuses a mistyped shift, and listens twice on one harness's port",
+        "from two blocks (both serve) and from one (the second is refused, the control)."
+      ]
+    },
+    {
       "name": "The ear",
       "shard": "sound",
       "run": "npm run music",

@@ -6,8 +6,19 @@
 # is already done. Not as root: the runner runs the checks as this user, in a
 # LaunchAgent, so Chromium gets the GPU of the logged-in session.
 #
-#   bash scripts/macrunner-setup.sh            (the runner is named owner-mac)
-#   bash scripts/macrunner-setup.sh other-mac  (a second machine, same label)
+#   bash scripts/macrunner-setup.sh                 (the runner is named owner-mac)
+#   bash scripts/macrunner-setup.sh --runners 2     (and owner-mac-2 beside it)
+#   bash scripts/macrunner-setup.sh other-mac       (a second machine, same label)
+#
+# More than one runner on one Mac (PLAN.md 19ah-6): the first lives in
+# ~/actions-runner, the second in ~/actions-runner-2, and so on up to three,
+# each its own LaunchAgent on the one label, so a deploy's shards run that
+# many at a time. What makes that safe is HARNESS_PORT_SHIFT in each one's
+# .env (10000 for the first, 20000 for the second): every harness serves on
+# its port plus that (scripts/ports.mjs), so two shards never meet on a port,
+# and neither meets a session running a harness by hand, which has the
+# unshifted ports. The second and later keep their own npm cache too, so two
+# jobs never restore one into the same folder at once.
 #
 # No token is printed or written to a file by this script. The runner's
 # registration token goes from GitHub's API to config.sh in a variable; the
@@ -16,8 +27,16 @@
 # self-hosted runner does.
 set -euo pipefail
 REPO=jstevoh/chromaglass
-DIR="$HOME/actions-runner"
-NAME="${1:-owner-mac}"
+NAME=owner-mac
+RUNNERS=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --runners) RUNNERS="${2:-}"; shift 2 ;;
+    -*) echo "unknown option $1"; exit 1 ;;
+    *) NAME="$1"; shift ;;
+  esac
+done
+case "$RUNNERS" in 1 | 2 | 3) ;; *) echo "--runners is 1, 2 or 3 (scripts/ports.mjs has three blocks for runners)"; exit 1 ;; esac
 LABEL=owner-mac
 here="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -33,66 +52,90 @@ echo "1. Pull requests from outside contributors wait for your approval before a
 gh api -X PUT "repos/$REPO/actions/permissions/fork-pr-contributor-approval" -f approval_policy=all_external_contributors
 echo "   approval_policy: $(gh api "repos/$REPO/actions/permissions/fork-pr-contributor-approval" --jq .approval_policy)"
 
-echo "2. The runner, in $DIR"
-mkdir -p "$DIR"
-cd "$DIR"
-if [ ! -x ./config.sh ]; then
-  rel=$(gh api repos/actions/runner/releases/latest)
-  tag=$(jq -r .tag_name <<< "$rel")
-  sha=$(jq -r .body <<< "$rel" | sed -n 's/.*BEGIN SHA osx-arm64 -->\([0-9a-f]\{64\}\)<.*/\1/p')
-  [ -n "$sha" ] || { echo "   the release notes of $tag carry no osx-arm64 checksum; stopping rather than run an unchecked download"; exit 1; }
-  curl -fsSL -o runner.tgz "https://github.com/actions/runner/releases/download/$tag/actions-runner-osx-arm64-${tag#v}.tar.gz"
-  echo "$sha  runner.tgz" | shasum -a 256 -c -
-  tar xzf runner.tgz
-  rm runner.tgz
-  echo "   $tag unpacked, checksum matched"
-else
-  echo "   already unpacked"
-fi
-
-echo "3. Registered with the repository as $NAME, label $LABEL"
-if [ ! -f .runner ]; then
-  tok=$(gh api -X POST "repos/$REPO/actions/runners/registration-token" --jq .token)
-  ./config.sh --unattended --url "https://github.com/$REPO" --token "$tok" --name "$NAME" --labels "$LABEL" --work _work --replace
-  unset tok
-else
-  echo "   already registered"
-fi
-
-echo "4. The runner refuses every job but main's deploy"
-# Any branch pushed here can bring a workflow that asks for this runner by
-# name, and the approval in step 1 covers forks only. So the runner itself
-# checks each job before it starts (scripts/macrunner-hook.sh): a push to main
-# or a run by hand on main, of deploy.yml, or the job fails before its first
-# step. The copy that runs lives in ~/.chromaglass-runner, outside the runner's
-# folder, where no job's checkout and no runner update writes; it is copied
-# from this checkout, so run this script from main.
 HOOKDIR="$HOME/.chromaglass-runner"
 mkdir -p "$HOOKDIR"
-install -m 755 "$here/scripts/macrunner-hook.sh" "$HOOKDIR/job-started.sh"
-bash "$HOOKDIR/job-started.sh" --selftest | tail -1
-restart=0
-if ! grep -qx "ACTIONS_RUNNER_HOOK_JOB_STARTED=$HOOKDIR/job-started.sh" .env 2> /dev/null; then
-  touch .env
-  grep -v '^ACTIONS_RUNNER_HOOK_JOB_STARTED=' .env > .env.new || true
-  echo "ACTIONS_RUNNER_HOOK_JOB_STARTED=$HOOKDIR/job-started.sh" >> .env.new
-  mv .env.new .env
-  restart=1
-  echo "   hook set in $DIR/.env"
-else
-  echo "   hook already set"
-fi
 
-echo "5. Started now and at every login (a LaunchAgent, as you)"
-# The runner reads .env when it starts, so a running one is restarted when
-# step 4 changed it.
-if ./svc.sh status 2> /dev/null | grep -q 'Started'; then
-  [ "$restart" = 0 ] || { ./svc.sh stop; ./svc.sh start; }
-else
-  ./svc.sh install > /dev/null 2>&1 || true
-  ./svc.sh start
-fi
-./svc.sh status | grep -E 'Started|Stopped|not installed' || true
+# One line of the runner's .env, which it reads when it starts and gives to
+# every job; marks the runner for a restart when it changed.
+setenv() {
+  if ! grep -qx "$1=$2" .env 2> /dev/null; then
+    touch .env
+    grep -v "^$1=" .env > .env.new || true
+    echo "$1=$2" >> .env.new
+    mv .env.new .env
+    restart=1
+    echo "   $1=$2 set in $DIR/.env"
+  else
+    echo "   $1 already $2"
+  fi
+}
+
+# Steps 2 to 5, for each runner on this Mac.
+runner() {
+  local i="$1"
+  DIR="$HOME/actions-runner"
+  local name="$NAME"
+  [ "$i" = 1 ] || { DIR="$HOME/actions-runner-$i"; name="$NAME-$i"; }
+  echo "== runner $i of $RUNNERS: $name"
+  echo "2. The runner, in $DIR"
+  mkdir -p "$DIR"
+  cd "$DIR"
+  if [ ! -x ./config.sh ]; then
+    rel=$(gh api repos/actions/runner/releases/latest)
+    tag=$(jq -r .tag_name <<< "$rel")
+    sha=$(jq -r .body <<< "$rel" | sed -n 's/.*BEGIN SHA osx-arm64 -->\([0-9a-f]\{64\}\)<.*/\1/p')
+    [ -n "$sha" ] || { echo "   the release notes of $tag carry no osx-arm64 checksum; stopping rather than run an unchecked download"; exit 1; }
+    curl -fsSL -o runner.tgz "https://github.com/actions/runner/releases/download/$tag/actions-runner-osx-arm64-${tag#v}.tar.gz"
+    echo "$sha  runner.tgz" | shasum -a 256 -c -
+    tar xzf runner.tgz
+    rm runner.tgz
+    echo "   $tag unpacked, checksum matched"
+  else
+    echo "   already unpacked"
+  fi
+
+  echo "3. Registered with the repository as $name, label $LABEL"
+  if [ ! -f .runner ]; then
+    tok=$(gh api -X POST "repos/$REPO/actions/runners/registration-token" --jq .token)
+    ./config.sh --unattended --url "https://github.com/$REPO" --token "$tok" --name "$name" --labels "$LABEL" --work _work --replace
+    unset tok
+  else
+    echo "   already registered"
+  fi
+
+  echo "4. The runner refuses every job but main's deploy, and has ports of its own"
+  # Any branch pushed here can bring a workflow that asks for this runner by
+  # name, and the approval in step 1 covers forks only. So the runner itself
+  # checks each job before it starts (scripts/macrunner-hook.sh): a push to main
+  # or a run by hand on main, of deploy.yml, or the job fails before its first
+  # step. The copy that runs lives in ~/.chromaglass-runner, outside the runner's
+  # folder, where no job's checkout and no runner update writes; it is copied
+  # from this checkout, so run this script from main.
+  [ "$i" != 1 ] || {
+    install -m 755 "$here/scripts/macrunner-hook.sh" "$HOOKDIR/job-started.sh"
+    bash "$HOOKDIR/job-started.sh" --selftest | tail -1
+  }
+  restart=0
+  setenv ACTIONS_RUNNER_HOOK_JOB_STARTED "$HOOKDIR/job-started.sh"
+  # Its own block of harness ports, and from the second on its own npm cache
+  # (the header says why). The first keeps ~/.npm, which it has always used.
+  setenv HARNESS_PORT_SHIFT "$((i * 10000))"
+  [ "$i" = 1 ] || setenv npm_config_cache "$DIR/.npm"
+
+  echo "5. Started now and at every login (a LaunchAgent, as you)"
+  # The runner reads .env when it starts, so a running one is restarted when
+  # step 4 changed it.
+  if ./svc.sh status 2> /dev/null | grep -q 'Started'; then
+    [ "$restart" = 0 ] || { ./svc.sh stop; ./svc.sh start; }
+  else
+    ./svc.sh install > /dev/null 2>&1 || true
+    ./svc.sh start
+  fi
+  ./svc.sh status | grep -E 'Started|Stopped|not installed' || true
+}
+
+for i in $(seq 1 "$RUNNERS"); do runner "$i"; done
+cd "$here"
 
 echo "6. The deploy's probe can see the runner"
 # The environment only main can use, so a branch's workflow cannot read it.

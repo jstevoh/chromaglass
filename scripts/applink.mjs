@@ -41,12 +41,12 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { WebSocket, WebSocketServer } from 'ws';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { parseLaptopAddress, relaySocketUrl, remoteHref } from '../src/lib/appLink';
 import { detectTier } from '../src/lib/platform';
 import { DEFAULT_SETTINGS } from '../src/types';
 
-const APP_PORT = Number(process.env.APPLINK_PORT ?? 4191);
+const APP_PORT = port(4191, 'APPLINK_PORT');
 const RELAY_PORT = APP_PORT + 1;
 /** A host a crafted link might name as the relay. */
 const STRANGER_PORT = APP_PORT + 2;

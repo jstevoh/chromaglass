@@ -47,9 +47,9 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.REWALL_PORT ?? 4191);
+const PORT = port(4191, 'REWALL_PORT');
 const ORIGIN = `http://localhost:${PORT}`;
 
 const results = [];

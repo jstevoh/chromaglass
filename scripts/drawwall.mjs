@@ -46,12 +46,12 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { WebSocket } from 'ws';
 import { build } from 'esbuild';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { installFrameReader } from './frame.mjs';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 
 const APP = process.argv.includes('--app');
-const PORT = Number(process.env.DRAWWALL_PORT ?? 4198);
+const PORT = port(4198, 'DRAWWALL_PORT');
 const KEY = '4321';
 const BASE = `http://localhost:${PORT}`;
 

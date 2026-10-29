@@ -69,7 +69,7 @@ const MANIFEST = process.env.CHECKS_MANIFEST || path.join(ROOT, 'scripts/checks.
 // list), and `checks.mjs` runs every shard.
 export const SHARED = [
   'scripts/chromium.mjs', 'scripts/frame.mjs', 'scripts/lab.mjs', 'scripts/lab-entry.ts',
-  'scripts/checks.mjs',
+  'scripts/checks.mjs', 'scripts/ports.mjs',
 ];
 
 export function parseManifest(text, where = 'scripts/checks.json') {
