@@ -9231,6 +9231,11 @@ a grid of generic stock thumbnails: ours are the plate itself.
   (`keys:*` whose `orderId` is a test order), then change the three `CHECKOUT_*_URL`s in
   `src/lib/tierGates.ts` to the live products' links and register the live webhook. `npm run
   license-worker` checks 9 to 9d.
+  *Live ids and links (2026-10-29, Lemon Squeezy approved the store): Home 1479217, Upgrade
+  1479218, Pro 1479219; `tierGates.ts` carries the three live checkout links and the Worker
+  knows the live ids without settings (check 9e). Still owed, in order: Worker deployed, KV swept
+  for test-minted keys, the live webhook created (order created and refunded) with its own
+  secret on the Worker, then this PR merges, then one real purchase by the owner, refunded.
 - **34a-5. The owner's words and the share card.** *The words shipped (2026-10-28, the owner's OK
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
