@@ -1157,8 +1157,8 @@ export class WebGPUFluid {
       ['liquidForces', [VEL], true],
       ['squeezeUpdate', [RGBA32], true],
       ['scaleDye', [dye], true],
-      // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
-      ['addSlosh', [VEL], false],
+      // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
+      ['addSlosh', [VEL], open.slosh],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
       ['dampGridCurv', [dye], true],
       ['dampGridLimit', [dye], true],

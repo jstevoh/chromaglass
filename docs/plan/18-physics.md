@@ -272,6 +272,19 @@ its frame rate live. "Free" means no new passes or texture reads.
       the liquid is pushed out twice. The one-press answer: the dish takes the gap's
       squeeze as its source and the gap's own push goes. Moves what `npm run squeeze`
       measures, so it wants the owner's eyes on Beat Squeeze first (27f-3).
+    - **18a-13i. A look that tips its dish waits for the dish's kernels: shipped**
+      (2026-10-29). The first deploy run on the owner's Mac (run 40929715769) went red
+      on `npm run startup`'s "every look opens on only what the show waited for": Bass
+      Drop asked for the five slosh kernels and `fluid/addSlosh` in its first steps.
+      Not a new path: a resting hand sways (`swayAt`), so Plate Rock's swing through
+      Bass Drop's Frame Sway 0.35 (`rockAccel`, 18a-13a) tips the dish from its first
+      frame; the kernels were all built behind the show and the dish waited for them,
+      and on the M4 that build finished inside the look's three-second window where
+      GitHub's slower Macs had never got there. `gpu/opening.ts` now has a `slosh`
+      flag (Plate Rock × Frame Sway, or the Slosh dial with the plate stood up, on a
+      thin gap), read by `WebGPUSlosh.prepare` and `addSlosh`. In the lab Bass Drop's
+      opening builds 61 pipelines (Classic's 56 and these), all ready, asks for all five slosh kernels
+      in its first steps and none late. The bar is unchanged.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
