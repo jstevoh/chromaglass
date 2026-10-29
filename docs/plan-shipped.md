@@ -5678,6 +5678,16 @@ relief and not an outline. Nothing moves: the camera and its clock are as before
 not a physical height field (33g-2); the thinned boundary line is a taste choice; the
 cells that remain are 20c-1's look-alike, opt-in.
 
+*33g-3 (2026-10-29, the owner: "No I don't want cells").* `macro-bead`, `cell-bloom` and
+`lace-run` set Paint Cells to 0, and Macro Bead and Cell Bloom set Macro Lacing to 0;
+Lacing Run keeps its lacing, which is dendritic filaments and not cells. `macroview` line
+1 was a settings audit that exempted those three; it now asks all looks (33 and the
+defaults) for Paint Cells 0 and for Macro Lacing 0 but in `lace-run`, and fails if
+`lace-run` loses its lacing (the exemption cannot go stale). Lab, SwiftShader: 6/6, cells
+0 in the shipped looks, the old-defaults control still 0.1399 and 0.1697 (the knob is live).
+*Shortcut, named:* the audit reads settings, not pixels, for the three looks; their frames
+are the same shader as `classic` with the knob at 0, which `macroview` measures.
+
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
 and lacing's own contribution to the frame (the frame against the same frame with both
