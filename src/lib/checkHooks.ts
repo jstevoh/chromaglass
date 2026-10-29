@@ -20,8 +20,8 @@
  * with `?debug` on the page's address (most are: a visitor's show carries
  * none of the plate's back doors). It is types only and changes nothing at
  * run time. It landed with the setters still casting as they did, so the
- * move that added it touched no setter; App's setters, which moved into its
- * hooks under `src/app/` (PLAN 19ai-8), then dropped their casts and assign
+ * move that added it touched no setter; App's setters of the names declared
+ * here, which moved into its hooks under `src/app/` (PLAN 19ai-8), then dropped their casts and assign
  * `window.<name>` directly (19ai-4a), so the compiler holds each of them to the
  * shape written here. Doing so found two that were looser here than the code
  * that sets them (`chromaglassTool`, `chromaglassBench`). A new hook is a line

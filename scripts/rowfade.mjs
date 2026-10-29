@@ -547,7 +547,7 @@ const userPresetSrc = around('const applyUserPreset =', 500);
 const luckySrc = around('const triggerLucky =', 600);
 const newSrc = around('const newLook =', 500);
 const revertSrc = around('const revertLook =', 800);
-const sendSrc = app.slice(app.indexOf('const sendLook ='), app.indexOf('/** Go: the armed look'));
+const sendSrc = app.slice(app.indexOf('const sendLook ='), app.indexOf('const goLook ='));
 check('every look that comes in stops a take on the gel and the lumia (a preset, a saved look, Lucky), and New drops every take',
   [presetSrc, userPresetSrc, luckySrc].every(s => /lookTakesLevels\(\)/.test(s))
   && /rowFades\.clear\(\)/.test(newSrc) && /rowFades\.forget\(FADE_ROWS\)/.test(newSrc) && /setRowFading\(\{\}\)/.test(newSrc));

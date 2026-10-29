@@ -18,7 +18,7 @@ import type { SongChange } from '../hooks/useSongChange';
  * are sent to them (`lib/castProtocol.ts`), throttled to the cast's own rate,
  * and the ear's readings follow at the frame rate.
  *
- * `chromaglassCastState` (`npm run mirror`, `npm run cast`) reads what was sent
+ * `chromaglassCastState` (`scripts/mirror.mjs`, `npm run draftwall`) reads what was sent
  * from the log kept here.
  */
 interface CastFeedDeps {
