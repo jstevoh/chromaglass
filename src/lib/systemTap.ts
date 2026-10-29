@@ -24,6 +24,26 @@
   reads the things that can: both clocks, how many packets reached the page
   and where the next one is scheduled, the destination track's state, and
   what `getDisplayMedia` answered. The check prints them (scripts/desktop-audio.mjs).
+
+  What the first red with those numbers said (run 40770856220, the same
+  evening): the tap's clock ran, 0.43 s after the click to 9.30 s at the end,
+  232 of 234 packets in the page and scheduled, the track live; the ear's
+  context, made a few milliseconds after it, reported "running" and its clock
+  never left zero; and a fresh context made at the end reported 44100 Hz
+  where the first two had 48000 (the renderer's fallback parameters when the
+  output device cannot be opened) and its clock stayed at zero too. So the
+  wire was sound, and the runner's output device, having opened one stream,
+  opened no second one for the rest of the run. Eight of eleven runs that day
+  did open two; the three that did not were the faster hosts (PLAN.md
+  23.8-clock). On a Mac with a real output device Chromium opens as many as
+  the page asks for; in the runner's virtual one a second stream can die.
+
+  So the ear analyses the System audio source inside this context: it is
+  handed `context` and makes no context of its own (useAudioAnalyzer's
+  `sharedContext`). The PCM, the loopback and the analyser then share the one
+  output stream the device did open, which is also one fewer stream for the
+  Mac to drive at a gig. The check keeps printing both clocks and the probe,
+  so a run on which even the first stream does not open says so.
 */
 
 export type NativePcmTap = (fn: (samples: ArrayLike<number>, sampleRate: number) => void) => () => void;
@@ -49,6 +69,12 @@ export interface SystemTapStats {
 export interface SystemTap {
   /** The stream the rest of the app hears: the destination's. */
   stream: MediaStream;
+  /**
+   * The context the stream is made in. The ear analyses this source inside
+   * it (useAudioAnalyzer's `sharedContext`) rather than in a context of its
+   * own: one output stream to the Mac instead of two. See the module comment.
+   */
+  context: AudioContext;
   stop: () => void;
   stats: () => SystemTapStats;
 }
@@ -125,6 +151,7 @@ export function startSystemTap(nativeTap: NativePcmTap, stillWanted: () => boole
   }, () => { display = 'refused'; /* the PCM tap carries on */ });
   return {
     stream: dest.stream,
+    context: ctx,
     stats,
     stop: () => {
       unsubPcm();

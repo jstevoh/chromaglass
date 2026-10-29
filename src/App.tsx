@@ -906,6 +906,8 @@ export default function App() {
   const simulatedRef = useRef<SimulatedMusic | null>(null);
   /** The Mac app's system-audio loopback tap (PLAN.md 23.8). */
   const systemTapRef = useRef<{ stop: () => void } | null>(null);
+  /** The System audio source's context, for the ear to analyse in (lib/systemTap.ts); null for every other source. */
+  const [earContext, setEarContext] = useState<AudioContext | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   /** The wall's engine, always; `visualizerRef` is the desk's, which in Preview with a wall up is a copy (PLAN.md 8b; see `drafting`). */
   const wallRef = useRef<LiquidVisualizerHandle | null>(null);
@@ -1043,6 +1045,7 @@ export default function App() {
     }
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
     if (systemTapRef.current) { systemTapRef.current.stop(); systemTapRef.current = null; }
+    setEarContext(null);
     // The drone owns an AudioContext and four running oscillators; leaving it
     // behind would keep them sounding under whatever replaced it.
     stopDrone();
@@ -1107,6 +1110,10 @@ export default function App() {
           );
           systemTapRef.current = tap;
           stream = tap.stream;
+          // The ear analyses in the tap's own context: one output stream, not
+          // two (the reason is in lib/systemTap.ts). Set before the stream, so
+          // the ear never starts a context of its own for this stream.
+          setEarContext(tap.context);
           setAudioStream(stream);
         } else {
           // Raw, as the microphone below, and in stereo: a shared tab is the
@@ -1620,6 +1627,7 @@ export default function App() {
     settings.autoCalibrate !== false, calibrateNonce,
     // The microphone hears the hand on the laptop: its clicks are not beats.
     audioSource === 'microphone',
+    earContext,
   );
   const liveAudio = ear.audioData;
   /*

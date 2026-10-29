@@ -44,6 +44,23 @@
   asks a fresh context of its own, with an oscillator, whether any sound at
   all can be rendered in the page just then: a dead device fails that too, a
   dead wire does not.
+
+  What the first red with those numbers said (run 40770856220, the same
+  evening, the seventh run of this line on that head): the tap's clock ran,
+  first moving 0.43 s after the click and at 9.30 s at the end, 232 of 234
+  packets in the page and scheduled to 9.90 s, the track live; the ear's
+  context, made a few milliseconds after the tap's, reported "running" and its
+  clock never left zero; and the fresh context at the end reported 44100 Hz
+  where the first two had 48000 (the renderer's fallback parameters when the
+  output device cannot be opened) with its clock at zero too, oscillator peak
+  0. So the wire was sound and the runner's output device, having opened one
+  stream, opened no second one for the rest of the run. The fix is in the
+  app, not here: the ear now analyses the System audio source inside the
+  tap's own context (lib/systemTap.ts, useAudioAnalyzer's `sharedContext`),
+  so the source and its analysis are the one stream the device did open. The
+  line keeps printing both clocks and the probe: with one context the two
+  clocks are one, and a run on which even that stream does not open says so
+  in the probe, and fails.
 */
 
 /**
