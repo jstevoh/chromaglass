@@ -38,22 +38,7 @@ Open:
   after painters (a Warhol screen print's off-register blocks, Riley's black and
   white, Rothko's soft fields); none is planned yet.
 
-*Found along the way (for §14b's owner, not this section's):* on this PR's two Mac
-runs, `npm run wall`'s "every refresh's own timestamp was believed" read 2, 4, 4, 5, 5
-and then 1, 1, 1, 1, 3 fallbacks across its five two-window cases, while #207's run on
-the same base read 0; the same harness in a cloud session reads 0 on this branch, and
-the plate's display pipeline compiles in the same time with and without the print
-(SwiftShader, 2.0–2.4 s both). `stampFallbacks` is a page-wide total, so one early
-fallback turns every later case red, and it did not say which bound tripped. This PR
-now counts them apart (`stampMisses`), and the next Mac run said which: 4 to 6, every
-one ahead of now, the worst by 2.4 ms in every case, none stale. The draw gate had
-believed a stamp only up to 2 ms ahead, on the belief that Chrome never stamps a
-refresh ahead of now; it now believes up to one 240 Hz refresh (4.2 ms), which the
-gate's 0.6-of-a-refresh margin already treats as the same refresh. Still open for
-§14b: which clock runs ahead (the show's frames or the wall's converted ones; the
+*Shipped so far (found along the way, for §14b's owner):* `npm run wall` counts stamp misses apart (`stampMisses`), the draw gate believes a stamp up to one 240 Hz refresh ahead, and the harness checks its own gap (`originGap >= 1000`). Story in `docs/plan-shipped.md` §21 (moved 2026-10-29, 19m-2).
+Still open for §14b: which clock runs ahead (the show's frames or the wall's converted ones; the
 count is page-wide), and whether the 2.4 ms is a Mac display link stamping the refresh
-a frame is for (inferred, not measured). And the line catches a wrongly converted wall
-only because the harness opens the wall five seconds after the show (the conversion's
-error is that gap, caught by the one-second stale bound); with under a second between
-them it would pass. **Fixed:** the harness (`scripts/wall.mjs`) checks its own gap is
-over a second (`originGap >= 1000`).
+a frame is for (inferred, not measured).

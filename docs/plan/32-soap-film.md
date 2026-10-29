@@ -76,59 +76,21 @@ Literature the model sits in: Chomaz, *J. Fluid Mech.* 2001 (the vertical film's
 convection), Gros, Bussonnière and Cantat on marginal regeneration, and Huang and
 colleagues 2020.
 
-**The target (numbers, from the photograph and from the prototype).** A 32 × 64 film of
-seeded noise on 800 nm, evaporating at 5 nm/s, at `dt` 0.05, over 120 s, sampled every
-5 s. The prototype reaches true rupture (film under 30 nm, the only black that is the
-film's and not a dark band's) after about 95 s, so the look stage is short: at 110 s the
-film under 30 nm is 2.7%, dark 16.1%, saturated 83%, 9 of 12 hue sectors, and the window
-the check asks for is exactly its three samples in a row, so 32a has no slack there and
-should say so in its PR rather than tune toward it. One honest gap: the prototype is far
-more saturated than the photograph (80–90%, against 15%) because the reflected table at
-gain 4 is colourful, and the photograph's silver and white come from the look (the gain,
-the ground, light that is not a point), so the saturation bar asks only for *more than*
-10%, and 32b is where the look is tuned toward the photo's 15%.
+**The target.** *Shipped so far*: the prototype's numbers 32a was built to (a 32 × 64 film on 800 nm over 120 s) and the saturation gap 32b tuned toward the photograph's 15%. Story in `docs/plan-shipped.md` §32a (moved 2026-10-29, 19m-2).
 
-**The check: `npm run soapfilm`** (`scripts/soapfilm.mjs`, node only, 7 groups, 23 lines).
-It holds the *model*, not a picture of it, and it was written against three look-alikes
-that it must fail (a film with no black, a blur laid over a fixed ramp, and a
-compressible flow), each of which passed an earlier, weaker draft. C1 gravity sorts the
-film (a 1600 nm patch sinks and a 400 nm one rises, each at least a quarter of the film's
-height in 600 steps); C2 nothing is made or lost (mean thickness to 1e-9, a uniform film
-stays uniform); C3 gravity is the only driver (with `g = 0` a noisy film does not move at
-all; with `g` reversed the sort reverses; half the gravity sorts about half as fast, a
-ratio of 0.35 to 0.7 after 2.5 s: the owner's rule against whole-frame motion from
-sound); C4 the flow is a flow and the thickness moves with it (face divergence under
-1e-3 of the fastest speed over the cell size; the falling patch keeps a local peak of at
-least 45% of its excess after 5 s, where first-order upwind keeps 38% and a limited
-second-order scheme 51%, and its mass stays within 0.3 to 1.7 of the start; and every
-cell's change in a step lies in the interval its faces' flows could carry, the face
-thickness taken anywhere between its two neighbours, so a smoothed film or a flow that is
-reported but not used falls outside); C5 the colours move with the angle (the picture is
-the table's colour for each thickness to 1.5/255, in 0..1, a film at 30° and 50° looks
-like a thinner one straight on, `d cos θ_t`, an independently written Airy formula
-agrees with the table to 1e-6, and `cosI = 1` is the table's own value); C6 the film
-drains like a real one (quarter means grow top to bottom from 30 s on, the top reaches
-true rupture first and by 120 s, a ruptured cell stays black); C7 it looks like the
-photograph (a window of at least three samples in a row in which film under 30 nm is
-between 0.5% and 6%, dark between 3% and 25%, saturated over 10% and at least 7 of the 12
-hue sectors held; check C7 has no upper bound on saturation — `sat > 0.10` only — so it
-would pass a film far more saturated than the photograph, such as main's 79% or the
-ungraded 77%, for a check session to add that bar). Black is the film's thickness, never the picture's brightness. Against
-a scratch prototype of the model above (not committed) it reads 23 of 23; with no
-`src/lib/soapFilm.ts` it exits 1 and says so. A bar is never moved to get green: if the
-model cannot reach one, the PR says what it reached and asks.
+**The check: `npm run soapfilm`** (`scripts/soapfilm.mjs`, node only, 7 groups C1–C7, 23 lines; its rationale and the three look-alikes it must fail are in the script's header). Open from it: C7 has no upper bound on saturation (`sat > 0.10` only), for a check session to add that bar (32b-1). Story in `docs/plan-shipped.md` §32a (moved 2026-10-29, 19m-2).
 
 ## ~~32a. The CPU reference~~ — **Shipped, #403** (`src/lib/soapFilm.ts`, `cosI` on `filmReflectance` in `src/lib/filmTable.ts`, `npm run soapfilm` wired into `checks.yml`'s `logic` part; `npm run soapfilm` 23/23, `npm run filmtable` 8/8, 600 steps on 32×64 in 0.69 s; story in `docs/plan-shipped.md` §32a)
 
-## ~~32b. The reflected view~~ — **Shipped, this PR (#469)** (`soapFilmRgb` reflected view in `src/lib/soapFilm.ts` with Snell path factor `d_eff = h cos θ_t`, 4-point path spread `spread = 0.025`, dark ground `ground = 0.0004`, and colour grade `notchFloor = 0.0725`, `chromaRetention = 0.67` named under shortcut (f) in `PLAN.md` §32 and `src/lib/soapFilm.ts`; `npm run soapfilm` 23/23 with C7 saturation bar unchanged, `npm run filmtable` 8/8; control with the grade off (`notchFloor = 0`, `chromaRetention = 1`) is 77% saturated, 22.7% dark, 9/12 hues at t=120 s, and with the grade on is 13% saturated, 19.4% dark, 8/12 hues at t=120 s (14.8% saturated, 12/12 hues at t=110 s) against the photograph's 15% saturated and 9/12 hues; 3-angle render at 0°/30°/50° shows bands shift down by 13–18 rows while Newton-black lace stays at row 1.00–1.09; story in `docs/plan-shipped.md` §32b; replacing the grade with the real solid-angle integral and camera gamut mapping is 32b-1 below)
+## ~~32b. The reflected view~~ — **Shipped, #469** (`soapFilmRgb` in `src/lib/soapFilm.ts`; the colour grade is 32b-1 below)
 
-**Shipped.** Story in `docs/plan-shipped.md` §32b (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped.md` §32b (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
 
 - **32b-1. Replace the colour grade with the soft box's solid-angle integral and camera gamut mapping.** In 32b, the 4-point path spread (`spread = 0.025`) and dark ground (`ground = 0.0004`) move C7's `t = 120` s saturation by two points (79% → 77%), while the colour grade (`notchFloor = 0.0725`, `chromaRetention = 0.67`) accounts for the rest of the drop from 77% to 13% against the photograph's 15%. Replace that grade with the real phenomenon: integrate the film's Airy reflectance over the soft box's solid angle as a quadrature in `cosI` with s and p Fresnel reflection terms at each angle and the thickness's phase `4π n d cos θ_t / λ` at each angle (which also retires the Fresnel half of shortcut (f)), then map the integrated CIE XYZ tristimulus into the camera's sRGB gamut instead of clamping negative linear channels to zero. *Measure:* the same saturation and hue numbers `npm run soapfilm` C7 prints, with the grade removed (`notchFloor = 0`, `chromaRetention = 1`), showing how much of the 77% → 15% saturation drop the solid-angle integral and camera gamut mapping recover. Also note that check C7 in `scripts/soapfilm.mjs` has no upper bound on saturation (`sat > 0.10` only, so it would pass a film far more saturated than the photograph, such as main's 79% or the ungraded 77%), for a check session to add that bar.
 
-## ~~32c. The GPU solver~~ — **Shipped, this PR (#505)** (`src/gpu/soapFilm.ts` exporting `createSoapFilmGpu`, `src/gpu/wgsl/soapFilm.ts` with `soapSetup`, `soapSorRed`, `soapSorBlack`, `soapProject` and `soapTransport`, and `scripts/checks.json` wiring `npm run soapgpu` on the Mac `plate` shard beside `sloshgpu` and `npm run soapgpu -- --selftest` on Measure's `lab` shard beside `sloshgpu`; `npm run soapgpu` 29/29 on `apple metal-3` — first-step flows 0.195%, first-step thickness 1.116%, 1 s thickness 0.065% at `dt = 0.05` s, 0.022% at `dt = 1/60` s, 0.884% at `zeta = 0.25, dt = 0.2` s with 4 CFL sub-steps, C1 thick +29.41 vs +29.41 and thin −22.56 vs −22.55 rows, C2 drift 7.0e-9, C3 reversed −20.86 vs −20.85 rows, C4 max `|div u|` 1.8e-4 /s, C6 worst quarter mean 0.08%, top black at 115 s vs 115 s, torn hole 0 refilled and 160 vs 160 black cells, 0 of 4785 steps idle, 0 of 514 reads idle, `src/lib/soapFilm.ts` absent from bundle, `cost: 2.44 ms a step at 256 × 256 on apple metal-3`; `npm run soapgpu -- --selftest` 29/29; `npm run soapfilm` 23/23; `npm run wgsl` 142 shaders; `npm run physics` 20/20; `npm run derive` 4/4; story in `docs/plan-shipped.md` §32c)
+## ~~32c. The GPU solver~~ — **Shipped, #505** (`src/gpu/soapFilm.ts`, `src/gpu/wgsl/soapFilm.ts`; `npm run soapgpu` 29/29 on Metal)
 
-**Shipped.** Story in `docs/plan-shipped.md` §32c (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped.md` §32c (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
 
 - **32c-1. The drain's own "a ruptured cell stays black" never fires.** soapfilm.mjs C6 reads
   it on the drain, where measured, the reference with its rupture marks removed refills no cell

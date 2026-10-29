@@ -30,16 +30,10 @@ caught; a quiet bridge can be. It samples at the App's render rate, not the ear'
 and the change is a fixed 2 s fade wherever it lands (`App.tsx`, the On a New Song
 effect). `npm run music` only feeds it synthetic level traces.
 
-- **14z-1** (**shipped**): On a New Song opens on Keep. Nobody gets a look changed by
-  a boundary nobody trusts; New preset and Random are still one press in Settings.
-  `npm run music`: "a new song keeps the look unless someone asks for more" (FAIL on
-  'preset', ok on 'off').
+- ~~**14z-1**~~ (**shipped**): On a New Song opens on Keep (`npm run music`). Story in `docs/plan-shipped.md` §14z-1 (moved 2026-10-29, 19m-2).
 - **14z-2** (**shipped**): where a song ends and the next begins, measured on real songs.
   Story in `docs/plan-shipped.md` §14z-2 (moved 2026-10-29, 19m).
-- **14z-3** (**shipped**): the change lands on a hit of the new song (27 of 31 gaps; else
-  1 s after it is confirmed), a median 1.0 s after its first note. After a gap the look fades
-  in over 1 s; named by identification, mid-crossfade, it blends in over twice the desk's
-  fade, at least 4 s. Judged on the owner's GPU: `docs/judging.md` §65.
+- ~~**14z-3**~~ (**shipped**): the change lands on a hit of the new song. Story in `docs/plan-shipped.md` §14z-3 (moved 2026-10-29, 19m-2). Judged on the owner's GPU: `docs/judging.md` §65.
 - **14z-4**: once the owner has judged §65 with their own music, On a New Song opens on
   New preset again (the `music` check's default line moves with it).
 - **14z-5**: the room tracker seeds its floor on the analyser's first frame, and an analyser

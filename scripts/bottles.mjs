@@ -27,7 +27,8 @@
  * does not step on a cloud session's software WebGPU, and this says so and
  * stops rather than passing on nothing.
  *
- * The stroke is off the middle, at (0.25, 0.3) to (0.4, 0.3), and nothing
+ * The stroke is off the middle, at (0.1, 0.3) to (0.25, 0.3) of the canvas
+ * (0.22 to 0.33 of the plate from its centre, PLAN 19ac-3), and nothing
  * may land at its point reflection: a stroke through the centre is its own
  * mirror image, so a flipped coordinate anywhere between the pointer and the
  * field would have passed.
@@ -301,8 +302,30 @@ try {
     }
     throw new Error(`the tool never became ${t}`);
   };
-  /** Off the middle, so the stroke is not its own mirror image. */
-  const FROM = [0.25, 0.3], TO = [0.4, 0.3];
+  /*
+    Off the middle, so the stroke is not its own mirror image, and far enough
+    off it that the hand's own pours cannot reach the mirror. These are
+    fractions of the canvas, and the plate is not the canvas: the view shows
+    two thirds of the plate's width (fluidPointAt's 1.5), the desk's canvas
+    is about twice as wide as it is tall, and the dish's turn rotates the
+    whole stroke about the centre. The old stroke, (0.25, 0.3) to (0.4, 0.3),
+    read on the plate from (0.31, 0.40) to (0.38, 0.49): its end 0.116 from
+    the centre, so the stroke came within 0.232 of its mirror, where the
+    comments here had it 0.4 away. A splatter flings 3 to 18 cells at the
+    128 grid (0.14 of the plate) and a pour counts at the mirror within 0.12
+    of it, 0.26 in all, so a fling from the stroke's end toward the centre
+    could land at both: the Mac's red on #559 was a pour at (0.516, 0.484),
+    0.123 from the hand with the mouse down and the look's ring laid no
+    more times, 0.10 from the mirror of the stroke's end. That is PLAN
+    19ac-3's "one at the mirror", and the look's own pours were never in
+    it. Moved left, the stroke reads 0.44 from its mirror (0.51 at x 0.05,
+    which puts a fling at the far end past the dish's rim), and
+    `MIRROR_CLEAR` below asks that of every run, so a desk that reshapes
+    the canvas says so instead of turning the splatter red one run in sixty.
+  */
+  const FROM = [0.1, 0.3], TO = [0.25, 0.3];
+  /** The splatter's furthest fling (18 cells at 128, and the cell it floors to) plus the 0.12 a pour at the mirror is counted within. */
+  const MIRROR_CLEAR = 19 / 128 + 0.12;
   /** A stroke, and where the hand was on the plate at each step of it (the pointer's own reading). */
   const stroke = async (t) => {
     await pickTool(t);
@@ -448,6 +471,12 @@ try {
   await settle(600);
   const amountPoured = await amount();
   const firstPour = await phaseAlong(ferro.dropper.path);
+  {
+    const p = ferro.dropper.path;
+    const gap = Math.min(...p.flatMap((a) => p.map((b) => Math.hypot(a[0] - (1 - b[0]), a[1] - (1 - b[1])))));
+    check('the stroke is far enough off the middle that the hand\'s own pours cannot reach its mirror',
+      gap > MIRROR_CLEAR, `on the plate from (${p[0].map((v) => v.toFixed(2))}) to (${p[p.length - 1].map((v) => v.toFixed(2))}), ${gap.toFixed(3)} from its mirror against a splatter's reach and the mirror's radius of ${MIRROR_CLEAR.toFixed(3)}`);
+  }
   check('the first pour shows only itself: none of a look\'s ferrofluid left unseen in the solver',
     firstPour && firstPour.near > 0.5 && firstPour.near > 0.6 * firstPour.total && firstPour.mirror < 0.05 * firstPour.near,
     firstPour ? `${firstPour.near.toFixed(1)} of ${firstPour.total.toFixed(1)} along the stroke, ${firstPour.mirror.toFixed(1)} at its mirror` : 'the phase does not read back');

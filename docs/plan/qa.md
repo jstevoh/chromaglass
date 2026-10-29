@@ -12,21 +12,11 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   live (the microphone heard the click; onsets gated in a gesture's moment).
 - ~~**QA-2** The mouse pointer shows on the show screen.~~ #271 live.
 - ~~**QA-19** Interacting with settings switches to and maximizes the performance window.~~
-  Main's 5b81f3c removed the auto-fill on the next click (`useCastSession.ts`); the
-  open #323 edits the same listener and is superseded (review pass, 2026-10-10).
-  What follows is the report as it was. Desk, wall.
-  When the additional window that is used for performances is showing and not maximized,
-  interacting with settings to change something automatically switches focus to the
-  additional window and maximizes it. The performer needs to be able to use the settings
-  without the overall extra window changing states (besides the light show settings
-  themselves updating). Cause: `useCastSession.ts` captures any `pointerdown`/`keydown`
-  outside raw text inputs and delegates `fillWindow()`, forcing the performance receiver window
-  fullscreen.
+  Fixed on main's 5b81f3c (`useCastSession.ts`; #323 superseded). Story in
+  `docs/plan-shipped.md` §QA-19 (moved 2026-10-29, 19m-2).
 - ~~**QA-28** The whole plate slides under the camera with the sound, a jolt on every
-  kick: nauseating to watch (the owner, 2026-10-11).~~ **Fixed** (Frame Sway, 27a-7):
-  #347's cover glass dragged the whole picture 0.39% of the plate a frame on average
-  at the default Plate Rock (0.72% at the peak, a quarter of the plate a second);
-  it is seated by default now and slides 0 (`npm run framesway`).
+  kick: nauseating to watch (the owner, 2026-10-11).~~ **Fixed** (Frame Sway, 27a-7;
+  `npm run framesway`). Story in `docs/plan-shipped.md` §QA-28 (moved 2026-10-29, 19m-2).
 - ~~**QA-29** Choices that did nothing: 20 of the 80 values the menus offer were silently
   dropped (2026-10-09 to 2026-10-11).~~ Shipped; story in `docs/plan-shipped.md` §QA-29
   (moved 2026-10-29, 19m).
@@ -62,21 +52,16 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
 - ~~**QA-4**~~ **Fixed, #293**: with a desk up the chip sits at the top of the plate's box,
   not the window's; `npm run layout` asks it on both desks at 1440/1280/1024 (main: 3,856
   px² over Record). Story in `docs/plan-shipped.md` §QA-4 (moved 2026-10-29, 19m).
-- **QA-5** Layers: + appears only on one-plate looks and there is no −. Desk, phone.
-  **Shipped (#273, §16f)**: + on one layer, − on two, on the desk and the phone's Play
-  sheet (a third plate is 16d).
+- ~~**QA-5** Layers: + appears only on one-plate looks and there is no −.~~ **Shipped**
+  (#273, §16f; a third plate is 16d). Story in `docs/plan-shipped.md` §QA-5 (moved
+  2026-10-29, 19m-2).
 - ~~**QA-6** The Magnet lays a fixed grid of spikes.~~ #247 live (9t).
 
 - ~~**QA-12**~~ **Fixed, #296**: switching to Hold writes the camera's own centre into the aim (`holdWhereItIs` in `src/lib/macroCamera.ts`, run by App's `updateSettings`, so the desk's chip, the phone's Hold and the Camera menu all get it). `npm run holdjump`: the frame moved 0.299 (from Auto) and 0.197 (from Follow) of the plate in the second after Hold on main, 0.000 now; `npm run phone` asks it in the app on the Mac shard.
 
-- ~~**QA-16**~~ **Fixed, #293**: a hue past 40° from every ink prints as two inks overprinted, green (cyan over yellow) and violet (magenta, half cyan); `npm run benday` 7 (main: green printed yellow, violet blue). Violet is laid flat, 21f.
-  On Roy, 1963 a green dye cannot be added: it prints as another colour.
-  Desk (the owner's report from the corner dot, plate `roy`). Likely cause, read in
-  the code but not yet run: the Ben-Day print snaps every pixel's hue to the nearest of
-  three inks (`benDayInkIndex` in `src/gpu/wgsl/plate.ts`, red, yellow or blue), so a
-  green lands on yellow or blue. A real comic printed green as yellow and blue dots
-  overlapping on the paper; doing that keeps the three inks and gives back green,
-  orange and purple. Next to QA-15; deferred with it.
+- ~~**QA-16**~~ **Fixed, #293**: a green on Roy, 1963 prints as two inks overprinted
+  (`npm run benday` 7; violet laid flat, 21f). Story in `docs/plan-shipped.md` §QA-16
+  (moved 2026-10-29, 19m-2).
 - ~~**QA-18**~~ **Fixed, this PR** (`npm run saves`, 28 lines, in Measure's browser part;
   main fails "Save asks for a name again with a saved look open"). Story in
   `docs/plan-shipped.md` §QA-18 (moved 2026-10-29, 19m).
