@@ -185,15 +185,15 @@
       ]
     },
     {
-      "name": "No file over 40 KB grows",
+      "name": "No new file over 100 KB, no big file grows",
       "shard": "logic",
       "run": "npm run sizes",
       "always": true,
       "why": [
-        "The size ratchet (scripts/sizes.mjs, PLAN.md 19ai-5): a new file stays at or under",
-        "40 KB, and one already over it may not grow past its ceiling in scripts/sizes.json,",
+        "The size ratchet (scripts/sizes.mjs, PLAN.md 19ai-5, 19ai-5d): a new file stays at or under",
+        "100 KB (past 40 KB, a warning), and one already over it may not grow past its ceiling in scripts/sizes.json,",
         "which only shrinks against the base. It reads every file in the tree, so it runs on",
-        "every diff, a document's included. Its self-test grows a file, adds a 41 KB one and",
+        "every diff, a document's included. Its self-test grows a file, adds a 101 KB one, warns on a 41 KB one and",
         "raises a ceiling in a scratch repository first."
       ]
     },
@@ -205,6 +205,18 @@
         "The scripts that read GitHub's API never print the token: a 502 from",
         "it once printed the owner's whole token through flakes.mjs's error.",
         "Against a local server that answers 502, with the old way as control."
+      ]
+    },
+    {
+      "name": "The owner's Mac takes only main's deploys, and never holds one",
+      "shard": "logic",
+      "run": "npm run macguard",
+      "why": [
+        "The runner's job-started hook (scripts/macrunner-hook.sh) against every way",
+        "a job can arrive: main's push and run by hand taken; a branch, a pull",
+        "request, pull_request_target, workflow_run, a schedule, another workflow",
+        "on main and another repository refused. And the watchdog's stall rule",
+        "(scripts/macwatch.mjs) against made-up runs, between two shards included."
       ]
     },
     {
