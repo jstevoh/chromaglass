@@ -23,14 +23,14 @@
  * whole of the change.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, installFrameReader, settlePlate, waitForEngine, developPlate } from './frame.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
 
-const PORT = 4343;
+const PORT = port(4343);
 const CURVE = Number(process.env.DEPTH_CURVE ?? 1);
 const DRAG = Number(process.env.DEPTH_DRAG ?? 3);
 // What the solver is handed: `deriveStep` clamps the curve to [-1, 1], so a
