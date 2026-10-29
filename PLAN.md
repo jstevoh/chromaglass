@@ -7040,6 +7040,12 @@ once the login works (23.14).*
   *(Open console step for the owner: in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Web client `793087423172-fi7d5oq5tisv3is84vvf8e6dtorighql.apps.googleusercontent.com`, add `https://chromaglass.art/__/auth/handler`, `https://www.chromaglass.art/__/auth/handler`, and `https://chromaglass.web.app/__/auth/handler` under Authorised redirect URIs, then update `VITE_FIREBASE_AUTH_DOMAIN` to `chromaglass.art` so `signInWithRedirect` stays same-domain on iPhone Safari.)*
 - **23.13** (**shipped**, #390 and extended in #394): `public/privacy.html` and `public/terms.html` completed and
   approved by the owner, including 23.12's licence key, Lemon Squeezy checkout, and 2-machine terms. *Measure:* `npm run privacy` (16/16, CI, part `logic`).
+  2026-10-24: both pages name who runs ChromaGlass, the owner's California LLC (the terms
+  had named the product itself as the contracting party, which is not a person in law).
+- **23.13-mail** (open, the owner): `support@chromaglass.art`, the contact both pages and
+  the terms give, has no mailbox: on 2026-10-24 the domain's DNS (GoDaddy) had no MX
+  record, so mail to it bounces. Set up a mail service for the domain and add its MX and
+  SPF records; until then the pages promise an address nobody reads.
 - **23.10** (**shipped**, #394; brief `docs/handoff-signin.md`): the sign-in on the
   hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
   with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
