@@ -141,29 +141,7 @@ to `film`.
 
 **Partly shipped** (#211 for the sound; the MIDI fader on 2026-10-11): the ear keeps every reading in a ref, tells React ten times a second, and the plate hears a reading taken on its own frame; a fader is read by the plate on its frame and shown on the desk ten times a second (`npm run renders`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-**Read in the code.** Every frame the analyser calls `setAudioData` with two new
-arrays (`useAudioAnalyzer.ts`), which re-renders the whole ~4,400-line `App`; only
-then does an effect copy it into `audioDataRef`, after this frame's loop has run, so
-the plate reads the sound one frame late. A MIDI CC goes through an animation frame,
-`setSettings` and an effect the same way (`rideSetting`, `App.tsx`). `App.tsx` already
-avoids exactly this elsewhere ("a re-render of the whole shell sixty times a
-second"). On a weaker laptop that is dropped frames and garbage-collection hitches on
-top of the solver.
-
-Measured since, by `npm run ears` on the Mac runner (2026-09-27): with the show
-window covered and nothing else drawing, the ear's 16 ms tick read 15 times a
-second, not 60 (inferred: each reading re-renders `App`, and the main thread could
-not take more); the visible app drew 28 frames a second in the same run. On #195's
-deploy (main 6c6d17e) the visible page drew 14 frames in two seconds while the rest
-of the show was still being built behind it, and `npm run ears` went red on a floor
-of twenty frame readings, with the ear doing what it should (the wall's 10 asks all
-read in the page's stalls). The floor now asks that every frame the page drew read
-(#194); how slowly a busy page draws is this item's to fix, not that check's.
-
-*Fix:* the frame loop reads the analyser and the ride's shadow itself; React keeps
-the meters, at about ten updates a second, with the arrays reused. *Measure:* count
-`App` renders a second under `?debug` in `npm run desk` with a stream running (12 or
-fewer), and stamp the reading's time against the frame's.
+*Shipped so far* (#211, #194): the whole-App render on every reading, what `npm run ears` measured of it, and the fix (the frame loop reads the ear itself, React keeps the meters). Story in `docs/plan-shipped.md` §14f (moved 2026-10-29, 19m-2).
 
 Still open here: the reading's two byte arrays are still new each reading (about 60 KB
 a second), not reused: a listener may hold an older reading, so reusing them needs the
@@ -267,10 +245,8 @@ widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
   in each, so a 120 Hz ProMotion MacBook, a 90/120 Hz Android phone or a 144 Hz
   laptop pays for 120–144 draws a second of a liquid that steps at 60 or 30. Cap the
   draw rate at 60, or twice the step rate when the governor has halved it.
-- *A readback every frame, even frozen.* `syncFromGpu()` runs for every layer each
-  frame whatever the solver did; with the plate frozen the solver stops but the draw
-  and the readback go on at the display's rate. Read back only on a frame that stepped
-  or wrote deltas.
+- ~~*A readback every frame, even frozen.*~~ **Shipped with 14ab-3** (#549): the solver
+  reads its fields back only after a submit that may have written them.
 - *The governor knows nothing of heat.* It climbs whenever frames are fast and
   retried a failed rung every 90 s, forever (`governor.ts`), so a laptop or phone that
   is warming up climbs, drops frames for a second and a half, steps down, and does it
@@ -381,13 +357,7 @@ Story in `docs/plan-shipped.md`. Left open from it:
   same second can be refused as busy. A store that refuses answers 503 `busy` with CORS
   (`npm run fingerprint-worker`, check 8). *Fix:* a Durable Object counter, or the paid
   plan's quota. *Measure:* the same harness with a store that allows one write a second.
-- ~~**14o-smoke**~~ (S): the deployed Worker, measured from a cloud session on 2026-10-24.
-  The live site's build carries the Worker's address; a POST with no Origin is refused 403;
-  one from the site's origin passes the store, size and rate gates to the body (400 on a
-  non-audio body); a 4 s tone reaches AudD, which answers that it cannot fingerprint a pure
-  tone; and a 10 s clip of the bundled "Live On Rainy Days" comes back 200 `{"match":false}`
-  (not in AudD's catalogue). Whether a well-known commercial track comes back named is
-  the one thing left, and needs a recording no cloud session should send.
+- ~~**14o-smoke**~~ (S): the deployed Worker, measured from a cloud session on 2026-10-24. Story in `docs/plan-shipped.md` §14o-smoke (moved 2026-10-29, 19m-2). Left: whether a well-known commercial track comes back named, which needs a recording no cloud session should send.
 
 ## 14p. Show night runs whatever merged last
 

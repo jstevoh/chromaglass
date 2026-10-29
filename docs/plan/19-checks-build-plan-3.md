@@ -19,19 +19,7 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   and last call. No bar moved. When a red names the pour, either mark it as the show's own
   in the log (the way the dye log marks `auto`) or hold the show off the plate for the
   window, as `__bottleTest` already holds `doseLiquid` off.
-- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** Its step-down
-  nudge ("12. slower framerates suggest upgrading to Pro") is read after `forceStepDown(true)`.
-  The hook set the engine status once and the next frame's own status replaced it: on software
-  WebGPU `classifyAdapter` says 'software', `qualityLadder` has one rung, `failRung` has
-  nowhere to go and `governor.steppedDown` stays false, so the card unmounted before the
-  check read it ("locator.textContent: Timeout 30000ms"). Not reproducible by running the
-  check (0 of 10 red on main in a cloud session, 0 of 6 after), so the nudge's presence was
-  sampled every frame for three seconds after the hook: the card is there for all of them
-  both ways, and the check, once it reads three seconds later, goes red 2 of 2 on main and
-  passes 2 of 2 with the fix. The hook now keeps what it was asked (`forcedStepDown` in the
-  loop's status), and the status in the loop reads it. A test hook only; the governor, the
-  ladder and the real step-down are as they were. It touches no bar. `governor.ts` was not
-  touched (#441, #474 and the #402 finish thread are in it).
+- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** The hook keeps what it was asked (`forcedStepDown`); no bar, no governor change. Story in `docs/plan-shipped.md` §19aa-10 (moved 2026-10-29, 19m-2).
 - **19aa-11. The Mac `webgpu` check "the stage starts, with nothing asked for" (3 of 192,
   read 2026-10-25; two of them within twenty minutes that day).** `no stage` with no
   `gpuFailure`, 30 s after load, on the first page of the run only: every later page of
@@ -123,16 +111,11 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
   measurement on the Mac, not from this line.
 
-- **19ac-3. `bottles` counts the look's own pours as the hand's, and goes red on one at the
-  mirror.** `WebGPU (macOS) · tools` failed `bottles` twice on one head (#533, which changes
-  neither the bottle nor the tools), on two different lines: "splatter with the Oil bottle"
-  (39 pours, 1 at the mirror) and "splatter with the Ferrofluid bottle" (37 pours, 1 at the
-  mirror; the hand's flings 0.13 from the hand, nothing near the mirror), and passed on the
-  third run. The stroke's mirror is 0.4 of the plate from it and a splatter's fling reaches
-  about 0.07, so the pour is not the hand's: read it from `__bottleLog` with the call's
-  `auto` flag and the look's lays, and count the hand's alone. Until then a lone pour at
-  the mirror is this, not a flipped coordinate (that puts every pour there). Not yet shown
-  from the log.
+- **19ac-3. `bottles`' "one at the mirror" was the hand's own splatter, the stroke too near
+  the middle (shipped 2026-10-29).** The canvas's (0.25, 0.3) to (0.4, 0.3) lay on the plate
+  0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
+  The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
+  the clearance each run. Story in `docs/plan-shipped.md` §19ac-3.
 
 ## 19ad. The `open` shard flakes on four unrelated faults
 
@@ -271,6 +254,40 @@ advisories.
   `Strict-Transport-Security` itself); the Mac app's own server sends none of these headers
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
+
+## 19ah. The owner's Mac runs main's deploy shards (2026-10-28)
+
+Asked 2026-10-28: the owner's Mac helping CI as much as it safely can. A deploy that reaches
+the GPU waited a mean 50 minutes per Mac shard for GitHub's macOS machines (13 such deploys
+in 14 days, slowest shard's wait 80 minutes, 17 minutes of work per shard), 124 minutes
+push to live. Built: a probe job in `deploy.yml` (`scripts/macrunner.mjs`, a fine-grained
+token with Administration: Read in the main-only `mac-runner` environment) lists the
+shards the owner's Mac may take when a runner labelled `owner-mac` is online and idle;
+`checks.yml` sends those to it, never a pull request's run; each such shard first waits for
+the harness ports (`scripts/macports.sh`); `scripts/macrunner-setup.sh` installs the runner
+in `~/actions-runner` as the owner; `npm run macqueue` reports deploys by where their shards
+ran. How it works and how to pause it: `docs/mac-runner.md`.
+
+- **19ah-1. Open: measure it, then decide on a second machine.** After a week of deploys,
+  `npm run macqueue -- --hours 168` against the baseline above: push to live, and how often
+  the Mac was free. A second machine (the same script, a second runner on the same label)
+  pays off if deploys still wait for the Mac or go to GitHub's queue while it is busy.
+- **19ah-2. Open: a separate macOS user for the runner.** Jobs run as the owner and can read
+  the owner's signing keys and `gh` sign-in. Only main's reviewed workflow runs there, but a
+  user of its own (logged in, for the GPU) would take the reach away.
+- **19ah-3. Shipped (with 19ah): a shard queued for a Mac that went to sleep after the
+  probe.** `deploy.yml`'s `Watchdog` (`scripts/macwatch.mjs`) starts the deploy again with
+  `hosted` and cancels the stalled run after 15 minutes queued with none running. It
+  counts the run finished only when the checks' `WebGPU (macOS)` job has (19ah-3a: every
+  job made so far is briefly finished after `reach`, before the shards' jobs exist). Still
+  open: it holds an ubuntu runner for the length of the shards (free on a public
+  repository); a shorter way would be a watchdog that wakes on a schedule.
+- **19ah-4. Open: the by-hand Mac workflows** (`gallery`, `controls`, `pixels`, `film`) could
+  take the same probe and lane; they are the longest Mac jobs and queue the same way.
+- **19ah-5. Open: the job-started hook is copied by hand.** `macrunner-setup.sh` installs
+  `scripts/macrunner-hook.sh` from the checkout it runs in; a change to the hook on `main`
+  reaches the Mac only when the owner runs setup again. A check that the installed copy
+  matches `main`'s (the probe could read a hash the hook prints) would say when it is stale.
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 

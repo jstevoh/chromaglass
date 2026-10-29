@@ -46,6 +46,7 @@ import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP } from './stepping';
+import { rimCount, rimMask } from '../lib/rimMask';
 
 export class FluidSimulation {
   size: number;
@@ -726,7 +727,8 @@ export class FluidSimulation {
     if (this.carry) { this.carry.destroy(); this.carry = null; }
     const dye = this.gpu.rbDyeView, vel = this.gpu.rbVelView;
     let sum = 0, sr = 0, sg = 0, sb = 0;
-    const isThin = this.thinGap;
+    // The rim's cells, a mask made once (PLAN 14ab-3), not a test a cell a frame.
+    const rim = this.thinGap ? rimMask(this.size) : null;
     const S = this.size;
     let count = 0;
     for (let j = 0; j < S; j++) {
@@ -736,11 +738,7 @@ export class FluidSimulation {
         this.rbDensity[idx] = d;
         this.rbVx[idx] = vel[idx * 4];
         this.rbVy[idx] = vel[idx * 4 + 1];
-        if (isThin) {
-          const u = (i + 0.5) / S - 0.5;
-          const v = (j + 0.5) / S - 0.5;
-          if (u * u + v * v >= OPEN_RIM * OPEN_RIM) continue;
-        }
+        if (rim && !rim[idx]) continue;
         sum += d;
         sr += dye[idx * 4]; sg += dye[idx * 4 + 1]; sb += dye[idx * 4 + 2];
         count++;
@@ -752,22 +750,8 @@ export class FluidSimulation {
     this.rbSeq++;
   }
 
-  private dishAreaCells = 0;
   /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
-  private get dishArea(): number {
-    if (this.dishAreaCells) return this.dishAreaCells;
-    let count = 0;
-    const S = this.size;
-    for (let j = 0; j < S; j++) {
-      for (let i = 0; i < S; i++) {
-        const u = (i + 0.5) / S - 0.5;
-        const v = (j + 0.5) / S - 0.5;
-        if (u * u + v * v < OPEN_RIM * OPEN_RIM) count++;
-      }
-    }
-    this.dishAreaCells = count;
-    return count;
-  }
+  private get dishArea(): number { return rimCount(this.size); }
 
   private pullStateFromGpu() {
     const gpu = this.gpu!;

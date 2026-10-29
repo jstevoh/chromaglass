@@ -52,11 +52,7 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
   cyberpunk and stardust-collapse, their liquid turns faster than 0.05 rad/s all the
   time and the swirl's centrifuge runs on every step there, not only while they play
   (22k measured what that costs: under a fifth of a percent of the GPU).
-- ~~**22k. The swirl runs on every look with music routed to rotation.**~~ **Measured and
-  cut** (#258). Since 22h a music look's dish sways under its liquid, so Ω − ω_l is over the
-  swirl's 1e-3 rad/s floor nearly all the time: on CI's Mac, with the built-in band playing,
-  the swirl ran on 91–100% of the nine thin looks' steps. It was thirteen dispatches a step on
-  the current's half grid (spinSwirl, its divergence, ten Jacobi sweeps, the gradient).
+- ~~**22k. The swirl runs on every look with music routed to rotation.**~~ **Measured and cut** (#258). Story in `docs/plan-shipped.md` §22k (moved 2026-10-29, 19m-2).
 
   Found along the way:
   - **22g's thin palm reads 0.307 in the lab, not the 0.607 written there,** on main before

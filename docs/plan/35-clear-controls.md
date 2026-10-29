@@ -39,36 +39,14 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     groups; the same headings would find a setting faster there.
 - ~~**35c-1** Squish Plate in five.~~ Story in `docs/plan-shipped.md` §35c-1 (moved
   2026-10-29, 19m).
-- **35c-2** One home per setting, second half. Shipped: **Flash Limit** has one switch, in Master
-  (Wall → Output draws a state line and no switch); each **Impact** master sits under the Drive of
-  its source (Room, Film, Sound), Shapes Impact alone staying at the bay; the platform's spin is a
-  **Plate Spin** section of its own in Motion (it was the first half of Plates & LED, which Stage's
-  gate keeps out of Build and Gig); Build's deck takes Squish Plate beside Fluid Physics; the
-  sequencer in Songs is a button; the track panel's Takes is a pointer to the Record panel (its
-  own Start a take and replay list were a second copy). Blackout was checked and is already one
-  per surface (the desk header on a desk, Settings' Master only where there is no desk; the
-  remote's two share a test id because there is one per layout). The unused
-  `desk/PerformanceButton.tsx` was already gone (`record` asserts it). Story in
-  `docs/plan-shipped.md` §35.
-- **35c-3** One home for **MIDI on** and the **audio source**. Shipped: the Controller section of
-  Settings is the one place MIDI is turned on, its ports (in, and now the LEDs out) chosen, a
-  factory map loaded and a controller auto-mapped; the MIDI sheet is the teaching surface and says
-  the state (`midi-state`) with a **Set up…** button into the section. The Sound sheet is the one
-  place the source is chosen (six tiles, with the plate as an instrument); Settings' Sound row is a
-  state line (`audio-source-state`) and **Change in Sound…**, the device picker staying beside it.
-  The phone already had one home for each (its Sound sheet; Web MIDI is not on iOS). Story in
-  `docs/plan-shipped.md` §35. Left from it:
+- ~~**35c-2** One home per setting, second half.~~ **Shipped**: Flash Limit's one switch, each Impact master under its source's Drive, Plate Spin, Squish Plate in Build's deck, the sequencer button, Takes as a pointer. Story in `docs/plan-shipped.md` §35c-2 (moved 2026-10-29, 19m-2).
+- **35c-3** One home for **MIDI on** and the **audio source**. *Shipped*: Settings' Controller section is MIDI's one home, the Sound sheet the source's. Story in `docs/plan-shipped.md` §35c-3 (moved 2026-10-29, 19m-2). Left from it:
   - The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
     (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.
   - 35b-2's pin picker and command palette still list by section, not by the seven groups.
-
-- **35c-2** One home per setting, what is left of phase 3: Flash Limit (Settings' Master and the
-  Wall), Blackout, MIDI on (Settings and Controller) and the audio source (Settings and Sound)
-  each appear in two places, with record and replay, and the unused `desk/PerformanceButton.tsx`;
-  Drive/Impact pairs sit in different sections (one Strength per input); the platform's spin in
-  Plates & LED is Motion's but Stage-gated; the sequencer is behind a 10 px, 40%-opacity link in
-  Songs; the Build layout's deck lists Fluid Physics, which used to be the glass's knobs, so it
-  could take Squish Plate beside it. After 35c-1.
+  - Each Drive/Impact pair (now side by side under its source) is still two knobs: whether
+    each becomes one Strength per input is undecided, and 14ad-2 waits on it (from 35c-2's
+    first statement, moved 2026-10-29, 19m-2).
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

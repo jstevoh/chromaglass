@@ -76,39 +76,11 @@ Left, each its own plan item:
 
 **Shipped** (#215): Blow's wind carries the colour and the oil the way the hand went, rather than erasing them (`npm run wind`, `npm run tools`). Its follow-ups are 15f and 15g. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-**Changed after it shipped (2026-10-04): the push was judged against what came after it.**
-Main's deploy of 5505a2a (run 37196539858) went red on `tools`' "pushes the colour
-along": the wind moved the pool's middle +0.70% of the plate toward B, against
-+0.56% to beat, all of it from the window left alone *after* the stroke (+0.39%;
-the window before read -0.00%). With the ambient seeder off (#249) the window before
-read -0.08% to +0.00% on all five runs that reached the line, and the window after
-+0.24% to +0.39%, toward B every time. And since Thin Gap is on in every look
-(18a-every) the stroke's own push is smaller (+0.70% to +2.31% on main's code, was +0.76% to +4.15%), so the
-drift is a larger share. Whether it is the wind's liquid still going is not settled:
-split in halves on #254's first run it read +0.30% then +0.16% (no dying away within
-the thin gap's tenth of a second), and charged at the second half's rate the wind's
-+0.64% met +0.69%. Charging it or not is a guess either way, and not charging it
-would pass a wind that pushed nothing on a plate that starts drifting with the
-stroke. So the wind is now drawn both ways, out to the right and out to the left
-from a fresh pool in the plate's middle each time, and each has to beat the window
-before it by 0.002: a drift the wind did not make helps one stroke as much as it
-holds back the other, and from the middle a drift toward the middle moves neither. The windows after are
-printed in halves for both; if they turn round with the wind, the drift is the
-wind's. On #254's Mac run (37200639755): out to the right +2.33% against +0.20% to
-beat, out to the left +1.48%, both with -0.00% before; after it +0.16% then +0.14%
-right and +0.26% then +0.15% left, each toward its own stroke's end, so the drift
-after does turn round with the wind. Not yet seen: the line failing on a wind with
-its carry turned off.
+*Shipped so far* (#254): the wind is drawn both ways from the plate's middle and each stroke beats the window before it; the drift after turns round with the wind. Story in `docs/plan-shipped.md` §15c (moved 2026-10-29, 19m-2). Not yet seen: the line failing on a wind with its carry turned off.
 
 ## 15g. Blow as air on a thin film, not a carry (replaces 15c's shortcut)
 
-**First part shipped**: on a thin gap (every look) the moving Blow is the breath's
-stress on the surface, ½ρ_air C_f U² (about 0.38 Pa), a body force the solve takes in
-for as long as the breath goes on, so the column goes at τh/2μ; its push and its three
-carries (`blowDye`, `blowOil`, `blowCarry`) no longer run there (`src/lib/breath.ts`,
-hsBody; `npm run airblow`, 5 checks). Not yet judged on the Mac (judging §44). How it
-was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the
-same number. Open, each its own PR:
+*Shipped so far* (first part): on a thin gap the moving Blow is the breath's shear on the surface, ½ρ_air C_f U², a body force for as long as the breath goes on (`src/lib/breath.ts`; `npm run airblow`), and its push and its three carries no longer run there. Story in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2). Not yet judged on the Mac (judging §44). Open, each its own PR:
 
 - **15g-2 The jet's dimple.** A held puff (a Blow held still that is not the straw:
   a second finger, a plate that is not the lead, a remote's puff) still runs the old
@@ -143,45 +115,7 @@ same number. Open, each its own PR:
   app pushes colour left during a Blow stroke, or the stroke to the right runs fewer
   steps of breath; the check prints both (wind steps, aired, readings) to find which.
 
-What follows is the item as it was written, before its first part shipped:
-
-The owner's standing rule (2026-09-28): build from the chemistry and physics of the
-liquids, not from a picture of their result. 15c is a shortcut by that rule, and so
-are the carries it copied. The wind moves the colour, the oil and the ferrofluid
-directly, a take from under the hand and a put a hop ahead (`blowDye`, `blowOil`,
-`blowCarry`), because the flow cannot carry them: a tool's push is cut back to idle
-at the end of the step it was added in (15b). The Finger (`carryDye`, `carryMix`,
-`fingerCarry`) and the Press (`pressDye`, `pressMix`) do the same. It keeps the
-colour and moves it the right way, and it is not what air on a liquid does.
-
-What air blown on a thin layer does, and what the plate would need:
-
-- **Shear.** Air moving over the surface drags it with a tangential stress, about
-  tau = 1/2 rho_air C_f U^2 along the jet (C_f a few thousandths for a wall jet).
-  In a layer this thin the flow is viscous (lubrication), so the stress drives a
-  Couette profile: the surface moves at tau h / mu and the depth-mean at
-  tau h / (2 mu), in proportion to the depth. A deep pool moves more than a thin
-  film under the same breath, and a thick oil (glycerine) less than water. The
-  plate's depth-mean velocity should take tau h / (2 mu) as a force that lasts as
-  long as the breath does, not a disc of velocity that the clamp removes.
-- **Pressure.** Where the jet meets the surface it presses a dimple, about
-  1/2 rho_air U^2 at the stagnation point, which pushes liquid out from under the
-  nozzle (a Poiseuille flow, -h^2 grad p / (3 mu) depth-mean). That is a held
-  puff's ring, and it is the Press's physics at a smaller pressure: it belongs in
-  the gap field the Press already squeezes (`squeeze`, `applySquish`), not in a
-  ring map.
-- **The film.** The layer's thickness moves with its own flow,
-  dh/dt + div(h u) = 0: it thins where the air hits and piles up in a bow wave
-  where the wind stops. Colour, oil and ferrofluid are then carried by that one
-  flow, conserved by the advection, and the carries can go.
-
-Depends on 15b: the tool's force has to reach a flow that remembers it (the lasting
-current `cur`, or the clamp lifted for forced flow), which changes how every tool
-feels, so it goes to the owner first. When it lands, `npm run wind` is the check:
-with the carries deleted, the colour kept and moved along by the flow alone, and the
-oil with it, against the same bars. Then the same for the Finger (a solid dragged
-through the layer: no-slip on the finger, the wake behind it) and the Press
-(squeeze flow from the gap, which the solver half models already).
+*The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 
 ## 15f. Found with 15c
 
@@ -204,49 +138,7 @@ through the layer: no-slip on the finger, the wake behind it) and the Press
 
 **Partly shipped** (#210): a press carries the oil with its colour, and a pressed ferrofluid pool keeps its volume under Thin Gap (`npm run pressoil`, `npm run ferropress`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-`squeezeOut` carried the dye into a ring and nothing else. With Oil Bodies on, a
-press took the oil's colour out of its body, which is what the Finger did before
-`carryMix`. The ferrofluid under a palm doesn't move either.
-
-**The oil: shipped.** A press takes the oil the way it takes the dye, the same share
-of every cell under the palm, and puts it down on the dye's ring (the palm's rim to
-1.7 palms out), area for area (`pressMix`, the other mode of `mixCarry`); the dye's
-half (`pressDye`) now lands each cell's colour by the same map, straight out, where it
-used to spread it evenly round the whole ring, which put half of a palm-edge press's
-colour in the water across the ring from its oil. Both live in `src/lib/pressRing.ts`,
-which the app and the lab share. What would land off the plate is not taken, oil or
-colour. The oil is pressed once a dye reading on its own clock, so a clear body is
-pressed at the dye's rate. `npm run pressoil` (lab, with the app's own palm, a quarter
-of the plate across) 11/11: the oil kept to 0.4% of what moved in the middle, off it
-and in a corner; every palm cell at exactly 0.4^6; the ring gaining what the palm lost
-band by band; one press of each half on a body's edge landing the same amounts in the
-same cells (the old even ring: 454 of 908 on the far side, in the water); each palm
-cell giving up the same share of colour as of oil; and in a corner all the colour
-taken landing (780.0 of 780.0), none taken from the 2225 palm cells with nowhere to go. A first
-cut with the Finger's cone and a hop lost 27% of the oil moved in a corner and landed a
-fifth of it back under the palm. `npm run bottles` (Mac) asks that the app's Press,
-held and replayed, reaches it, and only with Oil Bodies on. The phone's Press is the
-same `squeezeOut`. The straight-out dye is a change of look on every plate: to be
-judged on the Mac (`docs/judging.md` §18). The only app check of the dye ring's shape
-is `npm run press`, which is not in CI and sets its settings by writing into the
-debug hook's copy (the pattern `depth` had); worth bringing into the tools shard.
-
-And the gap's drag takes the ferrofluid's own viscosity, by share (`hsPrep`,
-`FERRO_NU`, 5 mm²/s, a light hydrocarbon ferrofluid's). Which way a front fingers then
-follows the two liquids (Saffman–Taylor): on the default plate (Thickness 0.45, a light
-oil of 22 mm²/s) the ferrofluid is the thinner, so a press pushing it out into the oil
-is the unstable direction, and a bumpy pool's outline keeps more of its bumps (its
-spread over its radius 0.023 → 0.013 against 0.009 for an even pair, `ferropress`
-§5); in water it is the thicker, the press rounds it a little more (0.008), and the
-lift is the unstable one. The same drag sets how fast the ferrofluid answers any
-body force under Thin Gap, the magnet's included: about 4.4 times faster than before
-(its drag is 0.22 of the default oil's), in any clear liquid since 18a-2 (before it,
-the pull itself scaled with the clear liquid's viscosity, so in water the ferrofluid
-answered about 5 times slower and in glycerine far faster; now only the liquid it has
-to push aside slows it). That is the real liquid's answer, not a change to the magnet's code; the
-owner's eye on it is in judging §23. The
-phone's Press is the same press on the same solver, and Thin Gap is on its settings
-sheet. Judged on the Mac: `docs/judging.md` §23.
+*Shipped so far* (#210): the press carries the oil to the dye's ring by one straight-out map (`src/lib/pressRing.ts`; `npm run pressoil` 11/11), and the gap's drag takes the ferrofluid's own viscosity (`FERRO_NU`; `npm run ferropress`). Story in `docs/plan-shipped.md` §15d (moved 2026-10-29, 19m-2). Still owed: the straight-out dye and the ferrofluid's faster answer judged on the Mac (judging §18, §23), and `npm run press`, the only app check of the dye ring's shape, is not in CI: worth bringing into the tools shard.
 
 *Open, found building it:*
 - **With Thin Gap off a press still greys the ferrofluid.** The old solver's flow cannot
