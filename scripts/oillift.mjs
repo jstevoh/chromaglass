@@ -252,9 +252,10 @@ check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ halved f
 {
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8');
   const vis = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  const solver = readFileSync('src/sim/fluidSimulation.ts', 'utf8');
   check('the phone\'s tilt lifts the oil too: the step lifts by its rockX, and the frame loop\'s rockX carries the phone\'s tilt',
-    /lift \* p\.rockX, lift \* p\.rockY/.test(fluid) && /const rockX = swingX \+ ext\.x/.test(vis) && /rockX: plateSin\(this\.tiltX, this\.rockX\)/.test(vis),
-    'fluid.ts hands hsBody lift × p.rockX; LiquidVisualizer: rockX = swingX + ext.x…, the step rockX = plateSin(tiltX, rockX)');
+    /lift \* p\.rockX, lift \* p\.rockY/.test(fluid) && /const rockX = swingX \+ ext\.x/.test(vis) && /rockX: plateSin\(this\.tiltX, this\.rockX\)/.test(solver),
+    'fluid.ts hands hsBody lift × p.rockX; LiquidVisualizer: rockX = swingX + ext.x…; sim/fluidSimulation.ts: the step rockX = plateSin(tiltX, rockX)');
 }
 
 const failed = checks.filter((c) => !c.ok);
