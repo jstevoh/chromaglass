@@ -27,12 +27,7 @@ dropped picture or 3D model driven by the music as its own look does not.
 because our free site asks for a login and needs its own reason to (saves your looks);
 a grid of generic stock thumbnails: ours are the plate itself.
 
-- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version; the
-  story is in `docs/plan-shipped.md` §34a, the owner's look is `docs/judging.md` §62.* A first
-  visit meets `src/components/Landing.tsx` (its own lazy chunk, no Firebase, no engine) and
-  "Play free" opens the sign-in over it; a returning visit, `?remote`, `?cast`, the iPhone app,
-  a desktop launch and a visit part way through a redirect or an emailed link never see it.
-  `npm run signin` holds it (3a, 3, 6, 7, 10, 11b).
+- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version*: `Landing.tsx` before the sign-in, `npm run signin` holding it; the owner's look is `docs/judging.md` §62. Story in `docs/plan-shipped.md` §34a (moved 2026-10-29, 19m-2).
 - **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
   video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
   the app's own frames, because a cloud session cannot film the app and the lab's plate barely

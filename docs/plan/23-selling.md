@@ -114,15 +114,7 @@ once the login works (23.14).*
   offline for good (23.4). A build with no Firebase config (`npm run dev`, every
   check, a fork's own copy) has no sign-in at all; the source is public and BUSL lets
   anyone run it, so the wall is the hosted site's, as the paid gates are.
-- **Measured by** `npm run signin` (`scripts/signin.mjs`, written before the build):
-  the Firebase Auth emulator stands in for Google's servers, so the real SDK runs in
-  a cloud session and on CI with no project or secret. Fourteen lines, from "no
-  Firebase in a build without the config" to "a sign-out in another tab and the
-  account deleted leave a running plate up". On today's site it is red from line 3.
-  Run against a throwaway sign-in in the session that wrote it, every line went
-  green, so each line can pass; the same sign-in made to drop the show when the
-  account signs out failed line 8, and one that waited on Firebase alone failed
-  line 7.
+- *Shipped so far*: `npm run signin` (`scripts/signin.mjs`, the Firebase Auth emulator standing in for Google) measures the sign-in, fourteen lines. Story in `docs/plan-shipped.md` §23 Accounts (moved 2026-10-29, 19m-2).
 
 ## Steps
 
@@ -177,38 +169,13 @@ once the login works (23.14).*
   same sign-in once (`LicenseGate.tsx`, `src/main.tsx`), online, then runs as the site does;
   with a verified Ed25519 key it never asks. *Measure:* `npm run tiers` (11/11): verified with a key, with none
   and signed in, and with none and signed out.
-- **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`).
-  The merchant's webhook files each Ed25519-signed key under the buyer's email in Workers KV;
-  a signed-in app asks the Worker for its keys with its Firebase ID token, checked against
-  Google's public keys, and activates up to 2 machines per key. *Measure:*
-  `npm run license-worker` (12/12, wired into `checks.yml` `Measure · logic`): `DEFAULT_PUBLIC_JWK.x`
-  matches across `server/license-key.js` and `src/lib/licenseKey.ts` and is not the burned key, a bad webhook
-  signature refused, missing `LICENSE_PRIVATE_KEY` fails closed (500), a bad token refused, a good token given its own keys and no one else's,
-  Home→Pro upgrade, two-machine cap, and a refunded key revoked.
-  **23.12-url** (**shipped**): `deploy.yml` never passed `VITE_FIREBASE_LICENSES_URL` to the
-  build, so the live bundle had the account's key fetch and the marketing-choice sync folded away
-  (measured on the live site 2026-10-19: no `/keys` or `/preferences` call in any chunk); a signed-in
-  site never pulled its key from the account. Now passed from a repository secret of that name
-  (the Worker's address with no path). Built with and without it: 0 chunks carry the calls without,
-  1 with. Typing a key by hand never needed it (checked offline). *Open:* `VITE_FIREBASE_SHOWS_URL`
+- **23.12** (**shipped**, this PR): accounts hold the keys (`server/license-worker.js`); `npm run license-worker`. Story in `docs/plan-shipped.md` §23.12 (moved 2026-10-29, 19m-2).
+  **23.12-url** (**shipped**): `deploy.yml` now passes `VITE_FIREBASE_LICENSES_URL` to the build, so a signed-in site pulls its key from the account. Story in `docs/plan-shipped.md` §23.12-url (moved 2026-10-29, 19m-2).
+  *Open:* `VITE_FIREBASE_SHOWS_URL`
   is read by `accountShows.ts` and is also not in the build; it falls back to `/account-shows` on the
   same origin, which the hosted site does not serve, so decide with 23.14 where that endpoint lives.
-  **23.12-jwks** (**shipped**, this PR): the owner's Pro account read Free (2026-10-24). The Worker
-  verified Firebase ID tokens only against a `GOOGLE_JWKS` variable that the check sets and the live
-  Worker never had, so it answered 401 to every real sign-in and no account key ever reached a
-  browser; and the app asked for the key only while the profile sheet was open. Now the Worker fetches
-  Google's published keys for Firebase tokens and keeps them for the endpoint's max-age (about five
-  hours, measured), asking at most once a minute for an unknown key id or while Google is down, one
-  fetch shared by concurrent requests; an RS256 token must name this project as both audience and
-  issuer, and carry an expiry, an issue time not in the future and a subject; the app asks once it starts signed in
-  (`src/lib/accountLicense.ts`, from `main.tsx`) and again the moment a sign-in completes in the
-  sheet, keeping the best of Home and Pro; a key taken off the computer by hand stays off until
-  asked back from the sheet (it would otherwise retake a Mac's seat at the next start). *Measure:*
-  `npm run license-worker` 15/15, 12/15 on the old Worker (8: no `GOOGLE_JWKS`, a good token gets
-  its Pro key and Google is asked once, old: 0 keys, 401; 8b: Google down, ten tokens ask it once;
-  3b: tokens for another project, another issuer, the demo project, or with no audience or issuer
-  refused, old: four of five let through); `npm run signin` 14 (Free before the key is
-  filed, Pro after a restart with the sheet never opened). *Owed:* `wrangler deploy` of the licence
+  **23.12-jwks** (**shipped**, this PR): the Worker fetches Google's published keys for Firebase tokens, and the app asks for the account's key at start and after a sign-in. Story in `docs/plan-shipped.md` §23.12-jwks (moved 2026-10-29, 19m-2).
+  *Owed:* `wrangler deploy` of the licence
   Worker from the owner's Mac (its config is not in the repo), then confirm `owner-pro-1` is filed
   under the owner's sign-in email and was signed after the key rotation (the sheet now says so in
   words when the account holds a key the app cannot verify).
@@ -216,47 +183,11 @@ once the login works (23.14).*
   refused by every browser; the Worker could re-sign such records on `GET /keys` with the current
   key (it is the source of truth for what was sold), with a check that a forged token never enters
   KV that way.
-  **23.14-verify** (**shipped**, #467; found 2026-10-24): `server/account-shows.js`
-  `verifyAccountToken` read the token's uid, audience and issuer but never checked its
-  signature, so anyone who could reach a show server could name any uid and read or publish
-  that account's running shows. It now verifies RS256 against Google's keys in
-  `server/firebase-token.js` (cached and rate-limited as 23.12-jwks does), the project, the
-  issuer and the times; the emulator's unsigned tokens count only with `FIREBASE_AUTH_EMULATOR`
-  set. *Measure:* `npm run accountlink` 1b (a signed token taken; unsigned, forged and
-  other-project tokens refused), 7/7.
+  **23.14-verify** (**shipped**, #467): `server/account-shows.js` now verifies the account token's signature against Google's keys (`server/firebase-token.js`); `npm run accountlink` 1b. Story in `docs/plan-shipped.md` §23.14-verify (moved 2026-10-29, 19m-2).
 - **23.14** (**shipped**, this PR): linking devices by account (`server/account-shows.js`,
   `src/lib/accountShows.ts`). Story in `docs/plan-shipped.md` §23.14 (moved 2026-10-29,
   19m).
-- **23.18** (**shipped**, this PR): cloud sync for Pro (`server/cloud-sync.js`,
-  `src/lib/cloudSync.ts`, `src/lib/cloudSyncApp.ts`, `CloudSyncCard` in the profile sheet,
-  desk and phone). Asked by the owner, 2026-10-25: the Mac app has its own storage, so looks
-  saved in Chrome were not in it. A Pro account now carries the saved looks, sequences, saved
-  sets and the working set list, song shows and action sets, custom liquids, the MIDI map,
-  tool amounts, music settings and Follow songs; every browser and Mac app signed in to it
-  keeps them in step through the licence Worker's `/sync` (one KV value per account, the tier
-  read from the keys filed under the account's email). Each device stays the source of truth
-  offline and saves exactly as before; the engine looks at the same localStorage keys every
-  5 s and stamps what changed. The rule is newest-wins per item with deletions as tombstones,
-  the cloud's copy on a tie, and what a device held before it first synced stamped oldest (so
-  a second machine's untouched starter set never replaces the first's). Clocks are corrected
-  by the skew each answer measures; a record far in the future is pulled back to a minute past
-  the server's clock. KV has no transactions, so a manifest every ten minutes finds a push lost
-  to another device's write and sends it again. Not synced, on purpose: the projector layout,
-  audio input and source, MIDI ports, desk mode, licence and sign-in, which belong to the
-  machine. The MIDI map syncs whole, one value: two computers with different controllers
-  replace each other's map (a map per controller is 23.18-midi). Erase the cloud copy from the
-  sheet (any signed-in account, Pro or not); the erase leaves a marker, and a push on a sign-in
-  token issued before it is refused, so a Mac app left open cannot put back an erased or
-  deleted account's copy. Deleting the account stops if the erase fails. A look the cloud
-  refuses (over 256 KB) is reported on the card and not sent again until edited.
-  *Measure:* `npm run cloudsync` (13/13, `checks.yml` `Measure · logic`): saved on one device
-  and read back by the stores' own load functions on the other, for arrival, the starter set
-  list, concurrent edits of different looks, the later edit of one look from a clock ten
-  minutes slow, deletion, offline edits, a lost write healed, Home/keyless/forged/other
-  accounts refused or isolated, unreadable storage never read as empty, erase, a future
-  stamp, a refused look and an id of `toString`, and the wiring (every synced key is its
-  module's, and every key held in React state reloads when the cloud writes it). Each guard
-  was broken in turn and its line went red.
+- **23.18** (**shipped**, this PR): cloud sync for Pro (`server/cloud-sync.js`, `src/lib/cloudSync.ts`): a Pro account carries its looks, sets, liquids, MIDI map and settings across every signed-in browser and Mac app; `npm run cloudsync`. Story in `docs/plan-shipped.md` §23.18 (moved 2026-10-29, 19m-2).
   **23.18-deploy** (*owner*): `/sync` exists once the licence Worker is deployed by hand from
   the Mac (`npx wrangler deploy`, as for #460); until then a Pro sheet says sync stopped on an
   error and retries, and nothing else changes.
@@ -285,38 +216,9 @@ once the login works (23.14).*
   the next one in the cloud, before the Mac job.
   **23.18-exit** (open): a Mac app quit straight after an edit sends it the next time it opens
   (no send on `pagehide`); a `keepalive` push of the waiting records under 64 KB would close it.
-- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (the owner,
-  2026-10-24: "I don't want to do the apple developer account or accept logins from
-  them. maybe later - but not now."). The button is held behind `APPLE_SIGN_IN` in
-  `SignInScreen.tsx`, the landing page and the privacy page say Google or an emailed
-  link. *Measure:* `npm run signin` line 4 fails if an Apple button is drawn.
-- **23.10e** (**shipped**, this PR): email and password accounts (the owner, 2026-10-24:
-  "an email login option that stores passwords and other account details ... and if they
-  have a google account it can link to that"). Firebase Email/Password beside Google and the
-  emailed link; Firebase keeps one account per email, so a password is one more way into the
-  same uid and the licence (keyed on the email, `keys:<email>`) follows with no Worker change.
-  *Sign-in form* (`SignInForm`, shared by the first-visit screen, the account sheet on the desk
-  and the phone): "Continue with email" opens an Emailed link / Password pair of tabs; Password
-  has sign in, create account, show/hide, and "Forgot password?". Sign-up mails the confirmation
-  link at once. An address that already has an account says so, and offers "Continue with Google
-  and add this password" (Google, then `linkWithCredential`). A Google sign-in Firebase refuses
-  because the email has a password keeps Google's credential and attaches it on the next
-  password sign-in. *Account sheet* (`AccountSignInMethods.tsx`): which ways in the account has,
-  "Set a password" (a Google account: `linkWithCredential`; an emailed-link one: `updatePassword`),
-  and, for an unconfirmed password account, a banner with "I've confirmed" (reload, renew the
-  token, ask the Worker for the licence) and "Send it again". **Why confirmation matters:** the
-  licence Worker already refuses an ID token whose email is not verified
-  (`license-worker.js`, `email_verified === false`), which is what stops a stranger signing up
-  with someone else's address from reading that person's licence; an unconfirmed account reads
-  Free until the link is opened. *Measure:* `npm run signin` 17–21 (the real SDK against the Auth
-  emulator): sign-up makes one unconfirmed account, mails the link, starts the plate, a filed Pro
-  key reads Free until confirmed and Pro after; on a phone the password signs in to the same uid,
-  a wrong one is refused in words, a reset is mailed; a Google account signed up again gets no
-  second account and ends with `google.com` + `password` on one uid; a Google and an
-  emailed-link account each set a password from the sheet and sign in with it; the password form
-  fits 1024×768 and a phone upright and on its side. *Console step, **done** (the owner, 2026-10-25): Email/Password is on and
-  "Link accounts that use the same email" is on.* Live since the 10:23 AM PT deploy on
-  2026-10-25. *Owed by the owner:* the one hand-try the emulator cannot do (Google account,
+- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (`APPLE_SIGN_IN` in `SignInScreen.tsx`; `npm run signin` line 4). Story in `docs/plan-shipped.md` §23.10d (moved 2026-10-29, 19m-2).
+- **23.10e** (**shipped**, this PR): email and password accounts beside Google and the emailed link (`SignInForm`, `AccountSignInMethods.tsx`; `npm run signin` 17–21), live since the 2026-10-25 deploy. Story in `docs/plan-shipped.md` §23.10e (moved 2026-10-29, 19m-2).
+  *Owed by the owner:* the one hand-try the emulator cannot do (Google account,
   Account, Set a password, sign out, sign in with the password, same licence;
   `linkWithCredential` against the real project).
   Open follow-ups:

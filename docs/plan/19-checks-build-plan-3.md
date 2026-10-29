@@ -19,19 +19,7 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   and last call. No bar moved. When a red names the pour, either mark it as the show's own
   in the log (the way the dye log marks `auto`) or hold the show off the plate for the
   window, as `__bottleTest` already holds `doseLiquid` off.
-- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** Its step-down
-  nudge ("12. slower framerates suggest upgrading to Pro") is read after `forceStepDown(true)`.
-  The hook set the engine status once and the next frame's own status replaced it: on software
-  WebGPU `classifyAdapter` says 'software', `qualityLadder` has one rung, `failRung` has
-  nowhere to go and `governor.steppedDown` stays false, so the card unmounted before the
-  check read it ("locator.textContent: Timeout 30000ms"). Not reproducible by running the
-  check (0 of 10 red on main in a cloud session, 0 of 6 after), so the nudge's presence was
-  sampled every frame for three seconds after the hook: the card is there for all of them
-  both ways, and the check, once it reads three seconds later, goes red 2 of 2 on main and
-  passes 2 of 2 with the fix. The hook now keeps what it was asked (`forcedStepDown` in the
-  loop's status), and the status in the loop reads it. A test hook only; the governor, the
-  ladder and the real step-down are as they were. It touches no bar. `governor.ts` was not
-  touched (#441, #474 and the #402 finish thread are in it).
+- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** The hook keeps what it was asked (`forcedStepDown`); no bar, no governor change. Story in `docs/plan-shipped.md` §19aa-10 (moved 2026-10-29, 19m-2).
 - **19aa-11. The Mac `webgpu` check "the stage starts, with nothing asked for" (3 of 192,
   read 2026-10-25; two of them within twenty minutes that day).** `no stage` with no
   `gpuFailure`, 30 s after load, on the first page of the run only: every later page of

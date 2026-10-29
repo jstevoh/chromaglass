@@ -4,46 +4,7 @@ Part 2 of 3 of §19; it begins at 19l. The section starts in `19-checks-build-pl
 
 ## 19l. App frames readable in a cloud session
 
-CLAUDE.md says the full app on software WebGPU returns zero readbacks, so `qa`, `tools`,
-`magnet`, `mirror` and the rest can only be run on the Mac, after a push and a queue.
-*Read 2026-10-04 in a cloud session, Chromium 141:* headless, the device is lost at the
-first canvas present ("A valid external Instance reference no longer exists"), which is
-why the lab, which never presents, works. Headed under `xvfb-run` with the same flags the
-device survives and `__cgFrame` returns the app's frame (1280×800, mean 0.29); `tools` gave
-7 of 15 real readings, where headless gave 3 of 14, all zeros. The rest failed on speed: the
-plate stepped 8 times a window against 21 to 25 on Metal.
-
-*Fix:* `scripts/chromium.mjs` launches headed under xvfb when `PW_WEBGPU=1` on Linux
-(`scripts/desktop.mjs` already re-executes itself under `xvfb-run`); checks wait for the
-engine rather than sleeping, and count windows in steps where they count seconds. CI stays
-on Metal, as 19h's "what would not help" found. A session can then reproduce the logic of
-a Mac check before it pushes; about a third of the Mac reds were the PR's own (19h).
-*Measure:* the same commit through `tools`, `magnet`, `mirror` and `bottles` in a cloud
-session and on the Mac: the lines that do not depend on the step rate agree. *Size:* M.
-
-*Built (2026-10-26, this PR):* `scripts/chromium.mjs` launches headed into an Xvfb it starts
-itself (`-displayfd`, so parallel harnesses never race for a display), with the GPU watchdog off,
-when `PW_WEBGPU` is set on Linux and the harness asks (`present: true`: `tools`, `magnet`,
-`mirror`, `bottles`) or `PW_PRESENT=1` does. Asked for, not the default: the first push made it the
-default and CI's Linux lab part ran out of its 25 minutes, the twenty-odd checks that set
-`PW_WEBGPU=1` themselves (`signin`, `tiers`, ...) each driving a live software plate, and
-`intro`'s fade finishing 95 s late behind the first step. Those measure the page, not the plate. `scripts/frame.mjs`'s `engineQuery()` adds `&dpr=0.25&steps=60` there, and two waits:
-`waitForEngine` after the opening, `settlePlate` for every other wait in `tools`, `magnet`,
-`mirror` and `bottles`, the wall clock on a GPU exactly as before and, in software, also a share
-(`PW_STEP_SHARE`, 0.05) of the steps the Mac's sixty a second would take.
-*What was found on the way, Chromium 153:* headless still loses the device at the first present
-(a bare canvas: lost at once headless, thirty frames headed). Headed was not enough by itself:
-the app's first full solver step (248 compute passes) holds SwiftShader's one GPU thread for
-25 to 100 s, compiling as it first dispatches, and Chromium's watchdog takes that for a hang
-and kills the GPU process, so the page lost its device, made a new one, reached the same step
-and was killed again, for good. That is what `startup.mjs`'s "SwiftShader loses the app's
-device every few seconds" was. With the watchdog off, the plate's frame reads back (mean 0.40
-on classic, moving) and the plate makes about 0.4 steps a second at 256² and at 128² alike
-(the cost is a step's dispatches, not its cells), against about sixty on Metal; the drawing
-was 90% of a 1280×800 software frame (36 s), 2 to 3 s at `dpr=0.25`. `stages` read 0.7 to
-1 s a solver layer a step. So a cloud session runs a Mac check's logic on a plate that moves,
-at a twentieth of its steps, and not its magnitudes.
-*Measured:* see the PR (tools, magnet, mirror, bottles here against the same commit's Mac shards).
+*Shipped so far* (2026-10-26): `scripts/chromium.mjs` launches headed into its own Xvfb, watchdog off, when `PW_WEBGPU` is set and a harness asks (`present: true`); `waitForEngine` and `settlePlate` in `scripts/frame.mjs`; a cloud run has a Mac check's logic at a twentieth of its steps. Story in `docs/plan-shipped.md` §19l (moved 2026-10-29, 19m-2).
 
 ### 19l-2. The first step's stall on a cold compiler (found with 19l)
 
@@ -62,21 +23,7 @@ tries any of them headed. Each wants its own pass: its opening wait through `wai
 its waits through `settlePlate`, and a cloud run beside the Mac's to say which of its lines agree.
 *Size:* S each.
 
-*Built (2026-10-27):* eight more opted in, each run here at the same commit (`PW_WEBGPU=1`, three
-at a time on 4 cores, 5% of the Mac's steps): `take` 9 of 9, `ferro` 7 of 7, `ferrodrift` 6 of 6,
-`finger` 2 of 2 (these agree with the Mac's), `bubbles` 26 of 30 and `depth` 8 of 10 (the
-failing lines wait on the plate having developed for nine of the Mac's seconds, 540 steps, here 27:
-"the plate holds nearly still while it is photographed" read 61% of pixels moved, "the show is
-running" wants two steady seconds, "switching it off puts the plate back" is a magnitude),
-`handpour` 26 of 31 (the bank's size against what a pour raised the mean by, and the slider's
-ordering, are magnitudes of a pour at a twentieth of its steps), `kickbubbles` 8 of 12 (all its
-"releases no bubbles" and layout lines agree; the four that count kicks reaching the bubbles
-"at least 15" in a listening window read 1 to 3, the window being the wall clock's).
-What it took: `take` read a toast that goes in a few seconds, so its wait after the first stop is the
-wall clock, its note waits 30 s in software, and it waits for the engine again after its reload;
-`kickbubbles` skipped itself unless a Mac drew, and its clicks and canvas lookup waited out
-Playwright's 30 s behind the plate's first step; `handpour`'s `waitForShow` has five minutes in
-software, not one.
+*Shipped so far* (2026-10-27): eight more opted in (`take`, `ferro`, `ferrodrift`, `finger` agree with the Mac; `bubbles` and `depth` waited on a developed plate, done in 19l-4; `handpour` and `kickbubbles` read magnitudes). Story in `docs/plan-shipped.md` §19l-3 (moved 2026-10-29, 19m-2).
 
 *Left out, and why:*
 - `spin`, `flick`: they read the dish's angular velocity in radians a *wall* second after a flick,
@@ -100,35 +47,7 @@ a named step count in place of nine seconds, so a Mac and a cloud run develop th
 
 ### 19l-4. A software plate develops the Mac's steps, on a clock that steps with it (found with 19l-3)
 
-*What was found:* the step count was half of it. `bubbles`' "the plate holds nearly still while it is
-photographed" read 21.5% of its pixels moved across *one* step (7.4 s of wall clock), 26.8% across
-three (15 s), 34.3% across six (23 s), where the Mac moves 4 to 8% in its 72 steps: it tracked the
-wall clock, not the steps. The frame loop moves the lamp's wander, the gel wheel, the dish's turn and
-the phrasing by each frame's elapsed time (`realDt`), and a software frame is one step and two to
-fifteen seconds of it, so a software plate was the Mac's with its lamp and dish run fast. More steps
-alone would have made that worse, not better.
-
-*Built (2026-10-27):* `?lockstep=1` (`LOCKSTEP` in `LiquidVisualizer.tsx`): each frame's elapsed
-time is exactly the step it takes, so a software plate is the Mac's plate in slow motion. A harness
-asks for it with `engineQuery({ lockstep: true })`, which a GPU never sends. And `developPlate(page,
-ms)` in `scripts/frame.mjs`: on a GPU `waitForTimeout(ms)` exactly as before, in software every one
-of the Mac's `ms × 60 / 1000` steps, for the waits a line reads the plate's age through: `bubbles`'
-opening, its "let a look develop", its 1.2 s bracket and the 0.9 s in which a bubble opens its hole in
-the dye (at three steps, 14 of 850 bubble pixels were lit), `depth`'s opening. Slow by design: 540 steps
-took 62 to 80 minutes with two or three harnesses sharing four cores.
-Two lines were wrong for reasons the slow plate showed up, both fixed so a Mac reads them exactly as
-before: `bubbles`' floors on the pixels a bubble draws (3000, 800, 500) were counts in the Mac's
-742,000-pixel frame, and a cloud frame at `dpr=0.25` has 46,375, so they are now the same share of
-the frame read, never more than the Mac's (scale exactly 1 there); `depth`'s "the show is running"
-read the last nine rows of a load timeline that stops at 400 rows (100 s), and after a developed
-opening passed on rows from the page's first minute, so it now reads only while the timeline is
-still being written.
-*Measured, cloud (`PW_WEBGPU=1`, two harnesses sharing four cores):* `bubbles` 13 of 15 before (the
-still plate 23,338 of 46,375 pixels moved; the three colour lines never ran, gated on the Mac's pixel
-count), 16 of 18 after (the still plate 518 moved, 1.1%; drawn on 435 against a floor of 188); `depth`
-8 of 10 before, 9 of 10 after ("switching it off puts the plate back" 1.221 against 1.220, red before;
-"the show is running" red as the Mac-only line below, where a first run without the timeline's guard
-had passed on stale rows).
+*Shipped so far* (2026-10-27): `?lockstep=1` steps each frame's clock with the plate, `developPlate` in `scripts/frame.mjs` gives a software plate the Mac's steps; `bubbles` 16 of 18, `depth` 9 of 10. Story in `docs/plan-shipped.md` §19l-4 (moved 2026-10-29, 19m-2).
 
 *Still red in `bubbles`, open:* "it lets the lamp through rather than painting light on top" found 14
 and then 32 lit pixels (the line needs forty pairs and brighter thick dye) and the bubbles 0 to -4%
@@ -162,17 +81,16 @@ moved to `docs/plan-shipped.md` (its third pass). Story, and the plan as first w
   one file to the section a PR writes in, but two PRs in one section, or both in the running
   order, still conflict; `docs/judging.md` and `CHANGELOG.md` still do. *Measure:* conflicts
   recorded per merge of main.
-- **19m-2. Read each section once for the shipped prose the markers did not catch** (F, M,
-  a section at a time). The move was by marker only: an item or a bullet whose title or
-  first line says shipped or fixed, or is struck, moved whole, and one that shipped with
-  open work found along the way kept that work in place, only its story moving. A story
-  told in prose inside an open item stayed where it was (§0's "Partly shipped" account,
-  10 and 11's opening paragraphs, the *Open:* sentences inside 23.12, 23.17g and 23.17m,
-  27e's first part), so §10, §11, §14, §18, §19 and §23 are still 30 to 75 KB each. A
-  reader who knows the code can move those stories by hand, leaving stubs. Found while
-  sorting: §28 has 28f and 28g written twice, an older short version of each before the
-  longer one; the two want folding into one, keeping the longer.
-- **19m-3. The archive by section** (F, S): `docs/plan-shipped.md` is about 600 KB and a
+- ~~**19m-2. Read each section once for the shipped prose the markers did not catch**~~
+  **Shipped** (2026-10-29): about 1,700 lines of shipped stories in 30 section files moved,
+  open plan 757 → 631 KB; 28f and 28g folded. Story in `docs/plan-shipped.md` §19m-2
+  (moved 2026-10-29, 19m-2).
+- **19m-4. What the two passes left half-cut** (F, S, found in 19m-2). `15-tools-on-liquids.md`
+  line 19 is a fragment the 15i stub left ("Maze, Ferro Paint) carry their own amount…");
+  §16's three "Found while building it, not done" lists stand without the 16a, 16b and 16c
+  bullets they were under; the archive now tells §14v-7, §14ab-8, §14y's shipped bullet,
+  §27a-8 and §35c-2 twice (the third pass's copy and the fourth's), wanting one each.
+- **19m-3. The archive by section** (F, S): `docs/plan-shipped.md` is about 750 KB (after 19m-2) and a
   ledger in `scripts/sizes.json`; one file a section, like the plan's, would take it off.
 
 ## 19n. A shorter deploy
@@ -322,42 +240,13 @@ required `Measure`; the … Story in `docs/plan-shipped.md` §19x (moved 2026-10
   a red check in the last month of `antigravity/` PRs before widening it, since every
   widening costs ordinary physics work a line in the body.
 
-- **19x-3. Measured quotes what it printed.** **Shipped** (2026-10-26, the owner's rule from
-  the scorecard): the `Check changes named` job also fails an Antigravity PR (`antigravity/…`
-  branch) whose `Measured:` has a command with no printed line quoted beside it, a group with
-  no command, a script that is not in `package.json`, or no `Measured:` at all (`npm run
-  checkguard`; the form is in `docs/handoff.md`). It reads the form, not the truth; the
-  reviewer runs one script and compares. Re-based 2026-10-28 (the first draft sat red for two
-  days on two unrelated Mac flakes and fell 35 commits behind): run against the bodies of
-  #505 and #511, the two newest Antigravity PRs, the first version failed 28 and 37 lines
-  that quoted exactly what their checks print (`PASS …`, `36/36 checks passed`, `all lines
-  pass`, `adapter: apple`, a heading over quoted lines, a CI job id beside the command), so a
-  printed line now also counts in those forms, and by being in the command's own script's
-  source; a sentence of the writer's own ("it passed on 2026-10-26", "24 checks green")
-  still does not. The code lives in `scripts/measured.mjs` (and the API reads in
-  `scripts/checkguard-api.mjs`), so `checkguard.mjs` stays inside its size ceiling (19ai-5).
-  Found by the review: run over `scripts/checkguard.mjs` itself, `npm run
-  checkguard` still reads "it passed on 2026-10-26" as printed, because the self-test holds
-  that sentence in a string literal; the lookup cannot tell a script's fixtures from what it
-  prints (the other scripts' fixtures are the same risk, small, and the reviewer's re-run is
-  the guard). Found along the way: `namedLines` does not read a
+- **19x-3. Measured quotes what it printed.** **Shipped** (2026-10-26): the `Check changes named` job fails an Antigravity PR whose `Measured:` quotes no printed line (`scripts/measured.mjs`, `npm run checkguard`). Story in `docs/plan-shipped.md` §19x-3 (moved 2026-10-29, 19m-2). Named limit: `npm run checkguard` still reads "it passed on 2026-10-26" as printed, because the self-test holds that sentence in a string literal; the lookup cannot tell a script's fixtures from what it prints (the other scripts' fixtures are the same risk, small, and the reviewer's re-run is the guard). Found along the way: `namedLines` does not read a
   `Check changes:` that is itself a list item (`- **Check changes:**`, how Antigravity's
   bodies write the whole block), so a named change under that form is not seen. It fails
   safe (red, never green) but costs a round; read it the way `measuredGroups` does.
 
 ## 19y. Compaction and helper models set from the repo, not the host
-Found 2026-10-17: the 200k compaction window chosen on 10-12 was never in effect. A cloud
-session's environment still carried `CLAUDE_CODE_AUTO_COMPACT_WINDOW=500000` with the
-percentage override at 80, so threads compacted near 400k and sat at 130–380k for most
-of their steps, each step re-reading all of it from the cache. And no agent in
-`.claude/agents/` named a model, so a helper started from the most expensive thread ran
-on that thread's model whatever the job was.
-
-Changed: `.claude/settings.json` sets the window to 200000 in its `env` block (the
-documented way a project's settings replace an inherited variable; it reaches the cloud
-threads and the Mac's own sessions alike) and `CLAUDE_CODE_SUBAGENT_MODEL` to sonnet for
-helpers that name none. `prepush-reviewer` and `check-skeptic` name opus (they judge);
-`setting-auditor`, `preset-auditor` and `video-watcher` name sonnet (they read and list).
+**Shipped** (2026-10-17): `.claude/settings.json` sets the window to 200000 in its `env` block and `CLAUDE_CODE_SUBAGENT_MODEL` to sonnet; the agents that judge name opus. Story in `docs/plan-shipped.md` §19y (moved 2026-10-29, 19m-2).
 
 Measure: a session started after the merge shows the window at 200000 in its
 environment, and its context compacts near 160k rather than 400k (inferred from the
@@ -406,13 +295,7 @@ name, since `renders` on … Story in `docs/plan-shipped.md` §19aa (moved 2026-
   window is the lead). Two deploys went red on one-off Mac flakes on 10-24.
 - **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** Story in
   `docs/plan-shipped.md` §19aa-6 (moved 2026-10-29, 19m).
-- **19aa-8. The Blow's push follows the solver steps, and the stroke gave it too few
-  (shipped 2026-10-25).** `tools`' "and pushes the colour along, whichever way it blows"
-  was red on 13 of 187 Mac runs in the week to 10-24. Over 28 Mac strokes the push
-  correlates 0.73 with the wind steps the stroke laid and the CI Macs step 12 to 23 times
-  a second, so a stroke of 1500 ms of waiting got 38 to 71 and the weak ones read
-  -0.07% to +0.05% against +0.15%. The stroke now takes 3000 ms of waiting; nine strokes
-  of one Mac run at three paces read +0.46% to +2.97% with no straw step. The paused hunt
+- **19aa-8. The Blow's push follows the solver steps, and the stroke gave it too few (shipped 2026-10-25).** The stroke takes 3000 ms of waiting. Story in `docs/plan-shipped.md` §19aa-8 (moved 2026-10-29, 19m-2). The paused hunt
   for why the app pushes less per step than the lab (the breath's share, the `still`
   threshold, the Dropper's bottle) is not answered: the toolAmount is 1, so
   `k = kRaw²` is 1, and the 0.75-cell `still` threshold is under the moves' one cell on a

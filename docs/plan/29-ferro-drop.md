@@ -130,72 +130,10 @@ the code's entry points, the checks to add and the scenes to match, in
     coarsens it). Until then magnetgain reads the drop's speed against the two-liquid law, with
     the rim's own factor `share·(ν_clear/ν_ff)^(1−φ)` applied per cell as the shader applies it,
     and a bar of 20% (the weak drop reads about -6% on software WebGPU, the strong one about +4%).
-  - ~~**29c-7. A resting drop dissolves into its halo.**~~ **Shipped** (#373; `npm run ferrorest`
-    4/4, story in `docs/plan-shipped.md` §29c). On the thin gap, `phaseCHVolume` used a constant
-    mobility at Cahn number ≈ 0.5 (an eight-cell drop on 384², `R = 0.022`, `phaseSharp = 0.75`),
-    so a curved edge's Gibbs–Thomson chemical potential shifted the bulk equilibrium to
-    `c_eq ≈ 0.021` and drove ferrofluid out into the clear oil at `2·M·dt` per substep: with no
-    magnet and nothing moving, a resting drop went from 116 half-full cells as poured (100 at the
-    20th step, where the check starts its clock) to 84 at the 200th, its peak fell `0.996 → 0.946`,
-    and its halo of cells over `0.01` grew by `+248` (`352 → 600`, from `222` as poured), step for
-    step as on `main` with `thinGap: 1`; a dragged drop continually left that halo behind in fresh
-    oil and re-made it as it moved, losing about half its ferrofluid (`352 → 1602` cells over
-    `0.01`). `phaseCHVolume` now multiplies each face's flux by the degenerate mobility
-    `mob = 4m(1 − m)` at the face's mean share `m = ½(c_p + c_q)`, with no floor (Elliott & Garcke
-    1996): antisymmetric across each face so `Σc·h` is conserved (to `0.011%` over 180 steps, against
-    a `9.8%` loss when evaluated at `c_p` alone), at most `1` so the explicit stability limit
-    (`≤ M_0`) is unchanged, and zero in pure oil and pure ferrofluid. At rest (`npm run ferrorest`,
-    4/4) the drop holds `90` of `100` half-full cells (`90.0%`, bar `>= 88%`), its peak holds
-    `0.975` (bar `>= 0.96`), and its halo grows by `+94` (`324 → 418`, bar `<= +120`), while on the
-    dragged drop the cells over `0.01` fall from `1602` to `1238`. The deep plate's `phaseCH` stays
-    as on `main` (under **29c-1**).
-  - ~~**29c-8. A dragged drop loses its trailing rim to the oil's return flow.**~~ **Shipped** (#495;
-    `npm run ferrodrag` 3/3 on the Mac GPU, story in `docs/plan-shipped.md` §29c). With the
-    limiter-matched `phaseCompress` (29c-1) and degenerate mobility in `phaseCHVolume` (29c-7) both
-    in place (`ferropress` 7/7, `magnetgain` 5/5, `ferrorest` 5/5), a drop dragged `0.3` of the
-    plate in 3 s under a `0.4` magnet at depth `0.2` (`npm run ferrodrag`) still lost its trailing
-    rim to the oil's dipole return flow (`ferrodrag` 1/3 on `main`: lag `3.24R` against the `2R` bar,
-    half-full cells `100 → 0` against the `±15%` bar, cells over `0.01` `324 → 1238`, centroid at
-    rest moved `0.010` cells). Where the drop's back rim thinned, the cell's single mixture velocity
-    `u_mix = φu_ff + (1 − φ)u_oil` turned backward with the oil closing in behind the drop, so
-    `phaseAdvectPlan` carried that faint ferrofluid into the wake and `phaseCompress` compressed it
-    along the wake rather than back into the drop. Chosen fix: **two-phase carry** (`phaseVelocity`
-    in `src/gpu/wgsl/fluid.ts`, writing `this.phaseVelT` read by `phaseAdvect`, `phaseAdvectPlan`
-    and `phaseCompress` while `this.vel` remains the mixture velocity for dye, oil and
-    `phaseMomentum`), chosen over a pre-projection Korteweg or contact-line force because any force
-    before `hsProject` still leaves a single projected cell velocity `u_mix` shared by both phases
-    (and any curl-free edge force is removed by the pressure projection). For each rim cell on a
-    thin gap when no labyrinth or standing-spike field is parting the pool (`cohere = (1 − 2·maze)·(1 − spikeAmt)`
-    while `!filmHeld`), `phaseVelocity` samples the half-full drop body (`φ >= 0.50`) within 11
-    cells weighted by `((φ − 0.50)/0.50)·exp(−r²/64)` to get the local body velocity `u_m` and
-    centre-of-mass offset `x_m`. It leaves `v` untouched whenever `dot(v.xy, u_m) >= |u_m|²` (so
-    radial squeeze flows under a press where `|u(r)| ∝ r` are a no-op: `ferropress` 7/7, middle
-    `0.968 → 0.981`, worst ring `0.012`), and weights the carry by position along the drop's motion
-    (`along = dot(x_m, u_m)/|u_m|`: full carry up to `φ = 0.96` on the trailing side `along > 0`,
-    and only the outer leading toe `φ < 0.49` on the leading side `along < 0` so the front
-    half-full contour keeps its two-liquid Darcy speed and MUSCL shear). On the Mac GPU,
-    `npm run ferrodrag` reaches **3/3** (lag `1.82R` against `2.0R`, half-full cells `100 → 106`,
-    `106.0%` kept against `±15%`, cells over `0.01` `324 → 378`, stationary control `0.010` cells),
-    `ferrohold` holds **5/5** (step 60 `110` half-full cells, centroid `0.426`; mean lead `1.69R`
-    vs `1.93R` with `phaseMomentum` off, `+0.24R` against `0.13R`; mean half-full `107.6` vs `92.6`
-    with `phaseCompress` off, `+15.0` against `13`), `magnetgain` holds **5/5** (`+2%` weak, `+3%`
-    strong against Darcy's), and `ferrorest` (`5/5`), `spikes` (`6/6`), `maze` (`4/4`), `fingers`
-    (`4/4`), `domes` (`4/4`) and `ferrohands` (`4/4`) are unchanged. Per the 29c-8 brief, `ferrodrag`
-    was not added to `checks.yml` in #495. The review found the deep plate riding `phaseVelT` after
-    Thin Gap was switched off (`runPhaseAdvect` keyed off `hsP`, which outlives Thin Gap): the dragged
-    drop, magnet off, slid on another `0.0425` of the plate in 120 steps and smeared to `0` half-full
-    cells; keyed off the step's own `thinLive` it stays (`0.6206 → 0.6241`, `104 → 94` half-full).
-  - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (this PR; story in `docs/plan-shipped.md` §29c):
-    `npm run ferrodrag` on the show shard (lines 1 to 3, 3/3 on Metal in 39 s), and `ferrohold` read
-    over the whole drag (steps 60 to 180) with its bars between the runs again (5/5 on Metal: lead
-    `1.74R` vs `2.07R`, half-full `105.8` vs `82.2`). The Thin-Gap-off line joined CI under 29c-11.
-  - ~~**29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**~~
-    **Shipped** (this PR; story in `docs/plan-shipped.md` §29c): the lab stayed thin for the first of
-    those "deep" steps while the old plate's pipelines built off the frame (`thinGapOn`), and on Metal
-    the build outlasted the drop's coast (57 of 120 steps deep on the real plate, 0 on the control).
-    `lab.step` now builds the old plate first after a thin step; lines 4 and 5 require all 120 steps
-    deep and run in CI (`npm run ferrodrag -- --thinoff`, show shard). Metal 5/5: real `0.09R`,
-    control `1.93R`.
+  - ~~**29c-7. A resting drop dissolves into its halo.**~~ **Shipped** (#373; `npm run ferrorest` 4/4; the deep plate's `phaseCH` stays as on `main`, under **29c-1**). Story in `docs/plan-shipped.md` §29c-7 (moved 2026-10-29, 19m-2).
+  - ~~**29c-8. A dragged drop loses its trailing rim to the oil's return flow.**~~ **Shipped** (#495; two-phase carry, `phaseVelocity` in `src/gpu/wgsl/fluid.ts`; `npm run ferrodrag` 3/3 on the Mac GPU). Story in `docs/plan-shipped.md` §29c-8 (moved 2026-10-29, 19m-2).
+  - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (`npm run ferrodrag` on the show shard, `ferrohold` 5/5 on Metal). Story in `docs/plan-shipped.md` §29c-10 (moved 2026-10-29, 19m-2).
+  - ~~**29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**~~ **Shipped** (`npm run ferrodrag -- --thinoff` in CI, Metal 5/5). Story in `docs/plan-shipped.md` §29c-11 (moved 2026-10-29, 19m-2).
   - **29c-12. Key `phaseVel()`'s default off `thinLive` before `phaseCompress` reaches the deep plate.**
     `runPhaseCompress` and `runPhasePlanned` call `phaseVel()` with `thin = true`, which today runs only
     on a thin step. Once `phaseCompress` moves onto the deep plate (29c-1), that default must be keyed
