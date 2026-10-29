@@ -10,6 +10,7 @@
  */
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,17 +29,21 @@ function defaultMachineId() {
   return String(process.env.CHROMAGLASS_MACHINE_ID || hostname() || 'local-mac').trim().slice(0, 128);
 }
 
+const EMPTY_STATE = () => ({ active: null, activations: {}, seatId: null, seats: {} });
+
 function readStateFile(filePath) {
   try {
-    if (!existsSync(filePath)) return { active: null, activations: {} };
+    if (!existsSync(filePath)) return EMPTY_STATE();
     const parsed = JSON.parse(readFileSync(filePath, 'utf8'));
-    if (!parsed || typeof parsed !== 'object') return { active: null, activations: {} };
+    if (!parsed || typeof parsed !== 'object') return EMPTY_STATE();
     return {
       active: parsed.active && typeof parsed.active === 'object' ? parsed.active : null,
       activations: parsed.activations && typeof parsed.activations === 'object' ? parsed.activations : {},
+      seatId: typeof parsed.seatId === 'string' && parsed.seatId ? parsed.seatId : null,
+      seats: parsed.seats && typeof parsed.seats === 'object' ? parsed.seats : {},
     };
   } catch {
-    return { active: null, activations: {} };
+    return EMPTY_STATE();
   }
 }
 
@@ -74,6 +79,33 @@ function readJsonBody(req) {
   });
 }
 
+/**
+ * Did a web page on another site send this? The licence routes act on whoever
+ * reaches this port from the laptop itself, and a page in any browser on the
+ * laptop can make that request: with no check, `fetch('http://localhost:3000/
+ * license-deactivate', { method: 'POST', mode: 'no-cors' })` from a stranger's
+ * site signs the running app out of its licence, in Safari and Firefox, which
+ * do not ask first as current Chrome does (the security audit of 2026-10-28,
+ * finding 10). A browser says where a request came from, in `Sec-Fetch-Site`
+ * and `Origin`, and a page cannot change either; a request with neither (curl,
+ * the checks, a script on this Mac) is not a page and is let through, since
+ * anything on the laptop could read the licence file anyway.
+ */
+function fromAnotherSite(req) {
+  const site = req.headers['sec-fetch-site'];
+  if (site !== undefined && site !== 'same-origin' && site !== 'none') return true;
+  const origin = req.headers.origin;
+  if (origin === undefined) return false;
+  try {
+    return new URL(origin).host.toLowerCase() !== String(req.headers.host ?? '').toLowerCase();
+  } catch {
+    return true; // `Origin: null`, from a sandboxed frame or a file: page
+  }
+}
+
+/** A body that is JSON, said so: a cross-site form or a plain fetch cannot send that without asking first. */
+const saysJson = (req) => /^application\/json\b/i.test(String(req.headers['content-type'] ?? ''));
+
 function sendJson(res, status, payload) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -88,15 +120,37 @@ export function createServerLicenseManager(options = {}) {
 
   function loadState() {
     const disk = readStateFile(filePath);
-    if (disk.active || Object.keys(disk.activations).length > 0) {
+    if (disk.active || disk.seatId || Object.keys(disk.activations).length > 0) {
       memState = disk;
     }
     return memState;
   }
 
+  // What a second Mac sees when the Worker says the seats are full.
+  function label() {
+    return String(options.label ?? process.env.CHROMAGLASS_MACHINE_LABEL ?? hostname()).slice(0, 80);
+  }
+
   function saveState(next) {
     memState = next;
     writeStateFile(filePath, next);
+  }
+
+  /**
+   * This install's name for the licence Worker's seat count (PLAN.md 23.17g).
+   * Not the host name `machineId` uses: two Macs both called "MacBook-Pro"
+   * would share one seat, and the host name is what the owner renames. A random
+   * id filed beside the key, so it survives a reinstall of the app (the
+   * licence file sits in the app's data folder) and is lost with that folder,
+   * which is a new seat, freed from the old Mac by "Remove from this computer".
+   */
+  function seatId() {
+    const state = loadState();
+    if (!state.seatId) {
+      state.seatId = randomUUID();
+      saveState(state);
+    }
+    return state.seatId;
   }
 
   async function currentStatus() {
@@ -119,6 +173,13 @@ export function createServerLicenseManager(options = {}) {
           machineId: state.active.machineId || machineId,
           machines,
           maxMachines: MAX_MACHINES_PER_KEY,
+          seatId: seatId(),
+          label: label(),
+          // Whether the licence Worker has said this Mac may hold the key. A key
+          // that has never reached the Worker (typed in offline) is false, and
+          // the page asks at its next online start; the answer is kept here for
+          // the starts that are offline (PLAN.md 23.17g).
+          seatConfirmed: Boolean(state.seats[check.id]),
           requireSignIn,
           enforced,
         };
@@ -135,12 +196,15 @@ export function createServerLicenseManager(options = {}) {
       machineId,
       machines: [],
       maxMachines: MAX_MACHINES_PER_KEY,
+      seatId: seatId(),
+      label: label(),
+      seatConfirmed: false,
       requireSignIn,
       enforced,
     };
   }
 
-  async function activate(rawKey, rawMachineId) {
+  async function activate(rawKey, rawMachineId, seatConfirmed) {
     const key = typeof rawKey === 'string' ? rawKey.trim() : '';
     const machineId = typeof rawMachineId === 'string' && rawMachineId.trim()
       ? rawMachineId.trim().slice(0, 128)
@@ -186,6 +250,10 @@ export function createServerLicenseManager(options = {}) {
     }
 
     state.activations[check.id] = existing;
+    // true files the Worker's yes; false takes it back (the Worker said full to a
+    // Mac that held a seat); undefined leaves it as it was.
+    if (seatConfirmed === true) state.seats[check.id] = Date.now();
+    else if (seatConfirmed === false) delete state.seats[check.id];
     state.active = {
       key,
       tier: check.tier,
@@ -221,6 +289,7 @@ export function createServerLicenseManager(options = {}) {
       if (check.id && Array.isArray(state.activations[check.id])) {
         state.activations[check.id] = state.activations[check.id].filter((m) => m !== machineId);
       }
+      if (check.id) delete state.seats[check.id];
     }
     if (!rawMachineId || state.active?.machineId === machineId) {
       state.active = null;
@@ -249,6 +318,15 @@ export function createServerLicenseManager(options = {}) {
       return;
     }
 
+    if (fromAnotherSite(req)) {
+      sendJson(res, 403, { error: 'cross-site' });
+      return;
+    }
+    if (req.method === 'POST' && !saysJson(req)) {
+      sendJson(res, 415, { ok: false, error: 'json-only' });
+      return;
+    }
+
     if (pathname === LICENSE_INFO_PATH && req.method === 'GET') {
       const status = await currentStatus();
       sendJson(res, 200, status);
@@ -263,7 +341,7 @@ export function createServerLicenseManager(options = {}) {
         sendJson(res, 400, { ok: false, error: 'invalid-json' });
         return;
       }
-      const result = await activate(body?.key, body?.machineId);
+      const result = await activate(body?.key, body?.machineId, typeof body?.seatConfirmed === 'boolean' ? body.seatConfirmed : undefined);
       sendJson(res, result.status, result.body);
       return;
     }

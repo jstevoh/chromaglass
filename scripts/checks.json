@@ -172,6 +172,30 @@
         "gallery runs on its label rather than on every push (PLAN.md 19a).",
         "A rename in one file would quietly undo either."
       ]
+    },    {
+      "name": "Where CI's keys can go",
+      "shard": "logic",
+      "run": "npm run cisecrets",
+      "why": [
+        "The deploy key and the Mac signing set only in jobs that run in their",
+        "main-only environments, the signing set never handed to a pull request's",
+        "run, no tag trigger on the Mac app, every workflow read-only at the top",
+        "and outside actions pinned to a commit (scripts/cisecrets.mjs; the security",
+        "audit of 2026-10-28). Each rule meets a broken copy of the real file first."
+      ]
+    },
+    {
+      "name": "No new file over 100 KB, no big file grows",
+      "shard": "logic",
+      "run": "npm run sizes",
+      "always": true,
+      "why": [
+        "The size ratchet (scripts/sizes.mjs, PLAN.md 19ai-5, 19ai-5d): a new file stays at or under",
+        "100 KB (past 40 KB, a warning), and one already over it may not grow past its ceiling in scripts/sizes.json,",
+        "which only shrinks against the base. It reads every file in the tree, so it runs on",
+        "every diff, a document's included. Its self-test grows a file, adds a 101 KB one, warns on a 41 KB one and",
+        "raises a ceiling in a scratch repository first."
+      ]
     },
     {
       "name": "The API scripts keep the token out of their errors",
@@ -181,6 +205,18 @@
         "The scripts that read GitHub's API never print the token: a 502 from",
         "it once printed the owner's whole token through flakes.mjs's error.",
         "Against a local server that answers 502, with the old way as control."
+      ]
+    },
+    {
+      "name": "The owner's Mac takes only main's deploys, and never holds one",
+      "shard": "logic",
+      "run": "npm run macguard",
+      "why": [
+        "The runner's job-started hook (scripts/macrunner-hook.sh) against every way",
+        "a job can arrive: main's push and run by hand taken; a branch, a pull",
+        "request, pull_request_target, workflow_run, a schedule, another workflow",
+        "on main and another repository refused. And the watchdog's stall rule",
+        "(scripts/macwatch.mjs) against made-up runs, between two shards included."
       ]
     },
     {
@@ -196,6 +232,16 @@
       "name": "The bands",
       "shard": "sound",
       "run": "npm run bands"
+    },
+    {
+      "name": "The ear's detectors",
+      "shard": "sound",
+      "run": "npm run eargc",
+      "why": [
+        "The seventeen onset detectors decide as the sorted history did and make",
+        "next to no garbage a frame (scripts/eargc.mjs, PLAN.md 14ab-7): against",
+        "the old detector verbatim, at 60, 144 and 400 refreshes a second."
+      ]
     },
     {
       "name": "Where songs end and begin",
@@ -357,6 +403,17 @@
         "step down gives something up, and that a rung asking for fewer device",
         "pixels actually gets fewer. That last one was inert for a long while",
         "and nothing looked."
+      ]
+    },
+    {
+      "name": "The step cadence",
+      "shard": "logic",
+      "run": "npm run cadence",
+      "why": [
+        "The plate takes its steps evenly (scripts/cadence.mjs, PLAN.md",
+        "14aa): on a display whose refresh is a whole ratio of the step",
+        "no frame stops or doubles the liquid, dropped refreshes are caught up,",
+        "and the model makes the old loop stutter as its control."
       ]
     },
     {
@@ -588,7 +645,7 @@
     {
       "name": "The sound cords",
       "shard": "logic",
-      "run": "npm run soundcords -- --controls",
+      "run": "npm run soundcords",
       "why": [
         "A sound cord's shape (PLAN 30a): tone bursts in and out of a dragged",
         "band, fires counted against the threshold and timed against the attack",
@@ -743,6 +800,19 @@
         "minutes on a slow runner, and this PR's lab part was cancelled at",
         "the limit twice with this check in it (2026-10-27). About a minute",
         "here, three to four in full: the build's PR weighs where it fits."
+      ]
+    },
+    {
+      "name": "A step asks for nothing it throws away",
+      "shard": "lab",
+      "run": "npm run encode",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
+        "PLAN.md Wave 4.1, H2c-4): the bytes it allocates and the writes it",
+        "makes a dispatch, counted in the page by Chromium's own heap sampler.",
+        "JavaScript's cost, which is the same on SwiftShader as on Metal, so it",
+        "sits here rather than in the Mac queue."
       ]
     },
     {
@@ -962,9 +1032,27 @@
         "The load (scripts/loadtime.mjs, PLAN.md 14v): the built site served",
         "with Brotli over a slowed network, and the page asks for the app's",
         "chunks alongside its entry and for the GPU before the app has",
-        "arrived, while the remote and a cast fetch no App chunk. The order is",
+        "arrived, while the remote and a cast fetch no App chunk; and the",
+        "webpage at chromaglass.art (a second build, with a demo sign-in) asks",
+        "for its own chunk beside the entry, for the app only once its first",
+        "picture is in, and for the GPU only at Play (14v-9). The order is",
         "what is judged, so no GPU is needed and a runner's speed cannot move",
         "it."
+      ]
+    },
+    {
+      "name": "The security headers",
+      "shard": "browser",
+      "run": "node scripts/csp.mjs",
+      "why": [
+        "The site's security headers (scripts/csp.mjs, PLAN.md 19ag): firebase.json's",
+        "CSP (frame-ancestors, object-src, base-uri, form-action enforced; the",
+        "rest report-only), Referrer-Policy, Permissions-Policy and nosniff,",
+        "served on the built site and opened as the show, the remote, a cast",
+        "and the static pages with a blob worker, blob media and the lookups",
+        "the app makes tried on top: nothing reported, the controls reported,",
+        "another origin cannot frame it. No GPU. The site \"The load\" just",
+        "built (`npm run csp` builds first, for a run by hand)."
       ]
     },
     {
@@ -1592,8 +1680,7 @@
         "degenerate mobility in phaseCHVolume holds its half-full core and",
         "halo against Ostwald ripening into the clear oil, conserves Σc·h, and",
         "does not move without a field, and sheds its half-full cells more",
-        "slowly in a second window (steps 200 to 380). `npm run ferrodrag` stays",
-        "out of CI as known red until PLAN 29c-8."
+        "slowly in a second window (steps 200 to 380)."
       ]
     },
     {
@@ -1618,13 +1705,30 @@
         "The dragged drop while it is dragged (PLAN 29c-8's neighbour): the",
         "ferrofluid carried along itself (phaseMomentum) and what the moving",
         "edge's limiter withheld paid back (phaseCompress), each held on its own",
-        "over steps 60 to 120 of `ferrodrag`'s scene, a window before the trailing",
-        "rim is lost to the oil's return flow. `ferrodrag` reads at three seconds,",
-        "red with both passes and without them, so it could not tell. The script",
+        "over steps 60 to 180 of `ferrodrag`'s scene (to 120 until 29c-8 kept the",
+        "trailing rim to the end of the drag; 29c-10). `ferrodrag` read at three",
+        "seconds, red with both passes and without them, so it could not tell. The script",
         "runs the scene three times (as given, phaseMomentum off, phaseCompress",
         "off) and requires each pass to be worth a margin, so the control is in",
         "the run and not done by hand once. On the fifth shard with",
-        "`magnetgain`: three scenes of 120 steps."
+        "`magnetgain`: three scenes of 200 steps."
+      ]
+    },
+    {
+      "name": "The dragged ferrofluid drop follows the magnet",
+      "shard": "show",
+      "run": "npm run ferrodrag -- --thinoff",
+      "why": [
+        "The closeup's ferrofluid drop dragged 0.3 of the plate in three",
+        "seconds (PLAN 29c, 29c-8): it follows the magnet within two radii and",
+        "keeps its half-full body within 15%, which the two-phase carry of its",
+        "trailing rim (phaseVelocity) made true on Metal, 3/3 (out of CI as",
+        "known red until then). With no magnet the drop does not move. With",
+        "`-- --thinoff` (PLAN 29c-11): Thin Gap off after the drag, all 120",
+        "steps deep, the drop stays put and stays a drop, and a lab whose deep",
+        "plate rides the thin gap's stale velocity is red on the same line",
+        "(the #495 review's fix, in the run). On the show shard, the lightest",
+        "on #495's run (14.2 minutes of 20); 39 s there for lines 1 to 3."
       ]
     },
     {

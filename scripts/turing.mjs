@@ -595,17 +595,17 @@ try {
   const shareM = /let above = cap \* mix\(([0-9.]+), ([0-9.]+), r\);/.exec(fluidSrc);
   if (!capM || !shareM) throw new Error('turing: the regime lines (cap, above) were not found in fluid.ts');
   const SPOT_CAP = Number(capM[1]) - Number(capM[2]) * FEED, SPOT_SHARE = Number(shareM[2]);
-  // The rate the app moves the Drift it hands the solver by is read from the visualizer, so the
+  // The rate the app moves the Drift it hands the solver by is read from the app (sim/constants.ts), so the
   // lab ramps as the app does and not as a number typed twice (a step of full Drift starves a tile).
-  const visSrc = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+  const visSrc = readFileSync(new URL('../src/sim/constants.ts', import.meta.url), 'utf8');
   const rateM = /const TURING_DRIFT_PER_SECOND = ([0-9.]+);/.exec(visSrc);
-  if (!rateM) throw new Error('turing: TURING_DRIFT_PER_SECOND was not found in LiquidVisualizer.tsx');
+  if (!rateM) throw new Error('turing: TURING_DRIFT_PER_SECOND was not found in sim/constants.ts');
   const DRIFT_RATE = Number(rateM[1]);
   // A "." parses to NaN, which Math.min would hand the shader without a word.
   if (!(Number.isFinite(DRIFT_RATE) && DRIFT_RATE > 0 && DRIFT_RATE <= 1)) throw new Error(`turing: TURING_DRIFT_PER_SECOND read as ${rateM[1]}, wanted a number in (0, 1]`);
   // The app counts the rate in solver iterations (a slow machine runs fewer a frame), and so does the lab.
   const iterM = /const TURING_ITERATIONS_PER_SECOND = ([0-9.]+);/.exec(visSrc);
-  if (!iterM || Number(iterM[1]) !== DRIFT_UNITS_PER_SECOND) throw new Error(`turing: TURING_ITERATIONS_PER_SECOND in LiquidVisualizer.tsx is ${iterM ? iterM[1] : 'missing'}, the lab ramps at ${DRIFT_UNITS_PER_SECOND}`);
+  if (!iterM || Number(iterM[1]) !== DRIFT_UNITS_PER_SECOND) throw new Error(`turing: TURING_ITERATIONS_PER_SECOND in sim/constants.ts is ${iterM ? iterM[1] : 'missing'}, the lab ramps at ${DRIFT_UNITS_PER_SECOND}`);
   const drift = await page.evaluate(async ({ FEED, KILL, DU, DV, SEEDS, SETTLE, RUN, ABOVE, TILE, PER_SECOND, RATE, DRIFTS, SPOT_KILL, SNAPS }) => {
     const N = 256;
     // Connected pieces of the activator (over ABOVE, four-way, the plate's outer 16 pixels left out

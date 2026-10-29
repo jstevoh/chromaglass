@@ -55,7 +55,8 @@ import { fitMarkForCast } from './lib/markFit';
 import { runBench, formatBench, readRenderer } from './lib/bench';
 import type { BenchOptions } from './lib/bench';
 import { BenchOverlay } from './components/BenchOverlay';
-import type { EngineStatus } from './lib/platform';
+import { isDesktopApp, type EngineStatus } from './lib/platform';
+import { isGlobalAmbientMode, setGlobalAmbientMode, onAmbientModeChange } from './lib/ambient';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
 import { PhonePlay } from './components/phone/PhonePlay';
@@ -71,6 +72,7 @@ import { MidiPanel } from './components/MidiPanel';
 import { MidiActivity } from './components/MidiActivity';
 import { useMidi } from './hooks/useMidi';
 import { useGamepad } from './hooks/useGamepad';
+import { GamepadRing } from './components/GamepadRing';
 import { useSceneCamera } from './hooks/useSceneCamera';
 import { useCameras } from './hooks/useCameras';
 import { cameraPresent } from './lib/cameras';
@@ -165,8 +167,8 @@ const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 function rememberedSource(): AudioSource {
   try {
     const raw = sessionStorage.getItem(AUDIO_SOURCE_KEY);
-    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker.
-    if (raw === 'microphone' || raw === 'simulated') return raw;
+    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker in a browser (never in the Mac app).
+    if (raw === 'microphone' || raw === 'simulated' || (raw === 'system' && isDesktopApp())) return raw;
   } catch { /* private */ }
   return 'none';
 }
@@ -510,6 +512,11 @@ export default function App() {
       };
     (window as unknown as { chromaglassGovernor?: () => unknown }).chromaglassGovernor =
       () => wallRef.current?.governor?.() ?? null;
+    (window as unknown as { chromaglassAmbient?: (on?: boolean) => boolean }).chromaglassAmbient =
+      (on?: boolean) => {
+        if (typeof on === 'boolean') setAmbientModeRef.current(on);
+        return isGlobalAmbientMode();
+      };
     (window as unknown as { chromaglassSanitizePatch?: typeof sanitizePatch }).chromaglassSanitizePatch = sanitizePatch;
     // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
     (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
@@ -560,6 +567,29 @@ export default function App() {
       (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => wallRef.current?.pourText(rows, opts);
     (window as unknown as { chromaglassBench?: unknown }).chromaglassBench =
       (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
+  }, []);
+
+  // ── Ambient TV mode (PLAN.md 23.8 / 14j): cool & quiet (60 Hz draw, 30 Hz physics) ──
+  const [ambientMode, setAmbientModeState] = useState<boolean>(() => isGlobalAmbientMode());
+  const setAmbientMode = useCallback((on: boolean) => {
+    setGlobalAmbientMode(on);
+    setAmbientModeState(on);
+    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { setAmbient?: (on: boolean) => void } }).__CHROMAGLASS_NATIVE__;
+    native?.setAmbient?.(on);
+  }, []);
+  const setAmbientModeRef = useRef(setAmbientMode);
+  setAmbientModeRef.current = setAmbientMode;
+  useEffect(() => {
+    const unsubGov = onAmbientModeChange((on) => setAmbientModeState(on));
+    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { onAmbientChange?: (fn: (on: boolean) => void) => () => void } }).__CHROMAGLASS_NATIVE__;
+    const unsubNative = native?.onAmbientChange?.((on) => {
+      setGlobalAmbientMode(on);
+      setAmbientModeState(on);
+    });
+    return () => {
+      unsubGov();
+      unsubNative?.();
+    };
   }, []);
 
   /*
@@ -873,6 +903,8 @@ export default function App() {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   /** The synthesised band, when that is what the show is listening to. */
   const simulatedRef = useRef<SimulatedMusic | null>(null);
+  /** The Mac app's system-audio loopback tap (PLAN.md 23.8). */
+  const systemTapRef = useRef<{ stop: () => void } | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   /** The wall's engine, always; `visualizerRef` is the desk's, which in Preview with a wall up is a copy (PLAN.md 8b; see `drafting`). */
   const wallRef = useRef<LiquidVisualizerHandle | null>(null);
@@ -1009,6 +1041,7 @@ export default function App() {
       setAudioStream(null);
     }
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
+    if (systemTapRef.current) { systemTapRef.current.stop(); systemTapRef.current = null; }
     // The drone owns an AudioContext and four running oscillators; leaving it
     // behind would keep them sounding under whatever replaced it.
     stopDrone();
@@ -1059,21 +1092,84 @@ export default function App() {
     try {
       let stream: MediaStream;
       if (source === 'system') {
-        // Raw, as the microphone below, and in stereo: a shared tab is the
-        // music itself. With plain `audio: true` Chrome shared a music tab as
-        // a call: one channel, with echo cancellation, noise suppression and
-        // auto gain all on. The show heard it processed, and a recording of
-        // it failed outright (the master's 320 kbps is more AAC than one
-        // channel carries). Plain again only if the constraints are refused,
-        // never after the person has said no to sharing.
-        try {
-          stream = await navigator.mediaDevices.getDisplayMedia({
+        const nativeTap = (window as unknown as {
+          __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: Float32Array, sampleRate: number) => void) => () => void };
+        }).__CHROMAGLASS_NATIVE__?.onSystemAudioPcm;
+        if (nativeTap) {
+          // Mac app (PLAN.md 23.8): ScreenCaptureKit loopback via setDisplayMediaRequestHandler
+          // (no tab picker) combined with the main-process loopback audio tap.
+          // Subscribe the PCM tap and hand `dest.stream` to `useAudioAnalyzer` immediately,
+          // before `getDisplayMedia` resolves (~0.8 s on macOS), so no early PCM packets
+          // are dropped while ScreenCaptureKit initializes.
+          const ctx = new AudioContext();
+          if (ctx.state === 'suspended') void ctx.resume();
+          // Under ?debug, for `npm run desktop` to say whether this context
+          // was running yet when it read the ear, beside the ear's own.
+          if (new URLSearchParams(window.location.search).has('debug')) {
+            (window as unknown as { __systemTapContext?: AudioContext }).__systemTapContext = ctx;
+          }
+          const dest = ctx.createMediaStreamDestination();
+          let displayStream: MediaStream | null = null;
+          let nextTime = 0;
+          let pcmChunks = 0;
+          const unsubPcm = nativeTap((samples: Float32Array, sampleRate: number) => {
+            if (!samples || samples.length === 0 || ctx.state === 'closed') return;
+            if (ctx.state === 'suspended') void ctx.resume();
+            const sr = sampleRate > 0 ? sampleRate : ctx.sampleRate;
+            const buf = ctx.createBuffer(1, samples.length, sr);
+            buf.getChannelData(0).set(samples);
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            src.connect(dest);
+            const now = ctx.currentTime;
+            // Give the first scheduled chunk 60 ms so React has committed `dest.stream`
+            // and `useAudioAnalyzer` has connected its `AnalyserNode`.
+            if (nextTime < now) nextTime = now + (pcmChunks === 0 ? 0.06 : 0.005);
+            src.start(nextTime);
+            nextTime += buf.duration;
+            pcmChunks += 1;
+          });
+          systemTapRef.current = {
+            stop: () => {
+              unsubPcm();
+              displayStream?.getTracks().forEach(t => t.stop());
+              if (ctx.state !== 'closed') void ctx.close();
+            },
+          };
+          stream = dest.stream;
+          setAudioStream(stream);
+          void navigator.mediaDevices.getDisplayMedia({
             audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
             video: true,
-          });
-        } catch (e) {
-          if (!(e instanceof TypeError) && (e as Error)?.name !== 'OverconstrainedError') throw e;
-          stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          }).then((ds) => {
+            if (ask !== sourceAskRef.current || ctx.state === 'closed') {
+              ds.getTracks().forEach(t => t.stop());
+              return;
+            }
+            displayStream = ds;
+            if (ds.getAudioTracks().length > 0) {
+              try {
+                ctx.createMediaStreamSource(ds).connect(dest);
+              } catch { /* fallback to PCM tap */ }
+            }
+          }, () => { /* loopback tap continues */ });
+        } else {
+          // Raw, as the microphone below, and in stereo: a shared tab is the
+          // music itself. With plain `audio: true` Chrome shared a music tab as
+          // a call: one channel, with echo cancellation, noise suppression and
+          // auto gain all on. The show heard it processed, and a recording of
+          // it failed outright (the master's 320 kbps is more AAC than one
+          // channel carries). Plain again only if the constraints are refused,
+          // never after the person has said no to sharing.
+          try {
+            stream = await navigator.mediaDevices.getDisplayMedia({
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
+              video: true,
+            });
+          } catch (e) {
+            if (!(e instanceof TypeError) && (e as Error)?.name !== 'OverconstrainedError') throw e;
+            stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+          }
         }
       } else {
         // Ask for the raw microphone. The browser's defaults — echo
@@ -3670,6 +3766,7 @@ export default function App() {
           // Straight from the render rather than from the cast snapshot, which
           // is assembled for a receiver and not for a question.
           isAutomated: l.isAutomated,
+          ambient: isGlobalAmbientMode(),
           settings: settingsRef.current,
           appRenders: appRendersRef.current,
         };
@@ -4656,9 +4753,9 @@ export default function App() {
   });
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassInputs?: unknown }).chromaglassInputs = () => ({ midi: { enabled: midi.enabled, input: midi.activeInputName, bindings: midi.map.bindings.length, learning: midi.learning }, gamepad });
+      (window as unknown as { chromaglassInputs?: unknown }).chromaglassInputs = () => ({ midi: { enabled: midi.enabled, input: midi.activeInputName, bindings: midi.map.bindings.length, learning: midi.learning }, gamepad: { connected: gamepad.connected, cursor: gamepad.cursor.get() } });
     }
-  }, [midi.enabled, midi.activeInputName, midi.map, midi.learning, gamepad]);
+  }, [midi.enabled, midi.activeInputName, midi.map, midi.learning, gamepad.connected, gamepad.cursor]);
   // ── A projector, noticed ──
   // A second screen that is not built in is the projector. Ask (a chip),
   // Automatic (the show goes there on the next click after it appears), or
@@ -4667,12 +4764,11 @@ export default function App() {
     send: (screen) => { void startCast('window', screen); },
     casting: isCasting,
   });
-  const gamepadCursorStyle = useMemo(() => {
-    if (!gamepad.cursor.visible) return null;
+  // Where the controller's ring is drawn: the plate's rectangle, or the window before it has one.
+  const gamepadRingRect = useCallback(() => {
     const r = visualizerRef.current?.drawnRect?.();
-    const box = r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-    return { left: box.left + gamepad.cursor.x * box.width, top: box.top + (1 - gamepad.cursor.y) * box.height };
-  }, [gamepad.cursor]);
+    return r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+  }, []);
 
   // ── ⌘K, and the keys a hand finds in the dark ───────────────────
   /*
@@ -4967,6 +5063,8 @@ export default function App() {
       onDrone={changeDrone}
       droneRunning={droneRunning}
       onDroneToggle={toggleDrone}
+      ambientMode={ambientMode}
+      onAmbientMode={setAmbientMode}
       readLevel={readLevel}
       deaf={earDeaf}
       embed={embed}
@@ -5053,6 +5151,7 @@ export default function App() {
       onWallTest={setWallTest}
       tempo={tempoLabel}
       readTempo={readTempo}
+      readEar={() => ear.live.current?.features ?? null}
       spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
       onTap={tapTempo}
       onTempoClear={clearTempo}
@@ -5175,13 +5274,7 @@ export default function App() {
         which is how a hand on a dish aims anyway; the design screen keeps it
         for finding where the cursor is. `npm run showcursor` asks both.
       */}
-      {gamepadCursorStyle && overlaysVisible && (
-        <div
-          className="pointer-events-none fixed z-30 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80 shadow-[0_0_12px_rgba(255,255,255,0.6)] transition-transform"
-          style={{ left: gamepadCursorStyle.left, top: gamepadCursorStyle.top, width: gamepad.cursor.pressing ? 44 : 28, height: gamepad.cursor.pressing ? 44 : 28, backgroundColor: gamepad.cursor.pressing ? `${selectedLiquid?.color ?? '#fff'}55` : 'transparent' }}
-          data-testid="gamepad-cursor"
-        />
-      )}
+      {overlaysVisible && <GamepadRing cursor={gamepad.cursor} rect={gamepadRingRect} colour={selectedLiquid?.color ?? '#fff'} />}
 
       {/* The music file's player: always audible, never in the way */}
       <audio ref={musicElRef} className="hidden" preload="auto"
@@ -6136,6 +6229,8 @@ export default function App() {
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
             recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, choice: recordChoice, onChoice: setRecordChoice }}
+            ambientMode={ambientMode}
+            onAmbientMode={setAmbientMode}
             onHide={hideOverlays}
             onFullLayout={() => {
               try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
