@@ -452,17 +452,42 @@ function projectorWindowOptions(features) {
   };
 }
 
-function fillOnLoad(win) {
-  const fill = () => {
-    if (win.isDestroyed()) return;
-    // `true`: run as if from a gesture, which is what the page's full screen asks for.
-    win.webContents.executeJavaScript(
-      "document.fullscreenElement ? true : document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => true, () => false)",
-      true,
-    ).catch(() => { /* closed before it loaded */ });
-  };
-  win.webContents.on('did-finish-load', fill);
+/*
+  Fill a projector window's screen. The page's own full screen first, run as
+  if from a gesture (`true`), which is what it asks for and what the page
+  reads back (`document.fullscreenElement`). If that is refused, the window's
+  own full screen: on a plain window like this one it hides the title bar
+  just the same, and the show counts a window whose page covers its screen
+  as filling it (useCastSession's `readWindowFullscreen`).
+*/
+async function fillProjector(win) {
+  if (win.isDestroyed()) return false;
+  const page = await win.webContents.executeJavaScript(
+    "document.fullscreenElement ? true : document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => true, () => false)",
+    true,
+  ).catch(() => false);   // closed before it loaded
+  if (!page && !win.isDestroyed()) win.setFullScreen(true);
+  return !win.isDestroyed() && (page || win.isFullScreen());
 }
+
+function fillOnLoad(win) {
+  win.webContents.on('did-finish-load', () => { void fillProjector(win); });
+}
+
+/*
+  The projector windows each show window opened, so the laptop's "Make it
+  full screen" (ProjectorFillChip) can ask for its own again. Once the page
+  has loaded, nothing puts a window back that left full screen (Escape on
+  the wall, or the Mac moving it out of its Space), and a click on the show
+  has to reach the projector's page to do it; from here it needs no gesture.
+  Only a window this sender opened is touched.
+*/
+const projectorsOf = new Map();
+ipcMain.handle('chromaglass:fill-projector', async (e) => {
+  const mine = [...(projectorsOf.get(e.sender.id) ?? [])].filter((w) => !w.isDestroyed());
+  const filled = await Promise.all(mine.map(fillProjector));
+  return filled.some(Boolean);
+});
 
 /** What each projector window was opened with, for the check to see which screen the page chose. */
 const opened = [];
@@ -479,7 +504,14 @@ function wireWindow(win) {
     if (/^https?:/.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
-  win.webContents.on('did-create-window', (child) => { wireWindow(child); fillOnLoad(child); });
+  win.webContents.on('did-create-window', (child) => {
+    wireWindow(child);
+    fillOnLoad(child);
+    const id = win.webContents.id;
+    if (!projectorsOf.has(id)) projectorsOf.set(id, new Set());
+    projectorsOf.get(id).add(child);
+    child.on('closed', () => projectorsOf.get(id)?.delete(child));
+  });
   win.webContents.on('will-navigate', (e, url) => {
     if (isOurs(url)) return;
     e.preventDefault();

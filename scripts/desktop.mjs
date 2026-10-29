@@ -861,6 +861,139 @@ try {
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
     !probeSeen ? 'the guard never refused the probe, so it saw nothing' : outside.length ? outside.slice(0, 6).map((b) => `${b.type} ${b.url}`).join(', ') : 'every request the pages made was to the app itself');
 
+  // ── the wall's title-bar chip (PLAN 14af) ─────────────────────────
+  /*
+    The title-bar chip, when the wall leaves full screen (the owner,
+    2026-10-29: "I can't get rid of this popup. I don't even know what it
+    means."). The line above only says the chip is absent while the window
+    fills its screen, which a chip that never mounts passes too. This takes
+    the projector out of full screen, as Escape on the wall does, and asks of
+    the chip what the owner could not get from it:
+
+    - that it comes up, inside the hook's 400 ms poll and a margin;
+    - that its button puts the window back (here through main.js's
+      `fillProjector`, the Mac app's own path), and the chip goes;
+    - that, framed again, its X takes it away and it stays away 2 s later
+      (five polls) while the window is still framed (read framed at that
+      moment, or the dismissal was the window filling, not the X), and
+      through the wall filling and leaving full screen once more.
+
+    It runs last, before the quit, and leaves the wall framed and smaller
+    than its screen: nothing after it reads the wall's picture, so nothing
+    has to be put back.
+
+    It needs the projector to have been filling its screen to start from;
+    the line above already fails a run where it was not, so this one says
+    so and leaves it there.
+  */
+  if (cast && castState?.full) {
+    const wallState = () => electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return null;
+      return { page: await w.webContents.executeJavaScript('!!document.fullscreenElement'), window: w.isFullScreen(), short: await w.webContents.executeJavaScript('innerWidth < screen.width - 1 || innerHeight < screen.height - 1') };
+    }, cast.id).catch(() => null);
+    const leaveFull = () => electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return;
+      await w.webContents.executeJavaScript('document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : null', true);
+      if (w.isFullScreen()) w.setFullScreen(false);
+      // The window leaves full screen after the page does, and puts back its
+      // old bounds when it has: resized before then, it is put back over the
+      // resize (the second pass of this line, once, before this wait).
+      for (let i = 0; i < 40 && w.isFullScreen(); i++) await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 200));
+      // Smaller than its screen, as a framed window is. The window is made
+      // the size of its display (main.js), and under Xvfb there is no window
+      // manager to draw a title bar, so a window left at that size has none
+      // and the app rightly counts it as filling the screen.
+      const b = w.getBounds();
+      w.setBounds({ x: b.x + 40, y: b.y + 40, width: Math.round(b.width * 0.8), height: Math.round(b.height * 0.8) });
+    }, cast.id).catch(() => {});
+    const chipCount = () => page.locator('[data-testid=projector-fill]').count();
+    const waitFor = async (ok, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ok()) return Date.now() - t0; await sleep(100); } return null; };
+    const framed = async () => { const s = await wallState(); return !!s && !s.page && !s.window && s.short; };
+    // Filled only on a read that says so: a wall that closed, reloaded or
+    // could not be read is not a filled one (the check-skeptic, 2026-10-29).
+    const filled = async () => { const s = await wallState(); return !!s && (s.page || s.window || !s.short); };
+    const chipUp = () => waitFor(async () => (await chipCount()) > 0, 2000);
+    const NAME = "projector: the title-bar chip comes up when the wall leaves full screen, its button fills the wall from the app's side, and its X keeps it hidden for that window";
+
+    await leaveFull();
+    const left = await waitFor(framed, 4000);
+    const chipUpIn = left === null ? null : await chipUp();
+    const text = chipUpIn === null ? '' : ((await page.locator('[data-testid=projector-fill-text]').textContent().catch(() => '')) ?? '').trim();
+    /*
+      The button, with the wall's page refusing its own full screen. Under
+      Xvfb the page's full screen is granted, so the delegated message alone
+      would fill the wall and a broken `fillProjector` (the IPC, the preload,
+      main.js's list of projectors) would pass, and so would a hook that no
+      longer counts the window's own full screen. Refused, the one way back is
+      main.js falling back to `setFullScreen`: the window full, the page not,
+      and the chip has to go on the window's say alone.
+    */
+    let filledIn = null, chipGoneIn = null, how = null, wmStandIn = false;
+    if (chipUpIn !== null) {
+      await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+        const w = BrowserWindow.fromId(id);
+        if (w && !w.isDestroyed()) await w.webContents.executeJavaScript('document.documentElement.requestFullscreen = () => Promise.reject(new Error("refused by the check")); true');
+      }, cast.id).catch(() => {});
+      await page.locator('[data-testid=projector-fill-go]').click();
+      filledIn = await waitFor(async () => { const s = await wallState(); return !!s && s.window && !s.page; }, 5000);
+      how = await wallState();
+      /*
+        The window's full screen covers its screen on a Mac (after its
+        animation). Under Xvfb there is no window manager to do that: the
+        window says it is in full screen and keeps its size, so its page
+        stays short of the screen and the app, rightly, still sees a frame.
+        There the check does the window manager's part and sizes it to its
+        display, and says it did. Either way the chip then has to go on the
+        page covering its screen alone, the page's own full screen refused.
+      */
+      if (filledIn !== null && (await waitFor(async () => { const t = await wallState(); return !!t && !t.short; }, 2500)) === null) {
+        wmStandIn = true;
+        await electronApp.evaluate(({ BrowserWindow, screen }, id) => {
+          const w = BrowserWindow.fromId(id);
+          if (w && !w.isDestroyed()) w.setBounds(screen.getDisplayMatching(w.getBounds()).bounds);
+        }, cast.id).catch(() => {});
+      }
+      chipGoneIn = filledIn === null ? null : await waitFor(async () => (await chipCount()) === 0, 2000);
+    }
+    /*
+      The X: framed again, dismissed, and still away 2 s later with the wall
+      still framed (or the dismissal was the wall filling). Then the wall
+      fills and leaves full screen once more, and the chip must stay away:
+      an X held only until the next change of state would pass the first
+      half. A new window asking again needs a second Send to wall; that is
+      `hold()` clearing it, not measured here.
+    */
+    let dismissedStays = null, stillFramed = null, again = null, staysThrough = null;
+    if (chipGoneIn !== null) {
+      await leaveFull();
+      again = (await waitFor(framed, 4000)) !== null && (await chipUp()) !== null;
+      if (again) {
+        await page.locator('[data-testid=projector-fill-dismiss]').click();
+        await sleep(2000);
+        dismissedStays = (await chipCount()) === 0;
+        stillFramed = await framed();
+        await electronApp.evaluate(({ BrowserWindow }, id) => { BrowserWindow.fromId(id)?.setFullScreen(true); }, cast.id).catch(() => {});
+        const refilled = (await waitFor(filled, 4000)) !== null;
+        await sleep(600);
+        await leaveFull();
+        const reframed = (await waitFor(framed, 4000)) !== null;
+        await sleep(1500);
+        staysThrough = refilled && reframed ? (await chipCount()) === 0 : null;
+      }
+    }
+    check(NAME,
+      chipUpIn !== null && /full screen/i.test(text) && filledIn !== null && chipGoneIn !== null && dismissedStays === true && stillFramed === true && staysThrough === true,
+      left === null ? 'the wall never left full screen'
+        : chipUpIn === null ? 'no chip within 2 s of the wall leaving full screen'
+        : `chip up in ${chipUpIn} ms ("${text}"); with the page's own full screen refused, the button ${filledIn === null ? `left the wall unfilled by the window for 5 s (page ${how?.page}, window ${how?.window})` : `filled the wall by the window's full screen in ${filledIn} ms${wmStandIn ? ' (sized to its display by the check, as no window manager did)' : ''}, the chip ${chipGoneIn === null ? 'still up 2 s later' : `gone ${chipGoneIn} ms after`}`}${again === false ? '; the second time out of full screen, the wall or the chip did not come back, so the X was never tried' : ''}${dismissedStays === null ? '' : `; after its X the chip ${dismissedStays ? 'stayed away' : 'came back'} for 2 s with the wall ${stillFramed ? 'still framed' : 'filled again (so the X was not what was measured)'}`}${dismissedStays === null ? '' : staysThrough === null ? '; the wall could not be filled and framed again to try the X a second time' : `, and ${staysThrough ? 'stayed away' : 'came back'} after the wall filled and left full screen once more`}`);
+  } else {
+    check("projector: the title-bar chip comes up when the wall leaves full screen, its button fills the wall from the app's side, and its X keeps it hidden for that window", false,
+      cast ? 'the wall was not filling its screen to start from (the line above says why)' : 'no projector window opened');
+  }
+
   // ── quits ──────────────────────────────────────────────────────────
   const projectorOpen = (await allWindows()).some((w) => /[?&]cast=/.test(w.url));
   await electronApp.evaluate(({ BrowserWindow }, find) => { new Function('BrowserWindow', `return ${find}`)(BrowserWindow)?.close(); }, SHOW_WINDOW);
