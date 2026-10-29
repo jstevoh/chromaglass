@@ -32,7 +32,8 @@ the plate moving with its sound on: a still of a liquid light show sells nothing
 **What not to claim.** Syphon, NDI and Spout (13.2, 13.3), the DAW bridge (13.7), Windows
 (13-win) and the iPhone app (§12) are planned, not built: no post says otherwise until
 each ships. No clip uses a song we have no licence for (Content ID takes the video down
-or its earnings); every track's licence is named in the description. The marketing's
+or its earnings), except the album show's claimed albums under 37x-1's rule; every
+track's licence, or its rights holder, is named in the description. The marketing's
 numbers (views, sign-ins, sales) are the owner's and stay in the project's files, never in
 this public repository.
 
@@ -241,6 +242,14 @@ song a chapter, premiered at a fixed hour and kept as a video. The build items a
     download without CC) is a licence to listen, not to sync or publish, and YouTube
     Music's terms forbid downloading or reusing its tracks. Once an artist has agreed
     (37x-2), a file bought from Qobuz or Bandcamp is the right audio to render from.
+  - *Where the audio comes from, technically.* A Qobuz or Bandcamp purchase downloads as
+    plain FLAC with no copy protection: the owner buys it (their account, their card), it
+    lands in the album's queue folder (37x-7), and the album render (37x-4) reads the
+    files. Qobuz's streaming and YouTube Music give no files: neither has an official way
+    to take the audio out, and the tools that do break their terms and break often. The
+    fallback for anything that plays on the Mac is the Mac app's system-audio input: the
+    album plays in its own app while Record films the plate, in real time, with the Mac
+    tied up and whatever stutters happened in the take, unlike the offline render.
   - *Popular albums are not viable on this channel.* The owner asked 2026-10-29 whether a
     licensed album could go up anyway, letting the rights holder take YouTube's earnings.
     Content ID often does exactly that (the label "monetizes" the claim and the video stays
@@ -248,7 +257,17 @@ song a chapter, premiered at a fixed hour and kept as a video. The build items a
     video has views: many labels block whole-album uploads outright, a live stream is cut
     off when a claim matches, and a manual takedown is a copyright strike; three strikes
     delete the channel and every look video on it. A single famous song in a short clip is
-    the same gamble at a smaller scale. So the weekly show uses only cleared music.
+    the same gamble at a smaller scale.
+  - *The owner's answer, 2026-10-29:* "I'm ok with it hitting contentID - I want to
+    support the artists." So popular albums can be played, with the rights holder taking
+    the earnings, under one rule: each album is uploaded private days ahead (37s), and goes
+    public only when every claim on it comes back as *monetize*; a block in any territory,
+    or a claim that mutes the audio, means the album is skipped and the next one in the
+    queue plays. Where they go is the owner's pick, made the same day: on a **second
+    channel**, so a later manual takedown can
+    strike only that channel, while the main channel keeps cleared music and artist
+    collaborations. A claimed album is never streamed live (37x-6): a Premiere of the
+    already-checked upload, only.
   - Even a CC track can be claimed, when its artist's distributor registers it in Content
     ID; uploading private days ahead (37s) shows the claim before the Premiere, and the
     licence is the dispute.
