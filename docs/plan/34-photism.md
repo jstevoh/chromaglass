@@ -54,6 +54,39 @@ a grid of generic stock thumbnails: ours are the plate itself.
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
   note goes unsigned unless the owner says otherwise.
+- **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
+  synth people, producers and artists, who need the technical capabilities before they pay.)*
+  `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search
+  engine), at `/pro` through a `firebase.json` rewrite and linked from the landing's price section
+  as `/pro.html`. Sections: sync and control, Ableton and DAWs, sound in, projectors, lights,
+  recording, the spec table, a Free / Home / Pro table and a FAQ. Every claim was checked against
+  the code and `docs/guide.md` on 2026-10-29; what the plan has and the app does not (Syphon and NDI
+  13.2–13.3, the DAW bridge 13.7, Ableton Link and OSC out 13.5, several outputs 36b, patch inputs
+  24.1, notes as voices 24.3, YouTube Live 37x-4, Windows 13-win) is marked *on the way*. The same
+  check found the landing's Pro card, the Settings tiles (`APP_FEATURE_TILES`) and the upgrade card
+  (`RunLocallyCard`) selling "several projectors with edge blending" and "MIDI out", which do not
+  ship: the app drives one projector output, mapped into up to sixteen surfaces on every tier, and
+  MIDI out is a controller's LEDs. Those lines now name OSC, Art-Net, the 1024² grid and cloud
+  sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
+  Found along the way:
+  - **34a-7a. OSC and Art-Net are not gated.** Only the 1024² grid and cloud sync check for a Pro
+    key; a Home key gets OSC and Art-Net in the app (`desktop/main.js`, `server/` have no tier
+    check). The page and the cards sell them as Pro, as §23's table does. Put both behind
+    `canUseProFeature()` in the app, or move them to Home on the page (the owner's call, asked
+    2026-10-29). *Measure:* `npm run tiers` with a Home key reads OSC and Art-Net refused.
+  - **34a-7b. The Terms' Pro line promises what does not ship.** `public/terms.html` lists
+    multi-projector edge blending, Syphon, Spout, NDI and MIDI out under Pro. Legal text, so the
+    owner's words: make it name what ships and say the rest arrives as updates.
+  - **34a-7c. Art-Net has no panel in the Mac app.** It is set only by `ARTNET_*` environment
+    variables when the show server starts, which a Finder launch never sets, though
+    `desktop/README.md` says it works "with no terminal". A Show menu item or a Settings → Wall
+    card for host, universe, fixtures, order and the in-map, kept in the app's settings.
+  - **34a-7d. Network displays cannot start over the Wi-Fi.** A `?cast` page at an `http://`
+    address gets no WebGPU (14m-https, #443), so "more screens on other computers" is not sold yet.
+  - **34a-7e. The Ableton route, tried end to end on the owner's Mac.** The page tells a Live user
+    to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
+    whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
+    the set beside the page as a download.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

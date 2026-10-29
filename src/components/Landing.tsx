@@ -99,8 +99,8 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     price: '$199',
     lines: [
       'Everything in Home',
-      'Several projectors with edge blending',
-      'OSC, Art-Net / DMX and MIDI out',
+      'OSC and Art-Net / DMX in the Mac app',
+      'The finest 1024² grid, and cloud sync of your looks',
     ],
   },
 ];
@@ -253,7 +253,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Free to play. Pay for the app.</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
           The whole plate is free in your browser, and it stays free: this is not a trial. Home and Pro add the Mac app and what a show needs:
-          full-length recordings with no mark, the phone remote, more projectors. Pay once, no subscription. Start with Home and move to
+          full-length recordings with no mark, the phone remote, OSC and Art-Net for a rig. Pay once, no subscription. Start with Home and move to
           Pro later for the $164 difference. Buying opens soon.
         </p>
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -269,6 +269,10 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </div>
           ))}
         </div>
+        {/* What a rig needs to know, on a page of its own (PLAN.md 34a-7). */}
+        <p data-cg-landing-pro="" className="mt-4 text-[14px] leading-relaxed text-text-2">
+          Playing a rig? <a href="/pro.html" className="underline underline-offset-2 hover:text-text">What it syncs with, plugs into and records</a>, for VJs, synth players and producers.
+        </p>
         {/* The Mac app's download is a public file (the owner's choice,
             2026-10-25); the app opens only on a Home or Pro key (PLAN.md
             23.17d: the owner chose Home too, 2026-10-26). On a phone or a PC

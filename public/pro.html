@@ -1,0 +1,472 @@
+<!doctype html>
+<!--
+  The page for the people who will pay (PLAN.md 34a-7).
+
+  What was asked (the owner, 2026-10-29): a part of the website for VJs, synth
+  and modular players, producers and artists, who spend money only once their
+  technical questions are answered: what it syncs to, what it plugs into, how it
+  goes on a projector, what it records.
+
+  Why a page of its own and not more of the landing page: the landing page sells
+  the feeling to everyone, and a rider's worth of port numbers and codecs would
+  bury that. Why a static file, as the Terms are, and not a React route: nothing
+  here needs the engine, Firebase or the intro, so it paints at once, a search
+  engine and a link preview read all of it, and the app's boot path (the landing
+  decision in main.tsx, `npm run startup`) is untouched.
+
+  Every line was checked against the code and docs/guide.md on 2026-10-29, and
+  only what ships is sold. What the plan has but the app does not is under "On
+  the way", with no dates. When an item ships or a gate moves (src/lib/tierGates.ts),
+  this page changes in the same PR. The look follows the landing page's tokens
+  (src/index.css @theme): the same black, greys, violet focus ring and Geist.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ChromaGlass for pros: sync, projectors, recording, spec</title>
+<meta name="description" content="What ChromaGlass connects to and puts out, for VJs, synth players, producers and artists: MIDI clock and timecode, OSC, Art-Net, projector mapping, system audio, 4K renders, and exactly what ships today.">
+<meta property="og:title" content="ChromaGlass for pros">
+<meta property="og:description" content="MIDI clock and timecode, OSC, Art-Net, projector mapping, system audio and 4K renders, for VJs, synth players, producers and artists.">
+<meta property="og:image" content="https://chromaglass.art/og-card.png">
+<meta property="og:url" content="https://chromaglass.art/pro">
+<meta name="theme-color" content="#0A0A0B">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0A0A0B; --surface: #111113; --elevated: #18181B;
+    --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.14);
+    --text: #FAFAFA; --text-2: #D4D4D8; --muted: #A1A1AA; --dim: #71717A;
+    --accent: #8B5CF6; --accent-text: #C4B5FD; --accent-bg: rgba(139,92,246,.14); --accent-border: rgba(139,92,246,.45);
+    --ok: #4ADE80;
+    --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  a { color: inherit; }
+  a:focus-visible, .btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); border-radius: 8px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+  @media (min-width: 640px) { .wrap { padding: 0 32px; } }
+
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: 8px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+  .brand img { width: 28px; height: 28px; }
+  .top nav { display: flex; gap: 4px; font-size: 14px; }
+  .top nav a { color: var(--text-2); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; }
+  .top nav a:hover { color: var(--text); }
+
+  .hero { position: relative; isolation: isolate; overflow: hidden; border-bottom: 1px solid var(--border); }
+  .hero .bg { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+  .hero .scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(to bottom, rgba(10,10,11,.7) 0%, rgba(10,10,11,.55) 40%, rgba(10,10,11,.9) 85%, #0a0a0b 100%); }
+  .hero .inner { padding-top: 64px; padding-bottom: 56px; }
+  @media (min-width: 640px) { .hero .inner { padding-top: 112px; padding-bottom: 80px; } }
+  .kicker { font: 500 12px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin: 0 0 14px; }
+  h1 { font-size: clamp(34px, 7.5vw, 60px); line-height: 1.05; letter-spacing: -.025em; font-weight: 600; margin: 0; max-width: 18ch; }
+  .lede { margin: 16px 0 0; max-width: 38rem; font-size: 17px; line-height: 1.6; color: var(--text-2); }
+  .ctas { margin-top: 28px; display: flex; flex-direction: column; gap: 12px; }
+  @media (min-width: 560px) { .ctas { flex-direction: row; } }
+  .btn { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border-radius: 8px; padding: 0 24px; font-size: 15px; font-weight: 500; text-decoration: none; }
+  .btn.primary { background: var(--text); color: var(--bg); }
+  .btn.primary:hover { opacity: .9; }
+  .btn.ghost { border: 1px solid var(--border-strong); color: var(--text-2); }
+  .btn.ghost:hover { background: rgba(255,255,255,.05); }
+  .jump { margin: 22px 0 0; display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; }
+  .jump a { display: inline-flex; min-height: 36px; align-items: center; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; color: var(--muted); text-decoration: none; background: rgba(10,10,11,.5); }
+  .jump a:hover { color: var(--text); border-color: var(--border-strong); }
+
+  section.block { padding: 56px 0; border-bottom: 1px solid var(--border); scroll-margin-top: 8px; }
+  @media (min-width: 640px) { section.block { padding: 80px 0; } }
+  section.alt { background: var(--surface); }
+  h2 { font-size: clamp(24px, 4.5vw, 32px); line-height: 1.15; letter-spacing: -.015em; font-weight: 600; margin: 0; }
+  .sub { margin: 10px 0 0; max-width: 40rem; font-size: 15px; line-height: 1.65; color: var(--muted); }
+  .grid { margin-top: 32px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 1040px) { .grid.three { grid-template-columns: 1fr 1fr 1fr; } }
+  .card { border: 1px solid var(--border); border-radius: 12px; background: var(--bg); padding: 20px; min-width: 0; }
+  section.alt .card { background: var(--elevated); }
+  .card h3 { font-size: 16px; font-weight: 500; margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .card p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
+  .card ul { margin: 10px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--muted); }
+  .card li { margin: 5px 0; }
+  .card strong, .sub strong { color: var(--text-2); font-weight: 500; }
+  .tag { flex: none; font: 500 11px/1 var(--mono); letter-spacing: .04em; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--border-strong); color: var(--muted); white-space: nowrap; }
+  .tag.pro { color: var(--accent-text); border-color: var(--accent-border); background: var(--accent-bg); }
+  .soon { margin-top: 12px; font-size: 13px; line-height: 1.55; color: var(--dim); }
+  .soon b { font-weight: 500; color: var(--muted); }
+  code, pre { font-family: var(--mono); font-size: 12.5px; }
+  code { color: var(--text-2); }
+  pre { margin: 12px 0 0; padding: 12px 14px; border-radius: 8px; background: rgba(255,255,255,.03); border: 1px solid var(--border); color: var(--text-2); overflow-x: auto; line-height: 1.6; }
+
+  /* The spec and the tiers are tables a phone reads too: the spec stacks its two
+     columns under 560px, and the tier table keeps four short columns that fit
+     a 360px screen without a sideways scroll of the page. */
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .spec { margin-top: 28px; }
+  .spec th, .spec td { text-align: left; vertical-align: top; padding: 12px 0; border-top: 1px solid var(--border); }
+  .spec th { width: 30%; font-weight: 500; color: var(--text-2); padding-right: 20px; }
+  .spec td { color: var(--muted); line-height: 1.55; }
+  .spec tr.group th { padding-top: 28px; border-top: none; font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+  @media (max-width: 559px) {
+    .spec th, .spec td { display: block; width: auto; padding: 0; border: none; }
+    .spec th { padding-top: 14px; border-top: 1px solid var(--border); }
+    .spec td { padding: 4px 0 14px; }
+    .spec tr.group th { padding-top: 24px; border-top: none; }
+  }
+  .tiers { margin-top: 28px; table-layout: fixed; }
+  .tiers th, .tiers td { padding: 11px 6px; border-top: 1px solid var(--border); text-align: center; vertical-align: top; line-height: 1.4; }
+  .tiers th:first-child, .tiers td:first-child { text-align: left; padding-left: 0; width: 40%; color: var(--text-2); }
+  .tiers thead th { border-top: none; font-weight: 500; font-size: 15px; }
+  .tiers thead th span { display: block; font: 400 12px/1.4 var(--mono); color: var(--muted); margin-top: 2px; }
+  .tiers td { color: var(--muted); font-size: 13px; }
+  .tiers .y { color: var(--ok); font-size: 15px; }
+  .tiers .n { color: var(--dim); }
+  .tiers .pro { background: var(--accent-bg); }
+  @media (max-width: 559px) { .tiers { font-size: 12.5px; } .tiers td { font-size: 12px; } .tiers th:first-child, .tiers td:first-child { width: 37%; } }
+  .note { margin-top: 14px; font-size: 13px; line-height: 1.6; color: var(--dim); max-width: 46rem; }
+
+  .faq { margin-top: 24px; max-width: 46rem; }
+  details { border-top: 1px solid var(--border); }
+  details:last-child { border-bottom: 1px solid var(--border); }
+  summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding: 12px 0; font-size: 16px; font-weight: 500; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font: 400 20px/1 var(--mono); color: var(--dim); flex: none; }
+  details[open] summary::after { content: "−"; }
+  summary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); border-radius: 4px; }
+  details p { margin: 0 0 16px; font-size: 15px; line-height: 1.65; color: var(--muted); }
+
+  .close { padding-top: 56px; padding-bottom: 24px; }
+  footer { padding-bottom: max(32px, env(safe-area-inset-bottom)); font-size: 12px; line-height: 1.6; color: var(--dim); }
+  footer a { color: var(--dim); }
+  footer a:hover { color: var(--text-2); }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <img class="bg" src="/landing/looks/ferro-paint.webp" alt="" aria-hidden="true" decoding="async">
+  <div class="scrim" aria-hidden="true"></div>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/"><img src="/favicon.svg" alt="" aria-hidden="true">ChromaGlass</a>
+      <nav aria-label="Site">
+        <a href="/">Home</a>
+        <a href="/show">Play</a>
+      </nav>
+    </header>
+    <div class="inner">
+      <p class="kicker">For VJs, synth players, producers and artists</p>
+      <h1>A liquid light show that plugs into your rig.</h1>
+      <p class="lede">What ChromaGlass listens to, what it syncs with, how it goes on a projector and what it records. Everything on this page ships today unless it says <em>on the way</em>.</p>
+      <div class="ctas">
+        <a class="btn primary" href="/show">Try it free in Chrome</a>
+        <a class="btn ghost" href="#spec">Read the spec</a>
+      </div>
+      <ul class="jump" aria-label="On this page">
+        <li><a href="#sync">Sync and control</a></li>
+        <li><a href="#daw">Ableton and DAWs</a></li>
+        <li><a href="#sound">Sound in</a></li>
+        <li><a href="#walls">Projectors</a></li>
+        <li><a href="#lights">Lights</a></li>
+        <li><a href="#record">Recording</a></li>
+        <li><a href="#tiers">Free, Home, Pro</a></li>
+        <li><a href="#faq">Questions</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<main>
+
+<section class="block" id="sync">
+  <div class="wrap">
+    <h2>Sync and control</h2>
+    <p class="sub">The plate follows your clock and your hands. Anything that speaks MIDI or OSC can drive it, and every control in the app can be learned.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>MIDI clock and timecode <span class="tag">All tiers</span></h3>
+        <ul>
+          <li><strong>MIDI clock</strong> in: the beat clock follows the tempo; Start, Continue and Stop start and stop the show.</li>
+          <li><strong>MIDI Time Code</strong> at 24, 25, 29.97 and 30 fps, full-frame and quarter-frame, for a show locked to a timeline.</li>
+          <li>No clock? A phase-locked beat tracker hears the kick, or tap the tempo, or type the BPM.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>MIDI controllers <span class="tag">All tiers</span></h3>
+        <ul>
+          <li><strong>MIDI learn</strong> for any knob, fader or pad, CC or note, with four banks, soft takeover and endless encoders.</li>
+          <li>Ready-made maps for the <strong>APC mini mk2, APC40 mkII, Launch Control XL, Launchpad Mini mk3 / Launchpad X</strong> and <strong>nanoKONTROL2</strong>, with the pads lit to match.</li>
+          <li>Anything else (a MIDI Fighter Twister, a Faderfox, a sequencer's CC lane) works through learn.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>OSC in <span class="tag pro">Pro · Mac app</span></h3>
+        <p>The Mac app listens on <strong>UDP 9000</strong> once you turn on <em>Show → OSC input</em>, for this Mac only or for the whole network. Send it from Resolume, TouchDesigner, Max, Ableton's Connection Kit, TouchOSC, VCV Rack or a norns script.</p>
+<pre>/chromaglass/setting/&lt;key&gt; 0.8
+/chromaglass/action/&lt;name&gt;      seq-next, blackout-toggle, …
+/chromaglass/preset &lt;id&gt;
+/chromaglass/drop  x y [amount]
+/chromaglass/blow  x y [amount] [dx dy]
+/chromaglass/press x y [amount]
+/chromaglass/tilt  x y
+/chromaglass/dye   #rrggbb</pre>
+      </div>
+      <div class="card">
+        <h3>Your phone as the remote <span class="tag">Home · Pro</span></h3>
+        <p>The Mac app runs its own show server. Any phone or iPad on the venue's Wi-Fi opens the remote in its browser with the show's key: looks, dyes and the mixer, with nothing to install and nothing going through the cloud.</p>
+        <p class="soon"><b>On the way:</b> MIDI notes as voices (each note pours its own dye) and OSC out.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block alt" id="daw">
+  <div class="wrap">
+    <h2>With Ableton Live and other DAWs</h2>
+    <p class="sub">There is no plugin yet, so here is the honest route today. It uses nothing but standard MIDI and audio, which every DAW speaks.</p>
+    <div class="grid three">
+      <div class="card">
+        <h3>Tempo and transport</h3>
+        <p>Turn on <strong>MIDI clock</strong> (and MTC if you like) to the Mac's <strong>IAC Driver</strong> bus in your DAW. ChromaGlass follows the tempo, and Play and Stop in the DAW start and stop the show.</p>
+      </div>
+      <div class="card">
+        <h3>Automation</h3>
+        <p>Draw <strong>CC automation</strong> on a MIDI track sent to the same bus, then MIDI-learn each lane to a control: the look changes, swells and blackouts happen on the bar you wrote them. In the Mac app, Connection Kit's OSC sends work too.</p>
+      </div>
+      <div class="card">
+        <h3>Audio</h3>
+        <p>The Mac app hears <strong>system audio</strong> straight from macOS, so it hears whatever Live is playing with no loopback driver. In the browser, route the master into an input (an interface's line in, or a loopback device) and pick it.</p>
+      </div>
+    </div>
+    <p class="soon"><b>On the way:</b> an AU / VST3 bridge plugin that sends the host's transport, automatable slots and the track's audio to the app, and Ableton Link. Both are in the public plan with no date yet.</p>
+  </div>
+</section>
+
+<section class="block" id="sound">
+  <div class="wrap">
+    <h2>Sound in</h2>
+    <p class="sub">The plate is driven by the sound itself: it answers each kick and note in the liquid, and never by shaking the whole frame.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>System audio <span class="tag">Home · Pro · Mac app</span></h3>
+        <p>Whatever the Mac is playing, captured through macOS's own ScreenCaptureKit: Live, Logic, a streaming service, a DJ app. No tab to share, no picker, no loopback driver.</p>
+      </div>
+      <div class="card">
+        <h3>Inputs <span class="tag">All tiers</span></h3>
+        <p>Any input the browser lists: an interface's line in, a mixer's send, a microphone in the room, or a shared browser tab's audio. A line or mic input is read as <strong>one mono channel</strong> today, with the browser's echo, noise and level processing turned off.</p>
+        <p class="soon"><b>On the way:</b> patch inputs, so every channel of an interface can be a voice, a gate, CV or a clock (1, 2, 4, 24 or 48 PPQN) with reset. A browser gets at most two channels from an interface, so all of them will come through the Mac app.</p>
+      </div>
+      <div class="card">
+        <h3>Song ID and lyrics</h3>
+        <p><strong>Timed lyrics</strong> (from LRCLIB) for every tier. In the Mac app, Home and Pro also <strong>identify the song</strong> playing in the room and step through that song's look script.</p>
+      </div>
+      <div class="card">
+        <h3>The show runs offline <span class="tag">Home · Pro · Mac app</span></h3>
+        <p>The app carries the whole show and its server inside it, and its licence checks offline, so a venue with no internet is fine. Song ID and lyric lookups are the only things that need a connection.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block alt" id="walls">
+  <div class="wrap">
+    <h2>Projectors and walls</h2>
+    <p class="sub">The plate is drawn at the projector's own resolution, not stretched from a window.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>One cable, no clicks</h3>
+        <p>On HDMI or USB-C, the site sends the show to the projector in one click. The <strong>Mac app</strong> does it with <strong>no click</strong>: plug the projector in and the show is on it, full screen, and back on it after a re-plug. The display does not sleep, and the show keeps time when its window is covered.</p>
+      </div>
+      <div class="card">
+        <h3>Mapping <span class="tag">All tiers</span></h3>
+        <ul>
+          <li>Rear-projection flip, <strong>four-corner keystone</strong>, feathered edge masks, gain and gamma.</li>
+          <li>Up to <strong>16 mapped surfaces</strong> on the output, each showing the wall, the front plate, the back plate or a film, with soft edges where they overlap, lined up by eye.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Safe for a room</h3>
+        <p>A built-in limiter reads what actually reached the screen and holds sustained flashing under three a second, the photosensitive-seizure guideline, while a single hard hit on a kick is left alone. It is on by default. If the GPU is lost (a projector plugged in mid-set, a driver reset), the show recovers by itself without losing the cue list.</p>
+      </div>
+      <div class="card">
+        <h3>Into someone else's rig</h3>
+        <p>Today, capture the projector window in OBS and send it on with OBS's NDI or Syphon plugin into Resolume, MadMapper, HeavyM or TouchDesigner.</p>
+        <p class="soon"><b>On the way:</b> Syphon and NDI straight out of the Mac app, and several projector outputs from one Mac, each with its own corner pin and a blended span between them.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="lights">
+  <div class="wrap">
+    <h2>Lights</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Art-Net / DMX out <span class="tag pro">Pro · Mac app</span></h3>
+        <p>The room's lights take the plate's colours: any universe, up to 170 fixtures, RGB, GRB, BRG, RGBW and dimmer orders, at up to 44 frames a second. When the glass thins the room dims, and a blackout on the desk is a blackout on the rig.</p>
+      </div>
+      <div class="card">
+        <h3>Art-Net in <span class="tag pro">Pro · Mac app</span></h3>
+        <p>A lighting desk drives the show: map any channel of a universe onto any setting, so the desk holds the running order.</p>
+        <p class="soon">Today both are set with environment variables when the show server starts (the <a href="https://github.com/jstevoh/chromaglass/blob/main/docs/guide.md#art-net-the-rooms-lights-follow-the-plate">guide</a> has the list). <b>On the way:</b> a panel in the app for them.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block alt" id="record">
+  <div class="wrap">
+    <h2>Recording and rendering</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Record the show</h3>
+        <p>The output as you play it, with its sound: WebM (VP9 and Opus) or MP4 (H.264), at the canvas's size and 60 fps, at 5, 12 or 30 Mbps. Free clips stop at 15 seconds with a small corner mark; Home and Pro record the whole set with no mark.</p>
+      </div>
+      <div class="card">
+        <h3>Render a song</h3>
+        <p>An offline bounce, frame by frame, so it never drops a frame however heavy the look: H.264 or VP9 with the track's audio, at <strong>720p, 1080p or 4K</strong>, square or vertical 1080, at 24, 30 or 60 fps. Free renders stop at 720p with the mark.</p>
+      </div>
+      <div class="card">
+        <h3>Takes</h3>
+        <p>Record your hands rather than the picture: a take keeps every drop, blow and control move, and plays them back on the live plate.</p>
+      </div>
+      <div class="card">
+        <h3>Your name on it <span class="tag">Home · Pro</span></h3>
+        <p>Your own logo or SVG on the glass instead of the ChromaGlass mark. What you record and render is yours to post, sell and screen.</p>
+        <p class="soon"><b>On the way:</b> going live to YouTube straight from the Mac app.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="spec">
+  <div class="wrap">
+    <h2>The spec</h2>
+    <table class="spec">
+      <tbody>
+        <tr class="group"><th colspan="2" scope="colgroup">Runs on</th></tr>
+        <tr><th scope="row">Mac app</th><td>Apple silicon Macs (M1 and later). Signed and notarised by Apple, updates itself. One key works on two Macs.</td></tr>
+        <tr><th scope="row">Browser</th><td>Current Chrome or Edge on a Mac, with WebGPU. MIDI needs Chrome, Edge or Opera. Safari and Firefox are not supported yet.</td></tr>
+        <tr><th scope="row">Windows</th><td>Not tested yet. A Windows app is planned.</td></tr>
+        <tr><th scope="row">Phone, iPad</th><td>The remote, in the browser, on the same Wi-Fi as the Mac app.</td></tr>
+        <tr class="group"><th colspan="2" scope="colgroup">The simulation</th></tr>
+        <tr><th scope="row">Solver</th><td>A real fluid simulation on the GPU: dye, oil, soap film and ferrofluid with their own physics (diffusion, surface tension, immiscibility, a magnet's field).</td></tr>
+        <tr><th scope="row">Grid</th><td>256² to 768², or automatic from the GPU's measured frame cost; <strong>1024²</strong> with Pro.</td></tr>
+        <tr><th scope="row">Looks</th><td>33 built in; build and save your own on the Design desk.</td></tr>
+        <tr><th scope="row">Mixer</th><td>Seven layers (LED ring, gel wheel, lumia, front plate, back plate, film, logo), each with level, grade and a blend (own, screen, add, multiply, key), and fades timed in bars.</td></tr>
+        <tr><th scope="row">Running order</th><td>Show sequencer, set lists, cue bar.</td></tr>
+        <tr class="group"><th colspan="2" scope="colgroup">In and out</th></tr>
+        <tr><th scope="row">MIDI in</th><td>Clock, Start / Continue / Stop, MTC (24, 25, 29.97, 30), CC and notes by learn; maps for APC mini mk2, APC40 mkII, Launch Control XL, Launchpad Mini mk3 / X, nanoKONTROL2.</td></tr>
+        <tr><th scope="row">MIDI out</th><td>LED feedback to the controller.</td></tr>
+        <tr><th scope="row">OSC</th><td>In, UDP 9000, Mac app, Pro.</td></tr>
+        <tr><th scope="row">Art-Net</th><td>Out and in, UDP 6454, any universe, up to 44 fps, Mac app, Pro.</td></tr>
+        <tr><th scope="row">Audio in</th><td>System audio (Mac app); one mono input from an interface or mic; a browser tab's audio.</td></tr>
+        <tr><th scope="row">Video out</th><td>One projector output at its native resolution; up to 16 mapped surfaces.</td></tr>
+        <tr><th scope="row">Record</th><td>WebM (VP9 + Opus) or MP4 (H.264), canvas size, 60 fps, 5 / 12 / 30 Mbps.</td></tr>
+        <tr><th scope="row">Render</th><td>H.264 or VP9 with audio; 720p, 1080p, 4K, square and vertical 1080; 24 / 30 / 60 fps.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block alt" id="tiers">
+  <div class="wrap">
+    <h2>Free, Home and Pro</h2>
+    <p class="sub">The whole plate is free in the browser, for good. Home and Pro are the Mac app and what a show needs. Pay once, no subscription, at least a year of updates; Home to Pro later is the $164 difference.</p>
+    <table class="tiers">
+      <thead>
+        <tr><td></td><th scope="col">Free<span>browser</span></th><th scope="col">Home<span>$35</span></th><th scope="col" class="pro">Pro<span>$199</span></th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Every look, liquid and tool; the Design desk</td><td class="y">✓</td><td class="y">✓</td><td class="y pro">✓</td></tr>
+        <tr><td>MIDI clock, timecode, learn and controller maps</td><td class="y">✓</td><td class="y">✓</td><td class="y pro">✓</td></tr>
+        <tr><td>Projector mapping, 16 surfaces</td><td class="y">✓</td><td class="y">✓</td><td class="y pro">✓</td></tr>
+        <tr><td>Record the show</td><td>15 s, marked</td><td>Full, no mark</td><td class="pro">Full, no mark</td></tr>
+        <tr><td>Render a song</td><td>720p, marked</td><td>Up to 4K</td><td class="pro">Up to 4K</td></tr>
+        <tr><td>The Mac app: system audio, no-click projector, offline</td><td class="n">–</td><td class="y">✓</td><td class="y pro">✓</td></tr>
+        <tr><td>Phone remote</td><td class="n">–</td><td class="y">✓</td><td class="y pro">✓</td></tr>
+        <tr><td>Song ID</td><td class="n">–</td><td class="y">✓</td><td class="y pro">✓</td></tr>
+        <tr><td>Your own logo</td><td class="n">–</td><td class="y">✓</td><td class="y pro">✓</td></tr>
+        <tr><td>OSC in</td><td class="n">–</td><td class="n">–</td><td class="y pro">✓</td></tr>
+        <tr><td>Art-Net / DMX out and in</td><td class="n">–</td><td class="n">–</td><td class="y pro">✓</td></tr>
+        <tr><td>1024² grid</td><td class="n">–</td><td class="n">–</td><td class="y pro">✓</td></tr>
+        <tr><td>Cloud sync of looks, sets and MIDI maps</td><td class="n">–</td><td class="n">–</td><td class="y pro">✓</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Pro is where the rig features go as they ship: Syphon and NDI out, several projector outputs, the DAW bridge, patch inputs. They are in the public plan without dates, so buy for what is in this table today. Refunds within 14 days.</p>
+  </div>
+</section>
+
+<section class="block" id="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <div class="faq">
+      <details>
+        <summary>Does it work with Ableton Live?</summary>
+        <p>Through MIDI and audio, yes, with no plugin: send MIDI clock and CC automation to the IAC bus, MIDI-learn the lanes, and let the Mac app hear Live through system audio. We have not yet published a Live set tested end to end with it; that, Ableton Link and an AU / VST3 bridge plugin are on the way. <a href="#daw">The route in full.</a></p>
+      </details>
+      <details>
+        <summary>Can I feed it into Resolume, MadMapper or TouchDesigner?</summary>
+        <p>Not directly yet: there is no Syphon or NDI output today. Capture the projector window in OBS and send it on with OBS's NDI or Syphon plugin. Going the other way, Resolume, TouchDesigner and Max can drive ChromaGlass over OSC (Pro).</p>
+      </details>
+      <details>
+        <summary>How many projectors can it drive?</summary>
+        <p>One output from the Mac, at the projector's native resolution, which you can map into up to 16 surfaces with keystone, masks and soft overlapping edges. Several physical outputs from one Mac, each with its own corner pin, are planned for Pro.</p>
+      </details>
+      <details>
+        <summary>Can I sync it to my modular or a hardware sequencer?</summary>
+        <p>Yes, by MIDI clock: anything that sends clock and Start / Stop over USB or a MIDI interface. VCV Rack (with an OSC module) and norns can send OSC to the Mac app. Any audio you patch into an interface input drives the plate. Gate, CV and clock inputs on every channel of an interface are planned.</p>
+      </details>
+      <details>
+        <summary>Do I need the internet at the gig?</summary>
+        <p>Not with the Mac app. It carries the show inside it and checks its licence offline. Only song ID and lyric lookups need a connection.</p>
+      </details>
+      <details>
+        <summary>Can I sell what I record?</summary>
+        <p>Yes. What you record and render is yours to post, sell and screen (the free tier's clips carry a small corner mark). The <a href="/terms.html">Terms</a> have the details.</p>
+      </details>
+      <details>
+        <summary>Will my laptop run it?</summary>
+        <p>The Mac app needs an Apple silicon Mac. The app measures what each frame costs on your GPU and picks the grid to hold the frame rate, so a lighter Mac runs a coarser grid rather than dropping frames. Try your looks free in Chrome on the same Mac first.</p>
+      </details>
+      <details>
+        <summary>Is it a subscription? How many computers?</summary>
+        <p>No subscription: Home and Pro are paid once and include at least a year of updates. A key works on two Macs at a time, and you can move it from the profile sheet. Home to Pro is $164.</p>
+      </details>
+      <details>
+        <summary>Windows?</summary>
+        <p>Not yet. Nothing has been tested on a Windows PC, so we don't sell it there. A Windows app is in the plan.</p>
+      </details>
+      <details>
+        <summary>Something isn't here.</summary>
+        <p>Write to <a href="mailto:support@chromaglass.art">support@chromaglass.art</a>. One person makes ChromaGlass and answers that address, and what working artists ask for goes into the plan.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<div class="wrap close">
+  <h2>Open it and pour something.</h2>
+  <div class="ctas">
+    <a class="btn primary" href="/show">Try it free in Chrome</a>
+    <a class="btn ghost" href="/#looks">See the looks</a>
+  </div>
+</div>
+
+</main>
+
+<div class="wrap">
+  <footer>
+    Refunds within 14 days of buying: write to <a href="mailto:support@chromaglass.art">support@chromaglass.art</a> or ask the store.
+    <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a>
+  </footer>
+</div>
+
+</body>
+</html>
