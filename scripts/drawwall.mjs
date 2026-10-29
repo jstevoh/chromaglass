@@ -111,7 +111,7 @@ const traceSince = (t0, t1) => {
   if (!t0 || !t1) return 'no trace';
   const n = Math.min(t1.trips.length, t1.answered - t0.answered);
   const trips = t1.trips.slice(t1.trips.length - n);
-  return `${t1.frames - t0.frames} frames offered, ${t1.full - t0.full} passed over with every place taken; round trip ${med(trips.map(t => t[2]))} ms (read ${med(trips.map(t => t[0]))}, encode ${med(trips.map(t => t[1]))})`;
+  return `${t1.frames - t0.frames} frames offered, ${t1.full - t0.full} passed over with every place taken, ${t1.refused - t0.refused} refused (no GPU slot); round trip ${med(trips.map(t => t[2]))} ms (read ${med(trips.map(t => t[0]))}, encode ${med(trips.map(t => t[1]))})`;
 };
 const senderTrace = (wall) => wall.evaluate(() => structuredClone(window.__sender.trace));
 const framesOf = async (page) => Number(await page.getByTestId('draw-picture').getAttribute('data-frames'));
@@ -206,10 +206,17 @@ try {
         three pictures in flight came to 6.3 a second at 14 frames (#436's
         run), a round trip near 480 ms, seven frames. Here the trip is three
         (the read lands two frames on, the worker's answer one more), so four
-        frames of lag make the Mac's seven.
+        frames of lag make the Mac's seven. The lag is on the buffer's map
+        itself, so the grab's slot is held through it as the Mac's is behind
+        its queued frames: held after the map, the slots were free and a grab
+        kept to three of them read 14.0 a second here; held in it, 7.0.
       */
       window.__readLag = 0;
       window.__lag = (v, n) => new Promise((resolve) => { const f = () => (--n <= 0 ? resolve(v) : requestAnimationFrame(f)); requestAnimationFrame(f); });
+      if (typeof GPUBuffer !== 'undefined') {
+        const map = GPUBuffer.prototype.mapAsync;
+        GPUBuffer.prototype.mapAsync = function (...a) { return map.apply(this, a).then(v => (window.__readLag > 0 ? window.__lag(v, window.__readLag) : v)); };
+      }
       window.__gpuStart = async () => {
         const adapter = await navigator.gpu?.requestAdapter();
         if (!adapter) return 'no WebGPU adapter';
@@ -232,10 +239,7 @@ try {
       const loop = (t) => {
         if (window.__drawing && window.__mode === 'gpu') {
           const { tex, grab, W, H } = window.__gpu;
-          sender.tapGrab((w, h) => {
-            const read = grab.grab(tex, w, h);
-            return read && window.__readLag > 0 ? read.then(px => window.__lag(px, window.__readLag)) : read;
-          }, W, H);
+          sender.tapGrab((w, h) => grab.grab(tex, w, h), W, H);
         } else if (window.__drawing) { paint(t); sender.tap(c); }
         for (const end = performance.now() + window.__hold; performance.now() < end;);
         requestAnimationFrame(loop);
@@ -356,6 +360,21 @@ try {
           return { n, want: window.PP.PAD_PICTURE_IN_FLIGHT };
         });
         check('and the GPU\'s read holds as many pictures out at once as the sender lets out', slots.n === slots.want && slots.want >= 8, `${slots.n} of ${slots.want}`);
+        /*
+          And the sender lets that many out: reads that never land, offered
+          a frame every 70 ms on its own clock (past the pace, inside the
+          two-second watchdog), start exactly PAD_PICTURE_IN_FLIGHT and pass
+          the rest over. The lag line above holds at a sender kept to four
+          (8.3 a second, a margin of nothing), so this is what pins eight.
+        */
+        const places = await wall.evaluate(() => {
+          let t = 0, starts = 0;
+          const s = new window.PP.PadPictureSender(() => {}, () => t);
+          s.want(480);
+          for (let i = 0; i < 20; i++, t += 70) s.tapGrab(() => { starts++; return new Promise(() => {}); }, 960, 720);
+          return { starts, full: s.trace.full, want: window.PP.PAD_PICTURE_IN_FLIGHT };
+        });
+        check('and the sender lets that many out, and passes the rest over', places.starts === places.want && places.full === 20 - places.want, `${places.starts} started, ${places.full} passed over, of ${places.want}`);
         await wall.evaluate(() => { window.__hold = 0; window.__readLag = 0; window.__mode = '2d'; });
         await page.waitForTimeout(1500);
       }
