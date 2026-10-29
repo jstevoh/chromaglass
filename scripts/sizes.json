@@ -10,8 +10,8 @@
     "-- --update` lowers it to the tree; nothing raises it. Recorded from main at b38801e, 2026-10-28."
   ],
   "ledgers": {
-    "PLAN.md": "Every PR writes in the plan; out when 19m splits it into one file per section.",
-    "docs/plan-shipped.md": "Every shipped item moves its story here; out when 19m splits the archive with the plan.",
+    "PLAN.md": "The plan's index since 19m: the order of work and the running order every PR writes in. Its sections are files under docs/plan/, cut into parts of about 30 KB.",
+    "docs/plan-shipped.md": "Every shipped item moves its story here; out when 19m-3 splits the archive by section.",
     "docs/judging.md": "Every PR the owner must look at adds a section here.",
     "docs/guide.md": "Every feature writes what it does here (README.md); to be split by part of the app.",
     "CHANGELOG.md": "Every release adds its entry at the top.",
