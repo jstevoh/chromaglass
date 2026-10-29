@@ -20,7 +20,7 @@
  *      through it, counted rather than inferred
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { PIN_RANGE } from '../src/lib/deskPins.ts';
 import { DRIFTABLE } from '../src/lib/drift.ts';
@@ -28,7 +28,7 @@ import { DRIFTABLE } from '../src/lib/drift.ts';
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
 
-const PORT = Number(process.env.EVOLVING_PORT ?? 4347);
+const PORT = port(4347, 'EVOLVING_PORT');
 const WATCH = Number(process.env.EVOLVING_WATCH ?? 70000);
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });

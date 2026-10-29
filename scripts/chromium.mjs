@@ -17,6 +17,11 @@
 
 import { existsSync } from 'node:fs';
 
+// A harness's port comes with its browser: most import only this file, and a
+// port asked for in scripts/ports.mjs moves with the runner the shard is on,
+// so two shards on one Mac never meet on one (PLAN.md 19ah-6).
+export { port, untilServing } from './ports.mjs';
+
 const SANDBOX = '/opt/pw-browsers/chromium';
 
 export function chromiumPath() {

@@ -76,7 +76,7 @@ for (const c of man.checks) {
   const own = new Set();
   const cmds = [c.run, ...[...npmScriptsOf(c.run, scripts)].map((n) => scripts[n] ?? '')].join('\n');
   if (/\bnpm run build\b|\bvite build\b/.test(cmds) || files.some((f) => /['"`/]dist['"`/]/.test(text(f)))) own.add('dist/');
-  for (const f of files) for (const m of text(f).matchAll(/(?:PORT\s*(?:\?\?|\|\||=)\s*|port:\s*|localhost:|--port[ =]['"`]?)(\d{4,5})\b/g)) own.add(`port ${m[1]}`);
+  for (const f of files) for (const m of text(f).matchAll(/(?:PORT\s*(?:\?\?|\|\||=)\s*|port:\s*|\bport\(|localhost:|--port[ =]['"`]?)(\d{4,5})\b/g)) own.add(`port ${m[1]}`);
   for (const m of cmds.matchAll(/--outfile=(\S+)/g)) own.add(m[1]);
   info.set(c, { reads: r, app, browser, own, here: !(mac && app), env: mac ? { PW_WEBGPU: '1' } : {} });
 }

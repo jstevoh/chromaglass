@@ -288,6 +288,29 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   `scripts/macrunner-hook.sh` from the checkout it runs in; a change to the hook on `main`
   reaches the Mac only when the owner runs setup again. A check that the installed copy
   matches `main`'s (the probe could read a hash the hook prints) would say when it is stale.
+- **19ah-6. Built: two shards at once on the owner's Mac.** Asked 2026-10-29 (the first
+  deploy on the Mac, run 40929715769, ran its five shards one after another in 51.5
+  minutes). Each runner takes one job, so a second runner on the same Mac is the whole of
+  it, but 74 harnesses served on fixed ports, many shared (4351: `bottles`, `mirror`,
+  `moving`, `render-app`), and `macports.sh` made a second shard wait. Now every harness
+  asks `scripts/ports.mjs` for its port, which adds `HARNESS_PORT_SHIFT` (a block of
+  10000; unset everywhere but a runner's `.env`, so GitHub's machines and sessions keep
+  their ports); `macrunner-setup.sh --runners 2` adds `owner-mac-2` in
+  `~/actions-runner-2` with block 20000 and its own npm cache, and gives the first 10000;
+  `npm run ports` (Measure, every diff) fails a harness with a bare port and proves two
+  blocks serve one harness side by side while one block still collides. Open: the A/B on
+  the M4 (wall time against 51.5 minutes; `startup`, `squeeze`, `drawwall`'s rate and
+  `mirror` green with their bars as they are), and if a timing-heavy shard cannot share
+  the GPU, a label that keeps it alone. Found along the way: `quick.mjs` keeps checks
+  that share a port apart; giving each of its workers a block would let them run side
+  by side (they still share `dist/`).
+- **19ah-7. Open: every harness waits for its preview to answer.** Deploy 580 (2026-10-29)
+  lost `tools` to `ERR_CONNECTION_REFUSED` on localhost:4346 9.4 s after `vite preview` was
+  spawned, ports free and vite silent: the harness had slept a fixed 2.5 s. `tools.mjs` now
+  asks `untilServing` (scripts/ports.mjs) and prints how long the server took; sixty other
+  harnesses still sleep a fixed time, and with two shards on one Mac (19ah-6) the start is
+  slower. Move them to `untilServing`, and read the printed times on the Mac first to see
+  how slow a start gets.
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 

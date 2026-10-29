@@ -44,12 +44,12 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { coveredControls, legibility } from './layoutProbe.mjs';
 import { wantsPhoneLayout, tiltReading, phoneScreen } from '../src/lib/phone.ts';
 import { playHand, DRAG_PX, HOLD_MS } from '../src/lib/playGesture.ts';
 
-const PORT = Number(process.env.PHONE_PORT ?? 4183);
+const PORT = port(4183, 'PHONE_PORT');
 const HEADED = process.argv.includes('--head');
 const NEED_GPU = !!process.env.PHONE_GPU;
 const SHOTS = process.env.PHONE_SHOTS || null;

@@ -37,14 +37,14 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { PINNABLE, PIN_RANGE } from '../src/lib/deskPins.ts';
 import { DEFAULT_RIDES } from '../src/components/desk/DeskPanels.tsx';
 import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
 import { readingOf } from './judge.mjs';
 
-const PORT = Number(process.env.CONTROLS_PORT ?? 4345);
+const PORT = port(4345, 'CONTROLS_PORT');
 const OUT = process.env.CONTROLS_OUT ?? 'controls';
 const MODE = process.env.CONTROLS_MODE === 'all' ? 'all' : 'rides';
 const WAIT = Number(process.env.CONTROLS_WAIT ?? 2500);

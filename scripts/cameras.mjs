@@ -46,9 +46,9 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.CAMERAS_PORT ?? 4199);
+const PORT = port(4199, 'CAMERAS_PORT');
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`;
 
 const results = [];

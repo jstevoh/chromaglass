@@ -12,12 +12,12 @@
  * the visuals are actually driven by.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { LIBRARY, librarySeconds, credits } from '../src/lib/musicLibrary.ts';
 
-const PORT0 = Number(process.env.SHELF_PORT ?? 4900);
-let server = null, port = PORT0, leaving = false;
+const PORT0 = port(4900, 'SHELF_PORT');
+let server = null, served = PORT0, leaving = false;
 for (let t = 0; t < 6 && !server; t++) {
   const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT0 + t), '--strictPort'],
     { detached: true, stdio: ['ignore', 'ignore', 'ignore'] });
@@ -25,7 +25,7 @@ for (let t = 0; t < 6 && !server; t++) {
   child.on('exit', () => { died = true; });
   await new Promise(r => setTimeout(r, 2500));
   if (died) continue;
-  server = child; port = PORT0 + t;
+  server = child; served = PORT0 + t;
 }
 if (!server) { console.error('no free port'); process.exit(2); }
 const stop = () => { leaving = true; try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
@@ -43,7 +43,7 @@ const browser = await launchChromium(chromium);
 try {
   // Wide enough for the desk: the tabs only exist when there is room for it.
   const page = await browser.newPage({ viewport: { width: 1500, height: 940 } });
-  await page.goto(`http://localhost:${port}/?debug`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${served}/?debug`, { waitUntil: 'load' });
   await page.waitForTimeout(1500);
 
   // Every file on the shelf is actually served, and is actually audio.

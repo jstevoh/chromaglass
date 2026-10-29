@@ -66,6 +66,7 @@ import { HandSounds, HAND_HEARD_FOR_S } from '../src/lib/handSounds.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { stream, setShowSeed } from '../src/lib/rng.ts';
 import { renderBand } from './band.mjs';
+import { port } from './ports.mjs';
 
 const APP = process.argv.includes('--app');
 const checks = [];
@@ -256,7 +257,7 @@ async function app() {
     const b = spawnSync('npm', ['run', 'build'], { stdio: ['ignore', 'ignore', 'inherit'] });
     if (b.status !== 0) { check('the site builds', false, `exit ${b.status}`); return; }
   }
-  const PORT = Number(process.env.CLICKS_PORT ?? 4371);
+  const PORT = port(4371, 'CLICKS_PORT');
   const notes = [];
   const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'],
     { stdio: ['ignore', 'pipe', 'pipe'], detached: true });

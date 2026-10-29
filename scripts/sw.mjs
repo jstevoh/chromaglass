@@ -43,13 +43,13 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
 
-const PORT = 4326;
+const PORT = port(4326);
 const DIST = new URL('../dist', import.meta.url).pathname;
 const checks = [];
 const check = (name, ok, detail = '') => {

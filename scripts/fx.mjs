@@ -31,10 +31,10 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { pathToFileURL } from 'node:url';
 import { mkdirSync } from 'node:fs';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { installFrameReader, waitForShow } from './frame.mjs';
 
-const PORT = Number(process.env.FX_PORT ?? 4326);
+const PORT = port(4326, 'FX_PORT');
 /** As the wall harness: a fraction of the window, so SwiftShader keeps up. FX_DPR=1 for full size. */
 const DPR = process.env.FX_DPR ?? '0.5';
 const checks = [];

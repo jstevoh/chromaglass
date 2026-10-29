@@ -88,9 +88,9 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.SWITCHES_PORT ?? 4187);
+const PORT = port(4187, 'SWITCHES_PORT');
 const BASE = `http://localhost:${PORT}/`;
 // The plate's resolution does not change a control's colour, and every
 // millisecond the software renderer spends on it is one the page is not

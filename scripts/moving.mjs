@@ -49,7 +49,7 @@
  * ffmpeg (see the header of scripts/watch.mjs).
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -57,7 +57,7 @@ import { engineQuery } from './frame.mjs';
 import { watchVideo, freezes, WatchError } from './watch.mjs';
 import { AUTOPLAY, withBand, recordTake, untilRunning } from './recorder.mjs';
 
-const PORT = Number(process.env.MOVING_PORT ?? 4351);
+const PORT = port(4351, 'MOVING_PORT');
 const LOOK = process.env.MOVING_LOOK ?? 'soap-film';
 const SECONDS = Math.max(24, Number(process.env.MOVING_SECONDS ?? 30));
 const OUT = path.resolve(process.env.MOVING_OUT ?? '/tmp/chromaglass-moving');

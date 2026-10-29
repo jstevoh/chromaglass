@@ -44,14 +44,14 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { FlashGuard } from '../src/lib/flashGuard.ts';
 import { DrawGate, refreshStamp } from '../src/lib/drawGate.ts';
 import { engineQuery, installFrameReader } from './frame.mjs';
 
-const PORT = Number(process.env.WALL_PORT ?? 4324);
+const PORT = port(4324, 'WALL_PORT');
 
 /*
   How many pixels the plate is drawn into, as a fraction of the window.

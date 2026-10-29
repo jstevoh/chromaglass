@@ -65,11 +65,11 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import zlib from 'node:zlib';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { clickAt } from './layoutProbe.mjs';
 import { SHOW_PATH } from '../src/lib/showPath.ts';
 
-const PORT = Number(process.env.PHONELINK_PORT ?? 4197);
+const PORT = port(4197, 'PHONELINK_PORT');
 const PREVIEW_PORT = PORT + 1;
 const KEY = '7391';
 /** How long the panel has to notice a phone: the relay's message, React, a paint. */

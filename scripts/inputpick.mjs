@@ -32,9 +32,9 @@
  */
 import { chromium } from 'playwright';
 import { spawn, spawnSync } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.INPUTPICK_PORT ?? 4193);
+const PORT = port(4193, 'INPUTPICK_PORT');
 const results = [];
 const check = (name, ok, detail = '') => {
   results.push({ name, ok: !!ok });

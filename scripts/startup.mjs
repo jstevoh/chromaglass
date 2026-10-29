@@ -4,11 +4,11 @@
  *
  *   npm run startup
  *
- * What was reported, by `npm run depth` on every fresh Mac runner: a few
+ * What was reported, by `npm run depth` on each fresh Mac runner: a few
  * seconds after load the plate took eight steps and then stopped for about
  * nine seconds (9.30 s on run 36245105594, 8.58 s on 36243996678), with no
- * animation frame and no loop heartbeat while the page's own timers kept
- * firing. The black box logged it as "no frame for 6s". The first step had
+ * animation frame or loop heartbeat while the page's own timers kept
+ * firing. The black box logged it as "no frame for 6s". The first step
  * asked for forty-four pipelines on the frame, and the GPU process compiled
  * them, cold, before it would present another.
  *
@@ -16,7 +16,7 @@
  * look opens with while the starting frame is up, the rest behind the show
  * once it is. The show is opened twice, each time on a cold shader cache:
  * once with `?prepare=0`, the old way, as the control, and once as it ships.
- * The control is printed, and judged only as the bar for 1b: it is what
+ * The control is printed and judged only as the bar for 1b: it is what
  * says the cache really was cold and the instruments below really can see
  * the freeze. The show as it ships is asked:
  *
@@ -97,7 +97,7 @@
  * Only a Mac shows the freeze itself.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -107,7 +107,7 @@ import { heldStretches, selfCheck } from './pagehold.mjs';
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
 
-const PORT = 4357;
+const PORT = port(4357);
 /**
  * The longest a frame, a heartbeat or a step may take to follow the last
  * one. Two seconds, because the freeze was nine and a healthy show on the
@@ -448,7 +448,7 @@ function coldCache() {
   return found.length ? `emptied ${found.length} (${found.map((p) => p.slice(root.length)).join(', ')})` : `none found under ${root}`;
 }
 
-const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
+const server = spawn('./node_modules/.bin/vite', ['preview', '--port', `${PORT}`, '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
 let up = true, leaving = false;
 // Only a surprise before we ask it to go (depth.mjs has the long version).

@@ -379,19 +379,21 @@ jobs:
         shard: ${{ fromJSON(needs.reach.outputs.shards) }}
     steps:
       - uses: actions/checkout@v5
-      # The owner's Mac is also where sessions run the harnesses by hand, on
-      # the same fixed ports (`PORT = 43xx` in scripts/), so a shard started
-      # beside one would fail to serve, or read the other's server. It waits
-      # for them to close, up to ten minutes, and then fails naming who holds
-      # them. GitHub's Macs are fresh and skip this.
-      - name: The harness ports are free on the owner's Mac
-        if: ${{ runner.environment == 'self-hosted' }}
-        timeout-minutes: 11
-        run: bash scripts/macports.sh 600
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
+      # Each runner on the owner's Mac serves the harnesses in a block of
+      # ports of its own (HARNESS_PORT_SHIFT in its .env, scripts/ports.mjs),
+      # apart from another runner's shard and a session's run by hand; what
+      # can still hold one is a cancelled job's server in this runner's block.
+      # It waits for them to close, up to ten minutes, and then fails naming
+      # who holds them. After setup-node: the list is scripts/ports.mjs's.
+      # GitHub's Macs are fresh and skip this.
+      - name: The harness ports are free on the owner's Mac
+        if: ${{ runner.environment == 'self-hosted' }}
+        timeout-minutes: 11
+        run: bash scripts/macports.sh 600
       - run: npm ci
       # The Mac shards have headroom (19w) and no Metal-side download has gone slow
       # yet, but the fetch is as unbounded here as the two above were, and the Mac
