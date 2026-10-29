@@ -878,9 +878,14 @@ try {
       moment, or the dismissal was the window filling, not the X), and
       through the wall filling and leaving full screen once more.
 
-    It runs last, before the quit, and leaves the wall framed and smaller
-    than its screen: nothing after it reads the wall's picture, so nothing
-    has to be put back.
+    It runs last, before the quit, and puts the wall back in its page's own
+    full screen at the end, as the quit line has always found it. Each step
+    waits for the window's own transition to finish ('enter-full-screen',
+    'leave-full-screen'): on a Mac those are animations of most of a second,
+    and the first version, which read only `isFullScreen()` and moved on,
+    passed its own line on CI's Mac and left an app that then did not quit
+    when the show was closed (run 40942225503; the quit line passed on every
+    other branch's run that day).
 
     It needs the projector to have been filling its screen to start from;
     the line above already fails a run where it was not, so this one says
@@ -895,13 +900,15 @@ try {
     const leaveFull = () => electronApp.evaluate(async ({ BrowserWindow }, id) => {
       const w = BrowserWindow.fromId(id);
       if (!w || w.isDestroyed()) return;
-      await w.webContents.executeJavaScript('document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : null', true);
-      if (w.isFullScreen()) w.setFullScreen(false);
       // The window leaves full screen after the page does, and puts back its
       // old bounds when it has: resized before then, it is put back over the
-      // resize (the second pass of this line, once, before this wait).
-      for (let i = 0; i < 40 && w.isFullScreen(); i++) await new Promise((r) => setTimeout(r, 50));
-      await new Promise((r) => setTimeout(r, 200));
+      // resize. So wait for its own 'leave-full-screen', the end of the Mac's
+      // animation, not for `isFullScreen()` to turn.
+      const left = w.isFullScreen() ? new Promise((r) => { w.once('leave-full-screen', r); setTimeout(r, 4000); }) : null;
+      await w.webContents.executeJavaScript('document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : null', true);
+      if (w.isFullScreen()) w.setFullScreen(false);
+      if (left) await left;
+      await new Promise((r) => setTimeout(r, 300));
       // Smaller than its screen, as a framed window is. The window is made
       // the size of its display (main.js), and under Xvfb there is no window
       // manager to draw a title bar, so a window left at that size has none
@@ -957,6 +964,9 @@ try {
         }, cast.id).catch(() => {});
       }
       chipGoneIn = filledIn === null ? null : await waitFor(async () => (await chipCount()) === 0, 2000);
+      // The Mac's animation into full screen, finished before the next step
+      // asks the window to leave it.
+      await sleep(1500);
     }
     /*
       The X: framed again, dismissed, and still away 2 s later with the wall
@@ -975,15 +985,29 @@ try {
         await sleep(2000);
         dismissedStays = (await chipCount()) === 0;
         stillFramed = await framed();
-        await electronApp.evaluate(({ BrowserWindow }, id) => { BrowserWindow.fromId(id)?.setFullScreen(true); }, cast.id).catch(() => {});
+        await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+          const w = BrowserWindow.fromId(id);
+          if (!w || w.isDestroyed()) return;
+          await new Promise((r) => { w.once('enter-full-screen', r); setTimeout(r, 4000); w.setFullScreen(true); });
+        }, cast.id).catch(() => {});
         const refilled = (await waitFor(filled, 4000)) !== null;
-        await sleep(600);
+        await sleep(300);
         await leaveFull();
         const reframed = (await waitFor(framed, 4000)) !== null;
         await sleep(1500);
         staysThrough = refilled && reframed ? (await chipCount()) === 0 : null;
       }
     }
+    // The wall as the quit line has always found it: its page in its own
+    // full screen, the stand-in refusal taken off, the transition finished.
+    await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return;
+      const entered = new Promise((r) => { w.once('enter-full-screen', r); setTimeout(r, 4000); });
+      const ok = await w.webContents.executeJavaScript("delete document.documentElement.requestFullscreen; document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => true, () => false)", true);
+      if (ok) await entered;
+      await new Promise((r) => setTimeout(r, 500));
+    }, cast.id).catch(() => {});
     check(NAME,
       chipUpIn !== null && /full screen/i.test(text) && filledIn !== null && chipGoneIn !== null && dismissedStays === true && stillFramed === true && staysThrough === true,
       left === null ? 'the wall never left full screen'

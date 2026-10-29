@@ -737,6 +737,13 @@ async function start() {
       if (!w.isDestroyed()) w.destroy();
     }
     app.quit();
+    // And out, whatever holds the quit up. On CI's Mac a run whose projector
+    // window had been in and out of the Mac's own full screen just before
+    // stayed running with its port taken after the show was closed
+    // (PLAN 14af; run 40942225503), and an app left running with no window
+    // keeps the show's port from the next launch. `will-quit` exits at once
+    // when the quit goes through; this is only for when it does not.
+    setTimeout(() => app.exit(0), 3000).unref?.();
   });
   const query = process.env.CHROMAGLASS_QUERY ?? '';
   await showWindow.loadURL(`http://localhost:${show.port}/${query}`);

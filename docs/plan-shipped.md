@@ -2353,7 +2353,10 @@ top of the projection. Three things were wrong:
   is shorter and still counts as framed. And the button now also asks main.js
   (`fillProjector`, over `chromaglass:fill-projector`), which needs no gesture and falls
   back to the window's own full screen if the page's is refused; the same fallback now
-  runs when the window loads.
+  runs when the window loads. Closing the show now also exits the app 3 s after the quit
+  if something holds the quit up: on CI's Mac the check's first version left a projector
+  that had been in and out of the Mac's own full screen, and the app then stayed running
+  with its port taken.
 
 The web's path was already sound: measured in Chromium 153 under Xvfb, a delegated
 `postMessage` (`delegate: 'fullscreen'`) lets the wall's `requestFullscreen` resolve with no
