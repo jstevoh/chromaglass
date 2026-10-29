@@ -120,10 +120,13 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   substrate seen through the surface's normal (refraction), a shallow depth of field
   and the dye's two layers parting in parallax. Each is a camera-pass term; take them
   one at a time with a `look` render, and keep `steadycam` green.
-- **33g-3. Three looks keep their cells by name.** `macro-bead`, `cell-bloom` and
-  `lace-run` set Paint Cells and Macro Lacing themselves, so they still draw cells at
-  the closeup. The owner to say whether they should stay (they are named for them) or
-  lose them too; `macroview` does not ask them.
+- ~~**33g-3. Three looks keep their cells by name.**~~ **Shipped** (the owner, 2026-10-29:
+  "No I don't want cells"). `macro-bead`, `cell-bloom` and `lace-run` now set Paint Cells
+  to 0; Macro Bead and Cell Bloom set Macro Lacing to 0 as well, and Lacing Run keeps its
+  lacing (its subject, dendrites rather than cells). Descriptions, the landing page and
+  the Guide say so, and `macroview` line 1 now audits every look. Open: Cell Bloom's name
+  says cells; the owner to say whether to rename it (its id is in set lists and saved
+  shows, so a rename keeps the id). Story in `docs/plan-shipped.md` §33g.
 - **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
   shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
   old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma
