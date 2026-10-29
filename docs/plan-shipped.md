@@ -7173,7 +7173,7 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
 
 - ~~**QA-32** The Close-up button "doesn't seem to do anything besides make the canvas
   black/empty" (the owner, 2026-10-29, with a screenshot of the Recipe panel).~~ **Fixed,
-  #PRNUM** (`npm run closeupland`): the closeup's camera is Hold by default, aimed at the
+  #575** (`npm run closeupland`): the closeup's camera is Hold by default, aimed at the
   middle of the plate, and Hold sat on its aim and nowhere else, so on a plate whose
   middle was bare (a look that pours in pools, a middle a finger had swept, a plate
   between pours) every way in (the button, M, the zoom, the phone's pinch and Zoom) was a
@@ -7185,7 +7185,8 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   fullest does, centred on the dye in it; an empty plate waits on the aim and lands on
   the first pour; a hand moving the aim during the closeup is obeyed onto glass, and a
   mode switch mid-closeup is not a landing (`npm run holdjump`). Same plate: 0.32 of the
-  frame lit before the landing was centred. And the desk's button flipped `macroMode`
+  frame lit before the landing was centred, 0.553 after, the pool 0.076 of a half-frame
+  off the middle; the pinch and the slider, coming in a notch at a time, land too. And the desk's button flipped `macroMode`
   alone, so the plate went to 4x while the Macro Zoom knob beside it read 1.00x; it is now
   the M key's press (`closeupToggle`), in by the zoom and out with both.
 

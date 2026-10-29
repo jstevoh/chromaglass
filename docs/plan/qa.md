@@ -25,7 +25,7 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   `docs/plan-shipped.md` §QA-31 (moved 2026-10-29, 19m).
 
 - ~~**QA-32** The Close-up button "doesn't seem to do anything besides make the canvas
-  black/empty" (the owner, 2026-10-29, with a screenshot).~~ **Fixed, #PRNUM**: the closeup
+  black/empty" (the owner, 2026-10-29, with a screenshot).~~ **Fixed, #575**: the closeup
   comes in on the nearest liquid when its aim shows none (`npm run closeupland`). Story in
   `docs/plan-shipped.md` §QA-32.
 - **QA-32a** A held closeup whose frame empties while it is in (the pool flows out of it,
