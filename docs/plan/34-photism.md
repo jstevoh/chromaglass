@@ -54,6 +54,21 @@ a grid of generic stock thumbnails: ours are the plate itself.
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
   note goes unsigned unless the owner says otherwise.
+- **34a-6. The looks as films, each to its own kind of music, and on the channel.** *(M; the owner's
+  Mac. The owner, 2026-10-29: re-record the looks, about a minute each, each to a different kind of
+  music, the cards to animate on hover, open larger and be heard, and the films on the new channel.)*
+  Built: `src/lib/siteFilms.ts` pairs each of the page's eight looks with a Kevin MacLeod piece
+  (CC BY 4.0; `public/landing/films/SOURCES.md` records the licence, the credit and each ISRC);
+  `npm run sitefilms` renders each look's minute through the app's own Song film on a Mac
+  (2560 × 1440, 60 fps), and cuts the card's 6 s muted loop (MP4 and WebM, seam blended), its
+  640 × 400 still, the channel's thumbnail and the description text; `-- --banner` photographs
+  the desk for the channel's banner. `LandingFilms.tsx`: a pointer (or focus) plays a card's
+  loop, a phone plays the card in view, reduced motion keeps the stills, and a card whose film is
+  on the channel opens it from youtube-nocookie.com with the credit under it. `npm run
+  landingfilms` holds all of it. Not a GIF: 256 colours band a plate's gradients, and a GIF is
+  ten to twenty times the bytes. Open: the films rendered on the Mac, the owner's OK on the first
+  upload, and each film's `youtube` id filled in. 34a-3 (sharper stills) is answered by the new
+  640 × 400 stills. Later: the hero could cross-fade the loops instead of the stills.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

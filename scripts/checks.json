@@ -1041,6 +1041,20 @@
       ]
     },
     {
+      "name": "The webpage's films",
+      "shard": "browser",
+      "run": "npm run landingfilms",
+      "why": [
+        "The webpage's looks as films (scripts/landingfilms.mjs, PLAN.md 34a-6):",
+        "each card's loop and still are there and small, each piece of music is",
+        "credited and free to use, no loop is asked for before a card plays, a",
+        "pointer plays a card's loop and leaving stops it, a click opens its",
+        "minute from the channel with the credit under it, a phone plays the",
+        "card in view and a tap opens it, and reduced motion keeps the stills.",
+        "No GPU."
+      ]
+    },
+    {
       "name": "The security headers",
       "shard": "browser",
       "run": "node scripts/csp.mjs",
