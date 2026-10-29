@@ -1944,6 +1944,23 @@ Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Tr
    + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
 5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?
 
+## 89. The site's security headers (PLAN 19ag)
+
+`firebase.json` now sends a Content-Security-Policy that blocks framing and `<object>`/`<base>` tricks (enforced), a
+fuller policy that only logs (report-only), Referrer-Policy, Permissions-Policy and nosniff. Nothing should look
+different. The things to try are the ones a policy can break and the cloud cannot reach.
+
+1. After the deploy, open https://chromaglass.art with the browser console open (Cmd-Option-J) and clear it. Sign in
+   with Google (the popup), then with an email link or password. Both should work as before.
+2. Play a song from the music shelf, open Lyrics, use Song ID, the buy links, the licence key box and a Send of the
+   crash report. Open a cast window and the remote on a phone.
+3. In the console, lines that begin "[Report Only] Refused to ..." are the policy telling us what it would block if it
+   were enforced. Copy them to the thread: each one is an address to add before 19ag-2 turns it on. A line that begins
+   "Refused to ..." without "[Report Only]", or a sign-in, song, cast or video that fails, is a bug in this PR.
+4. Bad: any sign-in, song, cast, remote or video that stops working.
+5. Decide: are you happy to leave the full policy on report-only until the console is clean?
+
+
 ## 87. System audio and Ambient TV mode in the Mac app (PLAN 23.8)
 
 `npm run desktop` verifies that clicking **System audio** in the Mac app intercepts `getDisplayMedia` with no tab picker and routes the System audio pipeline to the ear (using `CHROMAGLASS_AUDIO_TAP=1`, since `CHROMAGLASS_OFFLINE` skips macOS's TCC screen-capture prompt). The real ScreenCaptureKit loopback path needs macOS permission and a streaming app playing on the Mac:
@@ -1967,3 +1984,18 @@ Measured: `npm run cadence` (the old loop, modelled, stopped or doubled the liqu
 frames on 60, 59.94 and 120 Hz displays, by the median of nine seeds; the new clock on none, and
 it keeps time with the wall up at another refresh rate); `npm run encode` (a step's garbage 506 KB → 31 KB);
 `npm run rungs` (a rung the machine cannot hold retried 38 times in half an hour → 10).
+
+## 90. The game controller's ring, and the ear after its detectors changed (PLAN 14ab-7, 14ab-8)
+
+Both are meant to look and sound as before; this is the look at that, on a real pad and a
+real song. (§88 is the stutter, §89 the headers.)
+
+1. Plug in or pair a controller. Push the left stick: a ring should follow the plate under it, as smooth as the
+   mouse's pointer, and swell and tint when you hold the right trigger. Let go and it should fade after about
+   two and a half seconds. On the phone nothing changes (no ring without a pad).
+2. With the pad connected, open the Perform desk's clock and the meters: nothing else on the page should be
+   busier than with the pad unplugged.
+3. Play a song with clear drums. The kick and snare triggers (Sound › patch bay, the plate's kick bloom) should
+   land on the same hits as before this change: the readings are the same to the bit on the checks' songs.
+4. Bad: a ring that lags behind the stick, jumps to a corner when it first appears, or stays after the stick is
+   released; a beat that used to fire and does not.

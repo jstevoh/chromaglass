@@ -185,6 +185,19 @@
       ]
     },
     {
+      "name": "No new file over 100 KB, no big file grows",
+      "shard": "logic",
+      "run": "npm run sizes",
+      "always": true,
+      "why": [
+        "The size ratchet (scripts/sizes.mjs, PLAN.md 19ai-5, 19ai-5d): a new file stays at or under",
+        "100 KB (past 40 KB, a warning), and one already over it may not grow past its ceiling in scripts/sizes.json,",
+        "which only shrinks against the base. It reads every file in the tree, so it runs on",
+        "every diff, a document's included. Its self-test grows a file, adds a 101 KB one, warns on a 41 KB one and",
+        "raises a ceiling in a scratch repository first."
+      ]
+    },
+    {
       "name": "The API scripts keep the token out of their errors",
       "shard": "logic",
       "run": "npm run ghapi",
@@ -192,6 +205,18 @@
         "The scripts that read GitHub's API never print the token: a 502 from",
         "it once printed the owner's whole token through flakes.mjs's error.",
         "Against a local server that answers 502, with the old way as control."
+      ]
+    },
+    {
+      "name": "The owner's Mac takes only main's deploys, and never holds one",
+      "shard": "logic",
+      "run": "npm run macguard",
+      "why": [
+        "The runner's job-started hook (scripts/macrunner-hook.sh) against every way",
+        "a job can arrive: main's push and run by hand taken; a branch, a pull",
+        "request, pull_request_target, workflow_run, a schedule, another workflow",
+        "on main and another repository refused. And the watchdog's stall rule",
+        "(scripts/macwatch.mjs) against made-up runs, between two shards included."
       ]
     },
     {
@@ -207,6 +232,16 @@
       "name": "The bands",
       "shard": "sound",
       "run": "npm run bands"
+    },
+    {
+      "name": "The ear's detectors",
+      "shard": "sound",
+      "run": "npm run eargc",
+      "why": [
+        "The seventeen onset detectors decide as the sorted history did and make",
+        "next to no garbage a frame (scripts/eargc.mjs, PLAN.md 14ab-7): against",
+        "the old detector verbatim, at 60, 144 and 400 refreshes a second."
+      ]
     },
     {
       "name": "Where songs end and begin",
@@ -1006,6 +1041,21 @@
       ]
     },
     {
+      "name": "The security headers",
+      "shard": "browser",
+      "run": "node scripts/csp.mjs",
+      "why": [
+        "The site's security headers (scripts/csp.mjs, PLAN.md 19ag): firebase.json's",
+        "CSP (frame-ancestors, object-src, base-uri, form-action enforced; the",
+        "rest report-only), Referrer-Policy, Permissions-Policy and nosniff,",
+        "served on the built site and opened as the show, the remote, a cast",
+        "and the static pages with a blob worker, blob media and the lookups",
+        "the app makes tried on top: nothing reported, the controls reported,",
+        "another origin cannot frame it. No GPU. The site \"The load\" just",
+        "built (`npm run csp` builds first, for a run by hand)."
+      ]
+    },
+    {
       "name": "The intro",
       "shard": "browser",
       "run": "node scripts/intro.mjs",
@@ -1657,16 +1707,18 @@
     {
       "name": "The dragged ferrofluid drop follows the magnet",
       "shard": "show",
-      "run": "npm run ferrodrag",
+      "run": "npm run ferrodrag -- --thinoff",
       "why": [
         "The closeup's ferrofluid drop dragged 0.3 of the plate in three",
         "seconds (PLAN 29c, 29c-8): it follows the magnet within two radii and",
         "keeps its half-full body within 15%, which the two-phase carry of its",
         "trailing rim (phaseVelocity) made true on Metal, 3/3 (out of CI as",
-        "known red until then). With no magnet the drop does not move. Its",
-        "Thin-Gap-off lines run by hand (`-- --thinoff`, PLAN 29c-11): on Metal",
-        "they read the same with the review's fix and without it. On the show",
-        "shard, the lightest on #495's run (14.2 minutes of 20); 39 s there."
+        "known red until then). With no magnet the drop does not move. With",
+        "`-- --thinoff` (PLAN 29c-11): Thin Gap off after the drag, all 120",
+        "steps deep, the drop stays put and stays a drop, and a lab whose deep",
+        "plate rides the thin gap's stale velocity is red on the same line",
+        "(the #495 review's fix, in the run). On the show shard, the lightest",
+        "on #495's run (14.2 minutes of 20); 39 s there for lines 1 to 3."
       ]
     },
     {
