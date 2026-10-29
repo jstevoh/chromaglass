@@ -305,9 +305,11 @@ try {
   await dp.waitForTimeout(500);
   const inFilm = await dp.evaluate((ids) => ids.map(id => {
     const box = (t) => {
-      const el = document.querySelector(`[data-testid="settings-panel"] [data-testid="${t}-${id}"]`);
+      const el = document.querySelector(`[data-testid="settings-panel"] [data-testid="film-cartoons"] [data-testid="${t}-${id}"]`);
       const r = el?.getBoundingClientRect();
-      return r && r.width > 0 ? Math.round(r.height) : 0;
+      // Laid out is not seen: a row under visibility:hidden or opacity 0 has its box too.
+      const seen = el?.checkVisibility?.({ visibilityProperty: true, opacityProperty: true }) ?? false;
+      return r && r.width > 0 && seen ? Math.round(r.height) : 0;
     };
     return { id, pour: box('film-cartoon-pour'), film: box('film-cartoon-film') };
   }), CARTOONS.map(c => c.id));
@@ -318,17 +320,29 @@ try {
     const h = window.__cgVideo?.();
     return h ? { film: h.film?.currentSrc ?? null, filmKind: h.filmKind } : null;
   });
+  // Its time, read twice a second apart, and whether it is paused: that the
+  // cartoon plays, not only that the projector was handed it.
+  const clock = () => dp.evaluate((src) => {
+    const v = window.__cgPlayed.find(e => e.currentSrc.endsWith(src));
+    return v ? { t: v.currentTime, paused: v.paused } : null;
+  }, deskOne.src);
   await dp.getByTestId(`film-cartoon-film-${deskOne.id}`).click();
   await dp.waitForTimeout(1500);
   const onHeld = await dheld();
   const onPressed = await dp.getByTestId(`film-cartoon-film-${deskOne.id}`).getAttribute('aria-pressed');
+  const t0 = await clock();
+  await dp.waitForTimeout(1000);
+  const t1 = await clock();
+  const moved = t0 && t1 ? t1.t - t0.t : 0;
   await dp.getByTestId(`film-cartoon-film-${deskOne.id}`).click();
   await dp.waitForTimeout(400);
   const offDesk = await dheld();
   const offPressed = await dp.getByTestId(`film-cartoon-film-${deskOne.id}`).getAttribute('aria-pressed');
-  check(`and its Film puts ${deskOne.title} on the projector as the film, pressed; pressed again, takes it off`,
-    onHeld?.filmKind === 'file' && onHeld.film?.endsWith(deskOne.src) && onPressed === 'true' && offDesk?.filmKind === 'none' && offPressed === 'false',
-    `on: ${tail(onHeld?.film)} (${onHeld?.filmKind}), pressed ${onPressed}; off: ${offDesk?.filmKind}, pressed ${offPressed}`);
+  const offClock = await clock();
+  check(`and its Film plays ${deskOne.title} as the projector's film, pressed; pressed again, pauses it and takes it off`,
+    onHeld?.filmKind === 'file' && onHeld.film?.endsWith(deskOne.src) && onPressed === 'true' && moved >= 0.5
+      && offDesk?.filmKind === 'none' && offPressed === 'false' && offClock?.paused === true,
+    `on: ${tail(onHeld?.film)} (${onHeld?.filmKind}), pressed ${onPressed}, ${moved.toFixed(2)} s on in a second; off: ${offDesk?.filmKind}, pressed ${offPressed}, the video ${offClock ? (offClock.paused ? 'paused' : 'still playing') : 'not found'}`);
   await desk.close();
 } catch (e) {
   // Measured 2026-10-24 with the pour as it was before 14ab-1's fix (handed
