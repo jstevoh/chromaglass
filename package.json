@@ -236,6 +236,7 @@
     "gallery": "npm run build && esbuild scripts/gallery.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/gallery.mjs && node node_modules/.cache/gallery.mjs",
     "pixels": "npm run build && esbuild scripts/pixels.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/pixels.mjs && node node_modules/.cache/pixels.mjs",
     "controls": "npm run build && esbuild scripts/controls.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/controls.mjs && node node_modules/.cache/controls.mjs",
+    "sweep": "npm run build && esbuild scripts/sweep.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/sweep.mjs && node node_modules/.cache/sweep.mjs",
     "looks": "npm run build && esbuild scripts/looks.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/looks.mjs && node node_modules/.cache/looks.mjs",
     "depth": "npm run build && esbuild scripts/depth.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/depth.mjs && node node_modules/.cache/depth.mjs",
     "loadtime": "npm run build && node scripts/loadtime.mjs",

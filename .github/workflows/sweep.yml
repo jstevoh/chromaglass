@@ -1,0 +1,84 @@
+name: Sweep
+
+# Does every control on the desks do something you can see, on the look it is
+# meant for? (scripts/sweep.mjs). Each control is moved to both ends of its range
+# on the look and the music that suit it (the magnet on the ferrofluid, tension on
+# the oil, the kick dials on kicks) and the frame is measured before and after.
+# Evidence rather than a gate: the table (Works / Weak / Dead / Only matters with
+# X) comes back as an artifact and in the run's summary.
+#
+# On request only (Actions → Sweep → Run workflow), or on a pull request by
+# labelling it `sweep`: once per labelling, not per push. It needs a real GPU, so
+# it runs on the macOS runners, one shard per few of the sweep's settings.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: sweep-${{ github.ref }}-${{ github.event.label.name }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: Sweep ${{ matrix.shard }}
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'sweep'
+    runs-on: macos-15
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/6', '2/6', '3/6', '4/6', '5/6', '6/6']
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Every control on its own look, measured
+        run: npm run sweep
+        env:
+          SWEEP_SHARD: ${{ matrix.shard }}
+      - name: Name the artifact
+        id: name
+        if: always()
+        run: echo "slug=$(echo '${{ matrix.shard }}' | sed 's|/|of|')" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sweep-rows-${{ steps.name.outputs.slug }}
+          path: sweep/
+          retention-days: 14
+
+  table:
+    name: Sweep table
+    needs: sweep
+    if: always() && (github.event_name == 'workflow_dispatch' || github.event.label.name == 'sweep')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sweep-rows-*
+          path: sweep-in
+          merge-multiple: true
+      - name: Fold the shards into one table
+        run: |
+          mkdir -p sweep
+          cp sweep-in/rows-full-*.json sweep/
+          npx esbuild scripts/sweep.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/sweep.mjs
+          node node_modules/.cache/sweep.mjs --table
+          cat sweep/table-full.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sweep-table
+          path: sweep/
+          retention-days: 14

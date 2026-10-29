@@ -7942,6 +7942,13 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - Heat is not carried on a thin gap (the velocity's self-advection is gone and vel.z
     rides with it), so Buoyancy, Heat Decay and Double Diffusion are weaker than their
     dials say.
+  - **The check (in progress):** `npm run sweep` (`scripts/sweep.mjs`, `sweep.yml` on the
+    macOS runners, by hand or the `sweep` label) moves each control to both ends on the
+    look and music that suit it and prints Works / Weak / Dead / "Only matters with X".
+    It cannot run with the screen locked (no frames, no kicks), which is why it runs on
+    CI. About 39 controls are not measured yet because they need a held pointer, a film
+    or a long take (`NOT_MEASURED` in the script says why each). The table of the first
+    run goes in the thread; fixes follow in batches, one PR each.
 - **27e. The music should move the picture more (first part shipped, #307).** The owner,
   2026-10-05: "Generally I don't feel like music is having as much impact on the visuals
   as I would like." 27a-c make the kick's two rides and the stir answer harder. Read
