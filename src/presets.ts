@@ -1099,7 +1099,7 @@ export const PRESETS: Preset[] = [
       macroZoom: 2.1,            // 28i-2: fully in the closeup (>=2x) while wide enough to frame contrasting neighbour beads (>=2 hues/frame)
       macroChase: 0.7,           // a quick follow with a whip on each cut
       macroHold: 2.5,
-      macroCells: 0,             // 33g-3: the owner does not want cells at the closeup; the beads are the subject
+      macroCells: 0,
       macroCellScale: 0.45,
       macroLacing: 0,
       macroDepth: 0.6,
@@ -1171,7 +1171,7 @@ export const PRESETS: Preset[] = [
       macroZoom: 3.5,
       macroChase: 0.45,          // slower drift — this one lingers on a pool
       macroHold: 7.0,
-      macroCells: 0,             // 33g-3: no cells (was 1.0); the three pools turning under the magnifier are the picture
+      macroCells: 0,
       macroCellScale: 0.6,
       macroLacing: 0,
       macroDepth: 0.7,
@@ -1243,7 +1243,7 @@ export const PRESETS: Preset[] = [
       macroZoom: 2.1,            // 28i-2: fully in the closeup (>=2x) while wide enough to frame contrasting lacing tongues (>=2 hues/frame)
       macroChase: 0.75,          // the liveliest of the three
       macroHold: 2.4,            // short takes
-      macroCells: 0,             // 33g-3: no cells (was 0.8); the dendritic lacing alone is the subject
+      macroCells: 0,
       macroCellScale: 0.55,
       macroLacing: 1.0,          // lacing is the subject here
       macroDepth: 0.6,
