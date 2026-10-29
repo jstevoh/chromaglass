@@ -1097,7 +1097,7 @@ export default function App() {
       let stream: MediaStream;
       if (source === 'system') {
         const nativeTap = (window as unknown as {
-          __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: Float32Array, sampleRate: number) => void) => () => void };
+          __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: ArrayLike<number>, sampleRate: number) => void) => () => void };
         }).__CHROMAGLASS_NATIVE__?.onSystemAudioPcm;
         if (nativeTap) {
           // Mac app (PLAN.md 23.8): ScreenCaptureKit's loopback through

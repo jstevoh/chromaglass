@@ -147,8 +147,9 @@ export function useAudioAnalyzer(
    * A context to analyse in, instead of one of the ear's own: the Mac app's
    * System audio source (lib/systemTap.ts) makes its stream in a context and
    * hands it here, so the source and its analysis are one output stream to
-   * the Mac rather than two. The ear neither resumes nor closes a context it
-   * was handed; its owner does. Null for every other source.
+   * the Mac rather than two. The ear never closes a context it was handed
+   * (its owner does); it may resume it on a gesture, as it does its own.
+   * Null for every other source.
    */
   sharedContext: AudioContext | null = null,
 ): Ear {
@@ -188,6 +189,12 @@ export function useAudioAnalyzer(
     unlistenRef.current?.();
     unlistenRef.current = null;
     earRef.current = null;
+    // Unplug the nodes before letting go: closing a context of the ear's own
+    // frees them, but a context it was handed stays open, and an analyser left
+    // in it is pulled every quantum until the source changes (a restart on
+    // Recalibrate would leave one more each time).
+    sourceRef.current?.disconnect();
+    analyzerRef.current?.disconnect();
     if (audioContextRef.current && ownsContextRef.current) audioContextRef.current.close();
     audioContextRef.current = null;
     analyzerRef.current = null;

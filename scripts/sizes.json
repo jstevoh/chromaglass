@@ -48,7 +48,7 @@
     "scripts/wall.mjs": 141896,
     "scripts/watch.mjs": 67407,
     "scripts/webgpu-smoke.mjs": 48561,
-    "src/App.tsx": 370653,
+    "src/App.tsx": 370658,
     "src/components/desk/Desk.tsx": 44167,
     "src/components/desk/DeskPanels.tsx": 53253,
     "src/components/GuidePanel.tsx": 58766,

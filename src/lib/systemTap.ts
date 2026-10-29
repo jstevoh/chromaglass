@@ -55,8 +55,9 @@ export interface SystemTapStats {
   sampleRate: number;
   baseLatency: number;
   outputLatency: number;
-  /** PCM packets the page received over IPC, and samples in all. */
+  /** PCM packets the page received over IPC, how many of them were scheduled to play, and samples in all. */
   packets: number;
+  scheduled: number;
   samples: number;
   /** Where the next packet is scheduled on the tap context's clock. */
   nextTime: number;
@@ -94,8 +95,12 @@ export function startSystemTap(nativeTap: NativePcmTap, stillWanted: () => boole
   let display: SystemTapStats['display'] = 'pending';
   let nextTime = 0;
   let packets = 0;
+  let scheduled = 0;
   let samples = 0;
   const unsubPcm = nativeTap((pcm, sampleRate) => {
+    // Counted on arrival, before anything can throw (the preload swallows a
+    // throw), so the check's "packets in the page" is the wire and not the scheduling.
+    packets += 1;
     if (!pcm || pcm.length === 0 || ctx.state === 'closed') return;
     if (ctx.state === 'suspended') void ctx.resume();
     const sr = sampleRate > 0 ? sampleRate : ctx.sampleRate;
@@ -107,10 +112,10 @@ export function startSystemTap(nativeTap: NativePcmTap, stillWanted: () => boole
     const now = ctx.currentTime;
     // Give the first scheduled chunk 60 ms so React has committed `dest.stream`
     // and `useAudioAnalyzer` has connected its `AnalyserNode`.
-    if (nextTime < now) nextTime = now + (packets === 0 ? 0.06 : 0.005);
+    if (nextTime < now) nextTime = now + (scheduled === 0 ? 0.06 : 0.005);
     src.start(nextTime);
     nextTime += buf.duration;
-    packets += 1;
+    scheduled += 1;
     samples += pcm.length;
   });
   const stats = (): SystemTapStats => {
@@ -122,6 +127,7 @@ export function startSystemTap(nativeTap: NativePcmTap, stillWanted: () => boole
       baseLatency: ctx.baseLatency,
       outputLatency: ctx.outputLatency,
       packets,
+      scheduled,
       samples,
       nextTime,
       track: track ? { readyState: track.readyState, muted: track.muted, enabled: track.enabled } : null,
@@ -133,10 +139,12 @@ export function startSystemTap(nativeTap: NativePcmTap, stillWanted: () => boole
     w.__systemTapContext = ctx;
     w.__systemTap = stats;
   }
-  void navigator.mediaDevices.getDisplayMedia({
+  // Through a resolved promise, so a synchronous throw (no mediaDevices at
+  // all) lands in the refusal below and the tap, already made, still has its stop.
+  void Promise.resolve().then(() => navigator.mediaDevices.getDisplayMedia({
     audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
     video: true,
-  }).then((ds) => {
+  })).then((ds) => {
     if (!stillWanted() || ctx.state === 'closed') {
       ds.getTracks().forEach(t => t.stop());
       return;

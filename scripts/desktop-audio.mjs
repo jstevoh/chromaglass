@@ -104,6 +104,7 @@ export async function systemAudioLine({ page, electronApp, check, sleep, createS
       tapTime: tap?.currentTime ?? null,
       tapRate: tap?.sampleRate ?? null,
       packets: tap?.packets ?? null,
+      scheduled: tap?.scheduled ?? null,
       nextTime: tap?.nextTime ?? null,
       track: tap?.track ?? null,
       display: tap?.display ?? null,
@@ -135,7 +136,11 @@ export async function systemAudioLine({ page, electronApp, check, sleep, createS
   // after a second. A dead output device leaves its clock at zero and its
   // analyser silent; a wire broken between the tap and the ear leaves this
   // one sounding.
-  const probe = heardAt !== null ? null : await page.evaluate(async () => {
+  // Raced against three seconds: on a device that will not open, resume()
+  // or close() may never settle, and the line's numbers must still print.
+  const probe = heardAt !== null ? null : await Promise.race([
+    sleep(3000).then(() => ({ error: 'the probe did not settle in 3 s' })),
+    page.evaluate(async () => {
     try {
       const ctx = new AudioContext();
       if (ctx.state === 'suspended') await ctx.resume();
@@ -162,11 +167,12 @@ export async function systemAudioLine({ page, electronApp, check, sleep, createS
     } catch (e) {
       return { error: String(e?.message ?? e) };
     }
-  }).catch((e) => ({ error: String(e?.message ?? e) }));
+  }).catch((e) => ({ error: String(e?.message ?? e) })),
+  ]);
   const asksAfter = await electronApp.evaluate(() => globalThis.__chromaglassSystemAudioAsks ?? 0);
   const when = (t) => (t === null ? 'never' : `${(t / 1000).toFixed(2)} s`);
   const secs = (t) => (t === null || t === undefined ? '?' : `${Number(t).toFixed(2)} s`);
-  const clocks = (s) => `tap clock ${secs(s.tapTime)}${s.tapRate ? ` at ${s.tapRate} Hz` : ''}, ear clock ${secs(s.earTime)}${s.earRate ? ` at ${s.earRate} Hz` : ''}, ${s.packets ?? '?'} packets in the page, the next at ${secs(s.nextTime)}, track ${s.track ? `${s.track.readyState}${s.track.muted ? ' muted' : ''}${s.track.enabled ? '' : ' disabled'}` : 'none'}, display ${s.display ?? '?'}`;
+  const clocks = (s) => `tap clock ${secs(s.tapTime)}${s.tapRate ? ` at ${s.tapRate} Hz` : ''}, ear clock ${secs(s.earTime)}${s.earRate ? ` at ${s.earRate} Hz` : ''}, ${s.packets ?? '?'} packets in the page (${s.scheduled ?? '?'} scheduled), the next at ${secs(s.nextTime)}, track ${s.track ? `${s.track.readyState}${s.track.muted ? ' muted' : ''}${s.track.enabled ? '' : ' disabled'}` : 'none'}, display ${s.display ?? '?'}`;
   const systemHeard =
     sysLabel === 'System audio' &&
     audioPort > 0 &&
