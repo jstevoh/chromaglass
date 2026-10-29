@@ -22,6 +22,7 @@
  * with no Web MIDI and a WebGPU that CI never tests).
  */
 
+import inspector from 'node:inspector';
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell, systemPreferences } from 'electron';
 import electronUpdater from 'electron-updater';
 import { randomInt } from 'node:crypto';
@@ -43,6 +44,31 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 */
 const ROOT = app.isPackaged ? app.getAppPath() : resolve(HERE, '..');
 const SERVER = join(ROOT, 'server', 'remote-server.js');
+
+/*
+  A packed app does not open a debugger for anyone who asks. Chromium's
+  --remote-debugging-port (and -pipe) put the whole page, the licence gate
+  included, in reach of any script that can attach, and no Electron fuse covers
+  them (the security audit of 2026-10-28, finding 9; PLAN 23.17k closes the fuses
+  that can be closed). So a packed app launched with either quits
+  at once, saying why. This cannot stop the owner of the Mac, who can do
+  anything to software that runs as them; it stops the easy way past the gate
+  and another program borrowing the app's microphone and camera by attaching.
+  (Asked of Chromium's own command line, `app.commandLine`, so any spelling of
+  the switch it accepts is caught.) One exception, which is not a way in: when Node's own inspector is already
+  open (`--inspect`), the build is one whose fuses are open, and anyone with
+  that can attach anyway. Playwright (the checks) launches Electron with
+  --inspect=0 and --remote-debugging-port=0 together, and the check drives a
+  copy of the packed app with that one fuse back on (scripts/desktop.mjs); the
+  shipped app has it off (PLAN 23.17k), so the inspector never opens there and
+  the exception never applies to it.
+*/
+// Chromium's own parser decides what is a switch: it takes a single dash too (-remote-debugging-port=9333 opened DevTools
+// in a review of this guard, which had matched `--` only), so the question goes to it, not to a pattern on process.argv.
+if (app.isPackaged && !inspector.url() && (app.commandLine.hasSwitch('remote-debugging-port') || app.commandLine.hasSwitch('remote-debugging-pipe'))) {
+  console.error('ChromaGlass does not run with a remote debugger attached. Quit and open it normally.');
+  app.exit(1);
+}
 
 /*
   A profile of its own, for the check (`npm run desktop`): each run starts as
@@ -98,11 +124,15 @@ if (!app.requestSingleInstanceLock()) {
 let showWindow = null;
 /** Local UDP loopback tap for another process on this machine feeding PCM into System audio (23.8). */
 let loopbackAudioSocket = null;
+/** The show server's module, once it is running: the menu moves its OSC socket (`setOsc`). */
+let showServer = null;
 /** What the show server was started with, for the menu's details. */
 const show = {
   port: 0,
   osc: 0,
   audioPort: 0,
+  /** 'off', 'local' (this Mac only) or 'network' (anyone on the Wi-Fi); see oscSettings. */
+  oscMode: 'off',
   key: '',
   ambient: false,
   requireSignIn: false,
@@ -125,17 +155,52 @@ const show = {
  */
 function showKey() {
   if (process.env.SHOW_KEY) return String(process.env.SHOW_KEY);
-  const file = join(app.getPath('userData'), 'show.json');
   try {
-    const saved = JSON.parse(readFileSync(file, 'utf8'));
+    const saved = readShowFile();
     if (typeof saved.key === 'string' && /^\d{8,}$/.test(saved.key)) return saved.key;
   } catch { /* first launch */ }
   const key = String(randomInt(10_000_000, 100_000_000));
+  writeShowFile({ key });
+  return key;
+}
+
+/** userData/show.json: the show key, and who may send this Mac OSC (below). */
+function readShowFile() {
+  return JSON.parse(readFileSync(join(app.getPath('userData'), 'show.json'), 'utf8'));
+}
+function writeShowFile(patch) {
+  const file = join(app.getPath('userData'), 'show.json');
+  let now = {};
+  try { now = readShowFile(); } catch { /* first launch */ }
   try {
     mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, JSON.stringify({ key }, null, 2), { mode: 0o600 });
-  } catch { /* a key for this launch only */ }
-  return key;
+    writeFileSync(file, JSON.stringify({ ...now, ...patch }, null, 2), { mode: 0o600 });
+  } catch { /* kept for this launch only */ }
+}
+
+/*
+  Who may drive the show over OSC (the security audit of 2026-10-28, finding 4).
+  OSC is UDP with no show key, so whoever can send this Mac a packet changes
+  settings and switches presets; the terminal server has always listened on the
+  whole LAN, which on a venue's Wi-Fi is everyone in the room. The app opens
+  with it off and the performer picks, from the Show menu, "This Mac only"
+  (Resolume, TouchDesigner or Ableton on the same laptop) or "From the
+  network" (a lighting desk or a second computer). The choice is kept between
+  launches. OSC_PORT in the environment still decides for the checks, and for
+  anyone who launches the app with it set: they asked for it by name.
+*/
+// CHROMAGLASS_OSC_PORT moves the port the menu opens (the check cannot rely on 9000 being free); OSC_PORT, below, decides outright.
+const OSC_DEFAULT_PORT = Number(process.env.CHROMAGLASS_OSC_PORT) || 9000;
+const OSC_BINDS = { local: '127.0.0.1', network: '0.0.0.0' };
+function oscSettings() {
+  if (process.env.OSC_PORT !== undefined) {
+    const port = Number(process.env.OSC_PORT);
+    if (!(port > 0)) return { mode: 'off', port: OSC_DEFAULT_PORT };
+    return { mode: process.env.OSC_BIND === OSC_BINDS.local ? 'local' : 'network', port };
+  }
+  let saved = null;
+  try { saved = readShowFile().osc; } catch { /* first launch */ }
+  return { mode: saved === 'local' || saved === 'network' ? saved : 'off', port: OSC_DEFAULT_PORT };
 }
 
 /** Can this port be listened on, on every interface, the way the server will? */
@@ -435,7 +500,9 @@ function showDetails() {
       ? hosts.flatMap((h) => [`Phone remote: http://${h}:${show.port}/?remote=1&key=${show.key}`, `Network display: http://${h}:${show.port}/?cast=true&key=${show.key}`])
       : ['No network: the phone remote and network displays need the laptop on Wi-Fi or Ethernet.']),
     '',
-    show.osc > 0 ? `OSC in: UDP port ${show.osc} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)` : 'OSC in: off',
+    show.oscMode === 'off'
+      ? 'OSC in: off (Show menu > OSC input turns it on)'
+      : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
     ...(show.port !== 3000 ? ['', `Port 3000 was taken, so this show is on ${show.port}. Looks saved on 3000 are not in this one.`] : []),
   ];
   void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'The show server', detail: lines.join('\n'), buttons: ['OK'] });
@@ -480,6 +547,21 @@ function startUpdater() {
   ipcMain.handle('chromaglass:update-act', () => { updates.act(); return { ...updates.state, history: undefined }; });
 }
 
+/** The menu's OSC choice: kept, then applied to the running server without a restart. */
+async function setOscMode(mode) {
+  show.oscMode = mode;
+  writeShowFile({ osc: mode });
+  const state = await showServer?.setOsc?.(mode === 'off' ? 0 : show.osc, OSC_BINDS[mode]);
+  process.env.OSC_PORT = String(mode === 'off' ? 0 : show.osc);
+  process.env.OSC_BIND = OSC_BINDS[mode] ?? OSC_BINDS.local;
+  globalThis.__chromaglassOsc = { mode, state };
+  buildMenu();
+  // A port that is taken says so, rather than leaving a menu that claims OSC is on.
+  if (mode !== 'off' && !/^udp /.test(state ?? '') && !process.env.CHROMAGLASS_OFFLINE) {
+    void dialog.showMessageBox(showWindow ?? undefined, { type: 'warning', message: `OSC could not open UDP port ${show.osc}`, detail: `${state ?? 'The show server is not running'}. Another program may be using the port; quit it, or pick the setting again.`, buttons: ['OK'] });
+  }
+}
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
   const template = [
@@ -500,6 +582,14 @@ function buildMenu() {
         },
         { type: 'separator' },
         { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
+        {
+          label: 'OSC input',
+          submenu: [
+            ['off', 'Off'],
+            ['local', 'This Mac only'],
+            ['network', 'From the network'],
+          ].map(([mode, label]) => ({ id: `osc-${mode}`, label, type: 'radio', checked: show.oscMode === mode, click: () => setOscMode(mode) })),
+        },
       ],
     },
   ];
@@ -523,7 +613,10 @@ async function start() {
 
   show.port = await choosePort();
   show.key = showKey();
-  show.osc = Number(process.env.OSC_PORT ?? 9000);
+  const osc = oscSettings();
+  show.osc = osc.port;
+  show.oscMode = osc.mode;
+  buildMenu();
   /*
     The app opens on a Home or Pro licence (PLAN.md 23.17d; the owner,
     2026-10-25: "The Mac app should check the license. The app won't work for
@@ -564,7 +657,8 @@ async function start() {
   // The server reads its settings from the environment, as it does in a terminal.
   process.env.PORT = String(show.port);
   process.env.SHOW_KEY = show.key;
-  process.env.OSC_PORT = String(show.osc);
+  process.env.OSC_PORT = String(show.oscMode === 'off' ? 0 : show.osc);
+  process.env.OSC_BIND = OSC_BINDS[show.oscMode] ?? OSC_BINDS.local;
   const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);
   const licenseMgr = createServerLicenseManager({ filePath: licenseFile });
   await licenseMgr.initFromEnv();
@@ -584,8 +678,10 @@ async function start() {
     error: initialError,
     enforced: initialStatus.enforced,
   };
-  await import(pathToFileURL(SERVER).href);
+  showServer = await import(pathToFileURL(SERVER).href);
   await serverUp(show.port);
+  // What the check reads from the main process (scripts/desktop.mjs): the choice, and what the socket did with it.
+  globalThis.__chromaglassOsc = { mode: show.oscMode, state: showServer.oscState?.() };
 
   // A screen that sleeps in the middle of a set is the one thing the room notices.
   powerSaveBlocker.start('prevent-display-sleep');
