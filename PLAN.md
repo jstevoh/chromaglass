@@ -6499,7 +6499,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   `sizes.json` fails only past 100 KB (about 25k tokens), and one a pull request made or
   grew past 40 KB is a warning (an annotation on the file in CI). Ceilings hold only the
   files over 100 KB: 40 dropped, 13 left (2.7 MB). Ledgers leave the list under 40 KB, as
-  before. Ten new self-tests (46 in all).
+  before. The review found that freeing the 40 files between the bars let two green PRs land
+  one of them over 100 KB on main (presets.ts has 8 KB of room), so a file over the limit with
+  no ceiling is red only in a PR that resized it, and a note on main, as a stale entry is; and
+  four mutations its self-tests missed, now each caught. 21 new self-tests (57 in all).
 - **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
   App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
   such PR now has to move as many bytes out as it adds, wiring lines included. If that turns

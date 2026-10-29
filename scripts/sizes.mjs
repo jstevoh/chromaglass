@@ -166,9 +166,18 @@ export function judge(sizes, now, then, was = null, pr = true) {
   }
   // A file between the two bars is a warning only where this change made it
   // or grew it: the forty that sit there already are not news on every run.
+  //
+  // And a file past the limit with no ceiling is red only in a pull request
+  // that resized it, for the reason a stale entry is (above), found in the
+  // review of this rule: with the forty files between the bars free to grow,
+  // presets.ts at 90 KB takes two PRs of 5 KB each, each green against its
+  // own base and together 102 KB on main. Red wherever it was found, that
+  // would turn main's deploy and every open PR red with nobody's change to
+  // blame. So on main, and in a PR that did not touch the file, it is a note,
+  // and the next PR that resizes it owns the split.
   for (const [f, n] of sizes) {
     if (f in now.files || f in now.ledgers) continue;
-    if (n > LIMIT) bad.push(['new', f, `${f} is ${kb(n)} (${n} bytes), over the ${kb(LIMIT)} limit for a file: split it`]);
+    if (n > LIMIT) (pr && touched(f) ? bad : notes).push(['new', f, `${f} is ${kb(n)} (${n} bytes), over the ${kb(LIMIT)} limit for a file: split it`]);
     else if (n > WARN && (!was || n > (was.get(f) ?? 0))) notes.push(['big', f, `${f} is ${kb(n)}, over ${kb(WARN)} (about ${Math.round(n / 4096)}k tokens): if it has parts a session would read apart, give them files of their own`]);
   }
   if (then) {
@@ -274,6 +283,16 @@ export function run(root, { ref = null, ci = !!process.env.GITHUB_ACTIONS, pr = 
   return { bad: j.bad, notes: [...notes, ...j.notes], sizes, now, base: base.sha };
 }
 
+// How a note is printed. A warning is an annotation on the pull request's file
+// in CI as well as a line in the log: checks.mjs passes a check's output
+// through as it comes, so GitHub reads the `::warning` line. Its properties
+// are escaped as GitHub's toolkit escapes them, for a path with a comma.
+const prop = (v) => String(v).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A').replace(/:/g, '%3A').replace(/,/g, '%2C');
+export function said([k, f, what], ci) {
+  if (k !== 'big') return `note: ${what}`;
+  return ci ? `::warning file=${prop(f)},title=${prop(`Over ${kb(WARN)}`)}::${what}` : `warning: ${what}`;
+}
+
 // --- The self-test --------------------------------------------------------------
 // Each rule meets the break it is there for, in a real repository, through the
 // same run() the real tree goes through: git's listing, the binary test, the
@@ -331,6 +350,12 @@ function selftest() {
     warns('nor one it shrank', () => put('src/mid.ts', 50 * 1024), []);
     warns('a new file over 100 KB fails rather than warns', () => put('src/new.ts', NEW), []);
     warns('nor does a ledger, or a file with a ceiling', () => { add('PLAN.md', 1); add('src/big.ts', 1); }, []);
+    reset();
+    const blind = run(dir, { ci: false }).notes.filter(([k]) => k === 'big').map(([, f]) => f).join();
+    t(blind === 'src/mid.ts', 'with no base to tell what grew, every file between the bars is a warning', blind || 'none');
+    const w = said(['big', 'src/a,b.ts', 'src/a,b.ts is 41.0 KB'], true);
+    t(w === '::warning file=src/a%2Cb.ts,title=Over 40.0 KB::src/a,b.ts is 41.0 KB', 'in CI a warning is an annotation on the file, its path escaped', w);
+    t(said(['big', 'x', 'y'], false) === 'warning: y' && said(['stale', 'x', 'y'], true) === 'note: y', 'in a session it is a line, and a note is never an annotation');
     expect('a big file renamed is a new file over budget', () => g('mv', 'src/big.ts', 'src/moved.ts'), ['new src/moved.ts', 'stale src/big.ts']);
     expect('a big binary file passes', () => put('clip.mp4', 200 * 1024, '\0a'), []);
     expect('a package-lock.json in a folder passes', () => put('desktop/package-lock.json', 200 * 1024), []);
@@ -351,6 +376,13 @@ function selftest() {
     expect('and passes once lowering drops it', () => { put('src/big.ts', 60 * 1024); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); }, []);
     expect('a ledger under the warning fails until it leaves the list', () => put('PLAN.md', 1024), ['stale PLAN.md']);
     expect('a ledger between the bars stays one', () => put('PLAN.md', 41 * 1024), []);
+    expect('and lowering keeps it', () => { put('PLAN.md', 41 * 1024); write(dir, lowered(measure(dir), parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), ''))); t('PLAN.md' in parse(fs.readFileSync(path.join(dir, BASELINE), 'utf8'), '').ledgers, 'lowering keeps a ledger between the bars on the list'); }, []);
+    // Inside the slack and back under 100 KB: stale for the limit, not the slack.
+    reset(); put('src/edge.ts', LIMIT + 3 * 1024); baseline({ ledgers: { 'PLAN.md': 'x' }, files: { 'src/big.ts': BIG, 'src/edge.ts': LIMIT + 3 * 1024 } }); g('add', '-A'); g('commit', '-qm', 'a file 3 KB over the limit');
+    const edgeBase = g('rev-parse', 'HEAD').trim();
+    put('src/edge.ts', LIMIT);
+    const edge = run(dir, { ref: edgeBase, ci: false }).bad.map(([k, f]) => `${k} ${f}`).join();
+    t(edge === 'stale src/edge.ts', 'a file trimmed 3 KB to exactly 100 KB, inside the slack, has its ceiling dropped', edge || 'passed');
     // The review of #548: credited on the sum of ceilings, a ceiling sitting
     // above its file at the base (slack, or an entry for a file that has
     // already shrunk) paid for a fresh file over budget with no bytes moved.
@@ -395,6 +427,25 @@ function selftest() {
     [b] = ciKinds(true);
     t(b === 'grew src/big.ts', 'main 3 KB under its ceiling: a PR adding 2 KB is red on its own, so two cannot land 1 KB over', b || 'passed');
     t(run(dir, { ref: under, ci: false }).bad.some(([k]) => k === 'grew'), 'and the same against --base in a session');
+    // A file with no ceiling, 3 KB under the limit: two PRs of 2 KB each are
+    // green against their bases and land 1 KB over it on main.
+    g('reset', '-q', '--hard', lined); lines('src/mid.ts', LIMIT - 3 * 1024); g('add', '-A'); g('commit', '-qm', 'a file 3 KB under the limit');
+    const near = g('rev-parse', 'HEAD').trim();
+    g('checkout', '-qb', 'grow-head'); fs.writeFileSync(path.join(dir, 'src/mid.ts'), Array.from({ length: 32 }, (_, i) => line(8000 + i)).join('') + fs.readFileSync(path.join(dir, 'src/mid.ts'), 'utf8')); g('commit', '-qam', 'PR B adds 2 KB');
+    [b] = ciKinds(true);
+    t(b === '', 'a PR that grows a file to 2 KB under the limit is green', b);
+    g('checkout', '-q', 'main'); fs.appendFileSync(path.join(dir, 'src/mid.ts'), Array.from({ length: 32 }, (_, i) => line(9000 + i)).join('')); g('commit', '-qam', 'PR A adds 2 KB');
+    g('merge', '-q', '--no-edit', 'grow-head');
+    const over = fs.statSync(path.join(dir, 'src/mid.ts')).size;
+    [b, n] = ciKinds(false);
+    t(over === LIMIT + 1024 && b === '' && /new src\/mid\.ts/.test(n), 'two such PRs land 1 KB over the limit: main stays green, with a note', `${over} bytes; red [${b}], notes [${n}]`);
+    put('src/other.ts', 200); g('add', '-A'); g('commit', '-qm', 'a PR that does not touch it');
+    [b] = ciKinds(true);
+    t(b === '', 'a later PR that does not resize the file is not red for it', b);
+    add('src/mid.ts', 1); g('commit', '-qam', 'a PR that grows it');
+    [b] = ciKinds(true);
+    t(b === 'new src/mid.ts', 'a later PR that resizes it is, and owns the split', b || 'passed');
+    t(run(dir, { ref: near, ci: false }).bad.some(([k, f]) => k === 'new' && f === 'src/mid.ts'), 'and in a session, against the base before both, it is red');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -416,9 +467,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
   let failed = selftest();
   const r = run(ROOT, { ref });
-  // A warning is an annotation on the pull request's file as well as a line in
-  // the log (checks.mjs passes the check's output through as it comes).
-  for (const [k, f, what] of r.notes) console.log(k === 'big' && process.env.GITHUB_ACTIONS ? `::warning file=${f},title=Over ${kb(WARN)}::${what}` : `${k === 'big' ? 'warning' : 'note'}: ${what}`);
+  for (const n of r.notes) console.log(said(n, !!process.env.GITHUB_ACTIONS));
   for (const [, , what] of r.bad) { console.log(`FAIL ${what}`); failed++; }
   if (r.sizes) {
     const held = Object.keys(r.now.files).length, total = Object.values(r.now.files).reduce((a, b) => a + b, 0);
