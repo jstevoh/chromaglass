@@ -37,21 +37,7 @@ export const FREE_RECORD_MAX_SECONDS = 15;
 export const FREE_RENDER_MAX_HEIGHT = 720;
 export const FREE_SITE_LOGO_TEXT = 'ChromaGlass';
 
-// Lemon Squeezy's live-mode products (store approved 2026-10-29): Home 1479217, Upgrade 1479218,
-// Pro 1479219. The test-mode links these replace opened a checkout that charged nothing.
-export const CHECKOUT_HOME_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/87144c33-66fc-4a34-bb34-d85cd023901d';
-export const CHECKOUT_PRO_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/39f941ed-fc84-45b4-b188-2049f14def50';
-export const CHECKOUT_UPGRADE_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/0271d431-a839-4a31-8778-4028525563cd';
-
-export function buildCheckoutUrl(baseUrl: string, email?: string | null): string {
-  const clean = email?.trim();
-  if (!clean || !clean.includes('@')) return baseUrl;
-  const sep = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${sep}checkout[email]=${encodeURIComponent(clean)}`;
-}
+export { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, buildCheckoutUrl } from './checkoutLinks';
 
 export function openAccountSheet(): void {
   if (typeof window !== 'undefined') {
