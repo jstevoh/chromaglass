@@ -298,8 +298,11 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   const stills = rec.still ?? [];
   const letGo = stills.length > 0 && stills.every(([, e]) => e !== null);
   const letGoAt = letGo ? Math.max(...stills.map(([, e]) => e)) : null;
-  // Rounded to the millisecond in the prepare log, so a millisecond's slack.
-  const heldToEnd = letGoAt !== null && opening?.built != null && letGoAt >= opening.built - 1;
+  // Against the opening's end, not its last build, so a release moved back
+  // above the first uses' wait is red here too, whether or not a frame was
+  // sampled in that wait. `go` comes moments before the log takes its `ms`,
+  // and its `at` and `ms` are each rounded to the millisecond: 2 ms of slack.
+  const heldToEnd = letGoAt !== null && opening !== null && letGoAt >= opening.end - 2;
   // One at a time, as the opening has always asked for them (`renderBusy` in
   // gpu/prepare.ts): the hold must not let the lanes ask for several at once.
   const sorted = [...renders].sort((a, b) => a[0] - b[0]);
@@ -307,7 +310,7 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   check('9. it holds still while the opening builds, render pipelines one at a time and kernels after, and moves again once it is built',
     overlaps === 0 && renders.length > 0 && during.length > 0 && tail.length > 0 && whole.every(([, m]) => !m) && letGo && heldToEnd && lastEnd !== null
       && (afterward.some(([, m]) => m) || afterward.length <= 2),
-    `${renders.length} render compiles in the opening${opening ? '' : ' (no opening in the prepare log)'}, ${overlaps} asked while another compiled; ${whole.length} frames up in the opening (${opening ? `${s(opening.at)}–${s(opening.end)}, last build settled ${opening.built == null ? 'never' : s(opening.built)}` : 'none'}), ${whole.filter(([, m]) => m).length} of them moving; ${during.length} during the render compiles, ${tail.length} after the last of them (${tail.filter(([, m]) => m).length} moving); held still ${stills.map(([a, e]) => `${s(a)}–${e === null ? 'never let go' : s(e)}`).join(', ') || 'never'}; ${afterward.filter(([, m]) => m).length} of ${afterward.length} frames moving after the opening`);
+    `${renders.length} render compiles in the opening${opening ? '' : ' (no opening in the prepare log)'}, ${overlaps} asked while another compiled; ${whole.length} frames up in the opening (${opening ? `${s(opening.at)}–${s(opening.end)}, last build settled ${opening.built == null ? 'never' : s(opening.built)}` : 'none'}), ${whole.filter(([, m]) => m).length} of them moving; ${during.length} during the render compiles, ${tail.length} after the last of them, over ${opening && lastEnd !== null ? Math.round(opening.end - lastEnd) : '?'} ms (${tail.filter(([, m]) => m).length} moving); held still ${stills.map(([a, e]) => `${s(a)}–${e === null ? 'never let go' : s(e)}`).join(', ') || 'never'}; ${afterward.filter(([, m]) => m).length} of ${afterward.length} frames moving after the opening`);
   /*
     And still before them too, from the first frame the page draws. What it
     guards: on CI's Mac the frames stopped as long while Chromium started the

@@ -313,24 +313,28 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     frames present before the first fill is asked of the GPU.
   */
   if (quiet && builds.length > 0) await quiet.still().catch(() => undefined);
-  await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
-  /*
-    The first uses, handed over as each compile came in and not waited for
-    there (`firstUse` in `gpu/kit.ts` on why), waited for here, once, so
-    the show still opens with them paid. Within what is left of the
-    timeout, like the builds.
-  */
   let useWait: number | null = null;
-  if (stage === 'opening' && !gone) {
-    const w0 = performance.now();
-    const left = t0 + PREPARE_TIMEOUT_MS - w0;
-    if (left <= 0 || !await within(device.queue.onSubmittedWorkDone().catch(() => undefined), left)) timedOut = true;
-    useWait = Math.round(performance.now() - w0);
+  // Let go only once the opening is done, with every build settled and its
+  // first uses paid (`Quiet` says why), and the same however else it ends
+  // (gone, timed out, a build that never settled, a lane that threw): never
+  // left held still.
+  try {
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
+    /*
+      The first uses, handed over as each compile came in and not waited for
+      there (`firstUse` in `gpu/kit.ts` on why), waited for here, once, so
+      the show still opens with them paid. Within what is left of the
+      timeout, like the builds.
+    */
+    if (stage === 'opening' && !gone) {
+      const w0 = performance.now();
+      const left = t0 + PREPARE_TIMEOUT_MS - w0;
+      if (left <= 0 || !await within(device.queue.onSubmittedWorkDone().catch(() => undefined), left)) timedOut = true;
+      useWait = Math.round(performance.now() - w0);
+    }
+  } finally {
+    quiet?.go();
   }
-  // Let go only now, with every build of the opening settled and its first
-  // uses paid (`Quiet` says why), and the same when it ends any other way
-  // (gone, timed out, a build that never settled): never left held still.
-  quiet?.go();
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
     at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: [...asked, ...queue.map((b) => b.key)], builds: times, raw, useWait,
