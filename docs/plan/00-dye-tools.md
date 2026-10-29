@@ -4,77 +4,7 @@
 
 `src/gpu/wgsl/fluid.ts` (advection), `scripts/tools.mjs`
 
-*Found 2026-09-27, **cause found 2026-10-22**:* **"adds none" went red on runs that did
-not touch the Finger, because the window it was measured against was the ambient
-seeder, not the plate.** #182's tools shard (a Pacing change; the same code had passed
-the shard one commit earlier) read 50 → 64 against −12 before and +9 after, red by 1.5:
-the allowance was centred on the larger-magnitude idle reading rather than spanning
-both, which is not the bracket its comment described. That part is bracketed now
-(`fMinIdle`/`fMaxIdle`, spanning both readings and 0), and bracketing alone made the
-reds stop without explaining them.
-
-The explanation is that the Finger section, alone among the tool checks, left the
-ambient seeding on. The Blow and the Press both turn it off and say why ("so 'left
-alone' was the seeder's drift, not the plate's"). Measured on the Mac with the seeder
-on and **nothing dropped at all**, the plate reads 64 and gains +26 then +18 over the
-two idle windows — so "what the plate did alone" was mostly the seeder's rate. That is
-why the idle reading sat at +31 to +36 whether the pool was 66 or 728, an eleven-fold
-range: a window dominated by a term that does not depend on how much dye is on the
-plate. And a bracket built from it is wide in proportion to nothing: at a pool of 66 it
-accepted any Δ in [−15, +46], so a Finger that created 70% of the pool again in new dye
-would have passed (check-skeptic).
-
-Two findings are withdrawn rather than confirmed. The 2026-09-27 reading — 40 Mac
-shards, pools 49 to 279, the stroke adding +11 to +21 on all 12 pools under 150 — was
-read through those seeded windows, and at that size the seeder alone lays about as much
-as the Drop does, so it is not evidence about the Finger. And a Mac sweep at four pool
-sizes (728, 176, 152, 66) that put the hand's own contribution at +3 to +5 by
-subtracting a no-stroke control is measured on the same seeded plate, so it bounds the
-hand only against a background it did not control.
-
-*Done:* the seeder is off for the Finger section now, as for the Blow and the Press,
-with a new `quiet` check: left alone, the pool may not *gain* more than 5% of itself, or
-5, over an idle window. Gains only, because the fault is dye arriving from something the
-check does not control — a window that loses dye only narrows the bracket downward and
-cannot excuse a hand, and the Mac's after window reads −1, so a two-sided bar would
-charge it for nothing. It is ANDed into `adds none`, as the Press ANDs its own guard
-into both of its claims, so a plate the harness has declared unquiet cannot also print
-"adds none: ok".
-
-The idle windows fell from +35 to about 1, so the bracket closes on nothing and the
-check measures the hand. On the owner's Mac, four runs: idle +1 before and −1 to −0
-after, on pools of 357 and 611, and **the hand adds nothing** — Δ under ±0.5 every
-time. Thin pools are still unmeasured (below).
-
-A control (`TOOLS_FINGER_CONTROL=1`) runs the same shape with the mouse never going
-down, on the same helpers, and prints the hand's own contribution by subtraction: +0.1
-to −1.1 across three runs, against a slack of ±59 to ±97. It waits out the stroke in
-solver steps rather than milliseconds, because the real path pays 30 `mouse.move` round
-trips the control does not: at equal wall time the stroke ran 274 steps against the
-control's 122, a factor of two apart in the pool's age, and the comparison was void —
-the same fault the Hover check was rewritten to fix. Step-matched it reads 273 against
-272 on a pool of 611, and 138 against 137 on a pool of 357, and it prints both spans
-with the verdict, so a run that is not comparable, that timed out, or whose span did not
-read says nothing instead of implying the opposite. It reports and does not gate: with
-no pool it says so and stands down rather than throwing, because a reporting-only block
-that can end the run is a gate whatever its comment claims. And it states the narrower
-claim it can support — the second window is not biased by where it sits in the run — not
-the broader one it cannot, that the window is unbiased *when a stroke happened*. For
-that, the `fIdle`/`fIdleAfter` pair in the check's own detail is the evidence, and the
-control calibrates that pair rather than replacing it.
-
-*Done (PR #449): both bars set from the shards' own noise.* `TOOLS_FINGER_TRIALS=<n>`
-repeats the stroke on the same helpers, cycling the Drop's hold from 300 to 1500 ms so
-one runner reads thin pools and thick ones, and prints each trial's excess over the
-bracket as a share of the pool (reporting, not gating). Run twelve times on four Mac
-runners, 48 trials on pools of 39 to 357: the stroke landed at most **0.48 outside the
-bracket, 0.17% of its pool**, and the plate left alone gained at most **+0.74, 0.26%**.
-The six seeder-off shard runs before them and the five `adds none` lines beside them
-read the same. So `fSlack` is now `0.02 * pool + 1`, was `0.15 * pool + 5` (±8.1 on a pool
-of 357, was ±59; the nearest trial is a sixteenth of it), and the `quiet` bar is
-`0.02 * pool + 1`, was `max(5, 0.05 * pool)` (the nearest trial is a tenth of it). The
-check's detail now prints its Δ and windows to two places, so `npm run flakes -- --check
-'and adds none'` reads the margin from ordinary pushes.
+*Shipped so far* (#449): the Finger's `adds none` was read against the ambient seeder; the seeder is off for the Finger, a `quiet` check, a step-matched control, both bars set from 48 Mac trials. Story in `docs/plan-shipped.md` §0 (moved 2026-10-29, 19m-2).
 
 *Measured (PR #449):* the Finger adds no dye on a genuinely thin pool: twelve trials on
 pools of 39 to 80 landed at most 0.05 outside the bracket. `TOOLS_POOL_MS` shortens the Drop hold to
@@ -145,26 +75,7 @@ own and left as it is: Soap Bursts on the beat (Soap Flow), Rock and the rhythm 
 camera's beat (Macro Sync), and the look's pace (Tempo Sync). Whether any of those
 should also answer to Audio Impact is a later look question, not done here.
 
-*Found 2026-10-04 (#238), **done on the thin gap (#250); open on the old plate** below:* **with the band playing, the
-ferrofluid poured round Classic's middle drifted into it** (the disc 0.12 round the
-middle 0.180 → 0.501 of black in nine seconds on the Mac, 0.099 → 0.084 in silence).
-`npm run ferrodrift` (#250) pours the ring with the band on, in the app, on the Mac,
-and four runs of it found: with the look as it is the ring spreads into the middle as
-fast in silence as with the band (0.100 → 0.248 against 0.097 → 0.233 in twelve
-seconds, the ferrofluid's mean distance from the middle growing, so the look's own
-stirring spreading it both ways), and no slower with the bubbles, centre gravity,
-Tempo Sync or vibration taken away; with the plate's own currents held, as #238 held
-them, on the thin gap every look plays since #248 the band moves nothing in, its
-bubbles on the plate or not (0.097 → 0.082 and 0.102 → 0.076; silence 0.114 → 0.117);
-and held on the old plate (Thin Gap off) it still drifts in when the band's bubbles
-land near the middle (0.099 → 0.150 with two to seven, the mean distance 0.310 →
-0.298), and not on a run where it dropped none or with Bubbles at 0 (0.086 → 0.086,
-0.097 → 0.093). So it was the old plate's bubble press ("a still bubble presses the
-glass", above), and #248 took every look off it. The check asks the thin gap with
-the band and four bubbles set down where the band drops them, against a silence that
-has to be still itself, and asks the old plate to drift by more than the same bar, so
-the instrument is shown to see what it was built for; that line turns round to ask
-the old plate to stay once its bubbles stop pressing.
+*Found 2026-10-04 (#238), **done on the thin gap (#250); open on the old plate** below:* **with the band playing, the ferrofluid poured round Classic's middle drifted into it.** It was the old plate's bubble press ("a still bubble presses the glass", above); `npm run ferrodrift` (#250) holds the thin gap still with the band and asks the old plate to drift, a line that turns round once its bubbles stop pressing. Story in `docs/plan-shipped.md` §0 (moved 2026-10-29, 19m-2).
 
 *Found 2026-10-05 (#267, #281 and #287 red on it), **fixed in the ferrodrift control's
 PR:*** **the old-plate line sat on its bar.** Its four bubbles at 0.15, set down 2.5 s
@@ -198,15 +109,7 @@ the page's animation frames, not the stage's drawn ones, and did not wait for th
 to be off; it now waits for both, and the check prints all seven readings in order, so
 the next red says which frame was odd (this PR).
 
-**Deploys no longer re-measure a tree its PR already passed** (this PR, `npm run
-deploygate`). Measured 2026-09-27, 1 AM to 11 AM PT: 18 red runs, 5 of 16 deploys.
-Every deploy re-ran the four Mac shards; 16 of the last 20 merges published exactly
-the tree their PR's `Checks` had just passed on, and 3 of the 5 red deploys (#189,
-#195, #196) were that tree going red the second time on a check nothing in it
-touched. `deploy.yml` now skips the checks when the tree is the PR run's (the head
-contained main, and its run was green) and runs them in full otherwise. It halves
-the Mac jobs per merge, which is also what had run times at 20–55 minutes by noon
-against 10 at 1 AM.
+*Shipped so far* (`npm run deploygate`): deploys no longer re-measure a tree its PR already passed; 3 of 5 red deploys on 2026-09-27 were that tree going red the second time. Story in `docs/plan-shipped.md` §0 (moved 2026-10-29, 19m-2).
 
 *Found 2026-09-27, not yet done:* the checks that went red on deploys that day, on code
 they do not measure (besides the Finger, the mirror and the wall's gain above): Beat Squeeze on two deploys (#190's,

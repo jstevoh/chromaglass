@@ -9,7 +9,7 @@ Before starting anything that is not a bug fix, read `PLAN.md`: it is the plan's
 order, and a table of the sections. Then read only the file your step names: each section
 is a file under `docs/plan/` (`00-dye-tools.md` to `36-analog-operators.md`, a big one cut
 between items into parts of about 30 KB), and `grep -rn '14ab-4' docs/plan/` finds
-an item from its id. Never read every section: the open plan is about 700 KB in all, and
+an item from its id. Never read every section: the open plan is about 630 KB in all, and
 see "Keeping a session small" for why that matters. What shipped is in
 `docs/plan-shipped.md`, under the same numbers: a section keeps a one-line stub per shipped
 item and only the open work, so read the archive only when an open item needs the history
