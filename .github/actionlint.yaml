@@ -1,0 +1,5 @@
+# actionlint knows GitHub's runner labels; this is the one self-hosted label
+# the workflows ask for, the owner's Mac (PLAN.md 19ah, docs/mac-runner.md).
+self-hosted-runner:
+  labels:
+    - owner-mac

@@ -309,7 +309,10 @@ const SKEW = [0.1, 0.2, 0.9, 0.05, 0.8, 0.95, 0.25, 0.7];
     const ts = readFileSync(join(root, 'src/gpu/output.ts'), 'utf8');
     const varAt = Object.fromEntries([...wgsl.matchAll(/which == (\d+)\) \{ col = textureSampleLevel\((\w+),/g)].map(x => [Number(x[1]), x[2]]));
     const bindingOf = Object.fromEntries([...wgsl.matchAll(/@binding\((\d+)\) var (\w+): texture_2d/g)].map(x => [x[2], Number(x[1])]));
-    const kindAt = Object.fromEntries([...ts.matchAll(/binding: (\d+), resource: this\.bound\('(\w+)'\)/g)].map(x => [Number(x[1]), x[2]]));
+    // The pass's bind group is a list in binding order (`groupOf`, PLAN 14ab-5):
+    // a source's binding is its place in that list.
+    const list = ts.match(/groupOf\(this\.device, pipeline, \[([^\]]*)\]\)/)?.[1] ?? '';
+    const kindAt = Object.fromEntries(list.split(',').map((e, i) => [i, e.match(/this\.bound\('(\w+)'\)/)?.[1]]).filter(([, k]) => k));
     const routes = ['front', 'back', 'film'].map(kind => {
       const n = m.SOURCE_INDEX[kind];
       const v = varAt[n];
