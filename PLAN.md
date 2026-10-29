@@ -6511,6 +6511,19 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   with it, which costs a session the same. Five self-tests hold it, one the review of #548's exploit: the credit is the bytes that actually left the base's over-budget files in the PR, not the sum of their ceilings, so slack under a ceiling funds nothing. Whether 40 KB is the right
   budget for a new file at all is the owner's question, raised 2026-10-28 ("40kb seems
   somewhat arbitrary. I don't want quality to go down because of this").
+- **19ai-5d. Shipped: a warning at 40 KB, a failure at 100 KB** (the owner's pick,
+  2026-10-29). Measured on main at a68de68: about four bytes a token; 506 of 677 text files
+  under 20 KB; the cost in the 17 over 100 KB, each read whole by a session that needs a
+  fraction of it; the 40 between 40 and 100 KB mostly modules that do one job, whose prose
+  comments are 25 to 60% of their bytes (audioFeatures 52%, slosh 59%), so a 40 KB bar was
+  paid for in comments or in modules cut where they do not come apart. Now a file not in
+  `sizes.json` fails only past 100 KB (about 25k tokens), and one a pull request made or
+  grew past 40 KB is a warning (an annotation on the file in CI). Ceilings hold only the
+  files over 100 KB: 40 dropped, 13 left (2.7 MB). Ledgers leave the list under 40 KB, as
+  before. The review found that freeing the 40 files between the bars let two green PRs land
+  one of them over 100 KB on main (presets.ts has 8 KB of room), so a file over the limit with
+  no ceiling is red only in a PR that resized it, and a note on main, as a stale entry is; and
+  four mutations its self-tests missed, now each caught. 21 new self-tests (57 in all).
 - **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
   App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
   such PR now has to move as many bytes out as it adds, wiring lines included. If that turns
@@ -7061,6 +7074,12 @@ once the login works (23.14).*
   *(Open console step for the owner: in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → Web client `793087423172-fi7d5oq5tisv3is84vvf8e6dtorighql.apps.googleusercontent.com`, add `https://chromaglass.art/__/auth/handler`, `https://www.chromaglass.art/__/auth/handler`, and `https://chromaglass.web.app/__/auth/handler` under Authorised redirect URIs, then update `VITE_FIREBASE_AUTH_DOMAIN` to `chromaglass.art` so `signInWithRedirect` stays same-domain on iPhone Safari.)*
 - **23.13** (**shipped**, #390 and extended in #394): `public/privacy.html` and `public/terms.html` completed and
   approved by the owner, including 23.12's licence key, Lemon Squeezy checkout, and 2-machine terms. *Measure:* `npm run privacy` (16/16, CI, part `logic`).
+  2026-10-24: both pages name who runs ChromaGlass, the owner's California LLC (the terms
+  had named the product itself as the contracting party, which is not a person in law).
+- **23.13-mail** (open, the owner): `support@chromaglass.art`, the contact both pages and
+  the terms give, has no mailbox: on 2026-10-24 the domain's DNS (GoDaddy) had no MX
+  record, so mail to it bounces. Set up a mail service for the domain and add its MX and
+  SPF records; until then the pages promise an address nobody reads.
 - **23.10** (**shipped**, #394; brief `docs/handoff-signin.md`): the sign-in on the
   hosted site (`SignInScreen.tsx`, `firebaseAuth.ts`, `authFlag.ts`), over `#cg-intro`
   with Google, Apple and an emailed magic link, and the account sheet (`AccountSheet.tsx`:
@@ -8913,6 +8932,23 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   resets its `BandRange` when the band changes, so after a drag its live level reads
   against the old band's range until it catches up; (d) the rule for when a cord gates is
   written out twice in `SettingsPanel.tsx` beside `gated()` in `areaCords.ts`; import `gated`.
+- **30a-3. The plate at Beat Squeeze 0.8 stepped a quarter slower on the Mac runner from
+  the first runs carrying #511 (found 2026-10-28, #541).** `npm run squeeze`'s fifth-shard
+  log on 42 runs: the window at 0.8 read 220–309 steps in 12 s on every base without
+  864b4e2 and 170–217 on every base with it, two of them before the governor (#474)
+  merged; the window at 0 right after read the same throughout (208–354, then 302–359).
+  One branch whose own diff did not move read 299 on f85afa6 and 210 on a24bf12. #541's
+  timeline: warm, 241 steps at 0.8 against 326 at 0, the frames halving (about 25 a second
+  against 50) while the squeeze is up. Not seen on the owner's M4 (360 steps in every
+  window either side of #511, 2026-10-28). Nothing #511 changed is on the press's path
+  that reading finds (`pressKick`, `KickRelease`, `flushDeltas`, the slosh dish's
+  presses); its per-reading `spectrum` copy (`AudioFeatures.update`) and the patch bay's
+  per-cord state are what it adds every frame. *Measure:* the squeeze's cost on the
+  runner, a frame's CPU and GPU time with the squeeze up and down (`timestamp-query`), on
+  7230f0c and on 864b4e2; then make the dear part cheaper, and the window at 0.8 back
+  near the window at 0. #541 made the check's warm-up wait for the rate over three
+  seconds of the page's clock (it took one second of the harness's, which ran long), so
+  the window no longer opens on a plate still climbing; the bar is unchanged.
 
 ### 30b. The LFOs and envelopes are fixed
 
