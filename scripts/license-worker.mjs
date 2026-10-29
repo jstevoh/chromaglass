@@ -53,7 +53,9 @@ const check = (name, ok, detail = '') => {
 
 // ── 0. Built-in Ed25519 public key guard ─────────────────────────
 {
-  const BURNED_PUBLIC_X = 'ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw';
+  // The pairs retired so far: the first (rotated out before launch) and the one that signed the
+  // test-mode orders' keys (rotated out 2026-10, 23.12-rotate).
+  const BURNED_PUBLIC_X = ['ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw', 'E_OrBzBgNWzoKgdlDOVjCjqb6CvkE4L0olobNv2u96A'];
   const serverKeyText = readFileSync(new URL('../server/license-key.js', import.meta.url), 'utf8');
   const clientKeyText = readFileSync(new URL('../src/lib/licenseKey.ts', import.meta.url), 'utf8');
   const serverX = serverKeyText.match(/DEFAULT_PUBLIC_JWK[\s\S]*?\bx:\s*'([^']+)'/)?.[1] ?? '';
@@ -62,8 +64,8 @@ const check = (name, ok, detail = '') => {
     '0. DEFAULT_PUBLIC_JWK.x in server/license-key.js and src/lib/licenseKey.ts match and are not the burned key',
     Boolean(serverX) &&
       Boolean(clientX) &&
-      serverX !== BURNED_PUBLIC_X &&
-      clientX !== BURNED_PUBLIC_X &&
+      !BURNED_PUBLIC_X.includes(serverX) &&
+      !BURNED_PUBLIC_X.includes(clientX) &&
       serverX === clientX,
     `server=${serverX}, client=${clientX}`,
   );
@@ -1006,6 +1008,31 @@ let bobProToken = '';
     '15e. the Worker on the new pair seats the re-signed key on the same Mac and refuses the old token (401)',
     actNew.status === 200 && actNewBody.machines === 1 && actOld.status === 401,
     `new ${actNew.status} (${actNewBody.machines} Macs), old ${actOld.status}`,
+  );
+}
+
+// ── 15f. The owner's own address can hold test orders' keys too (the live KV does) ──
+{
+  const env15 = makeEnv();
+  await postWebhook(env15, { event: 'order_created', email: 'owner@example.com', orderId: 'owner-pro-1', tier: 'pro', keyId: 'owner-pro-1' });
+  await postWebhook(env15, { event: 'order_created', email: 'owner@example.com', orderId: 'test_order_a', tier: 'home' });
+  await postWebhook(env15, { event: 'order_created', email: 'owner@example.com', orderId: 'test_order_b', tier: 'pro' });
+  const kvAdapter = {
+    list: async (prefix) => [...env15.LICENSE_KV.values.keys()].filter((k) => k.startsWith(prefix)),
+    get: (n) => env15.LICENSE_KV.get(n),
+    put: (n, v) => env15.LICENSE_KV.put(n, v),
+    delete: (n) => env15.LICENSE_KV.delete(n),
+  };
+  const pair = await generatePair();
+  const all = await rotate({ kv: kvAdapter, privateJwk: pair.privateJwk, publicJwk: pair.publicJwk, keepEmails: ['owner@example.com'] });
+  await rotate({ kv: kvAdapter, privateJwk: pair.privateJwk, publicJwk: pair.publicJwk, keepEmails: ['owner@example.com'], keepIds: ['owner-pro-1'], apply: true });
+  const left = JSON.parse(await env15.LICENSE_KV.get('keys:owner@example.com'));
+  const remaining = [...env15.LICENSE_KV.values.keys()].sort();
+  check(
+    '15f. with --keep-id only the named licence of the owner\'s address is kept and re-signed; its test orders\' keys are deleted (without it all three would be kept)',
+    all.resigned.length === 3 && left.length === 1 && left[0].id === 'owner-pro-1' &&
+      remaining.join() === ['key:owner-pro-1', 'keys:owner@example.com'].join() && (await verifyLicenseKey(left[0].token, pair.publicJwk)).valid,
+    `without: ${all.resigned.join()}; with: ${left.map((k) => k.id).join()}; KV ${remaining.join()}`,
   );
 }
 

@@ -22,7 +22,9 @@
  *       `apply` writes a backup of every record it will touch to `--backup <file>`
  *       first (default `licence-kv-backup-<time>.json`, next to the key file, 0600),
  *       and refuses to run if --keep-email matches no record, so the owner is never left
- *       with nothing.
+ *       with nothing. `--keep-id key_a,key_b` keeps only those licences of the kept
+ *       emails (an owner's address can hold test orders' keys beside his own); the
+ *       rest of that address's records are deleted like anyone's.
  *
  * The order of a rotation, by hand on the owner's Mac when the owner says, with a rollback
  * at every step:
@@ -68,7 +70,8 @@ export async function generatePair() {
  * `list(prefix) → names`, `get(name) → text|null`, `put(name, text)` and `delete(name)`.
  * Returns the plan: what is kept and re-signed, what is deleted, and the backup of both.
  */
-export async function rotate({ kv, privateJwk, publicJwk, keepEmails, apply = false, log = () => {} }) {
+export async function rotate({ kv, privateJwk, publicJwk, keepEmails, keepIds = [], apply = false, log = () => {} }) {
+  const onlyIds = new Set(keepIds.map((i) => i.trim()).filter(Boolean));
   const keep = new Set(keepEmails.map((e) => e.trim().toLowerCase()).filter(Boolean));
   if (!keep.size) throw new Error('--keep-email is required: the owner must keep a key');
 
@@ -90,11 +93,13 @@ export async function rotate({ kv, privateJwk, publicJwk, keepEmails, apply = fa
     }
     for (const r of Array.isArray(list) ? list : []) {
       if (!r || r.revoked) continue;
+      // With --keep-id only those licences stay: an email can hold test orders' keys too.
+      if (onlyIds.size && !onlyIds.has(r.id)) continue;
       resign.push({ email, record: r });
       keptIds.add(r.id);
     }
   }
-  if (!resign.length) throw new Error(`no unrevoked licence is filed under ${[...keep].join(', ')}; refusing to delete the rest`);
+  if (!resign.length) throw new Error(`no unrevoked licence${onlyIds.size ? ` with id ${[...onlyIds].join(', ')}` : ''} is filed under ${[...keep].join(', ')}; refusing to delete the rest`);
 
   const keptNames = new Set([...keep].map((e) => `keys:${e}`));
   for (const id of keptIds) {
@@ -205,6 +210,7 @@ async function main(argv) {
   if (cmd === 'plan' || cmd === 'apply') {
     const keyFile = flag(argv, 'key');
     const keep = String(flag(argv, 'keep-email', '')).split(',');
+    const keepIds = String(flag(argv, 'keep-id', '')).split(',');
     if (!keyFile) throw new Error('--key <private key file> is required');
     const privateJwk = JSON.parse(readFileSync(keyFile, 'utf8'));
     const publicJwk = { kty: 'OKP', crv: 'Ed25519', alg: 'Ed25519', ext: true, key_ops: ['verify'], x: privateJwk.x };
@@ -215,12 +221,12 @@ async function main(argv) {
     });
     const apply = cmd === 'apply';
     // The backup is written before anything is changed, by running the plan first.
-    const plan = await rotate({ kv, privateJwk, publicJwk, keepEmails: keep, apply: false, log: console.log });
+    const plan = await rotate({ kv, privateJwk, publicJwk, keepEmails: keep, keepIds, apply: false, log: console.log });
     if (apply) {
       const backupFile = flag(argv, 'backup', `${keyFile}.kv-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
       writeFileSync(backupFile, JSON.stringify(plan.backup, null, 2), { mode: 0o600 });
       console.log(`backup of ${Object.keys(plan.backup).length} records: ${backupFile}`);
-      await rotate({ kv, privateJwk, publicJwk, keepEmails: keep, apply: true });
+      await rotate({ kv, privateJwk, publicJwk, keepEmails: keep, keepIds, apply: true });
     }
     console.log(`${apply ? 'applied' : 'plan'}: ${plan.resigned.length} re-signed, ${plan.deleted.length} deleted`);
     return;
