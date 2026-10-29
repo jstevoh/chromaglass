@@ -70,6 +70,33 @@ export function port(base, name, env = process.env) {
   return base + portShift(env);
 }
 
+// Until the preview server a harness started answers on its port: the
+// seconds it took, or an error that says which of the two ways it failed.
+//
+// What was reported (deploy 580, 2026-10-29, the `tools` shard on the
+// owner's Mac): `page.goto: net::ERR_CONNECTION_REFUSED at
+// http://localhost:4346/`, 9.4 s after tools.mjs spawned `vite preview`,
+// with the harness ports free when the shard began and nothing from vite on
+// stderr, so it had not exited (a port in use prints "Port 4346 is already
+// in use"). It had simply not listened yet. tools.mjs gave it a fixed 2.5
+// s, as sixty other harnesses do, and on a machine that is busier than
+// GitHub's at that moment (or running a second shard beside it, 19ah-6)
+// that is a race the plate never sees. Asked rather than slept: the wait
+// is as long as the server needs, up to a minute, and the failure names
+// itself instead of reading as the app's.
+export async function untilServing(at, { child, ms = 60_000 } = {}) {
+  const t0 = Date.now();
+  for (;;) {
+    if (child && child.exitCode !== null) throw new Error(`the preview server exited (${child.exitCode}) before it answered on port ${at}`);
+    try {
+      await fetch(`http://localhost:${at}/`, { signal: AbortSignal.timeout(2000) });
+      return (Date.now() - t0) / 1000;
+    } catch { /* not listening yet */ }
+    if (Date.now() - t0 > ms) throw new Error(`nothing answered on localhost:${at} in ${ms / 1000} s after its preview server was started`);
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
 // What counts as a harness's port in its source: `port(NNNN` is one; a bare
 // number after a name ending in PORT, or after a PORT variable's `??`, or
 // after a variable called `port`, or given to `--port` as a literal or a
@@ -158,6 +185,21 @@ if (process.argv.includes('--list')) {
   // And macports.sh's list is this one, shifted.
   const listed = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--list'], { env: { ...process.env, HARNESS_PORT_SHIFT: '10000' }, encoding: 'utf8' }).stdout.trim().split(',').map(Number);
   check('--list gives every harness port in its runner\'s block', listed.length === all.length && listed.includes(14357) && listed.every((n) => n >= BLOCK && n < 2 * BLOCK), `${listed.length} ports, ${listed[0]}…${listed.at(-1)}`);
+
+  // untilServing: a server that comes up late is waited for, one that dies
+  // is named, and a port nothing ever answers on fails in its time.
+  const { createServer } = await import('node:http');
+  const late = createServer((q, a) => a.end('ok'));
+  setTimeout(() => late.listen(port(4357, undefined, { HARNESS_PORT_SHIFT: '30000' }), '127.0.0.1'), 1200);
+  const took = await untilServing(34357, { ms: 10_000 }).catch((e) => e.message);
+  late.close();
+  check('a preview that listens 1.2 s late is waited for, not refused', typeof took === 'number' && took >= 1 && took < 5, `${typeof took === 'number' ? took.toFixed(1) + ' s' : took}`);
+  const dead = spawn(process.execPath, ['-e', 'process.exit(7)']);
+  await new Promise((r) => dead.on('exit', r));
+  const died = await untilServing(34357, { child: dead, ms: 5000 }).then(() => 'answered', (e) => e.message);
+  check('a preview that exited is named as exited', /exited \(7\)/.test(died), died);
+  const never = await untilServing(34357, { ms: 800 }).then(() => 'answered', (e) => e.message);
+  check('a port nothing answers on fails in its time', /nothing answered on localhost:34357/.test(never), never);
 
   console.log(`\n${fails ? `${fails} FAILED` : 'all passed'}`);
   process.exit(fails ? 1 : 0);
