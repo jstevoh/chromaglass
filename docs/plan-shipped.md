@@ -6075,6 +6075,53 @@ old hook under it, 43.3 / 42.8 (laptop / phone, stick sweeping) and 42.3 / 43.0 
 held) renders a second, now 1.0 on all four; the ring found in 12 of 12 looks, changing
 place, still under a held trigger, on the page.
 
+## 14ab-3, 14ab-5, 14ab-9. The frame's bind groups, its readbacks and thick liquid's share (shipped 2026-10-28, #549)
+
+14ab-5. The solver has kept its bind groups since H2c-11, but every pass after it made its
+own again each frame, over a fresh `createView()` of every texture it bound: the plate's
+pack, derive and display, the camera, the post chain's effect, push, stock and finish, the
+projector, the particles' and the air's splats, the slosh dish and the ferrofluid drop's
+relaxation. `gpu/groupCache.ts` finds a group by walking `WeakMap`s keyed by the pipeline and
+then each object bound, and a view by its texture. Nothing has to be told to forget: a
+texture made again is a new key, a texture let go is a key the collector takes with every
+group under it, and the dye's ping-pong pair is two keys found again on every frame after.
+Rooted at the pipeline because `layout: 'auto'` hands out a new layout object on each
+`getBindGroupLayout`. The post chain's ring makes a view of each of its 32 layers with the
+ring. `npm run framegroups` draws the app's chain in the lab (particles, plate, camera, the
+test effect three frames back in the ring, stock, finish, a projector source and the
+projector's pass) from three sets of objects each frame, at two sizes with the solver
+stepping between frames and the dye's ping-pong pair turned round every other frame: made fresh as before, 12 bind groups and 64 views
+a frame; cached, 0 and 0 once a size's first frames are past, every frame equal to the fresh
+chain's byte for byte; and a cache keyed by the pipeline alone draws another picture
+(the control). The plate's pack argument (the grid) is written when the grid changes, not
+every frame.
+
+14ab-3. `readbackAsync` asked the GPU for both fields on every call (two downsamples, two
+590 KB copies, two mappings), and the frame calls it every frame for every layer, so a
+120 Hz display stepping at sixty, a governor at thirty or a frozen plate read the same fields
+back again and again. And it returned "fresh" whenever its ring held anything, so
+`syncFromGpu`'s loop over every cell ran each frame on numbers it had, and `rbSeq`, which
+tells the bubbles' rim deposit not to put the same displaced dye back twice, rose on every
+frame instead of on every new mirror. Every solver submit that may write a field goes through
+`submit`, which counts (`ReadGate`, `gpu/readGate.ts`); the readback, `measure`, the share's read and the
+harnesses' reads go through `submitRead`, which does not. The review pass found the two
+delta writers (`applyDeltas`, `applySplats`) submitting on their own and going round the
+count: a pour handed across with no step after it was never read back. They count now,
+and `framereads` pours on a still plate (0 asked before the fix, 1 after).
+`readbackAsync` asks when the count has moved (or a ring has nothing from this epoch, or a
+ring had no free slot last time) and returns fresh only for a landing it has not handed out.
+`npm run framereads`, one call a frame: a still plate, 60 asked and 30 taken in 30 frames →
+0 and 0; a step every other frame, 60 asked for 15 steps → 15; 74 repeats in 148 taken → 0;
+a pour and a clear with no step are still read back; the settled mirror equals the field
+read straight out. The bubbles' rim deposit now runs once a new mirror, as its comment
+meant, which on a 120 Hz display or a governor at thirty is half as often as before. The means stay in the loop that fills the mirror; the rim is a mask.
+
+14ab-9. `speciesShare` went through `readField`: a new MAP_READ buffer, a 590 KB `slice` and
+a 590 KB unpadded copy a read, and a square root a cell. One kept buffer (`gpu/rimRead.ts`), summed where it is
+mapped in the same order, the rim a mask made once (`lib/rimMask.ts`, which the solver's and
+the app's dish areas use too): the share is the same number to the bit
+(`npm run framereads`), and the two reads after the first make no buffer (2 before).
+
 ## Moved in the third pass (2026-10-29, 19m)
 
 When `PLAN.md` became an index with one file a section under `docs/plan/` (19m), the

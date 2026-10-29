@@ -53,6 +53,14 @@ bill changes it: more Mac runners at once (19g).
   a moment after a render, so the line judges the runner as well as the loop. What it
   means to ask is whether the loop resumes at all: count frames until a fixed number
   have been drawn, with a long limit, rather than frames in a fixed half second.
+  **After L, done (#549, 2026-10-28):** L (the GPU lost mid-render) counted the frames
+  in the half second 4 s after the render, so it timed the runner's new device: 33 to
+  47 on quick runners, 0, 2, 5, 6 and 11 on slow ones across eleven show jobs on seven
+  branches that day. It now takes the half second again and again for up to 20 s until
+  one draws more than 5 frames the live show heard (`hearing.frames`, which a loop
+  spinning on a lost device does not move), the same bar, and prints how long the loop
+  took to come back; the 20 s limit is unmeasured until those prints are read. The other renders keep the one half second; M's 5 of 2026-10-03 is still
+  open under the same reading.
 - ~~`startup`'s "no stop in the opening" charges Chromium's hold at the GPU's start to the page~~ **Fixed 2026-10-04** (`scripts/pagehold.mjs`). Story in `docs/plan-shipped.md` §19c (moved 2026-10-29, 19m-2). *Still open:* the
   page's code after a GPU promise that ends exactly where Chromium's hold begins, with
   nothing between, still goes to check 4; which promise settled at 1.0 s on that run
