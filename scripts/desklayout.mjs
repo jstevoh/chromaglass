@@ -34,14 +34,14 @@ import {
   LAYOUT_NAMES, PANELS, PANEL_BY_ID, SHIPPED, FLOAT_SIZE,
   closePanel, collapseAll, dockPanel, floatPanel, isStagePanel, openPanel, openPanels,
   placeFloating, raiseFloating, sameLayout, sanitizeLayout, shippedLayout,
-  toggleCollapsed, whereIs,
+  toggleCollapsed, whereIs, drawnElsewhere,
 } from '../src/lib/deskLayout.ts';
 import {
   DEFAULT_TABS, TABS_KEY, TAB_KEY, TABS_MAX, TAB_NAME_MAX, addTab, baseLayout, defaultTabs, deleteTab, loadTabId, loadTabs, moveTab,
   renameTab, sanitizeTabs, saveTabs, setTabLayout, storedForm, tabForStored,
 } from '../src/lib/deskTabs.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, groupOf } from '../src/lib/settingsMap.ts';
-import { PINNABLE } from '../src/lib/deskPins.ts';
+import { PINNABLE, DEFAULT_RIDES, DEFAULT_RECIPE } from '../src/lib/deskPins.ts';
 const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
 
@@ -339,6 +339,62 @@ console.log('\n The operations');
     both.left.join() === 'physics' && both.deck.length === 0 && both.floating.map(f => f.id).join() === 'audio-input' && placesOf(both).doubled.length === 0,
     `left ${both.left.join()} · deck ${both.deck.join()} · floating ${both.floating.map(f => f.id).join()}`);
   check('the old ids are not panels any more', !PANEL_BY_ID.has('audio-mappings') && !PANEL_BY_ID.has('heat'));
+}
+
+// ── One control, one place on a tab ──────────────────────────────────
+/*
+  The owner (2026-10-29): "why are there repeated controls in the rides and
+  the recipe groups?" The Perform tab drew Speed, Turbulence, Soap Bursts,
+  Beat Press and Evolve Speed twice, Zoom three times and Swirl twice. What
+  each panel draws is worked out here the way the desk works it out
+  (`drawnElsewhere`, over each strip's keys and each knobs panel's section),
+  on every shipped tab, and counted.
+*/
+{
+  const SECTION_KEYS = new Map();
+  for (const s of PINNABLE) SECTION_KEYS.set(s.section, [...(SECTION_KEYS.get(s.section) ?? []), String(s.key)]);
+  const rides = DEFAULT_RIDES.map(String), recipe = DEFAULT_RECIPE.map(String);
+  const keysOf = (id) => id === 'rides' ? rides : id === 'recipe' ? recipe : PANEL_BY_ID.get(id)?.kind === 'knobs' ? SECTION_KEYS.get(id) ?? [] : [];
+  /** Every control each panel out on `l` draws, after it has left out what another has. */
+  const drawn = (l) => {
+    const n = new Map(), left = new Map();
+    for (const id of openPanels(l)) {
+      const held = drawnElsewhere(l, id, keysOf(id), rides, recipe);
+      for (const k of keysOf(id)) {
+        if (held.has(k)) left.set(`${id}:${k}`, held.get(k));
+        else n.set(k, [...(n.get(k) ?? []), id]);
+      }
+    }
+    return { n, left };
+  };
+  const before = (l) => {
+    const n = new Map();
+    for (const id of openPanels(l)) for (const k of keysOf(id)) n.set(k, (n.get(k) ?? 0) + 1);
+    return [...n].filter(([, c]) => c > 1).length;
+  };
+  for (const t of DEFAULT_TABS) {
+    const l = baseLayout(t.id);
+    const { n, left } = drawn(l);
+    const twice = [...n].filter(([, ids]) => ids.length > 1);
+    const pointsAtOut = [...left.values()].every(id => openPanels(l).includes(id));
+    check(`on ${t.name}, each control is drawn once (${before(l)} drawn more than once without the rule)`,
+      twice.length === 0 && pointsAtOut,
+      twice.length ? twice.map(([k, ids]) => `${k} on ${ids.join(' and ')}`).join('; ') : `${n.size} controls, ${left.size} left to another panel`);
+  }
+  const perform = baseLayout('perform');
+  const { n, left } = drawn(perform);
+  check('on Perform the Rides keep every one of theirs, the Recipe the rest of its own, and Fluid Physics and Macro give theirs up',
+    rides.every(k => n.get(k)?.join() === 'rides') && recipe.filter(k => !rides.includes(k)).every(k => n.get(k)?.join() === 'recipe')
+    && left.get('physics:vorticityConfinement') === 'recipe' && left.get('macro:macroZoom') === 'rides' && left.get('recipe:globalSpeed') === 'rides',
+    `Swirl on ${n.get('vorticityConfinement')?.join()}; Zoom on ${n.get('macroZoom')?.join()}; Speed on ${n.get('globalSpeed')?.join()}`);
+  // Closing the Rides gives the Recipe its whole strip back: nothing was taken off it, only not drawn twice.
+  const back = drawn(closePanel(perform, 'rides'));
+  check('and with the Rides closed the Recipe draws all of its own again',
+    recipe.every(k => back.n.get(k)?.join() === 'recipe'), `the Recipe draws ${recipe.filter(k => back.n.get(k)?.includes('recipe')).length} of ${recipe.length}`);
+  // A control picked onto the Recipe appears there, even one a section panel out on the tab has (qa's Refraction pick).
+  const picked = drawnElsewhere(perform, 'recipe', [...recipe, 'refraction'], rides, [...recipe, 'refraction']);
+  check('and a control picked onto the Recipe is drawn on it, not left to its section\'s panel',
+    !picked.has('refraction') && drawnElsewhere(perform, 'camera', ['refraction'], rides, [...recipe, 'refraction']).get('refraction') === 'recipe');
 }
 
 console.log(`\n${total - failed}/${total} checks passed`);

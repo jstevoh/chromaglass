@@ -111,16 +111,27 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
   measurement on the Mac, not from this line.
 
-- **19ac-3. `bottles` counts the look's own pours as the hand's, and goes red on one at the
-  mirror.** `WebGPU (macOS) · tools` failed `bottles` twice on one head (#533, which changes
-  neither the bottle nor the tools), on two different lines: "splatter with the Oil bottle"
-  (39 pours, 1 at the mirror) and "splatter with the Ferrofluid bottle" (37 pours, 1 at the
-  mirror; the hand's flings 0.13 from the hand, nothing near the mirror), and passed on the
-  third run. The stroke's mirror is 0.4 of the plate from it and a splatter's fling reaches
-  about 0.07, so the pour is not the hand's: read it from `__bottleLog` with the call's
-  `auto` flag and the look's lays, and count the hand's alone. Until then a lone pour at
-  the mirror is this, not a flipped coordinate (that puts every pour there). Not yet shown
-  from the log.
+- **19ac-3. `bottles`' "one at the mirror" was the hand's own splatter, the stroke too near
+  the middle (shipped 2026-10-29).** The canvas's (0.25, 0.3) to (0.4, 0.3) lay on the plate
+  0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
+  The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
+  the clearance each run. Story in `docs/plan-shipped.md` §19ac-3.
+- **19ac-4. `mirror`'s "and nowhere else" named the hand's own drop (shipped 2026-10-30).**
+  Since #512 the check photographs the Perform tab's preview, a wide window on the dish
+  where a cell is 0.055 of the plate tall and 0.154 wide, and a held drop reaches two cells
+  up its column (0.11 of the plate, 22 to 25 against a drift of 8 to 9) where the check
+  counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
+  under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
+  with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+- **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
+  and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
+  the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
+  fling alone cannot do it: a splatter logs one pour a step (its first droplet), 50 to 70 a
+  stroke, each 0.023 to 0.14 from the hand in a direction from a seeded stream, so the
+  mean offset's spread is about 0.008 an axis and 0.04 is a 4e-6 to 3e-4 run, not one in
+  ninety. The suspects are pours logged while the mouse was up and the pointer moving to
+  the next stroke (each adds up to 0.5 to the mean), and the look's ring (`lays`). Judge
+  the next red by its strays before changing anything.
 
 ## 19ad. The `open` shard flakes on four unrelated faults
 
@@ -297,7 +308,7 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
-the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves) and 19ai-5.
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit).
 
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
   was module code above the component. Story in `docs/plan-shipped.md` §19ai-3 (moved
@@ -328,3 +339,12 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-5b. Open: the ledgers come out.** 19m (PLAN.md split by section) takes PLAN.md and
   the archive off the list; `docs/guide.md` and `docs/judging.md` want the same split by
   part of the app; `scripts/checks.json` could be one file per shard.
+- **19ai-6. Shipped:** `wgsl/fluid.ts` split into one file a pass under
+  `src/gpu/wgsl/fluid/`, every kernel's text byte-identical (docs/plan-shipped.md, 19ai-6).
+- **19ai-6a. Open, found along the way.** About sixty comments across `src/` and
+  `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
+  file's header, which names each pass's file. Repoint one when its file is next touched,
+  not in a sweep of its own (it would collide with every open branch for nothing).
+- **19ai-7. Open, next:** `src/gpu/fluid.ts` (291 KB, about 95 methods) split into
+  pipeline setup and per-pass encoding, the same way: a pure move, before Antigravity's
+  GPU briefs resume (they touch both files).

@@ -50,6 +50,18 @@ a grid of generic stock thumbnails: ours are the plate itself.
   prices and says "Buying opens soon". When 23's webhook issues a key from a test purchase, the
   tier cards get Buy buttons (`CHECKOUT_HOME_URL`, `CHECKOUT_PRO_URL` in `lib/tierGates.ts`) and
   the "opens soon" line goes. Until a test purchase has been made, no button.
+- **34a-4b. The licence Worker refuses test-mode orders; the live store's product ids are settings.**
+  *(S; shipped in the go-live PR, Worker deploy owed.)* The webhook never read the order's
+  `test_mode`, so while the store is in test mode anyone paying with Lemon Squeezy's published
+  test card got a genuine signed key (found reviewing #428, 2026-10-22; open to everyone since
+  the account sheet's Buy buttons, #394). A test order now answers 200 and files nothing unless
+  the buyer's email is on the `TEST_MODE_EMAILS` Worker secret (the owner proves the path with
+  it). `LS_PRO_PRODUCT_IDS` and `LS_UPGRADE_PRODUCT_IDS` (Worker vars, comma separated) name the
+  live store's products, which get ids of their own; the test-mode ids stay built in. Go-live
+  order: deploy the Worker, set the secret and vars, sweep KV for keys minted from test orders
+  (`keys:*` whose `orderId` is a test order), then change the three `CHECKOUT_*_URL`s in
+  `src/lib/tierGates.ts` to the live products' links and register the live webhook. `npm run
+  license-worker` checks 9 to 9d.
 - **34a-5. The owner's words and the share card.** *The words shipped (2026-10-28, the owner's OK
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker

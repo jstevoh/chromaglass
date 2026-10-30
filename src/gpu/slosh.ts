@@ -1,5 +1,6 @@
 import { SLOSH_KERNELS, type SloshKernel } from './wgsl/slosh';
-import { Disposer, FIELD_USAGE, PipelineCache, type Prep, bindGroup } from './kit';
+import { Disposer, FIELD_USAGE, PipelineCache, type Prep } from './kit';
+import { groupOf } from './groupCache';
 import type { Opening } from './opening';
 import {
   SLOSH_N, SLOSH_G, SLOSH_REST_DEPTH, SLOSH_LENS, SLOSH_OIL_DENSITY, SLOSH_OIL_NU, SLOSH_PRESSES,
@@ -72,7 +73,7 @@ export class WebGPUSlosh {
     const p = this.pipe(k);
     if (!p) return false;
     pass.setPipeline(p);
-    pass.setBindGroup(0, bindGroup(this.device, p, res));
+    pass.setBindGroup(0, groupOf(this.device, p, res));
     pass.dispatchWorkgroups(Math.ceil(this.n / WG), Math.ceil(this.n / WG));
     return true;
   }
