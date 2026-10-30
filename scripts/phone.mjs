@@ -1239,14 +1239,14 @@ try {
           + `Record ${fmt(recBefore.rec)} → ${fmt(recDuring?.rec)} (${dr.toFixed(1)} px); `
           + `Shuffle ${fmt(recBefore.shuf)} → ${fmt(recDuring?.shuf)} (${ds.toFixed(1)} px)`);
       }
-      // The sheet: from the handle, five sliders in 44 rows, the looks, the two chips, the three buttons.
+      // The sheet: from the handle, six sliders in 44 rows, the looks, the two chips, the three buttons.
       await tap(page, 'play-handle');
       const sheetUp = await visible(page, 'play-sheet');
       check('Play: the handle brings the sheet up, and the tray goes', sheetUp && !(await visible(page, 'play-tray')));
       await shot(page, 'Play-portrait-sheet');
-      const sliders = ['speed', 'turbulence', 'swirl', 'soap', 'zoom'].map(k => `play-slider-${k}`);
+      const sliders = ['speed', 'turbulence', 'swirl', 'soap', 'zoom', 'evolve'].map(k => `play-slider-${k}`);
       const sb = await Promise.all(sliders.map(id => box(page, id)));
-      check('Play: five sliders, each a 44 row on screen', sb.every(b => onScreen(b) && b.height >= 43.5), sb.map((b, i) => b ? `${sliders[i]} ${Math.round(b.height)}` : `${sliders[i]} missing`).join(', '));
+      check('Play: six sliders, each a 44 row on screen', sb.every(b => onScreen(b) && b.height >= 43.5), sb.map((b, i) => b ? `${sliders[i]} ${Math.round(b.height)}` : `${sliders[i]} missing`).join(', '));
       const rest = ['play-looks', 'play-follow', 'play-wander', 'play-sheet-shuffle', 'play-clear', 'play-share', 'play-save'];
       const rb = await Promise.all(rest.map(id => box(page, id)));
       check('Play: the looks, the two chips, the three buttons and Save are on screen without a scroll', rb.every(b => onScreen(b)),

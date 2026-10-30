@@ -6196,7 +6196,7 @@ filter taken out it names the six); `bubbles` slows the plate through the Rides'
 The owner, the morning after 35c-4: "I noticed that there are a few repeated controls between
 panels. Let's check those." Every shipped tab was opened at 1440 and each panel's controls listed,
 every Settings section's writes read for a setting written by two sections, and the Sound sheet
-and the phone's sheets read beside them. Six were one control in two places:
+and the phone's sheets read beside them. Five were one control in two places:
 
 - **All settings…** was in the status bar (put there because a tab may not have the Rides), and
   still in the Rides' footer and the Recipe's. The status bar's is on every tab and never scrolls;
@@ -6214,17 +6214,39 @@ and the phone's sheets read beside them. Six were one control in two places:
   Music & Drone stand together, both were on screen. Settings' Input is where the Mic light lands
   (and `inputpick` drives), so it is the home; the sheet says which microphone it is hearing and its
   Change… opens Settings at Sound.
-- **The phone's Evolve Speed** was a Play slider and the Motion sheet's, the latter under the Evolve
-  switch it does nothing without. It is the Motion sheet's.
+
+A sixth was taken out and put back before merge: the phone's Play sheet draws Evolve and its speed,
+and so does the full layout's Motion sheet. The Play sheet is the simple screen, a curated set like
+the Rides, and the two layouts are never on the phone at once, so it is not a second copy on a
+surface; taking the speed off it left the simple screen with a switch and no rate.
 
 Left alone on purpose: the look menu's "Save as a new preset… ⌘S" beside the plate bar's Save (a
 menu item and its key), the header's lights (each opens its panel), and the Rides as copies of a
 section's controls, which 35c-4 keeps to once a tab.
 
+Then the three the sweep had left as open items, which the owner asked for the same day ("Fix all
+this stuff"):
+
+- **Change in Sound…** on the Setup tab opened the Sound sheet over the Music & Drone panel, which
+  is that sheet, already docked beside it. A section drawn as a desk or phone panel now goes through
+  one `sectionPanel` in `App.tsx`, which hands it no `onOpenSound` while the tab has `player` out;
+  the source's state still shows, and the Settings sheet (where the Mic light lands) keeps the
+  button. Measured in the browser at 1280: on Setup 0 buttons, with Music & Drone closed 1, in the
+  sheet 1.
+- **Two Saves.** The Cues panel's Save keeps the set and the plate bar's keeps the look; the set's
+  now says "Save set" (87 px at 1280, in its column).
+- **`npm run shelf`** looked for a button reading exactly "Sound", the tab before every tab was a
+  set of panels, found none (the header's Sound light reads "SoundSound" to it), and stopped at its first line, red, in no shard. It clicks Setup and finds the Music & Drone
+  panel's shelf; the rest of it was untouched and passes (the tracks reach the analyser, the credit
+  shows, the plate plays and stops). It is an entry in `scripts/checks.json` now, browser shard.
+
+`App.tsx` is over its size budget and may not grow: the helper takes the two call sites' repeated
+arguments, and the dead `isUnsubscribeRoute` (never called) went, so the file is 69 bytes smaller.
+
 Checks. `panel` asks each pair from both ends (the home there, the copy gone), in
 `scripts/panelOneHome.mjs` beside it since `panel.mjs` is at its size ceiling: 256/262 against
-main's components, 262/262 after; the no-controller check that asked for the Rides' button now asks
-for the MIDI light's words and no second route. `phone` counts five Play sliders, was six.
+main's components, 264/264 after (two more for the leftovers); the no-controller check that asked for the Rides' button now asks
+for the MIDI light's words and no second route.
 
 ### 35d. Colour and keys (shipped 2026-10-25)
 

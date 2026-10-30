@@ -60,17 +60,10 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
 - ~~**35c-5** One home each, the second sweep.~~ **Shipped** 2026-10-30: All settings… in the status
   bar alone, Beat Prediction in Sound alone (the rides' Follow beat switch gone), the no-controller
   route the header's MIDI light alone, the plates' music route in Plate Spin alone, the microphone in
-  Settings' Input alone (the Sound sheet says which and leads there), and on the phone Evolve Speed in
-  the Motion sheet alone. Story in `docs/plan-shipped.md` §35c-5. Left from it:
-  - On the Setup tab the Sound section's **Change in Sound…** opens the Sound sheet over the Music &
-    Drone panel, which is that sheet, already on the tab. A section does not know the tab it is
-    drawn on (`SectionCtx` has no layout), so the button cannot yet step aside for the panel.
-  - The Cues panel's **Save** keeps the set and the plate bar's **Save** keeps the look: two actions,
-    one name (35a's rule), and both buttons are at their width at 1280.
-  - `npm run shelf` (the Sound sheet's music shelf) stops at its first line, "there is a Sound tab
-    on the desk": the tabs are Perform, Sequence and Setup since the screens became panels, and the
-    check is in no shard of `scripts/checks.json`, so nothing has run it since. Red on main as of
-    40e6291; it wants the Music & Drone panel on Setup as its way in.
+  Settings' Input alone (the Sound sheet says which and leads there). Then the three the sweep left, on the owner's "fix all this stuff": Change
+  in Sound… steps aside while Music & Drone is on the tab, the set's button says "Save set", and
+  `npm run shelf` reaches the shelf through Setup and runs in the browser shard. Story in
+  `docs/plan-shipped.md` §35c-5.
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

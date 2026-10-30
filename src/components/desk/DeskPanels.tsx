@@ -182,7 +182,8 @@ function CuesBody({ p }: { p: DeskProps }) {
             testId="set-save"
             title={`Keep this set as “${p.setName}”, to open again from the menu`}
           >
-            {saved ? 'Saved' : 'Save'}
+            {/* "Save set", not "Save": the plate bar's Save keeps the look, and one name meant two things (PLAN 35c-5). */}
+            {saved ? 'Saved' : 'Save set'}
           </Button>
           <Button height={28} onClick={() => setSetMenu(v => !v)} testId="set-menu" title="Sets: open, new, import, export, song shows">⋯</Button>
         </span>
@@ -450,7 +451,7 @@ function RidesBody({ p }: { p: DeskProps }) {
         mixer is opened, set and closed far more often than it is watched, and
         a level is a ride. `npm run layout` asks that it covers none of the plate.
       */}
-      {/* All settings… went to the status bar, on every tab; its copy here stayed until PLAN 35c-5. */}
+      {/* The way into every setting is the status bar's, on every tab; a copy stood here until PLAN 35c-5. */}
       {!mixerOut && (
         <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
           <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>
@@ -494,7 +495,7 @@ function RecipeBody({ p }: { p: DeskProps }) {
     Random evolve is the rides' too. With both panels out (anyone can dock the
     recipe beside the rides now) it would be on the screen twice, and a control
     in two places is one nobody trusts mid-set: the recipe leaves it to the
-    rides, which is where Gig keeps it. All settings… is the status bar's, on
+    rides, which is where Gig keeps it. The way into every setting is the status bar's, on
     every tab, so neither panel draws it (PLAN 35c-5).
   */
   const ridesOut = whereIs(p.layout, 'rides') !== null;

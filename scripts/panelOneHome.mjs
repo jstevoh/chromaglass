@@ -12,7 +12,7 @@ export function oneHome({ check, root, panel, header, deskSrc, deskPanelsSrc }) 
   // thing a few hundred pixels below it and went in PLAN 35c-5.
   check('the no-controller route is the MIDI light, which says so, and the rides draw no second way there',
     /'No controller\. Click to set one up\.'/.test(header) && /onClick=\{onMidi\}/.test(header)
-    && !/no-controller-hint|onClick=\{p\.onMidi\}/.test(deskPanelsSrc) && !/Settings → MIDI to learn one/.test(deskPanelsSrc));
+    && !/no-controller-hint|onMidi/.test(deskPanelsSrc) && !/Settings → MIDI to learn one/.test(deskPanelsSrc));
 
   /*
     One home each, the second sweep (PLAN 35c-5). Each of these was one setting
@@ -22,18 +22,32 @@ export function oneHome({ check, root, panel, header, deskSrc, deskPanelsSrc }) 
     the home taken away with it.
   */
   const soundSheet = readFileSync(join(root, 'src/components/SoundPanel.tsx'), 'utf8');
-  const phonePlay = readFileSync(join(root, 'src/components/phone/PhonePlay.tsx'), 'utf8');
-  const phoneStage = readFileSync(join(root, 'src/components/phone/PhoneStage.tsx'), 'utf8');
   check('All settings… is the status bar\'s alone, not the rides\' or the recipe\'s too',
-    /data-testid="open-all-settings"/.test(deskSrc) && !/>All settings…</.test(deskPanelsSrc) && !/open-all-settings/.test(deskPanelsSrc));
+    /data-testid="open-all-settings"/.test(deskSrc) && !/All settings|onOpenSettings|open-all-settings/.test(deskPanelsSrc));
   check('Beat Prediction is the Sound section\'s slider, not a switch on the rides as well',
     /settingKey="beatPrediction"/.test(panel) && !/beatPrediction/.test(deskPanelsSrc));
   check('what turns the plates with the music is chosen in Plate Spin, not in Sound\'s wiring too',
     /data-testid="spin-audio-route"/.test(panel) && /\['velocity', 'density', 'color'\]\.map/.test(panel)
-    && !/'color', 'rotation'/.test(panel) && /goTo\('spin', 'sound'\)/.test(panel));
+    && !/'rotation'/.test(panel) && /goTo\('spin', 'sound'\)/.test(panel));
+  // The sheet is not handed the device's setter at all, so no control of its can pick one.
+  const sheetProps = readFileSync(join(root, 'src/App.tsx'), 'utf8').match(/<SoundPanel[\s\S]*?\/>/)?.[0] ?? '';
   check('the microphone is picked in Settings\' Input, and the Sound sheet says which and leads there',
-    /data-testid="audio-input"/.test(panel) && !/<select[^>]*\n?[^>]*onInput|sound-input-picker/.test(soundSheet)
+    /data-testid="audio-input"/.test(panel) && /onAudioInput=\{chooseAudioInput\}/.test(readFileSync(join(root, 'src/App.tsx'), 'utf8'))
+    && sheetProps.includes('inputId=') && !/chooseAudioInput|onInput/.test(sheetProps)
+    && !/value=\{inputId\}|sound-input-picker/.test(soundSheet)
     && /data-testid="sound-input-open"/.test(soundSheet) && /onPickMic\(\)/.test(soundSheet));
-  check('the phone: Evolve Speed is the Motion sheet\'s, under its switch, not a Play slider too',
-    /testId="phone-evolve-speed"/.test(phoneStage) && !/automateRate/.test(phonePlay));
+  /*
+    And two that were one thing named twice or opened twice. Sound's Change in
+    Sound… opens the Sound sheet, which on Setup is already out as the Music &
+    Drone panel; a section drawn as a panel is handed no way there while that
+    panel is on the tab (the Settings sheet keeps it, which qa and opensource
+    drive). The Cues panel's Save keeps the set, the plate bar's the look.
+  */
+  const app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+  check('a section on a tab with Music & Drone out draws no Change in Sound…, the sheet keeps it',
+    /const sectionPanel = [^\n]*whereIs\(deskLayout, 'player'\) && \{ onOpenSound: undefined \}/.test(app)
+    && (app.match(/settingsPanel\(\{ embed: id/g) ?? []).length === 1 && /onOpenSound=\{\(\) => \{/.test(app)
+    && /\{onOpenSound && \(/.test(panel));
+  check('the set\'s Save says it is the set\'s, the plate bar\'s Save is the look\'s',
+    /saved \? 'Saved' : 'Save set'/.test(deskPanelsSrc) && !/saved \? 'Saved' : 'Save'\}/.test(deskPanelsSrc));
 }
