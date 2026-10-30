@@ -291,6 +291,7 @@ export class LiveEncoder {
     try {
       // The audio's rate and channels are the track's: read its first chunk before anything is configured.
       let first: AudioData | null = null;
+      let firstReadAt = 0;
       let audioMeta: LiveAudioMeta | null = null;
       const track = audio?.getAudioTracks()[0] ?? null;
       if (track) {
@@ -300,6 +301,7 @@ export class LiveEncoder {
         const r = await this.reader.read();
         if (r.done || !r.value) throw new Error('the audio track ended before the stream began');
         first = r.value;
+        firstReadAt = performance.now();
         const channels = Math.min(2, first.numberOfChannels);
         const codec = await liveAudioCodec(first.sampleRate, channels, audioBitrate, this.opts.audioCodec);
         if (!codec) throw new Error(`no audio encoder for ${channels} channels at ${first.sampleRate} Hz`);
@@ -331,7 +333,7 @@ export class LiveEncoder {
         this.audio.configure({ codec: audioMeta.codec === 'aac' ? 'mp4a.40.2' : 'opus', sampleRate: audioMeta.sampleRate, numberOfChannels: audioMeta.channels, bitrate: audioBitrate });
       }
       this.phase = 'live';
-      if (first) { this.takeAudio(first); void this.pumpAudio(); }
+      if (first) { this.takeAudio(first, firstReadAt); void this.pumpAudio(); }
       this.tick(0);
     } catch (e) {
       this.fail(e);
@@ -408,11 +410,19 @@ export class LiveEncoder {
     }
   }
 
-  private takeAudio(ad: AudioData): void {
+  /**
+   * `readAt` is when the chunk came off the track, which for the first chunk
+   * is before the encoder probes and the server's answer: a second or more
+   * before `t0` on CI's Mac, where the clock then read as 'arrival' and the
+   * sync line found the sound 118 ms late, every click (the AAC encoder's
+   * own delay, stamped as if it were the sound's). The browser's clock is
+   * judged against the moment the chunk was read, not against now.
+   */
+  private takeAudio(ad: AudioData, readAt = performance.now()): void {
     try {
       if (this.audioClock === null) {
         const now = performance.now();
-        if (Math.abs(ad.timestamp / 1000 - now) < 1000) {
+        if (Math.abs(ad.timestamp / 1000 - readAt) < 1000) {
           this.audioClock = 'track';
           this.audioOriginUs = this.t0 * 1000;
           this.audioBaseMs = 0;
