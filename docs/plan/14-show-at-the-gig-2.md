@@ -293,16 +293,54 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   comments say a starved runner's late timers part the two windows' frames by themselves. Find
   a measure of the gate's fault that holds at a quarter of the display's refreshes, or a
   starvation reading that sets the line aside and says so. The bar itself stays where it is.
-- **14ab-12** (open, found with 14ab-2, read in the code and not measured) *A pour's
-  splats fold at once, and the fold runs the step's forces.* `applySplats` ends with
+- **14ab-12** (**closed** 2026-10-30, measured on the owner's Mac, #590; found with 14ab-2)
+  *A pour's splats fold at once, and the fold runs the step's forces.* `applySplats` ends with
   `foldDeltas`, which besides adding the deltas runs `liquidForces` (a dt-scaled push from the
   soap, the bodies and the polar liquid) and `squeezeUpdate` (the gap's own update, which the
-  step runs itself when no deltas were applied). So a frame whose tools lay splats runs
-  those once more than a frame that lays none, and a step after several such frames several
-  times. Measure it on a look with soap (a still plate, a tool laying splats at the frame
-  rate, the soap's push against a run where the splats go through the step's flush), and if
-  it is real, fold a frame's splats with the dye and flow alone, as the video pour's frames
-  now wait for the flush.
+  step runs itself when no deltas were applied). So a frame whose tools lay splats would run
+  those once more than a frame that lays none.
+
+  *What was measured.* Soap Film (`look=soap-film`, liquids soap and water in
+  `PRESET_LIQUIDS`), a still plate (no motor, no sound, no automation, drop height 0),
+  `sim=256`, the Dropper with the Soap bottle held at one spot (0.523, 0.409 of the plate)
+  for ten seconds through the real pointer, or not pressed at all. A is main at `0d961bbb`;
+  B is main with `applySplats` folding the dye and flow alone (the diff is on #590). Four
+  A/B pairs with the tool, two without, A/B/A/B, on the owner's Mac (adapter
+  `apple metal-3`, Chromium headed). Read on the GPU's own fields: the flow speed in a ring
+  0.04 to 0.10 plate widths round the spot (`readField('vel')`), the soap that
+  `liquidForces` pushes from (`liquids0.r`) as its rms radius and the radius holding 90% of
+  it, and the gap within 0.02 of the spot (`readSqueeze`). And, by wrapping the solver's
+  methods for the run, how often each was called.
+
+  | ten seconds of the Dropper | A (4 runs) | B (4 runs) |
+  |---|---|---|
+  | ring flow at 10 s, mean | 0.204, 0.234, 0.234, 0.265 | 0.242, 0.332, 0.192, 0.282 |
+  | ring flow at 10 s, max | 0.375, 0.441, 0.439, 0.488 | 0.443, 0.625, 0.358, 0.509 |
+  | soap rms radius at 2 / 5 / 10 s | 0.0313–0.0314 / 0.0442–0.0444 / 0.0592–0.0607 | 0.0290–0.0314 / 0.0426–0.0447 / 0.0580–0.0594 |
+  | soap r90 at 10 s | 0.0813, 0.0814, 0.0813, 0.0833 | 0.0792, 0.0813, 0.0814, 0.0813 |
+  | gap at the spot, 2 to 10 s | 0.03000 | 0.03000 |
+  | steps in the 10 s | 601–638 | 576–604 |
+  | `applySplats` calls | 0 | 0 |
+  | folds (`applyDeltas`) / steps, most folds between two steps | = steps, 1 | = steps, 1 |
+
+  With no tool (A twice, B twice): ring flow 1.8e-6, 4.8e-6 (A) and 4.3e-7, 2.7e-8 (B), no
+  soap within 0.3 of the spot, the gap 0.03000, every step one fold and none skipped (599 to
+  603 steps, as many folds). The two arms agree there, so the patch did not touch the step.
+
+  *Verdict: B does not differ from A beyond the spread, and cannot.* The ring flow scatters
+  by 0.19 to 0.33 run to run in either arm (the stream churns and the reads are by the wall
+  clock); the soap's radius agrees to 2e-4 wherever the run took about 600 steps (B's
+  0.0290 at 2 s is its one run that took 576). The reason is in the counts: **nothing calls
+  `applySplats`.** No `SplatList` is made anywhere in `src/`, `scripts/` or the lab; the
+  Dropper lays CPU deltas (`addDensity`, `liquid.deposit`) that go through `flushDeltas` →
+  `applyDeltas` → `foldDeltas` once a step at most, and a step that flushed skips its own
+  `squeezeUpdate` (`step(p, applied)`), so the gap's update runs once a step either way and
+  `liquidForces` once a flushed step. A second fold before a step is possible only through
+  `pullStateFromGpu`'s flush, which clears `dirty`, so the step after it does not fold
+  again. Nothing to fix in `fluid.ts`, so no 14ab-12a. Seen on the way and left for whoever
+  next owns them: on Soap Film every step flushed even with no tool (603 of 603), so there
+  the liquids' forces run once a step whatever 15e-1 says of a plate nothing is laid in; and
+  `applySplats` with `gpu/splats.ts` is code nothing runs.
 - **14ab-13** (open, found with 14ab-2, read in the code) *Is a poured video upside down?*
   The pour has always laid the frame's rows, which count down, on the grid's rows as they
   come; the text pour (`pourText`) flips its canvas first because "the plate's rows run from
