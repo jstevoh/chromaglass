@@ -10116,7 +10116,7 @@ model cannot reach one, the PR says what it reached and asks.
   overlapping on the paper; doing that keeps the three inks and gives back green,
   orange and purple. Next to QA-15; deferred with it.
 
-## 38b, 38g, 38n. Bubbles as pockets in a gap (#PR, 2026-10-30)
+## 38b, 38g, 38n. Bubbles as pockets in a gap (#603, 2026-10-30)
 
 Asked by the owner after the second realism audit: "physics at its core", settings may
 ramp past real. `src/lib/bubbles.ts` rewritten round one fact: between two glasses a bubble

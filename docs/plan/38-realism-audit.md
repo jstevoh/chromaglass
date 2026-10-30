@@ -40,7 +40,7 @@ written first. Line numbers are as read on main at d07ac31.
   no liquid is flat to the cos⁴ law and still from frame to frame; the heat's peak and the
   light's peak are the same point.
 
-- ~~**38b. Bubbles that never appear or vanish by a clock**~~ **Shipped** (#PR, with 38g and
+- ~~**38b. Bubbles that never appear or vanish by a clock**~~ **Shipped** (#603, with 38g and
   38n): no timers, fades, age-as-colour, daughters or wobble; a pocket inflates at a breath's
   rate, leaves at the open round rim (area falling at π·bσ/3μ), by a merge, under a drop, or by
   dissolving at Henry's law's rate, which is years; breakup at a critical deformation from
@@ -122,7 +122,7 @@ written first. Line numbers are as read on main at d07ac31.
   `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
   against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
 
-- ~~**38g. Bubbles that merge, crowd and stretch like pockets in a gap**~~ **Shipped** (#PR):
+- ~~**38g. Bubbles that merge, crowd and stretch like pockets in a gap**~~ **Shipped** (#603):
   the merged pocket starts as long as the pair was end to end and rounds off at Paterson's
   τ₂ = 2μR³/(b²σ) (times at 10, 15, 20 cells within 1% of the law); the neck's (σ/μ)·t growth
   is a millisecond, inside the step; strain stretches a pocket to ε·τ₂; crowding by Durian's
@@ -213,7 +213,7 @@ written first. Line numbers are as read on main at d07ac31.
   research's item 8 shipped, and nothing shows it. Photograph the looks with iridescence at
   0 and 1 for the owner to pick, as 18b-1 did for the lamp.
 
-- ~~**38n. Bubbles move by the look's own liquids**~~ **Shipped** (#PR): μ from the look's
+- ~~**38n. Bubbles move by the look's own liquids**~~ **Shipped** (#603): μ from the look's
   Thickness (or its Viscosity word with Thin Gap off), σ and air's solubility from water or
   oil; Taylor–Saffman's 2/(1 + 2.26·Ca^⅔) with no tuned 1.5 and no floor; buoyant climb
   Δρ·g·sinθ·b²/(12μ); the film Bretherton's 1.337·Ca^⅔·(b/2) for the pocket's own speed, kept

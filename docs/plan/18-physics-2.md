@@ -236,7 +236,7 @@ Left from 18h, each its own item:
 
 ## 18i. Bubbles and beads live by physics, not timers (shipped)
 
-**Partly shipped** (#358): Bretherton lubrication, agitation-driven wander, Saffman–Taylor fingers on the Straw, Reynolds film-drainage merge and the beads' pancake lag (`npm run bubblephysics`). Story in `docs/plan-shipped.md` §18i (moved 2026-10-29, 19m-2). Its two open items closed with 38b (#PR): there is no timed mode left to expose, a pocket
+**Partly shipped** (#358): Bretherton lubrication, agitation-driven wander, Saffman–Taylor fingers on the Straw, Reynolds film-drainage merge and the beads' pancake lag (`npm run bubblephysics`). Story in `docs/plan-shipped.md` §18i (moved 2026-10-29, 19m-2). Its two open items closed with 38b (#603): there is no timed mode left to expose, a pocket
 between glasses has no clock, and a pocket reaching the open round rim empties through it.
 
 ## 18j. Milky liquids scatter (shipped)
