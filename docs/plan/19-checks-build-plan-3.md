@@ -54,7 +54,9 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   that the page's timer ticked on time in (printed, not judged; no bar moved). The next
   step is to read that line on the week's reds and, if it is the page seen free, price it
   the way 14v-7 does the frame gaps, with the same synthetic cases. The reds are 4% of runs,
-  so the week after this merges is the evidence.
+  so the week after this merges is the evidence. Two more on 2026-10-30 (#550's `open` shard on one head, af60ee4): 2.09 and 2.49 s against 0.72
+  and 0.74 s, the show moving for good at 14.3 and 14.6 s against 23.6 and 22.1 s; the third run
+  of the shard read it green, and nothing in that diff was on the opening's path.
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
@@ -153,6 +155,9 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   reading in sixty-one is a real path through the code (a first frame, a resize, a
   reading taken before the wall asked) or noise; "allow one" would be the wrong fix if
   the one is a genuine route. Found while measuring 0-tap and 19ab (PRs #429, #444).
+  A third presentation on 2026-10-30 (#550, f3f052e): **68 ask, 0 frame, 0 tick over 71 frames
+  asked for**, the "fewer is an ask the ear missed" side of the same line, three in two seconds
+  with no stray reading against a bar of two; the same diff read the line green on four other runs.
 
 - **19ad-2. The same shard failed with no check having failed, and with a check that is
   green seven times out of seven on the owner's Mac.** Two more presentations on PR
@@ -215,6 +220,18 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   mirror over a run of shards (`npm run flakes`) against how many a stroke's geometry
   allows, then state the bar as that (the mirror reading should be the hand's own
   flipped path, not the fling's reach). Seeded or recorded flings would settle it.
+
+- **19ad-6. `scene`'s worst-frame line goes red without a number, and the `open` shard has
+  more marginal lines than 19ad-1 lists.** On 2026-10-30 (#550, f3f052e) `Measure · logic` read
+  "the costliest frame of each room, the cold first one included, is under 20 ms" red with
+  nothing after the dash: the line judges `Math.max(worst)` and prints no value, so a red
+  cannot be told from a stall of 21 ms or 200. It should print the worst frame and the room it
+  came from. The same day the `open` shard also read `renders`' "no sound, the Perform desk: the
+  App renders for its clock and no more" at 1.7 commits/s (five commits in a 3 s window where the
+  clock makes three or four, bar 1.5) and `drawwall`'s "the laptop's own frames reach Draw, at
+  least 8 a second" at 7.3/s with the display drawing 14.7 frames/s, each once, each green on the
+  same diff's other runs. Both belong in 19ad-1's measurement over a run of shards before any bar
+  moves.
 
 ## 19ae. A phone check reads its dye across a plate rebuild and calls it a fault
 

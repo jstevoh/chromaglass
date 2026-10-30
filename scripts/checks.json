@@ -1258,6 +1258,20 @@
       ]
     },
     {
+      "name": "The rig's wires",
+      "shard": "browser",
+      "run": "node scripts/rig.mjs",
+      "why": [
+        "OSC in, Art-Net out and in, MIDI in and out, as /pro sells them (scripts/rig.mjs,",
+        "PLAN.md 34a-7f): the real show server with a Pro key, and an OSC sender, a",
+        "fixture, a lighting desk, a controller and a DAW's clock played by sockets and",
+        "stand-in Web MIDI ports; then the built app on that server, its settings and",
+        "tempo moved by each. On the dist/ the phone's step built. The plate's colours on",
+        "the fixture need a plate that reports its dye back, so those two lines skip here",
+        "and are the owner's, run on the Mac (docs/judging.md §93 step 0), not a Mac shard's."
+      ]
+    },
+    {
       "name": "A click is not a beat, in the app",
       "shard": "browser",
       "run": "npm run clicks -- --app",
@@ -1303,6 +1317,19 @@
         "inputpick.mjs, PLAN.md 14s): Chromium's fake devices, Input 1 and then",
         "Input 2 picked in the settings, each opened by its id and the earlier",
         "ones closed. Media, not the plate, so no GPU; on the same dist/."
+      ]
+    },
+    {
+      "name": "The music shelf reaches the show",
+      "shard": "browser",
+      "run": "npm run shelf",
+      "why": [
+        "The tracks that ship play from the show's own origin and drive the plate",
+        "(scripts/shelf.mjs): each served as an MP3, one picked by hand from the",
+        "Music & Drone panel on Setup, the analyser hearing it, its credit on screen,",
+        "the plate as an instrument with its start and stop, and a track taking over",
+        "from it. It looked for a Sound tab the desk no longer has and sat in no",
+        "shard, red unseen (PLAN 35c-5). Media and the DOM, not the plate: no GPU."
       ]
     },
     {

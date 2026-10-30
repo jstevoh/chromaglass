@@ -6240,6 +6240,63 @@ more than once; now none) and holds the order; `panel` reads the Wall being hand
 looked for the button, and counts the dials the desk drew (Perform: 46, none twice; with the Recipe's
 filter taken out it names the six); `bubbles` slows the plate through the Rides' Speed when the Rides have it.
 
+### 35c-5. One home each, the second sweep (shipped 2026-10-30)
+
+The owner, the morning after 35c-4: "I noticed that there are a few repeated controls between
+panels. Let's check those." Every shipped tab was opened at 1440 and each panel's controls listed,
+every Settings section's writes read for a setting written by two sections, and the Sound sheet
+and the phone's sheets read beside them. Five were one control in two places:
+
+- **All settings…** was in the status bar (put there because a tab may not have the Rides), and
+  still in the Rides' footer and the Recipe's. The status bar's is on every tab and never scrolls;
+  the two panel copies are gone, and the Recipe's Close-up and Randomise take the row.
+- **Follow beat** on the Rides wrote Beat Prediction as 0 or 0.7, the setting the Sound section
+  draws as a slider: it read "off" below 0.05 and threw the slider's value away when pressed. The
+  switch is gone; Beat Prediction is pinnable, so Choose puts the real one on the strip.
+- **"No controller yet — set one up"** under the Rides did what the header's MIDI light does, on
+  every tab, whose title says "No controller. Click to set one up." The Rides keep the line that
+  names a connected controller, which is not a control.
+- **What turns the plates with the music** (`audioMappings.rotation`) was Sound's fourth wiring
+  select and Plate Spin's "Driven by". It is Plate Spin's, beside the motor it adds to; Sound's list
+  says so with a link.
+- **Which microphone** was Settings' Input and a select in the Sound sheet; on Setup, where Sound and
+  Music & Drone stand together, both were on screen. Settings' Input is where the Mic light lands
+  (and `inputpick` drives), so it is the home; the sheet says which microphone it is hearing and its
+  Change… opens Settings at Sound.
+
+A sixth was taken out and put back before merge: the phone's Play sheet draws Evolve and its speed,
+and so does the full layout's Motion sheet. The Play sheet is the simple screen, a curated set like
+the Rides, and the two layouts are never on the phone at once, so it is not a second copy on a
+surface; taking the speed off it left the simple screen with a switch and no rate.
+
+Left alone on purpose: the look menu's "Save as a new preset… ⌘S" beside the plate bar's Save (a
+menu item and its key), the header's lights (each opens its panel), and the Rides as copies of a
+section's controls, which 35c-4 keeps to once a tab.
+
+Then the three the sweep had left as open items, which the owner asked for the same day ("Fix all
+this stuff"):
+
+- **Change in Sound…** on the Setup tab opened the Sound sheet over the Music & Drone panel, which
+  is that sheet, already docked beside it. A section drawn as a desk or phone panel now goes through
+  one `sectionPanel` in `App.tsx`, which hands it no `onOpenSound` while the tab has `player` out;
+  the source's state still shows, and the Settings sheet (where the Mic light lands) keeps the
+  button. Measured in the browser at 1280: on Setup 0 buttons, with Music & Drone closed 1, in the
+  sheet 1.
+- **Two Saves.** The Cues panel's Save keeps the set and the plate bar's keeps the look; the set's
+  now says "Save set" (87 px at 1280, in its column).
+- **`npm run shelf`** looked for a button reading exactly "Sound", the tab before every tab was a
+  set of panels, found none (the header's Sound light reads "SoundSound" to it), and stopped at its first line, red, in no shard. It clicks Setup and finds the Music & Drone
+  panel's shelf; the rest of it was untouched and passes (the tracks reach the analyser, the credit
+  shows, the plate plays and stops). It is an entry in `scripts/checks.json` now, browser shard.
+
+`App.tsx` is over its size budget and may not grow: the helper takes the two call sites' repeated
+arguments, and the dead `isUnsubscribeRoute` (never called) went, so the file is 69 bytes smaller.
+
+Checks. `panel` asks each pair from both ends (the home there, the copy gone), in
+`scripts/panelOneHome.mjs` beside it since `panel.mjs` is at its size ceiling: 256/262 against
+main's components, 264/264 after (two more for the leftovers); the no-controller check that asked for the Rides' button now asks
+for the MIDI light's words and no second route.
+
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
@@ -6401,6 +6458,9 @@ old hook under it, 43.3 / 42.8 (laptop / phone, stick sweeping) and 42.3 / 43.0 
 held) renders a second, now 1.0 on all four; the ring found in 12 of 12 looks, changing
 place, still under a held trigger, on the page.
 
+## 23. Selling it: the site free, the app paid
+
+- **23.8-clock** (**shipped**, PR #550, 2026-10-29): the packed Mac check's system-audio line went red three times in eleven runs on 2026-10-28 (#544 twice, #537 once; each green on a re-run) with both of the source's contexts "running" within 0.1 s of the click, 239 packets sent and the ear reading volume 0 for the whole 10 s; the eight green runs heard the tone 0.7–1.0 s after the click, and the reds were the faster runners (the opening rung two steps higher). A context's state is not its clock: Chromium reports "running" when it asks the audio service for an output stream, and `currentTime` stays at zero until the device answers, so the line could not tell a dead device from a broken wire. The System audio source moved to `src/lib/systemTap.ts` (out of `App.tsx`, at its ceiling) with `stats()`, the line to `scripts/desktop-audio.mjs` (out of `desktop.mjs`, at its ceiling), printing both clocks, the packets in the page, the track, what `getDisplayMedia` answered and, when nothing is heard, whether a fresh context can render anything. The seventh run on that head (40770856220) was the red that said it: the tap's clock ran (0.43 s to 9.30 s, 232 packets in the page, the track live), the ear's context "running" with its clock never off zero, and the fresh context at 44100 Hz (the renderer's fallback when the output device will not open) with its clock at zero too. The runner's virtual output device, having opened one stream, opened no second one for the rest of that run. *Fix:* the ear analyses the System audio source inside the tap's own context (`useAudioAnalyzer`'s `sharedContext`, which it neither resumes nor closes): the PCM, ScreenCaptureKit's loopback and the analyser are one output stream, which is also one fewer for the Mac to drive at a gig. *Measure:* `npm run desktop -- --packaged` on CI's Mac, the system-audio line heard with one clock (the PR's runs on the fix are counted in its body); the line fails, with the probe's numbers, on a run where even the first stream does not open. *Open:* 23.8-streams in PLAN.md.
 ## 14ab-3, 14ab-5, 14ab-9. The frame's bind groups, its readbacks and thick liquid's share (shipped 2026-10-28, #549)
 
 14ab-5. The solver has kept its bind groups since H2c-11, but every pass after it made its

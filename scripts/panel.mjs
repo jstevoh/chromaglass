@@ -49,6 +49,7 @@ import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
+import { oneHome } from './panelOneHome.mjs';
 import { helpFor, CONTROL_HELP } from '../src/lib/controlHelp.ts';
 import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
 import { HALOGEN_KELVIN, LAMP_WARMTH_MAX, LEGACY_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, kelvinLabel, lampTint, warmthKelvin } from '../src/lib/lampKelvin.ts';
@@ -1121,9 +1122,8 @@ check('a value reads the same way wherever it is shown',
 check('and the settings panel asks the same question',
   /readSetting\(String\(settingKey \?\? ''\), safeValue, min, max\)/.test(panel));
 
-// A line telling you where to go, where a button could take you.
-check('the no-controller line goes there instead of naming the route',
-  /data-testid="no-controller-hint"/.test(deskPanelsSrc) && !/Settings → MIDI to learn one/.test(deskPanelsSrc));
+// A line telling you where to go, and the second sweep of one home each (PLAN 35c-5).
+oneHome({ check, root, panel, header, deskSrc, deskPanelsSrc });
 
 // ── A document, and a desk that is not a performance ────────────────
 /*

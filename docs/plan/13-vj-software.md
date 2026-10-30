@@ -77,7 +77,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      the page's tempo source takes its tempo, beat and bar; the Link switch in Settings →
      Sound → Tempo and on the phone's Sound sheet. `npm run link` 27/27. Story in
      `docs/plan-shipped.md` §13.5-link. **Owed:** the owner's session with Live
-     (`docs/judging.md` §93); until it passes, the Pro page keeps Link under "on the way".
+     (`docs/judging.md` §94); until it passes, the Pro page keeps Link under "on the way".
      - **13.5-link-one.** The bar grid (`lib/barGrid.ts`) finds the one by ear; Link
        already knows it (`TempoReading.bar`, beat zero of the session is every peer's bar
        line). Let a Link reading set the grid's place, so Accent the One and the song's

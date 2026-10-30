@@ -97,6 +97,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signLicenseKey } from '../server/license-key.js';
+import { systemAudioLine } from './desktop-audio.mjs';
 import { startRtmpListener, summarize } from './rtmpListener.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -691,100 +692,11 @@ try {
   // ── system audio & ambient TV (23.8) ───────────────────────────────
   // On the Mac app, "System audio" replaces "Another tab", intercepts
   // getDisplayMedia with no tab picker, and routes the System audio source's
-  // pipeline to the ear (fed here through CHROMAGLASS_AUDIO_TAP=1, since
-  // CHROMAGLASS_OFFLINE skips macOS TCC screen capture; the real
-  // ScreenCaptureKit path is docs/judging.md §87). Ambient TV mode caps the
-  // solver at 30 steps/s, caps frames drawn in the app at 60 Hz through
-  // DrawGate, and holds the machine's opening rung.
-  await page.locator('[data-testid=mode-segmented-setup]').click();
-  await page.locator('[data-testid=sound-source-system]').waitFor({ timeout: 5_000 });
-  const sysLabel = (await page.locator('[data-testid=sound-source-system]').textContent())?.trim() ?? '';
-  const asksBefore = await electronApp.evaluate(() => globalThis.__chromaglassSystemAudioAsks ?? 0);
-  /*
-    The tone, and when the ear is read. Until 2026-10-26 the check sent 1.2 s
-    of tone in 0.56 s (a child process, run to its end) and read the ear once,
-    the moment it returned: about 0.9 s after the click. The packed app on
-    e1380fa read "ear reads 9, volume 0" there, with the picker intercepted and
-    the tap open, and the same app built the same way, packed and unpacked, in
-    a cloud session read 61 and 46. Nothing on the audio path changed between
-    the run that passed (033c845) and that one. What that one read is a moment:
-    the first sound the page makes in a run starts Chromium's audio service and
-    the Mac's output device, and both of the System audio source's contexts
-    (the tap's and the ear's) count no time and pass no sound until it is up.
-    A runner that takes longer than 0.9 s to get there read silence, however
-    well the pipeline worked.
-
-    So the tone plays in real time (one 2048-sample packet every 40 ms, a hair
-    ahead of 42.7 ms of sound, so the tap's queue never runs dry) for as long
-    as the ear has not heard it, up to TONE_DEADLINE_MS, and the ear is read
-    every 100 ms meanwhile. The bar is as it was, a reading above 5 with the
-    picker intercepted. The line prints what the old one could not: both
-    contexts' states and the ear's volume at the old moment, and when each
-    context first ran and the ear first heard. A pipeline that does not reach
-    the ear still fails, after the deadline, with the contexts' states saying
-    whether it was the sound that never started or the wiring.
-  */
-  const TONE_DEADLINE_MS = 10_000;
-  await page.locator('[data-testid=sound-source-system]').click();
-  const clickedAt = Date.now();
-  const audioPort = await electronApp.evaluate(() => globalThis.__chromaglassAudioPort ?? 0);
-  const toneSock = createSocket('udp4');
-  const pkt = Buffer.alloc(12 + 2048 * 4);
-  pkt.write('CGPCM1\0\0', 0, 8, 'ascii');
-  pkt.writeUInt32LE(48000, 8);
-  let phase = 0;
-  let sent = 0;
-  const toneTimer = audioPort > 0 ? setInterval(() => {
-    for (let i = 0; i < 2048; i++) {
-      pkt.writeFloatLE(Math.sin(phase) * 0.85, 12 + i * 4);
-      phase += (2 * Math.PI * 220) / 48000;
-    }
-    toneSock.send(pkt, audioPort, '127.0.0.1');
-    sent++;
-  }, 40) : null;
-  const readEar = () => page.evaluate(() => {
-    const cs = window.chromaglassCastState?.();
-    const r = cs?.ear?.reads;
-    return {
-      reads: r ? (r.frame ?? 0) + (r.ask ?? 0) + (r.tick ?? 0) : 0,
-      volume: cs?.audio?.volume ?? 0,
-      ear: cs?.ear?.state ?? 'none',
-      tap: window.__systemTapContext?.state ?? 'none',
-    };
-  }).catch(() => ({ reads: 0, volume: 0, ear: 'unread', tap: 'unread' }));
-  const ms = () => Date.now() - clickedAt;
-  let atOldMoment = null;
-  let earRanAt = null;
-  let tapRanAt = null;
-  let soundHeard = { reads: 0, volume: 0, ear: 'none', tap: 'none' };
-  let heardAt = null;
-  while (ms() < TONE_DEADLINE_MS) {
-    soundHeard = await readEar();
-    const t = ms();
-    if (atOldMoment === null && t >= 900) atOldMoment = { t, ...soundHeard };
-    if (earRanAt === null && soundHeard.ear === 'running') earRanAt = t;
-    if (tapRanAt === null && soundHeard.tap === 'running') tapRanAt = t;
-    if (soundHeard.reads > 0 && soundHeard.volume > 5) { heardAt = t; break; }
-    await sleep(100);
-  }
-  if (toneTimer) clearInterval(toneTimer);
-  toneSock.close();
-  const asksAfter = await electronApp.evaluate(() => globalThis.__chromaglassSystemAudioAsks ?? 0);
-  const when = (t) => (t === null ? 'never' : `${(t / 1000).toFixed(2)} s`);
-  const systemHeard =
-    sysLabel === 'System audio' &&
-    audioPort > 0 &&
-    sent > 0 &&
-    asksAfter > asksBefore &&
-    heardAt !== null;
-  check(
-    'system audio: the System audio source\'s pipeline reaches the ear, and the picker was intercepted',
-    systemHeard,
-    `label "${sysLabel}", picker intercepted ${asksAfter - asksBefore} time(s), audio port ${audioPort}, ${sent} packets sent; ` +
-      `${heardAt !== null ? `heard ${when(heardAt)} after the click` : `not heard in ${TONE_DEADLINE_MS / 1000} s`}, ear reads ${soundHeard.reads}, volume ${Math.round(soundHeard.volume)}; ` +
-      `the contexts ran at ${when(tapRanAt)} (tap) and ${when(earRanAt)} (ear); ` +
-      `at ${atOldMoment ? when(atOldMoment.t) : 'the old moment (not reached)'}, where the line used to read: ${atOldMoment ? `tap ${atOldMoment.tap}, ear ${atOldMoment.ear}, volume ${Math.round(atOldMoment.volume)}` : 'heard before it'}`,
-  );
+  // pipeline to the ear; the line, the tone it plays and what it prints are
+  // scripts/desktop-audio.mjs. Ambient TV mode caps the solver at 30 steps/s,
+  // caps frames drawn in the app at 60 Hz through DrawGate, and holds the
+  // machine's opening rung.
+  await systemAudioLine({ page, electronApp, check, sleep, createSocket });
 
   // The ladder's governor exists once the renderer is up; the line below
   // fails a show without one, so wait for it to be there before the toggle
