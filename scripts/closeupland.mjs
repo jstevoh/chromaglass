@@ -249,8 +249,9 @@ if (process.argv.includes('--node')) {
     const lit = async () => {
       const px = await frameOf(page, 160, 100);
       if (!px) return null;
-      let n = 0;
-      for (let i = 0; i < px.length; i += 4) if ((px[i] + px[i + 1] + px[i + 2]) / 3 > 24) n++;
+      let n = 0, top = 0;
+      for (let i = 0; i < px.length; i += 4) { const l = (px[i] + px[i + 1] + px[i + 2]) / 3; if (l > 24) n++; if (l > top) top = l; }
+      lit.top = top;
       return n / (px.length / 4);
     };
     const state = () => page.evaluate(() => {
@@ -273,11 +274,25 @@ if (process.argv.includes('--node')) {
       await settlePlate(page, 2000);
       before = await state();
     }
+    /*
+      Then the pool laid once more, fresh, and the closeup pressed on it at
+      once. On the Mac two seconds is 120 of classic's steps at Turbulence
+      0.5, and on a re-run its 1x frame read 0.000 lit where three runs had
+      read 0.017 to 0.026: the pool stirred thin, under the 24 of 255 the
+      line counts, which the 4x frame's exposure (kept under what the frame
+      holds) still lit. The plate stays as laid now (the loop above), so a
+      fresh pool needs a frame or two drawn, not two seconds of stirring.
+    */
+    if (before?.onAim < BARE) {
+      await layPool();
+      await settlePlate(page, 250);
+      before = await state();
+    }
     const flat = await lit();
-    // The pool is about half a percent of the plate; measured 0.018 and
-    // 0.026 of the 1x frame lit in two runs.
+    // The pool is about half a percent of the plate; measured 0.017 to
+    // 0.026 of the 1x frame lit two seconds after it was laid.
     check('the control: at 1x the pool is drawn', flat !== null && flat > 0.005,
-      `${flat === null ? 'no frame read' : fx(flat)} of the frame lit (over 0.005 wanted: a frame that could not be read is black too)`);
+      `${flat === null ? 'no frame read' : fx(flat)} of the frame lit, its brightest pixel ${Math.round(lit.top ?? 0)} of 255 (over 0.005 wanted: a frame that could not be read is black too)`);
     check('the control: the frame on the aim is bare glass', before.onAim < BARE,
       `the 4x frame on the aim holds ${fx(before.onAim)} of the plate's average dye (under ${BARE} wanted)`);
     const button = page.locator('[data-testid="macro-button"]');
