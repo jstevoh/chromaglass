@@ -208,6 +208,18 @@
       ]
     },
     {
+      "name": "The owner's Mac takes only main's deploys, and never holds one",
+      "shard": "logic",
+      "run": "npm run macguard",
+      "why": [
+        "The runner's job-started hook (scripts/macrunner-hook.sh) against every way",
+        "a job can arrive: main's push and run by hand taken; a branch, a pull",
+        "request, pull_request_target, workflow_run, a schedule, another workflow",
+        "on main and another repository refused. And the watchdog's stall rule",
+        "(scripts/macwatch.mjs) against made-up runs, between two shards included."
+      ]
+    },
+    {
       "name": "The ear",
       "shard": "sound",
       "run": "npm run music",
@@ -801,6 +813,31 @@
         "makes a dispatch, counted in the page by Chromium's own heap sampler.",
         "JavaScript's cost, which is the same on SwiftShader as on Metal, so it",
         "sits here rather than in the Mac queue."
+      ]
+    },
+    {
+      "name": "A frame's passes make no bind group they had",
+      "shard": "lab",
+      "run": "npm run framegroups",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The passes after the solver keep their bind groups and views (PLAN.md 14ab-5,",
+        "scripts/framegroups.mjs, gpu/groupCache.ts): the app's chain drawn frame after",
+        "frame in the lab counts the groups and views it makes, and every frame is the",
+        "fresh chain's picture byte for byte. Calls counted, which SwiftShader makes as",
+        "Metal does, so it sits with encode rather than in the Mac queue."
+      ]
+    },
+    {
+      "name": "The frame reads back what the solver wrote, once",
+      "shard": "lab",
+      "run": "npm run framereads",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The fields are read back only after a submit that may have written them, and a",
+        "readback is handed out once (PLAN.md 14ab-3, scripts/framereads.mjs); thick",
+        "liquid's share reads into one kept buffer to the same number (14ab-9). Logic",
+        "and counts, the same on any adapter that computes."
       ]
     },
     {

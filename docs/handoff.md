@@ -157,7 +157,7 @@ One or two lines is enough: what, where, when, and what is now no longer owed.
 
 When a session runs out of credit mid-task: push what it has, even if it is red, fill in
 `Left:` with the very next step, and add the `handoff` label. The other tool picks it up
-with `gh pr checkout <n>`, reads the PR body and the one `PLAN.md` section, then removes
+with `gh pr checkout <n>`, reads the PR body and the one plan section (`docs/plan/`), then removes
 the label and carries on in the same PR.
 
 ## What Antigravity does in place of `.claude/`

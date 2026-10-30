@@ -60,6 +60,8 @@ import { createHash } from 'node:crypto';
 const PORT = 4351;
 const SEED = 7, OTHER_SEED = 8;
 const W = 320, H = 180, FPS = 30, SONG_S = 8;
+// More frames than this in the half second after a render: the live loop draws again.
+const LIVE_FRAMES = 5;
 let passed = 0, failed = 0;
 const check = (name, ok, detail = '') => {
   if (ok) passed++; else failed++;
@@ -125,7 +127,7 @@ try {
    * so nothing live (Evolve's six-second drift, above all) can land between
    * the reading and the render.
    */
-  const render = (o) => page.evaluate(async ({ o, b64 }) => {
+  const render = (o) => page.evaluate(async ({ o, b64, live }) => {
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -165,13 +167,31 @@ try {
     const after = state();
     if (o.evolve) window.chromaglassAction('automate-toggle');
     // The live loop draws again: the frame counter moves in the next half second.
-    const f0 = window.chromaglassDebug().frames ?? null;
-    // A lost device first has to come back (a new device, a new stage) before it can draw.
-    if (o.loseAt) await new Promise(res => setTimeout(res, 4000));
-    await new Promise(res => setTimeout(res, 500));
-    const f1 = window.chromaglassDebug().frames ?? null;
-    return { ...r, ms, before, after, liveFrames: f0 === null || f1 === null ? null : f1 - f0 };
-  }, { o, b64: o.silent ? silence : song });
+    // A lost device first has to come back (a new device, a new stage) before it
+    // can draw, and how long that takes is the runner's: so after L the half
+    // second is taken again and again, for up to 20 s, until one of them draws,
+    // where it used to be the half second 4 s after the render (PLAN.md's
+    // render-app item). The fixed 4 s read 33 and 38 frames on quick runners
+    // and 0, 2, 5 and 6 on slow ones (2026-10-28, eleven show jobs on seven
+    // branches): it judged how fast the runner gave a new device, not whether
+    // the loop came back. The bar is the half second's, as for every render,
+    // and how long the loop took to come back is printed. After L the frames
+    // counted are the ones the live show heard (`hearing.frames`), not every
+    // pass through the loop: the loop counts a frame before it looks whether the
+    // GPU is lost, so a new device lost again within five seconds (which waits
+    // a second or more before asking for the next) spins it at the display's
+    // rate drawing nothing, and the search would find that half second.
+    const frames = o.loseAt ? () => window.chromaglassDebug().hearing?.frames ?? null : () => window.chromaglassDebug().frames ?? null;
+    const tBack = performance.now();
+    let f0, f1;
+    do {
+      f0 = frames();
+      await new Promise(res => setTimeout(res, 500));
+      f1 = frames();
+    } while (o.loseAt && f0 !== null && f1 !== null && f1 - f0 <= live && performance.now() - tBack < 20_000);
+    const backMs = performance.now() - tBack - 500;
+    return { ...r, ms, before, after, liveFrames: f0 === null || f1 === null ? null : f1 - f0, backMs };
+  }, { o, b64: o.silent ? silence : song, live: LIVE_FRAMES });
 
   const runs = {};
   const say = (name, r) => console.log(`   ${name}: ${r.phase}; ${r.format}; ${r.summary ? `${r.summary.videoFrames} frames, ${r.summary.audioPackets} audio packets, ${r.summary.durationMs.toFixed(1)} ms, ${r.summary.bytes} bytes${r.summary.priming ? `, audio priming ${r.summary.priming.samples} samples (${r.summary.priming.source}${r.summary.priming.measured !== null && r.summary.priming.measured !== undefined ? `, measured ${r.summary.priming.measured}` : ''}), ${r.summary.priming.dropped} packets past the song dropped` : ''}` : r.message}; ${(r.ms / 1000).toFixed(1)} s`);
@@ -328,9 +348,10 @@ try {
   }
   // After every render, including one that failed halfway (a GPU lost mid-render
   // used to leave the live show with no frame loop at all).
-  const stalled = Object.entries(runs).filter(([, r]) => !((r.liveFrames ?? 0) > 5));
+  const stalled = Object.entries(runs).filter(([, r]) => !((r.liveFrames ?? 0) > LIVE_FRAMES));
   check('the live loop draws again after every render', stalled.length === 0,
-    stalled.length ? stalled.map(([n, r]) => `${n}: ${r.liveFrames ?? 'no counter'}`).join('; ') : Object.entries(runs).map(([n, r]) => `${n} ${r.liveFrames}`).join(', ') + ' frames in half a second');
+    (stalled.length ? stalled.map(([n, r]) => `${n}: ${r.liveFrames ?? 'no counter'}`).join('; ') : Object.entries(runs).map(([n, r]) => `${n} ${r.liveFrames}`).join(', ') + ' frames in half a second')
+      + `; after L's lost GPU that half second began ${(L.backMs / 1000).toFixed(1)} s after the render`);
   /*
     What a render used to leave running in the live show: a fade stamped on
     the film's clock, which a young page read as not yet begun and ran over
