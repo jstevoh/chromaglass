@@ -417,12 +417,12 @@ try {
       const live = window.__cgLive;
       if (!live) return { error: 'no __cgLive on the page' };
       let keychain;
-      try { await live.keys.set('check', 'desktop-check-key'); keychain = 'kept'; } catch (e) { keychain = `refused: ${e.message}`; }
+      try { await live.keys.set('check', 'desktop-check-key'); await live.keys.set('check-tall', 'desktop-check-tall'); keychain = 'kept'; } catch (e) { keychain = `refused: ${e.message}`; }
       const names = (await live.keys.list().catch(() => [])).map((k) => k.name);
       const probes = await live.probe({ width: 640, height: 360, fps: 30 }).catch((e) => [{ acceleration: 'probe', error: e.message }]);
       try {
-        // The portrait destination's key is the repo app's own (the packed app would refuse it, and this line runs on the repo's).
-        const tall = { name: 'tall', url, key: 'desktop-check-tall', orientation: 'portrait' };
+        // Both keys by name where the store keeps them: the packed app (desktop.yml's `-- --packaged`) takes no key from the page.
+        const tall = keychain === 'kept' ? { name: 'tall', url, keyName: 'check-tall', orientation: 'portrait' } : { name: 'tall', url, key: 'desktop-check-tall', orientation: 'portrait' };
         const wide = keychain === 'kept' ? { name: 'check', url, keyName: 'check' } : { name: 'check', url, key: 'desktop-check-key' };
         const st = await live.start({ destinations: [wide, tall], width: 640, height: 360, portrait: { width: 360, height: 640 }, fps: 30 });
         return { state: st, keychain, names, probes };
@@ -430,7 +430,7 @@ try {
     }, listener.url).catch((e) => ({ error: e.message }));
     await sleep(4000);
     const stopped = await page.evaluate(() => window.__cgLive?.stop()).catch(() => null);
-    const removed = await page.evaluate(() => window.__cgLive?.keys.remove('check')).catch(() => null);
+    const removed = await page.evaluate(async () => (await window.__cgLive?.keys.remove('check')) && (await window.__cgLive?.keys.remove('check-tall'))).catch(() => null);
     const pub = pubs.get('desktop-check-key') ?? null;
     const sum = pub ? summarize(pub) : null;
     const tallPub = pubs.get('desktop-check-tall') ?? null;
