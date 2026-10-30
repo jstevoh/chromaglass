@@ -6012,8 +6012,9 @@ were inert), Lucky rolls them only with the lens on, and the shipped looks keep 
 cameras. Refraction and Chromatic Aberration are now MIDI-learnable, and they and Focus glide in a
 sequence stage.
 
-After: a full dial with Lens at 0 moves the frame by a mean of 11.7 (refraction), 8.1
-(aperture), 21.9 (bloom) and 4.8 (chromatic) levels; at Lens 1 10.5, 7.5, 21.7, 4.1. Where
+After: a full dial with Lens at 0 moves the frame by a mean of 11.0 (refraction), 8.1
+(aperture), 21.6 (bloom) and 4.6 (chromatic) levels; at Lens 1 10.0, 7.5, 20.7, 3.9 (as
+`npm run lens` reads them on the last push; the first read 11.7, 8.1, 21.9, 4.8). Where
 they work is checked as physics: refraction moves 54% of the steep pixels and 13% of the flat,
 chromatic aberration leaves green alone, bloom only adds light, every dial at 0 draws the
 plate as no pass would, and a plate with no dye gives them nothing to work on. The check
@@ -6070,9 +6071,37 @@ relief while bloom moves 94% of it; the near-zero arm is a turn to 0.002 (a dial
 picture by construction); and each of the 203 other numbers in the settings, at 1 on its own,
 leaves the pass off. 61 lines, all green; on the old pass 15 of 31 fail.
 
-Left open as 33i-1 to 33i-8 in `PLAN.md`: the Abbe-8 exaggeration, the 8-bit glow knee, the
-64-tap cost and edge hair at aperture 1, Lens-up at the defaults, and a dial swept through 0
-rebuilding the pass.
+A third review (2026-10-30: the check-skeptic on `npm run lens` again, and the pre-push review)
+found the glow's migration half fitted and five more ways the check could pass on a fault. The
+old pass sent the glow through the sensor's roll-off before mixing it in by Lens, so the glow
+reached the frame about Lens squared times its dial, not Lens times it, and a look saved at a
+low Lens opened with too much glow: an every-optic-at-.8 look at Lens .3 moved 29.9% of its lit
+pixels by 8 levels or more, and the old defaults there sat 3.45 levels off. Bloom is now read as
+Lens squared times its dial (`bloomScale`, `src/lib/userPresets.ts`): 12.1% and 2.21. The saved
+looks are measured over their lit pixels (the black around the pours is more than half the
+frame, which is 41% to 48% lit, and halved every mean), with bars on the mean and on the share
+moved by 8 (4.3, 7.4 and 2.4 levels; 12%, 19% and 5%), which the migrated looks meet at 2.2–3.2,
+3.6–5.5 and 1.2–1.8 levels; the 384 px fit misses them on 11 of 12 looks at Lens 1, and the
+fitted bloom and refraction taken at half and one and a half times must sit further from the old
+picture on most looks (bloom on all 18 both ways, refraction on 15 and 18). Refraction's
+direction is asked, not only where it moves: a steep pixel must take the colour a tenth of the
+frame along its slope, against the colour as far against it and at half and one and a half times
+the throw (100.0% on all three; patched shaders by hand: a shift that ignored the slope 68.1% on
+the way, the slope backwards 0.0%, its axes swapped 64.8%, half the throw 0.0% on the throw, and
+a picture that did not move at all 88.8% on the way but 7.6% on the throw). Each dial at Lens 1
+must keep three quarters of what it does at Lens 0 (85% to 96%; a Lens that halved two optics
+kept both over the old bar alone). A look that never wrote an optic is read with exactly what
+the old default migrates to, not merely above 0. The visualizer's call that fills the pass's
+uniforms is read and must take each dial from its own setting and the clock from the view, beside
+a copy with the bass added to the bloom that must fail, and `brightness` joins the sound words.
+65 lines, all green; on the old pass 16 of 33 fail. The review also found that Evolve's glass
+theme now wanders an optic that draws at Lens 0 and can walk a light one to 0 (33i-9), and that a
+set item's controls and a sequence stage's settings skip the migration (33i-10).
+
+Left open as 33i-1 to 33i-10 in `docs/plan/33-bubbles-closeup.md`: the Abbe-8 exaggeration, the
+8-bit glow knee, the 64-tap cost and edge hair at aperture 1, Lens-up at the defaults, a dial
+swept through 0 rebuilding the pass, Evolve and the camera, and set items and stages skipping the
+migration.
 
 ## 34. What a competitor's page showed
 

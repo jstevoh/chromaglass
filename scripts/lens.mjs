@@ -40,13 +40,23 @@
  *      flat wash of dye refraction and aperture move nothing, because they act
  *      on the relief and a wash has none, while bloom, which acts on light,
  *      moves most of it; Focus moves the frame with the aperture open and does
- *      not with it shut;
+ *      not with it shut; refraction moves the picture the way the slope says:
+ *      a steep pixel takes the colour the plate has a tenth of the frame along
+ *      its slope, not the colour that far against it (a shift that ignored the
+ *      slope, or read it backwards or with its axes swapped, fails);
  *   4. Lens is the sensor's look and no more: Lens at 1 with the optics at 0
  *      changes the frame, and over the optics the optics still do at least
- *      half of what they do without it while Lens still adds its own;
- *   5. the camera pass's own code reads no sound, so the frame stays where the
- *      plate puts it; a dial moves with the music only when a person patches
- *      it to (MIDI; the patch bay has no keys for it, PLAN.md 33i-5);
+ *      half of what they do without it while Lens still adds its own; each
+ *      dial alone moves the frame at least three quarters as much with Lens at
+ *      1 as with it at 0 (it measured 85% to 96%);
+ *   5. the camera pass's own code reads no sound, and the app fills its
+ *      uniforms from the settings and the clock alone (the call in
+ *      LiquidVisualizer is read, beside a copy that adds the bass to one dial,
+ *      which must fail), so the frame stays where the plate puts it. A dial
+ *      moves with the music only through what moves the settings: a cord a
+ *      person patches (MIDI; the patch bay has no keys for it, PLAN.md 33i-5),
+ *      or Evolve, whose glass theme wanders the optics it may (printed) over
+ *      minutes and leans which way on the song's sections (src/lib/slowEvolve.ts);
  *   6. a look saved with Lens up opens looking as it did. The first reading of
  *      such a look, "it keeps its optics", was reviewed on this plate: the new
  *      optics are stronger at the same dial, so a look saved with the old
@@ -55,8 +65,13 @@
  *      Lens .6 10.5 (39.4%). Each such look is now rendered through the old
  *      pass (a second lab built on the frozen old shader, beside this one) and
  *      through the new pass with the settings the loader gives it, and the
- *      difference held under a bar; the unmigrated reading is rendered too, as
- *      the control, and must be far worse, or the bar measures nothing.
+ *      difference over the lit pixels held under a bar on its mean and on the
+ *      share moved by 8 levels or more (the black around the pours is half the
+ *      frame, and would halve any mean taken over all of it); the unmigrated
+ *      reading is rendered too, as the control, and must be far worse, or the
+ *      bar measures nothing; and the fitted bloom and refraction, each taken
+ *      at half and at one and a half times, must sit further from the old
+ *      picture on most looks, or the fit is a guess the bars cannot see.
  *
  * The saved looks are drawn at 1024 px, not at the 384 the dials are. The old
  * pass's blur circle was a count of pixels (nine per unit of height between
@@ -104,6 +119,16 @@ const SAVED = [...[1, 0.6, 0.3].flatMap((lens) => looks(lens, FOCUS)), ...[0.05,
 const SAVED_S = 1024;
 // The aperture's first fit, made at 384 px (the control below).
 const FIT_384 = 0.8;
+// The saved looks' bars over the lit pixels: the mean difference in levels and
+// the share moved by 8 or more (section 6). The worst look of each set on
+// Metal (2026-10-30) was 3.17 levels and 8.9% (the old defaults, Lens .6),
+// 5.49 and 14.0% (every optic at .8, Lens .6) and 1.78 and 3.8% (at .25;
+// Lens .6 and Lens 1 at Focus .05); each bar is that and about a third again.
+const BAR = {
+  'the old defaults': { mean: 4.3, share: 0.12 },
+  'every optic at .8': { mean: 7.4, share: 0.19 },
+  'every optic at .25': { mean: 2.4, share: 0.05 },
+};
 
 // The old pass's reading of a saved look: the dials as they were written.
 const oldCamera = (c) => ({ amount: c.lens, focus: c.focus, aperture: c.set.aperture, bloom: c.set.bloom, chromatic: c.set.chromaticAberration, refraction: c.set.refraction });
@@ -113,7 +138,13 @@ const out = 'node_modules/.cache/lens-lib.mjs';
 // The saved looks, as the new pass is given them: the loader's reading, the
 // settings as written (the control), and the loader's reading with the
 // aperture at its 384 px fit (the second control).
-let migratedCams = [], rawCams = [], fit384Cams = [];
+let migratedCams = [], rawCams = [], fit384Cams = [], nearCams = [], driftable = [];
+// The near misses: the fitted bloom and refraction each taken at half and at
+// one and a half times. Chromatic is not among them: its whole effect on a
+// migrated look is under a twentieth of a level (the old pass's fringe and the
+// new one's both round to nothing at the dials a look was saved with), so no
+// scale of it can be told from another, and none can do harm.
+const NEAR = [['bloom', 0.5], ['bloom', 1.5], ['refraction', 0.5], ['refraction', 1.5]];
 if (!BEFORE) {
   await build({
     stdin: {
@@ -123,6 +154,7 @@ if (!BEFORE) {
         "export { PRESETS } from './src/presets.ts';",
         "export { luckyLook } from './src/lib/lucky.ts';",
         "export { parsePresetFile, upgradeSaved, PRESET_FORMAT } from './src/lib/userPresets.ts';",
+        "export { DRIFTABLE } from './src/lib/drift.ts';",
       ].join('\n'),
       resolveDir: '.', loader: 'ts',
     },
@@ -182,16 +214,22 @@ if (!BEFORE) {
   check('one saved with Lens up has each optic scaled down to the dial that draws what it drew, and one saved from now on keeps whatever it was saved with',
     weaker && OPTICS.every((k) => v3.settings[k] === OLD[k]),
     `lens .6 ${OPTICS.map((k) => lensed2.settings[k]).join('/')} from ${OPTICS.map((k) => OLD[k]).join('/')}, version 3 ${OPTICS.map((k) => v3.settings[k]).join('/')}`);
+  // Not merely above 0: exactly what the same look reads as when it wrote the
+  // old defaults out, so a fallback to some other number (the new default,
+  // a half) fails.
   const absent = L.parsePresetFile(JSON.stringify({ format: L.PRESET_FORMAT, version: 2, name: 'old', settings: { camera: 1 } })).settings;
+  const written = savedLook(2, { camera: 1 }).settings;
   check('a look saved with Lens up and an optic it never wrote is read with that optic\'s old default, not 0',
-    absent.refraction > 0 && absent.aperture > 0 && absent.bloom > 0 && absent.chromaticAberration > 0,
-    OPTICS.map((k) => absent[k]).join('/'));
+    OPTICS.every((k) => absent[k] > 0 && absent[k] === written[k]),
+    `${OPTICS.map((k) => absent[k]).join('/')}, written out ${OPTICS.map((k) => written[k]).join('/')}`);
   migratedCams = SAVED.map((c) => {
     const st = savedLook(2, { camera: c.lens, focus: c.focus, ...c.set }).settings;
     return { amount: st.camera, focus: st.focus, aperture: st.aperture, bloom: st.bloom, chromatic: st.chromaticAberration, refraction: st.refraction };
   });
   rawCams = SAVED.map(oldCamera);
+  driftable = ['camera', 'focus', ...OPTICS].filter((k) => L.DRIFTABLE.includes(k));
   fit384Cams = SAVED.map((c, i) => ({ ...migratedCams[i], aperture: Math.round(Math.min(1, c.set.aperture * c.lens * FIT_384) * 1000) / 1000 }));
+  nearCams = SAVED.map((c, i) => NEAR.map(([key, k]) => ({ ...migratedCams[i], [key]: Math.round(Math.min(1, migratedCams[i][key] * k) * 1000) / 1000 })));
   const up = L.upgradeSaved({ ...m2, version: 2, settings: { ...D, ...OLD, camera: 0 } });
   check('a set list\'s saved looks are read the same way', !L.cameraWanted(up.settings) && up.version === 3,
     `version ${up.version}, wanted ${L.cameraWanted(up.settings)}`);
@@ -237,6 +275,19 @@ const helpers = () => {
       sum += d; n++;
     }
     return { share: big / Math.max(1, n), mean: sum / Math.max(1, n) };
+  };
+  // The same over the pixels lit (a channel above 8) in either picture, and
+  // the lit share of the frame: a saved look's frame is half black around the
+  // pours, and a mean over all of it would halve every difference.
+  window.litDiff = (a, b) => {
+    let big = 0, sum = 0, n = 0;
+    for (let i = 0; i < a.length; i += 4) {
+      if (Math.max(a[i], a[i + 1], a[i + 2], b[i], b[i + 1], b[i + 2]) <= 8) continue;
+      const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+      if (d >= 8) big++;
+      sum += d; n++;
+    }
+    return { share: big / Math.max(1, n), mean: sum / Math.max(1, n), lit: n / (a.length / 4) };
   };
 };
 const { page, close } = await openLab({ plugins: BEFORE ? oldShader : [], tag: BEFORE ? 'lensbefore' : '' });
@@ -319,6 +370,44 @@ const r = await page.evaluate(async ({ S }) => {
   const refracted = await draw({ ...OFF, refraction: 1 });
   o.whereRefraction = moved(off, refracted);
   o.whereRefractionMirrored = moved(off, refracted, mirror);
+  // Which way, and how far. The pass samples the plate at uv + n·(0.4·0.25)
+  // times the dial (camera.ts), so at the full dial a steep pixel takes the
+  // colour the off picture has a tenth of the frame along its slope, the
+  // slope's y running against the frame's rows. Each steep pixel where that
+  // colour and a wrong one differ by 16 levels or more (so the pair can be
+  // told apart) is asked which it took; the wrong ones are the colour as far
+  // against the slope, and the colour at half and at one and a half times the
+  // throw. Measured 100.0% for all three. A shift that ignored the slope
+  // scored 68.1% on the way, the slope read backwards 0.0%, its axes swapped
+  // 64.8%, and half the throw 0.0% against the half (each a patched copy of
+  // the shader, by hand). The way alone is not enough: a picture that did not
+  // move at all (the old pass at Lens 0) scores 88.8% on it, a steep pixel's
+  // own colour being nearer the colour along its slope than against it on
+  // this plate, and is caught by the throw (7.6% against the half), so all
+  // three are asked.
+  const at = (px, x, y) => {
+    x = Math.min(S - 1, Math.max(0, x)); y = Math.min(S - 1, Math.max(0, y));
+    const x0 = Math.floor(x), y0 = Math.floor(y), x1 = Math.min(S - 1, x0 + 1), y1 = Math.min(S - 1, y0 + 1), fx = x - x0, fy = y - y0;
+    const c = [0, 0, 0];
+    for (let k = 0; k < 3; k++) c[k] = (px[(y0 * S + x0) * 4 + k] * (1 - fx) + px[(y0 * S + x1) * 4 + k] * fx) * (1 - fy) + (px[(y1 * S + x0) * 4 + k] * (1 - fx) + px[(y1 * S + x1) * 4 + k] * fx) * fy;
+    return c;
+  };
+  const far = (p, q) => Math.max(Math.abs(p[0] - q[0]), Math.abs(p[1] - q[1]), Math.abs(p[2] - q[2]));
+  const way = (k) => {
+    let n = 0, near = 0;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      if (slope[i] <= 0.2) continue;
+      const dx = (aux[i * 4] / 255 * 2 - 1) * 0.1 * S, dy = -(aux[i * 4 + 1] / 255 * 2 - 1) * 0.1 * S;
+      const p = at(off, x + dx, y + dy), q = at(off, x + k * dx, y + k * dy);
+      if (far(p, q) < 16) continue;
+      n++;
+      const c = [refracted[i * 4], refracted[i * 4 + 1], refracted[i * 4 + 2]];
+      if (far(c, p) < far(c, q)) near++;
+    }
+    return { n, share: near / Math.max(1, n) };
+  };
+  o.refractionWay = { against: way(-1), half: way(0.5), more: way(1.5) };
   o.whereBloom = moved(off, await draw({ ...OFF, bloom: 1 }));
   o.whereChromatic = moved(off, await draw({ ...OFF, chromatic: 1 }));
   // A plate with nothing on it is black; no optic, alone or all four at once,
@@ -379,8 +468,13 @@ for (const [name, bar] of Object.entries(need)) {
 }
 for (const [name, bar] of Object.entries(need)) {
   const d = r.dial[name];
+  // Above the bar, and at least three quarters of what the dial does with Lens
+  // at 0: a Lens that halved an optic (a patched copy of the shader that
+  // scaled refraction by 1 - 0.45·Lens and chromatic by 1 - 0.5·Lens) kept
+  // both over the bar alone. Measured 85% (chromatic) to 96% (bloom).
   check(`${name} turned up with Lens at 1 is as strong, not weaker for the Lens${OLD_NOTE}`,
-    d.atLens1.mean >= bar, `mean ${d.atLens1.mean.toFixed(1)} levels`);
+    d.atLens1.mean >= bar && d.atLens1.mean >= 0.75 * d.full.mean,
+    `mean ${d.atLens1.mean.toFixed(1)} levels, ${d.full.mean >= 0.05 ? `${pct(d.atLens1.mean / d.full.mean)} of its ${d.full.mean.toFixed(1)}` : `against ${d.full.mean.toFixed(1)}`} with Lens at 0`);
 }
 for (const name of Object.keys(need)) {
   const d = r.dial[name];
@@ -401,6 +495,10 @@ check('refraction changes the steep parts of the plate and spares the flat',
 check('... and read against the slope turned top to bottom it does not (the control)',
   !refrOk(r.whereRefractionMirrored),
   `${pct(r.whereRefractionMirrored.steep)} of steep, ${pct(r.whereRefractionMirrored.flat)} of flat`);
+const ways = Object.entries(r.refractionWay);
+check('refraction moves the picture the way the slope says and as far: a steep pixel takes the colour a tenth of the frame along it',
+  ways.every(([, w]) => w.n >= 1000 && w.share >= 0.9),
+  ways.map(([k, w]) => `${pct(w.share)} of ${w.n} nearer it than ${{ against: 'the colour as far against it', half: 'half as far', more: 'half as far again' }[k]}`).join(', '));
 check('chromatic aberration leaves the green channel alone',
   r.whereChromatic.green === 0, `${pct(r.whereChromatic.green)} of pixels changed in green`);
 check('bloom only adds light',
@@ -441,7 +539,7 @@ if (!BEFORE) {
     const against = (was, cams) => page.evaluate(async ({ S, was, cams }) => {
       const o = unb64(was);
       const res = [];
-      for (const c of cams) res.push(diff(o, await lab.render(S, { granulation: 0 }, c ? { camera: c, time: 3 } : { time: 3 })));
+      for (const c of cams) res.push(litDiff(o, await lab.render(S, { granulation: 0 }, c ? { camera: c, time: 3 } : { time: 3 })));
       return res;
     }, { S: SAVED_S, was, cams });
     // The two labs hold one plate: with no camera pass at all they draw it to
@@ -449,22 +547,38 @@ if (!BEFORE) {
     const [same] = await against(await render(old.page, null), [null]);
     check(`the old pass's lab and this one hold the same plate (${SAVED_S} px, no pass)`,
       same.share === 0 && same.mean === 0, `${same.mean.toFixed(3)} levels`);
-    // The bar per set: the old pass drew its blur and glow with different
-    // shapes (twelve taps and eight directions against sixty-four and sixty),
-    // so the match is not exact, and the stronger the dials the more the
-    // shapes show. Named in PLAN.md 33i-7. The first reading ("keeps its
-    // optics") gave 8.1 and 10.5 levels for the old defaults at Lens 1 and .6.
-    const bar = { 'the old defaults': 2.5, 'every optic at .8': 4.5, 'every optic at .25': 1.5 };
+    // The bars per set, on the lit pixels: the old pass drew its blur and glow
+    // with different shapes (twelve taps and eight directions against
+    // sixty-four and sixty), so the match is not exact, and the stronger the
+    // dials the more the shapes show. Named in docs/plan/33-bubbles-closeup.md
+    // 33i-7. Each is the worst look of its set on this plate, with about a
+    // third again for the plate's own spread between machines. The first
+    // reading ("keeps its optics") gave 8.1 and 10.5 levels over the whole
+    // frame for the old defaults at Lens 1 and .6.
+    const bar = BAR;
     let lens1 = 0, missed384 = 0;
+    const lit = [], nearer = NEAR.map(() => 0);
     for (const [i, c] of SAVED.entries()) {
-      const [mig, raw, fit] = await against(await render(old.page, rawCams[i]), [migratedCams[i], rawCams[i], fit384Cams[i]]);
-      if (c.lens === 1) { lens1++; if (fit.mean >= bar[c.name]) missed384++; }
-      check(`a look saved with ${c.name}, Lens ${c.lens} and Focus ${c.focus} opens within ${bar[c.name]} levels of how the old pass drew it`,
-        mig.mean < bar[c.name] && raw.mean > 1.5 * mig.mean,
-        `migrated ${mig.mean.toFixed(2)} levels (${pct(mig.share)} of pixels by 8 or more, aperture ${migratedCams[i].aperture}); read as written ${raw.mean.toFixed(2)}; the 384 px fit ${fit.mean.toFixed(2)}`);
+      const [mig, raw, fit, ...near] = await against(await render(old.page, rawCams[i]), [migratedCams[i], rawCams[i], fit384Cams[i], ...nearCams[i]]);
+      const b = bar[c.name];
+      lit.push(mig.lit);
+      if (c.lens === 1) { lens1++; if (fit.mean >= b.mean || fit.share >= b.share) missed384++; }
+      near.forEach((d, k) => { if (d.mean > mig.mean) nearer[k]++; });
+      check(`a look saved with ${c.name}, Lens ${c.lens} and Focus ${c.focus} opens within ${b.mean} levels of how the old pass drew it, and moves under ${pct(b.share)} of its lit pixels by 8`,
+        mig.mean < b.mean && mig.share < b.share && raw.mean > 1.5 * mig.mean,
+        `migrated ${mig.mean.toFixed(2)} levels, ${pct(mig.share)} (aperture ${migratedCams[i].aperture}, bloom ${migratedCams[i].bloom}, refraction ${migratedCams[i].refraction}); read as written ${raw.mean.toFixed(2)}; the 384 px fit ${fit.mean.toFixed(2)}; near misses ${near.map((d) => d.mean.toFixed(2)).join('/')}`);
     }
+    check(`the saved looks' frames are part lit and part black, so the lit pixels are a measure of their own`,
+      Math.min(...lit) >= 0.3 && Math.max(...lit) <= 0.7, `${pct(Math.min(...lit))} to ${pct(Math.max(...lit))} of the frame lit`);
     check(`the aperture's 384 px fit misses the bar at ${SAVED_S} px on a third of the looks at Lens 1 (the control: the bars tell a fit from a near one)`,
       lens1 > 0 && missed384 >= lens1 / 3, `${missed384} of ${lens1}`);
+    // The fit is a fit, not a guess the bars cannot see: each near miss sits
+    // further from the old picture than the migration on most looks. The
+    // weakest looks (Lens .3, where the migrated dials are a few hundredths)
+    // are where a near miss can tie.
+    check('the fitted bloom and refraction are nearer the old picture than half or one and a half times them, on most looks',
+      nearer.every((n) => n > SAVED.length / 2),
+      NEAR.map(([key, k], j) => `${key} ×${k} further on ${nearer[j]} of ${SAVED.length}`).join(', '));
   } finally {
     await old.close();
   }
@@ -477,7 +591,7 @@ await close();
 // word that only holds a sound word inside it ("uniforms", "rms") is not.
 // The plate's own uniforms read the beat, which is the control: the same
 // reading must hear it there.
-const SOUND = /^(audio|bass|beat|kick|snare|energy|treble|loud|onset|band|spectrum|rms|sound|music|pitch|analy[sz])/;
+const SOUND = /^(audio|bass|beat|kick|snare|energy|treble|loud|onset|band|spectrum|rms|sound|music|pitch|brightness|analy[sz])/;
 const heard = (f) => {
   const code = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   const words = (code.match(/[A-Za-z_$][\w$]*/g) ?? []).flatMap((id) => id.split(/_|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/));
@@ -489,6 +603,29 @@ for (const f of ['src/gpu/wgsl/camera.ts', 'src/gpu/wgsl/cameraFields.ts', 'src/
   const words = heard(f);
   check(`${f}, the camera pass's own code, reads no sound`, words.length === 0, words.join(', '));
 }
+
+// What fills the pass's uniforms: the call in the visualizer, read as written.
+// Each dial is its own setting with a number for when it is unset, the clock is
+// the view's and the dither the chain's; anything else (a level, a band, a
+// beat added to a dial) fails. The control is the same call with the bass
+// added to the bloom, which must fail, or the reading accepts anything.
+const uniformsOf = (src) => {
+  const m = src.match(/fillCameraUniforms\(cam\.pack, \{([^{}]*)\}, canvas\.width/);
+  if (!m) return null;
+  const body = m[1].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  return Object.fromEntries(body.split(',').map((t) => t.trim()).filter(Boolean)
+    .map((t) => [t.slice(0, t.indexOf(':')).trim(), t.slice(t.indexOf(':') + 1).trim()]));
+};
+const UNIFORMS = { amount: 'camera', refraction: 'refraction', chromatic: 'chromaticAberration', focus: 'focus', aperture: 'aperture', bloom: 'bloom' };
+const fromSettings = (u) => !!u && Object.keys(u).length === Object.keys(UNIFORMS).length + 2
+  && u.time === 'view.time' && u.dither === 'post ? 0 : 1'
+  && Object.entries(UNIFORMS).every(([k, key]) => new RegExp(`^view\\.settings\\.${key} \\?\\? \\d+(\\.\\d+)?$`).test(u[k] ?? ''));
+const VIS = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+const BASS = 'bloom: view.settings.bloom ?? 0,';
+const bassed = VIS.replace(BASS, 'bloom: (view.settings.bloom ?? 0) + bassLevel * 0.2,');
+check('the app fills the pass\'s uniforms from the settings and the clock alone',
+  fromSettings(uniformsOf(VIS)) && bassed !== VIS && !fromSettings(uniformsOf(bassed)),
+  `${Object.keys(uniformsOf(VIS) ?? {}).join(', ')}; with the bass added to the bloom ${fromSettings(uniformsOf(bassed)) ? 'still read as the settings' : 'refused'}${driftable.length ? `; Evolve may wander ${driftable.join(', ')}` : ''}`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(`\n${checks.length - failed} passed, ${failed} failed`);

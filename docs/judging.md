@@ -2128,7 +2128,9 @@ few levels of how it did (its optics are rescaled by Lens, the aperture by Focus
 lens` line 6); the residual is a softer blur and a wider glow, not a different picture. It is
 fitted for a frame about a thousand pixels tall: on the laptop's full screen it should match
 best, and on the phone the blur reads softer than it did. Say whether that difference shows.
-Then Evolve on a look with Lens at 0: its glass theme wanders Refraction, Chromatic Aberration and
-Aperture, which did nothing at Lens 0 before and now bend, fringe and blur the plate. Say whether
-that is welcome as part of the dish evolving, or whether Evolve should leave the camera alone
-(PLAN 33i-9), and whether the frame hitches when one of them leaves 0 (33i-8).
+Then Evolve on a look with Lens at 0 and Refraction up a little (0.1): its glass theme wanders
+Refraction, Chromatic Aberration and Aperture where a look has them up (it never turns one on from
+0), and at Lens 0 those now bend, fringe and blur the plate where before they drew nothing. Say
+whether that is welcome as part of the dish evolving, or whether Evolve should leave the camera
+alone (PLAN 33i-9), and whether the frame hitches when a calm passage walks the Refraction down to
+0 and back up (33i-8).

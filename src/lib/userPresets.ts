@@ -61,7 +61,8 @@ const OLD_OPTIC_DEFAULT = { aperture: 0.5, bloom: 0.4, chromaticAberration: 0.3,
  * the new shader's renders against the old one's on the lab plate for each
  * dial at 0.25, 0.5, 0.75 and 1: refraction's best fit sat at 0.2 to 0.3 of
  * the old value (the old maths multiplied by the dye's height and then the
- * dial, so they were far weaker), bloom's at 0.4 and chromatic aberration's at
+ * dial, so they were far weaker), bloom's at 0.4 (at Lens 1; below it the
+ * scale falls with Lens, bloomScale's below) and chromatic aberration's at
  * about 0.03 (its old fringe was under half a level). Those three were drawn
  * as shares of the frame in both shaders, so their fit holds on any frame.
  * Aperture's does not, and is apertureScale's below. The blur and the glow are
@@ -93,6 +94,25 @@ export const OPTIC_SCALE = { aperture: 0.3, bloom: 0.4, chromaticAberration: 0.0
  * against 1.84 at its best.
  */
 const apertureScale = (focus: number) => OPTIC_SCALE.aperture * Math.min(1, 0.5 + Math.max(0, focus));
+/**
+ * Bloom's scale, for a look saved at this Lens: OPTIC_SCALE's 0.4 at Lens 1,
+ * and Lens times that below it, so the glow is read as Lens squared times its
+ * dial rather than Lens times it. The old pass added the glow and then sent
+ * the picture through the sensor's ACES roll-off before mixing it in by Lens,
+ * so the glow reached the frame Lens times, flattened by the roll-off's slope
+ * at a halo's brightness (about a third). The new pass adds the glow to the
+ * optical picture and mixes the sensor over it by Lens, so (1 - Lens) of the
+ * glow reaches the frame straight and only Lens of it is flattened. Matching
+ * the two asks for the dial times Lens·a / ((1 - Lens) + Lens·a), with a the
+ * roll-off's slope; at a = 0.3 that is within a few hundredths of Lens squared
+ * from Lens 0.15 to 1. Measured over the lit pixels of a 1024 px frame, the
+ * old defaults at Lens 0.3 sat 3.45 levels from the old pass with bloom read
+ * as Lens times its dial and 2.21 read as Lens squared; an every-optic-at-.8
+ * look at Lens 0.3 moved 29.9% of its lit pixels by eight levels or more, and
+ * 12.1% after (the check-skeptic's second pass found it: half the glow
+ * matched better than the migration on every look below Lens 1).
+ */
+const bloomScale = (lens: number) => OPTIC_SCALE.bloom * lens;
 function inertOptics<T extends Partial<VisualizerSettings>>(version: unknown, settings: T, saved: Partial<VisualizerSettings> = settings): T {
   if (Number(version) >= 3) return settings;
   const lens = settings.camera ?? 0;
@@ -103,7 +123,7 @@ function inertOptics<T extends Partial<VisualizerSettings>>(version: unknown, se
     for (const k of OPTICS) {
       // A hand-edited file can hold a string or NaN here; read it as the old default rather than carry NaN into a uniform.
       const was = Number.isFinite(saved[k]) ? (saved[k] as number) : OLD_OPTIC_DEFAULT[k];
-      const scale = k === 'aperture' ? apertureScale(focus) : OPTIC_SCALE[k];
+      const scale = k === 'aperture' ? apertureScale(focus) : k === 'bloom' ? bloomScale(lens) : OPTIC_SCALE[k];
       out[k] = Math.round(Math.min(1, Math.max(0, was * lens * scale)) * 1000) / 1000;
     }
     return out;
