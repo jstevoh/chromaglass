@@ -72,7 +72,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    first (§30, 2026-10-11: Link is the shared clock of the iPad's music apps, AUM, Loopy
    Pro, Drambo, Koala, as well as of Resolume, VDMX and TouchDesigner, and VS offers it
    as a clock source):
-   - ~~**13.5-link**~~ **Shipped** (2026-10-30, this PR): the show server joins a Link
+   - ~~**13.5-link**~~ **Shipped** (2026-10-30, #588): the show server joins a Link
      session (`server/abletonLink.js`, the protocol spoken in Node, no native addon) and
      the page's tempo source takes its tempo, beat and bar; the Link switch in Settings →
      Sound → Tempo and on the phone's Sound sheet. `npm run link` 27/27. Story in
