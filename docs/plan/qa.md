@@ -24,6 +24,16 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   and shivers with the music at Frame Sway 0 (the owner, 2026-10-11).~~ Shipped; story in
   `docs/plan-shipped.md` §QA-31 (moved 2026-10-29, 19m).
 
+- ~~**QA-32** The Close-up button "doesn't seem to do anything besides make the canvas
+  black/empty" (the owner, 2026-10-29, with a screenshot).~~ **Fixed, #575**: the closeup
+  comes in on the nearest liquid when its aim shows none (`npm run closeupland`). Story in
+  `docs/plan-shipped.md` §QA-32.
+- **QA-32a** A held closeup whose frame empties while it is in (the pool flows out of it,
+  Evolve thins it, a finger sweeps it) stays on the glass: Hold holds, by design, and only
+  coming in lands (QA-32). Follow rides the liquid instead. Whether Hold should step to the
+  nearest liquid when its frame has been bare for a few seconds, with no hand on the aim,
+  is the owner's call; `npm run closeupland` is where its line would go. Found with QA-32.
+
 **Tier 2. A control does the wrong thing, or cannot be reached.**
 
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
