@@ -4602,6 +4602,20 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
     page's clock at the read against the last frame's speeds. It now times by the plate's
     own clock (`chromaglassDebug().frameAt`) and read 0.188 against 0.188.
 
+## 24. Modular rigs (what has shipped)
+
+### 24.3-place. The melody walks across the plate (shipped)
+
+Asked in PLAN Wave 5 lane D, direction B of the owner's 2026-10-24 exploration of presets that listen: parts of the plate should answer the music, and a melody is a line that goes up and down, so it is drawn along the plate's width. Each note the microphone hears lets go of one drop, low notes on one side of the plate and high notes on the other, a harder note a bigger drop; the drops are real dropper drops of the look's dye and liquid, so neighbours merge or hold apart by the liquids' own immiscibility.
+
+- **`src/lib/melodyWalk.ts`** (arithmetic only): the `note` source's onsets say when a note began, the analyser's pitch which. An onset arms a drop and the drop lets go once the pitch has had the time to settle, because the pitch comes from a median of the last fifteen spectra and a new note wins it only on the eighth reading after it starts. Placed on the onset's own reading, 6 of 7 drops sat on the note before; after the settle, 10 of 10 were within a semitone and a half. The wait is read from the ear's own rate (`AudioReading.pitchSettleS`: 0.13 s at 60 readings a second, 0.27 s at 30), so a slow Mac is not placed by a note it has left.
+- **A better pitch for the melody (`src/lib/audioFeatures.ts`, `pitchFine`).** `pitch` is a bin's (43 Hz), two to three semitones wide at middle C and an octave across C2 to C3, and under a kick on every beat it read the drum for half of every beat (28.8 where the notes were 57 to 81). `pitchFine` is a parabola through the peak and its neighbours, searched from `MELODY_LOW_HZ` (110 Hz) up so a kick's body is out of the product at the fundamental. The old `pitch` and `pitchClass` are untouched, because the music's colour follows that class (24.3-place-4).
+- **Where.** A fixed scale, C3 to C6, along a line the look gives (`MELODY_LINES`): Aurora Borealis along the top of its curtains, Oil & Water across the middle (every note a bead of amber oil); any other look a straight line across the middle. A first version placed notes against the range of the last twelve and stacked a rising scale at the far end of the line (5 of 9 drops on one spot); the fixed scale spaces it evenly (x 0.29, 0.36, 0.37, 0.42, 0.46, 0.51, 0.55, 0.60, 0.67, 0.81). Off the line by the note's place in the circle of fifths, so a melody in a key stays in a band and a note it comes back to comes back to its place.
+- **A drum is not a note.** A note onset within 60 ms of the kick's is the kick's (its body is in the note band). A snare's cannot veto outright, because the snare source fires at full strength on a lead's own attack (8 of 15 notes of the scale), so a note beside a snare onset must have moved the pitch by 0.8 of a semitone or it is dropped (a real snare's crack leaves the median where it was). Drums alone: 0 drops in 8 s.
+- **Volume** is the note band's level (against its own recent range) at its highest between the onset and the settle, not the onset's own strength, which is a rise in decibels and read 0.79 for a note 12 dB down against 1.00 for the loud one: soft notes 0.78, hard 0.91.
+- **The dial.** `melodyWalk` (0 on every look; Aurora 0.7, Oil & Water 0.8) on the desk (the Show section, beside Kick Bloom), the phone remote, MIDI learn and the help text; held out of Evolve's pool. Laid in `LiquidVisualizer.tsx` (`layMelodyDrop`) with the area cords' step, the dye under the look's fill as every music pour is.
+- **Checked by** `npm run melody` (18 lines, in `scripts/checks.json` on the logic shard): a 15-note scale with a kick on every beat and a snare on the backbeat through the real analyser.
+
 ## 25. Areas of interest: several places on one plate
 
 **Why a look had one.** Read off the code, every look was built to have a single area
