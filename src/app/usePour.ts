@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useState, type RefObject } from 'react';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
+import { uprightPicture } from '../lib/videoFlow';
 
 /**
  * Pouring a picture or a film into the dish: an image laid as dye, a video
@@ -21,20 +22,9 @@ export function usePour({
     if (!file) return;
     const img = new Image();
     img.onload = () => {
-      // Draw image to an offscreen canvas to get pixel data
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      // The plate's rows run from the bottom of the frame up; a canvas's run down, and
-      // `injectImage` lays the rows it is given on the plate's as they come (as the
-      // text pour's canvas is turned before it, `pourText`). Drawn upside down here,
-      // the picture lands the right way up (PLAN 14ab-13: it landed upside down).
-      ctx.translate(0, img.height);
-      ctx.scale(1, -1);
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      // Its pixels turned over for the plate, whose rows count up (PLAN 14ab-13).
+      const imageData = uprightPicture(img, img.width, img.height);
+      if (!imageData) return;
       visualizerRef.current?.injectImage(imageData);
       URL.revokeObjectURL(img.src);
     };

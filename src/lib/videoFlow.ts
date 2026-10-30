@@ -48,22 +48,35 @@ const lum = (d: ArrayLike<number>, i: number) => VIDEO_LUMA[0] * d[i] + VIDEO_LU
 
 /**
  * One frame, on the CPU. `data` is the frame drawn at S×S, RGBA, its rows
- * counting down as a canvas's do (and laid on the grid's rows as they come,
- * as the pour always has); `prev` the last frame's, or null for a first frame,
- * which pours dye and no flow. The edge cells are left alone: the gradient
- * there would reach off the frame.
+ * counting down as a canvas's do; `prev` the last frame's, or null for a first
+ * frame, which pours dye and no flow. The edge cells are left alone: the
+ * gradient there would reach off the frame.
+ *
+ * The grid's rows count up the plate and a frame's count down it, so the
+ * grid's row y is the frame's row S−1−y, and the cell above a cell on the
+ * plate is the row before it in the frame. Until 14ab-13 the loop laid the
+ * frame's first row on the grid's first, as the solver's pass did, and a
+ * poured video landed upside down (photographed on the owner's Mac: a
+ * cartoon's sky poured at the bottom of the plate and its pumpkins at the
+ * top). The rows are turned here, where they are read, and not by drawing
+ * the frame again turned over on a canvas of its own: that is one more
+ * full-size draw a frame on the path 14ab exists to make lighter. The
+ * solver's pass turns its frame in the copy that takes it (`flipY` in
+ * `pourVideo`, gpu/fluid/inputs.ts), which costs nothing either.
  */
 export function pourVideoFrameCpu(target: VideoFlowTarget, data: ArrayLike<number>, prev: ArrayLike<number> | null, S: number): void {
+  const row = S * 4;
   for (let y = 1; y < S - 1; y++) {
+    const r = (S - 1 - y) * row;
     for (let x = 1; x < S - 1; x++) {
-      const i = (y * S + x) * 4;
+      const i = r + x * 4;
       const l = lum(data, i);
       if (l > VIDEO_KEY) target.addDensity(x, y, (l / 255) * VIDEO_DYE, data[i] / 255, data[i + 1] / 255, data[i + 2] / 255);
       if (!prev) continue;
       const diff = l - lum(prev, i);
       if (Math.abs(diff) <= VIDEO_CHANGE) continue;
       const gx = lum(data, i + 4) - lum(data, i - 4);
-      const gy = lum(data, i + S * 4) - lum(data, i - S * 4);
+      const gy = lum(data, i - row) - lum(data, i + row);
       const g2 = gx * gx + gy * gy;
       if (g2 > VIDEO_GRAD2) target.addVelocity(x, y, -diff * gx / g2 * VIDEO_FLOW, -diff * gy / g2 * VIDEO_FLOW);
     }
@@ -120,7 +133,9 @@ export function pourVideoFrame(
  * the grid, x 0.19–0.81 and y 0.31–0.69, each cell the pixel at its corner,
  * brighter pixels pouring more, a transparent one nothing. Moved here from
  * FluidSimulation with 14ab-2, as it was, beside the video's loop: the two
- * pictures the CPU pours.
+ * pictures the CPU pours. `img`'s first row lands on the grid's first, the
+ * plate's bottom, so a picture read off a canvas comes turned over
+ * (`uprightPicture` for an upload, and `pourText`'s own turn).
  */
 export function pourPictureCpu(target: VideoFlowTarget, img: ImageData, S: number): void {
   const w = img.width, h = img.height, d = img.data;
@@ -136,4 +151,24 @@ export function pourPictureCpu(target: VideoFlowTarget, img: ImageData, S: numbe
       target.addDensity(gx, gy, (0.5 + brightness * 1.5) * a, r, g, b);
     }
   }
+}
+
+/**
+ * A picture's pixels for `pourPictureCpu`, the right way up: drawn turned over
+ * onto a canvas of its size, as `pourText` turns its words, so its top row is
+ * the last and lands at the top of the plate. An uploaded picture was drawn
+ * as it came and landed upside down (PLAN 14ab-13: on the owner's Mac, a
+ * picture of pink words over blue ones poured with the blue on top and every
+ * letter upside down). Once a pour, so the canvas costs nothing a frame.
+ * Null when there is no 2D context to draw with.
+ */
+export function uprightPicture(img: CanvasImageSource, w: number, h: number): ImageData | null {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  if (!g) return null;
+  g.setTransform(1, 0, 0, -1, 0, h);
+  g.drawImage(img, 0, 0, w, h);
+  return g.getImageData(0, 0, w, h);
 }

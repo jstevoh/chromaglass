@@ -219,7 +219,10 @@ export class FluidInputs extends FluidPasses {
       this.videoVel = pp(RGBA32, 'video flow');
     }
     try {
-      d.queue.copyExternalImageToTexture({ source: src }, { texture: this.videoSrc }, [w, h]);
+      // Turned over in the copy: a frame's rows count down and the grid's up the plate, and the
+      // passes lay the texture's first row on the grid's first, so without it a poured video landed
+      // upside down (PLAN 14ab-13). The loop turns its rows where it reads them (`pourVideoFrameCpu`).
+      d.queue.copyExternalImageToTexture({ source: src, flipY: true }, { texture: this.videoSrc }, [w, h]);
     } catch (e) {
       // A video from another origin without CORS can be played and not read, here or by a canvas.
       if (!this.videoRefused) console.warn('[video pour] the frame could not be read', e);
