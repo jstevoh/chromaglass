@@ -132,10 +132,12 @@ jobs:
     if: ${{ !inputs.hosted && needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' && needs.verified.outputs.tested != 'disjoint' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Where MAC_RUNNER_PROBE lives: an environment that only main can use, as
-    # firebase-live is, so a branch's workflow cannot read the token. It reads
-    # the repository's runners (fine-grained, this repository only,
-    # Administration: read) and nothing else; it cannot register a runner.
+    # Where MAC_RUNNER_PROBE lives: the `mac-runner` environment, which main
+    # and, since 19ah-6, the sessions' branches may use (a pull request's own
+    # probe in checks.yml), never a fork's. The token reads the repository's
+    # runners (fine-grained, this repository only, Administration: read) and
+    # nothing else; it cannot register a runner. The keys that publish and
+    # sign stay in environments only main can use (scripts/cisecrets.mjs).
     environment: mac-runner
     permissions:
       contents: read
@@ -189,6 +191,17 @@ jobs:
       ${{ !cancelled() && needs.verified.result == 'success' &&
           needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' }}
     uses: ./.github/workflows/checks.yml
+    # A called workflow's jobs may ask for no more than its caller allows, and
+    # GitHub checks that when the run starts, for a job that will be skipped
+    # too: checks.yml's pull-request watchdog (19ah-6) asks for `actions:
+    # write` to cancel its own run. It never runs here (it needs the PR's own
+    # `mac` probe), and every other job in checks.yml names its own
+    # permissions or takes the file's read-only ones, so this lifts nothing
+    # they hold.
+    permissions:
+      contents: read
+      actions: write
+      pull-requests: read
     with:
       mac: ${{ needs.verified.outputs.tested != 'disjoint' }}
       local: ${{ needs.mac.outputs.shards || '[]' }}

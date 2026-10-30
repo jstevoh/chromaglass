@@ -41,8 +41,8 @@ on:
         default: true
       # The Mac shards to run on the owner's own Mac rather than GitHub's, as a
       # JSON list of shard names (PLAN.md 19ah). Only `deploy.yml` passes one,
-      # from its `mac` probe, on a push to main or a run by hand on main; a
-      # pull request never has inputs, so its shards always run on GitHub's.
+      # from its `mac` probe, on a push to main or a run by hand on main. A
+      # pull request never has inputs: its own `mac` job below asks instead.
       local:
         type: string
         default: '[]'
@@ -352,22 +352,87 @@ jobs:
   # setup is about half a minute (checkout, Node, npm ci, Chromium, the
   # build), so a run costs that much more Mac time and needs five runners
   # at once rather than four, but holds each for less.
+  # Is the owner's Mac free to take this pull request's Mac shards (PLAN.md
+  # 19ah-6)? The same probe as the deploy's (`scripts/macrunner.mjs`): a
+  # runner labelled `owner-mac`, online and idle, takes the first
+  # OWNER_MAC_SHARDS of them, and any other answer (busy, asleep, no token, an
+  # API that does not answer) sends every shard to GitHub's Macs as before.
+  # Only for a pull request whose branch is in this repository. A fork's is
+  # the public's code, which the Mac never runs (its hook refuses it in any
+  # case), and a fork's run gets no secrets to ask with.
+  #
+  # The token is MAC_RUNNER_PROBE, in the `mac-runner` environment, which since
+  # 19ah-6 lets the sessions' branches (`claude/*`, `antigravity/*`) in beside
+  # main: GitHub matches a pull request's run by its head branch's name. It reads the repository's runners and nothing else, so a branch's own
+  # workflow that copied it out could learn whether the Mac is busy. Every
+  # other key stays where only main can reach it (scripts/cisecrets.mjs).
+  mac:
+    name: Is the owner's Mac free
+    needs: reach
+    if: >-
+      ${{ github.event_name == 'pull_request' && needs.reach.outputs.mac == 'true' &&
+          github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: mac-runner
+    permissions:
+      contents: read
+    outputs:
+      shards: ${{ steps.probe.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: probe
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.MAC_RUNNER_PROBE }}
+          MAC_SHARDS: ${{ vars.OWNER_MAC_SHARDS }}
+        run: node scripts/macrunner.mjs
+
+  # The deploy's watchdog (`scripts/macwatch.mjs`, 19ah-3), for a pull request:
+  # a Mac that falls asleep between the probe's "free" and the shards would
+  # hold them in the queue for up to a day. Stalled for 15 minutes, it cancels
+  # the run and says so; "Re-run all jobs" then asks the probe again, which
+  # finds the Mac gone and sends the shards to GitHub's. Only the run's token,
+  # which may cancel this run and nothing beyond the repository's Actions.
+  watchdog:
+    name: Watchdog
+    needs: mac
+    if: ${{ needs.mac.outputs.shards != '' && needs.mac.outputs.shards != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+      - continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARDS: ${{ needs.mac.outputs.shards }}
+        run: node scripts/macwatch.mjs
+
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
-    needs: reach
-    if: ${{ needs.reach.outputs.mac == 'true' }}
-    # GitHub's Mac, or the owner's (PLAN.md 19ah) for a shard `deploy.yml`'s
-    # probe named. The repository is public, so a self-hosted runner must
-    # never take a pull request's job: anyone's fork can open one, and its
-    # workflow is the fork's. Hence the event test as well as the input,
-    # which a pull request cannot set. This line is not the guard, though: a
-    # branch can edit it, or bring its own workflow asking for `owner-mac`.
-    # The runner itself refuses any job that is not deploy.yml on main from
-    # a push or a run by hand (its job-started hook, scripts/macrunner-hook.sh),
-    # and a fork's PR waits for the owner's approval (docs/mac-runner.md).
+    needs: [reach, mac]
+    # Written out with `!cancelled()` because `mac` is skipped for a deploy, a
+    # fork's pull request and a change that reaches no Mac shard, and a job
+    # whose need was skipped is skipped with it unless its condition says
+    # otherwise. `reach` must still have succeeded, as before.
+    if: ${{ !cancelled() && needs.reach.result == 'success' && needs.reach.outputs.mac == 'true' }}
+    # GitHub's Mac, or the owner's (PLAN.md 19ah) for a shard a probe named:
+    # `deploy.yml`'s, passed in as `local`, or for a pull request from a branch
+    # of this repository the `mac` job's above (19ah-6). A pull request never
+    # reads `local`, and a fork's never runs `mac`, so its shards ask for
+    # `macos-15`. This line is not the guard, though: a branch can edit it, or
+    # bring its own workflow asking for `owner-mac`. The runner itself refuses
+    # any job that is not deploy.yml on main from a push or a run by hand, or
+    # checks.yml for a pull request whose branch is in this repository (its
+    # job-started hook, scripts/macrunner-hook.sh), and a fork's PR waits for
+    # the owner's approval (docs/mac-runner.md). A probe that failed outright
+    # leaves `shards` empty, which reads as none.
     # Only `owner-mac` is asked for, not `macOS`, so `npm run macqueue` keeps
     # GitHub's Macs and the owner's apart.
-    runs-on: ${{ github.event_name != 'pull_request' && contains(fromJSON(inputs.local || '[]'), matrix.shard) && fromJSON('["self-hosted","owner-mac"]') || 'macos-15' }}
+    runs-on: ${{ contains(fromJSON(github.event_name == 'pull_request' && (needs.mac.outputs.shards || '[]') || inputs.local || '[]'), matrix.shard) && fromJSON('["self-hosted","owner-mac"]') || 'macos-15' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false

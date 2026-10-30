@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Make this Mac a runner for main's deploys (PLAN.md 19ah, docs/mac-runner.md).
+# Make this Mac a runner for main's deploys and for the checks of pull requests
+# from this repository's own branches (PLAN.md 19ah, 19ah-6, docs/mac-runner.md).
 #
 # Run by the owner, at the Mac, in Terminal, signed in to `gh` as the
 # repository's owner. Every step can be run again: each one is skipped when it
@@ -95,10 +96,17 @@ fi
 ./svc.sh status | grep -E 'Started|Stopped|not installed' || true
 
 echo "6. The deploy's probe can see the runner"
-# The environment only main can use, so a branch's workflow cannot read it.
+# The environment main uses for the deploy's probe, and since 19ah-6 the
+# branches the sessions push (`claude/…`, `antigravity/…`) for a pull request's
+# probe: GitHub matches a pull request's run against its head branch's name.
+# The token in it reads the repository's runners and nothing else; no key
+# that can publish or sign is in this environment (scripts/cisecrets.mjs).
 gh api -X PUT "repos/$REPO/environments/mac-runner" --input - > /dev/null <<< '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
-gh api "repos/$REPO/environments/mac-runner/deployment-branch-policies" --jq '.branch_policies[].name' | grep -qx main ||
-  gh api -X POST "repos/$REPO/environments/mac-runner/deployment-branch-policies" -f name=main -f type=branch > /dev/null
+have=$(gh api "repos/$REPO/environments/mac-runner/deployment-branch-policies" --jq '.branch_policies[].name')
+for b in main 'claude/*' 'antigravity/*'; do
+  grep -qxF "$b" <<< "$have" ||
+    gh api -X POST "repos/$REPO/environments/mac-runner/deployment-branch-policies" -f name="$b" -f type=branch > /dev/null
+done
 if gh secret list --env mac-runner --repo "$REPO" | grep -q '^MAC_RUNNER_PROBE'; then
   echo "   MAC_RUNNER_PROBE is set already (to replace it: gh secret set MAC_RUNNER_PROBE --env mac-runner --repo $REPO)"
 else

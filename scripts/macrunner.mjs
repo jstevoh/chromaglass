@@ -1,7 +1,9 @@
-// Is the owner's Mac free to take a deploy's Mac shards (PLAN.md 19ah)?
+// Is the owner's Mac free to take a deploy's Mac shards (PLAN.md 19ah), or a
+// pull request's (19ah-6)?
 //
 // `deploy.yml`'s `mac` job runs this on a push to main (and a run by hand),
-// and only when the deploy is about to run the Mac shards. It writes
+// and only when the deploy is about to run the Mac shards; `checks.yml`'s
+// `mac` job runs it for a pull request whose branch is in this repository. It writes
 // `shards=<JSON list>` to $GITHUB_OUTPUT: the shards to run on the owner's
 // Mac, a self-hosted runner labelled `owner-mac`, which `checks.yml` sends
 // there instead of to GitHub's `macos-15`. Every other answer is `[]`, and the
@@ -18,7 +20,7 @@
 // The API needs a token that GITHUB_TOKEN cannot be (listing runners is an
 // Administration permission): MAC_RUNNER_PROBE, a fine-grained token for this
 // repository with Administration: read, kept in the `mac-runner` environment
-// that only main can use. No token, a refused one (expired), an API that does
+// that main and the sessions' branches can use, never a fork. No token, a refused one (expired), an API that does
 // not answer: each is `[]` with a warning that says which, never a red deploy.
 //
 // All five shards by default, one after another on the one runner: by the

@@ -1,4 +1,4 @@
-# The owner's Mac as a runner for main's deploys (PLAN.md 19ah)
+# The owner's Mac as a runner for main's deploys and our own pull requests (PLAN.md 19ah)
 
 A deploy whose change reaches the GPU runs five Mac shards (`scripts/checks.json`
 `.shards.mac`). On GitHub's macOS machines they wait in a queue first: over the 14 days to
@@ -10,17 +10,21 @@ Mac is free, and on GitHub's machines as before when it is not.
 
 ## What runs where
 
-- **Only `main`'s deploys.** `checks.yml` sends a shard to the label `owner-mac` only when
-  the run is not a pull request's and the deploy listed that shard. A pull request's run,
-  a fork's included, always asks for `macos-15`.
+- **`main`'s deploys, and pull requests from this repository's own branches** (19ah-6, the
+  owner, 2026-10-30). `checks.yml` sends a shard to the label `owner-mac` only when a probe
+  listed it: the deploy's, passed in, or for a pull request whose branch is in this
+  repository its own `Is the owner's Mac free` job. A fork's pull request never runs the
+  probe and always asks for `macos-15`.
 - **The runner refuses everything else itself.** Which runner a job asks for is up to the
   workflow, and any branch pushed here can carry a workflow of its own that asks for
   `owner-mac`. So before every job the runner runs a job-started hook
   (`scripts/macrunner-hook.sh`, installed by the setup script as
   `~/.chromaglass-runner/job-started.sh` and named in `~/actions-runner/.env`), which fails
   the job before its first step unless it is `deploy.yml` on `main`, started by a push or
-  by hand. A `pull_request_target`, `workflow_run` or scheduled run also has `main` as its
-  ref, hence the event as well. `bash scripts/macrunner-hook.sh --selftest` runs it
+  by hand, or `checks.yml` for a `pull_request` at its merge ref whose head branch is in
+  this repository and whose author is a person (the event payload says both; a fork's and
+  a bot's are refused). A `pull_request_target`, `workflow_run` or scheduled run also has
+  `main` as its ref, hence the event as well. `bash scripts/macrunner-hook.sh --selftest` runs it
   against each of those. The hook lives outside the runner's folder so neither a job nor a
   runner update can rewrite it. As well, pull requests from every outside contributor wait
   for the owner's approval before anything runs (Settings → Actions → General; the setup
@@ -33,7 +37,11 @@ Mac is free, and on GitHub's machines as before when it is not.
   any error, it lists none and every shard goes to GitHub as before.
 - **Its token** is `MAC_RUNNER_PROBE`, a fine-grained token for this repository with
   Administration: Read-only (listing runners needs it; the workflow's own token cannot),
-  kept in the `mac-runner` environment, which only `main` may use.
+  kept in the `mac-runner` environment, which `main` and the sessions' branches
+  (`claude/*`, `antigravity/*`) may use: GitHub matches a pull request's run against its
+  head branch's name. A fork's run gets no secrets at all. The token can only list runners,
+  so a branch's workflow that copied it out would learn whether the Mac is busy; the keys
+  that publish and sign stay in environments only `main` can use.
 - **How many shards** the Mac takes is the repository variable `OWNER_MAC_SHARDS` (a
   count, from the first; unset is all five). Set it lower to keep the Mac's share short
   and leave the rest to GitHub's queue.
@@ -44,7 +52,14 @@ Mac is free, and on GitHub's machines as before when it is not.
   it, and every deploy behind them. `deploy.yml`'s `Watchdog` job (`scripts/macwatch.mjs`)
   reads the run's jobs; when a shard has been queued for the owner's Mac for 15 minutes with
   none running, it starts `deploy.yml` again with `hosted` set (every shard on GitHub's
-  Macs) and cancels the stalled run, which the new one replaces in the queue.
+  Macs) and cancels the stalled run, which the new one replaces in the queue. A pull
+  request's run has its own `Watchdog`, which only cancels, with an error that says so:
+  **Re-run all jobs** then asks the probe again and sends the shards to GitHub's
+  (never Re-run failed jobs, which keeps the old answer). Re-running by itself is 19ah-7.
+- **Deploys and pull requests share the one Mac.** Whichever probe asks first while it is
+  idle gets it; the other finds it busy and goes to GitHub's queue as before. Two probes in
+  the same minute can both see it idle, and the second run's shards then wait their turn
+  behind the first's.
 
 ## Setting it up (at the Mac, once)
 
@@ -80,8 +95,11 @@ so deploys go to GitHub. To remove it for good: `svc.sh uninstall`, then
 ## What a job on the Mac can reach
 
 A job runs as the owner's user, so it can read what that user can: signing keys, `gh`'s
-sign-in, the home folder. Only `main`'s own workflow runs there (above), and `main` takes
-only merged pull requests, so what runs is what was reviewed. A separate macOS user for
+sign-in, the home folder. `main`'s own workflow runs there, and `main` takes only merged
+pull requests, so that much is what was reviewed. Since 19ah-6 a pull request's checks run
+there too, from a branch of this repository before anyone reviews it: only people and
+sessions the owner has given write access push such a branch, and those sessions already
+run on this Mac as this user. A fork's code, and a bot's pull request, never run there. A separate macOS user for
 the runner would take that away at the cost of a second login session for the GPU (PLAN
 19ah-2).
 
