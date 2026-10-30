@@ -6132,7 +6132,7 @@ mapped in the same order, the rim a mask made once (`lib/rimMask.ts`, which the 
 the app's dish areas use too): the share is the same number to the bit
 (`npm run framereads`), and the two reads after the first make no buffer (2 before).
 
-## 14ab-4. The CPU's deltas go across by the rows written (shipped 2026-10-30)
+## 14ab-4. The CPU's deltas go across by the rows written (shipped 2026-10-30, #579)
 
 14ab-4. With the GPU solver attached, `flushDeltas` copied all 192² cells of the CPU's
 delta arrays into two interleaved arrays and uploaded the dye, flow and multiplier grids
