@@ -15,7 +15,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types.ts';
 // node resolves no extensionless import.
 import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
 import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
-import { HIT_FEATURES, HIT_FEATURE_LABELS, type HitFeature } from './hitSource.ts';
+import { HIT_FEATURES, HIT_FEATURE_LABELS, isClassFeature, type HitFeature } from './hitSource.ts';
 import { MIX_CONTROLS } from './mixer.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 
@@ -163,8 +163,10 @@ export const MUSIC_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, 'beat', '
  * sources and the bands, and the hits as levels (`hitSource.ts`): how hard
  * each drum's last hit was, falling over a quarter second, and the note.
  * Levels and not triggers: a kick as a *moment* is `kick` above, and fires.
+ * And not the note's name (`noteClass`, PLAN 25i): a fader riding it would
+ * jump from one end to the other between B and C, a level it is not.
  */
-export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...HIT_FEATURES];
+export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...HIT_FEATURES.filter(f => !isClassFeature(f))];
 
 const hz = (f: number): string => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 0 : 1)}k` : `${Math.round(f)}`);
 /**

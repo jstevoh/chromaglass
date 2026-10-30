@@ -52,6 +52,12 @@ export interface LiquidBehaviour {
   /** Acid (+) or base (−), for a pH indicator in the dye. An amount: acid and base cancel. */
   acid?: number;
   /**
+   * The BZ reaction's activator (bromous acid), into its gel: where it lands
+   * the gel fires and a wave runs out from there, as a real dish of it does
+   * where a silver wire touches it (PLAN 25i). Nothing without BZ Reaction on.
+   */
+  bz?: number;
+  /**
    * Ferrofluid: how much of each drop goes into the dark liquid a magnet
    * pulls (the solver's second phase). That liquid never mixes with the dye;
    * the magnet, and the maze field, move it.

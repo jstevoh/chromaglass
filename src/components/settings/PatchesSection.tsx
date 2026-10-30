@@ -3,6 +3,7 @@ import { X, Cable } from 'lucide-react';
 import { SceneMapping, PatchSource } from '../../types';
 import { PER_LAYER } from '../../lib/sceneMap';
 import { AREA_TARGETS, isAreaTarget } from '../../lib/areaCords';
+import { isClassFeature } from '../../lib/hitSource';
 import { AreaPicker } from '../phone/AreaPicker';
 import { BandStrip } from '../phone/BandStrip';
 import { groupOf } from '../../lib/settingsMap';
@@ -270,9 +271,10 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                     Shaping the cord (PLAN 30a / 25h-2): gain before the
                     threshold on sound and band cords, and mode (Follow vs Gate)
                     with Gate (threshold), Rise (attack) and Fall (release) on
-                    both whole-plate sound/band cords and area cords.
+                    both whole-plate sound/band cords and area cords. Not on the
+                    note (PLAN 25i): a name has no level to gate or gain.
                   */}
-                  {(m.source === 'sound' || m.source === 'bands' || m.area !== undefined) && (() => {
+                  {(m.source === 'sound' || m.source === 'bands' || m.area !== undefined) && !isClassFeature(m.feature) && (() => {
                     const isSoundOrBands = m.source === 'sound' || m.source === 'bands';
                     const isGated = m.area !== undefined
                       ? (m.mode === 'gate' || (m.mode !== 'follow' && (m.threshold !== undefined || m.attack !== undefined || m.release !== undefined)))
