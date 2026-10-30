@@ -324,6 +324,13 @@ export interface PlateSolver {
    */
   handOver?(): SolverCarry | null;
   takeOver?(carry: SolverCarry): boolean;
+  /**
+   * A frame of the video pour, its dye and its motion worked out on the GPU
+   * and added to the CPU's deltas at the next flush (PLAN 14ab-2). Optional:
+   * without it the app pours the frame through the CPU's arrays
+   * (lib/videoFlow.ts). False when it poured nothing.
+   */
+  pourVideo?(src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, fresh: boolean): boolean;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   /**
    * `hands`, when a hand is in the liquid on a thin gap: L²×4 of (Σ χ·U, Σ χ, 0),

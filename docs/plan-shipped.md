@@ -6428,6 +6428,56 @@ cells (the app caps bubbles at 13); it marks `fillHole`'s own reach now, and the
 a bubble of 38 cells. It also had each frame's control seen alone, the multiplier laid in
 the lab, and a second breath, so the breath's grid goes by rows in both halves.
 
+## 14ab-2. The video pour's dye and flow on the GPU (shipped 2026-10-30, #584)
+
+14ab-2. A poured video was drawn into a 192² canvas every frame and read back with
+`getImageData`, copied whole (147 KB) to be the next frame's reference, and each of its
+36,000 cells went through `addDensity` (its brightness as dye, under a luma key) and, where
+it changed by more than the video's noise, `addVelocity` (the change read as motion along
+the brightness gradient, u = −(dI/dt)∇I/|∇I|², brightness constancy's smallest answer). On
+the GPU solver every one of those calls also marked its row, so each step sent all the
+rows the picture covered, up to the whole 1.33 MB, on top of the loop's own time (1.4 to
+1.6 ms a frame in node, before the browser's read back).
+
+The WebGPU solver now takes the frame as a texture (`pourVideo`, `fluid/inputs.ts`) and
+works out the same thing in two compute passes (`videoSample`, `videoFlow`, in
+`wgsl/splat.ts`), with the loop's numbers interpolated from `lib/videoFlow.ts`, where the
+loop itself now lives for the WebGL solver and the CPU's. The frame is drawn at the grid's
+size as the canvas did, each cell the mean of up to four bilinear taps a side over its
+footprint so a big frame's detail does not alias into motion, and kept as 8 bits, so the
+thresholds see the canvas's whole numbers. Its deltas are held until the step's flush and
+added to the CPU's there (`upsampleDeltaSum`), as the loop's writes waited in the CPU's
+arrays: two frames between two steps (a step rate under the refresh) add up, and a hand's
+push on a thin gap is imposed with the video's, as one. A step with only the video's frames
+still flushes, and sends no row of the CPU's. The app's frame makes one call
+(`pourVideoFrame` in `lib/videoFlow.ts`): the solver's pass, or, when it has none or poured
+nothing (a frame from another origin that cannot be read), the canvas and the loop. With it
+one fault went: the pour plays every cartoon on one element, so the next cartoon's first
+frame was differenced against the last one's end and the cut read as a burst of motion; a
+frame is now fresh when the video's address changes. The still picture's CPU pour
+(`injectImage`) moved beside the loop, as it was, to keep `fluidSimulation.ts` under its
+size ceiling.
+
+`npm run videoflow` (node and lab, 19 lines; the Mac's fifth shard runs its `<video>` line
+alone): in node, the real FluidSimulation through the app's own call pours through the loop
+without the pass (the reference) and with it writes nothing into the CPU's arrays, flushes
+for the held frames with 0 bytes against 1.03 MB for the check's picture (a cartoon covering
+the frame sends 1.33 MB), sends a tool's cells in the same frame by their own row, flushes
+before a read of the plate, and hands a frame the pass did not pour to the loop; each video's
+first frame is fresh. On the real solver the deltas the fold takes match the loop's to 1.7e-7
+(dye) and 3.4e-6 (flow) of their scale, at the grid's size, at four times it and at four by
+two (each cell's block dithered, so one tap a cell is seen), a frame a step later too, and
+the plate after the fold (its flow to its half float); a playing `<video>` pours where its
+frame is, cell by cell. SwiftShader loses its GPU instance copying from a `<video>`, so the
+cloud pours an ImageBitmap of it and the Mac the element. Controls: the second frame poured
+as a first is seen in the flow, the last frame alone is not the two frames' sum, a flush after
+the flush adds nothing, the canvas's pour upside down is 143% from itself, and by hand one tap
+a cell, the edge guard removed, the held frames not added, the vertical gradient reversed, the
+read's flush removed and the fresh frame keyed on the wrong thing each fail their lines. The
+review (check-skeptic) found the first four of those gaps. `pourVideo` costs 0.1 to 0.2 ms
+of the CPU a call on SwiftShader, a canvas's copy included; a video's is a copy on the GPU.
+`npm run wgsl` now compiles the splat kernels too, which it never had.
+
 ## Moved in the third pass (2026-10-29, 19m)
 
 When `PLAN.md` became an index with one file a section under `docs/plan/` (19m), the

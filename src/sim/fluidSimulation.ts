@@ -34,6 +34,7 @@ import { DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow'
 import { stirOf } from '../lib/stir';
 import { frameSway, plateSin } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
+import { pourPictureCpu } from '../lib/videoFlow';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
@@ -209,6 +210,8 @@ export class FluidSimulation {
   private rows = new DeltaRows(GRID_SIZE);
   private get dirty() { return this.rows.any; }
   private set dirty(v: boolean) { if (v) this.rows.whole(); else this.rows.clear(); }
+  /** The solver holds video frames for the next flush (pourVideoFrame). */
+  private videoLaid = false;
   private mul: Float32Array;        // multiplicative dye change (a carry's take; the show's own puffs thin by 0.8)
   /** The press being held (its spoke seed) and how many steps it has run, for the pile at the fingers' tips. */
   private squishSteps = 0;
@@ -764,7 +767,7 @@ export class FluidSimulation {
     // Whatever was added in the frame or two since is let go — a blank plate
     // is not.
     if (!this.gpuLanded && this.restoreSeed()) return;
-    if (this.dirty) this.flushDeltas(this.dt || 0.01);
+    if (this.dirty || this.videoLaid) this.flushDeltas(this.dt || 0.01);
     const { dye, vel } = gpu.readback();
     for (let i = 0; i < GRID_AREA; i++) {
       this.densityR[i] = dye[i * 4];
@@ -784,7 +787,9 @@ export class FluidSimulation {
 
   /** The written rows to the GPU, then zeroed (lib/deltaRows.ts). */
   private flushDeltas(dt: number) {
-    const gpu = this.gpu!, rows = this.rows.rows();
+    // For the video's frames alone no row is sent (`rows()` would say all).
+    const gpu = this.gpu!, rows = this.rows.any ? this.rows.rows() : this.rows.mask;
+    this.videoLaid = false;
     const a = { ...this.dyeTarget(), vx: this.vx, vy: this.vy, temp: this.temp, gap: this.gap, dyeAdd: this.dyeAdd, velAdd: this.velAdd, hands: this.handsLaid ? this.hands : null, breath: this.breathLaid ? this.breath : null };
     const runs = packRows(a, rows);
     gpu.applyDeltas(a.dyeAdd, a.velAdd, a.mul, dt, a.hands, a.breath, this.sheetLaid ? this.sheetGap : null, rows);
@@ -1142,6 +1147,12 @@ export class FluidSimulation {
     this.vy[index] += amountY;
   }
 
+  /** A video pour's frame to the solver's own passes (PLAN 14ab-2), held there for the next flush; false when it has none (lib/videoFlow.ts). */
+  pourVideoFrame(src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, fresh: boolean): boolean {
+    if (!this.gpu?.pourVideo?.(src, fresh)) return false;
+    return (this.videoLaid = true);
+  }
+
   /**
    * Say that the delta arrays have been written to directly. A caller that
    * fills a whole field in one pass — the room's flow does — has no reason to
@@ -1227,30 +1238,8 @@ export class FluidSimulation {
     this.temp[index] += amount;
   }
 
-  // Inject an image as colored dye — scales image to fit visible grid area
-  injectImage(imgData: ImageData) {
-    const w = imgData.width, h = imgData.height;
-    const d = imgData.data; // RGBA Uint8ClampedArray
-    // Map image into the central visible region of the grid
-    const S = this.size;
-    const gx0 = Math.round(S * 0.19), gx1 = Math.round(S * 0.81);
-    const gy0 = Math.round(S * 0.31), gy1 = Math.round(S * 0.69);
-    const gw = gx1 - gx0, gh = gy1 - gy0;
-    for (let gy = gy0; gy < gy1; gy++) {
-      for (let gx = gx0; gx < gx1; gx++) {
-        // Sample the image pixel (bilinear centre of each grid cell)
-        const imgX = Math.floor(((gx - gx0) / gw) * w);
-        const imgY = Math.floor(((gy - gy0) / gh) * h);
-        const pi = (imgY * w + imgX) * 4;
-        const r = d[pi] / 255, g = d[pi + 1] / 255, b = d[pi + 2] / 255;
-        const a = d[pi + 3] / 255;
-        if (a < 0.05) continue; // skip transparent pixels
-        const brightness = r * 0.3 + g * 0.59 + b * 0.11;
-        const amount = (0.5 + brightness * 1.5) * a;
-        this.addDensity(gx, gy, amount, r, g, b);
-      }
-    }
-  }
+  /** A still picture poured as dye, into the middle of the dish (lib/videoFlow.ts). */
+  injectImage(imgData: ImageData) { pourPictureCpu(this, imgData, this.size); }
 
   clearAll() {
     this.liquid.clear();
@@ -2896,7 +2885,7 @@ export class FluidSimulation {
     this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
 
     if (this.gpu) {
-      const applied = this.dirty;
+      const applied = this.dirty || this.videoLaid;
       if (applied) this.flushDeltas(p.dt);
       this.stepSlosh(settings, p);
       this.gpu.step(p, applied);
