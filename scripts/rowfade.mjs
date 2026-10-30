@@ -84,6 +84,7 @@ import { MIX_SOURCE_INFO, fadeKey } from '../src/lib/mixer.ts';
 import { MIN_BEAT_CONFIDENCE } from '../src/lib/barGrid.ts';
 import { build } from 'esbuild';
 import { appSource } from './appSource.mjs';
+import { settingsSource } from './settingsSource.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = (p) => readFileSync(join(root, p), 'utf8');
@@ -618,8 +619,8 @@ const mounts = {
   // Both of the desk's mixers: the docked sheet over the rides and the Mixer panel.
   'the desk': (src('src/components/desk/DeskPanels.tsx').match(/<MixerPanel [^>]*onFade=\{p\.takes\?\.onFade\}/g) ?? []).length === 2
     && (src('src/components/desk/DeskPanels.tsx').match(/<MixerPanel [^>]*fading=\{p\.takes\?\.fading\}/g) ?? []).length === 2 && /takes=\{mixTakes\}/.test(app),
-  'Settings': /onFade=\{mixTakes\?\.onFade\}/.test(src('src/components/SettingsPanel.tsx'))
-    && /fading=\{mixTakes\?\.fading\}/.test(src('src/components/SettingsPanel.tsx')) && /mixTakes=\{mixTakes\}/.test(app),
+  'Settings': /onFade=\{mixTakes\?\.onFade\}/.test(settingsSource(src))
+    && /fading=\{mixTakes\?\.fading\}/.test(settingsSource(src)) && /mixTakes=\{mixTakes\}/.test(app),
   'the phone': /onFade=\{p\.mixer\.takes\?\.onFade\}/.test(src('src/components/phone/PhoneStage.tsx'))
     && /fading=\{p\.mixer\.takes\?\.fading\}/.test(src('src/components/phone/PhoneStage.tsx')) && /takes: mixTakes/.test(app),
   'the remote, lit from the display\'s state': /onFade=\{\(id\) => action\(`mix-fade-\$\{id\}`/.test(src('src/components/RemoteControl.tsx'))

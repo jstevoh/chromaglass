@@ -49,6 +49,7 @@ import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
+import { oneHome } from './panelOneHome.mjs';
 import { helpFor, CONTROL_HELP } from '../src/lib/controlHelp.ts';
 import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
 import { HALOGEN_KELVIN, LAMP_WARMTH_MAX, LEGACY_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, kelvinLabel, lampTint, warmthKelvin } from '../src/lib/lampKelvin.ts';
@@ -60,12 +61,13 @@ import { VU_FULL, needleAtRest, needleDeg, stepNeedle } from '../src/lib/vuMeter
 import { MAX_DOTS, strobeOf } from '../src/lib/strobeRing.ts';
 import { MOUNT_MM, NOTCH_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_H_MM, WINDOW_W, WINDOW_W_MM, stepOf, trayDeg } from '../src/lib/slideTray.ts';
 import { appSource } from './appSource.mjs';
+import { settingsSource, isSettingsPart } from './settingsSource.mjs';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
 // the cache directory rather than at the source it is here to read.
 const root = process.env.INIT_CWD ?? process.cwd();
-const panel = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+const panel = settingsSource();
 const panel0 = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
 const panel0app = appSource();
 const sim = readFileSync(join(root, 'src/sim/fluidSimulation.ts'), 'utf8');
@@ -1119,9 +1121,8 @@ check('a value reads the same way wherever it is shown',
 check('and the settings panel asks the same question',
   /readSetting\(String\(settingKey \?\? ''\), safeValue, min, max\)/.test(panel));
 
-// A line telling you where to go, where a button could take you.
-check('the no-controller line goes there instead of naming the route',
-  /data-testid="no-controller-hint"/.test(deskPanelsSrc) && !/Settings → MIDI to learn one/.test(deskPanelsSrc));
+// A line telling you where to go, and the second sweep of one home each (PLAN 35c-5).
+oneHome({ check, root, panel, header, deskSrc, deskPanelsSrc });
 
 // ── A document, and a desk that is not a performance ────────────────
 /*
@@ -1242,7 +1243,7 @@ check('and neither starts over the limit',
     // presses them.
     'ledBlend', 'gelBlend', 'lumiaBlend', 'backBlend', 'filmBlend', 'markBlend',
   ]);
-  const panelSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+  const panelSrc = settingsSource();
   const drawn = new Set([
     ...[...panelSrc.matchAll(/settingKey="([A-Za-z0-9_]+)"/g)].map(m => m[1]),
     ...[...panelSrc.matchAll(/onUpdate\(\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g)].map(m => m[1]),
@@ -1313,7 +1314,7 @@ check('and neither starts over the limit',
   const PLUMBING = new Set(['presets.ts', 'types.ts', 'SettingsPanel.tsx',
                             'deskPins.ts', 'lucky.ts', 'lookFade.ts']);
   const body = readdirSync(join(root, 'src'), { recursive: true })
-    .filter(f => /\.tsx?$/.test(f) && !PLUMBING.has(f.split('/').pop()))
+    .filter(f => /\.tsx?$/.test(f) && !PLUMBING.has(f.split('/').pop()) && !isSettingsPart(f))
     .map(f => readFileSync(join(root, 'src', f), 'utf8'))
     .join('\n');
   // `patch.layer(l)` is the frame reading one plate's settings (its dish's
@@ -1912,7 +1913,7 @@ check('and neither starts over the limit',
   }
   check('the vignette blends as the old grade did, to 1.5% in the corners of the dish, from 0 to 1',
     shaderForm && worstCorner < 0.015, `shader form ${shaderForm}, worst ${(worstCorner * 100).toFixed(2)}% over 21 notches and three corner depths`);
-  const pinLamp = readFileSync(join(root, 'src/lib/deskPins.ts'), 'utf8'), settingsSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+  const pinLamp = readFileSync(join(root, 'src/lib/deskPins.ts'), 'utf8'), settingsSrc = settingsSource();
   check('the pin range, the Settings slider (typed as the number the sheet reads) and the bulb all end at the library\'s top',
     /key: 'lampWarmth'[^}]*max: LAMP_WARMTH_MAX/.test(pinLamp) && /settingKey="lampWarmth"/.test(settingsSrc) && Number(/label="Lamp Warmth"[\s\S]{0,160}max=\{([\d.]+)\}/.exec(settingsSrc)?.[1]) === LAMP_WARMTH_MAX &&
     /<Bulb warmth=\{at \* LAMP_WARMTH_MAX\}/.test(readFileSync(join(root, 'src/components/ui/Pace.tsx'), 'utf8')));

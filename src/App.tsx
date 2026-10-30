@@ -16,7 +16,7 @@ import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
 import type { Cue, ControlKind } from './components/desk/deskProps';
 import { useDeskTabs } from './hooks/useDeskLayout';
-import { closePanel, isSectionPanel, openPanel, openPanels } from './lib/deskLayout';
+import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './lib/deskLayout';
 import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
@@ -158,11 +158,6 @@ const hasAccountOrLicenseUI =
   (typeof window !== 'undefined' &&
     (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
       new URLSearchParams(window.location.search).get('tierGates') === '1'));
-
-const isUnsubscribeRoute = () =>
-  typeof window !== 'undefined' &&
-  (/^\/unsubscribe\/?$/i.test(window.location.pathname) ||
-    new URLSearchParams(window.location.search).has('unsubscribe'));
 
 const isProfileRoute = () =>
   typeof window !== 'undefined' &&
@@ -461,8 +456,6 @@ export default function App() {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   /** The synthesised band, when that is what the show is listening to. */
   const simulatedRef = useRef<SimulatedMusic | null>(null);
-  /** The Mac app's system-audio loopback tap (PLAN.md 23.8). */
-  const systemTapRef = useRef<{ stop: () => void } | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   /** The wall's engine, always; `visualizerRef` is the desk's, which in Preview with a wall up is a copy (PLAN.md 8b; see `drafting`). */
   const wallRef = useRef<LiquidVisualizerHandle | null>(null);
@@ -483,9 +476,9 @@ export default function App() {
 
   const {
     handleSourceChange, toggleDrone, changeDrone, chooseAudioInput, toggleMusic, playMusicFile,
-    playTrack, closeMusicFile,
+    playTrack, closeMusicFile, earContext,
   } = useSoundSource({
-    audioStream, audioInputId, setAudioStream, simulatedRef, systemTapRef, stopDrone,
+    audioStream, audioInputId, setAudioStream, simulatedRef, stopDrone,
     setAudioSource, musicElRef, wallRef, droneParams, droneRef, setDroneRunning, refreshAudioInputs,
     setDroneParams, setAudioInputId, audioSourceRef, musicCtxRef, musicFile, setMusicFile,
     setMusicTime, audioSource, setLibraryOpen, playTrackRef,
@@ -609,6 +602,7 @@ export default function App() {
     settings.autoCalibrate !== false, calibrateNonce,
     // The microphone hears the hand on the laptop: its clicks are not beats.
     audioSource === 'microphone',
+    earContext,
   );
   const liveAudio = ear.audioData;
   /*
@@ -2168,7 +2162,7 @@ export default function App() {
       onSource={(x) => { void handleSourceChange(x); }}
       inputs={audioInputs}
       inputId={audioInputId}
-      onInput={chooseAudioInput}
+      onPickMic={deskOpen.sound}
       playing={musicPlaying}
       time={musicTime}
       loop={musicLoop}
@@ -2316,6 +2310,8 @@ export default function App() {
       {...over}
     />
   );
+  // A section as a panel; with Music & Drone out, Sound has no way there (35c-5).
+  const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {}, ...(whereIs(deskLayout, 'player') && { onOpenSound: undefined }) });
 
   return (
     // On a phone the height is the dynamic viewport's: 100vh there is the
@@ -3213,7 +3209,7 @@ export default function App() {
               onAdd: (id) => onDeskLayout(l => openPanel(l, id, 'deck')),
               onRemove: (id) => onDeskLayout(l => closePanel(l, id)),
               render: (id) => (id === 'songs' ? songsScreen(true) : id === 'sequences' ? sequencesScreen(true) : id === 'player' ? soundScreen(true)
-                : isSectionPanel(id) && id !== 'mixer' ? settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} }) : null),
+                : isSectionPanel(id) && id !== 'mixer' ? sectionPanel(id) : null),
             }}
             // Mid-fade the settings are between two looks and match neither,
             // so the look is named by where it is going: the name a thumb
@@ -3769,7 +3765,7 @@ export default function App() {
           layout={deskLayout}
           onLayout={onDeskLayout}
           onResetLayout={onDeskReset}
-          renderSection={(id) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} })}
+          renderSection={sectionPanel}
           sheetOpen={showSettings || showStage}
           onOpenSection={openSettingsAt}
           onStage={() => { setShowStage(true); setShowSettings(false); setShowHelp(false); }}

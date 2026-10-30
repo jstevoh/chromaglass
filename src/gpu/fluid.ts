@@ -111,8 +111,8 @@ export class WebGPUFluid extends FluidReads {
       ['liquidForces', [VEL], true],
       ['squeezeUpdate', [RGBA32], true],
       ['scaleDye', [dye], true],
-      // The slosh's addition to the flow the dye rides: only once the dial is up (PLAN 18a-13).
-      ['addSlosh', [VEL], false],
+      // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
+      ['addSlosh', [VEL], open.slosh],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
       ['dampGridCurv', [dye], true],
       ['dampGridLimit', [dye], true],
@@ -302,6 +302,10 @@ export class WebGPUFluid extends FluidReads {
     // opening's first twenty seconds on the Mac: built behind, and `npm run
     // startup` gives each look's opening seconds as well as steps to say so.
     for (const name of ['splatDeltas', 'pourImage']) add(`${name}:${RGBA32}`, splatKernel(name, RGBA32), false);
+    // The video pour's (PLAN 14ab-2), only for a show that pours a video.
+    add('videoSample:rgba8unorm', splatKernel('videoSample', 'rgba8unorm'), false);
+    add(`videoFlow:${RGBA32}`, splatKernel('videoFlow', RGBA32), false);
+    add(`upsampleDeltaSum:${RGBA32}`, splatKernel('upsampleDeltaSum', RGBA32), false);
     for (const name of ['statsTiles', 'statsFold'] as const) add(name, STATS_KERNELS[name], false);
     return [...keyed].map(([key, [code, now]]) => cache.computePrep(key, code, !now));
   }

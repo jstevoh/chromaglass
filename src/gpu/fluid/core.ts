@@ -14,6 +14,7 @@ import { ReadGate } from '../readGate';
 import { WebGPUParticles } from '../particles';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
+import { RowUploads } from '../../lib/deltaRows';
 import { MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
 
 export class FluidCore {
@@ -338,6 +339,8 @@ export class FluidCore {
   protected viewTex: GPUTexture | null = null;
   protected blankR: GPUTexture | null = null;
   protected blankPhaseTex: GPUTexture | null = null;
+  /** Uploads by rows (lib/deltaRows.ts). */
+  readonly uploads = new RowUploads();
   /** The hands in the liquid (applyDeltas' \`hands\`), on the CPU's grid and on the solver's, made when a hand first touches a thin gap. */
   protected cpuHandTex: GPUTexture | null = null;
   protected handTex: GPUTexture | null = null;

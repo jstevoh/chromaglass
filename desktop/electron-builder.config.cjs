@@ -43,6 +43,10 @@ module.exports = {
   files: [
     'main.js',
     'updates.js',
+    'live.js',
+    'liveSession.js',
+    'rtmp.js',
+    'keys.js',
     'preload.cjs',
     'package.json',
     { from: '../dist', to: 'dist', filter: ['**/*'] },

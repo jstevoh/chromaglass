@@ -90,3 +90,49 @@ stop the stream (§37x-4's phone version).
    YouTube + Twitch + Kick + Facebook for the cleared-music shows. Instagram and TikTok
    wait on their follower counts.
 3. Test streams are **unlisted** YouTube broadcasts; the first public one is the owner's.
+
+## What is built (37x-4b, 2026-10-29)
+
+The encoder and its destinations, with no panel yet (37x-4d): in the Mac app's console,
+
+```js
+await __cgLive.keys.set('youtube', '<the stream key from YouTube Studio>');   // once; kept in the keychain store
+await __cgLive.start({ url: 'rtmps://a.rtmps.youtube.com/live2', keyName: 'youtube', width: 1920, height: 1080, fps: 30 });
+await __cgLive.state();   // frames taken and skipped, packets, the client's bytes behind, drops, acks, the server's words
+await __cgLive.stop();
+```
+
+Several at once, and a portrait one (37x-4c):
+
+```js
+await __cgLive.start({ destinations: [
+  { name: 'youtube', url: 'rtmps://a.rtmps.youtube.com/live2', keyName: 'youtube' },
+  { name: 'twitch', url: 'rtmps://live.twitch.tv/app', keyName: 'twitch' },
+  { name: 'tiktok', url: '<the server URL TikTok gives>', keyName: 'tiktok', orientation: 'portrait' },
+] });
+(await __cgLive.state()).transport.destinations;   // per destination: kbps, secondsBehind, videoDropped, reconnects, phase
+```
+
+`src/lib/liveStream.ts` encodes the plate's canvas and the sound the show hears (whichever
+source is open: a song, the microphone, the Mac's system audio); `desktop/live.js` speaks
+RTMPS from the main process; `desktop/keys.js` keeps the keys (Electron's `safeStorage`
+through the login Keychain; a key is named by the page and never read by it); `npm run live`
+measures the stream against a local RTMP server (`scripts/rtmpListener.mjs`, which also runs
+by hand: `node scripts/rtmpListener.mjs --port 1935 --out scratch/stream.flv` records a stream
+from the app or from OBS as a `.flv`). Pro only. What the stream is: 1080p by default at the
+frame rate asked, H.264 High with a keyframe every two seconds, AAC at 160 kbps; the panel and the phone's Stop are 37x-4d.
+
+Several destinations (37x-4c): the landscape encode is made once and its packets written to
+every landscape destination's socket; a portrait destination adds one more encode, 720x1280
+by default, of the middle of the plate (cropped, never squeezed; `portrait.fit: 'contain'`
+shows all of it with black above and below), and the sound is one encode for all.
+`desktop/liveSession.js` keeps each connection on its own: one that cannot keep up drops
+its own video to the next keyframe once it is two seconds of stream behind (judged on the
+server's acknowledgements of what it has received, which the client asks for every 256
+KB; on the socket's own buffer if a server never acknowledges, which sees a slow link only
+once the kernel's buffers are full, seconds late: PLAN 37x-4c), and sends again once it is
+back under one; audio is never dropped. A lost connection is tried again after 2, 4, 8, 15
+then every 30 seconds with the key it was started with, and joins at the next keyframe; a
+refused key is not asked again. The show starts when the first destination is live and fails
+only when none is. `npm run livedrop` measures all of it against throttled, hanging-up and
+refusing listeners.

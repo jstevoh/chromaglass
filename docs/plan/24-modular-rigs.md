@@ -125,7 +125,7 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   - **24.3-place-5. Two more looks, and a line you draw.** The two named looks have lines
     of their own; every other look takes a straight line across the middle if Melody
     Walk is turned up. Which looks next, and a way to drag the line on the desk (the
-    way an area is placed), wait for the owner's eyes on these two (judging §92).
+    way an area is placed), wait for the owner's eyes on these two (judging §94).
   - **24.3-place-6. `npm run shelf` is red on main, found while checking this.**
     It clicks a desk button whose text is "Sound" and finds none ("there is a
     Sound tab on the desk"), the same on an unmodified main at a68de68. It is

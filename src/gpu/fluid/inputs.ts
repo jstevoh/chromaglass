@@ -15,13 +15,27 @@ import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RGB
 import { FluidPasses } from './passes';
 
 export class FluidInputs extends FluidPasses {
+  /**
+   * The video pour (PLAN 14ab-2): its frame at the video's own size, the last
+   * two at the grid's, and the deltas of the frames poured since the last
+   * flush, which takes them with the CPU's. Made on the first frame poured.
+   */
+  private videoSrc: GPUTexture | null = null;
+  private videoFrames: PingPong | null = null;
+  private videoDye: PingPong | null = null;
+  private videoVel: PingPong | null = null;
+  /** Frames poured since the last flush. */
+  private videoPending = false;
+  /** `videoFrames` holds a frame this solver poured, so the next can be differenced against it. */
+  private videoPrimed = false;
+  private videoRefused = false;
 
   /**
    * Fold the CPU-side deltas into the field. `dyeAdd` is L²×4 (R,G,B
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null, rows: Uint8Array | null = null): void {
     const q = this.device.queue;
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -37,18 +51,18 @@ export class FluidInputs extends FluidPasses {
       `scripts/mirror.mjs`). The mean is now taken on the GPU from the source
       itself, in project().
     */
-    q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
-    q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
-    q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
+    this.uploads.write(q, this.cpuDyeTex, dyeAdd, 16, rows, this.L);
+    this.uploads.write(q, this.cpuVelTex, velAdd, 16, rows, this.L);
+    this.uploads.write(q, this.cpuMulTex, dyeMul, 4, rows, this.L);
     if (hands) {
       if (!this.handTex) {
         const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
         this.cpuHandTex = this.disposer.track(this.device.createTexture({ label: 'hands (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
         this.handTex = this.disposer.track(this.device.createTexture({ label: 'hands', size: [this.N, this.N], format: RGBA32, usage }));
       }
-      q.writeTexture({ texture: this.cpuHandTex! }, hands, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
       let fastest = 0;
-      for (let k = 0; k < hands.length; k += 4) if (hands[k + 2] > 0.5) fastest = Math.max(fastest, Math.hypot(hands[k], hands[k + 1]) / hands[k + 2]);
+      for (const [h0, h1] of this.uploads.write(q, this.cpuHandTex!, hands, 16, rows, this.L))
+        for (let k = h0 * this.L * 4; k < (h1 + 1) * this.L * 4; k += 4) if (hands[k + 2] > 0.5) fastest = Math.max(fastest, Math.hypot(hands[k], hands[k + 1]) / hands[k + 2]);
       this.handFastest = fastest;
     }
     if (breath) {
@@ -57,7 +71,7 @@ export class FluidInputs extends FluidPasses {
         this.cpuBreathTex = this.disposer.track(this.device.createTexture({ label: 'breath (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
         this.breathTex = this.disposer.track(this.device.createTexture({ label: 'breath', size: [this.N, this.N], format: RGBA32, usage }));
       }
-      q.writeTexture({ texture: this.cpuBreathTex! }, breath, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+      this.uploads.write(q, this.cpuBreathTex!, breath, 16, rows, this.L);
     }
     if (sheet) {
       if (!this.sheetTex) {
@@ -65,7 +79,7 @@ export class FluidInputs extends FluidPasses {
         this.cpuSheetTex = this.disposer.track(this.device.createTexture({ label: 'sheet (cpu)', size: [this.L, this.L], format: R32, usage }));
         this.sheetTex = this.disposer.track(this.device.createTexture({ label: 'sheet', size: [this.N, this.N], format: R32, usage }));
       }
-      q.writeTexture({ texture: this.cpuSheetTex! }, sheet, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
+      this.uploads.write(q, this.cpuSheetTex!, sheet, 4, null, this.L);
     }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);
@@ -73,9 +87,16 @@ export class FluidInputs extends FluidPasses {
     const enc = this.device.createCommandEncoder({ label: 'deltas' });
     const pass = enc.beginComputePass({ label: 'deltas' });
     // Onto the full grid, the same bilinear the delta passes used to do
-    // themselves, so the two paths meet at one place.
-    this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
-    this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
+    // themselves, so the two paths meet at one place. The video pour's
+    // frames since the last flush are added on the way (pourVideo).
+    if (this.videoPending) {
+      this.upsampleSum(pass, this.cpuDyeTex, this.videoDye!.read, this.deltaDyeTex);
+      this.upsampleSum(pass, this.cpuVelTex, this.videoVel!.read, this.deltaVelTex);
+      this.videoPending = false;
+    } else {
+      this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
+      this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
+    }
     this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
     if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
     // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
@@ -163,6 +184,81 @@ export class FluidInputs extends FluidPasses {
   }
 
   /**
+   * A frame of the video pour (PLAN 14ab-2, lib/videoFlow.ts): its dye and
+   * its motion as flow, worked out here and held until the next flush adds
+   * them to the CPU's deltas, as the loop's writes were held in the CPU's
+   * arrays. Two frames between two steps (a step rate under the refresh) add
+   * up, as they did there. `fresh` is a new video: its first frame has no
+   * last one to be differenced against.
+   *
+   * The loop it replaces read the frame back from a canvas every frame and
+   * wrote 36,000 cells through `addDensity` and `addVelocity`, and marked
+   * every row written, so each step sent all 1.3 MB of deltas across too.
+   * Here nothing comes back and nothing goes over but the frame, which for
+   * a video is a copy on the GPU (`npm run videoflow` has the numbers).
+   *
+   * False when nothing was poured (no frame yet, a frame that cannot be
+   * read, a kernel not built), so the app can try its own way.
+   */
+  pourVideo(src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, fresh: boolean): boolean {
+    const w = 'videoWidth' in src ? src.videoWidth : src.width;
+    const h = 'videoHeight' in src ? src.videoHeight : src.height;
+    if (!w || !h) return false;
+    const d = this.device;
+    if (!this.videoSrc || this.videoSrc.width !== w || this.videoSrc.height !== h) {
+      if (this.videoSrc) this.disposer.release(this.videoSrc);
+      this.videoSrc = this.disposer.track(d.createTexture({
+        label: 'video frame', size: [w, h], format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      }));
+    }
+    if (!this.videoFrames) {
+      const pp = (format: GPUTextureFormat, label: string) => new PingPong(d, this.disposer, [this.L, this.L], format, label);
+      this.videoFrames = pp('rgba8unorm', 'video frames');
+      this.videoDye = pp(RGBA32, 'video dye');
+      this.videoVel = pp(RGBA32, 'video flow');
+    }
+    try {
+      d.queue.copyExternalImageToTexture({ source: src }, { texture: this.videoSrc }, [w, h]);
+    } catch (e) {
+      // A video from another origin without CORS can be played and not read, here or by a canvas.
+      if (!this.videoRefused) console.warn('[video pour] the frame could not be read', e);
+      this.videoRefused = true;
+      return false;
+    }
+    const frames = this.videoFrames, dye = this.videoDye!, vel = this.videoVel!;
+    this.writeSplatArgs((fresh || !this.videoPrimed ? 0 : 1) | (this.videoPending ? 2 : 0));
+    const enc = d.createCommandEncoder({ label: 'video pour' });
+    const pass = enc.beginComputePass({ label: 'video pour' });
+    /*
+      The sampling's group is not cached: the frame's texture is made again
+      when the video's size changes, under the same label. And a kernel not
+      built (refused, or failed) pours nothing, rather than marking deltas
+      that were never written: `dyeIn` would then be the frames the last
+      flush already took, and they would land twice.
+    */
+    let poured = false;
+    if (this.splatRun(pass, 'videoSample', 'rgba8unorm', [this.videoSrc, this.sampler, frames.write], this.L, false)) {
+      frames.swap();                                  // read: this frame; write: the last, read before it is written again
+      poured = this.splatRun(pass, 'videoFlow', RGBA32, [frames.read, frames.write, dye.read, vel.read, dye.write, vel.write], this.L);
+    }
+    pass.end();
+    this.submit(enc);
+    if (!poured) return false;
+    dye.swap();
+    vel.swap();
+    this.videoPending = true;
+    this.videoPrimed = true;
+    return true;
+  }
+
+  /** A wiped plate takes no frame poured before it. */
+  override clear(): void {
+    super.clear();
+    this.videoPending = false;
+  }
+
+  /**
    * A splat-side dispatch. `rest` is the bindings after the args uniform, in
    * the order the source declares them, and `format` is whatever storage
    * format its destination wants.
@@ -177,9 +273,9 @@ export class FluidInputs extends FluidPasses {
     rest: (GPUBuffer | GPUTexture | GPUSampler)[],
     size: number,
     cache = true,
-  ): void {
+  ): boolean {
     const pipe = this.pipelines.computePipeline(`${name}:${format}`, splatKernel(name, format));
-    if (!pipe) return;
+    if (!pipe) return false;
     const label = (r: GPUBuffer | GPUTexture | GPUSampler) => (r instanceof GPUSampler ? 'sampler' : r.label);
     const key = `splat ${name}:${format}:${rest.map(label).join(',')}`;
     let group = cache ? this.groups.get(key) : undefined;
@@ -191,10 +287,15 @@ export class FluidInputs extends FluidPasses {
     pass.setBindGroup(0, group);
     const w = Math.ceil(size / 8);
     pass.dispatchWorkgroups(w, w);
+    return true;
   }
 
   private upsample(pass: GPUComputePassEncoder, src: GPUTexture, dst: GPUTexture): void {
     this.splatRun(pass, 'upsampleDelta', dst.format, [src, dst], this.N);
+  }
+
+  private upsampleSum(pass: GPUComputePassEncoder, src: GPUTexture, more: GPUTexture, dst: GPUTexture): void {
+    this.splatRun(pass, 'upsampleDeltaSum', dst.format, [src, more, dst], this.N);
   }
 
   private splatPass(pass: GPUComputePassEncoder): void {

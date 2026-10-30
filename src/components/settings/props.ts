@@ -1,16 +1,26 @@
-// The desk panel's props, moved out of SettingsPanel.tsx (PLAN 19ai, the size ratchet).
+import React from 'react';
+import type { MixTakes } from '../../lib/mixFade';
+import { VisualizerSettings, BlendMode, PatchSource } from '../../types';
+import type { AudioReading } from '../../lib/audioFeatures';
+import { factoryFor } from '../../lib/midi';
+import { plateAreas } from '../../lib/plateAreas';
+import type { MidiController } from '../../hooks/useMidi';
+import type { PinApi } from './controls';
+import type { LiquidDesignerProps } from '../LiquidDesigner';
+import type { OutputConfig, WallTest } from '../../lib/outputConfig';
+import type { TempoReading } from '../../lib/tempo';
+import type { CartoonShelfProps } from '../CartoonShelf';
+import type { RoomCalibration } from '../../lib/audioCalibration';
+import type { EngineStatus } from '../../lib/platform';
 
-import type { AudioReading } from '../lib/audioFeatures';
-import type { EngineStatus } from '../lib/platform';
-import type { LiquidDesignerProps } from './LiquidDesigner';
-import type { MidiController } from '../hooks/useMidi';
-import type { MixTakes } from '../lib/mixFade';
-import type { OutputConfig, WallTest } from '../lib/outputConfig';
-import type { RoomCalibration } from '../lib/audioCalibration';
-import type { TempoReading } from '../lib/tempo';
-import type { VisualizerSettings } from '../types';
-import type { CartoonShelfProps } from './CartoonShelf';
-import type { PinApi } from './SettingsPanel';
+/*
+  The settings panel's props, and what it hands each section (PLAN 19ai-9).
+  `SectionCtx` is the props a section reads (those with a default in the panel's
+  signature arrive with it applied, so they are required here) and the panel's
+  own locals: the shells' `keep` and `shown`, the card's classes, `goTo`, the
+  engine's live reading. A name a section starts reading is added here and to
+  the object the panel builds; the typecheck says when one is missing.
+*/
 
 export interface SettingsPanelProps {
   onPourVideo?: (file: File) => void;
@@ -150,3 +160,24 @@ export interface SettingsPanelProps {
   /** The public domain cartoons that ship with the app, for the Film section (CartoonShelf, PLAN 14ac). */
   cartoons?: CartoonShelfProps;
 }
+
+export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'onOpenSound' | 'onFlickPlate' | 'cartoons'>
+  & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'pourName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
+  & {
+    filmInputRef: React.RefObject<HTMLInputElement | null>;
+    markInputRef: React.RefObject<HTMLInputElement | null>;
+    lookAreas: ReturnType<typeof plateAreas>;
+    areaColours: string[][];
+    canCaptureWindow: boolean;
+    live: EngineStatus | null;
+    showFrameSplit: boolean;
+    blendModes: BlendMode[];
+    keep: (id: string) => boolean;
+    shown: (id: string) => boolean;
+    detectedFactory: ReturnType<typeof factoryFor>;
+    goTo: (id: string, from: string) => React.JSX.Element;
+    listens: (source: PatchSource) => boolean;
+    CARD: string;
+    GRID: string;
+    TITLE: string;
+  };

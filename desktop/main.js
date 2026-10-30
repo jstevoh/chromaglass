@@ -23,7 +23,7 @@
  */
 
 import inspector from 'node:inspector';
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell, systemPreferences } from 'electron';
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, safeStorage, screen, session, shell, systemPreferences } from 'electron';
 import electronUpdater from 'electron-updater';
 import { randomInt } from 'node:crypto';
 import { createSocket } from 'node:dgram';
@@ -33,6 +33,8 @@ import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
+import { wireLive } from './liveSession.js';
+import { makeKeyStore } from './keys.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -535,6 +537,12 @@ function showDetails() {
     show.oscMode === 'off'
       ? 'OSC in: off (Show menu > OSC input turns it on)'
       : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    // The server refuses OSC and Art-Net below Pro (PLAN.md 34a-7a); the
+    // details say so, rather than an open port that answers nothing. Not a
+    // dialog on the menu's pick: on a Mac a message box is a sheet on the
+    // show window, and a window with a sheet up does not close, so the app
+    // hung at quit in desktop.yml's packed check (no Pro key in that run).
+    ...(showServer?.linkTier && !showServer.linkTier().pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
     ...(show.port !== 3000 ? ['', `Port 3000 was taken, so this show is on ${show.port}. Looks saved on 3000 are not in this one.`] : []),
   ];
   void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'The show server', detail: lines.join('\n'), buttons: ['OK'] });
@@ -615,7 +623,7 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
         {
-          label: 'OSC input',
+          label: 'OSC input (Pro)',
           submenu: [
             ['off', 'Off'],
             ['local', 'This Mac only'],
@@ -683,6 +691,15 @@ async function start() {
     if (typeof url !== 'string' || !isOurs(url) || new URL(url).protocol !== 'http:') return false;
     void shell.openExternal(url);
     return true;
+  });
+  // The live stream (PLAN.md 37x-4b): the page encodes, this process speaks
+  // RTMPS (live.js), and the stream keys stay in the keychain store (keys.js),
+  // where a packed app alone can read them. Headless until the panel (37x-4d):
+  // the page's `window.__cgLive` drives it from the console and the check.
+  wireLive(ipcMain, {
+    keys: makeKeyStore({ file: join(app.getPath('userData'), 'live-keys.json'), safeStorage }),
+    isPackaged: app.isPackaged,
+    send: (channel, payload) => { if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send(channel, payload); },
   });
   const licenseFile = process.env.CHROMAGLASS_LICENSE_FILE ?? join(app.getPath('userData'), 'license.json');
   process.env.CHROMAGLASS_LICENSE_FILE = licenseFile;
