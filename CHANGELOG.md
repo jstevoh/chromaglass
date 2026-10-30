@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
+
+- The oil beads are laid larger in the macro view (twice the size scale), where each is a
+  lens that turns the plate upside down, so the closeup reads as glass and liquid with
+  depth. Macro Bead's Beads dial is 0.7 (was 0.35). Cell Bloom is now **Lens Pools**
+  (the same look, the same id). The plate's own beads are unchanged.
+
 ### Changed — no look draws cells (PLAN 33g-3)
 
 - Macro Bead, Cell Bloom and Lacing Run no longer turn Paint Cells on (and Macro Bead and

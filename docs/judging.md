@@ -1476,6 +1476,15 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   silicone and oil, Macro Bead as domed wet beads, Lacing Run as lacing without cells.
   Say whether Cell Bloom's name should change now that it has none.
 
+  *(33g-2a, 2026-10-30.)* In the closeup the oil beads are laid twice the size scale, and
+  Macro Bead's Beads dial is 0.7 (was 0.35). Open Macro Bead and Lens Pools (Cell Bloom,
+  renamed) and look at 3x to 5x: the beads should read as glass lenses with the plate upside
+  down in them and a dark ring, big enough to be the picture. Say whether they are too big
+  or too many (the factor is `MACRO_BEAD_SCALE` in `lib/beads.ts`, the dial the look's
+  Beads), and whether the lens beads over the dye's dark ground look like glass or like
+  holes. Beads already on a plate keep their size until they retire, so switch looks, not
+  only zoom, to see the full effect.
+
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
 Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
