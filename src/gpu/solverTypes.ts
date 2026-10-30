@@ -324,6 +324,13 @@ export interface PlateSolver {
    */
   handOver?(): SolverCarry | null;
   takeOver?(carry: SolverCarry): boolean;
+  /**
+   * A frame of the video pour, its dye and its motion worked out on the GPU
+   * and added to the CPU's deltas at the next flush (PLAN 14ab-2). Optional:
+   * without it the app pours the frame through the CPU's arrays
+   * (lib/videoFlow.ts). False when it poured nothing.
+   */
+  pourVideo?(src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, fresh: boolean): boolean;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   /**
    * `hands`, when a hand is in the liquid on a thin gap: L²×4 of (Σ χ·U, Σ χ, 0),
@@ -335,8 +342,12 @@ export interface PlateSolver {
    * `sheet`, when Beat Squeeze's rhythm sheet moved this step: L² of the
    * gap's change, solved (lib/sheet.ts), laid as it is: no film closing on
    * top and no ceiling at rest (squeezeUpdate's `sheetT`, PLAN 27f-4).
+   * `rows`, a mask of the rows written since the last call, one byte a row
+   * (lib/deltaRows.ts, PLAN 14ab-4), or null for all: outside them every array
+   * is zero (`dyeMul` one), and only those rows, with the rows the last upload
+   * wrote, go across.
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null): void;
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null): void;
   /**
    * Drive the slosh dish for the next step (lib/slosh.ts SloshDrive: the tilt,
    * the water's viscosity, the presses, whether to lay it level first), or null

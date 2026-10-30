@@ -19,19 +19,7 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   and last call. No bar moved. When a red names the pour, either mark it as the show's own
   in the log (the way the dye log marks `auto`) or hold the show off the plate for the
   window, as `__bottleTest` already holds `doseLiquid` off.
-- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** Its step-down
-  nudge ("12. slower framerates suggest upgrading to Pro") is read after `forceStepDown(true)`.
-  The hook set the engine status once and the next frame's own status replaced it: on software
-  WebGPU `classifyAdapter` says 'software', `qualityLadder` has one rung, `failRung` has
-  nowhere to go and `governor.steppedDown` stays false, so the card unmounted before the
-  check read it ("locator.textContent: Timeout 30000ms"). Not reproducible by running the
-  check (0 of 10 red on main in a cloud session, 0 of 6 after), so the nudge's presence was
-  sampled every frame for three seconds after the hook: the card is there for all of them
-  both ways, and the check, once it reads three seconds later, goes red 2 of 2 on main and
-  passes 2 of 2 with the fix. The hook now keeps what it was asked (`forcedStepDown` in the
-  loop's status), and the status in the loop reads it. A test hook only; the governor, the
-  ladder and the real step-down are as they were. It touches no bar. `governor.ts` was not
-  touched (#441, #474 and the #402 finish thread are in it).
+- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** The hook keeps what it was asked (`forcedStepDown`); no bar, no governor change. Story in `docs/plan-shipped.md` §19aa-10 (moved 2026-10-29, 19m-2).
 - **19aa-11. The Mac `webgpu` check "the stage starts, with nothing asked for" (3 of 192,
   read 2026-10-25; two of them within twenty minutes that day).** `no stage` with no
   `gpuFailure`, 30 s after load, on the first page of the run only: every later page of
@@ -123,16 +111,27 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
   measurement on the Mac, not from this line.
 
-- **19ac-3. `bottles` counts the look's own pours as the hand's, and goes red on one at the
-  mirror.** `WebGPU (macOS) · tools` failed `bottles` twice on one head (#533, which changes
-  neither the bottle nor the tools), on two different lines: "splatter with the Oil bottle"
-  (39 pours, 1 at the mirror) and "splatter with the Ferrofluid bottle" (37 pours, 1 at the
-  mirror; the hand's flings 0.13 from the hand, nothing near the mirror), and passed on the
-  third run. The stroke's mirror is 0.4 of the plate from it and a splatter's fling reaches
-  about 0.07, so the pour is not the hand's: read it from `__bottleLog` with the call's
-  `auto` flag and the look's lays, and count the hand's alone. Until then a lone pour at
-  the mirror is this, not a flipped coordinate (that puts every pour there). Not yet shown
-  from the log.
+- **19ac-3. `bottles`' "one at the mirror" was the hand's own splatter, the stroke too near
+  the middle (shipped 2026-10-29).** The canvas's (0.25, 0.3) to (0.4, 0.3) lay on the plate
+  0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
+  The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
+  the clearance each run. Story in `docs/plan-shipped.md` §19ac-3.
+- **19ac-4. `mirror`'s "and nowhere else" named the hand's own drop (shipped 2026-10-30).**
+  Since #512 the check photographs the Perform tab's preview, a wide window on the dish
+  where a cell is 0.055 of the plate tall and 0.154 wide, and a held drop reaches two cells
+  up its column (0.11 of the plate, 22 to 25 against a drift of 8 to 9) where the check
+  counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
+  under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
+  with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+- **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
+  and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
+  the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
+  fling alone cannot do it: a splatter logs one pour a step (its first droplet), 50 to 70 a
+  stroke, each 0.023 to 0.14 from the hand in a direction from a seeded stream, so the
+  mean offset's spread is about 0.008 an axis and 0.04 is a 4e-6 to 3e-4 run, not one in
+  ninety. The suspects are pours logged while the mouse was up and the pointer moving to
+  the next stroke (each adds up to 0.5 to the mean), and the look's ring (`lays`). Judge
+  the next red by its strays before changing anything.
 
 ## 19ad. The `open` shard flakes on four unrelated faults
 
@@ -272,10 +271,44 @@ advisories.
   (`server/remote-server.js`); `desktop/` has its own lockfile and its own advisories
   (Electron, the audit's finding 7).
 
+## 19ah. The owner's Mac runs main's deploy shards (2026-10-28)
+
+Asked 2026-10-28: the owner's Mac helping CI as much as it safely can. A deploy that reaches
+the GPU waited a mean 50 minutes per Mac shard for GitHub's macOS machines (13 such deploys
+in 14 days, slowest shard's wait 80 minutes, 17 minutes of work per shard), 124 minutes
+push to live. Built: a probe job in `deploy.yml` (`scripts/macrunner.mjs`, a fine-grained
+token with Administration: Read in the main-only `mac-runner` environment) lists the
+shards the owner's Mac may take when a runner labelled `owner-mac` is online and idle;
+`checks.yml` sends those to it, never a pull request's run; each such shard first waits for
+the harness ports (`scripts/macports.sh`); `scripts/macrunner-setup.sh` installs the runner
+in `~/actions-runner` as the owner; `npm run macqueue` reports deploys by where their shards
+ran. How it works and how to pause it: `docs/mac-runner.md`.
+
+- **19ah-1. Open: measure it, then decide on a second machine.** After a week of deploys,
+  `npm run macqueue -- --hours 168` against the baseline above: push to live, and how often
+  the Mac was free. A second machine (the same script, a second runner on the same label)
+  pays off if deploys still wait for the Mac or go to GitHub's queue while it is busy.
+- **19ah-2. Open: a separate macOS user for the runner.** Jobs run as the owner and can read
+  the owner's signing keys and `gh` sign-in. Only main's reviewed workflow runs there, but a
+  user of its own (logged in, for the GPU) would take the reach away.
+- **19ah-3. Shipped (with 19ah): a shard queued for a Mac that went to sleep after the
+  probe.** `deploy.yml`'s `Watchdog` (`scripts/macwatch.mjs`) starts the deploy again with
+  `hosted` and cancels the stalled run after 15 minutes queued with none running. It
+  counts the run finished only when the checks' `WebGPU (macOS)` job has (19ah-3a: every
+  job made so far is briefly finished after `reach`, before the shards' jobs exist). Still
+  open: it holds an ubuntu runner for the length of the shards (free on a public
+  repository); a shorter way would be a watchdog that wakes on a schedule.
+- **19ah-4. Open: the by-hand Mac workflows** (`gallery`, `controls`, `pixels`, `film`) could
+  take the same probe and lane; they are the longest Mac jobs and queue the same way.
+- **19ah-5. Open: the job-started hook is copied by hand.** `macrunner-setup.sh` installs
+  `scripts/macrunner-hook.sh` from the checkout it runs in; a change to the hook on `main`
+  reaches the Mac only when the owner runs setup again. A check that the installed copy
+  matches `main`'s (the probe could read a hash the hook prints) would say when it is stale.
+
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
-the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves) and 19ai-5.
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), 19ai-8, and 19ai-9 (the settings panel).
 
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
   was module code above the component. Story in `docs/plan-shipped.md` §19ai-3 (moved
@@ -289,9 +322,33 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
   reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
   whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
-- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
-  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
-  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
+- **19ai-4a. Shipped with 19ai-8 for App's setters** (the story in `docs/plan-shipped.md`).
+  The plate's setters in `LiquidVisualizer.tsx` still cast, and drop theirs when next edited.
+- **19ai-8. Shipped: `App()` into its domains' hooks** (`src/app/`, 34 hooks; `App.tsx` 372,525
+  → 215,830 bytes; the story in `docs/plan-shipped.md`). A check that reads App's source as
+  text reads `scripts/appSource.mjs`, App and its hooks as one text.
+- **19ai-8a. Open: what stayed in `App()`.** The settings' writers at its heart (the ride,
+  the drift, `updateSettings`, `applyPreset`, the saved-look document, `lookPhase` and
+  `magnetInHand`, the automation's effect: about 30 KB) were left, because they reach
+  forward to `settingsRef`, `setDocDirty` and `lookFadeRef` declared after them, and a
+  verbatim move cannot take them without reordering more than it moves; likewise the
+  overlay's keys (they set panels declared later), the cue functions and `runAction`. Next
+  is the 97 KB JSX return, which is components rather than hooks: the overlay, the desks'
+  props and the phone's props as their own files.
+- **19ai-8b. Open: hooks that take App whole.** A verbatim move keeps every name a run read,
+  so `useCommandPalette` takes 52 parameters, `useRemote` 48, `useWallLook` 37. Once
+  19ai-8a has moved the settings' writers, the ones that read a domain's state and its
+  setters can take that domain's hook result instead of its pieces.
+- **19ai-9. Shipped: the settings panel's sections into `src/components/settings/`**
+  (`SettingsPanel.tsx` 201,442 → 23,916 bytes; the story in `docs/plan-shipped.md`). A check
+  that reads the panel's markup as text reads `scripts/settingsSource.mjs`, the panel and
+  its sections as one text.
+- **19ai-9a. Open, found along the way: the panel's seventy-two props.** App hands
+  `SettingsPanel` its props one by one (thirteen for the film and the pour, eight for the
+  tempo), and the panel hands them on to its sections in `SectionCtx`. Once 19ai-8b gives
+  each domain one hook result, the panel can take the film's or the tempo's whole, as its
+  sections read them; until then a new value a section reads is four edits for one name
+  (App, the props, `SectionCtx` and the object the panel builds).
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** Story in `docs/plan-shipped.md`
   §19ai-5 (moved 2026-10-29, 19m).
 - **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** Story in
@@ -306,3 +363,11 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-5b. Open: the ledgers come out.** 19m (PLAN.md split by section) takes PLAN.md and
   the archive off the list; `docs/guide.md` and `docs/judging.md` want the same split by
   part of the app; `scripts/checks.json` could be one file per shard.
+- **19ai-6. Shipped:** `wgsl/fluid.ts` split into one file a pass under
+  `src/gpu/wgsl/fluid/`, every kernel's text byte-identical (docs/plan-shipped.md, 19ai-6).
+- **19ai-6a. Open, found along the way.** About sixty comments across `src/` and
+  `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
+  file's header, which names each pass's file. Repoint one when its file is next touched,
+  not in a sweep of its own (it would collide with every open branch for nothing).
+- **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
+  a pure move (docs/plan-shipped.md, 19ai-7).

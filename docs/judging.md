@@ -1286,8 +1286,9 @@ to the monitor:
 
 With the projector window up (or a cast), put the plate bar on **Preview** and change the
 look: pick another, ride a few sliders, clear the plate. The wall should carry on with
-the look it had, while the desk's preview shows the copy. Then press **Send to wall**
-(⌘⏎): the wall should fade to the copy's look over the Go's fade.
+the look it had, while the desk's preview shows the copy. Then click **Wall** in the
+header (or ⌘⏎; the plate bar's Send to wall button went in PLAN 35c-4): the wall should
+fade to the copy's look over the Go's fade.
 
 - Does the wall stay exactly as it was while you build? The dimmer, the mixer and the
   music still move it on purpose; nothing else should.
@@ -1469,8 +1470,11 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   field, parallax); the lamp's lowering and the dome gain (×14) are the two numbers to move.
 - Say whether the highlight burns out on a bright pool, and whether a pool's edge reads
   as relief without a drawn outline.
-- `macro-bead`, `cell-bloom` and `lace-run` still draw cells, by name. Say whether they
-  should (PLAN 33g-3).
+- `macro-bead`, `cell-bloom` and `lace-run` draw no cells now either (the owner, 2026-10-29,
+  PLAN 33g-3); Lacing Run alone keeps its dendritic lacing. Open Macro Bead, Cell Bloom
+  and Lacing Run at their own zoom: Cell Bloom should read as three turning pools of
+  silicone and oil, Macro Bead as domed wet beads, Lacing Run as lacing without cells.
+  Say whether Cell Bloom's name should change now that it has none.
 
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
@@ -1999,3 +2003,55 @@ real song. (§88 is the stutter, §89 the headers.)
    land on the same hits as before this change: the readings are the same to the bit on the checks' songs.
 4. Bad: a ring that lags behind the stick, jumps to a corner when it first appears, or stays after the stick is
    released; a beat that used to fire and does not.
+
+## 91. The wall's "isn't full screen" chip goes when it should, and can be hidden (PLAN 14af)
+
+The chip at the top of the desk that says the wall window isn't full screen. It used to be
+stuck there, unexplained, with no way to close it.
+
+1. Send to wall with a projector (or a second screen) connected. The wall should fill its
+   screen by itself, and no chip should show on the laptop.
+2. Click the wall and press Escape. Within half a second the laptop should show "The wall
+   window isn't full screen, so its title bar shows on the wall". Click **Make it full
+   screen**: the wall fills again and the chip goes.
+3. Escape on the wall again, then in the Mac app use the wall window's green button instead:
+   the chip should go too (the window's own full screen has no title bar in the app).
+4. Escape once more and click the chip's X: it should stay away until a new wall window is
+   opened, even though the wall is still framed.
+5. Bad: a chip that stays up over a wall with no title bar; a button that does nothing and
+   says nothing; an X that comes back a second later.
+
+## 92. The live stream, to an unlisted YouTube broadcast (PLAN 37x-4b)
+
+The lab streams to its own server and measures the stream; only a real platform can say it
+takes ours, and only a camera can say the sound and the plate agree after the Mac's
+system-audio path. Unlisted, never public, until you say so.
+
+1. In YouTube Studio, Go live → Stream, an **unlisted** broadcast; copy the stream key. Open the
+   Mac app, the console (View → Toggle Developer Tools), and `docs/live-show.md`'s four lines
+   with that key. Within thirty seconds Studio's preview should show the plate, "Excellent
+   connection", no dropped frames in `__cgLive.state()`.
+2. Open the album in Qobuz or YouTube Music with the app's sound source on *System audio*.
+   Watch the broadcast on a phone (it runs twenty or so seconds behind): a hit in the music
+   should bloom the plate right after the hit, as it does on the laptop, not before it.
+3. Clap once in front of the laptop's camera with the microphone as the source: in the
+   broadcast, the clap and the plate's bloom should fall together within a frame or two.
+4. Stop with `__cgLive.stop()`; the broadcast should end cleanly in Studio within a few seconds.
+5. Bad: Studio never shows a picture (the key or the RTMPS path), the sound runs ahead of or
+   behind the plate by more than a frame or two (the Mac's clock, the plan's note under
+   37x-4b), frames dropped with a good upload, or the app's frame rate falling while live
+   (`npm run stutter`'s two-step frames, 37x-4c).
+6. Several at once (37x-4c), with whichever second account exists (Twitch, Kick, a Facebook
+   Page; or a second unlisted YouTube stream): keep both keys in the store, then
+   `await __cgLive.start({ destinations: [{ name: 'youtube', url: 'rtmps://a.rtmps.youtube.com/live2', keyName: 'youtube' }, { name: 'twitch', url: 'rtmps://live.twitch.tv/app', keyName: 'twitch' }] })`.
+   Both previews should show the plate; `(await __cgLive.state()).transport.destinations`
+   gives each one's kbps, seconds behind and dropped frames. `measuredAt` should read
+   `server` for YouTube (it acknowledges what it receives; if it reads `socket`, the
+   seconds-behind figure only sees the Mac's own buffer: say so).
+7. If Instagram or TikTok live is open to the account: add a destination with
+   `orientation: 'portrait'`. On a phone it should fill the screen with the middle of the plate,
+   sharp, not squeezed; the landscape one beside it unchanged.
+8. Turn the Wi-Fi off for ten seconds and on again while live: each destination should come
+   back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
+   one. A wrong key on one destination should fail that one alone, once, with the
+   platform's words, while the others stream.

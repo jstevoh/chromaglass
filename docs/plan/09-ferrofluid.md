@@ -14,12 +14,7 @@ comes through the liquid, but these films are lit from the front.
 What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
 (`/mnt/project-files/ferrofluid-look/watch/`), in the order to fix them:
 
-- **9b. Maze detail**, shipped in #167. The maze's finger width is fixed by `MAZE_PERIOD` (0.045 of the
-  plate) and comes out two to three times wider than the reference, and it coarsens
-  over time. Maze Detail (0 to 1) divides the period by up to three; 0 is the maze as it
-  was, bit for bit, and Ferro Maze uses 0.5. `npm run maze`: finger width 0.0296 at 0.5
-  against 0.0431 at 0 (ratio 0.69). Whether it now matches the reference is for the
-  Mac.
+- **9b. Maze detail**, shipped in #167: Maze Detail (0 to 1) divides `MAZE_PERIOD` by up to three, Ferro Maze at 0.5 (`npm run maze`). Whether it now matches the reference is for the Mac. Story in `docs/plan-shipped.md` §9b (moved 2026-10-29, 19m-2).
 - **9d. Smaller faults.** A sub-half phase shows as brown ghost smears; Ferro Maze's
   white table clips (32 % of the frame blown); no visible pulse on the kick.
 
@@ -31,14 +26,7 @@ Open, from building 9e (in the order to do them):
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
 
-- **9ab. Fingers thinner than the grid are drawn** (**shipped**). The plate drew the
-  ferrofluid only past its half-full line, so a finger pulled out narrower than the
-  solver's interface was not drawn at all. `npm run fingers` then passed or failed on the
-  dye's shade under it, and went red on the deploy after #267 (4 at 0.12 against 7). With
-  no line within four cells up the slope, the strand is now drawn by Beer–Lambert through
-  the thickness its phase gives. Lab: 13/16/13/8 drawn against the field's 15/19/13/8
-  (2 at 0.12 by the line before). Judging §41. Open: the maze's haze (9aa) is under half
-  full too and is drawn by the same rule, so it reads browner until 9aa takes the leak out.
+- **9ab. Fingers thinner than the grid are drawn** (**shipped**): a strand under the half-full line is drawn by Beer–Lambert through its phase's thickness (`npm run fingers`). Judging §41. Open: the maze's haze (9aa) is under half full too and is drawn by the same rule, so it reads browner until 9aa takes the leak out. Story in `docs/plan-shipped.md` §9ab (moved 2026-10-29, 19m-2).
 - **9aa. The maze is two to three times coarser than its period, and leaves a haze**
   (measured 2026-10-04, building 4a-clock). Ferro Maze, Ferro Paint and Magnet Garden
   in the Mac gallery are fat black blobs with a brown haze round them, where the
@@ -205,39 +193,7 @@ Open, from building 9i:
     face is a fixed 0.06 above it (`MAGNET_FACE`), clamped 0.01 under the liquid.
     Saying the setting as the gap itself would be plainer, but changes every
     saved look's magnet; worth doing with a look version bump.
-- **9w. Carry the ferrofluid across a new solver** (**shipped**). The dye was
-  carried when the governor moved the grid; the phase was not, so the frame loop
-  poured the look's ring onto every new solver while Ferrofluid was up: a pool
-  dragged into a shape lost it, and ferrofluid poured by hand from the bottle (on
-  Classic, say) came back as the look's ring, ferrofluid nobody poured. With the
-  Magnet moving only what is on the plate (9y), a pool lost that way left it
-  nothing to hold. The oil, soap and acidity of the mix (Oil Bodies' bodies
-  among them) and the BZ and Liesegang reactions were lost the same way, with
-  nothing poured back. Now the old solver copies those fields on the GPU before
-  it goes (`handOver` in `gpu/fluid.ts`), and the new one lays them onto its
-  grid (`takeOver`): the ferrofluid and the mix by an area-weighted mean
-  (`carryArea`, counted in integers so every overlap is exact), which keeps the
-  amount to the rounding, and the reactions copied as they were. The frame loop
-  lays the look's ferrofluid only on a solver that opened on no carry (the first,
-  or one after a lost device). `npm run regrid` (lab, 6/6 in a cloud session at
-  384² and 256²): 5.288% of the plate in → 5.288% on the new grid, 0.0 ppm off,
-  each cell (ferrofluid and mix) within 1.5e-7 of the area mean worked out in JavaScript, the black
-  shared 97.4% (98.2% back up), the middle moved 0.00 cell; the same move with
-  nothing handed over leaves 0.000% (main's behaviour); oil 3.020% → 3.020%, soap
-  0.690% → 0.690%, acid 0.396% → 0.396%, Oil Bodies' tally the same; BZ and the
-  gel identical value for value; a carry from another device refused. On the
-  Mac, `npm run magnet` check 8 asks it of the app: the Ferrofluid bottle on
-  Classic, two pools poured, the governor stepped down from 512²: no lay, the
-  same amount, the pools where they were. Not carried: Oil Bodies' share of the
-  dye (it starts empty and is handed back the colour inside each body within a
-  few steps), the glass's press (a press held through a move starts again from
-  the rest gap), the particles (H1, which re-seed from the dye), and the clear
-  film of 20b (#259, which landed while this was in review: its field is
-  dropped at a move as the ferrofluid was, to be carried the same way). Not checked
-  anywhere yet: that the app keeps the carry until the new solver's first
-  readback, so an out-of-memory retry after a climb gets it, and that after a
-  lost device the app's next solver refuses the old carry and lays the look's
-  ferrofluid as before (the lab checks only a second device's refusal).
+- **9w. Carry the ferrofluid across a new solver** (**shipped**): the old solver copies the ferrofluid, the mix and the reactions on the GPU before it goes (`handOver`/`takeOver` in `gpu/fluid.ts`; `npm run regrid`, `npm run magnet` check 8 on the Mac). Not carried: Oil Bodies' share of the dye, the glass's press, the particles, and 20b's clear film (#259; to be carried the same way). Not checked anywhere yet: that the app keeps the carry until the new solver's first readback, so an out-of-memory retry after a climb gets it, and that after a lost device the app's next solver refuses the old carry and lays the look's ferrofluid as before (the lab checks only a second device's refusal). Story in `docs/plan-shipped.md` §9w (moved 2026-10-29, 19m-2).
 - **9z. The dye at its own grid across a new solver.** Found while doing 9w: the
   dye and the flow cross a move of the grid through the CPU's 192² arrays
   (`FluidSimulation.attachGpu`, `pullStateFromGpu`), so a plate on 384² to 1024²

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { CAST_CHANNEL, type CastMessage } from '../lib/castProtocol';
+import { isDesktopApp } from '../lib/platform';
 
 /**
  * The sender side of casting.
@@ -21,6 +22,12 @@ export function useCastSender(
   const [isCasting, setIsCasting] = useState(false);
   /** For a window we opened: whether it fills its screen (the browser's own fullscreen, no title bar); null when unknown or not a window. */
   const [windowFullscreen, setWindowFullscreen] = useState<boolean | null>(null);
+  /**
+   * The operator said "leave it" to the chip that asks for the projector
+   * window's full screen. Held for that window only: a new one (a fresh Send
+   * to wall, or the wall taken back after a reload) asks again.
+   */
+  const [fillDismissed, setFillDismissed] = useState(false);
   const windowRef = useRef<Window | null>(null);
   const connectionRef = useRef<PresentationConnectionLike | null>(null);
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -46,10 +53,32 @@ export function useCastSender(
     stageRef.current?.(null);
     setIsCasting(false);
     setWindowFullscreen(null);
+    setFillDismissed(false);
   }, []);
 
+  /*
+    Whether the projector window shows no frame. The page's own full screen
+    is the one way in a browser: the OS's (the green button) keeps Chrome's
+    title bar over the wall (CastHint says so on the wall itself).
+
+    The Mac app is different, and that difference left the chip stuck there
+    (the owner, 2026-10-29: "I can't get rid of this popup"). Its projector is
+    a plain Electron window, and the OS's full screen on a plain window hides
+    the title bar entirely. A window put there by the green button, or by
+    main.js when the page's own full screen was refused, filled its screen
+    with nothing over it, and the chip went on asking, because only
+    `fullscreenElement` was read. So in the app a window whose page covers its
+    whole screen counts as filling it, whatever put it there. A window
+    merely zoomed to the screen still has its title bar and the menu bar
+    above it, so its page is shorter than the screen and still counts as
+    framed.
+  */
   const readWindowFullscreen = useCallback((w: Window): boolean | null => {
-    try { return !!w.document.fullscreenElement; } catch { return null; }   // not ours to read
+    try {
+      if (w.document.fullscreenElement) return true;
+      if (isDesktopApp() && w.innerWidth >= w.screen.width - 1 && w.innerHeight >= w.screen.height - 1) return true;
+      return false;
+    } catch { return null; }   // not ours to read
   }, []);
 
   /**
@@ -57,12 +86,20 @@ export function useCastSender(
    * A title bar on it (the app's name, or the address) is the browser's
    * window frame: the OS's full screen keeps it, the browser's own removes
    * it, and that needs a gesture — normally one on that window. Capability
-   * delegation hands this window's gesture to it, so a click here does it.
-   * Must be called from a click or key press.
+   * delegation hands this window's gesture to it, so a click here does it
+   * (measured in Chromium 153: the projector's requestFullscreen resolves
+   * from a delegated message, with no activation of its own). Must be
+   * called from a click or key press.
+   *
+   * In the Mac app the app's side does it as well (desktop/main.js
+   * `fillProjector`): it needs no gesture, and when the page's full screen is
+   * refused it falls back to the window's own, which the read above counts.
    */
   const fillWindow = useCallback(() => {
     const w = windowRef.current;
     if (!w || w.closed || readWindowFullscreen(w) !== false) return;
+    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { fillProjector?: () => Promise<unknown> } }).__CHROMAGLASS_NATIVE__;
+    if (isDesktopApp()) void native?.fillProjector?.().catch(() => { /* an older app, or the window went */ });
     const msg = { chromaglass: 'fullscreen' };
     try {
       (w.postMessage as unknown as (m: unknown, o: { targetOrigin: string; delegate?: string }) => void)(msg, { targetOrigin: window.location.origin, delegate: 'fullscreen' });
@@ -89,6 +126,7 @@ export function useCastSender(
    * reload of this page left open (`adopt`, below).
    */
   const hold = useCallback((castWindow: Window) => {
+    if (windowRef.current !== castWindow) setFillDismissed(false);
     windowRef.current = castWindow;
     openChannel();
     setIsCasting(true);
@@ -282,7 +320,9 @@ export function useCastSender(
 
   useEffect(() => () => { cleanup(); }, [cleanup]);
 
-  return { isCasting, startCast, stopCast, send, windowFullscreen, fillWindow };
+  const dismissFill = useCallback(() => setFillDismissed(true), []);
+
+  return { isCasting, startCast, stopCast, send, windowFullscreen, fillWindow, fillDismissed, dismissFill };
 }
 
 // The Presentation API is not in every TypeScript lib; the shape used here.

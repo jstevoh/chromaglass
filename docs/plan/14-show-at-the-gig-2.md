@@ -141,17 +141,7 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
 
 **Partly shipped** (2026-10-04): the opening builds its pipelines three at a time, asks for the app and the GPU earlier, asks for the display first, and an intro covers the black plate (`npm run loadtime`, `npm run intro`, `npm run startup`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-Reported by the owner 2026-10-04: "Chromaglass takes a long time to load on the web."
-Measured the same day. Where the time went, on CI's Mac with the shader cache emptied
-(`npm run startup`, runs 37166785182, 37166234101, 37165604455): the desk is up within
-a second, and the plate sits black on its starting frame until its first step at
-12.15, 17.62 and 12.49 s. 11.46, 13.57 and 11.83 s of that is `gpu/prepare.ts`
-building the opening's fifty pipelines one after another (about 0.23 s each; the
-first, `fluid/fill`, 0.6–2.7 s while Chromium starts Metal; `plate/display` 1.5–2.2 s
-alone). The owner's machine pays the same, scaled to its compiler, whenever a deploy
-changes the shaders. The download is small beside it (about 550 kB of scripts, Brotli,
-cached for good) but was a chain: the entry ran before the app's chunks were asked
-for, and the GPU was asked for only after they had arrived and drawn.
+*Shipped so far* (2026-10-04): where the opening's time went on CI's Mac (the plate black 12 to 18 s to its first step, 11 to 14 s of it fifty pipelines compiled one after another; the download a chain). Story in `docs/plan-shipped.md` §14v (moved 2026-10-29, 19m-2).
 
 - **Shipped, 14v-5: the intro starts still, and turns once the opening's render
   pipelines are built** (2026-10-10). Turning, it stopped the Mac's frames while
@@ -161,20 +151,7 @@ for, and the GPU was asked for only after they had arrived and drawn.
   frames settle** (2026-10-18, this PR). Story in `docs/plan-shipped.md` §14v-6 (moved
   2026-10-29, 19m).
 
-- **Shipped, 14v-7: a frame gap while the intro is held still counts only the page's own
-  work in it** (2026-10-24, the owner's choice). All 41 reds of "no stop in the opening"
-  in the week to 10-24 were Chromium giving the device or compiling its first kernel
-  with the page idle (its own long tasks 0.83 s at most) and a still intro on screen,
-  every gap over before the intro let go. Inside the still stretch a gap now loses only
-  the time the page's own timer kept ticking on time (`TICK_FREE_MS` 250), up to
-  `STILL_IDLE_CAP_S` 4.5 s all told, and only of a still that let go; outside it, and for
-  heartbeats and steps, the 2 s bar is unchanged. Six synthetic openings check the rule on
-  every run. Replayed on the logs by long tasks alone: 41 red to 0; the ticks in the gaps
-  are not printed, so the week after decides. Named limit: the GPU process's compiles of
-  the app's shaders inside the still stretch are not counted (1, 1b and the first step's
-  cap hold their length). Story in
-  `docs/plan-shipped.md` §14v-7; judged by `npm run flakes -- --check 'no stop in the
-  opening'` over the week after.
+- **Shipped, 14v-7: a frame gap while the intro is held still counts only the page's own work in it** (2026-10-24, the owner's choice). Story in `docs/plan-shipped.md` §14v-7 (moved 2026-10-29, 19m-2); judged by `npm run flakes -- --check 'no stop in the opening'` over the week after. Named limit: the GPU process's compiles of the app's shaders inside the still stretch are not counted (1, 1b and the first step's cap hold their length).
 - **14v-8. Two edges of 14v-7's rule, from its review (#456).** (b) is shipped (2026-10-25):
   three more synthetic openings for the `seenOk` gate (long tasks not observable, the
   timer's median over its bar, no timer reading), each of which must count the gap whole;
@@ -206,24 +183,7 @@ for, and the GPU was asked for only after they had arrived and drawn.
   restrict and zero) could be one dispatch writing both, which is fewer compiles and
   fewer dispatches a step. Each fusion changes the solver's step, so each wants
   `physics`, `thingap` and the Mac's frame time, not just `startup`.
-- **Changed after it shipped (2026-10-04, #254): one render pipeline compiling at a time.**
-  Main's deploy of 5505a2a (run 37196539858) went red on `startup` 4b: the page's
-  thread held 4.98 s from 0.96 s, against the 4.5 s cap. The three render pipelines
-  asked first (display, derive, the air's splat) did not compile side by side: each
-  took 5.22–5.24 s there, where the display alone had taken 1.03–2.49 s on every
-  run before this item, and the hold ended 0.27–0.65 s before the display's compile
-  did on six of the seven Mac runs since (2.92 to 5.94 s; the seventh still waited
-  in its lanes for first uses). Before it, with a kernel first, the hold ended 2.5
-  to 4.5 s in whatever was compiling, once with nothing asked yet. So
-  `buildInTurn` now compiles one render pipeline at a time, the display still
-  first, the other lanes taking kernels beside it. So what the page asks does move
-  when Chromium's hold at the GPU's start ends: it can lengthen it. On #254's Mac run
-  (37200639755) the hold was 2.91 s from 1.01 s (4.98 s on the red deploy; 1.92 to
-  4.98 s on the seven runs since #249), the first step 10.21 s (7.96 to 14.19 s).
-  The display still took 3.46 s, settling at 3.9 s with the two kernels beside it,
-  which also took 3.46 s each: whatever is in flight under Chromium's GPU start
-  ends with it. So one run says the change is not worse and passes 4b with room;
-  whether it narrows the spread needs the next deploys' readings.
+- **Changed after it shipped (2026-10-04, #254): one render pipeline compiling at a time.** Story in `docs/plan-shipped.md` §14v (moved 2026-10-29, 19m-2). Still to read: whether it narrows the spread, from the next deploys' readings.
 - *Fewer or smaller opening pipelines.* `plate/display` alone is 1.5–2.2 s cold, and
   every look opens on the same forty-three; a display shader split by what the look
   turns on, or kernels that share one pipeline, would cut the compile itself. Measure
@@ -263,17 +223,7 @@ for, and the GPU was asked for only after they had arrived and drawn.
 
 **Shipped.** Story in `docs/plan-shipped.md` §14y (moved 2026-10-29, 19m).
 
-- **Measured:** `npm run opensource`: the desk and the phone open with the sound on Off,
-  a click starts nothing and opens no device, a pick is kept through a reload of the
-  tab, and a new tab opens on Off again. Before: a fresh page's first click started the
-  band; a remembered Mic reopened on launch.
-- **Check changes:** `qa`'s "a first visit is driven by the band after one click" now
-  asks that the click starts nothing, and the band is then chosen with its button;
-  `kickbubbles` chooses the band by the Sound control after its dials are set (a band
-  started at load would play before Audio Impact 0 is held, and the Mac runner's Chromium
-  plays without a gesture); `gallery`, `pixels`, `shots`, `swirlcost`, `ferrodrift`'s band
-  pages and the sixteen harnesses that set the remembered source write it to
-  `sessionStorage` now.
+- **Measured** (`npm run opensource`) and **check changes** (`qa`'s first-visit line, `kickbubbles`, and the harnesses that set the remembered source). Story in `docs/plan-shipped.md` §14y (moved 2026-10-29, 19m-2).
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
@@ -321,33 +271,17 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
 
 - ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Story in
   `docs/plan-shipped.md` §14ab-1 (moved 2026-10-29, 19m).
-- **14ab-2** *The video pour's optical flow is a CPU loop* over a 192² `getImageData`
-  each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
-  pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
-  belongs in a compute pass beside it.
-- **14ab-3** *Every frame reads both fields back and averages them on the CPU*
-  (`syncFromGpu`, a loop over every cell of each layer for the mean density and colour)
-  where `measure()` on the GPU returns the same means in 32 bytes. With 14j's "read back
-  only on a frame that stepped".
-- **14ab-4** *A CPU pour uploads the whole grid every step* (`flushDeltas`: about 1.3 MB
-  through three to five `writeTexture`s and the upsamples), for a few changed cells.
-  Splat records on the GPU (`applySplats`) are the path; what still goes through the
-  delta grids is the bubbles' rims, the hands, the breath and the room stir.
-- **14ab-5** *The plate, post chain, camera, output and particles make their bind groups
-  and views every frame* (10–20 `createBindGroup`, 40–60 `createView`); the solver
-  caches its own (H2c-11).
+- ~~**14ab-2** *The video pour's optical flow is a CPU loop*~~ **Shipped** (#584, `npm run videoflow`: no loop and no rows sent while a video pours, the deltas the CPU loop's to 1.7e-7). Story in `docs/plan-shipped.md` §14ab-2.
+- ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*~~ **Shipped** (#549, `npm run framereads`: a still plate 60 → 0 readbacks asked in thirty frames). Story in `docs/plan-shipped.md` §14ab-3.
+- ~~**14ab-4** *A CPU pour uploads the whole grid every step*~~ **Shipped** (#579, `npm run frameuploads`: a cell after a cell 1.33 MB → 14 KB, the flush 318 → 18 µs). Story in `docs/plan-shipped.md` §14ab-4.
+- ~~**14ab-5** *The plate, post chain, camera, output and particles make their bind groups and views every frame*~~ **Shipped** (#549, `npm run framegroups`: 12 groups and 64 views a frame → 0 and 0). Story in `docs/plan-shipped.md` §14ab-5.
 - **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
   gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
 - ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort on
   their history.~~ Shipped; story in `docs/plan-shipped.md` §14ab-7 (moved 2026-10-29, 19m).
-- ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows (a new cursor
-  object each tick) and sets `connected` on every poll through a stale closure (with
-  14j's timer line).~~ **Shipped** (#533): the ring (`GamepadRing`) listens to a store in
-  the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
-  (`npm run renders`' gamepad phase), and the poll sets `connected` once.
-- **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
-  sixty steps (`speciesShare`); a ring like the readback's.
+- ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows~~ **Shipped** (#533, `npm run renders`' gamepad phase). Story in `docs/plan-shipped.md` §14ab-8 (moved 2026-10-29, 19m-2).
+- ~~**14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every sixty steps~~ **Shipped** (#549, `npm run framereads`: the same share to the bit, no buffer after the first). Story in `docs/plan-shipped.md` §14ab-9.
 - **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
   tools shard, two attempts on one head were each red on one line of 224, a different line
   each time. Attempt 1 failed "both windows animating, 0.25 of a refresh behind", which read
@@ -359,6 +293,29 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   comments say a starved runner's late timers part the two windows' frames by themselves. Find
   a measure of the gate's fault that holds at a quarter of the display's refreshes, or a
   starvation reading that sets the line aside and says so. The bar itself stays where it is.
+- **14ab-12** (open, found with 14ab-2, read in the code and not measured) *A pour's
+  splats fold at once, and the fold runs the step's forces.* `applySplats` ends with
+  `foldDeltas`, which besides adding the deltas runs `liquidForces` (a dt-scaled push from the
+  soap, the bodies and the polar liquid) and `squeezeUpdate` (the gap's own update, which the
+  step runs itself when no deltas were applied). So a frame whose tools lay splats runs
+  those once more than a frame that lays none, and a step after several such frames several
+  times. Measure it on a look with soap (a still plate, a tool laying splats at the frame
+  rate, the soap's push against a run where the splats go through the step's flush), and if
+  it is real, fold a frame's splats with the dye and flow alone, as the video pour's frames
+  now wait for the flush.
+- **14ab-13** (open, found with 14ab-2, read in the code) *Is a poured video upside down?*
+  The pour has always laid the frame's rows, which count down, on the grid's rows as they
+  come; the text pour (`pourText`) flips its canvas first because "the plate's rows run from
+  the bottom of the frame up", and `injectImage` does not. If that comment is right, a poured
+  video and an uploaded picture land upside down. A `look` render of a cartoon with a known
+  top (a title card) settles it; 14ab-2 kept the orientation as it was.
+- **14ab-11** (open, found with 14ab-4) *The deltas' whole-grid writers and the GPU's whole
+  passes.* The writers that still set `dirty = true` send all 192² rows: the room's and the
+  film's stir (whole by nature), but also a press, a lift, a carry, a pop and the liquids'
+  step, which know their discs and could say them with `rows.add` as the hand does. And on
+  the GPU, `applyDeltas` still upsamples the three delta grids and folds them over the
+  whole plate each flush; a dispatch over the written bands' rows (scaled to N) would do.
+  `npm run frameuploads` holds whichever writer moves to rows to its own scan.
 
 ## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 
@@ -405,6 +362,8 @@ Open, found building it:
   shelf's weight, fetched only when someone picks it. If that proves a cost (a phone on mobile
   data), cut it to a half hour of its best scenes as a separate entry, or serve it by a
   lower bitrate; the check holds a feature under 30 MB.
+- **14ac-7** *The cartoons were not in Settings → Film.* **Shipped** (2026-10-29): the Film
+  section lists the shelf under its demo loops. Story in `docs/plan-shipped.md` §14ac.
 
 ## 14ae. One Record button (shipped, asked 2026-10-24)
 

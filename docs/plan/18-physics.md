@@ -68,56 +68,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 ## 18a. The plate is a Hele-Shaw cell (replaces the speed clamp)
 **Partly shipped**: Thin Gap is built and on in every look (#248), the Press draws the liquid back, and 18a-2 (forces that are forces) is done. What is open is below: the findings along the way, 18a-2's open findings, and the steps left for later PRs. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
 
-- **Where:** `MAX_SPEED` and `damping` in `decayVel`; the lasting current
-  (`currentForces`, `addCurrent`); the squeeze film's red-black sweeps and
-  `squeezeVelBuf`; the depth multiply in `addCurrent`.
-- **The shortcuts it removes:**
-  - **The clamp** sets every speed on the plate (above).
-  - **The squeeze film's pressure solve** does almost nothing. Five red-black sweeps
-    solve ∇²p = 12μ ḣ/h³, and `squeezeVelBuf` adds −(h²/12μ)∇p to the velocity. That
-    is a pure gradient, which the next projection deletes, as the kernel's own comment
-    says ("pressing seventy-five times harder moved the same 1%"). The sweeps and the
-    add are most of the squeeze stage, which is the step's most expensive at 1.13 ms.
-    What actually presses is the −ḣ/h source in `divergence`. The operator is also the
-    wrong one: the Reynolds equation is ∇·(h³∇p) = 12μ ḣ, not ∇²p with h³ moved into
-    the source.
-  - **Depth as a capped multiply** on the projected flow ((h²/h₀²)^k, capped at 1),
-    which makes a divergence-free field divergent. That is why it ships off.
-- **What it takes:**
-  - One velocity field with implicit drag, u ← (u + dt(f − ∇p)/ρ)/(1 + dt·12ν/h²).
-  - A variable-coefficient projection ∇·(M∇p) = ∇·(Mf) + ∂h/∂t, with mobility
-    M = h³/12μ(x). The multigrid takes face coefficients (harmonic means); a version
-    was built once (physics-plan).
-  - **An open rim:** cells at the dish's edge held at p = 0, so liquid can enter and
-    leave there instead of every source being balanced by a uniform sink. This is what
-    viscous fingering was missing.
-  - At these Reynolds numbers the velocity's self-advection and the second projection
-    can go.
-  - A tool then acts on the flow and the flow carries every field. Blow is a surface
-    shear stress, a Finger is a solid in the layer (Brinkman penalisation: the hand's
-    velocity imposed inside its disc), a Press is ∂h/∂t. The hand-written carries
-    (`carryDye`, `carryMix`, `fingerCarry`, `pressDye`, `pressMix`, `blowDye`,
-    `blowOil`, `blowCarry`) can then be retired one at a time, each against its
-    existing check (`finger`, `wind`, `pressoil`, `ferrohands`).
-- **Cost:** removing the second projection (0.82), the velocity advection (0.69), most
-  of the viscosity (0.91), the current (0.41) and the squeeze sweeps saves about 3 ms.
-  The variable-coefficient solve and its coefficient pass add about 1 ms. So roughly
-  2 ms a step are saved. The collocated grid's patches (`dampGrid`, the Rhie–Chow
-  faces, `mixRelax`) are worth reconsidering in the same change: a staggered grid
-  removes the checkerboard they exist for.
-- **What is lost:** eddies. A thin plate has no turbulence, so the swirl has to come
-  from hands, heat (18f), tilt and rotation. The noise stirring should stay as a
-  declared dial ("hand stir"), fed in before the projection so that it too lasts
-  through the drag time, not added after it.
-- **Subsumes:** 15b (a tool's push lasts one step), the force half of 15g (air's shear
-  and the jet's dimple on the film), bubbles-plan G (press and lift as different
-  strokes: the lift's Saffman–Taylor fingers grow from this instead of from
-  `squish.ts`'s hashed spokes, whose count is 8 + seed % 9) and roadmap Stage 1 F
-  (depth). It is the prerequisite for the grates thread's Saffman–Taylor item.
-- **Ships as:** a solver mode behind a setting, off by default, judged look by look on
-  the Mac, because it changes how every look moves and every tool feels. Measured by
-  a new lab check (a press's ring radius against the volume displaced; a drag's
-  displacement against the drag time ρh²/12μ; dye conserved with the carries off).
+*Shipped so far* (Thin Gap, on in every look since #248): one velocity field with the gap's implicit drag in place of the clamp, a variable-coefficient projection with an open rim, the noise stirring kept as a declared stir dial. The item as first written (where, the shortcuts it removes, what it takes, cost, what is lost, subsumes, ships as) is in `docs/plan-shipped.md` §18a (moved 2026-10-29, 19m-2).
 
 - **Found along the way, open:**
   - **Depth Drag does nothing on a thin gap** (found with 18a-every). It is the old
@@ -148,24 +99,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     so measure what the 0.45-a-cell clamp leaves behind instead: the pool's edge
     against where its volume puts it. `phaseRelax` still keeps Σc, not Σc·h
     (under 0.1% in that check).
-  - **The app's let-go check read a pool still spreading** (fixed in this PR,
-    not yet green on the Mac). On run 37134289958 the pressed pool read 0.047 →
-    0.077 → 0.076 from the palm and the idle pool 0.051 → 0.066 → 0.082: the check
-    passed at 112% net while the pressed colour never came in (a press frozen at
-    the lift reads 107% against that idle pool, check-skeptic). Run 37145038742
-    read 20% (pressed 0.062 → 0.094 → 0.098, the idle pool on the old solver).
-    Runs 37148523629 to 37163762683 then showed the separate idle pool starting
-    15 to 40% from its press's, and Classic's own flow drifting a settled pool out
-    0.004 of the plate a second, half the press's push over the lift's three
-    seconds. The press itself read 62%, 98%, 97% and 99% back net of drift. Now
-    each pool is its own control (its drift measured before the hand), on the
-    calm plate (mirror.mjs's CALM), with a quarter of the push back before any
-    drift is credited and a press frozen at the lift reading under half. The
-    calm plate with no bubbles still drifted 0.0043 a second (run 37166234101),
-    as much as settled 1.5 or 8 seconds: the three ambient seeding orbits that
-    every look runs keep painting colour a quarter of the plate out (it grew 6%
-    in three untouched seconds). The check now turns them off for its runs
-    (`chromaglassDebug().ambientSeed`) and fails if colour still arrives.
+  - **The app's let-go check read a pool still spreading**: fixed (each pool its own control on the calm plate, the ambient seeding off for its runs). Story in `docs/plan-shipped.md` §18a (moved 2026-10-29, 19m-2).
   - **On the Mac the thin Press barely clears the colour from under the palm.**
     The share of the colour within 0.05 of the palm went 76% → 69% held → 68%
     after the lift (its idle pool 78% → 76% → 72%; Thin Gap off 72% → 1%). The
@@ -280,35 +214,8 @@ its frame rate live. "Free" means no new passes or texture reads.
   - **18a-10, the in-plane viscosity.** The viscosity stage (0.91 ms) still runs with
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
-  - **18a-11, the cost measured (shipped).** Measured 2026-10-07 on the Mac with `npm run stages`
-    over alternating 20-second runs at 768² and 512² (`docs/judging.md` §19):
-    At 768²:
-    - `thinGap=false`: a solver step is 31.7 ms whole (16.5 ms Layer 0, 15.2 ms Layer 1;
-      `project 1` + `project 2` = 6.7 ms/layer, `advect velocity` = 1.2 ms/layer), achieving 20.4 steps/s.
-    - `thinGap=true`: a solver step is 67.8 ms whole (51.1 ms Layer 0, 16.7 ms Layer 1), achieving 11.4 steps/s.
-      In Layer 1, `thin gap` projection is 7.3 ms (44% of layer), roughly parity with the Navier-Stokes
-      projection + velocity advection it replaces (6.9 ms + 1.2 ms = 8.1 ms).
-      The bulk of the cost difference is Layer 0's conservative height-advected dye transport
-      (`advect dye` 36.1 ms vs 1.3 ms).
-    - In-plane `viscosity` (18a-10) costs 1.52 ms across both layers (1.53 ms Layer 0, 1.47 ms Layer 1).
-    At 512²:
-    - `thinGap=true` with `steps=60`: a solver step is 19.7 ms whole (12.7 ms Layer 0, 7.0 ms Layer 1)
-      and drawing 6.8 ms, yielding 32.8 steps/s at 33.4 ms/frame (~30 fps).
-    - `thinGap=true` with `steps=30` (H2b): frame time drops to 19.2 ms (52 fps) with 27.5 steps/s (92% speed),
-      advancing 2.38e-2 liquid/s (+33% over 60 steps/s).
-    Thin Gap does not need any look turned off: on the 512² hosted ceiling it runs smoothly at 33 ms/frame,
-    and H2b at 30 steps/s delivers 52 fps.
-  - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.**
-    Found 2026-10-04 reading the code for 14v: the thin gap's projection cleared its
-    pressure with `clearBuffer(pass, this.hsP!, 'clear pressure')`, under the same bind
-    group key as the old plate's `this.press`, so it zeroed `press` and the thin solve
-    started each step from the last step's pressure, a warm start nobody chose (and
-    after a `groups.clear()` the two could swap). Measured by the Thin Gap thread
-    (`npm run thingap`, lab): cleared for real, a press on a 130² grid moved its ring
-    63% of the way the displaced volume puts it (15/16); warm, 100% (16/16), the
-    numbers every Thin Gap result shipped on. So the clear is gone and the warm start
-    is the choice, said where the solve begins (`thinProject`). Open: whether
-    `hsCycles` from cold should converge on a grid that is not a power of two.
+  - **18a-11, the cost measured (shipped).** Measured 2026-10-07 on the Mac with `npm run stages` (`docs/judging.md` §19): Thin Gap needs no look turned off (512², 33 ms/frame; H2b 52 fps), and the in-plane viscosity (18a-10) is 1.52 ms. Story in `docs/plan-shipped.md` §18a-11 (moved 2026-10-29, 19m-2).
+  - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.** The clear is gone and the warm start is the choice, said in `thinProject`. Story in `docs/plan-shipped.md` §18a-12 (moved 2026-10-29, 19m-2). Open: whether `hsCycles` from cold should converge on a grid that is not a power of two.
   - **18a-13, tilt sloshes the liquid: shipped** (the owner, 2026-10-20: tip it one way
     and then the other and the colour should slop and mix). A shallow-water dish on the
     CPU (`lib/slosh.ts`) fed by the owner's tilt alone, its flow added to the thin solve's
@@ -365,6 +272,10 @@ its frame rate live. "Free" means no new passes or texture reads.
       the liquid is pushed out twice. The one-press answer: the dish takes the gap's
       squeeze as its source and the gap's own push goes. Moves what `npm run squeeze`
       measures, so it wants the owner's eyes on Beat Squeeze first (27f-3).
+    - **18a-13i. A look that tips its dish waits for the dish's kernels in its opening:
+      shipped** (2026-10-29; found by the first deploy run on the owner's Mac, `npm run
+      startup`). `gpu/opening.ts` has a `slosh` flag read by `WebGPUSlosh.prepare` and
+      `addSlosh`. Story in `docs/plan-shipped.md` §18a-13i.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

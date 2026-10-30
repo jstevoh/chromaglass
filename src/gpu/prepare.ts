@@ -409,7 +409,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUPlate.prepare(device, format, PICTURE_FORMAT, open),
     ...WebGPUFrameProbe.prepare(device),
     ...WebGPUAir.prepare(device),
-    ...WebGPUSlosh.prepare(device),
+    ...WebGPUSlosh.prepare(device, open),
     ...WebGPUParticles.prepare(device, open),
     ...WebGPUCamera.prepare(device, format, open),
     ...WebGPUOutput.prepare(device, format),

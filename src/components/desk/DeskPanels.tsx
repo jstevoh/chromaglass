@@ -11,7 +11,7 @@ import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import { PINNABLE, PIN_RANGE, type DeskSpec } from '../../lib/deskPins';
-import { PANEL_BY_ID, whereIs } from '../../lib/deskLayout';
+import { PANEL_BY_ID, drawnElsewhere, whereIs } from '../../lib/deskLayout';
 import { relayInfo, type RelayInfo } from '../../lib/remoteProtocol';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { encodeQr, qrPath } from '../../lib/qr';
@@ -35,26 +35,6 @@ import { SHOW_PATH } from '../../lib/showPath';
  * them (`npm run saves`, `npm run layout`, the Mac's `qa`) are asking about
  * the controls, not about which column they were in.
  */
-
-/*
-  What a performer rides. Each has to pass three tests: it shows on any look
-  within a second, pulling it back undoes it, and it does something no other
-  ride does.
-
-  Dimmer (intensity), Speed (motion), Turbulence (calm glass to boiling),
-  Beat Press (the kick squeezes the glass), Plate Rock (the kick tips the
-  plate and it sloshes back), Soap Bursts (the dye blown apart on the beat),
-  Zoom (a dive into the liquid), and Evolve Speed (how far the show wanders
-  on its own; raising it from zero switches Random Evolve on).
-
-  Swirl and Gravity were here and are not now, though Choose still has both.
-  Swirl only spins up eddies a look already has, so on a calm one it did
-  next to nothing. Gravity pours the dye down the plate and pulling it back
-  does not bring the dye up again: it is a scene change, not a ride.
-*/
-export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
-  'dimmer', 'globalSpeed', 'turbulenceScale', 'beatSqueeze', 'plateRock', 'surfactantFlow', 'macroZoom', 'automateRate',
-];
 
 const RANGE = PIN_RANGE;
 
@@ -520,6 +500,8 @@ function RecipeBody({ p }: { p: DeskProps }) {
     the recipe leaves them to the rides, which is where Gig keeps them.
   */
   const ridesOut = whereIs(p.layout, 'rides') !== null;
+  // And so are the controls themselves: one control, one place on a tab (`drawnElsewhere`).
+  const elsewhere = drawnElsewhere(p.layout, 'recipe', p.recipeKeys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="recipe">
       <div className="flex h-7 shrink-0 items-center justify-end px-3">
@@ -544,7 +526,8 @@ function RecipeBody({ p }: { p: DeskProps }) {
               Nothing on the recipe. <span className="text-text">Choose</span> picks what is here.
             </p>
           )}
-          <ControlGrid keys={p.recipeKeys} p={p} prefix="recipe" />
+          <ControlGrid keys={p.recipeKeys.filter(k => !elsewhere.has(String(k)))} p={p} prefix="recipe" />
+          <Elsewhere held={elsewhere} testId="recipe-elsewhere" />
           {!ridesOut && (
             <div className="mt-2 border-t border-border pt-1">
               <Toggle
@@ -841,6 +824,22 @@ function ToolsBody({ p }: { p: DeskProps }) {
   );
 }
 
+/**
+ * The line under a panel that left some of its controls to another on the
+ * tab: which, and where. Without it a control chosen for the Recipe and not
+ * drawn there would look lost, and the panel that has it is the one to open.
+ */
+function Elsewhere({ held, testId }: { held: Map<string, string>; testId: string }) {
+  if (held.size === 0) return null;
+  const by = new Map<string, string[]>();
+  for (const [key, panel] of held) by.set(panel, [...(by.get(panel) ?? []), RANGE.get(key)?.label ?? key]);
+  return (
+    <p className="pt-2 pb-1 text-[12px] leading-snug text-faint" data-testid={testId}>
+      {[...by].map(([panel, labels]) => `${labels.join(', ')} on ${PANEL_BY_ID.get(panel)?.name ?? panel}`).join(' · ')}
+    </p>
+  );
+}
+
 // ── A section, as knobs or whole ─────────────────────────────────────
 
 const SECTION_KEYS = new Map<string, (keyof VisualizerSettings)[]>();
@@ -849,10 +848,13 @@ for (const s of PINNABLE) SECTION_KEYS.set(s.section, [...(SECTION_KEYS.get(s.se
 function KnobsBody({ id, p }: { id: string; p: DeskProps }) {
   const keys = SECTION_KEYS.get(id) ?? [];
   const name = PANEL_BY_ID.get(id)?.name ?? id;
+  // A knob the Rides or the Recipe have out is drawn there, not here as well (`drawnElsewhere`).
+  const elsewhere = drawnElsewhere(p.layout, id, keys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid={`section-knobs-${id}`}>
       <div className={scroller}>
-        <ControlGrid keys={keys} p={p} prefix="knob" />
+        <ControlGrid keys={keys.filter(k => !elsewhere.has(String(k)))} p={p} prefix="knob" />
+        <Elsewhere held={elsewhere} testId={`panel-${id}-elsewhere`} />
       </div>
       {/*
         The rest of the section: its switches and pickers are not numbers, so

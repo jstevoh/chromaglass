@@ -9,7 +9,7 @@ Before starting anything that is not a bug fix, read `PLAN.md`: it is the plan's
 order, and a table of the sections. Then read only the file your step names: each section
 is a file under `docs/plan/` (`00-dye-tools.md` to `36-analog-operators.md`, a big one cut
 between items into parts of about 30 KB), and `grep -rn '14ab-4' docs/plan/` finds
-an item from its id. Never read every section: the open plan is about 700 KB in all, and
+an item from its id. Never read every section: the open plan is about 630 KB in all, and
 see "Keeping a session small" for why that matters. What shipped is in
 `docs/plan-shipped.md`, under the same numbers: a section keeps a one-line stub per shipped
 item and only the open work, so read the archive only when an open item needs the history
@@ -84,11 +84,11 @@ skill: the lab renders the real plate shader on a deterministic plate.
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | areas of the dish and their cords (`src/lib/plateAreas.ts`, `src/lib/areaCords.ts`, a preset's area cords) | `areacords` (`-- --node` for the gate and the tables; the lab half with `PW_WEBGPU=1`), `plate`, `desk` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
-| Preview's copy (`drafting`, `wallRef` in `App.tsx`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
+| Preview's copy (`drafting`, `wallRef` in `src/app/useWallLook.ts`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
 | the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
 | sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`, `useAudioAnalyzer`, `lib/earClock.ts`, `lib/audioFeatures.ts`, `lib/handSounds.ts`) | `shelf`, `music`, `ears`, `renders` (what the sound re-renders, and whether the plate hears each frame's reading), `kicks`, `clicks` (a click on the laptop is not a beat; `-- --app` in a browser) |
 | the patch bay's cords (`src/lib/sceneMap.ts`, a cord's gate, gain or dragged band; `CordGate` in `lib/areaCords.ts`) | `soundcords` (`-- --controls` until PLAN 30a is built), `scene`, `areacords -- --node` |
-| the cartoons (`src/lib/cartoons.ts`, `public/video/cartoons/`, `CartoonShelf.tsx`), the video pour (`pourVideo`, `pourVideoFrom` in `App.tsx`) | `cartoons` (a new cartoon gets its row in `public/video/cartoons/SOURCES.md` first), `phone`, `layout` |
+| the cartoons (`src/lib/cartoons.ts`, `public/video/cartoons/`, `CartoonShelf.tsx`), the video pour (`pourVideo`, `pourVideoFrom` in `src/app/usePour.ts`) | `cartoons` (a new cartoon gets its row in `public/video/cartoons/SOURCES.md` first), `phone`, `layout` |
 | `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
 | `scripts/watch.mjs` | `npm run watch -- --selftest` and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |
@@ -150,6 +150,13 @@ deploy:
   file the site is built from differs from the commit that is live (a docs, check
   or workflow merge; PLAN.md 19j), the deploy checks and publishes nothing, green in
   seconds. A run started by hand always checks and deploys.
+- **The owner's Mac** takes a deploy's Mac shards when it is online and idle (a probe job
+  in `deploy.yml` asks first; the runner's label is `owner-mac`), otherwise they go to
+  GitHub's macOS machines as before. Never a pull request's run: the runner's job-started
+  hook refuses all but `deploy.yml` on main. A shard stalled on a sleeping Mac moves to
+  GitHub's after 15 minutes (`Watchdog`); by hand, **Re-run all jobs**, never failed jobs.
+  Setup, pausing it for a show, and what a job there can reach: `docs/mac-runner.md`
+  (PLAN.md 19ah).
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured), `pixels.yml` (every

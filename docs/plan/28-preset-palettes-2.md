@@ -14,13 +14,7 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
   it sells in (PLAN 23: Home includes one pack, Pro all). The reworks go to Antigravity as
   short briefs; this item lists them as they are briefed.
 
-  Judged on the Mac gallery of 2026-10-19 (8, 20 and 40 s, `scripts/judge.mjs`'s numbers)
-  against the 2026-10-11 film. Of 41 looks, 10 retire (nine in batch 1, Lumia after 28i-5), 31 stay, 21 of those reworked. The
-  three faults the photos share: looks that stand still (eight under .01 gallery motion at
-  20 and 40 s, four more by eye; Acid Trip reads .11 to .23), looks that lose the black
-  (Classic, Galaxy, Cell Bloom drains to flat indigo, flat .21 to .81 and luma .52 to .08
-  by 40 s), and looks on a white ground (Turing Print at luma .85 to .94 for 20 s,
-  Sensual Laboratory, Roy at .7).
+  *Judged so far* (the Mac gallery of 2026-10-19 against the 2026-10-11 film): of 41 looks, 10 retire (nine in 28i-1, Lumia after 28i-5), 31 stay, 21 of those reworked; the three shared faults were stillness, lost black and a white ground. Story in `docs/plan-shipped.md` §28i (moved 2026-10-29, 19m-2).
 
   - ~~**28i-1. Retire nine**~~ (Antigravity, batch 1, **shipped** in #408; story in
     `docs/plan-shipped.md` 28i-1): nine ids through `RETIRED_PRESETS`, every check that
@@ -30,13 +24,7 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     fails on any quoted retired id in src/, so retiring the look trips it on the layer.
     5b learns to tell a preset id from a setting key (named under `Check changes:`, its
     reach unchanged for preset ids), then the look retires.
-  - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2,
-    **shipped** in this PR; story in `docs/plan-shipped.md` 28i-2): all 21 reworked looks
-    meet their gallery (`8/20/40 s`) and film (`90 s`) bars; `jellyfish-bloom` appears once
-    in `evolution.ts`'s `calm` bucket and `poster-1969` appears once in `sequencer.ts`'s
-    `Pace` sequence. `poster-1969` now runs on a single plate (`layerCount: 1`), raising its
-    12 s step rate from `15.9 steps/s` (two 384² plates) to `24.8 steps/s` (one 384² plate);
-    reaching `>= 30 steps/s` (`PINNED_STEP_RATE = 30`) is open as **28i-2a** below.
+  - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2) **Shipped**: all 21 reworked looks meet their gallery and film bars; Poster's `>= 30 steps/s` is open as **28i-2a** below. Story in `docs/plan-shipped.md` §28i-2 (moved 2026-10-29, 19m-2).
   - **28i-2a, open. Poster, 1969's step rate on a single 384² plate.** Measured over 12 s
     (`squeeze` harness), `poster-1969` on `main` ran `layerCount: 2` (`2 × 384²` thin-gap
     plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at
@@ -63,16 +51,7 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
   - **28i-3. Sound on the liquid, not the frame** (batch 3, **open for the film measure**;
     frame fixes on the eight looks and the Milk Marbling dead-patch fix **shipped** in #473,
     story in `docs/plan-shipped.md` 28i-3).
-    - ~~**Frame fixes on the eight looks and Milk Marbling's dead patch**~~ (**shipped** in
-      #473): Galaxy (`energy`), Cyberpunk (`complexity`), Acid Trip (`energy`), Aurora
-      (`energy`), Solar Flare (`bass`), Fractal Dream (`treble`), Neon Coral Reef (`timbre`)
-      and Stardust Collapse (`bass`) moved `audioMappings.rotation` to `'none'` and onto
-      liquid targets (`npm run framesway` counts the slot, 59 of 59 still; the other two of
-      28f-3's ten, `timbre-shifter` in #351 and `deep-ocean` in #408, had already left the
-      slot). Milk Marbling's `treble → airVelocity` at depth `.02` (gated to `0` under `0.1`
-      in `LiquidVisualizer.tsx:4257`) is replaced with two area cords on its food-colouring
-      spots (`npm run soundpatch` §1 folds each patch on the look's own settings too, 100 of
-      100 move).
+    - ~~**Frame fixes on the eight looks and Milk Marbling's dead patch**~~ **Shipped** (#473). Story in `docs/plan-shipped.md` §28i-3 (moved 2026-10-29, 19m-2).
     - **28i-3b, open (with 28f-2).** Every look that hears sound now carries two or three
       fast liquid patches or area cords from `hits`, `bands`, onsets and notes only (#473;
       `npm run soundpatch` §2 counts both plate-wide liquid patches and area cords on fast

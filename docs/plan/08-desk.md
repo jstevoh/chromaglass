@@ -61,6 +61,13 @@ Open from Desk v2, each its own thread (the UI lane):
     - **8-draw-a-3** (S) OSC's `/blow`, `/drop`, `/press` still take the plate's point,
       not the wall's, so a TouchOSC pad has the old pad's fault (only its middle lands
       under the finger). A `/wall/...` form, or a flag argument, as the remote's `wall`.
+    - ~~**8-draw-a-4** A slow show starved the pad: 3 pictures out at once gave 6.3/s at
+      14 frames~~ (shipped 2026-10-29; `docs/plan-shipped.md` §8-draw-a).
+    - **8-draw-a-5** (S) `drawwall --app` reads the pad at whatever rate the runner
+      draws, so the real plate's slow trip is tested only when a runner happens to be
+      starved (the stand-in's held reads cover the sender). A phase that slows the
+      display itself, a page in the same browser loading the shared GPU until the show
+      draws about 14 frames, would test it on every run. *Measure:* the line's trace.
   - **8-draw-b** (S) The phone's Draw has no bottle, Spin or Tilt (the design's four
     tools only); they are in Controls. A bottle tile on the phone, or a long press on
     Drop for the bottle list, would put soap on the plate from Draw.
@@ -163,27 +170,8 @@ Open from Desk v2, each its own thread (the UI lane):
   in `docs/plan-shipped.md` §8j (moved 2026-10-29, 19m).
   - **8j-1** (S) The remote page (`RemoteControl.tsx`) has its own sliders and no card;
     its names are whole, but the line would help there too.
-  - ~~**8j-2** Cards that stuck and stacked~~ (the owner, 2026-10-24: Macro Zoom's card
-    stayed up under Evolve Speed's). **Shipped.** A knob whose mouse-up never reached the
-    page thought a hand was still on it: Chromium then sends no pointerup, only a
-    lostpointercapture on the next buttonless move, which the knob did not hear. The
-    drag now ends on a lost capture, a release or cancel anywhere in the window, a move
-    with no button down, or the window losing focus; and one card is up at a time,
-    whatever asked for it. Checks: `npm run layout` (two knobs with swallowed releases;
-    a focused card replaced by a hovered one), `npm run phone` (a tap on another name
-    swaps the card). Which gesture on the owner's Mac swallowed the release is not known.
-  - ~~**8j-3** Hover cards wait much longer~~ (the owner, 2026-10-27: "tool tips on
-    hover over are getting annoying"). **Shipped.** One constant, `TIP_DELAY_MS` (1.5 s,
-    `src/lib/tipDelay.ts`), was 380 ms for the knob and fader cards, and the browser's own
-    `title=` tips (about 240 of them, near a second, not slowable) came up on top. Both
-    now wait the one number, counted afresh on every control with no grace between
-    neighbours: `src/lib/titleTips.ts` lifts a `title` off the element under a mouse or
-    pen, draws its words on a card after the wait and puts it back when the hand goes,
-    presses, types or scrolls (also in a panel's own window). The phone is unchanged: a
-    touch never starts the wait and the name tap still opens its card at once. Checks:
-    `npm run layout` (a knob's card and a `title=` are each absent at 60% of the wait and
-    up after it; the title is back and the card gone after), `npm run phone`.
-    Not changed: the remote page and the cast page, which do not install it.
+  - ~~**8j-2** Cards that stuck and stacked~~ (the owner, 2026-10-24). **Shipped**: a drag ends on a lost capture, a release anywhere, a buttonless move or lost focus, and one card is up at a time (`npm run layout`, `npm run phone`). Which gesture on the owner's Mac swallowed the release is not known. Story in `docs/plan-shipped.md` §8j-2 (moved 2026-10-29, 19m-2).
+  - ~~**8j-3** Hover cards wait much longer~~ (the owner, 2026-10-27). **Shipped** (#509): one `TIP_DELAY_MS` (1.5 s) for the knob cards and the `title=` tips (`src/lib/titleTips.ts`; `npm run layout`, `npm run phone`); the remote and cast pages do not install it. Story in `docs/plan-shipped.md` §8j-3 (moved 2026-10-29, 19m-2).
 
 *Proposed 2026-09-28:* **pictures, not swatches, in the cue list.** In the dark a look is
 picked by its name and one colour swatch (`lookSwatch`, `PhoneStage.tsx`, and the desk's

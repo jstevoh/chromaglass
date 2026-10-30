@@ -67,6 +67,7 @@ import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '../lib/intro';
+import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid } from '../sim/tools';
@@ -747,9 +748,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
 
   const videoPourRef = useRef<HTMLVideoElement | null>(null);
-  const videoFlowCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoFlowCtxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const videoFlowPrevRef = useRef<Uint8ClampedArray | null>(null);
+  /** The video the pour's last frame was of, and that frame for the CPU's loop (lib/videoFlow.ts). */
+  const videoFlowRef = useRef<VideoPourState>({ source: null, prev: null });
+  /** The frame drawn at the grid's size and read back, for a solver with no pass of its own; null when it cannot be read (another origin's video). */
+  const readVideoFrame = (v: CanvasImageSource, S: number): Uint8ClampedArray | null => {
+    if (!videoFlowCtxRef.current) {
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      videoFlowCtxRef.current = c.getContext('2d', { willReadFrequently: true });
+    }
+    const ctx = videoFlowCtxRef.current;
+    if (!ctx) return null;
+    try {
+      ctx.drawImage(v, 0, 0, S, S);
+      return ctx.getImageData(0, 0, S, S).data;
+    } catch { return null; }
+  };
 
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
@@ -1699,7 +1714,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       videoPourRef.current?.pause();
       videoPourRef.current = video;
-      videoFlowPrevRef.current = null;   // the last video's frame is no reference for this one's motion
+      videoFlowRef.current.source = null;   // the last video's frame is no reference for this one's motion
       video.play().catch(() => { /* plays on the next gesture */ });
     },
     stopPourVideo: () => {
@@ -3314,173 +3329,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
 
         // ── Video Pour (Transparency & Optical Flow) ──
-
-
+        /*
+          The video's dye and its motion as flow (lib/videoFlow.ts). On the
+          WebGPU solver the frame goes to the GPU and is worked out there
+          (PLAN 14ab-2): this was a 192² getImageData, a 147 KB copy and
+          thirty-six thousand addDensity calls every frame, and every row of
+          the deltas sent across each step. Otherwise it runs here as it did.
+        */
         if (videoPourRef.current && !videoPourRef.current.paused && videoPourRef.current.readyState >= 2) {
-
-
           videoPourReadsRef.current++;
-          const v = videoPourRef.current;
-
-
           const fluid = fluidsRef.current[0];
-
-
-          if (fluid) {
-
-
-            const S = fluid.size;
-
-
-            if (!videoFlowCanvasRef.current) {
-
-
-              const c = document.createElement('canvas');
-
-
-              c.width = S; c.height = S;
-
-
-              videoFlowCanvasRef.current = c;
-
-
-              videoFlowCtxRef.current = c.getContext('2d', { willReadFrequently: true });
-
-
-            }
-
-
-            const ctx = videoFlowCtxRef.current;
-
-
-            if (ctx) {
-
-
-              ctx.drawImage(v, 0, 0, S, S);
-
-
-              const imgData = ctx.getImageData(0, 0, S, S);
-
-
-              const data = imgData.data;
-
-
-              const prev = videoFlowPrevRef.current;
-
-
-              const flowStrength = 0.8;
-
-
-              
-
-
-              for (let y = 1; y < S - 1; y++) {
-
-
-                for (let x = 1; x < S - 1; x++) {
-
-
-                  const i = (y * S + x) * 4;
-
-
-                  const r = data[i], g = data[i+1], b = data[i+2];
-
-
-                  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-
-
-                  
-
-
-                  // Luma-key transparency: Dark pixels are ignored
-
-
-                  if (lum > 15) {
-
-
-                    const alpha = lum / 255.0;
-
-
-                    fluid.addDensity(x, y, alpha * 0.15, r/255.0, g/255.0, b/255.0);
-
-
-                  }
-
-
-                  
-
-
-                  // Optical Flow Velocity
-
-
-                  if (prev) {
-
-
-                    const prevLum = 0.299 * prev[i] + 0.587 * prev[i+1] + 0.114 * prev[i+2];
-
-
-                    const diff = lum - prevLum;
-
-
-                    if (Math.abs(diff) > 10) {
-
-
-                      const lumX = (0.299 * data[i+4] + 0.587 * data[i+5] + 0.114 * data[i+6]) - 
-
-
-                                   (0.299 * data[i-4] + 0.587 * data[i-3] + 0.114 * data[i-2]);
-
-
-                      const lumY = (0.299 * data[i + S*4] + 0.587 * data[i + S*4 + 1] + 0.114 * data[i + S*4 + 2]) - 
-
-
-                                   (0.299 * data[i - S*4] + 0.587 * data[i - S*4 + 1] + 0.114 * data[i - S*4 + 2]);
-
-
-                      const gradMag2 = lumX * lumX + lumY * lumY;
-
-
-                      if (gradMag2 > 1) {
-
-
-                        // Flow velocity formula: - (dI/dt) * Grad(I) / |Grad(I)|^2
-
-
-                        const vx = -diff * lumX / gradMag2 * flowStrength;
-
-
-                        const vy = -diff * lumY / gradMag2 * flowStrength;
-
-
-                        fluid.addVelocity(x, y, vx, vy);
-
-
-                      }
-
-
-                    }
-
-
-                  }
-
-
-                }
-
-
-              }
-
-
-              videoFlowPrevRef.current = new Uint8ClampedArray(data);
-
-
-            }
-
-
-          }
-
-
+          if (fluid) pourVideoFrame(fluid, videoPourRef.current, videoFlowRef.current, readVideoFrame);
         }
-
 
         for (let simStep = 0; simStep < simSteps; simStep++) {
           // The room stirs the lead plate: it is ambient, not a tool, so it
@@ -6083,7 +5943,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
         /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
-        padPicture: (() => { const s = padPictureSender(); return s ? { sent: s.sent, bytes: s.bytes, wanted: s.wanted, via: s.via, from: s.from } : null; })(),
+        padPicture: padPictureSender()?.debug ?? null,
         /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
         wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */

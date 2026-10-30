@@ -50,23 +50,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
 
 **Running order.** Steps marked *(owner)* need the owner's Mac and a VJ app on it.
 
-1. **The wrapper** (one PR): an Electron app for the Mac with the built site inside
-   it (offline from the first launch), the show server started with it, the show
-   window opened on the projector with no click needed, background throttling off,
-   and a macOS build on the CI runner. A check loads the packaged app with the
-   network off and sees a lit plate. **Shipped** (2026-09-27): `desktop/` (its
-   README has the build, the signing secrets and the first launch), the check
-   `npm run desktop` run on the packed app by `.github/workflows/desktop.yml` on a
-   Mac, which also builds the `.dmg` (Actions → Mac app → Run workflow). The server
-   is `server/remote-server.js` unchanged, imported by the app; the app keeps its
-   show key between launches; `useProjector` sends the show to a projector with no
-   gesture when `isDesktopApp()`, and the app fills the projector's screen itself.
-   Measured in a cloud session before and after: with a stand-in second screen, no
-   projector window opened before, one opened in full screen after; without the
-   app's fill, the wall showed the click hint and the laptop the title-bar chip.
-   **Owed:** the Mac look (`docs/judging.md` §26), and signing it with the owner's
-   Developer ID (the secrets in `desktop/README.md`); until then macOS asks once in
-   Privacy & Security before it opens.
+1. ~~**The wrapper**~~ **Shipped** (2026-09-27, #207): `desktop/`, checked by `npm run desktop` on the packed app in `desktop.yml`. Story in `docs/plan-shipped.md` §13.1 (moved 2026-10-29, 19m-2). **Owed:** the Mac look (`docs/judging.md` §26); signing landed with 13-update-signed.
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
    the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
@@ -200,12 +184,7 @@ network):
 - Record keeps the whole take in memory until it stops (`src/hooks/useRecorder.ts`).
   That's fine for a song and risky for a set. In Chrome, write to a file as it
   records (File System Access).
-- Shipped: Flexible Canvas Video Recording & Performance Separation (`src/hooks/useRecorder.ts`,
-  `src/components/RecordPanel.tsx`, `src/components/desk/RecordControls.tsx`). Canvas-only video
-  recording with optional audio inclusion toggle, quality presets (Master 30 Mbps, Standard 12 Mbps,
-  Compact 5 Mbps), frame rate (60/30 fps), container selection (Auto, WebM, MP4), and last take tracking.
-  Performance gesture/stroke recording is clearly separated and controlled side-by-side in desk toolbars
-  and a unified recording studio modal (`R` for video, `T` for performance).
+- ~~Flexible Canvas Video Recording & Performance Separation~~ **Shipped**. Story in `docs/plan-shipped.md` §13 (moved 2026-10-29, 19m-2).
 - The popup projector has only been used with one projector. Run two before rig R1
   counts on it.
 
@@ -230,24 +209,8 @@ network):
 - **13-update** (**shipped** ad hoc, asked 2026-10-25; the story is in
   `docs/plan-shipped.md` §13) Story in `docs/plan-shipped.md` §13-update (moved 2026-10-29,
   19m).
-  - **13-update-signed** *(shipped 2026-10-27: the first signed and notarised release,
-    1.3.692, went live at 7:12 PM PT; `MAC_APP_NOTARISED` is now true in
-    `src/lib/macApp.ts`, so the profile sheet's Mac app card and the landing page stop
-    telling the Open Anyway way round, and `npm run updates` asserts the flag and that
-    both pages still gate the words on it. The build job's limit went from 40 to 75
-    minutes after a run was cancelled at 40 still waiting on Apple's notary service.
-    Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces
-    it in place)*: with the Developer ID secrets in, the same code downloads in the
-    background and installs on quit. Nothing else to build. The release notes stopped
-    by themselves, from what `spctl` says of the built app.
-  - **13-first-open** *(shipped)*: the first release, 1.3.622 (2026-10-25), was refused on
-    the owner's Mac ("may harm your Mac"), and the reply sent then said right-click →
-    Open, which macOS 15 no longer offers for an app it cannot check. The release notes
-    (when `spctl` refuses the build), the profile sheet's Mac app card and the landing
-    page's download line now say System Settings → Privacy & Security → Open Anyway;
-    `desktop/README.md` adds the `xattr` way. Only a Developer ID **and** notarisation
-    (13.1-sign) removes the warning. *Measure:* `npm run updates`, two lines (the words,
-    and the notes' gate before publishing).
+  - ~~**13-update-signed**~~ **Shipped** (2026-10-27: the first signed and notarised release, 1.3.692; `MAC_APP_NOTARISED` is true and `npm run updates` asserts it). Story in `docs/plan-shipped.md` §13-update-signed (moved 2026-10-29, 19m-2). Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces it in place.
+  - ~~**13-first-open**~~ **Shipped**: the release notes, the profile sheet's Mac app card and the landing page say Open Anyway (`npm run updates`). Story in `docs/plan-shipped.md` §13-first-open (moved 2026-10-29, 19m-2).
   - *Trap:* the updater reads the repository's **newest** release. Any other kind of
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
     with `--latest=false`, or every installed app looks for `latest-mac.yml` in it

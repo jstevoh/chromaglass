@@ -59,11 +59,20 @@ const prOf = (run) =>
     .filter((p) => p.head.ref === run.head_branch && t(p.created_at) <= t(run.created_at))
     .sort((a, b) => t(b.created_at) - t(a.created_at))[0];
 
+// The owner's own Mac (a self-hosted runner, PLAN.md 19ah) asks for the label
+// `owner-mac` and not `macos`, so its jobs are kept apart from GitHub's: the
+// figures below are the account's queue, and the owner's Mac is not in it.
+const OWN = 'owner-mac';
 const jobs = [];
+const own = [];
 const waiting = [];
 for (const run of runs) {
   const list = get(`actions/runs/${run.id}/jobs?per_page=100&filter=all`).jobs;
   for (const job of list) {
+    if ((job.labels || []).includes(OWN)) {
+      if (job.status === 'completed' && job.runner_name && job.started_at) own.push({ job, run });
+      continue;
+    }
     if (!(job.labels || []).some((l) => /macos/i.test(l))) continue;
     if (job.status !== 'completed') {
       waiting.push({ job, run });
@@ -79,6 +88,40 @@ const ranMs = ({ job }) => t(job.completed_at) - t(job.started_at);
 const waitMs = ({ job }) => t(job.started_at) - t(job.created_at);
 
 console.log(`macOS jobs in the last ${hours} h (since ${since}): ${runs.length} runs, ${jobs.length} Mac jobs that a runner took\n`);
+
+// Every deploy that ran Mac shards, and where they ran: what the owner asked
+// to have measured once the Mac took deploys (2026-10-28). Read from the
+// deploy workflow's own runs, so the 1,000-run cap above does not cut it
+// short. The time is push to finished, the wait each shard's queue.
+{
+  const deploys = [];
+  for (let page = 1; page <= 5; page++) {
+    const j = get(`actions/workflows/deploy.yml/runs?per_page=100&page=${page}&status=completed&created=%3E%3D${since}`);
+    deploys.push(...j.workflow_runs);
+    if (j.workflow_runs.length < 100) break;
+  }
+  const rows = { "GitHub's": [], "the owner's": [], 'both': [] };
+  for (const run of deploys) {
+    const mac = get(`actions/runs/${run.id}/jobs?per_page=100&filter=latest`).jobs.filter((j) => /^WebGPU \(macOS\) · /.test(j.name) && j.runner_name && j.started_at);
+    if (!mac.length) continue;
+    const mine = mac.filter((j) => (j.labels || []).includes(OWN)).length;
+    const where = mine === 0 ? "GitHub's" : mine === mac.length ? "the owner's" : 'both';
+    rows[where].push({
+      wait: mac.reduce((a, j) => a + t(j.started_at) - t(j.created_at), 0) / mac.length,
+      span: Math.max(...mac.map((j) => t(j.completed_at))) - Math.min(...mac.map((j) => t(j.created_at))),
+      total: t(run.updated_at) - t(run.created_at),
+      ok: run.conclusion === 'success',
+    });
+  }
+  const mean = (a, k) => min(a.reduce((s, r) => s + r[k], 0) / a.length).trim();
+  console.log(`deploys that ran the Mac shards (${deploys.length} deploys in the window):`);
+  for (const [where, a] of Object.entries(rows)) {
+    if (a.length) console.log(`  on ${where} Macs: ${a.length} (${a.filter((r) => r.ok).length} green), a shard waited ${mean(a, 'wait')} min, the shards took ${mean(a, 'span')} min from queued to done, the deploy ${mean(a, 'total')} min push to finished`);
+  }
+  if (own.length) console.log(`  the owner's Mac ran ${own.length} jobs, ${min(own.reduce((a, j) => a + ranMs(j), 0)).trim()} runner-minutes, a mean ${min(own.reduce((a, j) => a + waitMs(j), 0) / own.length).trim()} min after each was queued`);
+  console.log('');
+}
+
 const total = jobs.reduce((a, j) => a + ranMs(j), 0);
 if (!total) {
   console.log('no Mac job ran in the window');
