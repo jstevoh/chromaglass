@@ -776,8 +776,17 @@ const api = {
       await buf.mapAsync(GPUMapMode.READ);
       const src = new Uint8Array(buf.getMappedRange());
       const out = new Uint8Array(size * size * 4);
+      // The plate draws into the camera's scene the way the app does, flipped
+      // (a texture's rows run the other way from a canvas's), and its aux
+      // attachment with it; the camera turns the picture upright as it reads
+      // the scene, but the aux is read here as stored. Read without turning,
+      // the slope under each pixel was its mirror row's, and the check of
+      // where refraction acts (npm run lens) passed on that mirror: 54.6% of
+      // "steep" pixels moved against 12.0% of "flat", where the right way up
+      // reads 88.3% against 0.9%.
+      const upside = kind === 'aux' ? !!camera || flipped : flipped;
       for (let y = 0; y < size; y++) {
-        const from = flipped ? size - 1 - y : y;
+        const from = upside ? size - 1 - y : y;
         out.set(src.subarray(from * row, from * row + size * 4), y * size * 4);
       }
       buf.unmap(); buf.destroy(); if (kind !== 'aux') tex.destroy();

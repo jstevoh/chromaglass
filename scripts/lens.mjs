@@ -26,29 +26,48 @@
  * Asked here:
  *
  *   1. the gate: the pass is wanted when Lens or any of the four optics is up
- *      and by nothing else; the defaults and every shipped look and every roll
- *      of Lucky that has Lens at 0 have all four at 0, so no look changes;
+ *      and by nothing else (every other number in the settings is turned to 1
+ *      in turn and none wakes it); the defaults and every shipped look and
+ *      every roll of Lucky that has Lens at 0 have all four at 0, so no look
+ *      changes;
  *   2. each dial alone, with Lens at 0, moves a share of the frame that a
- *      person sees (at least 8 levels in some channel), above a bar, and a
- *      half-turn moves less than a full one (a dial, not a switch);
+ *      person sees (at least 8 levels in some channel), above a bar; a
+ *      half-turn moves less than a full one and a turn to nearly 0 (0.002)
+ *      next to nothing, so it is a dial that fades out, not a switch;
  *   3. controls: the same render twice is identical (so a difference is the
- *      dial); each dial at 0 is the off picture exactly; a plate with no dye
- *      on it gives refraction, aperture and bloom nothing to work on; Focus
- *      moves the frame with the aperture open and does not with it shut;
+ *      dial); every dial at 0 is the plate drawn with no pass at all; a dark
+ *      plate stays dark under every optic (none adds light of its own); on a
+ *      flat wash of dye refraction and aperture move nothing, because they act
+ *      on the relief and a wash has none, while bloom, which acts on light,
+ *      moves most of it; Focus moves the frame with the aperture open and does
+ *      not with it shut;
  *   4. Lens is the sensor's look and no more: Lens at 1 with the optics at 0
- *      changes the frame, and Lens at 1 over the optics keeps what they did;
- *   5. nothing in the camera pass is driven by the band: its sources read no
- *      sound, so the frame stays where the plate puts it;
+ *      changes the frame, and over the optics the optics still do at least
+ *      half of what they do without it while Lens still adds its own;
+ *   5. the camera pass's own code reads no sound, so the frame stays where the
+ *      plate puts it; a dial moves with the music only when a person patches
+ *      it to (MIDI; the patch bay has no keys for it, PLAN.md 33i-5);
  *   6. a look saved with Lens up opens looking as it did. The first reading of
  *      such a look, "it keeps its optics", was reviewed on this plate: the new
  *      optics are stronger at the same dial, so a look saved with the old
  *      defaults (aperture .5, bloom .4, chromatic .3, refraction .6) and Lens
  *      at 1 moved 8.1 levels on average (31.6% of pixels by 8 or more), and at
  *      Lens .6 10.5 (39.4%). Each such look is now rendered through the old
- *      pass (a child run of this script on the frozen old shader, below) and
+ *      pass (a second lab built on the frozen old shader, beside this one) and
  *      through the new pass with the settings the loader gives it, and the
  *      difference held under a bar; the unmigrated reading is rendered too, as
  *      the control, and must be far worse, or the bar measures nothing.
+ *
+ * The saved looks are drawn at 1024 px, not at the 384 the dials are. The old
+ * pass's blur circle was a count of pixels (nine per unit of height between
+ * the dye and the focal plane) and the new one is a share of the frame (a
+ * twentieth), so how the two compare depends on the frame, and a look saved
+ * before 33i was seen at the owner's, about a thousand pixels tall. The first
+ * fit of the aperture (0.8) was made at 384 and is right only there: at 1024
+ * the best is 0.3, which is 0.8 × 384/1024, and near focus 0, where the old
+ * circle was widest, smaller still (the loader's `apertureScale`). The 384 fit
+ * is rendered here as a second control: at 1024 it must miss the bar on a
+ * third of the looks, or the bar cannot tell a fit from a near one.
  *
  * `LENS_BEFORE=1` builds the lab on the camera shader as it was before 33i
  * and asks for the dials with Lens at 0, as a person would turn them: the
@@ -56,13 +75,10 @@
  * (the numbers are printed with it).
  */
 import { build } from 'esbuild';
-import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
 
 const BEFORE = !!process.env.LENS_BEFORE;
-// A child run on the old shader that only renders the saved looks and writes the frames here.
-const DUMP = process.env.LENS_DUMP;
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok });
@@ -73,26 +89,31 @@ const pct = (x) => `${(x * 100).toFixed(1)}%`;
 // What the owner's looks saved before 33i held beside Lens: the four optics
 // were multiplied by Lens then, and these were the defaults. Three sets (the
 // defaults, a strong set and a light one) at three Lens values, because the
-// old pass blended by Lens and the blur and the glow are not linear in a dial.
+// old pass blended by Lens and the blur and the glow are not linear in a dial;
+// and the three at Lens 1 over the focal plane, because the old blur circle
+// grew with the distance to it and the loader scales the aperture by Focus.
 const OLD = { aperture: 0.5, bloom: 0.4, chromaticAberration: 0.3, refraction: 0.6 };
 const SAVED_SETS = {
   'the old defaults': OLD,
   'every optic at .8': { aperture: 0.8, bloom: 0.8, chromaticAberration: 0.8, refraction: 0.8 },
   'every optic at .25': { aperture: 0.25, bloom: 0.25, chromaticAberration: 0.25, refraction: 0.25 },
 };
-const SAVED_LENS = [1, 0.6, 0.3];
-const SAVED = SAVED_LENS.flatMap((lens) => Object.entries(SAVED_SETS).map(([name, set]) => ({ lens, name, set })));
-const SAVED_FILE = 'node_modules/.cache/lens-saved-old.json';
 const FOCUS = 0.55; // DEFAULT_SETTINGS.focus, which the old pass was also shown with
+const looks = (lens, focus) => Object.entries(SAVED_SETS).map(([name, set]) => ({ lens, focus, name, set }));
+const SAVED = [...[1, 0.6, 0.3].flatMap((lens) => looks(lens, FOCUS)), ...[0.05, 0.3, 1].flatMap((focus) => looks(1, focus))];
+const SAVED_S = 1024;
+// The aperture's first fit, made at 384 px (the control below).
+const FIT_384 = 0.8;
 
 // The old pass's reading of a saved look: the dials as they were written.
-const oldCamera = (c) => ({ amount: c.lens, focus: FOCUS, aperture: c.set.aperture, bloom: c.set.bloom, chromatic: c.set.chromaticAberration, refraction: c.set.refraction });
+const oldCamera = (c) => ({ amount: c.lens, focus: c.focus, aperture: c.set.aperture, bloom: c.set.bloom, chromatic: c.set.chromaticAberration, refraction: c.set.refraction });
 
 // ── 1. The gate ───────────────────────────────────────────────────────
 const out = 'node_modules/.cache/lens-lib.mjs';
-// The saved looks, as the new pass is given them: the loader's reading, and the
-// settings as written (the control).
-let migratedCams = [], rawCams = [];
+// The saved looks, as the new pass is given them: the loader's reading, the
+// settings as written (the control), and the loader's reading with the
+// aperture at its 384 px fit (the second control).
+let migratedCams = [], rawCams = [], fit384Cams = [];
 if (!BEFORE) {
   await build({
     stdin: {
@@ -124,6 +145,14 @@ if (!BEFORE) {
     each.map(([k, v]) => `${k} ${v}: ${wanted({ [k]: v })}`).join(', '));
   check('Focus alone does not (a focal plane with nothing to blur shows nothing)',
     !wanted({ focus: 1 }));
+  // Every other number a look holds, turned all the way up on its own: the
+  // gate reads Lens and the four optics and nothing else, so no other dial
+  // switches a pass on that changes the frame (the sensor's grain moved out
+  // of this pass into the plate's own uniforms for that reason).
+  const others = Object.keys(D).filter((k) => typeof D[k] === 'number' && k !== 'camera' && !OPTICS.includes(k));
+  const woke = others.filter((k) => wanted({ [k]: 1 }));
+  check('no other setting asks for the pass: every other number in the settings, at 1 on its own, leaves it off',
+    others.length >= 50 && woke.length === 0, woke.length ? `woke it: ${woke.join(', ')}` : `${others.length} settings`);
   const drift = L.PRESETS.filter((p) => wanted(p.settings) !== ((p.settings.camera ?? 0) > 0.001));
   check('every shipped look keeps its camera as it was: on exactly when it set Lens above 0',
     drift.length === 0, drift.length ? `changed: ${drift.map((p) => p.id).join(', ')}` : `${L.PRESETS.length} looks`);
@@ -158,115 +187,128 @@ if (!BEFORE) {
     absent.refraction > 0 && absent.aperture > 0 && absent.bloom > 0 && absent.chromaticAberration > 0,
     OPTICS.map((k) => absent[k]).join('/'));
   migratedCams = SAVED.map((c) => {
-    const st = savedLook(2, { camera: c.lens, ...c.set }).settings;
+    const st = savedLook(2, { camera: c.lens, focus: c.focus, ...c.set }).settings;
     return { amount: st.camera, focus: st.focus, aperture: st.aperture, bloom: st.bloom, chromatic: st.chromaticAberration, refraction: st.refraction };
   });
   rawCams = SAVED.map(oldCamera);
+  fit384Cams = SAVED.map((c, i) => ({ ...migratedCams[i], aperture: Math.round(Math.min(1, c.set.aperture * c.lens * FIT_384) * 1000) / 1000 }));
   const up = L.upgradeSaved({ ...m2, version: 2, settings: { ...D, ...OLD, camera: 0 } });
   check('a set list\'s saved looks are read the same way', !L.cameraWanted(up.settings) && up.version === 3,
     `version ${up.version}, wanted ${L.cameraWanted(up.settings)}`);
 }
 
 // ── 2–4. The pass, in the lab ──────────────────────────────────────────
-const plugins = [];
 // The camera pass as it was before 33i, frozen in a fixture so this runs where
 // origin/main is not fetched and does not move when main does.
-if (BEFORE) {
-  const old = readFileSync('scripts/fixtures/camera-before-33i.ts.txt', 'utf8');
-  plugins.push({
-    name: 'old-camera',
-    setup(b) { b.onLoad({ filter: /src\/gpu\/wgsl\/camera\.ts$/ }, () => ({ contents: old, loader: 'ts' })); },
-  });
-}
-// The old pass's frames of the saved looks come from a run of this script on
-// the old shader, which renders them and stops: two shaders cannot live in one lab.
-if (!BEFORE) {
-  mkdirSync('node_modules/.cache', { recursive: true });
-  try {
-    execFileSync(process.execPath, ['scripts/lens.mjs'], { env: { ...process.env, LENS_BEFORE: '1', LENS_DUMP: SAVED_FILE }, stdio: 'pipe' });
-  } catch (e) {
-    console.log(String(e.stdout ?? '') + String(e.stderr ?? ''));
-    process.exit(1);
-  }
-}
-const { page, close } = await openLab({ plugins, tag: BEFORE ? 'lensbefore' : '' });
-const S = 384;
-const cams = DUMP ? SAVED.map(oldCamera) : [...migratedCams, ...rawCams];
-const r = await page.evaluate(async ({ S, cams, only }) => {
-  await lab.create(256);
-  const pal = lab.palette();
-  let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 9; i++) {
-    const a = lab.dyeOf(pal.colours[(i * 3) % pal.colours.length]);
-    lab.dye(0.15 + rnd() * 0.7, 0.15 + rnd() * 0.7, 0.06 + rnd() * 0.07, a, 1.4);
-  }
-  lab.flush(); await lab.step(40);
-  const draw = (cam) => lab.render(S, { granulation: 0 }, { camera: cam, time: 3 });
-  const b64 = (px) => {
+const oldShader = [{
+  name: 'old-camera',
+  setup(b) {
+    const old = readFileSync('scripts/fixtures/camera-before-33i.ts.txt', 'utf8');
+    b.onLoad({ filter: /src\/gpu\/wgsl\/camera\.ts$/ }, () => ({ contents: old, loader: 'ts' }));
+  },
+}];
+// The plate every frame of the dials and the saved looks is drawn from, and
+// the sums both labs share. `diff` is the share of pixels that moved by 8 or
+// more levels in some channel and the mean change (the larger of the three
+// channels at each pixel), over the pixels `win` keeps, or all of them.
+const helpers = () => {
+  window.nine = async () => {
+    await lab.create(256);
+    const pal = lab.palette();
+    let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 9; i++) {
+      const a = lab.dyeOf(pal.colours[(i * 3) % pal.colours.length]);
+      lab.dye(0.15 + rnd() * 0.7, 0.15 + rnd() * 0.7, 0.06 + rnd() * 0.07, a, 1.4);
+    }
+    lab.flush(); await lab.step(40);
+  };
+  window.b64 = (px) => {
     const u = new Uint8Array(px.buffer ? px.buffer : px); let t = '';
     for (let i = 0; i < u.length; i += 0x8000) t += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
     return btoa(t);
   };
-  const o = {};
-  o.frames = [];
-  for (const c of cams) o.frames.push(b64(await draw(c)));
-  if (only) return o;
-  const diff = (a, b) => {
-    let big = 0, sum = 0; const n = a.length / 4;
+  window.unb64 = (s) => { const t = atob(s); const u = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) u[i] = t.charCodeAt(i); return u; };
+  window.diff = (a, b, win) => {
+    let big = 0, sum = 0, n = 0;
     for (let i = 0; i < a.length; i += 4) {
+      if (win && !win[i / 4]) continue;
       const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
       if (d >= 8) big++;
-      sum += d;
+      sum += d; n++;
     }
-    return { share: big / n, mean: sum / n };
+    return { share: big / Math.max(1, n), mean: sum / Math.max(1, n) };
   };
+};
+const { page, close } = await openLab({ plugins: BEFORE ? oldShader : [], tag: BEFORE ? 'lensbefore' : '' });
+await page.evaluate(helpers);
+const S = 384;
+const r = await page.evaluate(async ({ S }) => {
+  await nine();
+  const draw = (cam) => lab.render(S, { granulation: 0 }, { camera: cam, time: 3 });
+  const o = {};
   const OFF = { amount: 0, focus: 0.5 };
   const off = await draw(OFF);
   o.off2 = diff(off, await draw(OFF));
-  const dials = { refraction: 'refraction', chromatic: 'chromatic', aperture: 'aperture', bloom: 'bloom' };
   o.dial = {};
-  for (const [name, key] of Object.entries(dials)) {
+  for (const key of ['refraction', 'chromatic', 'aperture', 'bloom']) {
     const full = await draw({ ...OFF, [key]: 1 });
     const half = await draw({ ...OFF, [key]: 0.5 });
-    const zero = await draw({ ...OFF, [key]: 0 });
-    o.dial[name] = { full: diff(off, full), half: diff(off, half), zero: diff(off, zero), atLens1: diff(await draw({ amount: 1, focus: 0.5 }), await draw({ amount: 1, focus: 0.5, [key]: 1 })) };
+    // Nearly 0, not 0: a dial at exactly 0 is the off picture by
+    // construction, so it would ask nothing. Measured 0.05, 0.03, 0.14 and
+    // 0.01 levels (refraction, chromatic, aperture, bloom).
+    const near = await draw({ ...OFF, [key]: 0.002 });
+    o.dial[key] = { full: diff(off, full), half: diff(off, half), zero: diff(off, near), atLens1: diff(await draw({ amount: 1, focus: 0.5 }), await draw({ amount: 1, focus: 0.5, [key]: 1 })) };
   }
   // Focus with the aperture open and shut.
   const open0 = await draw({ ...OFF, aperture: 1, focus: 0 });
   const open1 = await draw({ ...OFF, aperture: 1, focus: 1 });
   o.focusOpen = diff(open0, open1);
   o.focusShut = diff(await draw({ ...OFF, focus: 0 }), await draw({ ...OFF, focus: 1 }));
-  // Lens is the sensor look: on its own it moves the frame; over the optics it keeps them.
+  // Lens is the sensor look: on its own it moves the frame; over the optics it
+  // keeps them. What the optics do is measured twice, from the plain picture
+  // without Lens and from Lens's picture with it, so Lens's own change to the
+  // frame is not counted as the optics surviving it.
   const optics = { refraction: 1, bloom: 1, aperture: 1, chromatic: 1, focus: 0.3 };
   const lensOnly = await draw({ amount: 1, focus: 0.5 });
   o.lensOnly = diff(off, lensOnly);
   const opticsOff = await draw({ ...OFF, ...optics });
   const opticsLens = await draw({ ...OFF, ...optics, amount: 1 });
-  o.opticsKept = diff(off, opticsLens);
+  o.optics = diff(off, opticsOff);
+  o.opticsUnderLens = diff(lensOnly, opticsLens);
   o.lensOverOptics = diff(opticsOff, opticsLens);
   // The pass with every dial at 0 is the plate as it was without a pass:
   // nothing jumps when a dial leaves 0.
   o.nopass = diff(off, await lab.render(S, { granulation: 0 }, { time: 3 }));
   // What the lens has to work on, and where it works.
+  const slopeOf = (aux) => {
+    const sl = new Float32Array(aux.length / 4);
+    for (let i = 0; i < sl.length; i++) sl[i] = Math.hypot(aux[i * 4] / 255 * 2 - 1, aux[i * 4 + 1] / 255 * 2 - 1);
+    return sl;
+  };
   const aux = await lab.render(S, { granulation: 0 }, { camera: { amount: 0 }, aux: true, time: 3 });
   const m = aux.length / 4;
+  const slope = slopeOf(aux);
   let hs = 0, steep = 0, flat = 0, dyed = 0;
-  const slope = new Float32Array(m);
   for (let i = 0; i < m; i++) {
-    slope[i] = Math.hypot(aux[i * 4] / 255 * 2 - 1, aux[i * 4 + 1] / 255 * 2 - 1);
     hs += aux[i * 4 + 2];
     if (slope[i] > 0.2) steep++;
     if (slope[i] < 0.02) flat++;
     if (aux[i * 4 + 2] > 8) dyed++;
   }
   o.aux = { height: hs / m / 255, steep: steep / m, flat: flat / m, dyed: dyed / m };
+  // The same slope turned top to bottom: the control for the refraction's
+  // bars, which must fail them, or they hold for any reading of the slope.
+  // Before the lab read the aux upright under the camera this was the reading,
+  // and it gave 54.6% of steep pixels and 12.0% of flat.
+  const mirror = new Float32Array(m);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) mirror[y * S + x] = slope[(S - 1 - y) * S + x];
   // Where each dial changed a pixel, by the slope under it.
-  const moved = (a, b) => {
+  const moved = (a, b, sl = slope) => {
     let st = 0, st8 = 0, fl = 0, fl8 = 0, dark = 0, green = 0;
     for (let i = 0; i < m; i++) {
       const d = Math.max(Math.abs(a[i * 4] - b[i * 4]), Math.abs(a[i * 4 + 1] - b[i * 4 + 1]), Math.abs(a[i * 4 + 2] - b[i * 4 + 2]));
-      if (slope[i] > 0.2) { st++; if (d >= 8) st8++; }
-      else if (slope[i] < 0.02) { fl++; if (d >= 8) fl8++; }
+      if (sl[i] > 0.2) { st++; if (d >= 8) st8++; }
+      else if (sl[i] < 0.02) { fl++; if (d >= 8) fl8++; }
       if (b[i * 4] + b[i * 4 + 1] + b[i * 4 + 2] <= a[i * 4] + a[i * 4 + 1] + a[i * 4 + 2] - 9) dark++;
       // Not on black: the dither is added only to a pixel that has some light, so a fringe
       // reaching one off the black edge brings its dither, in green too.
@@ -274,24 +316,53 @@ const r = await page.evaluate(async ({ S, cams, only }) => {
     }
     return { steep: st8 / Math.max(1, st), flat: fl8 / Math.max(1, fl), dark: dark / m, green: green / m };
   };
-  o.whereRefraction = moved(off, await draw({ ...OFF, refraction: 1 }));
+  const refracted = await draw({ ...OFF, refraction: 1 });
+  o.whereRefraction = moved(off, refracted);
+  o.whereRefractionMirrored = moved(off, refracted, mirror);
   o.whereBloom = moved(off, await draw({ ...OFF, bloom: 1 }));
   o.whereChromatic = moved(off, await draw({ ...OFF, chromatic: 1 }));
-  // A plate with nothing on it.
+  // A plate with nothing on it is black; no optic, alone or all four at once,
+  // may light a pixel of it. The brightest channel anywhere in the frame.
+  const peak = (px) => { let p = 0; for (let i = 0; i < px.length; i += 4) p = Math.max(p, px[i], px[i + 1], px[i + 2]); return p; };
   await lab.create(256);
   lab.flush(); await lab.step(4);
-  const bare = await draw(OFF);
-  o.bare = {};
-  for (const key of ['refraction', 'aperture', 'bloom']) o.bare[key] = diff(bare, await draw({ ...OFF, [key]: 1 }));
+  o.dark = { 'no optic': peak(await draw(OFF)) };
+  for (const key of ['refraction', 'aperture', 'bloom', 'chromatic']) o.dark[key] = peak(await draw({ ...OFF, [key]: 1 }));
+  o.dark['all four'] = peak(await draw({ ...OFF, refraction: 1, aperture: 1, bloom: 1, chromatic: 1 }));
+  // A flat wash: one pour wide enough to leave a lit middle with no slope in
+  // it. Refraction bends light by the slope and the aperture blurs by the
+  // height, so over a part of the wash at least 12 px from any slope (0.02 or
+  // more) or any undyed pixel, they must move nothing; a uniform wash cannot
+  // show a shift or a blur, which is the point: they act on the relief, and a
+  // dial that lit or darkened the dye itself would show here. Bloom acts on
+  // light and must move most of it, or the window is not lit enough to ask.
+  await lab.create(256);
+  lab.dye(0.5, 0.5, 0.8, lab.dyeOf(lab.palette().colours[0]), 1.4);
+  lab.flush(); await lab.step(40);
+  const washAux = await lab.render(S, { granulation: 0 }, { camera: { amount: 0 }, aux: true, time: 3 });
+  const washSlope = slopeOf(washAux);
+  const bad = new Uint8Array(m);
+  for (let i = 0; i < m; i++) bad[i] = washSlope[i] >= 0.02 || washAux[i * 4 + 2] <= 8 ? 1 : 0;
+  const win = new Uint8Array(m);
+  const R = 12;
+  for (let y = R; y < S - R; y++) for (let x = R; x < S - R; x++) {
+    let ok = 1;
+    for (let dy = -R; dy <= R && ok; dy += 2) for (let dx = -R; dx <= R; dx += 2) if (bad[(y + dy) * S + x + dx]) { ok = 0; break; }
+    win[y * S + x] = ok;
+  }
+  const wash = await draw(OFF);
+  let n = 0, lit = 0;
+  for (let i = 0; i < m; i++) if (win[i]) { n++; lit += Math.max(wash[i * 4], wash[i * 4 + 1], wash[i * 4 + 2]); }
+  o.wash = { share: n / m, lit: lit / Math.max(1, n) };
+  for (const key of ['refraction', 'aperture', 'bloom']) o.wash[key] = diff(wash, await draw({ ...OFF, [key]: 1 }), win);
   return o;
-}, { S, cams, only: !!DUMP });
-await close();
-if (DUMP) { writeFileSync(DUMP, JSON.stringify(r.frames)); process.exit(0); }
+}, { S });
 
 const OLD_NOTE = BEFORE ? ' (the camera pass as it was before 33i)' : '';
 // Mean change in 0..255 levels over the whole frame, full dial. Measured on
-// this build (SwiftShader, 384 px, nine pours): refraction 11.7, aperture 8.1,
-// bloom 21.9, chromatic 4.8. The pass as it was before 33i, at Lens 1 (the only
+// this build (384 px, nine pours): refraction 11.0, aperture 8.1, bloom 21.6,
+// chromatic 4.6 on Metal; 11.7, 8.1, 21.9, 4.8 on SwiftShader. The pass as it
+// was before 33i, at Lens 1 (the only
 // way those dials worked there): 3.6, 4.4, 8.8, 0.5. A bar between the two fails
 // the old pass on strength as well as on the Lens multiply.
 const need = { refraction: 6, aperture: 6, bloom: 15, chromatic: 2 };
@@ -313,70 +384,110 @@ for (const [name, bar] of Object.entries(need)) {
 }
 for (const name of Object.keys(need)) {
   const d = r.dial[name];
-  check(`${name}: a half-turn moves the frame less than a full turn, and a turn to 0 not at all`,
-    d.half.mean < d.full.mean && d.half.mean > 0 && d.zero.share === 0 && d.zero.mean === 0,
-    `half ${d.half.mean.toFixed(1)}, full ${d.full.mean.toFixed(1)}, zero ${d.zero.mean.toFixed(1)} levels`);
+  check(`${name}: a half-turn moves the frame less than a full turn, and a turn to nearly 0 (0.002) next to nothing`,
+    d.half.mean < d.full.mean && d.half.mean > 0 && d.zero.share === 0 && d.zero.mean < 0.3,
+    `half ${d.half.mean.toFixed(1)}, full ${d.full.mean.toFixed(1)}, at 0.002 ${d.zero.mean.toFixed(2)} levels (${pct(d.zero.share)} by 8 or more)`);
 }
 // Where each dial works is its physics. Refraction turns light where the
-// surface is tilted, so it must change the steep parts of the plate and leave
-// a flat part (slope under 0.02) nearly alone; dispersion is a shift of red
-// against blue about the green, so green stays; a glow adds light and never
-// takes it away.
+// surface is tilted, so it must change most of the steep parts of the plate
+// and leave the flat (slope under 0.02) all but alone; read against the slope
+// turned top to bottom it must not, or the bars hold for any slope at all.
+// Dispersion is a shift of red against blue about the green, so green stays;
+// a glow adds light and never takes it away.
+const refrOk = (w) => w.steep >= 0.6 && w.flat <= 0.05;
 check('refraction changes the steep parts of the plate and spares the flat',
-  r.whereRefraction.steep >= 0.3 && r.whereRefraction.steep >= 3 * r.whereRefraction.flat,
+  refrOk(r.whereRefraction),
   `${pct(r.whereRefraction.steep)} of steep pixels moved by 8 or more, ${pct(r.whereRefraction.flat)} of flat`);
+check('... and read against the slope turned top to bottom it does not (the control)',
+  !refrOk(r.whereRefractionMirrored),
+  `${pct(r.whereRefractionMirrored.steep)} of steep, ${pct(r.whereRefractionMirrored.flat)} of flat`);
 check('chromatic aberration leaves the green channel alone',
   r.whereChromatic.green === 0, `${pct(r.whereChromatic.green)} of pixels changed in green`);
 check('bloom only adds light',
   r.whereBloom.dark < 0.005, `${pct(r.whereBloom.dark)} of pixels darkened by 3 or more levels`);
-check('a plate with no dye on it gives refraction, aperture and bloom nothing to work on',
-  Object.values(r.bare).every((d) => d.share === 0),
-  Object.entries(r.bare).map(([k, d]) => `${k} ${pct(d.share)}`).join(', '));
+check('a dark plate stays dark: no dial adds light of its own',
+  Object.values(r.dark).every((p) => p === 0),
+  `brightest channel ${Object.entries(r.dark).map(([k, p]) => `${k} ${p}`).join(', ')}`);
+check('a flat wash leaves a lit window with no slope in it',
+  r.wash.share > 0.2 && r.wash.lit > 64, `${pct(r.wash.share)} of the frame, lit ${r.wash.lit.toFixed(1)}`);
+check('refraction and aperture act on the relief: over the flat wash they move nothing',
+  r.wash.refraction.share === 0 && r.wash.aperture.share === 0,
+  `refraction ${pct(r.wash.refraction.share)} (mean ${r.wash.refraction.mean.toFixed(2)}), aperture ${pct(r.wash.aperture.share)} (mean ${r.wash.aperture.mean.toFixed(2)})`);
+check('... while bloom, which acts on light, moves most of it (the control)',
+  r.wash.bloom.share >= 0.5, `${pct(r.wash.bloom.share)} of the window`);
 check('Focus moves the frame with the aperture open, and not with it shut',
   r.focusOpen.share >= 0.02 && r.focusShut.share === 0,
   `open ${pct(r.focusOpen.share)}, shut ${pct(r.focusShut.share)}`);
 check('Lens alone is the sensor\'s look and moves the frame by itself',
   r.lensOnly.share >= 0.1, `${pct(r.lensOnly.share)} (mean ${r.lensOnly.mean.toFixed(1)} levels)`);
-// Lens is a sensor look laid over the optics: it should still be most of what
-// it was on a bare plate once the optics are up, not eaten by them.
+// Lens is a sensor look laid over the optics. The optics must still do at
+// least half of what they do without it, measured from Lens's own picture (a
+// measure from the plain picture is met by Lens alone, 40.7%), and Lens must
+// still be at least half of what it is on a plate with the optics at 0.
 check('Lens over the optics keeps what the optics did and still adds its own look',
-  r.opticsKept.share >= 0.3 && r.lensOverOptics.share >= 0.5 * r.lensOnly.share,
-  `against the plain picture ${pct(r.opticsKept.share)}; Lens's own part ${pct(r.lensOverOptics.share)} against ${pct(r.lensOnly.share)} alone`);
+  r.opticsUnderLens.share >= 0.5 * r.optics.share && r.lensOverOptics.share >= 0.5 * r.lensOnly.share,
+  `the optics ${pct(r.opticsUnderLens.share)} under Lens against ${pct(r.optics.share)} without; Lens's own part ${pct(r.lensOverOptics.share)} against ${pct(r.lensOnly.share)} alone`);
 
 // ── 6. Saved looks ────────────────────────────────────────────────────
-// The mean change in levels between two frames, the larger of the three
-// channels at each pixel, and the share of pixels that moved by 8 or more.
+// The old pass in a second lab beside this one, on the same nine pours: one
+// frame at a time is drawn there and compared here, so no more than one
+// 1024 px frame crosses at once.
 if (!BEFORE) {
-  const bufs = JSON.parse(readFileSync(SAVED_FILE, 'utf8')).map((b) => Buffer.from(b, 'base64'));
-  const mine = r.frames.map((b) => Buffer.from(b, 'base64'));
-  const meanDiff = (a, b) => {
-    let sum = 0, big = 0; const n = a.length / 4;
-    for (let i = 0; i < a.length; i += 4) {
-      const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
-      sum += d; if (d >= 8) big++;
+  const old = await openLab({ plugins: oldShader, tag: 'lensold' });
+  try {
+    await old.page.evaluate(helpers);
+    for (const p of [page, old.page]) await p.evaluate(() => nine());
+    const render = (p, cam) => p.evaluate(async ({ S, cam }) => b64(await lab.render(S, { granulation: 0 }, cam ? { camera: cam, time: 3 } : { time: 3 })), { S: SAVED_S, cam });
+    const against = (was, cams) => page.evaluate(async ({ S, was, cams }) => {
+      const o = unb64(was);
+      const res = [];
+      for (const c of cams) res.push(diff(o, await lab.render(S, { granulation: 0 }, c ? { camera: c, time: 3 } : { time: 3 })));
+      return res;
+    }, { S: SAVED_S, was, cams });
+    // The two labs hold one plate: with no camera pass at all they draw it to
+    // the level, so what differs below is the two passes.
+    const [same] = await against(await render(old.page, null), [null]);
+    check(`the old pass's lab and this one hold the same plate (${SAVED_S} px, no pass)`,
+      same.share === 0 && same.mean === 0, `${same.mean.toFixed(3)} levels`);
+    // The bar per set: the old pass drew its blur and glow with different
+    // shapes (twelve taps and eight directions against sixty-four and sixty),
+    // so the match is not exact, and the stronger the dials the more the
+    // shapes show. Named in PLAN.md 33i-7. The first reading ("keeps its
+    // optics") gave 8.1 and 10.5 levels for the old defaults at Lens 1 and .6.
+    const bar = { 'the old defaults': 2.5, 'every optic at .8': 4.5, 'every optic at .25': 1.5 };
+    let lens1 = 0, missed384 = 0;
+    for (const [i, c] of SAVED.entries()) {
+      const [mig, raw, fit] = await against(await render(old.page, rawCams[i]), [migratedCams[i], rawCams[i], fit384Cams[i]]);
+      if (c.lens === 1) { lens1++; if (fit.mean >= bar[c.name]) missed384++; }
+      check(`a look saved with ${c.name}, Lens ${c.lens} and Focus ${c.focus} opens within ${bar[c.name]} levels of how the old pass drew it`,
+        mig.mean < bar[c.name] && raw.mean > 1.5 * mig.mean,
+        `migrated ${mig.mean.toFixed(2)} levels (${pct(mig.share)} of pixels by 8 or more, aperture ${migratedCams[i].aperture}); read as written ${raw.mean.toFixed(2)}; the 384 px fit ${fit.mean.toFixed(2)}`);
     }
-    return { mean: sum / n, share: big / n };
-  };
-  // The bar per set: the old pass drew its blur and glow with different
-  // shapes (twelve taps and eight directions against sixty-four and sixty), so
-  // the match is not exact, and the stronger the dials the more the shapes
-  // show. Named in PLAN.md 33i. The first reading ("keeps its optics") gave
-  // 8.1 and 10.5 levels for the old defaults at Lens 1 and .6.
-  const bar = { 'the old defaults': 3, 'every optic at .8': 6, 'every optic at .25': 2.5 };
-  SAVED.forEach((c, i) => {
-    const mig = meanDiff(bufs[i], mine[i]);
-    const raw = meanDiff(bufs[i], mine[SAVED.length + i]);
-    check(`a look saved with ${c.name} and Lens ${c.lens} opens within ${bar[c.name]} levels of how the old pass drew it`,
-      mig.mean < bar[c.name] && raw.mean > 1.5 * mig.mean,
-      `migrated ${mig.mean.toFixed(2)} levels (${pct(mig.share)} of pixels by 8 or more); read as written ${raw.mean.toFixed(2)} (${pct(raw.share)})`);
-  });
+    check(`the aperture's 384 px fit misses the bar at ${SAVED_S} px on a third of the looks at Lens 1 (the control: the bars tell a fit from a near one)`,
+      lens1 > 0 && missed384 >= lens1 / 3, `${missed384} of ${lens1}`);
+  } finally {
+    await old.close();
+  }
 }
+await close();
 
 // ── 5. No sound in the pass ───────────────────────────────────────────
-const SOUND = /\b(audio|bass|beat|kick|energy|treble|mids?|analy[sz]er|spectrum|rms|sound)\b/i;
-for (const f of ['src/gpu/wgsl/camera.ts', 'src/gpu/camera.ts', 'src/gpu/cameraWanted.ts']) {
+// Every name in the code (the WGSL in its strings too), cut at underscores
+// and at each capital, so beatPhase, u_kick and bassLevel are heard and a
+// word that only holds a sound word inside it ("uniforms", "rms") is not.
+// The plate's own uniforms read the beat, which is the control: the same
+// reading must hear it there.
+const SOUND = /^(audio|bass|beat|kick|snare|energy|treble|loud|onset|band|spectrum|rms|sound|music|pitch|analy[sz])/;
+const heard = (f) => {
   const code = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  check(`${f} reads no sound`, !SOUND.test(code), SOUND.exec(code)?.[0] ?? '');
+  const words = (code.match(/[A-Za-z_$][\w$]*/g) ?? []).flatMap((id) => id.split(/_|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/));
+  return [...new Set(words.map((w) => w.toLowerCase()).filter((w) => SOUND.test(w)))];
+};
+const control = heard('src/gpu/plateUniforms.ts');
+check('the reading hears sound where there is some: the plate\'s uniforms', control.length > 0, control.join(', '));
+for (const f of ['src/gpu/wgsl/camera.ts', 'src/gpu/wgsl/cameraFields.ts', 'src/gpu/camera.ts', 'src/gpu/cameraWanted.ts']) {
+  const words = heard(f);
+  check(`${f}, the camera pass's own code, reads no sound`, words.length === 0, words.join(', '));
 }
 
 const failed = checks.filter((c) => !c.ok).length;

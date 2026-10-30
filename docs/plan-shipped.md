@@ -6017,7 +6017,8 @@ After: a full dial with Lens at 0 moves the frame by a mean of 11.7 (refraction)
 they work is checked as physics: refraction moves 54% of the steep pixels and 13% of the flat,
 chromatic aberration leaves green alone, bloom only adds light, every dial at 0 draws the
 plate as no pass would, and a plate with no dye gives them nothing to work on. The check
-fails on the old pass on 14 lines. The bars were first set as shares of pixels moved, which
+fails on the old pass on 14 lines. (The 54% and 13% read the slope upside down; see the
+second review below: upright it is 88% and 1%.) The bars were first set as shares of pixels moved, which
 the skeptic showed an old pass at Lens 1 nearly met; they are means now, between the old
 pass's and the new.
 
@@ -6037,8 +6038,41 @@ Aberration, which this PR makes pinnable and so driftable. That is safe for the 
 leaves a dial the look set to 0 at 0, so it never turns an optic on, and only wanders one a look
 already uses.
 
-Left open as 33i-1 to 33i-7 in `PLAN.md`: the Abbe-8 exaggeration, the 8-bit glow knee, the
-64-tap cost and edge hair at aperture 1, and Lens-up at the defaults.
+Main's size ratchet (19ai-5) held the visualizer and the settings panel to main's size, and
+moving the grain's gate to make room turned up a fault: the visualizer told the plate the camera
+was on only with Lens above 0, but the same flag picks the plate's finish under a post chain, so
+with an optic up and Lens at 0 the plate was drawn into the camera's 8-bit texture with no
+dither. The gate on Lens now lives in `fillPlateUniforms` beside the settings it reads (the
+uniform is the pass and Lens; the finish reads the pass alone). Only the harness's test chain
+reached it.
+
+A second skeptic pass on `npm run lens` (2026-10-29) found seven ways it could pass while
+measuring nothing, and closing them turned up two faults. The lab read the camera's aux texture
+upside down (`scripts/lab-entry.ts` turned only the frame upright under the camera), so
+refraction's steep against flat compared the picture with the slope mirrored: 54.6% against
+12.0%, which loose bars (30%, three times) let through. Read upright it is 88.3% against 0.9%; the
+bars are 60% and 5%, and the mirrored reading is kept as a control that must fail them. And the
+aperture's fit held only at the size it was made at. The old blur circle was a count of pixels
+(nine per unit of height from the focal plane) and the new one is a share of the frame (a
+twentieth), so the fit made at 384 px (0.8) is 1024/384 too strong at the thousand-odd pixels a
+look was seen at. Fitted again at 1024 px with Focus varied, the scale is 0.3 at mid focus and
+falls to 0.15 near Focus 0, where the old circle was widest (`apertureScale`,
+`src/lib/userPresets.ts`): the old defaults at Lens 1 and Focus .05 went from 3.41 levels off the
+old picture to 1.53. The saved looks are now drawn at 1024 px in a second lab built on the old
+shader beside the new one (both are checked to hold the same plate to the level), the 384 fit is
+a control that must miss the bars on a third of the looks at Lens 1 (it misses 7 of 12), and the
+bars are 2.5, 4.5 and 1.5 levels for the three sets, which the migrated looks meet at 1.3–1.9,
+2.6–3.2 and 0.8–1.1. The rest: what Lens keeps of the optics is measured from Lens's own picture
+(the old measure was met by Lens alone, 40.7%); the sound reading cuts names into words, with the
+plate's uniforms as the control that it hears the beat; the dark plate is held to a peak of 0
+under every optic, and a flat wash shows refraction and aperture moving nothing where there is no
+relief while bloom moves 94% of it; the near-zero arm is a turn to 0.002 (a dial at 0 was the off
+picture by construction); and each of the 203 other numbers in the settings, at 1 on its own,
+leaves the pass off. 61 lines, all green; on the old pass 15 of 31 fail.
+
+Left open as 33i-1 to 33i-8 in `PLAN.md`: the Abbe-8 exaggeration, the 8-bit glow knee, the
+64-tap cost and edge hair at aperture 1, Lens-up at the defaults, and a dial swept through 0
+rebuilding the pass.
 
 ## 34. What a competitor's page showed
 

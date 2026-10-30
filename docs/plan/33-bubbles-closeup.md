@@ -134,7 +134,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
   line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
 
-## ~~33i. The camera's dials do something~~ — **Shipped, this PR** (Settings → Camera: Refraction, Aperture, Bloom and Chromatic Aberration act at their own settings with Lens at 0, and are no longer greyed; the shader rebuilt on thin-prism refraction, a thin lens's blur circle, a power-law glow and Abbe dispersion, `src/gpu/wgsl/camera.ts`; the four default to 0 and saved looks and set lists are read as they looked (a look with Lens up has each optic rescaled by Lens, within 2 to 4 levels of the old picture), `PRESET_VERSION` 3; `npm run lens`: mean change of the frame at a full dial, Lens at 0, was 0.0 for all four on the old pass, now refraction 11.7, aperture 8.1, bloom 21.9, chromatic 4.8 levels; story in `docs/plan-shipped.md` §33i)
+## ~~33i. The camera's dials do something~~ — **Shipped, this PR** (Settings → Camera: Refraction, Aperture, Bloom and Chromatic Aberration act at their own settings with Lens at 0, and are no longer greyed; the shader rebuilt on thin-prism refraction, a thin lens's blur circle, a power-law glow and Abbe dispersion, `src/gpu/wgsl/camera.ts`; the four default to 0 and saved looks and set lists are read as they looked (a look with Lens up has each optic rescaled by Lens, the aperture by Focus too, within 0.8 to 3.2 levels of the old picture at a 1024 px frame), `PRESET_VERSION` 3; `npm run lens`: mean change of the frame at a full dial, Lens at 0, was 0.0 for all four on the old pass, now refraction 11.0, aperture 8.1, bloom 21.6, chromatic 4.6 levels on Metal; story in `docs/plan-shipped.md` §33i)
 
 - **33i-1. Shortcuts to replace with the real thing.** (a) Dispersion runs at an Abbe
   number of about 8, the densest flints; real oils sit near 50 and would show nothing.
@@ -165,10 +165,22 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   the bubble's own slope, and let Aperture treat it as the thing it is. Judge whether the
   closeup misses it first (`docs/judging.md` §93).
 - **33i-7. Saved looks with Lens up are close, not identical.** Each optic is rescaled by
-  Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`); the old defaults sit
-  2.0 to 2.3 levels from the old pass, an every-optic-at-.8 look 3.4 to 3.95, at .25 1.1 to
-  1.5. The rest is the kernels: the old 12-tap blur and 8-direction glow against the new 64
-  taps and 60 samples. The old fringe was under half a level, so chromatic maps to about
-  0.03. `npm run lens` line 6 holds the bars (3, 6, 2.5).
+  Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`), the aperture's by Focus
+  too (`apertureScale`); at a 1024 px frame the old defaults sit 1.3 to 1.9 levels from the old
+  pass, an every-optic-at-.8 look 2.6 to 3.2, at .25 0.8 to 1.1. The rest is the kernels: the
+  old 12-tap blur and 8-direction glow against the new 64 taps and 60 samples. The old fringe
+  was under half a level, so chromatic maps to about 0.03. And the frame: the old blur circle
+  was a count of pixels and the new one a share of the frame, so the aperture is fitted at
+  1024 px, about the frame the looks were seen at; on a smaller frame (a phone) a migrated look
+  is softer than it was, on a larger one sharper. A saved look does not record its frame, so
+  the fit cannot follow it. `npm run lens` line 6 holds the bars (2.5, 4.5, 1.5) and a control
+  (the 384 px fit) that must miss them.
+- **33i-8. A dial swept through 0 rebuilds the camera pass.** The visualizer builds a new
+  `WebGPUCamera` when `cameraWanted` turns true and disposes it when it turns false
+  (`LiquidVisualizer.tsx`), so each crossing compiles the pass's pipelines again. Before 33i only
+  Lens did that; now any of the five does, and a MIDI knob turned down to 0 and up, or a sound
+  cord dipping a dial to 0 on each beat once 33i-5 adds keys, rebuilds it each time. Measure
+  the hitch on the Mac (a knob swept through 0 ten times, `npm run stutter`'s two-step frames),
+  and if it shows, keep the pass for a few seconds after it stops being wanted.
 - **33i-5. `sceneMap.ts` has no keys for the camera's dials**, so a scene cannot ride
   them; add them if a scene should (the frame must not move with sound).

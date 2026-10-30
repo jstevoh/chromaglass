@@ -61,22 +61,50 @@ const OLD_OPTIC_DEFAULT = { aperture: 0.5, bloom: 0.4, chromaticAberration: 0.3,
  * the new shader's renders against the old one's on the lab plate for each
  * dial at 0.25, 0.5, 0.75 and 1: refraction's best fit sat at 0.2 to 0.3 of
  * the old value (the old maths multiplied by the dye's height and then the
- * dial, so they were far weaker), aperture's at 0.8, bloom's at 0.4 and
- * chromatic aberration's at about 0.03 (its old fringe was under half a level).
- * The blur and the glow are not linear in the dial, so the fit is exact at no
- * value; what is left is named in PLAN.md 33i.
+ * dial, so they were far weaker), bloom's at 0.4 and chromatic aberration's at
+ * about 0.03 (its old fringe was under half a level). Those three were drawn
+ * as shares of the frame in both shaders, so their fit holds on any frame.
+ * Aperture's does not, and is apertureScale's below. The blur and the glow are
+ * not linear in the dial, so the fit is exact at no value; what is left is
+ * named in PLAN.md 33i.
  */
-export const OPTIC_SCALE = { aperture: 0.8, bloom: 0.4, chromaticAberration: 0.03, refraction: 0.28 } as const;
+export const OPTIC_SCALE = { aperture: 0.3, bloom: 0.4, chromaticAberration: 0.03, refraction: 0.28 } as const;
+/**
+ * Aperture's scale, for a look saved at this Focus. The old blur circle was
+ * measured in pixels, nine per unit of height between a dome and the focal
+ * plane at any size of frame, and the new one is a share of the frame, a
+ * twentieth of its height per unit: on the lab's 384 px frame the old circle
+ * was half the new one, on a 1024 px frame (a laptop's window, a 1080 wall
+ * within a few percent) under a fifth. The first fit was made at 384 px and
+ * gave 0.8; at 1024 the same renders fit at 0.25 to 0.3 (0.8 times 384/1024),
+ * and the 0.8 left a look saved with the old defaults at Lens 1 and Focus 0.05
+ * 3.41 levels from how it was drawn, against 1.53 at its best. So the fit is
+ * the one at the size the looks were seen at, and on a smaller frame (Preview,
+ * a small window) a migrated look is a little softer than it was.
+ *
+ * With the focal plane low, every dome is most of a unit from it and the depth
+ * half of the circle is most of the blur, so the new circle's larger depth
+ * term shows most: the best scale there was 0.1 to 0.15 at Focus 0.05 and
+ * about 0.2 at 0.3, against 0.25 to 0.3 from 0.55 up. Half the scale at Focus
+ * 0, the whole of it from 0.5, follows that (`npm run lens`, the saved looks at
+ * Focus 0.05, 0.3, 0.55 and 1). A look saved at a lower Lens fits a larger
+ * scale (0.4 at Lens 0.6, the old pass's blend by Lens softening its blur less
+ * than the dial), but its error is flat in the scale there: 1.88 levels at 0.3
+ * against 1.84 at its best.
+ */
+const apertureScale = (focus: number) => OPTIC_SCALE.aperture * Math.min(1, 0.5 + Math.max(0, focus));
 function inertOptics<T extends Partial<VisualizerSettings>>(version: unknown, settings: T, saved: Partial<VisualizerSettings> = settings): T {
   if (Number(version) >= 3) return settings;
   const lens = settings.camera ?? 0;
   const out = { ...settings };
   if (lens > 0.001) {
     // The old pass was mix(plain, optics + sensor, Lens): the optics at Lens times their dial.
+    const focus = Number.isFinite(settings.focus) ? (settings.focus as number) : DEFAULT_SETTINGS.focus;
     for (const k of OPTICS) {
       // A hand-edited file can hold a string or NaN here; read it as the old default rather than carry NaN into a uniform.
       const was = Number.isFinite(saved[k]) ? (saved[k] as number) : OLD_OPTIC_DEFAULT[k];
-      out[k] = Math.round(Math.min(1, Math.max(0, was * lens * OPTIC_SCALE[k])) * 1000) / 1000;
+      const scale = k === 'aperture' ? apertureScale(focus) : OPTIC_SCALE[k];
+      out[k] = Math.round(Math.min(1, Math.max(0, was * lens * scale)) * 1000) / 1000;
     }
     return out;
   }
