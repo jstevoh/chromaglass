@@ -202,7 +202,12 @@ export async function revokeIds({ kv, ids, apply = false, log = () => {} }) {
       if (listRaw == null) throw new Error(`could not read ${listName}; refusing to go on`);
       backup[listName] = listRaw;
     }
-    const machines = await kv.get(`machines:${id}`);
+    // `get` throws on a missing record (wrangler answers 404, and a swallowed error is how a
+    // backup misses a record), and most keys never took a seat, so ask the list first and read
+    // `machines:<id>` only when it is there (found on the first live run, 2026-10-30).
+    const seated = (await kv.list(`machines:${id}`)).includes(`machines:${id}`);
+    const machines = seated ? await kv.get(`machines:${id}`) : null;
+    if (seated && machines == null) throw new Error(`could not read machines:${id}; refusing to go on`);
     if (machines != null) backup[`machines:${id}`] = machines;
     log(`REVOKE ${id} ${rec.tier} ${rec.email} order ${rec.orderId ?? '-'}${rec.revoked ? ' (already revoked)' : ''}`);
     edits.push({ id, rec, listName, hasMachines: machines != null });
