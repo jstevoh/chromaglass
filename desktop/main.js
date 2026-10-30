@@ -538,7 +538,10 @@ function showDetails() {
       ? 'OSC in: off (Show menu > OSC input turns it on)'
       : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
     // The server refuses OSC and Art-Net below Pro (PLAN.md 34a-7a); the
-    // details say so, rather than an open port that answers nothing.
+    // details say so, rather than an open port that answers nothing. Not a
+    // dialog on the menu's pick: on a Mac a message box is a sheet on the
+    // show window, and a window with a sheet up does not close, so the app
+    // hung at quit in desktop.yml's packed check (no Pro key in that run).
     ...(showServer?.linkTier && !showServer.linkTier().pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
     ...(show.port !== 3000 ? ['', `Port 3000 was taken, so this show is on ${show.port}. Looks saved on 3000 are not in this one.`] : []),
   ];
@@ -596,12 +599,6 @@ async function setOscMode(mode) {
   // A port that is taken says so, rather than leaving a menu that claims OSC is on.
   if (mode !== 'off' && !/^udp /.test(state ?? '') && !process.env.CHROMAGLASS_OFFLINE) {
     void dialog.showMessageBox(showWindow ?? undefined, { type: 'warning', message: `OSC could not open UDP port ${show.osc}`, detail: `${state ?? 'The show server is not running'}. Another program may be using the port; quit it, or pick the setting again.`, buttons: ['OK'] });
-  }
-  // A Home licence opens the port and the server ignores what arrives
-  // (PLAN.md 34a-7a): said once here, so a desk that does nothing is not a
-  // mystery. The choice is kept, and works the moment a Pro key is in.
-  else if (mode !== 'off' && showServer?.linkTier && !showServer.linkTier().pro && !process.env.CHROMAGLASS_OFFLINE) {
-    void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'OSC input is part of ChromaGlass Pro', detail: 'The port is open, but OSC messages are ignored until a Pro licence is in (Account, then Upgrade).', buttons: ['OK'] });
   }
 }
 

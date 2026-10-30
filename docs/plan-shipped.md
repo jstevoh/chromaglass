@@ -6042,8 +6042,10 @@ or removed and every two seconds, since the Mac app's main process files keys on
 Below Pro an OSC packet and an Art-Net in packet are dropped as they arrive and the Art-Net out
 tick sends nothing; until the first reading nothing passes. The gate is in the server and not the
 Mac app's menu because that is where the packets cross, so `OSC_PORT` or `ARTNET_HOST` set by
-hand meets it too. The Mac app's menu reads *OSC input (Pro)*, a Home licence that opens it is
-told packets are ignored, and Show Server Details says so (a live menu is 34a-7f). The Account
+hand meets it too. The Mac app's menu reads *OSC input (Pro)*, and Show Server Details says packets are
+ignored below Pro (a live menu is 34a-7h). A message box on the menu's pick was tried and taken
+out: on a Mac it is a sheet on the show window, and desktop.yml's packed check hung for 71
+minutes at the app's quit after picking OSC with no Pro tier read yet. The Account
 sheet's Home → Pro and Pro cards stopped selling "several projectors" and "video out", which do not
 ship, and name OSC, Art-Net, the 1024² grid and cloud sync, as the other cards do since 34a-7.
 

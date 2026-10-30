@@ -83,11 +83,12 @@ a grid of generic stock thumbnails: ours are the plate itself.
   Found along the way:
   - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
     2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
-  - **34a-7f. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
-    a Home licence opens the port from *Show → OSC input (Pro)* and gets a note that packets are
-    ignored, and Show Server Details says so; the menu could instead show the item disabled with
-    an upgrade line, read live from the licence rather than once at start (`show.license` is read
-    once in `desktop/main.js`). Art-Net has no menu at all yet (34a-7c), which is where its Pro
+  - **34a-7h. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
+    a Home licence opens the port from *Show → OSC input (Pro)* and only Show Server Details says
+    packets are ignored; the menu could instead show the item disabled with an upgrade line, read
+    live from the licence rather than once at start (`show.license` is read once in
+    `desktop/main.js`). Not a message box on the pick: on a Mac it is a sheet on the show window,
+    and a window with a sheet up did not close, so desktop.yml's packed check hung at quit. Art-Net has no menu at all yet (34a-7c), which is where its Pro
     note would sit.
   - **34a-7b. The Terms' Pro line promises what does not ship.** `public/terms.html` lists
     multi-projector edge blending, Syphon, Spout, NDI and MIDI out under Pro. Legal text, so the
