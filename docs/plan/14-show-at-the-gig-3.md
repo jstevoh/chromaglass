@@ -1,6 +1,25 @@
 # 14. The show at the gig: hearing, timing, speed and the picture on the wall (continued)
 
-Part 3 of 3 of §14; it begins at 14ad. The section starts in `14-show-at-the-gig.md`.
+Part 3 of 3 of §14; it begins at 14ad (14af sits before it). The section starts in `14-show-at-the-gig.md`.
+
+## 14af. The wall's "title bar" chip: it went on asking, and could not be closed (shipped, asked 2026-10-29)
+
+**Shipped** (2026-10-29): the chip says what is wrong in plain words, its button fills the
+wall in the Mac app from the app's side, the Mac app counts the window's own full screen as
+filling it, and an X hides it for that wall window. `npm run desktop`'s line "the
+title-bar chip comes up…". Story in `docs/plan-shipped.md` §14af. Judged on the owner's Mac
+in `docs/judging.md` §91.
+
+- **14af-1** (S) *A wall on the laptop's own screen.* With no projector, Send to wall puts the
+  window beside the desk, and filling it covers the desk; the chip asks anyway. Ask the
+  window's screen (Window Management's `getScreenDetails`, which `useCastSession` already
+  uses to place it) and, when it is the desk's screen, say "the wall is on this screen"
+  rather than ask for full screen.
+- **14af-2** (S) *In Chrome the green button still keeps the chip up, rightly or not.*
+  `CastHint` says Chrome keeps a popup's title bar in the OS's full screen, so in a browser
+  only the page's own full screen counts. Measure that on the Mac (a popup in green-button
+  full screen: is there a bar over the wall?) and, if there is none, count it there as the
+  Mac app now does.
 
 ## 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped, asked 2026-10-24)
 

@@ -134,7 +134,7 @@ export function useFilm({
     setFilmName(c.title);
     setFilmCameraLost(false);
   };
-  /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
+  /** The cartoon shelf's state and hands (desk, Settings, phone). */
   const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
   const cartoons: CartoonShelfProps = {
     pouring: pouringCartoon,

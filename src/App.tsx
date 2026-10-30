@@ -14,11 +14,10 @@ import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
-import { DEFAULT_RIDES } from './components/desk/DeskPanels';
 import type { Cue, ControlKind } from './components/desk/deskProps';
 import { useDeskTabs } from './hooks/useDeskLayout';
 import { closePanel, isSectionPanel, openPanel, openPanels } from './lib/deskLayout';
-import { DEFAULT_RECIPE, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
+import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette } from './components/desk/CommandPalette';
@@ -41,6 +40,7 @@ import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
 import { formatTimecode } from './lib/timecode';
 import { BenchOverlay } from './components/BenchOverlay';
 import { RunLocallyCard } from './components/RunLocallyCard';
+import { ProjectorFillChip } from './components/ProjectorFillChip';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
 import { PhonePlay } from './components/phone/PhonePlay';
 import { PHONE_OFF_KEY } from './lib/phone';
@@ -365,7 +365,7 @@ export default function App() {
   const stageRef = useRef<{ width: number; height: number } | null>(null);
   /** `setToast` is declared further down; the cast sender needs it up here. */
   const setToastRef = useRef<(m: string) => void>(() => {});
-  const { isCasting, startCast, stopCast, send: castSend, windowFullscreen, fillWindow } = useCastSender(
+  const { isCasting, startCast, stopCast, send: castSend, windowFullscreen, fillWindow, fillDismissed, dismissFill } = useCastSender(
     () => castReadyRef.current(),
     (size) => { stageRef.current = size; wallRef.current?.setStage(size); },
     // A blocked popup used to be silent, so Send to wall did visibly nothing
@@ -2299,6 +2299,7 @@ export default function App() {
       filmSource={filmSource}
       filmName={filmSource === 'file' ? filmName : null}
       pourName={isVideoPlaying ? pourName : null}
+      cartoons={cartoons}
       onFilmFile={loadFilm}
       onPourVideo={pourFile}
       onStopPourVideo={stopPour}
@@ -2519,11 +2520,8 @@ export default function App() {
           <button onClick={() => projector.setMode('off')} className="p-1 text-white/30 hover:text-white" aria-label="Dismiss and stop offering" title="Don't offer this (Settings → Wall turns it back on)"><X size={11} /></button>
         </div>
       )}
-      {isCasting && windowFullscreen === false && overlaysVisible && (
-        <div className="fixed top-3 left-1/2 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-amber-400/30 bg-black/60 px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-100/90 backdrop-blur-xl shadow-2xl" data-testid="projector-fill">
-          <Projector size={13} /> The projector window still has its title bar
-          <button onClick={fillWindow} className="rounded-full border border-amber-400/40 bg-amber-500/20 px-2 py-0.5 text-[9px] hover:bg-amber-500/30" title="Fill the projector's screen (the browser's own full screen, which drops the title bar).">fill its screen</button>
-        </div>
+      {isCasting && windowFullscreen === false && !fillDismissed && overlaysVisible && (
+        <ProjectorFillChip onFill={fillWindow} onDismiss={dismissFill} />
       )}
       {/*
         The zoom chip. Without a desk it hangs at the window's top, under the
@@ -3803,7 +3801,6 @@ export default function App() {
           edited={docDirty}
           dirty={docDirty}
           onSendToWall={() => sendToWallRef.current()}
-          onOpenWall={() => { void startCast('window'); }}
           onSave={saveLook}
           onSaveOver={docId ? replaceLook : undefined}
           onNew={newLook}

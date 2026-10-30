@@ -211,7 +211,7 @@ export function useCommandPalette({
         saveLook();
         return;
       }
-      // ⌘⏎ is Send to wall, which every layout's plate bar carries now.
+      // ⌘⏎ is Send to wall, as the header's Wall is on every tab.
       if (deskUp && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         sendToWallRef.current();
