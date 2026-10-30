@@ -19,7 +19,8 @@
  */
 
 import { AIR_SPLAT_WGSL } from './wgsl/air';
-import { Disposer, PipelineCache, type Prep, bindGroup, layoutFromWgsl, type RenderRecipe } from './kit';
+import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import { groupOf, viewOf } from './groupCache';
 
 /** x, y, radius (all as a fraction of the grid) and opacity. */
 const STRIDE = 4 * 4;
@@ -195,7 +196,7 @@ export class WebGPUAir {
     const pass = enc.beginRenderPass({
       label: 'air splat',
       colorAttachments: [{
-        view: this.field.createView(),
+        view: viewOf(this.field),
         loadOp: 'clear',
         storeOp: 'store',
         clearValue: { r: 0, g: 0, b: 0, a: 0 },
@@ -204,7 +205,7 @@ export class WebGPUAir {
     });
     if (this.live > 0 && pipeline) {
       pass.setPipeline(pipeline);
-      pass.setBindGroup(0, bindGroup(this.device, pipeline, [this.uniform, this.buffer, this.fingers]));
+      pass.setBindGroup(0, groupOf(this.device, pipeline, [this.uniform, this.buffer, this.fingers]));
       pass.draw(4, this.live);
     }
     pass.end();

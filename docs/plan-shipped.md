@@ -1214,6 +1214,24 @@ lapses fails "stops sending" (161 → 176), a frame that ignores the picture's s
 the pad changed the finger's cell by 287 (median cell 4, drift 5, centre 0.69,0.58 for
 0.69,0.58); the same point without the dish's turn changed it by 11 (it landed at
 0.56,0.82), and the old plate point by 3.
+
+**8-draw-a-4. A slow show starved the pad (2026-10-29).** `drawwall --app`'s "the
+laptop's own frames reach Draw, at least 8 a second" was red on #390 (7.0/s) and #436
+(6.3/s, run 40094781104), PRs that touched only static pages, both on Mac runners
+whose display had fallen to 14 frames a second. Not the count: it is the pictures
+painted on the remote, and 14 frames could have given 14. The sender let three
+pictures out at once (and the GPU grab kept three slots), and a picture's trip (the
+read behind the plate's queued frames, the worker's encode, its answer) is counted in
+frames, about seven at 14, 480 ms, so the pad got three a trip. The trip is longest in
+time exactly when every frame is needed. Across 384 tools jobs (10-17 to 10-29) the
+pad's rate was 0.41–0.52 of the display's frames on every run (median 0.485, 8.0–13.0/s
+at 16–27 frames), so it was starved always, and red (28 of them, 6.3–7.7/s) whenever a
+runner fell under about 16.5 frames, 11 of 31 jobs on 10-27 as the runners slowed. Now eight (`PAD_PICTURE_IN_FLIGHT`, shared by
+the slots, which are made only when every one is out). The stand-in check holds each
+GPU read four more frames, the Mac's trip: 6.0/s at 14.3 frames with three, 14.3/s
+with eight; a new line checks the grab hands out as many slots as the sender lets out.
+The sender keeps a trace (frames offered, passed over full, round trips split into read
+and encode), printed beside every rate line, so the next slow run says what held it.
 #### 8-play. Play: the phone's listening screen (2026-10-10)
 
 `src/components/phone/PhonePlay.tsx`, `src/lib/playGesture.ts`, `src/components/ui/TouchSlider.tsx`
@@ -2330,6 +2348,39 @@ Found along the way and written in as 14ab: the video pour's pause and play ever
 its CPU optical flow, the CPU field means, the whole-grid delta upload, per-frame bind
 groups outside the solver, the beads' canvas, the ear's allocations, the gamepad, the
 thick liquid's share.
+
+
+### 14af. The wall's "title bar" chip: it went on asking, and could not be closed (shipped 2026-10-29)
+
+The owner, from a screenshot of the desk with "THE PROJECTOR WINDOW STILL HAS ITS TITLE BAR ·
+fill its screen" across its top: "I can't get rid of this popup. I don't even know what it
+means." It meant the wall window was not in full screen, so its frame would sit across the
+top of the projection. Three things were wrong:
+
+- It had no close. A wall left framed on purpose kept it over the desk all show. Now an X
+  hides it for that wall window (`useCastSession`'s `fillDismissed`, cleared when a new
+  window is held).
+- It said a fact, not the trouble or the remedy. Now: "The wall window isn't full screen, so
+  its title bar shows on the wall" and **Make it full screen**; a click that has not taken
+  1.5 s later says to click the wall once or press F there (`ProjectorFillChip.tsx`, moved
+  out of `App.tsx`).
+- In the Mac app it read only the page's full screen (`fullscreenElement`). A plain Electron
+  window in the OS's full screen (the green button) has no title bar at all, and the chip
+  went on asking over it. The app now counts a window whose page covers its screen as
+  filling it; a window zoomed to the screen keeps its title bar and the menu bar, so its page
+  is shorter and still counts as framed. And the button now also asks main.js
+  (`fillProjector`, over `chromaglass:fill-projector`), which needs no gesture and falls
+  back to the window's own full screen if the page's is refused; the same fallback now
+  runs when the window loads. Closing the show now also exits the app 3 s after the quit
+  if something holds the quit up: on CI's Mac the check's first version left a projector
+  that had been in and out of the Mac's own full screen, and the app then stayed running
+  with its port taken.
+
+The web's path was already sound: measured in Chromium 153 under Xvfb, a delegated
+`postMessage` (`delegate: 'fullscreen'`) lets the wall's `requestFullscreen` resolve with no
+activation of its own. `npm run desktop` gained a line that takes the wall out of full
+screen and asks the chip to come up, its button to fill the wall again and the chip to go,
+and its X to keep it away for 2 s while the wall is still framed.
 
 
 ### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped 2026-10-24)
@@ -4183,6 +4234,27 @@ still 0.12 long (0.05 would give 0.51 but fling past the rim). The bar is unchan
 at the mirror). A new line asks every run for the gap between the stroke and its mirror
 to be more than 19/128 + 0.12, so a desk that reshapes the canvas fails by name.
 
+### 19ai-6. The solver's kernels, one file a pass (2026-10-28)
+
+`src/gpu/wgsl/fluid.ts` was 5,885 lines (290 KB): 96 kernels in one object literal and
+the snippets they share, so a thread changing one pass read the whole solver's WGSL
+first. It now keeps its header, the `KERNELS` table (built by spreading the pass files),
+the substepped and plan variants made from the moved kernels, and `kernel`; the
+kernels are under `src/gpu/wgsl/fluid/`, fourteen files of 6 to 31 KB: `shared`,
+`splats`, `gap`, `phase`, `phaseForces`, `labyrinth`, `pressure`, `carry`, `forces`,
+`oil`, `capillary`, `dye`, `gridFilter`, `reactions`, `fields`. Each moved text is the
+original's, comments and all; the move was made by a script working on the file's
+syntax tree (each property's full text with its leading comments), so nothing was
+retyped.
+
+Measured: every kernel's raw source, and `kernel(name, f)` for four formats, plus the
+module's exported strings, 625 entries, hashed together before and after:
+`b95d4f88f2071321` both times. Only the order of `KERNELS`' keys changed (the files
+group them by pass), which only the order `npm run wgsl` compiles them in reads; it
+compiled all of them on SwiftShader, `checked 143 shaders` and no error. Two checks read the solver's text rather than
+importing it, and now read the file their lines moved to: `plate` (the gate, in
+`dye.ts`) and `turing` (the regime's cap and share, in `reactions.ts`).
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
@@ -5713,6 +5785,16 @@ relief and not an outline. Nothing moves: the camera and its clock are as before
 not a physical height field (33g-2); the thinned boundary line is a taste choice; the
 cells that remain are 20c-1's look-alike, opt-in.
 
+*33g-3 (2026-10-29, the owner: "No I don't want cells").* `macro-bead`, `cell-bloom` and
+`lace-run` set Paint Cells to 0, and Macro Bead and Cell Bloom set Macro Lacing to 0;
+Lacing Run keeps its lacing, which is dendritic filaments and not cells. `macroview` line
+1 was a settings audit that exempted those three; it now asks all looks (33 and the
+defaults) for Paint Cells 0 and for Macro Lacing 0 but in `lace-run`, and fails if
+`lace-run` loses its lacing (the exemption cannot go stale). Lab, SwiftShader: 6/6, cells
+0 in the shipped looks, the old-defaults control still 0.1399 and 0.1697 (the knob is live).
+*Shortcut, named:* the audit reads settings, not pixels, for the three looks; their frames
+are the same shader as `classic` with the knob at 0, which `macroview` measures.
+
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
 and lacing's own contribution to the frame (the frame against the same frame with both
@@ -5928,6 +6010,35 @@ the absence of its old copies; `qa`'s Mic-dot block reads the state line and fol
 sheet's Mic tile; `opensource` and `kickbubbles` choose the band in the sheet and read the state
 line. Harnesses that set `chromaglass-audio-source` in storage are unchanged.
 
+### 35c-4. One control, one place on a tab; Send to wall is the Wall (shipped 2026-10-29)
+
+Two things the owner saw twice on the Perform tab, each reported with a screenshot.
+
+- **Send to wall.** "Why is there a send to wall button when there's the 'Wall' in the menu above
+  it. Let's get rid of the big button." In Live the two did the same thing, open the projector
+  window (or bring it forward). Only in Preview with a wall up did the button do something of its
+  own: send the copy the desk was building to the wall, across the fade (8b). The plate bar's
+  button is gone; the header's Wall is handed the send itself (`onSendToWall`), so in Preview with
+  a wall up it sends the copy, and otherwise it opens the window as before. Its tooltip says which
+  (`wallSends`), the plate bar's status reads "preview · ⌘⏎ sends to wall" while there is a copy to
+  send, and ⌘⏎ is unchanged. No MIDI binding pointed at the button. The phone has no Preview and no
+  Send to wall, so nothing there changed.
+- **Repeated dials.** "Why are there repeated controls in the rides and the recipe groups?" The
+  Perform tab ships with the Rides (Gig's strip) and the Recipe (Build's) both out, and with Fluid
+  Physics and Macro in its deck: Speed, Turbulence, Soap Bursts, Beat Press and Evolve Speed were
+  drawn twice, Zoom three times, Swirl twice. Now a control is drawn once on a tab
+  (`drawnElsewhere` in `lib/deskLayout.ts`): the Rides keep all of theirs, the Recipe the rest of its
+  own, and a section's knobs panel draws what neither strip has. A panel that gives one up says
+  where it went in a faint line under its dials. Nothing is taken off a strip, so a saved Rides or
+  Recipe is untouched, and closing the Rides gives the Recipe its whole strip back. `DEFAULT_RIDES`
+  moved from `DeskPanels.tsx` to `lib/deskPins.ts`, beside `DEFAULT_RECIPE`.
+
+Checks. `desklayout` counts every control each panel draws on every shipped tab (Perform drew 7
+more than once; now none) and holds the order; `panel` reads the Wall being handed the send and no
+`send-to-wall` in the desk; `layout` looks for the Wall, once and visible, on every tab, where it
+looked for the button, and counts the dials the desk drew (Perform: 46, none twice; with the Recipe's
+filter taken out it names the six); `bubbles` slows the plate through the Rides' Speed when the Rides have it.
+
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
@@ -6088,6 +6199,53 @@ the buttons each 16 ms. `npm run renders` gained a gamepad phase on a stand-in p
 old hook under it, 43.3 / 42.8 (laptop / phone, stick sweeping) and 42.3 / 43.0 (trigger
 held) renders a second, now 1.0 on all four; the ring found in 12 of 12 looks, changing
 place, still under a held trigger, on the page.
+
+## 14ab-3, 14ab-5, 14ab-9. The frame's bind groups, its readbacks and thick liquid's share (shipped 2026-10-28, #549)
+
+14ab-5. The solver has kept its bind groups since H2c-11, but every pass after it made its
+own again each frame, over a fresh `createView()` of every texture it bound: the plate's
+pack, derive and display, the camera, the post chain's effect, push, stock and finish, the
+projector, the particles' and the air's splats, the slosh dish and the ferrofluid drop's
+relaxation. `gpu/groupCache.ts` finds a group by walking `WeakMap`s keyed by the pipeline and
+then each object bound, and a view by its texture. Nothing has to be told to forget: a
+texture made again is a new key, a texture let go is a key the collector takes with every
+group under it, and the dye's ping-pong pair is two keys found again on every frame after.
+Rooted at the pipeline because `layout: 'auto'` hands out a new layout object on each
+`getBindGroupLayout`. The post chain's ring makes a view of each of its 32 layers with the
+ring. `npm run framegroups` draws the app's chain in the lab (particles, plate, camera, the
+test effect three frames back in the ring, stock, finish, a projector source and the
+projector's pass) from three sets of objects each frame, at two sizes with the solver
+stepping between frames and the dye's ping-pong pair turned round every other frame: made fresh as before, 12 bind groups and 64 views
+a frame; cached, 0 and 0 once a size's first frames are past, every frame equal to the fresh
+chain's byte for byte; and a cache keyed by the pipeline alone draws another picture
+(the control). The plate's pack argument (the grid) is written when the grid changes, not
+every frame.
+
+14ab-3. `readbackAsync` asked the GPU for both fields on every call (two downsamples, two
+590 KB copies, two mappings), and the frame calls it every frame for every layer, so a
+120 Hz display stepping at sixty, a governor at thirty or a frozen plate read the same fields
+back again and again. And it returned "fresh" whenever its ring held anything, so
+`syncFromGpu`'s loop over every cell ran each frame on numbers it had, and `rbSeq`, which
+tells the bubbles' rim deposit not to put the same displaced dye back twice, rose on every
+frame instead of on every new mirror. Every solver submit that may write a field goes through
+`submit`, which counts (`ReadGate`, `gpu/readGate.ts`); the readback, `measure`, the share's read and the
+harnesses' reads go through `submitRead`, which does not. The review pass found the two
+delta writers (`applyDeltas`, `applySplats`) submitting on their own and going round the
+count: a pour handed across with no step after it was never read back. They count now,
+and `framereads` pours on a still plate (0 asked before the fix, 1 after).
+`readbackAsync` asks when the count has moved (or a ring has nothing from this epoch, or a
+ring had no free slot last time) and returns fresh only for a landing it has not handed out.
+`npm run framereads`, one call a frame: a still plate, 60 asked and 30 taken in 30 frames →
+0 and 0; a step every other frame, 60 asked for 15 steps → 15; 74 repeats in 148 taken → 0;
+a pour and a clear with no step are still read back; the settled mirror equals the field
+read straight out. The bubbles' rim deposit now runs once a new mirror, as its comment
+meant, which on a 120 Hz display or a governor at thirty is half as often as before. The means stay in the loop that fills the mirror; the rim is a mask.
+
+14ab-9. `speciesShare` went through `readField`: a new MAP_READ buffer, a 590 KB `slice` and
+a 590 KB unpadded copy a read, and a square root a cell. One kept buffer (`gpu/rimRead.ts`), summed where it is
+mapped in the same order, the rim a mask made once (`lib/rimMask.ts`, which the solver's and
+the app's dish areas use too): the share is the same number to the bit
+(`npm run framereads`), and the two reads after the first make no buffer (2 before).
 
 ## Moved in the third pass (2026-10-29, 19m)
 

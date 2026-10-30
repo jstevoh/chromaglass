@@ -828,6 +828,31 @@
       ]
     },
     {
+      "name": "A frame's passes make no bind group they had",
+      "shard": "lab",
+      "run": "npm run framegroups",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The passes after the solver keep their bind groups and views (PLAN.md 14ab-5,",
+        "scripts/framegroups.mjs, gpu/groupCache.ts): the app's chain drawn frame after",
+        "frame in the lab counts the groups and views it makes, and every frame is the",
+        "fresh chain's picture byte for byte. Calls counted, which SwiftShader makes as",
+        "Metal does, so it sits with encode rather than in the Mac queue."
+      ]
+    },
+    {
+      "name": "The frame reads back what the solver wrote, once",
+      "shard": "lab",
+      "run": "npm run framereads",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The fields are read back only after a submit that may have written them, and a",
+        "readback is handed out once (PLAN.md 14ab-3, scripts/framereads.mjs); thick",
+        "liquid's share reads into one kept buffer to the same number (14ab-9). Logic",
+        "and counts, the same on any adapter that computes."
+      ]
+    },
+    {
       "name": "The slosh dish on the GPU",
       "shard": "lab",
       "run": "npm run sloshgpu",
@@ -1151,7 +1176,9 @@
         "stand-in laptop running the real picture sender on a painted 4:3",
         "canvas. Asked for only on Draw, painted the right way up at 8 a second",
         "or more, the frame in the wall's shape, and dimmed when it stops; and",
-        "the WebGPU show's way, the frame read on the GPU, on SwiftShader."
+        "the WebGPU show's way, the frame read on the GPU, on SwiftShader, at",
+        "14 frames a second with each read held four frames (a starved Mac's",
+        "trip, PLAN 8-draw-a-4) still 8 a second."
       ]
     },
     {

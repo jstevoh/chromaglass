@@ -36,6 +36,9 @@ import { pressShare } from '../lib/pressRing';
 import { SLOSH_N, type SloshDrive } from '../lib/slosh';
 import { WebGPUSlosh } from './slosh';
 import { DISH_GAP_RANGE, DISH_METRES, OIL_NU, OPEN_RIM, dragSeconds, dyeDensityContrast, thicknessViscosity } from '../lib/turntable';
+import { rimCount } from '../lib/rimMask';
+import { RimRead } from './rimRead';
+import { ReadGate } from './readGate';
 import { WebGPUParticles } from './particles';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR, dyeAbsorbances } from '../lib/dye';
@@ -1935,7 +1938,7 @@ export class WebGPUFluid {
     // The clear film goes with the plate, and is laid fresh on the next step a look asks for one.
     this.filmLaid = 0;
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.grainAge = 0;
   }
 
@@ -2037,7 +2040,7 @@ export class WebGPUFluid {
     if (sheet) this.upsample(pass, this.cpuSheetTex!, this.sheetTex!);
     this.foldDeltas(pass, !!sheet);
     pass.end();
-    q.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /**
@@ -2066,7 +2069,7 @@ export class WebGPUFluid {
     this.splatPass(pass);
     this.foldDeltas(pass);
     pass.end();
-    q.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /**
@@ -2111,7 +2114,7 @@ export class WebGPUFluid {
     this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     tex.destroy();
   }
 
@@ -2198,7 +2201,7 @@ export class WebGPUFluid {
       this.arg('reagent splat', [x, y, radius, amount, pattern_val, 0, 0, 0]), this.N);
     this.chem.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.chemLive = true;
     this.reagentLive = true;
   }
@@ -2212,7 +2215,7 @@ export class WebGPUFluid {
       this.arg('seedChem splat', [x, y, radius, 0, 0, 0, 0, 0]), this.N);
     this.chem.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.chemLive = true;
   }
 
@@ -2260,7 +2263,7 @@ export class WebGPUFluid {
       this.chem.swap();
     }
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /**
@@ -2302,7 +2305,7 @@ export class WebGPUFluid {
       this.printLive = false;
     }
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /** One solver step. Call applyDeltas first when there is anything to add. */
@@ -3574,7 +3577,7 @@ export class WebGPUFluid {
     this.stepParticles(enc, p);
 
     this.profiler.resolveInto(enc);
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.profiler.afterSubmit();
   }
 
@@ -3617,7 +3620,7 @@ export class WebGPUFluid {
       this.arg('phase splat', [x, y, radius, amount]));
     this.phase.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.phaseLive = true;
   }
 
@@ -3638,7 +3641,7 @@ export class WebGPUFluid {
     const pass = enc.beginComputePass({ label: 'clear phase' });
     for (const t of [this.phase.a, this.phase.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   private ensureMix(): PingPong {
@@ -3648,7 +3651,7 @@ export class WebGPUFluid {
       const pass = enc.beginComputePass();
       for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
       pass.end();
-      this.device.queue.submit([enc.finish()]);
+      this.submit(enc);
     }
     return this.mix;
   }
@@ -3693,7 +3696,7 @@ export class WebGPUFluid {
       this.hsRun(pass, 'pourVolume', 'pourVolume', this.arg('pour volume', [x, y, radius, take]), [this.hsPour!]);
     }
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /**
@@ -3708,18 +3711,20 @@ export class WebGPUFluid {
   async speciesShare(): Promise<number> {
     if (!this.species || !this.speciesLive) return 0;
     const pours = this.speciesQuiet;
-    const f = await this.readField('species');
-    const L = this.L;
-    let sum = 0, cells = 0;
-    for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
-      if (Math.hypot((i + 0.5) / L - 0.5, (j + 0.5) / L - 0.5) >= OPEN_RIM) continue;
-      sum += f[(i + j * L) * 4];
-      cells++;
-    }
-    const share = sum / Math.max(1, cells);
+    this.shareRead ??= new RimRead(this.device, this.disposer, 'species share');
+    const share = await this.shareRead.read(this.L, this.rbRow, this.readTarget, (enc) => {
+      this.simF[0] = this.N; this.simF[1] = this.L;
+      this.device.queue.writeBuffer(this.sim, 0, this.simData);
+      const pass = enc.beginComputePass();
+      this.run(pass, 'downsample', this.readTarget, [this.speciesLive ? this.species!.read : this.blank('rgba')], this.arg('none', [0, 0, 0, 0]), this.L);
+      pass.end();
+    });
     if (share < 1e-6 && pours === this.speciesQuiet) this.speciesLive = false;
     return share;
   }
+
+  /** Where the share is read into, kept (PLAN 14ab-9). */
+  private shareRead: RimRead | null = null;
 
   /**
    * The species' stage (PLAN 18d): its carry in the colour's substeps, unless
@@ -3765,7 +3770,7 @@ export class WebGPUFluid {
     pass.end();
     await this.device.queue.onSubmittedWorkDone();
     const t0 = performance.now();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     await this.device.queue.onSubmittedWorkDone();
     return performance.now() - t0;
   }
@@ -3799,7 +3804,7 @@ export class WebGPUFluid {
       this.arg('film splat', [x, y, radius, 0, what.film ?? 0, what.solvent ?? 0, 0, 0]), n);
     this.film.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /** Whether a clear film is on the plate (PLAN §20b). */
@@ -3813,7 +3818,7 @@ export class WebGPUFluid {
     const buf = this.device.createBuffer({ label: 'read film', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read film' });
     enc.copyTextureToBuffer({ texture: this.film.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const all = new Float32Array(buf.getMappedRange().slice(0));
     const out = new Float32Array(n * n * 4);
@@ -3831,7 +3836,7 @@ export class WebGPUFluid {
       const pass = enc.beginComputePass();
       for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
       pass.end();
-      this.device.queue.submit([enc.finish()]);
+      this.submit(enc);
     }
     return this.rxn;
   }
@@ -3878,7 +3883,7 @@ export class WebGPUFluid {
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.lies!.a, this.lies!.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /** Pour Liesegang's outer electrolyte (A) at a spot. */
@@ -3891,7 +3896,7 @@ export class WebGPUFluid {
     this.run(pass, 'gridSplat', l.write, [l.read], this.arg('lies splat', [x, y, radius, LIES_GRID, amount, 0, 0, 0]), LIES_GRID);
     l.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.liesLive = true;
   }
 
@@ -3946,7 +3951,7 @@ export class WebGPUFluid {
       this.arg('liquid splat 1', [x, y, radius, take, polar, 0, 0, 0]));
     this.liquids1.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {
@@ -3962,7 +3967,7 @@ export class WebGPUFluid {
     this.oilPoured = Math.max(0, this.oilPoured + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
     m.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.mixLive = true;
   }
 
@@ -4009,7 +4014,7 @@ export class WebGPUFluid {
     this.run(pass, 'mixCarry', m.write, [m.read], this.arg('mix carry', args));
     m.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /**
@@ -4032,7 +4037,7 @@ export class WebGPUFluid {
       this.arg('phase carry', [x, y, radius, Math.min(1, take), outward ? 0 : ux / len, outward ? 0 : uy / len, hop, outward ? 1 : 0]));
     this.phase.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   /** Pour into the BZ reaction: its activator, and a wake of oxidised catalyst behind it (a wave broken on one side curls into a spiral). */
@@ -4046,7 +4051,7 @@ export class WebGPUFluid {
       this.arg('rxn splat', [x, y, radius, BZ_GRID, what.bz ?? 0, what.bzWake ?? 0, 0, 0]), BZ_GRID);
     r.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.rxnLive = true;
   }
 
@@ -4132,7 +4137,7 @@ export class WebGPUFluid {
     // depositing, under the next look, in that look's colours.
     for (const t of [this.chem.a, this.chem.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     this.mixLive = false;
     this.rxnLive = false;
     this.liesLive = false;
@@ -4192,7 +4197,7 @@ export class WebGPUFluid {
       oilPoured: this.oilPoured,
       destroy: () => { for (const t of made.splice(0)) t.destroy(); },
     };
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     return carry;
   }
 
@@ -4239,7 +4244,7 @@ export class WebGPUFluid {
     };
     if (carry.rxn && same(carry.rxn, this.ensureRxn())) this.rxnLive = true;
     if (carry.lies && same(carry.lies, this.ensureLies())) this.liesLive = true;
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     return true;
   }
 
@@ -4254,7 +4259,7 @@ export class WebGPUFluid {
     const buf = this.device.createBuffer({ label: `read ${which}`, size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: `read ${which}` });
     enc.copyTextureToBuffer({ texture: pp.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const all = new Float32Array(buf.getMappedRange().slice(0));
     const out = new Float32Array(n * n * 4);
@@ -4271,7 +4276,7 @@ export class WebGPUFluid {
     const buf = this.device.createBuffer({ label: 'read half', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read half' });
     enc.copyTextureToBuffer({ texture: pp.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const all = new Uint16Array(buf.getMappedRange().slice(0));
     buf.unmap();
@@ -4318,7 +4323,7 @@ export class WebGPUFluid {
     const buf = this.device.createBuffer({ label: 'read phase', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read phase' });
     enc.copyTextureToBuffer({ texture: this.phase.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const all = new Float32Array(buf.getMappedRange().slice(0));
     const out = new Float32Array(n * n);
@@ -4344,7 +4349,7 @@ export class WebGPUFluid {
     const buf = this.device.createBuffer({ label: 'read squeeze', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read squeeze' });
     enc.copyTextureToBuffer({ texture: this.squeeze.read }, { buffer: buf, bytesPerRow: row }, [n, n]);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const all = new Float32Array(buf.getMappedRange().slice(0));
     const gap = new Float32Array(n * n), rate = new Float32Array(n * n);
@@ -4388,7 +4393,7 @@ export class WebGPUFluid {
     // Behind whatever the frame has already queued, so it is not timed with it.
     await this.device.queue.onSubmittedWorkDone();
     const t0 = performance.now();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
     await this.device.queue.onSubmittedWorkDone();
     return performance.now() - t0;
   }
@@ -4404,7 +4409,7 @@ export class WebGPUFluid {
     const buf = this.device.createBuffer({ label: 'read swirl', size: row * m, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read swirl' });
     enc.copyTextureToBuffer({ texture: this.swirl.read }, { buffer: buf, bytesPerRow: row }, [m, m]);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const halves = new Uint16Array(buf.getMappedRange().slice(0));
     buf.unmap();
@@ -4441,7 +4446,7 @@ export class WebGPUFluid {
     const buf = this.device.createBuffer({ label: 'read air', size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read air' });
     enc.copyTextureToBuffer({ texture: this.air.field }, { buffer: buf, bytesPerRow: row }, [n, n]);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const halves = new Uint16Array(buf.getMappedRange().slice(0));
     const out = new Float32Array(n * n);
@@ -5001,7 +5006,7 @@ export class WebGPUFluid {
     const buf = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder({ label: 'read carry' });
     enc.copyBufferToBuffer(this.carrySub, 0, buf, 0, 16);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const f = new Float32Array(buf.getMappedRange().slice(0));
     buf.unmap();
@@ -5202,7 +5207,7 @@ export class WebGPUFluid {
     this.run(pass, 'scaleDye', this.dye.write, [this.dye.read], this.arg('drain fade', [1 - (0.03 + t * t * 0.35), 0, 0, 0]));
     this.dye.swap();
     pass.end();
-    this.device.queue.submit([enc.finish()]);
+    this.submit(enc);
   }
 
   // ── What the CPU reads ────────────────────────────────────────────
@@ -5213,32 +5218,50 @@ export class WebGPUFluid {
    * see a field a frame or two old, as they did on WebGL.
    */
   readbackAsync(): boolean {
-    this.simF[0] = this.N; this.simF[1] = this.L;
-    this.device.queue.writeBuffer(this.sim, 0, this.simData);
-    const none = this.arg('none', [0, 0, 0, 0]);
-    const enc = this.device.createCommandEncoder({ label: 'readback' });
-    const slots: { which: 'dye' | 'vel'; buf: GPUBuffer | null }[] = [];
-    for (const which of ['dye', 'vel'] as const) {
-      const pass = enc.beginComputePass({ label: `downsample ${which}` });
-      this.run(pass, 'downsample', this.readTarget, [which === 'dye' ? this.dye.read : this.velForced], none, this.L);
-      pass.end();
-      enc.copyTextureToBuffer({ texture: this.readTarget }, { buffer: this.rbStaging[which], bytesPerRow: this.rbRow }, [this.L, this.L]);
-      slots.push({ which, buf: this.rbRings[which].copyFrom(enc, this.rbStaging[which]) });
+    // Asked only after a write, each landing taken once (`ReadGate`, PLAN 14ab-3).
+    const rings = this.rbRings;
+    if (this.reads.wants([rings.dye, rings.vel])) {
+      this.simF[0] = this.N; this.simF[1] = this.L;
+      this.device.queue.writeBuffer(this.sim, 0, this.simData);
+      const none = this.arg('none', [0, 0, 0, 0]);
+      const enc = this.device.createCommandEncoder({ label: 'readback' });
+      const slots: { which: 'dye' | 'vel'; buf: GPUBuffer | null }[] = [];
+      for (const which of ['dye', 'vel'] as const) {
+        const pass = enc.beginComputePass({ label: `downsample ${which}` });
+        this.run(pass, 'downsample', this.readTarget, [which === 'dye' ? this.dye.read : this.velForced], none, this.L);
+        pass.end();
+        enc.copyTextureToBuffer({ texture: this.readTarget }, { buffer: this.rbStaging[which], bytesPerRow: this.rbRow }, [this.L, this.L]);
+        slots.push({ which, buf: rings[which].copyFrom(enc, this.rbStaging[which]) });
+      }
+      this.submitRead(enc);
+      for (const s of slots) if (s.buf) rings[s.which].collect(s.buf);
+      if (slots.every((s) => s.buf)) this.reads.askedNow();
     }
-    this.device.queue.submit([enc.finish()]);
-    for (const s of slots) if (s.buf) this.rbRings[s.which].collect(s.buf);
     let fresh = false;
     for (const which of ['dye', 'vel'] as const) {
-      const data = this.rbRings[which].latest;
+      const data = this.reads.take(rings[which]);
       if (!data) continue;
       const src = new Float32Array(data);
       const dst = which === 'dye' ? this.rbDye : this.rbVel;
       const stride = this.rbRow / 4;
       for (let y = 0; y < this.L; y++) dst.set(src.subarray(y * stride, y * stride + this.L * 4), y * this.L * 4);
-      if (which === 'dye') this.rbDyeSeq = this.rbRings.dye.landed;
+      if (which === 'dye') this.rbDyeSeq = rings.dye.landed;
       fresh = true;
     }
     return fresh;
+  }
+
+  private readonly reads = new ReadGate();
+
+  /** A submit that may change a field: counted, so the next readback reads it. */
+  private submit(enc: GPUCommandEncoder): void {
+    this.device.queue.submit([enc.finish()]);
+    this.reads.wroteOne();
+  }
+
+  /** A submit that only reads, which nothing need read again. */
+  private submitRead(enc: GPUCommandEncoder): void {
+    this.device.queue.submit([enc.finish()]);
   }
 
   /**
@@ -5262,7 +5285,7 @@ export class WebGPUFluid {
     this.statsRun(pass, 'statsFold', [this.statsPartials, this.statsResult], 1);
     pass.end();
     const slot = this.statsRing.copyFrom(enc, this.statsResult);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     if (slot) this.statsRing.collect(slot);
     const data = this.statsRing.latest;
     this.statsFresh = !!data;
@@ -5282,22 +5305,8 @@ export class WebGPUFluid {
   /** The last measurement, without asking for another. */
   get stats(): FieldStats { return this.statsLatest; }
 
-  private dishAreaCells = 0;
   /** Number of grid cells inside the circular dish rim (r < OPEN_RIM = 0.5) on a thin gap. */
-  private get dishArea(): number {
-    if (this.dishAreaCells) return this.dishAreaCells;
-    let count = 0;
-    const n = this.N;
-    for (let j = 0; j < n; j++) {
-      for (let i = 0; i < n; i++) {
-        const u = (i + 0.5) / n - 0.5;
-        const v = (j + 0.5) / n - 0.5;
-        if (Math.hypot(u, v) < OPEN_RIM) count++;
-      }
-    }
-    this.dishAreaCells = count;
-    return count;
-  }
+  private get dishArea(): number { return rimCount(this.N); }
 
   /**
    * The same measurement, waiting for the GPU. For harnesses, not the show:
@@ -5317,7 +5326,7 @@ export class WebGPUFluid {
     this.statsRun(pass, 'statsFold', [this.statsPartials, this.statsResult], 1);
     pass.end();
     enc.copyBufferToBuffer(this.statsResult, 0, out, 0, 32);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await out.mapAsync(GPUMapMode.READ);
     const f = new Float32Array(out.getMappedRange().slice(0));
     out.unmap();
@@ -5395,7 +5404,7 @@ export class WebGPUFluid {
     const row = this.rbRow;
     const buf = this.device.createBuffer({ size: row * this.L, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     enc.copyTextureToBuffer({ texture: this.readTarget }, { buffer: buf, bytesPerRow: row }, [this.L, this.L]);
-    this.device.queue.submit([enc.finish()]);
+    this.submitRead(enc);
     await buf.mapAsync(GPUMapMode.READ);
     const padded = new Float32Array(buf.getMappedRange().slice(0));
     buf.unmap();

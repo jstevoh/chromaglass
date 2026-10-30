@@ -23,7 +23,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
+import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, DEFAULT_RIDES, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { THEMES, moveTargets } from '../src/lib/drift.ts';
 /*
@@ -44,7 +44,6 @@ import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { SettingRide, rideSlot } from '../src/lib/ride.ts';
-import { DEFAULT_RIDES } from '../src/components/desk/DeskPanels.tsx';
 import { SHIPPED } from '../src/lib/deskLayout.ts';
 import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
@@ -1719,7 +1718,8 @@ check('and neither starts over the limit',
   /*
     Desk v2 has one desk, and its plate actions moved from the header's slot
     to the plate's own bar, which every layout draws. So "the same on both"
-    is now: Send to wall and Save are in that bar, each once, and nothing in
+    is now: Save is in that bar once, Send to wall is Wall (Desk.tsx
+    says why), and nothing in
     the bar depends on which layout is up. The header's slot holds Blackout,
     which is the same on every layout for the same reason.
   */
@@ -1727,10 +1727,10 @@ check('and neither starts over the limit',
   const barAt = src.indexOf('The plate bar.');
   const bar = barAt < 0 ? '' : src.slice(barAt, src.indexOf('data-testid="desk-preview"', barAt));
   const header = trailingOf(src);
-  const inBar = ['send-to-wall', 'save-look'].filter(t => (bar.match(new RegExp(`testId="${t}"`, 'g')) ?? []).length === 1
+  const inBar = ['save-look'].filter(t => (bar.match(new RegExp(`testId="${t}"`, 'g')) ?? []).length === 1
     && (src.match(new RegExp(`testId="${t}"`, 'g')) ?? []).length === 1);
   check('both desks put actions on the top bar at all',
-    inBar.length === 2 && header !== null && header.includes('blackout-button'),
+    inBar.length && /onWall=\{p\.onSendToWall\}/.test(src) && !/send-to-wall/.test(src) && header?.includes('blackout-button'),
     `plate bar: ${inBar.join(', ') || 'none'}; header: ${header ? header.join(', ') : 'none'}`);
   check('and they are the same actions on both',
     bar.length > 0 && bar.indexOf('<Segmented') >= 0 && !/layoutName ===? ?'(build|gig|loadin)' &&[^\n]*(send-to-wall|save-look)/.test(bar)
