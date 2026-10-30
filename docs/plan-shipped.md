@@ -6153,8 +6153,13 @@ plate with a few cells written, twice the copy it would save. `npm run frameuplo
 did not say); the arrays at rest after every flush; the solver's copies bit for bit the
 whole run's after every flush in node and the plate bit for bit after every step on the real
 solver (two whole runs agree, and a span two rows short is seen); a cell after a cell sends
-14 KB, not 1.33 MB; over the check's ten frames 15.0 → 5.8 MB, most of it the whole-plate
-frame and the one after it. The flush's own CPU in node, two cells a step: 318 → 18 µs.
+14 KB, not 1.33 MB; over the node half's thirteen frames 19.6 → 9.6 MB (a hand, a breath and
+a bubble's ring are tens of rows each, and the frames after a whole one go whole), and the
+lab half's eight 13.0 → 3.3 MB. The flush's own CPU in node, two cells a step: 318 → 18 µs.
+The review found the popped hole's fill reaching a wider ring than the rim's, past R = 22
+cells (the app caps bubbles at 13); it marks `fillHole`'s own reach now, and the check pours
+a bubble of 38 cells. It also had each frame's control seen alone, the multiplier laid in
+the lab, and a second breath, so the breath's grid goes by rows in both halves.
 
 ## Moved in the third pass (2026-10-29, 19m)
 

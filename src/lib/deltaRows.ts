@@ -34,7 +34,7 @@
  * there again by then.
  */
 
-import { rimBand } from './bubbleDye';
+import { holeRing, rimBand } from './bubbleDye';
 
 /** Inclusive rows [first, last] of a grid. */
 export type RowSpan = readonly [number, number];
@@ -65,8 +65,13 @@ export class DeltaRows {
   /** A disc of reach `r` round row `y`, as layFinger and layBreath lay one. */
   disc(y: number, r: number): void { this.add(Math.round(y) - Math.ceil(r), Math.round(y) + Math.ceil(r)); }
 
-  /** A bubble's ring of radius R round row `y` (bubbleDye.ts: depositRim's reach; fillHole's is a row more, `pad` 1). */
-  rim(y: number, R: number, pad = 0): void { const r = rimBand(R).rOut + pad; this.add(y - r, y + r); }
+  /**
+   * The rows a bubble of radius R round row `y` writes (bubbleDye.ts): its rim
+   * deposit's ring, or (`hole`) the wider ring a popped bubble's hole is filled
+   * from, a cell past it. The two differ past R = 22 cells, where marking the
+   * deposit's ring for a fill left rows unsent (the review of 14ab-4).
+   */
+  rim(y: number, R: number, hole = false): void { const r = hole ? holeRing(R) + 1 : rimBand(R).rOut; this.add(y - r, y + r); }
 
   /** Something was written that did not say where: the whole grid goes. */
   whole(): void { this.all = true; }

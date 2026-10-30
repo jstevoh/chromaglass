@@ -1069,7 +1069,7 @@ export class FluidSimulation {
 
       // One pass of the ring falling back in (bubbleDye.ts).
       if (!(fillHole(this.dyeTarget(), dye, N, x, y, R) > 0)) continue;
-      this.rows.rim(y, R, 1);
+      this.rows.rim(y, R, true);
       /*
         And keep this hole on the books while it is still worth filling. The
         deficit shrinks every pass, so this drops out on its own — the count

@@ -38,8 +38,8 @@
  * and offset, the fold on the GPU): the same pattern of rows, laid and
  * stepped on a thin gap, with rows and whole, read back after every step.
  * The fields agree bit for bit. Controls: two whole runs agree (the solver is
- * deterministic, so a match means something), and a span two rows short
- * of what was written is seen.
+ * deterministic, so a match means something), and each frame's span two
+ * rows short of what it wrote is seen, alone, at its own step or the next.
  */
 import { build } from 'esbuild';
 import { pathToFileURL } from 'node:url';
@@ -121,6 +121,19 @@ const frames = [
     s.rbSeq++; s.depositBubbleRims(new Float32Array(4), 0);
   }],
   ['a hand elsewhere, two flushes after the last', (s) => s.fingerDrag(30, 20, 5, 0.05, -0.4, 0.3)],
+  ['a breath elsewhere, its grid by rows', (s) => s.blowWind(120, 60, 10, 1, -0.5, 0.3)],
+  /*
+    A bubble far bigger than the app makes (bubbles.ts caps them at 0.07 of
+    the plate): its hole is filled from a wider ring than its rim's, and
+    marking the rim's rows for the fill left rows unsent past R = 22 cells
+    (the review of 14ab-4).
+  */
+  ['a big bubble\'s rim', (s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.5, 0.2, 1]), 1); }],
+  ['the big bubble popped, its hole filled', (s) => {
+    const v = s.gpu.rbDyeView, R = 0.2 * L;
+    for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.5 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
+    s.rbSeq++; s.depositBubbleRims(new Float32Array(4), 0);
+  }],
   ['a tool\'s few cells again', (s) => s.addDensity(150, 170, 0.2)],
   ['and the next step', (s) => s.addDensity(150, 171, 0.2)],
   ['the room\'s stir, the whole plate', (s) => { for (let i = 0; i < AREA; i++) s.vx[i] += 1e-3; s.markDirty(); }],
@@ -167,7 +180,8 @@ const off = differ(rowsRun, wholeRun);
 check('rows and whole leave the solver the same, bit for bit, every flush', off.every((k) => k.length === 0),
   off.map((k, i) => k.length ? `${frames[i][0]}: ${k.join(',')}` : '').filter(Boolean).join('; '));
 // Two steps of a cell or two each: the second sends its rows and the first's, and that is all (36 bytes a cell: dye, flow, multiplier).
-const few = rowsRun[7].bytes, all = wholeRun[7].bytes;
+const at = frames.findIndex(([n]) => n === 'and the next step');
+const few = rowsRun[at].bytes, all = wholeRun[at].bytes;
 check('a step of a few cells after another sends their rows and nothing else', few === 2 * L * 36, `${MB(all)} → ${MB(few)}, against ${MB(2 * L * 36)} for rows 170 and 171`);
 const sum = (r) => r.reduce((a, f) => a + f.bytes, 0);
 console.log(`  over the ${frames.length} frames: ${MB(sum(wholeRun))} → ${MB(sum(rowsRun))}`);
@@ -194,11 +208,12 @@ if (!nodeOnly) {
         The same shape of frames on the real solver: a disc of dye, a hand
         with its flow, a breath, dye and a hand somewhere else (the hand's
         grid last written two uploads before, so its old rows must be sent
-        as zeros), and single cells; first the whole plate, as the room's
-        stir is. `short` hands a span two rows short of what was written,
-        the control (a disc's last row is its edge, weight nothing).
+        as zeros), a breath elsewhere, single cells, and last the whole
+        plate, as the room's stir is. A frame thins the dye (the multiplier).
+        `shortAt` hands that one frame a span two rows short of what was
+        written, the control (a disc's last row is its edge, weight nothing).
       */
-      const go = async (mode) => {
+      const go = async (mode, shortAt = -1) => {
         const { L } = await lab.create(128);
         const s = lab.solver();
         const A = L * L;
@@ -218,42 +233,55 @@ if (!nodeOnly) {
         const hand = (cx, cy, r) => disc(hands, cx, cy, r, (a, k, w) => { a[k] += 0.2 * w; a[k + 1] += 0.1 * w; a[k + 2] += Math.min(1, 2 * w); });
         const air = (cx, cy, r) => disc(breath, cx, cy, r, (a, k, w) => { a[k] += 0.05 * w; a[k + 1] += 0.02 * w; });
         const frames = [
-          () => { for (let i = 0; i < A; i++) va[i * 4] += 1e-3; dye(Math.round(L * 0.5), Math.round(L * 0.5), 10); lo = 0; hi = L - 1; return 'whole'; },
-          () => dye(Math.round(L * 0.45), Math.round(L * 0.2), 4),
+          () => { dye(Math.round(L * 0.45), Math.round(L * 0.2), 4); disc(mul, Math.round(L * 0.45), Math.round(L * 0.25), 6, (a, k, w) => { a[k / 4] *= 1 - 0.3 * w; }); },
           () => { hand(Math.round(L * 0.5), Math.round(L * 0.6), 6); flow(Math.round(L * 0.5), Math.round(L * 0.6), 6); return 'hands'; },
           () => { air(Math.round(L * 0.3), Math.round(L * 0.8), 7); return 'breath'; },
           () => { dye(Math.round(L * 0.6), Math.round(L * 0.12), 3); hand(Math.round(L * 0.2), Math.round(L * 0.35), 5); return 'hands'; },
+          () => { air(Math.round(L * 0.7), Math.round(L * 0.25), 6); return 'breath'; },
           () => dye(Math.round(L * 0.7), Math.round(L * 0.75), 1),
           () => dye(Math.round(L * 0.35), Math.round(L * 0.9), 1),
+          () => { for (let i = 0; i < A; i++) va[i * 4] += 1e-3; dye(Math.round(L * 0.5), Math.round(L * 0.5), 10); lo = 0; hi = L - 1; return 'whole'; },
         ];
-        // The app's first flush is whole (attachGpu), and so is every grid's first upload: one here, before the count.
+        /*
+          The app's first flush is whole (attachGpu), and so is every grid's
+          first upload: one here, before the count, with a wash of dye for
+          the multiplier to thin. Then a flush that wrote
+          nothing, which sends the whole grids once more as zeros and leaves
+          no rows held, so every frame after goes by its own rows.
+        */
+        for (let i = 0; i < A; i++) { da[i * 4] = 0.12; da[i * 4 + 1] = 0.06; da[i * 4 + 2] = 0.03; da[i * 4 + 3] = 0.3; }
         s.applyDeltas(da, va, mul, 0.01, hands, breath, null, null);
+        da.fill(0);
+        s.applyDeltas(da, va, mul, 0.01, hands, breath, null, new Uint8Array(L));
         await lab.step(1, p, true);
         const before = s.uploads.bytes;
         const reads = [];
-        for (const f of frames) {
+        for (let i = 0; i < frames.length; i++) {
           lo = Infinity; hi = -1;
-          const kind = f();
+          const kind = frames[i]();
           let rows = null;
-          if (mode !== 'whole' && kind !== 'whole') { rows = new Uint8Array(L); rows.fill(1, lo, mode === 'short' ? hi - 1 : hi + 1); }
+          if (mode !== 'whole' && kind !== 'whole') { rows = new Uint8Array(L); rows.fill(1, lo, i === shortAt ? hi - 1 : hi + 1); }
           s.applyDeltas(da, va, mul, 0.01, kind === 'hands' ? hands : null, kind === 'breath' ? breath : null, null, rows);
-          da.fill(0); va.fill(0); hands.fill(0); breath.fill(0);
+          da.fill(0); va.fill(0); hands.fill(0); breath.fill(0); mul.fill(1);
           await lab.step(1, p, true);
           const d = await s.readField('dye'), v = await s.readField('vel');
           reads.push([d, v]);
         }
-        return { reads, bytes: s.uploads.bytes - before, L };
+        return { reads, bytes: s.uploads.bytes - before, L, frames: frames.length };
       };
       const eq = (a, b) => { const x = new Uint32Array(a.buffer, a.byteOffset, a.length), y = new Uint32Array(b.buffer, b.byteOffset, b.length); if (x.length !== y.length) return false; for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false; return true; };
       const agree = (A, B) => A.reads.map((r, i) => eq(r[0], B.reads[i][0]) && eq(r[1], B.reads[i][1]));
-      const rows = await go('rows'), whole = await go('whole'), whole2 = await go('whole'), short = await go('short');
-      return { L: rows.L, rowsBytes: rows.bytes, wholeBytes: whole.bytes, rowsVsWhole: agree(rows, whole), wholeVsWhole: agree(whole, whole2), shortVsWhole: agree(short, whole) };
+      const rows = await go('rows'), whole = await go('whole'), whole2 = await go('whole');
+      // Each frame by rows short of its own, alone: seen at its own step or the next (the last is whole).
+      const shortSeen = [];
+      for (let k = 0; k < rows.frames - 1; k++) { const a = agree(await go('rows', k), whole); shortSeen.push(!a[k] || (k + 1 < a.length && !a[k + 1]) ? 'seen' : 'MISSED'); }
+      return { L: rows.L, rowsBytes: rows.bytes, wholeBytes: whole.bytes, rowsVsWhole: agree(rows, whole), wholeVsWhole: agree(whole, whole2), shortSeen };
     });
     console.log(`  The lab's side: the real solver, ${r.L}² delta grid, thin gap, ${r.rowsVsWhole.length} frames stepped`);
     console.log(`  bytes handed across: ${MB(r.wholeBytes)} whole → ${MB(r.rowsBytes)} by rows`);
     check('control: two whole runs agree bit for bit after every step', r.wholeVsWhole.every(Boolean), r.wholeVsWhole.join(','));
     check('rows and whole give the same plate, bit for bit, after every step', r.rowsVsWhole.every(Boolean), r.rowsVsWhole.join(','));
-    check('control: a span two rows short of what was written is seen', r.shortVsWhole.some((v) => !v), r.shortVsWhole.join(','));
+    check('control: each frame\'s span two rows short of what it wrote is seen', r.shortSeen.every((v) => v === 'seen'), `frames 1–${r.shortSeen.length}: ${r.shortSeen.join(',')}`);
     check('the real solver hands across less by rows', r.rowsBytes > 0 && r.rowsBytes * 2 < r.wholeBytes, `${MB(r.wholeBytes)} → ${MB(r.rowsBytes)}`);
   } finally { await close(); }
 }
