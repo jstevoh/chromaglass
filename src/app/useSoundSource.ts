@@ -1,8 +1,9 @@
-import { useRef, useCallback, useEffect, type Dispatch, type SetStateAction, type RefObject } from 'react';
+import { useRef, useState, useCallback, useEffect, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import { startPlateDrone, PLATE_PLACES, type DroneParams, type Drone } from '../lib/plateDrone';
 import { startSimulatedMusic, type SimulatedMusic } from '../lib/simulatedMusic';
 import type { Track } from '../lib/musicLibrary';
 import { isDesktopApp } from '../lib/platform';
+import { startSystemTap, type SystemTap } from '../lib/systemTap';
 import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY } from './shared';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 
@@ -42,7 +43,6 @@ interface SoundSourceDeps {
   audioInputId: string;
   setAudioStream: Dispatch<SetStateAction<MediaStream | null>>;
   simulatedRef: RefObject<SimulatedMusic | null>;
-  systemTapRef: RefObject<{ stop: () => void; } | null>;
   stopDrone: () => void;
   setAudioSource: Dispatch<SetStateAction<AudioSource>>;
   musicElRef: RefObject<HTMLAudioElement | null>;
@@ -64,11 +64,22 @@ interface SoundSourceDeps {
 }
 
 export function useSoundSource({
-  audioStream, audioInputId, setAudioStream, simulatedRef, systemTapRef, stopDrone, setAudioSource,
+  audioStream, audioInputId, setAudioStream, simulatedRef, stopDrone, setAudioSource,
   musicElRef, wallRef, droneParams, droneRef, setDroneRunning, refreshAudioInputs, setDroneParams,
   setAudioInputId, audioSourceRef, musicCtxRef, musicFile, setMusicFile, setMusicTime, audioSource,
   setLibraryOpen, playTrackRef,
 }: SoundSourceDeps) {
+  /** The Mac app's system-audio loopback tap (PLAN.md 23.8): the one source this hook starts and stops itself. */
+  const systemTapRef = useRef<SystemTap | null>(null);
+  /*
+    The context the ear analyses in when the source owns one. The System audio
+    source plays the Mac's sound into a context of its own, and on GitHub's
+    macOS runners the virtual output device opens one stream and refuses a
+    second, so an ear with its own context sat "running" with a clock at 0.00
+    for ten seconds while the tap's ran (PLAN 23.8-clock, the reason in
+    lib/systemTap.ts). Null for every other source: the ear makes its own.
+  */
+  const [earContext, setEarContext] = useState<AudioContext | null>(null);
   /*
     The stream the show hears and the input it was opened on, as refs beside
     the state, for handleSourceChange to read (PLAN.md 14s). Read from its
@@ -98,6 +109,7 @@ export function useSoundSource({
     }
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
     if (systemTapRef.current) { systemTapRef.current.stop(); systemTapRef.current = null; }
+    setEarContext(null);
     // The drone owns an AudioContext and four running oscillators; leaving it
     // behind would keep them sounding under whatever replaced it.
     stopDrone();
@@ -149,66 +161,24 @@ export function useSoundSource({
       let stream: MediaStream;
       if (source === 'system') {
         const nativeTap = (window as unknown as {
-          __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: Float32Array, sampleRate: number) => void) => () => void };
+          __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: ArrayLike<number>, sampleRate: number) => void) => () => void };
         }).__CHROMAGLASS_NATIVE__?.onSystemAudioPcm;
         if (nativeTap) {
-          // Mac app (PLAN.md 23.8): ScreenCaptureKit loopback via setDisplayMediaRequestHandler
-          // (no tab picker) combined with the main-process loopback audio tap.
-          // Subscribe the PCM tap and hand `dest.stream` to `useAudioAnalyzer` immediately,
-          // before `getDisplayMedia` resolves (~0.8 s on macOS), so no early PCM packets
-          // are dropped while ScreenCaptureKit initializes.
-          const ctx = new AudioContext();
-          if (ctx.state === 'suspended') void ctx.resume();
-          // Under ?debug, for `npm run desktop` to say whether this context
-          // was running yet when it read the ear, beside the ear's own.
-          if (new URLSearchParams(window.location.search).has('debug')) {
-            (window as unknown as { __systemTapContext?: AudioContext }).__systemTapContext = ctx;
-          }
-          const dest = ctx.createMediaStreamDestination();
-          let displayStream: MediaStream | null = null;
-          let nextTime = 0;
-          let pcmChunks = 0;
-          const unsubPcm = nativeTap((samples: Float32Array, sampleRate: number) => {
-            if (!samples || samples.length === 0 || ctx.state === 'closed') return;
-            if (ctx.state === 'suspended') void ctx.resume();
-            const sr = sampleRate > 0 ? sampleRate : ctx.sampleRate;
-            const buf = ctx.createBuffer(1, samples.length, sr);
-            buf.getChannelData(0).set(samples);
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            src.connect(dest);
-            const now = ctx.currentTime;
-            // Give the first scheduled chunk 60 ms so React has committed `dest.stream`
-            // and `useAudioAnalyzer` has connected its `AnalyserNode`.
-            if (nextTime < now) nextTime = now + (pcmChunks === 0 ? 0.06 : 0.005);
-            src.start(nextTime);
-            nextTime += buf.duration;
-            pcmChunks += 1;
-          });
-          systemTapRef.current = {
-            stop: () => {
-              unsubPcm();
-              displayStream?.getTracks().forEach(t => t.stop());
-              if (ctx.state !== 'closed') void ctx.close();
-            },
-          };
-          stream = dest.stream;
+          // Mac app (PLAN.md 23.8): ScreenCaptureKit's loopback through
+          // setDisplayMediaRequestHandler (no tab picker) and the main
+          // process's PCM tap, played into one stream (lib/systemTap.ts).
+          const tap = startSystemTap(
+            nativeTap,
+            () => ask === sourceAskRef.current,
+            new URLSearchParams(window.location.search).has('debug'),
+          );
+          systemTapRef.current = tap;
+          stream = tap.stream;
+          // The ear analyses in the tap's own context: one output stream, not
+          // two (the reason is in lib/systemTap.ts). Set before the stream, so
+          // the ear never starts a context of its own for this stream.
+          setEarContext(tap.context);
           setAudioStream(stream);
-          void navigator.mediaDevices.getDisplayMedia({
-            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
-            video: true,
-          }).then((ds) => {
-            if (ask !== sourceAskRef.current || ctx.state === 'closed') {
-              ds.getTracks().forEach(t => t.stop());
-              return;
-            }
-            displayStream = ds;
-            if (ds.getAudioTracks().length > 0) {
-              try {
-                ctx.createMediaStreamSource(ds).connect(dest);
-              } catch { /* fallback to PCM tap */ }
-            }
-          }, () => { /* loopback tap continues */ });
         } else {
           // Raw, as the microphone below, and in stereo: a shared tab is the
           // music itself. With plain `audio: true` Chrome shared a music tab as
@@ -408,6 +378,6 @@ export function useSoundSource({
 
   return {
     handleSourceChange, toggleDrone, changeDrone, chooseAudioInput, toggleMusic, playMusicFile,
-    playTrack, closeMusicFile,
+    playTrack, closeMusicFile, earContext,
   };
 }

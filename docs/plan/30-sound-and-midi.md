@@ -87,7 +87,9 @@ Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Story in
   7230f0c and on 864b4e2; then make the dear part cheaper, and the window at 0.8 back
   near the window at 0. #541 made the check's warm-up wait for the rate over three
   seconds of the page's clock (it took one second of the harness's, which ran long), so
-  the window no longer opens on a plate still climbing; the bar is unchanged.
+  the window no longer opens on a plate still climbing; the bar is unchanged. With #541 in, #550's
+  run on 2026-10-30 read 194 at 0.8 against 331 at 0 (bar 200), so the warm-up was not the cause;
+  the quarter is, and the line stays red about half the time until it is found.
 
 ## 30b. The LFOs and envelopes are fixed
 

@@ -60,6 +60,7 @@ on:
       - 'index.html'
       - 'vite.config.ts'
       - 'scripts/desktop.mjs'
+      - 'scripts/desktop-audio.mjs'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/desktop.yml'

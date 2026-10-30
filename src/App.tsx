@@ -461,8 +461,6 @@ export default function App() {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   /** The synthesised band, when that is what the show is listening to. */
   const simulatedRef = useRef<SimulatedMusic | null>(null);
-  /** The Mac app's system-audio loopback tap (PLAN.md 23.8). */
-  const systemTapRef = useRef<{ stop: () => void } | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   /** The wall's engine, always; `visualizerRef` is the desk's, which in Preview with a wall up is a copy (PLAN.md 8b; see `drafting`). */
   const wallRef = useRef<LiquidVisualizerHandle | null>(null);
@@ -483,9 +481,9 @@ export default function App() {
 
   const {
     handleSourceChange, toggleDrone, changeDrone, chooseAudioInput, toggleMusic, playMusicFile,
-    playTrack, closeMusicFile,
+    playTrack, closeMusicFile, earContext,
   } = useSoundSource({
-    audioStream, audioInputId, setAudioStream, simulatedRef, systemTapRef, stopDrone,
+    audioStream, audioInputId, setAudioStream, simulatedRef, stopDrone,
     setAudioSource, musicElRef, wallRef, droneParams, droneRef, setDroneRunning, refreshAudioInputs,
     setDroneParams, setAudioInputId, audioSourceRef, musicCtxRef, musicFile, setMusicFile,
     setMusicTime, audioSource, setLibraryOpen, playTrackRef,
@@ -609,6 +607,7 @@ export default function App() {
     settings.autoCalibrate !== false, calibrateNonce,
     // The microphone hears the hand on the laptop: its clicks are not beats.
     audioSource === 'microphone',
+    earContext,
   );
   const liveAudio = ear.audioData;
   /*
