@@ -4328,6 +4328,51 @@ three channels, the view 57% black, 37% red, 0% white, yellow and blue, 16 dots,
 3.69; now 0.1%, 9.9% black, 57% white, red 12.8%, yellow 6.8%, blue 9.8%, 254 dots, mean
 0.115. The phone lays the same seed (it is the plate, not a control).
 
+### 19ai-8. App() into its domains' hooks
+
+Shipped 2026-10-29, with 19ai-4a for App's setters. `App.tsx` was 372,525 bytes and
+6,650 lines, and `App()` was one function of 577 statements: 51 `useState`, 54 `useRef`,
+70 effects, and a 97 KB JSX return. A session asked to change the tempo label or the
+Record button read its way into the whole of it. Thirty-four of its domains are hooks in
+`src/app/` now (the projector's geometry, the tempo, what the show listens to and how it
+changes, the film and the room camera, the set list and the look fades, Preview's copy for
+the wall, the cast feed, the phone remote, the controllers, the command palette and its
+keys, a song's score and its render, the checks' window hooks, and the smaller ones round
+them), with `src/app/shared.ts` for what App and several hooks both read (the opening
+look, an armed look's and the wall's look's shapes, the sound's and the camera's keys).
+`App.tsx` is 215,830 bytes and 4,049 lines; `App()` 315 statements.
+
+The move is verbatim, by a script that read `App()` with the TypeScript checker: each hook
+is a contiguous run of `App()`'s statements, moved whole with its comments, and called at
+the place the run stood, so the order React calls App's hooks in, and the order their
+effects run in within a commit, is the order it was. What a run reads from earlier in
+`App()` is its parameter object, typed from the checker; what later code reads from it is
+what it returns. Every non-import line of the old file is in the new ones (a count line by
+line; the only lines that differ are seven declarations that gained `export` in
+`shared.ts`), and the typecheck holds the rest. Five runs had to move to be extracted at
+all, because App reached forward to something declared later through a closure, which a
+hook's parameters cannot: the toast's state now comes before the film (the film says a
+lost camera through it), the blackout before the look fades (a Go reads `blackoutRef`),
+the setting glides before the row fades (a row's take stops a glide), the mark's ref
+before Preview's copy, and the `?debug` window hooks to the end, after every ref and setter
+they reach. Three effects joined the hook of the state they read (`?bench`, and the
+`chromaglassTempo` and `chromaglassOutput` hooks). Each moved state or effect is
+independent of what it moved past; the window hooks are only called by a harness after the
+page has drawn.
+
+Nine checks read App's source as text, and seven of them went red on `App.tsx` alone
+(panel 9 lines, rowfade 9, backplate 3, slowevolve 2, cloudsync, learn and downbeat one
+each); `record` stayed green on `App.tsx` alone for the wrong reason, since its assertion
+is that the palette has no second Record row and the palette had left the file.
+`scripts/appSource.mjs` gives a check App and its hooks as one text, and the eight that
+needed it now read that; each prints what it printed on main, line for line. `pacing` reads
+only wiring that stayed in `App.tsx` and is unchanged.
+
+19ai-4a: App's setters of the checks' window hooks assign `window.<name>` with no cast, so
+`lib/checkHooks.ts` is checked by the compiler and not only read. That found two
+declarations looser than their setters (`chromaglassTool` took any string, `chromaglassBench`
+`unknown`), now the shapes the setters take.
+
 ## 22. Spin the plate
 
 **22a, shipped (#223).** The **Spin** tool (N on the desks, a tool on the phone's dock and the

@@ -100,7 +100,7 @@ try {
     /*
       And a chosen silence, before the page loads. The first drop is the
       page's first pointerdown, and on a browser that has never chosen a
-      sound source that gesture starts the simulated band (App.tsx, the
+      sound source that gesture starts the simulated band (useSoundSource, the
       first visit's wake). CALM holds the music's own reactions still, but
       the band's kicks released bubbles into the densest dye near the middle
       of the plate whatever Audio Impact said, and from the second drop on
@@ -354,7 +354,7 @@ try {
     }
     /*
       That the plate was silent, asked of the band itself: the band's own
-      hook (window.__band, which App.tsx defines whenever the band starts
+      hook (window.__band, which useSoundSource defines whenever the band starts
       under ?debug) as well as the kicks the plate and the ear counted. The
       counts alone can read 0 with the band playing on a page that is not
       drawing (check-skeptic): the plate counts a kick only in the frame

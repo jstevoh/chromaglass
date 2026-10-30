@@ -59,6 +59,7 @@ import { FULL_CM, HUB_CM, TAPE_CM_PER_S, TAPE_SECONDS, reelsAt } from '../src/li
 import { VU_FULL, needleAtRest, needleDeg, stepNeedle } from '../src/lib/vuMeter.ts';
 import { MAX_DOTS, strobeOf } from '../src/lib/strobeRing.ts';
 import { MOUNT_MM, NOTCH_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_H_MM, WINDOW_W, WINDOW_W_MM, stepOf, trayDeg } from '../src/lib/slideTray.ts';
+import { appSource } from './appSource.mjs';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
@@ -66,7 +67,7 @@ import { MOUNT_MM, NOTCH_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_H_MM, WINDOW
 const root = process.env.INIT_CWD ?? process.cwd();
 const panel = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
 const panel0 = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
-const panel0app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+const panel0app = appSource();
 const sim = readFileSync(join(root, 'src/sim/fluidSimulation.ts'), 'utf8');
 
 const checks = [];
@@ -1045,7 +1046,7 @@ check('and the sections the dots aim at exist',
   named "Settings" while the button that does the same thing says "All
   settings…", so typing the words on the button matched nothing at all.
 */
-const app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+const app = appSource();
 const guide = readFileSync(join(root, 'src/components/GuidePanel.tsx'), 'utf8');
 check('the app says Sound, never Audio, to the person using it',
   !/name: 'Audio Mappings'/.test(readFileSync(join(root, 'src/lib/settingsMap.ts'), 'utf8'))
