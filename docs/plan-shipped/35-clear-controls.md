@@ -159,6 +159,35 @@ the absence of its old copies; `qa`'s Mic-dot block reads the state line and fol
 sheet's Mic tile; `opensource` and `kickbubbles` choose the band in the sheet and read the state
 line. Harnesses that set `chromaglass-audio-source` in storage are unchanged.
 
+### 35c-4. One control, one place on a tab; Send to wall is the Wall (shipped 2026-10-29)
+
+Two things the owner saw twice on the Perform tab, each reported with a screenshot.
+
+- **Send to wall.** "Why is there a send to wall button when there's the 'Wall' in the menu above
+  it. Let's get rid of the big button." In Live the two did the same thing, open the projector
+  window (or bring it forward). Only in Preview with a wall up did the button do something of its
+  own: send the copy the desk was building to the wall, across the fade (8b). The plate bar's
+  button is gone; the header's Wall is handed the send itself (`onSendToWall`), so in Preview with
+  a wall up it sends the copy, and otherwise it opens the window as before. Its tooltip says which
+  (`wallSends`), the plate bar's status reads "preview · ⌘⏎ sends to wall" while there is a copy to
+  send, and ⌘⏎ is unchanged. No MIDI binding pointed at the button. The phone has no Preview and no
+  Send to wall, so nothing there changed.
+- **Repeated dials.** "Why are there repeated controls in the rides and the recipe groups?" The
+  Perform tab ships with the Rides (Gig's strip) and the Recipe (Build's) both out, and with Fluid
+  Physics and Macro in its deck: Speed, Turbulence, Soap Bursts, Beat Press and Evolve Speed were
+  drawn twice, Zoom three times, Swirl twice. Now a control is drawn once on a tab
+  (`drawnElsewhere` in `lib/deskLayout.ts`): the Rides keep all of theirs, the Recipe the rest of its
+  own, and a section's knobs panel draws what neither strip has. A panel that gives one up says
+  where it went in a faint line under its dials. Nothing is taken off a strip, so a saved Rides or
+  Recipe is untouched, and closing the Rides gives the Recipe its whole strip back. `DEFAULT_RIDES`
+  moved from `DeskPanels.tsx` to `lib/deskPins.ts`, beside `DEFAULT_RECIPE`.
+
+Checks. `desklayout` counts every control each panel draws on every shipped tab (Perform drew 7
+more than once; now none) and holds the order; `panel` reads the Wall being handed the send and no
+`send-to-wall` in the desk; `layout` looks for the Wall, once and visible, on every tab, where it
+looked for the button, and counts the dials the desk drew (Perform: 46, none twice; with the Recipe's
+filter taken out it names the six); `bubbles` slows the plate through the Rides' Speed when the Rides have it.
+
 #### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this

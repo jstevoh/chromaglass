@@ -67,6 +67,39 @@ its CPU optical flow, the CPU field means, the whole-grid delta upload, per-fram
 groups outside the solver, the beads' canvas, the ear's allocations, the gamepad, the
 thick liquid's share.
 
+### 14af. The wall's "title bar" chip: it went on asking, and could not be closed (shipped 2026-10-29)
+
+The owner, from a screenshot of the desk with "THE PROJECTOR WINDOW STILL HAS ITS TITLE BAR ·
+fill its screen" across its top: "I can't get rid of this popup. I don't even know what it
+means." It meant the wall window was not in full screen, so its frame would sit across the
+top of the projection. Three things were wrong:
+
+- It had no close. A wall left framed on purpose kept it over the desk all show. Now an X
+  hides it for that wall window (`useCastSession`'s `fillDismissed`, cleared when a new
+  window is held).
+- It said a fact, not the trouble or the remedy. Now: "The wall window isn't full screen, so
+  its title bar shows on the wall" and **Make it full screen**; a click that has not taken
+  1.5 s later says to click the wall once or press F there (`ProjectorFillChip.tsx`, moved
+  out of `App.tsx`).
+- In the Mac app it read only the page's full screen (`fullscreenElement`). A plain Electron
+  window in the OS's full screen (the green button) has no title bar at all, and the chip
+  went on asking over it. The app now counts a window whose page covers its screen as
+  filling it; a window zoomed to the screen keeps its title bar and the menu bar, so its page
+  is shorter and still counts as framed. And the button now also asks main.js
+  (`fillProjector`, over `chromaglass:fill-projector`), which needs no gesture and falls
+  back to the window's own full screen if the page's is refused; the same fallback now
+  runs when the window loads. Closing the show now also exits the app 3 s after the quit
+  if something holds the quit up: on CI's Mac the check's first version left a projector
+  that had been in and out of the Mac's own full screen, and the app then stayed running
+  with its port taken.
+
+The web's path was already sound: measured in Chromium 153 under Xvfb, a delegated
+`postMessage` (`delegate: 'fullscreen'`) lets the wall's `requestFullscreen` resolve with no
+activation of its own. `npm run desktop` gained a line that takes the wall out of full
+screen and asks the chip to come up, its button to fill the wall again and the chip to go,
+and its X to keep it away for 2 s while the wall is still framed.
+
+
 ### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped 2026-10-24)
 
 Asked by the owner: "I should be able to select any camera as a source any place where we

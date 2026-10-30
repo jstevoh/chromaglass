@@ -99,6 +99,21 @@ async function phone(width = 844, height = 390) {
   }
   return { ctx, page, tapAt, box: () => page.getByTestId('draw-wall').boundingBox() };
 }
+/*
+  Where a window's pictures went, from the sender's trace (lib/padPicture.ts):
+  the frames offered while a remote asked, those passed over because every
+  place in flight was taken, and the median round trip split into its read
+  back from the GPU and the worker's own encode. Printed beside each rate,
+  so a slow one says whether the frames, the places or the encode held it.
+*/
+const med = (a) => { const v = a.filter(x => x >= 0).sort((x, y) => x - y); return v.length ? v[v.length >> 1] : '–'; };
+const traceSince = (t0, t1) => {
+  if (!t0 || !t1) return 'no trace';
+  const n = Math.min(t1.trips.length, t1.answered - t0.answered);
+  const trips = t1.trips.slice(t1.trips.length - n);
+  return `${t1.frames - t0.frames} frames offered, ${t1.full - t0.full} passed over with every place taken, ${t1.refused - t0.refused} refused (no GPU slot); round trip ${med(trips.map(t => t[2]))} ms (read ${med(trips.map(t => t[0]))}, encode ${med(trips.map(t => t[1]))})`;
+};
+const senderTrace = (wall) => wall.evaluate(() => structuredClone(window.__sender.trace));
 const framesOf = async (page) => Number(await page.getByTestId('draw-picture').getAttribute('data-frames'));
 /** The remote's painted picture as a G×H grid of mean colours (its own canvas, top row first). */
 const gridOf = (page, G = 8, H = 6) => page.getByTestId('draw-picture').evaluate((c, [G, H]) => {
@@ -184,6 +199,24 @@ try {
         picture says which way it came.
       */
       window.__mode = '2d';
+      /*
+        \`__readLag\`: frames by which each GPU read lands later than it does
+        here. On the Mac's show the read is queued behind the plate's own
+        frames, and on a starved runner those frames are 70 ms each: there
+        three pictures in flight came to 6.3 a second at 14 frames (#436's
+        run), a round trip near 480 ms, seven frames. Here the trip is three
+        (the read lands two frames on, the worker's answer one more), so four
+        frames of lag make the Mac's seven. The lag is on the buffer's map
+        itself, so the grab's slot is held through it as the Mac's is behind
+        its queued frames: held after the map, the slots were free and a grab
+        kept to three of them read 14.0 a second here; held in it, 7.0.
+      */
+      window.__readLag = 0;
+      window.__lag = (v, n) => new Promise((resolve) => { const f = () => (--n <= 0 ? resolve(v) : requestAnimationFrame(f)); requestAnimationFrame(f); });
+      if (typeof GPUBuffer !== 'undefined') {
+        const map = GPUBuffer.prototype.mapAsync;
+        GPUBuffer.prototype.mapAsync = function (...a) { return map.apply(this, a).then(v => (window.__readLag > 0 ? window.__lag(v, window.__readLag) : v)); };
+      }
       window.__gpuStart = async () => {
         const adapter = await navigator.gpu?.requestAdapter();
         if (!adapter) return 'no WebGPU adapter';
@@ -199,7 +232,7 @@ try {
         }
         device.queue.writeTexture({ texture: tex }, data, { bytesPerRow: W * 4 }, [W, H]);
         const grab = new window.PP.WebGPUPadGrab(device);
-        window.__gpu = { tex, grab, W, H };
+        window.__gpu = { tex, grab, W, H, device };
         window.__mode = 'gpu';
         return 'ok';
       };
@@ -235,10 +268,10 @@ try {
     check('and the picture is that wide (inside 160–480)', widths.length > 0 && widths.at(-1) === Math.max(160, Math.min(480, asked.at(-1).width)), `${widths.slice(-3).join(' ')}`);
 
     // ── The picture ───────────────────────────────────────────────────
-    const f0 = await framesOf(page);
+    const f0 = await framesOf(page), q0 = await senderTrace(wall);
     await page.waitForTimeout(3000);
     const rate = ((await framesOf(page)) - f0) / 3;
-    check('the picture lands in the frame, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s`);
+    check('the picture lands in the frame, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s; ${traceSince(q0, await senderTrace(wall))}`);
     /*
       And on a busy page. The cloud's stand-in draws in a millisecond, and the
       Mac's show takes most of every frame: there one picture in flight came
@@ -250,13 +283,14 @@ try {
     */
     await wall.evaluate(() => { window.__hold = 70; });
     await page.waitForTimeout(500);
-    const g0 = await framesOf(page);
+    const g0 = await framesOf(page), q1 = await senderTrace(wall);
     const r0 = await wall.evaluate(() => { window.__fr = 0; const n = () => { window.__fr++; if (window.__hold) requestAnimationFrame(n); }; requestAnimationFrame(n); return 0; });
     await page.waitForTimeout(3000);
     const busy = ((await framesOf(page)) - g0) / 3;
     const fps = (await wall.evaluate(() => window.__fr)) / 3 + r0;
+    const busyTrace = traceSince(q1, await senderTrace(wall));
     await wall.evaluate(() => { window.__hold = 0; });
-    check('and on a page drawing 14 frames a second, still at least 8', busy >= 8 && fps < 16, `${busy.toFixed(1)}/s at ${fps.toFixed(1)} frames/s`);
+    check('and on a page drawing 14 frames a second, still at least 8', busy >= 8 && fps < 16, `${busy.toFixed(1)}/s at ${fps.toFixed(1)} frames/s; ${busyTrace}`);
     const { sent, bytes, via } = await wall.evaluate(() => ({ sent: window.__sender.sent, bytes: window.__sender.bytes, via: window.__sender.via }));
     // Off the page's idle time: toBlob there gave the Mac's busy show 2 a second.
     check('encoded in a worker', via === 'worker', via);
@@ -294,13 +328,54 @@ try {
           gg.map(c => c.map(v => v.toFixed(0)).join(',')).join(' | '));
         await wall.evaluate(() => { window.__hold = 70; window.__fr = 0; const n = () => { window.__fr++; if (window.__hold) requestAnimationFrame(n); }; requestAnimationFrame(n); });
         await page.waitForTimeout(500);
-        const k0 = await framesOf(page);
+        const k0 = await framesOf(page), q2 = await senderTrace(wall);
         const fr0 = await wall.evaluate(() => window.__fr);
         await page.waitForTimeout(3000);
         const gpuRate = ((await framesOf(page)) - k0) / 3;
         const gpuFps = ((await wall.evaluate(() => window.__fr)) - fr0) / 3;
-        await wall.evaluate(() => { window.__hold = 0; window.__mode = '2d'; });
-        check('and at least 8 a second on a page drawing 14 frames', gpuRate >= 8 && gpuFps < 16, `${gpuRate.toFixed(1)}/s at ${gpuFps.toFixed(1)} frames/s`);
+        const gpuTrace = traceSince(q2, await senderTrace(wall));
+        check('and at least 8 a second on a page drawing 14 frames', gpuRate >= 8 && gpuFps < 16, `${gpuRate.toFixed(1)}/s at ${gpuFps.toFixed(1)} frames/s; ${gpuTrace}`);
+        /*
+          And with each read landing four frames later, as a starved Mac's
+          does behind the plate's queued frames (PLAN 8-draw-a-4): the
+          places in flight must cover a trip of seven frames, or the pad
+          gets three pictures a trip, 6 a second where 14 frames were drawn.
+          The trace's "passed over" says which held it.
+        */
+        await wall.evaluate(() => { window.__readLag = 4; });
+        await page.waitForTimeout(1000);
+        const l0 = await framesOf(page), q3 = await senderTrace(wall);
+        const lr0 = await wall.evaluate(() => window.__fr);
+        await page.waitForTimeout(3000);
+        const lagRate = ((await framesOf(page)) - l0) / 3;
+        const lagFps = ((await wall.evaluate(() => window.__fr)) - lr0) / 3;
+        const lagTrace = traceSince(q3, await senderTrace(wall));
+        check('and with each read landing four frames later (a starved Mac\'s plate ahead of it), still at least 8', lagRate >= 8 && lagFps < 16, `${lagRate.toFixed(1)}/s at ${lagFps.toFixed(1)} frames/s; ${lagTrace}`);
+        // The GPU's own slots: as many reads out at once as the sender lets out.
+        const slots = await wall.evaluate(() => {
+          const { tex, device } = window.__gpu;
+          const grab = new window.PP.WebGPUPadGrab(device);
+          let n = 0;
+          for (let i = 0; i < 20; i++) if (grab.grab(tex, 160, 120)) n++;
+          return { n, want: window.PP.PAD_PICTURE_IN_FLIGHT };
+        });
+        check('and the GPU\'s read holds as many pictures out at once as the sender lets out', slots.n === slots.want && slots.want >= 8, `${slots.n} of ${slots.want}`);
+        /*
+          And the sender lets that many out: reads that never land, offered
+          a frame every 70 ms on its own clock (past the pace, inside the
+          two-second watchdog), start exactly PAD_PICTURE_IN_FLIGHT and pass
+          the rest over. The lag line above holds at a sender kept to four
+          (8.3 a second, a margin of nothing), so this is what pins eight.
+        */
+        const places = await wall.evaluate(() => {
+          let t = 0, starts = 0;
+          const s = new window.PP.PadPictureSender(() => {}, () => t);
+          s.want(480);
+          for (let i = 0; i < 20; i++, t += 70) s.tapGrab(() => { starts++; return new Promise(() => {}); }, 960, 720);
+          return { starts, full: s.trace.full, want: window.PP.PAD_PICTURE_IN_FLIGHT };
+        });
+        check('and the sender lets that many out, and passes the rest over', places.starts === places.want && places.full === 20 - places.want, `${places.starts} started, ${places.full} passed over, of ${places.want}`);
+        await wall.evaluate(() => { window.__hold = 0; window.__readLag = 0; window.__mode = '2d'; });
         await page.waitForTimeout(1500);
       }
     } else {
@@ -368,13 +443,13 @@ try {
     while (!((await framesOf(page)) > 0) && Date.now() - linked < 10_000) await page.waitForTimeout(50);
     const first = (Date.now() - linked) / 1000;
     check('the first picture reaches Draw within 2 s of the link', first <= 2, `${first.toFixed(2)} s`);
-    const shown = async () => ({ f: await framesOf(page), d: await display.evaluate(() => window.chromaglassDebug?.()?.frames ?? 0) });
+    const shown = async () => ({ f: await framesOf(page), ...(await display.evaluate(() => ({ d: window.chromaglassDebug?.()?.frames ?? 0, q: structuredClone(window.chromaglassDebug?.()?.padPicture?.trace ?? null) }))) });
     const a = await shown();
     await page.waitForTimeout(3000);
     const b = await shown();
     const rate = (b.f - a.f) / 3;
-    check('the laptop\'s own frames reach Draw, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s, the display drawing ${((b.d - a.d) / 3).toFixed(1)} frames/s`);
-    const pad = await display.evaluate(() => window.chromaglassDebug?.()?.padPicture);
+    check('the laptop\'s own frames reach Draw, at least 8 a second', rate >= 8, `${rate.toFixed(1)}/s, the display drawing ${((b.d - a.d) / 3).toFixed(1)} frames/s; ${traceSince(a.q, b.q)}`);
+    const pad = await display.evaluate(() => { const p = window.chromaglassDebug?.()?.padPicture; return p && { ...p, trace: undefined }; });
     check('each under 60 kB', pad && pad.sent > 0 && pad.bytes / pad.sent < 60_000, JSON.stringify(pad));
     // On the GPU (gpu/padGrab.ts): the canvas's way gave 6.3/s at 30 frames here.
     check('the show reads its frames for Draw on the GPU', pad?.from === 'gpu', pad?.from);

@@ -191,6 +191,29 @@ Turing Print" work (#331), which also made the reaction grow at all.
     held the identification's clock meanwhile and jumped once. A rehearsal map made from a
     file (28g-3) can carry bar positions from the beat grid, which would fix the place
     inside a held chord.
+  - **28g-10. Found along the way (2026-10-30): inside eight identical bars the place runs to
+    whichever bar the map's noise favours, and crosses into the next section early.** The
+    `followview` track-panel line ("its section is the one the band is playing") went red
+    once on main's deploy 580: the panel said chorus for the readings 6 and 7 s into a
+    verse, with the band 9 s from its chorus. An offline replay of the follower on the
+    band's own loop (the map made as `followview` makes it, the band rendered from the
+    tag's moment through `analysePcm` at 60 fps, `FollowedPlace` heard every reading)
+    reproduces it: the place is wrong, at 75% trust or more, for 28 s of 280, in stretches
+    of 1 to 3.5 s, nearly always ahead or behind by 7.9 s (four bars). A section of the
+    band is eight bars of one chord, every bar the same score, so no bar sounds different
+    from another; but the map's quarter-second profiles carry the render's noise (the
+    hits' seeded noise, the mean of a bar's profile varies by a tenth between bars), and
+    that noise is the same every hop, so the bars whose noise happens to look like the
+    room's outgrow the right one at SHARPNESS 3 within four or five seconds (the mass
+    moved from bar 3 to bar 7 of a verse in 4.5 s at a likelihood ratio of about 1.3 a
+    hop). The check's protocol replayed offline (readings 3 to 7 s into a section) passed
+    36 of 36 sections, so on the Mac's and the cloud's slower ear the wander comes a second
+    or two sooner; expect this red about one deploy in ten. A real band holding one chord
+    for eight bars has the same noise and more. The fix is the follower's, not the check's:
+    the likelihood should not be sharper than the map is distinctive (one way: match the
+    hop against the map's profile averaged over the bar where the map is static, or temper
+    SHARPNESS by how alike neighbouring bars are), measured against `npm run songfollow`
+    and this replay (`/mnt/project-files/handoff/followview-replay/`, the owner's files).
 - **28h. The score: the song drawn, its show's cues on it, and a nudge** (**shipped**,
   this PR; the story is in `docs/plan-shipped/28-preset-palettes.md` §28h). Open from it:
   - **28h-1.** (**shipped** with 28g-8.) The nudge re-anchors the follower rather than

@@ -210,7 +210,7 @@ of shipped stories, `docs/plan-shipped.md`, had grown to 750,284 bytes in 9,361 
 ledger exempt from `npm run sizes`, and a file a session opened whole to read one story.
 It is now `docs/plan-shipped/`, one file a section under the open plan's names, cut
 between items into parts where a section passed about 36 KB (§14 four parts, §19 four,
-§18 three, §28 two), so no file is over 35 KB and the ledger entry goes.
+§18 three, §28 two), so none is over the 40 KB at which `npm run sizes` warns, and the ledger entry goes.
 
 - **What moved, and how.** Each story went to its section by the number its heading
   starts with, under the pass that moved it (first and second, 2026-10-04; third, 19m;

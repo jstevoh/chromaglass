@@ -4,7 +4,7 @@ How each shipped item of the plan was found, built and measured. The open plan i
 `PLAN.md` (the index) and [`docs/plan/`](../plan/README.md), one file a section; this
 folder mirrors it, one file a section under the same name, and an item keeps a one-line
 stub in its open file naming its id here. A section over about 36 KB is cut between items
-into parts (`-2`, `-3`, …), each under 36 KB, as the open plan's are. Until 19m-3
+into parts (`-2`, `-3`, …), each under the 40 KB at which `npm run sizes` warns. Until 19m-3
 (2026-10-29) this was one file, `docs/plan-shipped.md`, of about 750 KB.
 
 **When an item ships**, its story goes at the end of its section's last file here, under a
@@ -66,14 +66,14 @@ the end of a sentence in 15i's story that the open plan had kept is back with it
 | [05-playing-it.md](05-playing-it.md) | §5 | 3 |  |
 | [06-render-a-song.md](06-render-a-song.md) | §6 | 4 |  |
 | [07-room-camera.md](07-room-camera.md) | §7 | 6 |  |
-| [08-desk.md](08-desk.md) | §8 | 34 |  |
+| [08-desk.md](08-desk.md) | §8 | 35 |  |
 | [09-ferrofluid.md](09-ferrofluid.md) | §9 | 22 |  |
 | [10-playing-like-a-show.md](10-playing-like-a-show.md) | §10 | 19 |  |
 | [11-mixer.md](11-mixer.md) | §11 | 27 |  |
 | [13-vj-software.md](13-vj-software.md) | §13 | 9 |  |
 | [14-show-at-the-gig.md](14-show-at-the-gig.md) | §14 | 25 |  |
 | [14-show-at-the-gig-2.md](14-show-at-the-gig-2.md) | §14 | 30 | 14v |
-| [14-show-at-the-gig-3.md](14-show-at-the-gig-3.md) | §14 | 34 | 14aa |
+| [14-show-at-the-gig-3.md](14-show-at-the-gig-3.md) | §14 | 36 | 14aa |
 | [14-show-at-the-gig-4.md](14-show-at-the-gig-4.md) | §14 | 9 | 14ad |
 | [15-tools-on-liquids.md](15-tools-on-liquids.md) | §15 | 26 |  |
 | [16-many-plates.md](16-many-plates.md) | §16 | 7 |  |
@@ -81,7 +81,7 @@ the end of a sentence in 15i's story that the open plan had kept is back with it
 | [18-physics-2.md](18-physics-2.md) | §18 | 27 | 18d |
 | [18-physics-3.md](18-physics-3.md) | §18 | 26 | 18l |
 | [19-checks-build-plan.md](19-checks-build-plan.md) | §19 | 30 |  |
-| [19-checks-build-plan-2.md](19-checks-build-plan-2.md) | §19 | 31 | 19v |
+| [19-checks-build-plan-2.md](19-checks-build-plan-2.md) | §19 | 36 | 19v |
 | [19-checks-build-plan-3.md](19-checks-build-plan-3.md) | §19 | 30 | 19aa |
 | [19-checks-build-plan-4.md](19-checks-build-plan-4.md) | §19 | 18 | 19x-3 |
 | [20-lace-and-holes.md](20-lace-and-holes.md) | §20 | 5 |  |
@@ -98,6 +98,6 @@ the end of a sentence in 15i's story that the open plan had kept is back with it
 | [32-soap-film.md](32-soap-film.md) | §32 | 17 |  |
 | [33-bubbles-closeup.md](33-bubbles-closeup.md) | §33 | 14 |  |
 | [34-photism.md](34-photism.md) | §34 | 4 |  |
-| [35-clear-controls.md](35-clear-controls.md) | §35 | 28 |  |
+| [35-clear-controls.md](35-clear-controls.md) | §35 | 30 |  |
 | [36-analog-operators.md](36-analog-operators.md) | §36 | 5 |  |
 | [qa.md](qa.md) | QA | 12 |  |

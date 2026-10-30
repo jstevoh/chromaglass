@@ -213,6 +213,24 @@ lapses fails "stops sending" (161 → 176), a frame that ignores the picture's s
 the pad changed the finger's cell by 287 (median cell 4, drift 5, centre 0.69,0.58 for
 0.69,0.58); the same point without the dish's turn changed it by 11 (it landed at
 0.56,0.82), and the old plate point by 3.
+
+**8-draw-a-4. A slow show starved the pad (2026-10-29).** `drawwall --app`'s "the
+laptop's own frames reach Draw, at least 8 a second" was red on #390 (7.0/s) and #436
+(6.3/s, run 40094781104), PRs that touched only static pages, both on Mac runners
+whose display had fallen to 14 frames a second. Not the count: it is the pictures
+painted on the remote, and 14 frames could have given 14. The sender let three
+pictures out at once (and the GPU grab kept three slots), and a picture's trip (the
+read behind the plate's queued frames, the worker's encode, its answer) is counted in
+frames, about seven at 14, 480 ms, so the pad got three a trip. The trip is longest in
+time exactly when every frame is needed. Across 384 tools jobs (10-17 to 10-29) the
+pad's rate was 0.41–0.52 of the display's frames on every run (median 0.485, 8.0–13.0/s
+at 16–27 frames), so it was starved always, and red (28 of them, 6.3–7.7/s) whenever a
+runner fell under about 16.5 frames, 11 of 31 jobs on 10-27 as the runners slowed. Now eight (`PAD_PICTURE_IN_FLIGHT`, shared by
+the slots, which are made only when every one is out). The stand-in check holds each
+GPU read four more frames, the Mac's trip: 6.0/s at 14.3 frames with three, 14.3/s
+with eight; a new line checks the grab hands out as many slots as the sender lets out.
+The sender keeps a trace (frames offered, passed over full, round trips split into read
+and encode), printed beside every rate line, so the next slow run says what held it.
 #### 8-play. Play: the phone's listening screen (2026-10-10)
 
 `src/components/phone/PhonePlay.tsx`, `src/lib/playGesture.ts`, `src/components/ui/TouchSlider.tsx`

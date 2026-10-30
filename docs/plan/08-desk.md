@@ -61,6 +61,13 @@ Open from Desk v2, each its own thread (the UI lane):
     - **8-draw-a-3** (S) OSC's `/blow`, `/drop`, `/press` still take the plate's point,
       not the wall's, so a TouchOSC pad has the old pad's fault (only its middle lands
       under the finger). A `/wall/...` form, or a flag argument, as the remote's `wall`.
+    - ~~**8-draw-a-4** A slow show starved the pad: 3 pictures out at once gave 6.3/s at
+      14 frames~~ (shipped 2026-10-29; `docs/plan-shipped/08-desk.md` §8-draw-a).
+    - **8-draw-a-5** (S) `drawwall --app` reads the pad at whatever rate the runner
+      draws, so the real plate's slow trip is tested only when a runner happens to be
+      starved (the stand-in's held reads cover the sender). A phase that slows the
+      display itself, a page in the same browser loading the shared GPU until the show
+      draws about 14 frames, would test it on every run. *Measure:* the line's trace.
   - **8-draw-b** (S) The phone's Draw has no bottle, Spin or Tilt (the design's four
     tools only); they are in Controls. A bottle tile on the phone, or a long press on
     Drop for the bottle list, would put soap on the plate from Draw.
