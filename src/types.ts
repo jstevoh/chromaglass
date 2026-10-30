@@ -952,12 +952,12 @@ export interface VisualizerSettings {
   renderStyle: RenderStyle; // 'photo': a lit paper backdrop, dye as transmission, drops as domes with a softbox in them
   paperA: string;             // the backdrop's two colours
   paperB: string;
-  camera: number;             // the camera pass as a whole (0 = off): refraction, depth of field, bloom, chromatic aberration, the sensor's roll-off
+  camera: number;             // Lens: how much of the sensor's look is on (roll-off, vignette, grain); the optics below each act on their own
   focus: number;              // the focal plane as a height: 0 the glass, 1 the tops of the thickest domes
-  aperture: number;           // how fast things go soft away from the focal plane
-  bloom: number;              // glow around the highlights
-  chromaticAberration: number;// colour fringing at refracting edges and the frame's corners
-  refraction: number;         // how much the dye and the bubbles bend what is under them
+  aperture: number;           // the lens's opening: how fast things go soft away from the focal plane (0 = everything sharp)
+  bloom: number;              // scatter in the lens: a halo around the highlights
+  chromaticAberration: number;// the glass's dispersion: colour fringing at refracting edges and, growing outward, at the frame's corners
+  refraction: number;         // how far the dye's curved surface bends what is under it (not the bubbles: PLAN 33i-6)
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
@@ -1200,10 +1200,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   paperB: '#f4c04a',
   camera: 0,
   focus: 0.55,
-  aperture: 0.5,
-  bloom: 0.4,
-  chromaticAberration: 0.3,
-  refraction: 0.6,
+  aperture: 0,
+  bloom: 0,
+  chromaticAberration: 0,
+  refraction: 0,
   microDroplets: 0,
   thinFilm: 0,
   filmPhysics: 0,           // the rainbow: the film every look was made with

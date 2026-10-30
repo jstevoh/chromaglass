@@ -20,7 +20,7 @@ import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
-import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
+import { WebGPUCamera, cameraWanted, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
 import { WebGPUPadGrab } from '../gpu/padGrab';
@@ -6702,15 +6702,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (film.kind !== 'none' && film.video && film.video.readyState >= 2 && film.video.videoWidth > 0) {
               upload('film', () => plate.setSource('film', film.video!));
             }
-            // Two passes when the camera is on: the plate is
-            // drawn into a texture and the camera looks at it, because
-            // refraction, depth of field, bloom and the sensor's roll-off
-            // all need the finished picture to sample from. Built the first
-            // frame it would do anything and dropped when it would not, so
-            // a show without a camera never pays for the second target.
+            // Two passes when the camera is on: the plate is drawn into a texture and the
+            // camera looks at it, because refraction, depth of field, bloom and the sensor's
+            // roll-off need the finished picture. Built when it would do anything
+            // (cameraWanted), dropped when not, so a show without one never pays for it.
             const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
-            if (camAmt > 0.001 && !camera) { camera = new WebGPUCamera(s.device, s.format); scopeSoon = 2; }
-            else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
+            const want = cameraWanted(view.settings);
+            if (want && !camera) { camera = new WebGPUCamera(s.device, s.format); scopeSoon = 2; }
+            else if (!want && camera) { camera.dispose(); camera = null; }
             const cam = camera;
 
             // The post chain, when an effect is on. None exist yet; the
@@ -6750,10 +6749,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               width: canvas.width, height: canvas.height,
               derived: true,
               grid: fields[0].dye.width,
-              // The plate leaves the grain to the camera when it is on, and
-              // still dithers into its 8-bit texture, or a dark ramp bands
-              // before the camera ever sees it.
-              cameraOn: !!cam,
+              // The grain is the Lens's (the sensor look) when it is up; the plate still
+              // dithers into its 8-bit texture, or a dark ramp bands before the camera sees it.
+              cameraOn: !!cam && camAmt > 0.001,
               // With a chain, the finish happens at the end of it instead.
               postChain: !!post,
             });

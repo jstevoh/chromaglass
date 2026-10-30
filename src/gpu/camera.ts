@@ -13,12 +13,15 @@
  * (docs/webgpu-plan.md, P7); what covers this pass now is `npm run webgpu`.
  */
 
+import { cameraWanted } from './cameraWanted';
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
 import { groupOf, viewOf } from './groupCache';
 import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { CAMERA_LAYOUT } from './wgsl/cameraFields';
 import { CAMERA_WGSL } from './wgsl/camera';
+
+export { cameraWanted };
 
 /** What the show's frame says about the lens. */
 export interface CameraView {

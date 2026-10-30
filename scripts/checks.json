@@ -1640,6 +1640,16 @@
       ]
     },
     {
+      "name": "The lens's dials",
+      "shard": "plate",
+      "run": "npm run lens",
+      "why": [
+        "The camera's four dials, each alone with Lens at 0 (refraction, aperture, bloom,",
+        "chromatic aberration each move the frame), and a pre-v3 saved look through the old and the",
+        "migrated shader: the same picture within a bar (PLAN 33i)."
+      ]
+    },
+    {
       "name": "The film, photographed",
       "shard": "plate",
       "run": "npm run filmlook",

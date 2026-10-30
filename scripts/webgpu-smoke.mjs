@@ -368,9 +368,21 @@ const watch = (page) => {
         await settle(3);
         const on = share(b, await shot());
         const timed = typeof dbg().webgpu.timings.camera === 'number';
-        d.settings.camera = 0;
+        // The optics act on their own settings now, so putting the camera back
+        // off is all five at 0, not Lens alone.
+        const OFF = { camera: 0, aperture: 0, bloom: 0, refraction: 0, chromaticAberration: 0 };
+        Object.assign(d.settings, OFF);
         await settle(3);
-        return { floor, on, timed };
+        // And the other way: Lens at 0 with the optics up must still make the
+        // pass (the gate used to be Lens alone, which left five dials that did
+        // nothing until it was turned).
+        const base = await shot();
+        Object.assign(d.settings, { ...OFF, bloom: 1, refraction: 1, aperture: 0.8 });
+        await settle(3);
+        const optics = share(base, await shot());
+        Object.assign(d.settings, OFF);
+        await settle(3);
+        return { floor, on, timed, optics };
       });
       // The governor's budget. On this path a frame is half a millisecond of
       // encoding whatever the machine is doing, so a budget spent in
@@ -516,6 +528,9 @@ const watch = (page) => {
         lens.on > 0.3 && lens.on > lens.floor * 5 && (!started.timestamps || lens.timed),
         `${(lens.on * 100).toFixed(0)}% of the frame against a floor of ${(lens.floor * 100).toFixed(1)}%` +
         (started.timestamps ? `, its pass ${lens.timed ? 'timed' : 'never timed'} on the GPU` : ''));
+      check('the lens\'s dials work with Lens at 0 (bloom, refraction and aperture alone)',
+        lens.optics > 0.1 && lens.optics > lens.floor * 5,
+        `${(lens.optics * 100).toFixed(0)}% of the frame against a floor of ${(lens.floor * 100).toFixed(1)}%`);
     }
       // ── The GPU, taken away ────────────────────────────────────────
       // `device.destroy()` is what a driver reset leaves behind, so this is
