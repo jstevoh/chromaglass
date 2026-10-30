@@ -2269,6 +2269,7 @@ export default function App() {
       wallTest={wallTest}
       onWallTest={setWallTest}
       {...tempoPanel}
+      readTempo={readTempo}
       readEar={() => ear.live.current?.features ?? null}
       spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
       midiClocked={midi.clocked}

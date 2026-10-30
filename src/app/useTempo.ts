@@ -73,10 +73,14 @@ export function useTempo() {
       () => tempoRef.current?.read(performance.now()) ?? null;
   }, []);
 
-  /** The Settings panel's whole Tempo block, its readout and its four ways to set one, handed over as one. */
+  /**
+    The Settings panel's Tempo block, its readout and the ways to set one,
+    handed over as one. Not `readTempo`, which App passes by name to the panel
+    and the phone alike (`npm run panel` finds the tap pad polled that way).
+  */
   const tempoPanel = useMemo(() => ({
-    tempo: tempoLabel, readTempo, onTap: tapTempo, onTempoClear: clearTempo, onTempoBpm: setTempoBpm, onLink: setLinkOn,
-  }), [tempoLabel, readTempo, tapTempo, clearTempo, setTempoBpm, setLinkOn]);
+    tempo: tempoLabel, onTap: tapTempo, onTempoClear: clearTempo, onTempoBpm: setTempoBpm, onLink: setLinkOn,
+  }), [tempoLabel, tapTempo, clearTempo, setTempoBpm, setLinkOn]);
 
   return {
     tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setTempoBpm, setLinkOn, tempoPanel,
