@@ -1105,7 +1105,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
-      beads: 0.35,            // oil drops on the plate, each a lens on the colour under it
+      beads: 0.7,             // each a lens on the colour under it
       globalSpeed: 0.06,
       surge: 0.55,        // beads visibly travel — the whole point
       layerCount: 1,
@@ -1163,7 +1163,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: 'cell-bloom',
-    name: 'Cell Bloom',
+    name: 'Lens Pools',
     description: 'Three small pools turning under a magnifier on violet: silicone in magenta and ultramarine, and a lavender pool of oil between them.',
     settings: {
       macroMode: true,

@@ -45,7 +45,7 @@ import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, step
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
-import { BeadField } from '../lib/beads';
+import { BeadField, beadPopulation } from '../lib/beads';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
@@ -838,7 +838,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const rotationAnglesRef = useRef<number[]>([]);
   /*
     The plate's angular velocity, in radians a second, one per layer.
-    
+
     Rotation used to be a speed and nothing else: the angle took
     `rotationSpeed * dt` every frame and the plate turned at exactly what the
     slider said. A plate is a thing with mass resting on something, so this
@@ -3495,7 +3495,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     af.addVelocity(px, py, (-ddy / dd) * w, (ddx / dd) * w);
                   }
                 }
-                
+
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 /*
@@ -4195,7 +4195,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const pitchClass = currentAudioData?.features?.pitchClass ?? 0;
                 // Normalize pitchClass (0-11) to a full circle (0 - 2PI)
                 const pitchAngle = (pitchClass / 12.0) * Math.PI * 2;
-                
+
                 // Each audio feature carries a different color from the harmony,
                 // offset by the true musical pitch so chords paint distinct colors!
                 /*
@@ -4681,7 +4681,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 }
                 if (simStep === 0 && beadFrameRef.current++ % 30 === 0) {
                   const dens = fluidsRef.current[0]?.readDensity;
-                  beads.populate(Math.round(60 + 360 * beadAmt), 0.8 + 0.4 * beadAmt, dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
+                  beads.populate(...beadPopulation(beadAmt, currentSettings.macroMode), dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
                 }
                 if (isActiveRef.current && drainFrameRef.current === 0) {
                   const lead0 = fluidsRef.current[0];
@@ -5474,11 +5474,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           filmGain: filmGainRef.current,
           mark: markRef.current,
           film: filmRef.current,
-          audio: { 
-            pitchClass: audioDataRef.current?.features?.pitchClass ?? 0, 
-            brightness: audioDataRef.current?.features?.brightness ?? 0, 
-            beatPhase: beatClockRef.current?.period > 0 
-                ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0 
+          audio: {
+            pitchClass: audioDataRef.current?.features?.pitchClass ?? 0,
+            brightness: audioDataRef.current?.features?.brightness ?? 0,
+            beatPhase: beatClockRef.current?.period > 0
+                ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0
                 : 0,
             // How far the beat may turn and breathe the frame (Frame Sway, lib/plateRock.ts).
             beatSway: frameSway(currentSettings.frameSway),

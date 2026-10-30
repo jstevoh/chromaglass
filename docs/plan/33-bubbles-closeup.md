@@ -127,6 +127,19 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   the Guide say so, and `macroview` line 1 now audits every look. Open: Cell Bloom's name
   says cells; the owner to say whether to rename it (its id is in set lists and saved
   shows, so a rename keeps the id). Story in `docs/plan-shipped.md` §33g.
+- ~~**33g-2a. The closeup's beads are the 3D.**~~ **Shipped** (the owner, 2026-10-30:
+  "a couple really cool macro 3d looking views", on the card "Beads first"). The oil beads
+  are the closeup's strongest depth cue (each a lens that turns the plate upside down inside
+  a dark meniscus, `dropCam`), but at the plate's size they were grain. In the closeup
+  (`macroMode`) the beads are now laid at 2.0 times the size scale (`beadPopulation` in
+  `lib/beads.ts`; the plate's is as it was, to the bit), Macro Bead's Beads dial is 0.7 (was
+  0.35), and Cell Bloom is Lens Pools (id kept: `cell-bloom`). Story in `docs/plan-shipped.md`
+  §33g. Shortcuts, named: the factor is a taste choice (1.6 gave the mean radius 1.35 times,
+  2.0 gives 1.44 to 1.49, 3.0 starts to leave the plate short of beads); beads already on the
+  plate keep their size until they retire. Open: no new setting (the size follows
+  `macroMode`, so a look cannot ask for smaller closeup beads); 33g-2 proper (refraction of
+  the ground, depth of field, parallax) is still the next optics step, and `lampjudge.mjs`
+  still quotes Cell Bloom's old description for its judge.
 - **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
   shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
   old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma

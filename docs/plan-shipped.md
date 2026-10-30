@@ -5947,6 +5947,16 @@ defaults) for Paint Cells 0 and for Macro Lacing 0 but in `lace-run`, and fails 
 *Shortcut, named:* the audit reads settings, not pixels, for the three looks; their frames
 are the same shader as `classic` with the knob at 0, which `macroview` measures.
 
+*33g-2a (2026-10-30, the owner: "a couple really cool macro 3d looking views").* In the
+closeup the beads are laid at twice the size scale (`beadPopulation`, `lib/beads.ts`), Macro
+Bead's Beads dial 0.35 -> 0.7, Cell Bloom renamed Lens Pools. `npm run drops` 32/32 (3 new
+lines): out of the closeup the dial's count and size are the old ones to the bit; in it the
+count is the same and the scale 2.0 times; a field populated that way holds beads 1.44 times
+larger in mean radius (bar 1.4 to 1.8) and 343 of 332 (bar 60%). The lab, `macro-bead` at
+2.5x on the 9-pool plate: before, small beads, one lens bead the size of a thumbnail; after,
+a dozen glass-like lens beads, three of them a fifth of the frame. Pictures in the project's
+shared files, `macro-closeup-33g/`. Not measured: how it looks on the owner's GPU.
+
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
 and lacing's own contribution to the frame (the frame against the same frame with both
