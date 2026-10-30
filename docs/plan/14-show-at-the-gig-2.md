@@ -169,6 +169,12 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   2.66 s, `fluid/squeezeUpdate` 1.40 s, `plate/display` 1.03 s). The two slowest are
   the next thing to read: why each takes eight times the median, and whether the
   opening needs them before its first step.
+- **Shipped, 14v-11: the intro holds still until the whole opening is built** (2026-10-29,
+  the owner's choice: never a stutter, even if it moves later). It let go at the last render
+  compile with the solver's kernels still compiling, and #540's run 40741268086 went red on
+  startup's "no stop in the opening" 0.13 s after (2.35 s from 8.70 s). `Quiet.go` now comes
+  once the opening's last build has settled and its first uses are paid; `npm run intro`
+  lines 9 and 9b hold it to that. The Mac's `startup` check 4 is the real test.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do

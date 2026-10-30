@@ -298,8 +298,8 @@ const frameStops = (x) => {
  * kernel of all (2.4 to 4.6 s for `fluid/fill`, a few lines); in all 41 the
  * page's own long tasks in the gap came to 0.7 s at most (in 38, none), and
  * every gap had ended before the intro let go of its still (4.64 to 11.96 s).
- * The intro is held still from the first paint until the opening's render
- * pipelines are built (`introStill`, 14v-5) precisely because on a cold Mac
+ * The intro is held still from the first paint until the opening is built
+ * (`introStill`, 14v-5, 14v-11) precisely because on a cold Mac
  * that is when the GPU stops the page's frames, and a turning mark froze
  * where a still one shows nothing. So those 41 were a still picture with
  * the page idle and Chromium busy, which no audience sees and the app
@@ -1538,7 +1538,7 @@ try {
     quarter-second row it was seen in; the intro's own leaving is exact.
   */
   const intro = o.intro ?? {};
-  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}; held still ${(intro.still ?? []).map(([a, e]) => `${(a / 1000).toFixed(2)}–${e == null ? 'never let go' : `${(e / 1000).toFixed(2)} s`}`).join(', ') || 'never'} (from the first paint until the opening's render pipelines were built)`);
+  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}; held still ${(intro.still ?? []).map(([a, e]) => `${(a / 1000).toFixed(2)}–${e == null ? 'never let go' : `${(e / 1000).toFixed(2)} s`}`).join(', ') || 'never'} (from the first paint until the opening was built)`);
   const p = o.prepared;
   const b = o.behind;
   check('the show opens and the plate is stepping',
