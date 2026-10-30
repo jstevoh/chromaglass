@@ -6580,7 +6580,7 @@ of the CPU a call on SwiftShader, a canvas's copy included; a video's is a copy 
 `npm run wgsl` now compiles the splat kernels too, which it never had.
 
 
-## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #PRNUM)
+## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
 
 14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the
 bottom of the frame up; a canvas's run down"), and the video pour and an uploaded picture
