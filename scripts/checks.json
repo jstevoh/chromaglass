@@ -1293,6 +1293,19 @@
       ]
     },
     {
+      "name": "The music shelf reaches the show",
+      "shard": "browser",
+      "run": "npm run shelf",
+      "why": [
+        "The tracks that ship play from the show's own origin and drive the plate",
+        "(scripts/shelf.mjs): each served as an MP3, one picked by hand from the",
+        "Music & Drone panel on Setup, the analyser hearing it, its credit on screen,",
+        "the plate as an instrument with its start and stop, and a track taking over",
+        "from it. It looked for a Sound tab the desk no longer has and sat in no",
+        "shard, red unseen (PLAN 35c-5). Media and the DOM, not the plate: no GPU."
+      ]
+    },
+    {
       "name": "The Source opens on Off",
       "shard": "browser",
       "run": "npm run opensource",
