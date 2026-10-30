@@ -397,10 +397,10 @@ try {
 const oldPush = (strength) => ({
   name: `old-fingering-push-${strength}`,
   setup(b) {
-    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]fluid\.ts$/ }, (args) => {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]fluid[\\/]forces\.ts$/ }, (args) => {
       const src = readFileSync(args.path, 'utf8');
       const at = '  /*\n    There was a fingering push here, and it is gone on purpose.';
-      if (!src.includes(at)) throw new Error('grating: the control could not find where the fingering push was in fluid.ts');
+      if (!src.includes(at)) throw new Error('grating: the control could not find where the fingering push was in wgsl/fluid/forces.ts');
       // The push as it shipped until it was taken out.
       const push = `  if (d >= 0.05) {
     let gx = (bilerpN(dye, uv + eL, S.n).a - bilerpN(dye, uv - eL, S.n).a) * 0.5;
