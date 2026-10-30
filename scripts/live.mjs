@@ -34,16 +34,26 @@
  *                it over the whole stream (a software encoder on a shared CI
  *                box may not hold every frame of thirty; the encoder skips a
  *                frame it has no room for and says how many), none repeated,
- *                a keyframe every two seconds within half a second
+ *                the median gap a frame, 19 in 20 gaps within two frames, no
+ *                gap over a second, and the clock kept through a stall (the
+ *                frame after a long gap is a frame after it, not another
+ *                long gap: the first Mac run read one 768 ms gap in 30 s
+ *                while a neighbouring job loaded the runner, and a check
+ *                that failed on it measured the runner, not the stream), a
+ *                keyframe within two frames after every two-second mark
  *   decodable    Chromium's own decoders, given the headers the stream sent,
  *                decode every frame and every packet: the stream is a valid
  *                H.264 and AAC (or Opus) stream, not just tags of bytes
  *   in sync      five times during the stream the page flashes the canvas
  *                white and sounds a click at the same instant (the audio
  *                clock and the frame clock paired through getOutputTimestamp);
- *                in what arrived, the frame that went white and the audio
- *                that went loud are within one frame and one audio block
- *                (1000/fps + 10 ms) of each other, every time
+ *                in what arrived, the white frame is the first frame taken
+ *                after the flash was drawn (not a later one), and the sound
+ *                goes loud where the page made it, once the codec's priming
+ *                is set back (measured, see live-entry.ts), within an audio
+ *                block and one codec frame (10 ms + 21 ms for AAC, 20 for
+ *                Opus): the two clocks agree, whatever the machine's stalls
+ *                did to the frame rate around a flash
  *   bookkeeping  the client answered the server's ping and acknowledged its
  *                bytes when asked, and its own counts match the server's
  *   a bad key    a stream whose key the server refuses fails with the
@@ -196,7 +206,17 @@ try {
   const vGaps = videoTags.slice(1).map((t, i) => t.timestamp - videoTags[i].timestamp);
   check('frames at the stream\'s rate', enoughVideo && rate >= FPS * 0.8 && rate <= FPS * 1.05, `${fmt(rate)} fps over ${fmt(videoSpan)} s (${s.video.frames} frames; the page skipped ${live.skipped})`);
   check('every frame later than the one before', enoughVideo && vGaps.every((g) => g > 0), `smallest gap ${fmt(Math.min(...vGaps))} ms`);
-  check('frames fill the stream, none more than three frames apart', enoughVideo && Math.max(...vGaps) <= 3 * 1000 / FPS, `largest gap ${fmt(Math.max(...vGaps))} ms`);
+  // The distribution, not the worst moment: the stream is on its clock when
+  // the typical gap is a frame and nearly every gap is within two; a shared
+  // runner's stall (768 ms once in 30 s on CI's Mac) shows in the largest gap,
+  // bounded at a second, and in whether the clock was kept through it: the
+  // gap after a long one must be an ordinary one (the timer skips to the
+  // frame due now, it does not queue the missed ones).
+  const sortedGaps = vGaps.slice().sort((a, b) => a - b);
+  const p95 = sortedGaps[Math.floor(sortedGaps.length * 0.95)] ?? NaN;
+  const afterStall = vGaps.filter((g, i) => i > 0 && vGaps[i - 1] > 3 * 1000 / FPS);
+  check('frames on the clock: the median gap a frame, 19 in 20 within two, none over a second', enoughVideo && Math.abs(median(vGaps) - 1000 / FPS) <= 1.5 && p95 <= 2 * 1000 / FPS && Math.max(...vGaps) <= 1000, `median ${fmt(median(vGaps))} ms, 95th ${fmt(p95)} ms, largest ${fmt(Math.max(...vGaps))} ms; ${vGaps.filter((g) => g > 3 * 1000 / FPS).length} gaps over three frames`);
+  check('the clock is kept through a stall: the gap after a long one is within two frames', enoughVideo && afterStall.every((g) => g <= 2 * 1000 / FPS), afterStall.length ? `after ${afterStall.length} stall(s): ${afterStall.map((g) => fmt(g, 0)).join(', ')} ms` : 'no stall over three frames');
   const keyTimes = videoTags.filter((t) => t.d.key).map((t) => t.timestamp);
   const keyGaps = keyTimes.slice(1).map((t, i) => t - keyTimes[i]);
   // The page asks for a keyframe every two seconds, at the first frame taken
@@ -230,19 +250,27 @@ try {
   const dark = median(frames.map((f) => f.mean));
   const levels = decoded.levels.slice().sort((a, b) => a.ts - b.ts);
   const quiet = median(levels.map((l) => l.rms));
-  const bound = 1000 / FPS + 10;
+  const loud = Math.max(...levels.map((l) => l.rms));
+  const codecFrameMs = codec === 'aac' ? 1024 / setup.sampleRate * 1000 : 20;
+  const primingMs = decoded.primingMs ?? 0;
+  const audioBound = 10 + codecFrameMs;
+  console.log(`  decoded: the codec's priming ${decoded.primingMs === null ? 'could not be measured' : `${fmt(primingMs)} ms`}; the plate ${fmt(dark, 0)} of 255 between flashes; the tone ${fmt(quiet, 3)} rms, the clicks ${fmt(loud, 3)}`);
   const sync = [];
   for (const ev of events) {
-    const flashAt = frames.find((f) => f.ts >= ev.flashMs - bound && f.ts <= ev.flashMs + 400 && f.mean > dark + 0.5 * (255 - dark));
-    const clickAt = levels.find((l) => l.ts >= ev.clickMs - bound && l.ts <= ev.clickMs + 400 && l.rms > quiet * 4 + 0.05);
-    sync.push({ flash: flashAt?.ts ?? null, click: clickAt?.ts ?? null, delta: flashAt && clickAt ? flashAt.ts - clickAt.ts : null, drawn: ev.flashMs, sounded: ev.clickMs });
+    // The first frame taken after the flash was drawn, and the first white one from there.
+    const firstAfter = frames.findIndex((f) => f.ts >= ev.flashMs);
+    const whiteAt = frames.findIndex((f, i) => i >= Math.max(0, firstAfter - 1) && f.ts <= ev.flashMs + 1500 && f.mean > dark + 0.5 * (255 - dark));
+    // The sound: where the level first reaches half the click's own peak, the codec's priming set back.
+    const clickAt = levels.find((l) => l.ts - primingMs >= ev.clickMs - audioBound && l.ts - primingMs <= ev.clickMs + 1500 && l.rms > quiet + 0.5 * (loud - quiet));
+    sync.push({
+      white: whiteAt >= 0 ? frames[whiteAt].ts : null, firstAfter: firstAfter >= 0 ? frames[firstAfter].ts : null, late: whiteAt >= 0 && firstAfter >= 0 ? whiteAt - firstAfter : null,
+      click: clickAt ? clickAt.ts - primingMs : null, audioErr: clickAt ? clickAt.ts - primingMs - ev.clickMs : null, drawn: ev.flashMs,
+    });
   }
-  console.log(`  sync: ${sync.map((x) => x.delta === null ? `(flash ${x.flash === null ? 'missing' : fmt(x.flash, 0)}, click ${x.click === null ? 'missing' : fmt(x.click, 0)})` : `${x.delta >= 0 ? '+' : ''}${fmt(x.delta, 0)} ms`).join(', ')} (video minus audio; a flash is seen at the next frame taken, so up to +${fmt(1000 / FPS, 0)} is the frame clock, not a lag); drawn vs frame: ${sync.map((x) => x.flash === null ? '?' : fmt(x.flash - x.drawn, 0)).join(', ')} ms`);
-  check(`${EVENTS} flashes and clicks all seen in what arrived`, sync.length === EVENTS && sync.every((x) => x.delta !== null), `${sync.length} events; plate ${fmt(dark, 0)} of 255 between flashes, tone ${fmt(quiet, 3)} rms between clicks`);
-  // The picture may read after the sound by up to a frame (the flash waits
-  // for the next frame taken) and an audio block (the click is found to 5
-  // ms, in 10 ms chunks); it may never read before it.
-  check(`picture within a frame and an audio block after the sound (0..${fmt(bound, 0)} ms), every time`, sync.length === EVENTS && sync.every((x) => x.delta !== null && x.delta >= -5 && x.delta <= bound), sync.map((x) => x.delta === null ? '?' : fmt(x.delta, 0)).join(', ') + ' ms');
+  console.log(`  sync: flash drawn → white frame ${sync.map((x) => x.white === null ? 'missing' : `+${fmt(x.white - x.drawn, 0)}`).join(', ')} ms (${sync.map((x) => x.late === null ? '?' : x.late === 0 ? 'the first frame after' : `${x.late} frame(s) late`).join(', ')}); click made → sound found ${sync.map((x) => x.audioErr === null ? 'missing' : `${x.audioErr >= 0 ? '+' : ''}${fmt(x.audioErr, 0)}`).join(', ')} ms`);
+  check(`${EVENTS} flashes and clicks all seen in what arrived`, sync.length === EVENTS && sync.every((x) => x.white !== null && x.click !== null), `${sync.filter((x) => x.white !== null).length} flashes, ${sync.filter((x) => x.click !== null).length} clicks`);
+  check('the flash is in the first frame taken after it was drawn, every time', sync.length === EVENTS && sync.every((x) => x.late === 0), sync.map((x) => x.late === null ? '?' : String(x.late)).join(', ') + ' frames late');
+  check(`the sound is where the page made it, within an audio block and a codec frame (±${fmt(audioBound, 0)} ms) after ${fmt(primingMs, 0)} ms of priming, every time`, sync.length === EVENTS && sync.every((x) => x.audioErr !== null && Math.abs(x.audioErr) <= audioBound), sync.map((x) => x.audioErr === null ? '?' : fmt(x.audioErr, 0)).join(', ') + ' ms');
 
   // Bookkeeping.
   check('the client answered the server\'s ping', (stopped?.transport?.pings ?? 0) >= 1 && s.pongs >= 1, `${stopped?.transport?.pings} answered, ${s.pongs} heard`);

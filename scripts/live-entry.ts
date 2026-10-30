@@ -5,6 +5,7 @@
 import './lab-entry.ts';
 import { LiveEncoder, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
 
+
 type LabApi = {
   create(N?: number, L?: number): Promise<{ N: number; L: number }>;
   dye(x: number, y: number, r: number, rgb: [number, number, number], d?: number): void;
@@ -212,8 +213,78 @@ const api = {
       try { await adec.flush(); } catch (e) { audioError = audioError ?? (e as Error).message; }
       if (adec.state !== 'closed') adec.close();
     }
-    return { frames, videoError, levels, audioError, audioSeconds };
+    /*
+      What the decoder puts before the sound: an AAC encoder and decoder
+      between them delay the signal by their priming (1024 to 2112 samples,
+      21 to 44 ms at 48 kHz; Record measures it for its MP4 edit list, the
+      same `measurePriming`), and a player that does not trim it (FLV has no
+      edit list; most do not) hears the stream's sound that much after its
+      stamp. Opus carries its pre-skip in the OpusHead and the decoder trims
+      it. Measured here with the stream's own codec and description, so the
+      sync line can set the decoded sound back by it and read the stream's
+      two clocks against each other, whatever the codec.
+    */
+    let primingMs: number | null = null;
+    if (audio) {
+      const samples = await codecDelay(audio.codec, audio.sampleRate, audio.channels);
+      primingMs = samples === null ? null : (samples / (audio.codec === 'aac' ? audio.sampleRate : 48000)) * 1000;
+    }
+    return { frames, videoError, levels, audioError, audioSeconds, primingMs };
   },
 };
+
+/**
+ * The delay the stream's audio codec puts on the sound, in decoded samples:
+ * Record's `measurePriming` (lib/render.ts) with two differences the check
+ * needs. It decodes exactly as `decode()` above does (Opus at 48 kHz, which
+ * is the only rate an Opus decoder runs at; the stream's own description),
+ * and it answers 0 when the signal comes out where it went in (Record reads
+ * a zero as "cannot tell", because its AAC never is; the Opus decoder trims
+ * the pre-skip and 0 is the right answer). Noise in, the same noise out at
+ * some lag: the lag where they correlate above 0.5 is the delay.
+ */
+async function codecDelay(codec: string, sampleRate: number, channels: number): Promise<number | null> {
+  const n = 16384, window = 8192, maxLag = 4096;
+  const probe = new Float32Array(n);
+  let x = 0x2545f491;
+  for (let i = 0; i < n; i++) { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; probe[i] = (x / 4294967296 - 0.5) * 0.5; }
+  const chunks: EncodedAudioChunk[] = [];
+  let desc: Uint8Array | null = null;
+  let failed = false;
+  const enc = new AudioEncoder({ output: (c, m) => { chunks.push(c); if (m?.decoderConfig?.description && !desc) { const d = m.decoderConfig.description; desc = d instanceof ArrayBuffer ? new Uint8Array(d.slice(0)) : new Uint8Array((d as ArrayBufferView).buffer.slice((d as ArrayBufferView).byteOffset, (d as ArrayBufferView).byteOffset + (d as ArrayBufferView).byteLength)); } }, error: () => { failed = true; } });
+  enc.configure({ codec: codec === 'aac' ? 'mp4a.40.2' : 'opus', sampleRate, numberOfChannels: channels, bitrate: 96000 });
+  const planar = new Float32Array(n * channels);
+  for (let c = 0; c < channels; c++) planar.set(probe, c * n);
+  const data = new AudioData({ format: 'f32-planar', sampleRate, numberOfFrames: n, numberOfChannels: channels, timestamp: 0, data: planar });
+  try { enc.encode(data); } finally { data.close(); }
+  try { await enc.flush(); } catch { failed = true; }
+  enc.close();
+  if (failed || !chunks.length) return null;
+  const out: Float32Array[] = [];
+  const dec = new AudioDecoder({ output: (a) => { const f = new Float32Array(a.numberOfFrames); a.copyTo(f, { planeIndex: 0, format: 'f32-planar' }); out.push(f); a.close(); }, error: () => { failed = true; } });
+  dec.configure({ codec: codec === 'aac' ? 'mp4a.40.2' : 'opus', sampleRate: codec === 'aac' ? sampleRate : 48000, numberOfChannels: channels, ...(desc ? { description: desc } : {}) });
+  for (const c of chunks) dec.decode(c);
+  try { await dec.flush(); } catch { failed = true; }
+  if (dec.state !== 'closed') dec.close();
+  if (failed) return null;
+  const got = new Float32Array(out.reduce((k, f) => k + f.length, 0));
+  let at = 0;
+  for (const f of out) { got.set(f, at); at += f.length; }
+  if (got.length < maxLag + window) return null;
+  // Opus at a source rate other than 48 kHz comes back resampled: correlate against the probe resampled the same way.
+  const ratio = codec === 'aac' ? 1 : 48000 / sampleRate;
+  const ref = new Float32Array(window);
+  for (let i = 0; i < window; i++) { const t = i / ratio; const j = Math.floor(t); ref[i] = probe[Math.min(n - 1, j)] * (1 - (t - j)) + probe[Math.min(n - 1, j + 1)] * (t - j); }
+  let pp = 0;
+  for (let i = 0; i < window; i++) pp += ref[i] * ref[i];
+  let best = -1, bestLag = -1;
+  for (let lag = 0; lag <= maxLag; lag++) {
+    let pg = 0, gg = 0;
+    for (let i = 0; i < window; i++) { const g = got[lag + i]; pg += ref[i] * g; gg += g * g; }
+    const r = gg > 0 ? pg / Math.sqrt(pp * gg) : 0;
+    if (r > best) { best = r; bestLag = lag; }
+  }
+  return best > 0.5 ? bestLag : null;
+}
 
 (window as unknown as { liveLab: typeof api }).liveLab = api;

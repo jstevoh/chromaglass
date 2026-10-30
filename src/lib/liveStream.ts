@@ -105,6 +105,7 @@ export interface LiveState {
   audioPackets: number;
   audioCodec: 'aac' | 'opus' | null;
   audioClock: 'track' | 'arrival' | null;
+  timing: { grabMs: number; firstOutMs: number | null; firstEncodeAt: number; outputs: number };
   encodeQueue: number;
   transport: LiveTransportState | null;
 }
@@ -144,6 +145,20 @@ export class LiveEncoder {
   private audioDescribed = false;
   private transportState: LiveTransportState | null = null;
   private counts = { frames: 0, skipped: 0, keyframes: 0, audioPackets: 0 };
+  /**
+   * Where each frame is drawn at the stream's size before it is encoded. A
+   * VideoFrame made straight from the plate's canvas is the canvas's size
+   * (the window's, 1024x653 in the Mac check), and an encoder configured for
+   * another size converts and scales it on the CPU after reading the GPU
+   * canvas back: the first Mac run of `npm run desktop` took 24 frames in
+   * four seconds that way, skipping 97. Drawing the canvas onto a 2D canvas
+   * of the stream's size is one GPU blit, and a frame from a 2D canvas is the
+   * path the lab's check already measured at the stream's rate.
+   */
+  private stage: OffscreenCanvas | HTMLCanvasElement | null = null;
+  private stageCtx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null = null;
+  /** For the checks: ms spent making frames, ms from the first encode to the first packet out, packets out. */
+  readonly timing = { grabMs: 0, firstOutMs: null as number | null, firstEncodeAt: 0, outputs: 0 };
   private phase: LiveState['phase'] = 'idle';
   private error: string | null = null;
   private stopping = false;
@@ -157,6 +172,7 @@ export class LiveEncoder {
       ...this.counts,
       audioCodec: this.audioCodec,
       audioClock: this.audioClock,
+      timing: { ...this.timing },
       encodeQueue: this.video?.encodeQueueSize ?? 0,
       transport: this.transportState,
     };
@@ -233,8 +249,11 @@ export class LiveEncoder {
       const keyFrame = bucket > this.lastKeyBucket;
       let frame: VideoFrame | null = null;
       try {
-        frame = new VideoFrame(canvas, { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
+        const t = performance.now();
+        frame = new VideoFrame(this.staged(canvas), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
+        if (this.counts.frames === 0) this.timing.firstEncodeAt = t;
         this.video.encode(frame, { keyFrame });
+        this.timing.grabMs += performance.now() - t;
         if (keyFrame) { this.lastKeyBucket = bucket; this.counts.keyframes++; }
         this.counts.frames++;
       } catch (e) {
@@ -250,7 +269,21 @@ export class LiveEncoder {
     this.timer = setTimeout(() => this.tick(due + 1), Math.max(0, next - performance.now()));
   }
 
+  /** The canvas drawn at the stream's size (see `stage`); the canvas itself when it already is. */
+  private staged(canvas: HTMLCanvasElement): HTMLCanvasElement | OffscreenCanvas {
+    const { width, height } = this.opts;
+    if (canvas.width === width && canvas.height === height) return canvas;
+    if (!this.stage) {
+      this.stage = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), { width, height });
+      this.stageCtx = this.stage.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+    }
+    if (!this.stageCtx) throw new Error('no 2D context to stage the stream\'s frames on');
+    this.stageCtx.drawImage(canvas, 0, 0, width, height);
+    return this.stage;
+  }
+
   private onVideo(chunk: EncodedVideoChunk, m?: EncodedVideoChunkMetadata): void {
+    if (this.timing.outputs++ === 0) this.timing.firstOutMs = performance.now() - this.timing.firstEncodeAt;
     const desc = m?.decoderConfig?.description;
     if (desc && !this.videoDescribed) {
       this.videoDescribed = true;

@@ -429,7 +429,7 @@ try {
     const keyOk = pub?.key === 'desktop-check-key' && (isMac ? viaKeychain : true) && (!viaKeychain || (started.names?.includes('check') && removed === true));
     const framesOk = !!sum && sum.video.header && sum.video.frames >= 60 && (stopped?.transport?.videoFrames ?? -1) === sum.video.frames;
     check(`live: the page streams the plate through the app to a listener${viaKeychain ? ', on a key kept by name in its keychain store' : ''}`, !started.error && keyOk && framesOk,
-      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s, ${stopped?.transport?.videoFrames ?? '?'} sent, ${stopped?.transport?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped; key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
+      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s, ${stopped?.transport?.videoFrames ?? '?'} sent, ${stopped?.transport?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped (${stopped?.timing ? `${(stopped.timing.grabMs / Math.max(1, stopped.frames)).toFixed(1)} ms a frame to grab, first packet ${stopped.timing.firstOutMs === null ? 'never' : `${stopped.timing.firstOutMs.toFixed(0)} ms after the first encode`}, ${stopped.timing.outputs} out` : 'no timing'}); key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
     await listener.close();
   }
 
