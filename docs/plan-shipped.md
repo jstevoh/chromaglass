@@ -4201,6 +4201,27 @@ still 0.12 long (0.05 would give 0.51 but fling past the rim). The bar is unchan
 at the mirror). A new line asks every run for the gap between the stroke and its mirror
 to be more than 19/128 + 0.12, so a desk that reshapes the canvas fails by name.
 
+### 19ai-6. The solver's kernels, one file a pass (2026-10-28)
+
+`src/gpu/wgsl/fluid.ts` was 5,885 lines (290 KB): 96 kernels in one object literal and
+the snippets they share, so a thread changing one pass read the whole solver's WGSL
+first. It now keeps its header, the `KERNELS` table (built by spreading the pass files),
+the substepped and plan variants made from the moved kernels, and `kernel`; the
+kernels are under `src/gpu/wgsl/fluid/`, fourteen files of 6 to 31 KB: `shared`,
+`splats`, `gap`, `phase`, `phaseForces`, `labyrinth`, `pressure`, `carry`, `forces`,
+`oil`, `capillary`, `dye`, `gridFilter`, `reactions`, `fields`. Each moved text is the
+original's, comments and all; the move was made by a script working on the file's
+syntax tree (each property's full text with its leading comments), so nothing was
+retyped.
+
+Measured: every kernel's raw source, and `kernel(name, f)` for four formats, plus the
+module's exported strings, 625 entries, hashed together before and after:
+`b95d4f88f2071321` both times. Only the order of `KERNELS`' keys changed (the files
+group them by pass), which only the order `npm run wgsl` compiles them in reads; it
+compiled all of them on SwiftShader, `checked 143 shaders` and no error. Two checks read the solver's text rather than
+importing it, and now read the file their lines moved to: `plate` (the gate, in
+`dye.ts`) and `turing` (the regime's cap and share, in `reactions.ts`).
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
