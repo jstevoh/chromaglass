@@ -368,6 +368,15 @@ rest is routine and the owner's calls.
     - *The encoder's own keyframes.* OpenH264 (the lab) starts a new group whenever the
       picture changes a lot, on top of the one asked for every two seconds; the check allows
       it. VideoToolbox should not; `npm run live` on the Mac shard says.
+    - *The app's encoder on GitHub's Mac.* On GitHub's macOS runner (a virtual machine with
+      no GPU of its own) the packed app encodes 640x360 at 170 ms a frame under every
+      WebCodecs hint (`__cgLive.probe()`: no-preference 171, prefer-software 198 ms, hardware
+      unsupported), while the lab's Chromium on the same kind of machine holds 30 fps at
+      that size (`npm run live -- --codec aac`, the fifth shard). Electron's build reaches a
+      different encoder than Chromium's there; find which (`chrome://gpu`'s video encode
+      line in the app, `media_use_openh264` in Electron's build args). The app's check
+      line wants the frames the probe says the machine can make, so the runner measures
+      the bridge, not its own encoder; judging §92 measures the real rate on the owner's Mac.
     - *Dropping on a slow upload is counted, not yet measured.* The client drops video to
       the next keyframe past 1.5 MB waiting on the socket; the lab's socket never falls
       behind. 37x-4c's listener needs a throttle (read slowly) to measure the drop and the
