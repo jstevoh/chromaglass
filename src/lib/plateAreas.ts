@@ -168,12 +168,13 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
   /*
     Poster, 1969 (PLAN 25b-4, 28i-3b): three hard-edged poster shapes apart on
     the glass, so the bass and snare work separate shapes rather than one
-    middle stain. Left, an orange-and-coral milk shape on the bass; right, an
-    ultramarine-and-purple ink shape on the mids; low in the middle, an amber
-    milk shape on the treble.
+    middle stain. Left, a milk shape on the bass whose bottle the lead's note
+    picks (PLAN 25i): orange, ultramarine or purple, so the kick pours and
+    the melody colours; right, an ultramarine-and-purple ink shape on the
+    mids; low in the middle, an amber milk shape on the treble.
   */
   'poster-1969': [
-    { x: 0.28, y: 0.36, r: 0.14, liquid: 'milk', dye: 0, dyes: [0, 1], band: 'bass' },
+    { x: 0.28, y: 0.36, r: 0.14, liquid: 'milk', dye: 0, dyes: [0, 3, 4], band: 'bass' },
     { x: 0.72, y: 0.38, r: 0.14, liquid: 'ink', dye: 3, dyes: [3, 4], band: 'mid' },
     { x: 0.48, y: 0.72, r: 0.13, liquid: 'milk', dye: 2, dyes: [2], band: 'treble' },
   ],
@@ -199,6 +200,21 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     { x: 0.31, y: 0.44, r: 0.14, liquid: 'acid', dye: 0, dyes: [0], band: 'mid' },
     { x: 0.69, y: 0.56, r: 0.14, liquid: 'base', dye: 1, dyes: [1], band: 'bass' },
   ],
+  /*
+    Chemical Clock (PLAN 25i): three places in the gel the kick touches,
+    one each kick in turn (areaForBand), as a projectionist touches a dish
+    of the reaction with a wire. The kick's own beat dose there is a drop of
+    the activator (the bottle, bottles.ts): the gel fires and a ring runs
+    out from it. A touch inside a ring still passing is in gel that has not
+    recovered and fires nothing (the Oregonator's refractory tail), so the
+    places pace themselves no faster than the gel can. Its own seed lays the
+    plate (OWN_SEED_AREAS): the areas are only where the music touches it.
+  */
+  'chemical-clock': [
+    { x: 0.3, y: 0.34, r: 0.12, liquid: 'activator', dye: 0, dyes: [0], band: 'bass' },
+    { x: 0.7, y: 0.38, r: 0.12, liquid: 'activator', dye: 1, dyes: [1], band: 'bass' },
+    { x: 0.5, y: 0.7, r: 0.12, liquid: 'activator', dye: 2, dyes: [2], band: 'bass' },
+  ],
 };
 
 /**
@@ -207,7 +223,7 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
  * Bloom's bells, Milk Marbling's pale milk dish and food-colouring spots),
  * rather than as pools (layAreas).
  */
-export const OWN_SEED_AREAS: ReadonlySet<string> = new Set(['jellyfish-bloom', 'milk-marble']);
+export const OWN_SEED_AREAS: ReadonlySet<string> = new Set(['jellyfish-bloom', 'milk-marble', 'chemical-clock']);
 
 /** The areas of a look, or null for a look built the old way. */
 export const plateAreas = (presetId: string | null | undefined): PlateArea[] | null =>

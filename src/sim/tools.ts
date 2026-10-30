@@ -13,6 +13,7 @@ import { LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { type FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE } from './constants';
 import { DICE } from './dice';
+import { fluidSink, type AreaSink } from '../lib/areaCords';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 export const HAND_SETTLE = 0.25;
@@ -170,3 +171,10 @@ export function pourLiquid(fluid: FluidSimulation, id: string, x: number, y: num
   const b = liq.behaviour.scatter && !hasDye ? { ...liq.behaviour, scatter: 0 } : liq.behaviour;
   fluid.liquid.deposit(x, y, r, b, AUTO_DOSE * strength * room);
 }
+
+/**
+ * Where the area cords (lib/areaCords.ts) lay on a plate: the Finger's paddle,
+ * the heat and the dye through the plate's own methods, and an area of a
+ * reagent's drop poured as that bottle (PLAN 25i).
+ */
+export const areaSink = (fluid: FluidSimulation): AreaSink => fluidSink(fluid, GRID_SCALE, pourLiquid);
