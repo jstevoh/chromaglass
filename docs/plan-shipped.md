@@ -4373,6 +4373,43 @@ only wiring that stayed in `App.tsx` and is unchanged.
 declarations looser than their setters (`chromaglassTool` took any string, `chromaglassBench`
 `unknown`), now the shapes the setters take.
 
+### 19ai-9. The settings panel's sections into their own files
+
+Shipped 2026-10-30. `components/SettingsPanel.tsx` was 201,442 bytes and 4,277 lines, and
+160 KB of it was one JSX tree, `sections`: twenty-nine `{keep(id) && (<section ...>)}`
+blocks reading the panel's seventy-two props and its locals by name. A session asked to
+move a slider in the Lamp read the patch bay and the controller to get there. Each section
+is now a component in `src/components/settings/`, in a file a group of the rail
+(`PlaySections`, `LookSections`, `MotionSections`, `ChemistrySections`, `PourSections`,
+`StageSections`; Feed cut into `SoundSection`, `RoomFilmSections`, `PatchesSection` and
+`MidiSection`, its three longest), with the slider and the pin chips in `controls.tsx`, the
+patch bay's lists in `patchLists.ts` and the props in `props.ts`. The panel draws the
+twenty-nine in the order they stood and keeps its shells, the engine's polling and the
+search; it is 23,916 bytes. The largest new file is `LookSections.tsx`, 34.8 KB.
+
+The move is verbatim, by a script: each section block (its leading comments to its closing
+`)}`) is in the new files byte for byte and in one piece, all twenty-nine compared, and
+every non-import line of the old file is in the new ones. A section takes one object,
+`SectionCtx` (the props it reads, with the panel's defaults applied, and sixteen locals:
+`keep`, `shown`, the card's classes, `goTo`, the live engine reading and the rest), and
+destructures what its markup reads, pruned with the typecheck's unused-locals pass. None of
+the blocks held a hook, so a section as a component renders when the panel does, as it did
+inline.
+And the built app draws the same page: the open sheet's markup (424 KB, 29 sections, 154
+sliders, 688 controls), each section opened from the rail, and the Setup desk's five
+section panels are identical, character for character, between main and this branch
+(device ids aside, which the browser hashes per origin).
+
+Three checks read the panel's markup as text: `panel` (every `<Slider>`, its chips, its
+key and its range), `desklayout` (each section kept for its panel, its `data-group`) and
+`rowfade` (the Mixer's take buttons). On `SettingsPanel.tsx` alone the first stops at "the
+settings panel still has its sliders: 0 found", `desklayout` fails every section, and
+`rowfade` fails "all four places the Mixer is drawn: Settings". `scripts/settingsSource.mjs`
+gives them the panel and its sections as one text; `panel` prints what it printed on main,
+line for line (257/257). `panel`'s "every setting is read by something that renders" leaves
+the panel out as plumbing, since a slider reads its own key; the sections are left out with
+it, or they would have passed every setting the panel draws.
+
 ## 22. Spin the plate
 
 **22a, shipped (#223).** The **Spin** tool (N on the desks, a tool on the phone's dock and the

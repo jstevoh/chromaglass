@@ -618,7 +618,8 @@ src/
     lyrics.ts                  # LRCLIB fetch, LRC parsing, word-triggers, sentiment
   components/
     LiquidVisualizer.tsx       # the plate's own state, the show's frame loop, and the stage
-    SettingsPanel.tsx          # Full settings UI panel
+    SettingsPanel.tsx          # The settings sheet's shells: rail, search, Stage sheet, desk panel
+    settings/                  # Its sections, one component each, by the rail's groups
     TrackPanel.tsx             # Now playing, evolution, listen history/replay
     LyricsOverlay.tsx          # Kinetic typography lyric overlay
   components/
