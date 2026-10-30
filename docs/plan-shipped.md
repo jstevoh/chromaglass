@@ -9321,7 +9321,7 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
-#### 37x-4b. The encoder and one destination (#PR)
+#### 37x-4b. The encoder and one destination (#577)
 
   - **37x-4b. The encoder and one destination (shipped 2026-10-29).** The owner: "open my mac
     app ... configure the live show. I can then stream it on all of the popular streaming

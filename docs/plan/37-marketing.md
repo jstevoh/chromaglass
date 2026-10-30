@@ -350,7 +350,7 @@ rest is routine and the owner's calls.
     150 followers), that simulcasting is allowed everywhere since Twitch dropped its rule
     in 2023, and the three designs weighed. YouTube's first enable takes up to 24 hours,
     so the owner enables it before the first show.
-  - **37x-4b. The encoder and one destination.** *(shipped 2026-10-29, #PR.)* `desktop/live.js`
+  - **37x-4b. The encoder and one destination.** *(shipped 2026-10-29, #577.)* `desktop/live.js`
     (the RTMPS client), `desktop/rtmp.js` (the wire), `desktop/keys.js` (the key store),
     `src/lib/liveStream.ts` (the wall-clock encoder), `window.__cgLive` in the Mac app, and
     `npm run live` against `scripts/rtmpListener.mjs`; story in `docs/plan-shipped.md` §37x-4b.
