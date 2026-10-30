@@ -52,9 +52,9 @@ interface LookCard { id: string; name: string; line: string }
 const LOOKS: LookCard[] = [
   { id: 'ferro-paint', name: 'Ferro Paint', line: 'Black ferrofluid worked through amber, teal and coral under a wandering magnet.' },
   { id: 'aurora-borealis', name: 'Aurora Borealis', line: 'Curtains of jade and lime rippling across a night sky.' },
-  { id: 'cell-bloom', name: 'Cell Bloom', line: 'Silicone breaking into rings of paint cells under a magnifier.' },
+  { id: 'cell-bloom', name: 'Cell Bloom', line: 'Three pools of silicone and oil turning under a magnifier.' },
   { id: 'poster-1969', name: 'Poster, 1969', line: 'Two opaque dyes, orange against ultramarine, flat like a Fillmore poster.' },
-  { id: 'macro-bead', name: 'Macro Bead', line: 'The camera follows one bead close up: cells, lacing, razor edges.' },
+  { id: 'macro-bead', name: 'Macro Bead', line: 'The camera follows one bead close up: domed, wet, razor edges.' },
   { id: 'jellyfish-bloom', name: 'Jellyfish Bloom', line: 'Magenta and lavender bells pulsing through teal water.' },
   { id: 'lace-run', name: 'Lacing Run', line: 'A tongue of amber dye dragging black lace behind it.' },
   { id: 'neon-coral-reef', name: 'Neon Coral Reef', line: 'A reaction grows coral across the glass, branch by branch.' },

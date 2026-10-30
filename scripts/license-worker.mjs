@@ -41,6 +41,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { build } from 'esbuild';
 import worker from '../server/license-worker.js';
+import { generatePair, restoreBackup, revokeIds, rotate } from './licenserotate.mjs';
 import { verifyLicenseKey } from '../server/license-key.js';
 import { createServerLicenseManager } from '../server/server-license.js';
 
@@ -52,7 +53,8 @@ const check = (name, ok, detail = '') => {
 
 // ── 0. Built-in Ed25519 public key guard ─────────────────────────
 {
-  const BURNED_PUBLIC_X = 'ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw';
+  // The pair retired before launch.
+  const BURNED_PUBLIC_X = ['ahOve0fG1aWiqxfwUmRwko0kZG8YziKy3y3ROjd7pgw'];
   const serverKeyText = readFileSync(new URL('../server/license-key.js', import.meta.url), 'utf8');
   const clientKeyText = readFileSync(new URL('../src/lib/licenseKey.ts', import.meta.url), 'utf8');
   const serverX = serverKeyText.match(/DEFAULT_PUBLIC_JWK[\s\S]*?\bx:\s*'([^']+)'/)?.[1] ?? '';
@@ -61,8 +63,8 @@ const check = (name, ok, detail = '') => {
     '0. DEFAULT_PUBLIC_JWK.x in server/license-key.js and src/lib/licenseKey.ts match and are not the burned key',
     Boolean(serverX) &&
       Boolean(clientX) &&
-      serverX !== BURNED_PUBLIC_X &&
-      clientX !== BURNED_PUBLIC_X &&
+      !BURNED_PUBLIC_X.includes(serverX) &&
+      !BURNED_PUBLIC_X.includes(clientX) &&
       serverX === clientX,
     `server=${serverX}, client=${clientX}`,
   );
@@ -171,13 +173,14 @@ const licensePubJwk = await crypto.subtle.exportKey('jwk', licenseEd25519.public
 
 const WEBHOOK_SECRET = 'whsec_test_merchant_secret_23_12';
 const SITE = 'https://chromaglass.web.app';
-const makeEnv = () => ({
+const makeEnv = (extra = {}) => ({
   LICENSE_KV: new FakeKV(),
   WEBHOOK_SECRET,
   LICENSE_PRIVATE_KEY: JSON.stringify(licensePrivJwk),
   LICENSE_PUBLIC_KEY: JSON.stringify(licensePubJwk),
   GOOGLE_JWKS: { keys: [googlePubJwk] },
   FIREBASE_PROJECT_ID: 'chromaglass',
+  ...extra,
 });
 
 async function postWebhook(env, bodyObj, { secret = WEBHOOK_SECRET, sigOverride = undefined } = {}) {
@@ -495,6 +498,67 @@ let bobProToken = '';
   }
 }
 
+// ── 9. Test-mode orders mint nothing; live product ids come from settings ──
+{
+  const lsOrder = (email, orderId, { test, productId = 1450530, name = 'ChromaGlass Home', status = 'paid', event = 'order_created' } = {}) => ({
+    meta: { event_name: event, ...(test === 'meta' ? { test_mode: true } : {}) },
+    data: {
+      id: orderId,
+      attributes: {
+        status,
+        user_email: email,
+        ...(test === 'order' ? { test_mode: true } : {}),
+        first_order_item: { product_id: productId, product_name: name, order_id: orderId },
+      },
+    },
+  });
+  const keysOf = async (env, email) => (await (await getKeys(env, await mintFirebaseToken({ email }))).json()).keys ?? [];
+
+  const env = makeEnv();
+  const t1 = await postWebhook(env, lsOrder('eve@example.com', 'ord_eve_1', { test: 'meta' }));
+  const t2 = await postWebhook(env, lsOrder('eve@example.com', 'ord_eve_2', { test: 'order' }));
+  const eveKeys = await keysOf(env, 'eve@example.com');
+  check(
+    '9. a test-mode order (meta or order flag) answers 200 and files no key',
+    t1.status === 200 && t2.status === 200 && eveKeys.length === 0 && env.LICENSE_KV.values.size === 0,
+    `${t1.status}/${t2.status}, ${eveKeys.length} keys, ${env.LICENSE_KV.values.size} in KV`,
+  );
+
+  const allow = makeEnv({ TEST_MODE_EMAILS: 'owner@example.com, Other@example.com' });
+  await postWebhook(allow, lsOrder('owner@example.com', 'ord_own_1', { test: 'meta' }));
+  await postWebhook(allow, lsOrder('stranger@example.com', 'ord_str_1', { test: 'meta' }));
+  const ownerKeys = await keysOf(allow, 'owner@example.com');
+  const strangerKeys = await keysOf(allow, 'stranger@example.com');
+  check(
+    '9b. TEST_MODE_EMAILS lets the owner prove the path with a test order, and only the owner',
+    ownerKeys.length === 1 && strangerKeys.length === 0,
+    `owner ${ownerKeys.length} keys, stranger ${strangerKeys.length}`,
+  );
+
+  const real = await postWebhook(env, lsOrder('frank@example.com', 'ord_frank_1'));
+  const frankKeys = await keysOf(env, 'frank@example.com');
+  check(
+    '9c. a live order (no test flag) still files its key',
+    real.status === 200 && frankKeys.length === 1 && frankKeys[0].tier === 'home',
+    `${real.status}, ${frankKeys.length} keys, tier ${frankKeys[0]?.tier}`,
+  );
+
+  // The live store's products have ids of their own and names that may be reworded; the
+  // settings say which ids are Pro and which is the Upgrade.
+  const live = makeEnv({ LS_HOME_PRODUCT_IDS: '777000', LS_PRO_PRODUCT_IDS: '777001', LS_UPGRADE_PRODUCT_IDS: '777002' });
+  await postWebhook(live, lsOrder('gina@example.com', 'ord_gina_1', { productId: 777001, name: 'ChromaGlass' }));
+  await postWebhook(live, lsOrder('hal@example.com', 'ord_hal_1', { productId: 777000, name: 'ChromaGlass' }));
+  const ginaKeys = await keysOf(live, 'gina@example.com');
+  const halKeys = await keysOf(live, 'hal@example.com');
+  await postWebhook(live, lsOrder('hal@example.com', 'ord_hal_2', { productId: 777002, name: 'ChromaGlass' }));
+  const halAfter = await keysOf(live, 'hal@example.com');
+  check(
+    '9d. LS_PRO_PRODUCT_IDS makes a live product Pro, and LS_UPGRADE_PRODUCT_IDS turns Home into Pro',
+    ginaKeys[0]?.tier === 'pro' && halKeys[0]?.tier === 'home' && halAfter.length === 1 && halAfter[0]?.tier === 'pro',
+    `gina ${ginaKeys[0]?.tier}, hal ${halKeys[0]?.tier} then ${halAfter.map((k) => k.tier).join('+')}`,
+  );
+}
+
 // ── 11. Refunding just an upgrade ─────────────────────────────────
 {
   const e = makeEnv();
@@ -757,6 +821,308 @@ let bobProToken = '';
     delete globalThis.__cgTestLicensePublicKey;
     delete process.env.LICENSE_PUBLIC_KEY;
   }
+}
+
+// ── 13. Only products we sell, only paid orders, only a Home can be upgraded ──
+// The security audit of 2026-10-28, findings 5 and 6. Each line below failed on the Worker before.
+{
+  const lsOrder = (email, orderId, { productId = 1450530, name = 'ChromaGlass Home', status = 'paid', event = 'order_created' } = {}) => ({
+    meta: { event_name: event },
+    data: {
+      id: orderId,
+      attributes: { status, user_email: email, first_order_item: { product_id: productId, product_name: name, order_id: orderId } },
+    },
+  });
+  const keysOf = async (e, email) => (await (await getKeys(e, await mintFirebaseToken({ email }))).json()).keys ?? [];
+  const env10 = makeEnv({ LS_HOME_PRODUCT_IDS: '777000', LS_PRO_PRODUCT_IDS: '777001', LS_UPGRADE_PRODUCT_IDS: '777002' });
+
+  // 10a. A product on none of the three lists files nothing, whatever its name says.
+  const named = await postWebhook(env10, lsOrder('ivy@example.com', 'ord_ivy_1', { productId: 999001, name: 'ChromaGlass Pro (bundle)' }));
+  const namedBody = await named.json();
+  check(
+    '13a. an order for a product we do not sell (named "Pro", on no list) answers 200, files no key and is held',
+    named.status === 200 && (await keysOf(env10, 'ivy@example.com')).length === 0 && namedBody.ignored === 'unknown product' && env10.LICENSE_KV.values.has('held:key_ord_ivy_1'),
+    `${named.status} ${JSON.stringify(namedBody)}, held=${env10.LICENSE_KV.values.has('held:key_ord_ivy_1')}`,
+  );
+
+  // 10b. Pending and failed orders file nothing; the same order, paid, files its key.
+  const pend = await postWebhook(env10, lsOrder('jon@example.com', 'ord_jon_1', { productId: 777000, status: 'pending' }));
+  const fail = await postWebhook(env10, lsOrder('kim@example.com', 'ord_kim_1', { productId: 777001, status: 'failed' }));
+  const none = (await keysOf(env10, 'jon@example.com')).length + (await keysOf(env10, 'kim@example.com')).length;
+  await postWebhook(env10, lsOrder('jon@example.com', 'ord_jon_1', { productId: 777000, status: 'paid' }));
+  const jonAfter = await keysOf(env10, 'jon@example.com');
+  check(
+    '13b. a pending or failed order files nothing, and the same order once paid files its key',
+    pend.status === 200 && fail.status === 200 && none === 0 && jonAfter.length === 1 && jonAfter[0].tier === 'home',
+    `${pend.status}/${fail.status}, keys while unpaid ${none}, after paid ${jonAfter.length} (${jonAfter[0]?.tier})`,
+  );
+
+  // 10c. An Upgrade needs an unrevoked Home key on file for the email.
+  const noHome = await postWebhook(env10, lsOrder('lee@example.com', 'ord_lee_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  const noHomeBody = await noHome.json();
+  const leeKeys = await keysOf(env10, 'lee@example.com');
+  await postWebhook(env10, lsOrder('mia@example.com', 'ord_mia_1', { productId: 777000 }));
+  await postWebhook(env10, lsOrder('mia@example.com', 'ord_mia_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  const miaKeys = await keysOf(env10, 'mia@example.com');
+  // A buyer who refunded their Home has none, so an Upgrade after it is held too.
+  await postWebhook(env10, lsOrder('ned@example.com', 'ord_ned_1', { productId: 777000 }));
+  await postWebhook(env10, lsOrder('ned@example.com', 'ord_ned_1', { productId: 777000, status: 'refunded', event: 'order_refunded' }));
+  await postWebhook(env10, lsOrder('ned@example.com', 'ord_ned_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  const nedKeys = await keysOf(env10, 'ned@example.com');
+  check(
+    '13c. an Upgrade with no Home key on file (never bought, or refunded) files no Pro key and is held; with a Home it upgrades it',
+    noHomeBody.ignored === 'upgrade with no Home key' && leeKeys.length === 0 && env10.LICENSE_KV.values.has('held:key_ord_lee_up') &&
+      miaKeys.length === 1 && miaKeys[0].tier === 'pro' && nedKeys.length === 0,
+    `lee ${leeKeys.length} keys (${noHomeBody.ignored}), mia ${miaKeys.map((k) => k.tier).join('+')}, ned ${nedKeys.length}`,
+  );
+
+  // 10d. A partial refund leaves the licence; the full refund takes it; our own direct refund still does.
+  await postWebhook(env10, lsOrder('oli@example.com', 'ord_oli_1', { productId: 777001 }));
+  const part = await postWebhook(env10, lsOrder('oli@example.com', 'ord_oli_1', { productId: 777001, status: 'partial_refund', event: 'order_refunded' }));
+  const partBody = await part.json();
+  const afterPart = await keysOf(env10, 'oli@example.com');
+  await postWebhook(env10, lsOrder('oli@example.com', 'ord_oli_1', { productId: 777001, status: 'refunded', event: 'order_refunded' }));
+  const afterFull = await keysOf(env10, 'oli@example.com');
+  await postWebhook(env10, { event: 'order_created', email: 'pat@example.com', orderId: 'ord_pat_1', tier: 'home' });
+  await postWebhook(env10, { event: 'order_refunded', email: 'pat@example.com', orderId: 'ord_pat_1' });
+  const patKeys = await keysOf(env10, 'pat@example.com');
+  check(
+    '13d. a partial refund leaves the licence (200, key still listed); a full refund revokes it; the owner\'s direct refund still does',
+    part.status === 200 && partBody.ignored === 'not a full refund' && afterPart.length === 1 && afterFull.length === 0 && patKeys.length === 0,
+    `partial ${part.status} ${partBody.ignored}, keys after partial ${afterPart.length}, after full ${afterFull.length}, direct ${patKeys.length}`,
+  );
+  // 13e. The paid order_created of an order already refunded, delivered again, files nothing (the review of #560).
+  await postWebhook(env10, lsOrder('rae@example.com', 'ord_rae_1', { productId: 777000 }));
+  await postWebhook(env10, lsOrder('rae@example.com', 'ord_rae_1', { productId: 777000, status: 'refunded', event: 'order_refunded' }));
+  const again = await postWebhook(env10, lsOrder('rae@example.com', 'ord_rae_1', { productId: 777000 }));
+  const againBody = await again.json();
+  // The same for an upgrade: Home, Upgrade, the upgrade refunded (the Home comes back), the Upgrade delivered again.
+  await postWebhook(env10, lsOrder('sal@example.com', 'ord_sal_1', { productId: 777000 }));
+  await postWebhook(env10, lsOrder('sal@example.com', 'ord_sal_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  await postWebhook(env10, lsOrder('sal@example.com', 'ord_sal_up', { productId: 777002, status: 'refunded', event: 'order_refunded' }));
+  await postWebhook(env10, lsOrder('sal@example.com', 'ord_sal_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  const salKeys = await keysOf(env10, 'sal@example.com');
+  check(
+    '13e. an order_created delivered again after its refund files nothing (a Home, or an Upgrade that would turn the refiled Home back into Pro)',
+    againBody.ignored === 'order already refunded' && (await keysOf(env10, 'rae@example.com')).length === 0 &&
+      salKeys.length === 1 && salKeys[0].tier === 'home',
+    `rae ${againBody.ignored}, sal ${salKeys.map((k) => k.tier).join('+')}`,
+  );
+  // 13f. The live store's three products are built in: a Worker with no settings files them, and the upgrade turns Home into Pro.
+  const bare = makeEnv();
+  await postWebhook(bare, lsOrder('tia@example.com', 'ord_tia_1', { productId: 1479217 }));
+  await postWebhook(bare, lsOrder('uma@example.com', 'ord_uma_1', { productId: 1479219 }));
+  await postWebhook(bare, lsOrder('tia@example.com', 'ord_tia_up', { productId: 1479218, name: 'ChromaGlass Upgrade' }));
+  const tiaKeys = await keysOf(bare, 'tia@example.com');
+  const umaKeys = await keysOf(bare, 'uma@example.com');
+  check(
+    '13f. the live Home (1479217), Upgrade (1479218) and Pro (1479219) products file their keys with no settings at all',
+    umaKeys.length === 1 && umaKeys[0].tier === 'pro' && tiaKeys.length === 1 && tiaKeys[0].tier === 'pro',
+    `pro ${umaKeys.map((k) => k.tier).join('+')}, home then upgrade ${tiaKeys.map((k) => k.tier).join('+')}`,
+  );
+}
+
+// ── 14. /activate and /deactivate are rate-limited (audit finding 15) ─────
+{
+  const env11 = makeEnv({ ACTIVATE_PER_ADDRESS: '5', ACTIVATE_PER_KEY: '3' });
+  await postWebhook(env11, { event: 'order_created', email: 'quinn@example.com', orderId: 'ord_quinn_1', tier: 'home' });
+  const token = (await (await getKeys(env11, await mintFirebaseToken({ email: 'quinn@example.com' }))).json()).keys[0].token;
+  const ask = (path, body, ip) =>
+    worker.fetch(
+      new Request(`https://licenses.example${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Origin: SITE, ...(ip ? { 'CF-Connecting-IP': ip } : {}) },
+        body: JSON.stringify(body),
+      }),
+      env11,
+    );
+  // Three asks on one key pass (from three addresses, so the address's own limit is not the one hit); the fourth is refused.
+  const statuses = [];
+  for (const ip of ['198.51.100.1', '198.51.100.2', '198.51.100.3', '198.51.100.4']) {
+    statuses.push((await ask('/activate', { key: token, machineId: 'm1' }, ip)).status);
+  }
+  const refused = await ask('/deactivate', { key: token, machineId: 'm1' }, '198.51.100.5');
+  const refusedBody = await refused.json();
+  check(
+    '14a. a key gets 3 asks an hour (ACTIVATE_PER_KEY) across both routes, then 429 with Retry-After',
+    statuses.slice(0, 3).every((st) => st === 200) && statuses[3] === 429 && refused.status === 429 &&
+      Number(refused.headers.get('Retry-After')) > 0 && refusedBody.error === 'too many requests',
+    `${statuses.join(',')}, deactivate ${refused.status}, Retry-After ${refused.headers.get('Retry-After')}`,
+  );
+
+  // One address sending anything (bad keys too) is cut off at ACTIVATE_PER_ADDRESS, before its key is read.
+  const bad = [];
+  for (let i = 0; i < 7; i++) bad.push((await ask('/activate', { key: 'cg1.AAAA.AAAA', machineId: `m${i}` }, '203.0.113.9')).status);
+  const other = await ask('/activate', { key: 'cg1.AAAA.AAAA', machineId: 'x' }, '203.0.113.10');
+  check(
+    '14b. an address gets 5 asks an hour (ACTIVATE_PER_ADDRESS), bad keys counted, then 429; another address is not affected',
+    bad.slice(0, 5).every((st) => st === 401) && bad[5] === 429 && bad[6] === 429 && other.status === 401,
+    `${bad.join(',')}, other address ${other.status}`,
+  );
+
+  // The counters expire with their hour, and a request with no address (the local checks) is not counted.
+  const counters = [...env11.LICENSE_KV.values.entries()].filter(([k]) => k.startsWith('rl:activate:'));
+  const noAddr = [];
+  for (let i = 0; i < 8; i++) noAddr.push((await ask('/activate', { key: 'cg1.AAAA.AAAA', machineId: 'z' })).status);
+  check(
+    '14c. the counters carry a TTL, and a request with no address is not counted by address',
+    counters.length > 0 && counters.every(([, v]) => v.ttl > 0) && noAddr.every((st) => st === 401),
+    `${counters.length} counters, ttls ${[...new Set(counters.map(([, v]) => v.ttl))].join(',')}, no-address ${noAddr.join(',')}`,
+  );
+}
+
+// ── 15. Rotating the signing key pair (audit finding 1; scripts/licenserotate.mjs) ──
+{
+  const env12 = makeEnv();
+  const oldPub = licensePubJwk;
+  // The owner's key, two buyers' (as if test-mode orders had minted them), a seat, and records the rotation must not touch.
+  await postWebhook(env12, { event: 'order_created', email: 'owner@example.com', orderId: 'owner-pro-1', tier: 'pro', keyId: 'owner-pro-1' });
+  await postWebhook(env12, { event: 'order_created', email: 'tester1@example.com', orderId: 'ord_t1', tier: 'pro' });
+  await postWebhook(env12, { event: 'order_created', email: 'tester2@example.com', orderId: 'ord_t2', tier: 'home' });
+  const ownerOld = (await (await getKeys(env12, await mintFirebaseToken({ email: 'owner@example.com' }))).json()).keys[0].token;
+  const testerOld = (await (await getKeys(env12, await mintFirebaseToken({ email: 'tester1@example.com' }))).json()).keys[0].token;
+  await postMachine(env12, '/activate', { key: ownerOld, machineId: 'owners-mac' });
+  await env12.LICENSE_KV.put('marketing:owner@example.com', '{"optIn":true}');
+  await env12.LICENSE_KV.put('sync:abc', '{"shows":[]}');
+  await env12.LICENSE_KV.put('held:key_ord_x', '{"reason":"unknown product"}');
+  const adapter = (kv) => ({
+    list: async (prefix) => [...kv.values.keys()].filter((k) => k.startsWith(prefix)),
+    get: (n) => kv.get(n),
+    put: (n, v) => kv.put(n, v),
+    delete: (n) => kv.delete(n),
+  });
+  const snapshot = () => JSON.stringify([...env12.LICENSE_KV.values.entries()].sort());
+  const fresh = await generatePair();
+
+  const before = snapshot();
+  const dry = await rotate({ kv: adapter(env12.LICENSE_KV), privateJwk: fresh.privateJwk, publicJwk: fresh.publicJwk, keepEmails: ['owner@example.com'] });
+  check(
+    '15a. a plan changes nothing and names what it would delete (the two buyers) and keep (the owner)',
+    snapshot() === before && dry.resigned.join() === 'owner-pro-1' && dry.deleted.some((n) => n === 'keys:tester1@example.com') && dry.deleted.some((n) => n === 'key:key_ord_t2'),
+    `${dry.deleted.length} to delete, re-sign ${dry.resigned.join()}`,
+  );
+
+  let refused = '';
+  try {
+    await rotate({ kv: adapter(env12.LICENSE_KV), privateJwk: fresh.privateJwk, publicJwk: fresh.publicJwk, keepEmails: ['nobody@example.com'], apply: true });
+  } catch (e) {
+    refused = e.message;
+  }
+  check('15b. a rotation that would keep no key refuses and changes nothing', refused.includes('refusing') && snapshot() === before, refused);
+
+  await rotate({ kv: adapter(env12.LICENSE_KV), privateJwk: fresh.privateJwk, publicJwk: fresh.publicJwk, keepEmails: ['owner@example.com'], apply: true });
+  const names = [...env12.LICENSE_KV.values.keys()].sort();
+  const ownerNew = JSON.parse(await env12.LICENSE_KV.get('keys:owner@example.com'))[0];
+  check(
+    '15c. after apply only the owner\'s licence records remain (with his seat); marketing, sync, held and rate-counter records are untouched',
+    names.filter((n) => !n.startsWith('rl:')).join() === ['held:key_ord_x', 'key:owner-pro-1', 'keys:owner@example.com', 'machines:owner-pro-1', 'marketing:owner@example.com', 'sync:abc'].join() && ownerNew.id === 'owner-pro-1' && ownerNew.tier === 'pro',
+    names.join(),
+  );
+  const newVerifies = await verifyLicenseKey(ownerNew.token, fresh.publicJwk);
+  const oldOnNew = await verifyLicenseKey(ownerOld, fresh.publicJwk);
+  const testerOnNew = await verifyLicenseKey(testerOld, fresh.publicJwk);
+  check(
+    '15d. the owner\'s re-signed key verifies against the new public key, same id and tier; the old token and a test buyer\'s do not',
+    newVerifies.valid && newVerifies.id === 'owner-pro-1' && newVerifies.tier === 'pro' && !oldOnNew.valid && !testerOnNew.valid,
+    `new ${newVerifies.valid}, old ${oldOnNew.valid}/${oldOnNew.error}, test buyer ${testerOnNew.valid}`,
+  );
+
+  // The Worker with the new pair: the re-signed key activates (and keeps its seat), the old one is refused.
+  const rotated = { ...env12, LICENSE_PRIVATE_KEY: JSON.stringify(fresh.privateJwk), LICENSE_PUBLIC_KEY: JSON.stringify(fresh.publicJwk) };
+  const actNew = await postMachine(rotated, '/activate', { key: ownerNew.token, machineId: 'owners-mac' });
+  const actOld = await postMachine(rotated, '/activate', { key: ownerOld, machineId: 'owners-mac' });
+  const actNewBody = await actNew.json();
+  check(
+    '15e. the Worker on the new pair seats the re-signed key on the same Mac and refuses the old token (401)',
+    actNew.status === 200 && actNewBody.machines === 1 && actOld.status === 401,
+    `new ${actNew.status} (${actNewBody.machines} Macs), old ${actOld.status}`,
+  );
+}
+
+// ── 15f. The owner's own address can hold test orders' keys too (the live KV does) ──
+{
+  const env15 = makeEnv();
+  await postWebhook(env15, { event: 'order_created', email: 'owner@example.com', orderId: 'owner-pro-1', tier: 'pro', keyId: 'owner-pro-1' });
+  await postWebhook(env15, { event: 'order_created', email: 'owner@example.com', orderId: 'test_order_a', tier: 'home' });
+  await postWebhook(env15, { event: 'order_created', email: 'owner@example.com', orderId: 'test_order_b', tier: 'pro' });
+  const kvAdapter = {
+    list: async (prefix) => [...env15.LICENSE_KV.values.keys()].filter((k) => k.startsWith(prefix)),
+    get: (n) => env15.LICENSE_KV.get(n),
+    put: (n, v) => env15.LICENSE_KV.put(n, v),
+    delete: (n) => env15.LICENSE_KV.delete(n),
+  };
+  const pair = await generatePair();
+  const all = await rotate({ kv: kvAdapter, privateJwk: pair.privateJwk, publicJwk: pair.publicJwk, keepEmails: ['owner@example.com'] });
+  await rotate({ kv: kvAdapter, privateJwk: pair.privateJwk, publicJwk: pair.publicJwk, keepEmails: ['owner@example.com'], keepIds: ['owner-pro-1'], apply: true });
+  const left = JSON.parse(await env15.LICENSE_KV.get('keys:owner@example.com'));
+  const remaining = [...env15.LICENSE_KV.values.keys()].sort();
+  check(
+    '15f. with --keep-id only the named licence of the owner\'s address is kept and re-signed; its test orders\' keys are deleted (without it all three would be kept)',
+    all.resigned.length === 3 && left.length === 1 && left[0].id === 'owner-pro-1' &&
+      remaining.join() === ['key:owner-pro-1', 'keys:owner@example.com'].join() && (await verifyLicenseKey(left[0].token, pair.publicJwk)).valid,
+    `without: ${all.resigned.join()}; with: ${left.map((k) => k.id).join()}; KV ${remaining.join()}`,
+  );
+  // 15g/15h. A record that cannot be read stops the plan; a backup puts everything back (the review of #560).
+  const env16 = makeEnv();
+  await postWebhook(env16, { event: 'order_created', email: 'owner@example.com', orderId: 'owner-pro-1', tier: 'pro', keyId: 'owner-pro-1' });
+  await postWebhook(env16, { event: 'order_created', email: 'tester@example.com', orderId: 'ord_t', tier: 'home' });
+  const real16 = {
+    list: async (prefix) => [...env16.LICENSE_KV.values.keys()].filter((k) => k.startsWith(prefix)),
+    get: (n) => env16.LICENSE_KV.get(n),
+    put: (n, v) => env16.LICENSE_KV.put(n, v),
+    delete: (n) => env16.LICENSE_KV.delete(n),
+  };
+  const flaky = { ...real16, get: async (n) => (n === 'key:key_ord_t' ? null : real16.get(n)) };
+  const snap16 = () => JSON.stringify([...env16.LICENSE_KV.values.entries()].map(([k, v]) => [k, v.value]).sort());
+  const before16 = snap16();
+  const pair16 = await generatePair();
+  let unreadable = '';
+  try {
+    await rotate({ kv: flaky, privateJwk: pair16.privateJwk, publicJwk: pair16.publicJwk, keepEmails: ['owner@example.com'], keepIds: ['owner-pro-1'], apply: true });
+  } catch (e) {
+    unreadable = e.message;
+  }
+  check('15g. a record that cannot be read stops the rotation before it changes anything', unreadable.includes('could not read key:key_ord_t') && snap16() === before16, unreadable);
+
+  const planned = await rotate({ kv: real16, privateJwk: pair16.privateJwk, publicJwk: pair16.publicJwk, keepEmails: ['owner@example.com'], keepIds: ['owner-pro-1'] });
+  await rotate({ kv: real16, privateJwk: pair16.privateJwk, publicJwk: pair16.publicJwk, keepEmails: ['owner@example.com'], keepIds: ['owner-pro-1'], apply: true });
+  const rotated16 = snap16() !== before16;
+  await restoreBackup({ kv: real16, backup: planned.backup });
+  check(
+    '15h. restoring the backup after an apply puts every licence record back as it was',
+    rotated16 && snap16() === before16,
+    `rotated ${rotated16}, restored ${snap16() === before16}`,
+  );
+  // 15i. Revoking by id, with no rotation (the owner's choice for the two test orders' keys): the Worker then
+  // lists and seats only the owner's, and a revoked key's token is refused at /activate.
+  const env17 = makeEnv();
+  await postWebhook(env17, { event: 'order_created', email: 'owner@example.com', orderId: 'owner-pro-1', tier: 'pro', keyId: 'owner-pro-1' });
+  await postWebhook(env17, { event: 'order_created', email: 'owner@example.com', orderId: 'test_a', tier: 'home' });
+  await postWebhook(env17, { event: 'order_created', email: 'owner@example.com', orderId: 'test_b', tier: 'pro' });
+  const listed17 = (await (await getKeys(env17, await mintFirebaseToken({ email: 'owner@example.com' }))).json()).keys;
+  const testB = listed17.find((k) => k.id === 'key_test_b').token;
+  await postMachine(env17, '/activate', { key: testB, machineId: 'm' });
+  const kv17 = {
+    list: async (prefix) => [...env17.LICENSE_KV.values.keys()].filter((k) => k.startsWith(prefix)),
+    get: (n) => env17.LICENSE_KV.get(n),
+    put: (n, v) => env17.LICENSE_KV.put(n, v),
+    delete: (n) => env17.LICENSE_KV.delete(n),
+  };
+  const snap17 = () => JSON.stringify([...env17.LICENSE_KV.values.entries()].filter(([k]) => /^keys?:/.test(k)).map(([k, v]) => [k, v.value]).sort());
+  const before17 = snap17();
+  const plan17 = await revokeIds({ kv: kv17, ids: ['key_test_a', 'key_test_b'] });
+  const untouched17 = snap17() === before17;
+  await revokeIds({ kv: kv17, ids: ['key_test_a', 'key_test_b'], apply: true });
+  const after17 = (await (await getKeys(env17, await mintFirebaseToken({ email: 'owner@example.com' }))).json()).keys;
+  const act17 = await postMachine(env17, '/activate', { key: testB, machineId: 'm2' });
+  const ownerTok17 = listed17.find((k) => k.id === 'owner-pro-1').token;
+  const ownerAct17 = await postMachine(env17, '/activate', { key: ownerTok17, machineId: 'm3' });
+  await restoreBackup({ kv: kv17, backup: plan17.backup });
+  check(
+    '15i. revoke-by-id: a plan changes nothing; after it /keys lists only the owner\'s, the revoked token is refused (401), the owner\'s still seats, and the backup restores it',
+    untouched17 && after17.map((k) => k.id).join() === 'owner-pro-1' && act17.status === 401 && ownerAct17.status === 200 && snap17() === before17,
+    `plan untouched ${untouched17}, after ${after17.map((k) => k.id).join()}, revoked activate ${act17.status}, owner activate ${ownerAct17.status}, restored ${snap17() === before17}`,
+  );
 }
 
 const failed = checks.filter((c) => !c.ok);

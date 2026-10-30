@@ -29,7 +29,7 @@ export interface DeskDots {
   recWhat?: string;
 }
 
-export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel, dots, midiName, onSound, onVideo, onWall, onMidi, onPhone, onRecord, onSearch, leading, trailing }: {
+export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel, dots, midiName, onSound, onVideo, onWall, wallSends, onMidi, onPhone, onRecord, onSearch, leading, trailing }: {
   breadcrumb: ReactNode;
   /** The owner's tabs (lib/deskTabs.ts), the one up, and the editor's changes. */
   tabs: { id: string; name: string }[];
@@ -51,6 +51,12 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
   onSound?: () => void;
   onVideo?: () => void;
   onWall?: () => void;
+  /**
+   * Wall sends the preview: the plate is on Preview with a wall up, so the
+   * desk is building on a copy the room does not see (PLAN.md 8b). Otherwise
+   * it opens the projector, or brings it forward.
+   */
+  wallSends?: boolean;
   /** The controller panel. The dot is the only thing on either desk that names MIDI. */
   onMidi?: () => void;
   onPhone?: () => void;
@@ -187,7 +193,9 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
           on={!!dots.wall}
           label="Wall" tight={t}
           onClick={onWall}
-          title={dots.wall ? 'On a wall — click for the output controls' : 'Not on a wall. Click for the projector and output controls.'}
+          title={wallSends
+            ? 'The wall is showing its own look while you preview. Click (or ⌘⏎) to send the preview to the wall.'
+            : dots.wall ? 'On a wall — click to bring the projector window forward' : 'Not on a wall. Click to open the projector window.'}
           testId="dot-wall"
         />
       )}

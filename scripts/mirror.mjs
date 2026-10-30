@@ -11,9 +11,16 @@
  * a calm Classic plate, and each is judged the same way: the tool used low and
  * to one side of the preview, and how much every cell of a 6x6 grid over the
  * preview changed, against the plate's own drift over the same time. The
- * cells round the hand must change; no cell away from them may change by much
- * more than the plate does on its own. Where one does, it is printed, with
- * whether it is the hand's mirror image across either axis or the centre.
+ * cells under the drop must change; no cell beyond its reach may change by
+ * much more than the plate does on its own. Where one does, it is printed,
+ * with whether it is the hand's mirror image across either axis or the centre.
+ *
+ * "Under the drop" is measured on the plate, not counted in cells. The desk's
+ * preview is a wide window on the dish (since the desk's tabs, #512, the
+ * Perform tab's: 802 by 289 at this viewport, showing 0.92 of the plate
+ * across and 0.33 of it down), so a cell is 0.154 of the plate wide and
+ * 0.055 tall, and a drop that reaches 0.11 from the hand covers two cells up
+ * and down but not one across. See DROP_REACH below.
  *
  * Four times over, at the same spot, and the maps averaged. Judged on one
  * drop, a calm Classic plate "echoed" in a different cell every run, with no
@@ -158,6 +165,22 @@ try {
     // Low and to the right, so its mirror images across each axis and the centre are three different cells.
     const at = { fx: 0.75, fy: 0.75 };
     const hx = hole.x + hole.width * at.fx, hy = hole.y + hole.height * at.fy;
+    /*
+      Where each cell's middle, and the hand, land on the plate: the app's own
+      reading of a window point (`chromaglassDebug().plateAt`, the same
+      arithmetic that puts the brush under the cursor, the plate's turn and
+      layer 2's own zoom included). Distances and the hand's mirror images
+      are then the plate's, which is what the derive pass's echo was (it lit
+      each plate's relief from its mirror), whatever window the desk shows.
+    */
+    const cellPlate = await page.evaluate(({ hole, G }) => {
+      const d = window.chromaglassDebug?.();
+      if (typeof d?.plateAt !== 'function') return null;
+      return Array.from({ length: G }, (_, y) => Array.from({ length: G }, (_, x) =>
+        d.plateAt(hole.x + hole.width * (x + 0.5) / G, hole.y + hole.height * (y + 0.5) / G)));
+    }, { hole, G });
+    const handPlate = await page.evaluate(([x, y]) => window.chromaglassDebug?.().plateAt?.(x, y) ?? null, [hx, hy]);
+    const plateDist = (y, x) => cellPlate && handPlate ? Math.hypot(cellPlate[y][x].x - handPlate.x, cellPlate[y][x].y - handPlate.y) : null;
     const drift = zero(), change = zero();
     // Each drop's own maps, for the median below.
     const driftReps = [], changeReps = [];
@@ -178,13 +201,64 @@ try {
     }
     const cellOf = (fx, fy) => [Math.min(G - 1, Math.floor(fy * G)), Math.min(G - 1, Math.floor(fx * G))];
     const [cy, cx] = cellOf(at.fx, at.fy);
-    const tags = new Map([
-      [cellOf(at.fx, 1 - at.fy).join(), 'mirror top/bottom'],
-      [cellOf(1 - at.fx, at.fy).join(), 'mirror left/right'],
-      [cellOf(1 - at.fx, 1 - at.fy).join(), 'mirror through the centre'],
-    ]);
-    const near = (y, x) => Math.abs(y - cy) <= 1 && Math.abs(x - cx) <= 1;
-    const here = Math.max(...[-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => change[cy + dy]?.[cx + dx] ?? 0)));
+    /*
+      The hand's mirror images are the plate's, not the preview's: the cell
+      whose middle is nearest to (1 - x, y), (x, 1 - y) and (1 - x, 1 - y) of
+      the hand on the plate. On layer 1 unturned those are the preview's own
+      mirror cells (the preview is centred on the plate); turned a quarter
+      they are the same cells with the axes' names swapped; on layer 2,
+      viewed through its own zoom and drift, the mirror across the plate's
+      middle line lands next to the hand, under the drop, and is named so
+      in the line below. A mirror further from its nearest cell's middle
+      than half a cell is off the preview, and the line says that too.
+    */
+    const tags = new Map();
+    const offPreview = [];
+    if (cellPlate && handPlate) {
+      const half = Math.hypot(cellPlate[0][1].x - cellPlate[0][0].x, cellPlate[0][1].y - cellPlate[0][0].y) / 2
+        + Math.hypot(cellPlate[1][0].x - cellPlate[0][0].x, cellPlate[1][0].y - cellPlate[0][0].y) / 2;
+      for (const [m, name] of [[{ x: handPlate.x, y: 1 - handPlate.y }, 'mirror across the middle line'], [{ x: 1 - handPlate.x, y: handPlate.y }, 'mirror across the middle column'], [{ x: 1 - handPlate.x, y: 1 - handPlate.y }, 'mirror through the centre']]) {
+        let best = null;
+        for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+          const d = Math.hypot(cellPlate[y][x].x - m.x, cellPlate[y][x].y - m.y);
+          if (!best || d < best.d) best = { d, y, x };
+        }
+        if (best.d <= half) tags.set(`${best.y},${best.x}`, name); else offPreview.push(name);
+      }
+    } else {
+      tags.set(cellOf(at.fx, 1 - at.fy).join(), 'mirror top/bottom');
+      tags.set(cellOf(1 - at.fx, at.fy).join(), 'mirror left/right');
+      tags.set(cellOf(1 - at.fx, 1 - at.fy).join(), 'mirror through the centre');
+    }
+    /*
+      A cell is under the drop when its middle is within DROP_REACH of the
+      hand on the plate, else it is judged. Until 2026-10-29 "round the hand"
+      was the eight cells about the hand's, which was a drop's reach while
+      the Design desk's preview showed the plate with cells about as tall as
+      wide. #512 gave the check the Perform tab's preview instead, a wide
+      window on the dish (see the top of this file): a cell there is 0.055
+      of the plate tall, and the hand's drop, held about 0.7 s, changes the
+      picture 0.11 from the hand (two cells up) as much as it does one cell
+      up. Measured on the Macs after #512, Classic's layer 1 with the hand at
+      (0.73, 0.42): up the hand's column 21 to 30 at 0.055 and 22 to 25 at
+      0.11, against 53 to 64 under the hand and a drift of 4 to 9; at 0.166
+      (three cells up, the hand's mirror across the plate's middle line) 6
+      to 7 against a drift of 4 to 5, and one cell across (0.154) 6 to 8
+      against 5. Before #512, with the hand at (0.81, 0.42) and wider cells,
+      the two-up cell read 11 against 9, under the allowance; after, 22 to
+      25 against 8 to 9, and the line went red on three of five deploys on
+      the owner's Mac and GitHub's alike (2026-10-29, deploys 570, 576, 580),
+      naming the hand's own paint "away from the hand". The reach is the
+      drop's footprint seen: strong at 0.11, gone by 0.154 to 0.166. The bar
+      on a judged cell is unchanged.
+    */
+    const DROP_REACH = 0.14;
+    const near = (y, x) => {
+      const d = plateDist(y, x);
+      return d === null ? Math.abs(y - cy) <= 1 && Math.abs(x - cx) <= 1 : d < DROP_REACH;
+    };
+    let here = 0;
+    for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) if (near(y, x)) here = Math.max(here, change[y][x]);
     /*
       Judged on the median of the four drops, not their mean.
 
@@ -255,11 +329,26 @@ try {
         return `${v.toFixed(1).padStart(6)}${mark}(${drift[y][x].toFixed(1)})`;
       }).join(''));
     }
+    // The drop's footprint on the plate: every cell within 0.25 of the hand, nearest first, with its mean change past its mean drift
+    // (the judgement below is on each drop's own median; the two can differ on a cell).
+    if (cellPlate && handPlate) {
+      const foot = [];
+      for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) { const d = plateDist(y, x); if (d < 0.25) foot.push({ d, y, x }); }
+      foot.sort((a, b) => a.d - b.d);
+      console.log(`     the hand on the plate at ${handPlate.x.toFixed(3)},${handPlate.y.toFixed(3)} (plateAt); a cell ${Math.hypot(cellPlate[0][1].x - cellPlate[0][0].x, cellPlate[0][1].y - cellPlate[0][0].y).toFixed(3)} of the plate across and ${Math.hypot(cellPlate[1][0].x - cellPlate[0][0].x, cellPlate[1][0].y - cellPlate[0][0].y).toFixed(3)} down; under the drop within ${DROP_REACH} (*), m a mirror of the hand${offPreview.length ? `; off the preview: ${offPreview.join(', ')}` : ''}`);
+      console.log('     mean change past mean drift by distance from the hand: ' + foot.map(({ d, y, x }) => `r${y + 1}c${x + 1} ${d.toFixed(3)}${near(y, x) ? '*' : ''}${tags.has(`${y},${x}`) ? 'm' : ''}: ${(change[y][x] - drift[y][x]).toFixed(1)}`).join(', '));
+    }
     const worst = away[0];
+    // Read on the plate, and a judgement left to make: the hand's own cell under the drop, at least half the grid judged (a zoomed-in layer exempts more; layer 2 leaves 20 of 36), and which mirrors sit under the drop said by name.
+    const under = [...Array(G * G).keys()].filter((i) => near(Math.floor(i / G), i % G)).length;
+    const mirrorsUnder = [...tags].filter(([k]) => near(...k.split(',').map(Number))).map(([, name]) => name);
+    if (sc.judge !== false) check(`${sc.name}: the cells under the drop are read on the plate, and most of the grid is judged`,
+      !!cellPlate && !!handPlate && Number.isFinite(handPlate.x) && Number.isFinite(handPlate.y) && near(cy, cx) && away.length >= G * G / 2,
+      cellPlate && handPlate ? `the hand at ${handPlate.x.toFixed(2)},${handPlate.y.toFixed(2)}; ${under} cells within ${DROP_REACH} of it, ${away.length} judged${mirrorsUnder.length ? `; under the drop: ${mirrorsUnder.join(', ')}` : ''}${offPreview.length ? `; off the preview: ${offPreview.join(', ')}` : ''}` : 'chromaglassDebug().plateAt is not there, so the cells were counted, not measured');
     if (sc.judge !== false) check(`${sc.name}: the tool changes the picture where it is used`, here > 3,
-      `${here.toFixed(1)} round the hand`);
+      `${here.toFixed(1)} under the drop`);
     if (sc.judge === false) {
-      console.log(`     (on the record: most away from the hand ${worst ? `${worst.v.toFixed(1)} past its drift at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}` : 'nothing'})`);
+      console.log(`     (on the record: most beyond the drop's reach ${worst ? `${worst.v.toFixed(1)} past its drift at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}` : 'nothing'})`);
       await page.close();
       continue;
     }
@@ -277,8 +366,8 @@ try {
     });
     check(`${sc.name}: the plate hears no music while it is judged`, !music.band && music.kicks === 0 && music.heard === 0,
       `${music.band ? 'the band was started' : 'no band started'}, ${music.kicks} kicks reached the plate and the ear heard ${music.heard}, over the ${REPS} drops`);
-    check(`${sc.name}: and nowhere else`, !worst || worst.over < 1,
-      worst ? `most away from the hand ${worst.v.toFixed(1)} past its drift (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} round the hand; each drop ${worst.reps}, drift ${worst.dreps}, past it ${worst.preps}` : 'nothing');
+    check(`${sc.name}: and nowhere else`, !!worst && worst.over < 1,
+      worst ? `most beyond the drop's reach ${worst.v.toFixed(1)} past its drift (median) at row ${worst.y + 1}, column ${worst.x + 1}${worst.tag ? ` (${worst.tag})` : ''}, allowed ${worst.allowed.toFixed(1)}, against ${here.toFixed(1)} under the drop; each drop ${worst.reps}, drift ${worst.dreps}, past it ${worst.preps}` : 'no cell was judged');
     await page.close();
   }
 } finally {

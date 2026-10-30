@@ -363,7 +363,7 @@ rest is routine and the owner's calls.
       timestamps, which Chromium puts on `performance.now()`'s clock (measured, the lab);
       the Mac's system-audio path (#550) schedules each captured chunk into a context 5 to
       60 ms after it was heard, so the stream's sound may sit that far behind the plate's
-      reaction to it. Measure on the Mac with a clap on camera (judging §91), and if it
+      reaction to it. Measure on the Mac with a clap on camera (judging §92), and if it
       shows, stamp the tap's chunks with the time they were captured.
     - *The encoder's own keyframes.* OpenH264 (the lab) starts a new group whenever the
       picture changes a lot, on top of the one asked for every two seconds; the check allows
