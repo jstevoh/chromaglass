@@ -2003,3 +2003,20 @@ real song. (§88 is the stutter, §89 the headers.)
    land on the same hits as before this change: the readings are the same to the bit on the checks' songs.
 4. Bad: a ring that lags behind the stick, jumps to a corner when it first appears, or stays after the stick is
    released; a beat that used to fire and does not.
+
+## 91. The wall's "isn't full screen" chip goes when it should, and can be hidden (PLAN 14af)
+
+The chip at the top of the desk that says the wall window isn't full screen. It used to be
+stuck there, unexplained, with no way to close it.
+
+1. Send to wall with a projector (or a second screen) connected. The wall should fill its
+   screen by itself, and no chip should show on the laptop.
+2. Click the wall and press Escape. Within half a second the laptop should show "The wall
+   window isn't full screen, so its title bar shows on the wall". Click **Make it full
+   screen**: the wall fills again and the chip goes.
+3. Escape on the wall again, then in the Mac app use the wall window's green button instead:
+   the chip should go too (the window's own full screen has no title bar in the app).
+4. Escape once more and click the chip's X: it should stay away until a new wall window is
+   opened, even though the wall is still framed.
+5. Bad: a chip that stays up over a wall with no title bar; a button that does nothing and
+   says nothing; an X that comes back a second later.
