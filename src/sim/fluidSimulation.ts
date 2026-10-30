@@ -35,6 +35,7 @@ import { stirOf } from '../lib/stir';
 import { frameSway, plateSin } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
+import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
 import { RhythmSheet, stampedVolume, kickRoom } from '../lib/sheet';
@@ -204,7 +205,10 @@ export class FluidSimulation {
   // flushed into the high-res field each step and zeroed. Readers use the
   // read* accessors, which serve a 192² downsample of the GPU field.
   gpu: PlateSolver | null = null;
-  private dirty = false;
+  /** lib/deltaRows.ts: `dirty = true` is every row. */
+  private rows = new DeltaRows(GRID_SIZE);
+  private get dirty() { return this.rows.any; }
+  private set dirty(v: boolean) { if (v) this.rows.whole(); else this.rows.clear(); }
   private mul: Float32Array;        // multiplicative dye change (a carry's take; the show's own puffs thin by 0.8)
   /** The press being held (its spoke seed) and how many steps it has run, for the pile at the fingers' tips. */
   private squishSteps = 0;
@@ -778,21 +782,15 @@ export class FluidSimulation {
     this.dirty = false;
   }
 
+  /** The written rows to the GPU, then zeroed (lib/deltaRows.ts). */
   private flushDeltas(dt: number) {
-    const gpu = this.gpu!;
-    const da = this.dyeAdd, va = this.velAdd;
-    for (let i = 0; i < GRID_AREA; i++) {
-      const i4 = i * 4;
-      da[i4] = this.densityR[i]; da[i4 + 1] = this.densityG[i]; da[i4 + 2] = this.densityB[i]; da[i4 + 3] = this.density[i];
-      va[i4] = this.vx[i]; va[i4 + 1] = this.vy[i]; va[i4 + 2] = this.temp[i]; va[i4 + 3] = this.gap[i];
-    }
-    gpu.applyDeltas(da, va, this.mul, dt, this.handsLaid ? this.hands : null, this.breathLaid ? this.breath : null, this.sheetLaid ? this.sheetGap : null);
+    const gpu = this.gpu!, rows = this.rows.rows();
+    const a = { ...this.dyeTarget(), vx: this.vx, vy: this.vy, temp: this.temp, gap: this.gap, dyeAdd: this.dyeAdd, velAdd: this.velAdd, hands: this.handsLaid ? this.hands : null, breath: this.breathLaid ? this.breath : null };
+    const runs = packRows(a, rows);
+    gpu.applyDeltas(a.dyeAdd, a.velAdd, a.mul, dt, a.hands, a.breath, this.sheetLaid ? this.sheetGap : null, rows);
     if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
-    this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
-    this.vx.fill(0); this.vy.fill(0); this.temp.fill(0); this.gap.fill(0);
-    this.mul.fill(1);
-    if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
-    if (this.breathLaid) { this.breath!.fill(0); this.breathLaid = false; }
+    restRows(a, runs);
+    this.handsLaid = this.breathLaid = false;
     if (this.sheetLaid) { this.sheetGap!.fill(0); this.sheetLaid = false; }
     this.dirty = false;
   }
@@ -996,7 +994,7 @@ export class FluidSimulation {
       // Into the ring just outside the rim (bubbleDye.ts), in the mirror's
       // own log-space rather than through `addDensity`, which takes a colour
       // and takes its log: going out to a colour and back would lose the mix.
-      if (depositRim(this.dyeTarget(), N, b.x, b.y, R, mass, aR, aG, aB)) this.dirty = true;
+      if (depositRim(this.dyeTarget(), N, b.x, b.y, R, mass, aR, aG, aB)) this.rows.rim(b.y, R);
     }
     this.fillPoppedHoles(packed, count, dye, N);
     if (this.coverPacked.length < count * 4) this.coverPacked = new Float32Array(Math.max(4, count * 4));
@@ -1071,7 +1069,7 @@ export class FluidSimulation {
 
       // One pass of the ring falling back in (bubbleDye.ts).
       if (!(fillHole(this.dyeTarget(), dye, N, x, y, R) > 0)) continue;
-      this.dirty = true;
+      this.rows.rim(y, R, 1);
       /*
         And keep this hole on the books while it is still worth filling. The
         deficit shrinks every pass, so this drops out on its own — the count
@@ -1124,7 +1122,7 @@ export class FluidSimulation {
 
   addDensity(x: number, y: number, amount: number, r = 1, g = 1, b = 1) {
     const index = x + y * this.size;
-    this.dirty = true;
+    this.rows.add(y, y);
     this.laidMass += amount;
     this.density[index] += amount;
     // Store log-space absorptions for Scott Burns geometric mean mixing.
@@ -1139,7 +1137,7 @@ export class FluidSimulation {
 
   addVelocity(x: number, y: number, amountX: number, amountY: number) {
     const index = x + y * this.size;
-    this.dirty = true;
+    this.rows.add(y, y);
     this.vx[index] += amountX;
     this.vy[index] += amountY;
   }
@@ -1225,7 +1223,7 @@ export class FluidSimulation {
 
   addTemp(x: number, y: number, amount: number) {
     const index = x + y * this.size;
-    this.dirty = true;
+    this.rows.add(y, y);
     this.temp[index] += amount;
   }
 
@@ -2397,7 +2395,7 @@ export class FluidSimulation {
     if (this.gpu && this.thinGap && !ferroUnasked) {
       const m = moved ?? { x: dx, y: dy };
       if (!this.hands) this.hands = new Float32Array(GRID_AREA * 4);
-      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y) > 0) { this.dirty = true; this.handsLaid = true; }
+      if (layFinger(this.hands, this.size, x, y, r, m.x, m.y) > 0) { this.rows.disc(y, r); this.handsLaid = true; }
       this.liquid.stir(x, y, r, Math.min(0.5, strength * 2.5));
       return;
     }
@@ -2567,7 +2565,7 @@ export class FluidSimulation {
       if (!this.breath) this.breath = new Float32Array(GRID_AREA * 4);
       const r = radius * GRID_SCALE;
       if (layBreath(this.breath, this.size, x, y, r, dx, dy, strength / BLOW_STRENGTH) > 0) {
-        this.dirty = true; this.breathLaid = true; this.lastBlowAired = true;
+        this.rows.disc(y, r); this.breathLaid = true; this.lastBlowAired = true;
       }
       return 0;
     }
