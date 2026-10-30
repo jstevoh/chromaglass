@@ -152,6 +152,22 @@ export function uprightFrame(
 }
 
 /**
+ * One frame of the video pour, as the app's frame loop makes it: the video's
+ * frame turned the right way up (`uprightFrame`) and then poured as
+ * `pourVideoFrame` does, still known by the video's own address. It is a call of
+ * its own so that the frame loop, which may not grow, makes the same one call.
+ */
+export function pourUpright(
+  plate: VideoPourPlate,
+  video: HTMLVideoElement,
+  state: VideoPourState,
+  read: (src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, S: number) => Uint8ClampedArray | null,
+): 'gpu' | 'cpu' | 'none' {
+  const frame = uprightFrame(video, state);
+  return frame ? pourVideoFrame(plate, frame, state, read, video) : 'none';
+}
+
+/**
  * A still picture poured as dye on the CPU (`injectImage`): into the middle of
  * the grid, x 0.19–0.81 and y 0.31–0.69, each cell the pixel at its corner,
  * brighter pixels pouring more, a transparent one nothing. Moved here from

@@ -67,7 +67,7 @@ import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '../lib/intro';
-import { pourVideoFrame, uprightFrame, type VideoPourState } from '../lib/videoFlow';
+import { pourUpright, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid } from '../sim/tools';
@@ -3339,9 +3339,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (videoPourRef.current && !videoPourRef.current.paused && videoPourRef.current.readyState >= 2) {
           videoPourReadsRef.current++;
           const fluid = fluidsRef.current[0];
-          // Turned over first: the plate's rows run up the frame, a video's down (14ab-13).
-          const upright = fluid ? uprightFrame(videoPourRef.current, videoFlowRef.current) : null;
-          if (fluid && upright) pourVideoFrame(fluid, upright, videoFlowRef.current, readVideoFrame, videoPourRef.current);
+          if (fluid) pourUpright(fluid, videoPourRef.current, videoFlowRef.current, readVideoFrame);
         }
 
         for (let simStep = 0; simStep < simSteps; simStep++) {

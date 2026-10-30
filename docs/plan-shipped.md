@@ -6572,8 +6572,9 @@ The grid's rows count up the plate and both pours (`pourPictureCpu`, and the sol
 turned over where the source is made, not in the solver (`src/gpu/` was another thread's that
 day): the upload draws its picture with `translate(0, h)` and `scale(1, -1)`, as `pourText`
 does (`usePour.ts`), and the frame loop hands the plate a video's frame drawn the same way
-onto a canvas of its own (`uprightFrame` in `lib/videoFlow.ts`, kept in the pour's state),
-with `pourVideoFrame` told which video it came from so a new cartoon is still fresh by its
+onto a canvas of its own (`pourUpright` and `uprightFrame` in `lib/videoFlow.ts`, the canvas
+kept in the pour's state; the loop's one call stays one call, as `LiquidVisualizer.tsx` may not
+grow), with `pourVideoFrame` told which video it came from so a new cartoon is still fresh by its
 address. The video's flow is worked out from the turned frames, so its motion is turned with
 its dye. The brief for this item named `usePour.ts`'s `pourVideo` for the video, but that
 only hands the element over once and the frame loop reads it, so the frame's one seam
