@@ -25,6 +25,7 @@ import { networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
+import { startLink } from './abletonLink.js';
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
@@ -358,7 +359,7 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link']);
 
 wss.on('connection', (socket, req) => {
   roles.set(socket, 'unknown');
@@ -428,6 +429,9 @@ wss.on('connection', (socket, req) => {
         const phoneCount = [...wss.clients].filter(c => roles.get(c) === 'controller').length;
         if (socket.readyState === 1) {
           socket.send(JSON.stringify({ type: 'controllers', count: phoneCount }));
+          // Tells the page Link is here to switch on, which a page with no
+          // show server behind it never hears, so it never offers the switch.
+          socket.send(linkMessage());
         }
       }
       return;
@@ -449,6 +453,12 @@ wss.on('connection', (socket, req) => {
         layers: Array.isArray(message.layers) ? message.layers.slice(0, 64) : [],
         master: typeof message.master === 'number' ? message.master : 1,
       };
+      return;
+    }
+    // Link on or off, from the laptop's own page only: a phone switching the
+    // room's clock source is not a remote's job.
+    if (message.type === 'link-enable') {
+      if (from === 'display') setLink(message.on === true);
       return;
     }
     if (from === 'mirror') return;   // a display only listens
@@ -647,6 +657,38 @@ if (ARTNET_IN.size > 0) {
     if (settings) broadcastTo('display', JSON.stringify({ type: 'patch', settings }));
   });
   listen.bind(ARTNET_PORT, '0.0.0.0');
+}
+
+// ── Ableton Link ───────────────────────────────────────────────────────
+//
+// The music's tempo and bar from Live, Bitwig, Traktor or an iPad's AUM, on
+// the network the show server is already on (`abletonLink.js`, PLAN.md
+// 13.5-link). Off until the laptop's page switches it on, so a show server
+// never shows up in somebody's Link session uninvited.
+//
+// The reading goes to the displays twenty times a second: the beat as Link
+// counts it at the moment of sending, which the page stamps on arrival. On
+// the one machine the socket is well under a millisecond and the page keeps
+// the earliest-arriving stamp (`TempoSource.linkReading`), so a late frame
+// does not drag the phase. A beat at 200 bpm is 300 ms; a twentieth of a
+// second between readings is only how fast a tempo change is heard.
+let link = null;
+let linkTimer = null;
+const linkMessage = () => JSON.stringify(link ? { type: 'link', on: true, ...link.reading() } : { type: 'link', on: false, peers: 0, bpm: 0, beat: null, playing: false });
+function setLink(on) {
+  if (on === (link !== null)) { broadcastTo('display', linkMessage()); return; }
+  if (on) {
+    link = startLink({ onError: (err) => console.log(`  Ableton Link: ${err.code ?? err.message}`) });
+    linkTimer = setInterval(() => broadcastTo('display', linkMessage()), 50);
+    linkTimer.unref?.();
+    console.log('  Ableton Link:       on (following the session on this network)');
+  } else {
+    clearInterval(linkTimer);
+    link.stop();
+    link = null;
+    console.log('  Ableton Link:       off');
+  }
+  broadcastTo('display', linkMessage());
 }
 
 // ── Startup banner ─────────────────────────────────────────────────────

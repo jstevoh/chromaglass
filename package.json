@@ -31,6 +31,7 @@
     "showkey": "npm run build && node scripts/showkey.mjs",
     "shapes": "node --experimental-strip-types scripts/shapes.mjs",
     "timecode": "node --experimental-strip-types scripts/timecode.mjs",
+    "link": "node --experimental-strip-types scripts/link.mjs",
     "cellride": "node --experimental-strip-types scripts/cellride.mjs",
     "scene": "esbuild scripts/scene.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/scene.mjs && node node_modules/.cache/scene.mjs",
     "soundcords": "esbuild scripts/soundcords.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundcords.mjs && node node_modules/.cache/soundcords.mjs",

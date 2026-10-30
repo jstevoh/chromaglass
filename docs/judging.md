@@ -2055,3 +2055,23 @@ system-audio path. Unlisted, never public, until you say so.
    back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
    one. A wrong key on one destination should fail that one alone, once, with the
    platform's words, while the others stream.
+
+## 93. Ableton Link with Live (PLAN 13.5-link)
+
+`npm run link` plays a Link session against the show server with a stand-in for Live written
+from the same reading of the protocol, so only Live can say the two agree.
+
+1. Live and the Mac app on the same Mac. In Live, Preferences → Link, Tempo & MIDI → Link on,
+   and the Link button in the transport bar lit. In the app, Settings → Sound → Tempo → **Link**.
+   Within a second or two the line beside it says "following 1 app", the tempo readout says
+   Live's tempo and "Link", and Live's transport bar says **1 Link**.
+2. Play a four-on-the-floor clip at 124. The plate's kicks should land with Live's kick, the
+   same way a MIDI clock's do; Beat Lead at 0. Change Live's tempo to 132 mid-clip: the readout
+   follows within half a second and the kicks stay on the beat.
+3. With the app open *first* and Live opened after: Live keeps its own tempo (the app must
+   never hand Live its 120).
+4. On two machines on the same Wi-Fi (Live on one, the app on the other): as step 2.
+5. Link off: Live's count goes back to 0 within a second, the readout to "listening".
+6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
+   prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
+   clock offset), Live's tempo changing when the app joins.

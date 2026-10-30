@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import type { TempoReading } from '../../lib/tempo';
+import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
   Magnet,
@@ -223,8 +223,10 @@ export interface PhoneStageProps {
   /** The plate's volume, 0 to 100, or null with no ear: what the VU needle in the Sound sheet is moved by. */
   readLevel: () => number | null;
   /** The tempo source: where the tempo comes from, a tap, and the reading the beat light polls. */
-  tempo: { source: string | null; bpm: number; taps: number };
+  tempo: TempoLabel;
   onTap: () => void;
+  /** Ableton Link on or off at the show server, offered while one is there (PLAN.md 13.5-link). */
+  onLink?: (on: boolean) => void;
   readTempo: () => TempoReading | null;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
@@ -1036,8 +1038,22 @@ export function PhoneStage(p: PhoneStageProps) {
             <TapPad tempo={p.tempo} read={p.readTempo} onTap={p.onTap} touch />
           </div>
           <p className="mt-1 text-[12px] leading-snug text-dim" data-testid="phone-tempo-says">
-            {p.tempo.source ? `${p.tempo.bpm} bpm, ${p.tempo.source === 'clock' ? 'from MIDI clock' : p.tempo.source === 'tap' ? 'tapped' : 'set'}. Four taps give a good one.` : 'Listening for the tempo. Two taps give one, four give a good one.'}
+            {p.tempo.source ? `${p.tempo.bpm} bpm, ${p.tempo.source === 'clock' ? 'from MIDI clock' : p.tempo.source === 'link' ? 'from Ableton Link' : tempoSourceName(p.tempo.source)}. Four taps give a good one.` : 'Listening for the tempo. Two taps give one, four give a good one.'}
           </p>
+          {/* Link, where a show server is there to join it: the Mac app at a phone's width. */}
+          {p.tempo.link?.available && p.onLink && (
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                onClick={() => p.onLink?.(!p.tempo.link?.on)}
+                aria-pressed={p.tempo.link.on}
+                data-testid="phone-tempo-link"
+                className={`min-h-11 flex-none rounded-xl border px-4 text-[14px] font-medium ${p.tempo.link.on ? LIT : 'border-white/10 bg-white/5'}`}
+              >
+                Link
+              </button>
+              <span className="text-[12px] leading-snug text-dim">{linkLine(p.tempo.link)}</span>
+            </div>
+          )}
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />

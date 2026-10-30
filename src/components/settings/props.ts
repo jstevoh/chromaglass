@@ -8,7 +8,7 @@ import type { MidiController } from '../../hooks/useMidi';
 import type { PinApi } from './controls';
 import type { LiquidDesignerProps } from '../LiquidDesigner';
 import type { OutputConfig, WallTest } from '../../lib/outputConfig';
-import type { TempoReading } from '../../lib/tempo';
+import type { TempoLabel, TempoReading } from '../../lib/tempo';
 import type { CartoonShelfProps } from '../CartoonShelf';
 import type { RoomCalibration } from '../../lib/audioCalibration';
 import type { EngineStatus } from '../../lib/platform';
@@ -125,7 +125,7 @@ export interface SettingsPanelProps {
   /** Open the Sound sheet, where the source is chosen. */
   onOpenSound?: () => void;
   /** Where the tempo is coming from, and the three ways to say it by hand. */
-  tempo?: { source: string | null; bpm: number; taps: number };
+  tempo?: TempoLabel;
   onTap?: () => void;
   /** The tempo source's reading, for the tap pad's beat light (it polls this itself). */
   readTempo?: () => TempoReading | null;
@@ -134,6 +134,8 @@ export interface SettingsPanelProps {
   /** The tempo the dish's Tempo mode is lit by (tapped, clocked or heard), bpm, or 0. */
   spinBpm?: number;
   onTempoClear?: () => void;
+  /** Ableton Link on or off at the show server (PLAN.md 13.5-link); offered only while one is there (`tempo.link.available`). */
+  onLink?: (on: boolean) => void;
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
   midiClocked?: boolean;
@@ -161,7 +163,7 @@ export interface SettingsPanelProps {
   cartoons?: CartoonShelfProps;
 }
 
-export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'onOpenSound' | 'onFlickPlate' | 'cartoons'>
+export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'onOpenSound' | 'onFlickPlate' | 'cartoons'>
   & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'pourName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
   & {
     filmInputRef: React.RefObject<HTMLInputElement | null>;

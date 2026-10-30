@@ -9,7 +9,7 @@
  * the low end never stops, a rehearsal against Ableton where the tempo is
  * already a known number sitting on the other side of a cable.
  *
- * So: three ways to tell the show the tempo instead of making it work the
+ * So: ways to tell the show the tempo instead of making it work the
  * tempo out.
  *
  *   **MIDI clock** — twenty-four pulses a quarter note, on the port that is
@@ -23,6 +23,11 @@
  *
  *   **A typed number** — when the tempo is on the setlist.
  *
+ *   **Ableton Link** — the session Live, Bitwig, Traktor or an iPad's AUM
+ *   share on the network, through the show server (a page cannot join it;
+ *   `server/abletonLink.js`). Tempo and phase with no cable, and it wins
+ *   over the others while it is speaking.
+ *
  * A source that knows the tempo sets both the period *and* the phase, which
  * is the part that matters: a beat clock with the right tempo and the wrong
  * phase puts every kick exactly half a beat late.
@@ -31,7 +36,30 @@
  * and taking over again is one button.
  */
 
-export type TempoSourceKind = 'clock' | 'tap' | 'manual';
+export type TempoSourceKind = 'clock' | 'tap' | 'manual' | 'link';
+
+/** Ableton Link as the page knows it: whether the show server offers it, whether it is on, and how many others are in the session. */
+export interface LinkStatus {
+  available: boolean;
+  on: boolean;
+  peers: number;
+}
+
+/** What the desk shows of the tempo, sampled from the source four times a second (`useTempo`). */
+export interface TempoLabel {
+  source: string | null;
+  bpm: number;
+  taps: number;
+  link?: LinkStatus;
+}
+
+/** The show server's Link message (`server/abletonLink.js`, `remoteProtocol.ts`). */
+export interface LinkMessage {
+  on: boolean;
+  peers: number;
+  bpm: number;
+  beat: number | null;
+}
 
 export interface TempoReading {
   /** Milliseconds per beat. */
@@ -45,6 +73,12 @@ export interface TempoReading {
   source: TempoSourceKind;
   /** Bumped on every fresh beat, so a reader can tell a new one from a held one. */
   seq: number;
+  /**
+   * That beat's place in the bar, 0 being the one, from a source that knows
+   * the bar (Link, whose session agrees on it in fours); absent otherwise.
+   * Nothing reads it yet: the bar grid finds the one by ear (PLAN 13.5-link-one).
+   */
+  bar?: number;
 }
 
 /** The same range the beat clock works in: 60 to 200 bpm. */
@@ -69,6 +103,28 @@ const TAP_GAP = 2500;
 /** Two taps closer than this are one press arriving twice. */
 const DOUBLE_TAP_MS = 25;
 
+/**
+ * How long a Link reading is believed after the last one. The show server
+ * sends twenty a second, so this is twenty missed: a server gone, the session
+ * left. Then the clock hands back, as a stopped MIDI clock does.
+ */
+const LINK_HOLD = 1000;
+/**
+ * How far the beat's anchor may creep later per reading, ms.
+ *
+ * Each reading is stamped when it arrives, and one that sat behind a frame
+ * arrives late, which reads as a beat that fell late. So the anchor keeps the
+ * *earliest* arrival (the least delayed) and creeps toward later ones only by
+ * this much: a hundredth of a millisecond a reading, a fifth of one a second.
+ * The server's clock and the page's are the same machine's monotonic clock, so
+ * there is no drift to follow worth the name; the creep is for Link's own
+ * re-measurement every thirty seconds, which can move the session's offset by
+ * microseconds. A twentieth of a millisecond a reading (one a second) was tried
+ * first: readings up to a frame late then left the beat up to 2.3 ms late
+ * (`npm run link`), against 0.86 ms at worst now.
+ */
+const LINK_CREEP = 0.01;
+
 const clampPeriod = (ms: number) => Math.max(MIN_PERIOD, Math.min(MAX_PERIOD, ms));
 
 /**
@@ -88,6 +144,17 @@ const fold = (ms: number): number => {
   return p;
 };
 
+/** The source's name on the desk and the phone. */
+export const tempoSourceName = (source: string | null): string =>
+  source === 'clock' ? 'midi clock' : source === 'tap' ? 'tapped' : source === 'link' ? 'Link' : 'set';
+
+/** What Link is doing, in a few words beside its switch. */
+export function linkLine(link: LinkStatus): string {
+  if (!link.on) return 'off';
+  if (link.peers === 0) return 'looking for a session on this network';
+  return link.peers === 1 ? 'following 1 app' : `following ${link.peers} apps`;
+}
+
 export const bpmOf = (period: number): number => (period > 0 ? 60000 / period : 0);
 export const periodOf = (bpm: number): number => (bpm > 0 ? 60000 / bpm : 0);
 
@@ -106,14 +173,62 @@ export class TempoSource {
   // Tap
   private taps: number[] = [];
 
+  // Ableton Link, through the show server. Kept beside the other sources rather
+  // than in `kind`, so a Link session that ends hands back to whatever was
+  // tapped or typed before it, and a MIDI clock lapsing does not end Link.
+  /** When beat zero fell on the page's clock, the true period, the last whole beat, and until when it is believed. */
+  private link: { origin: number; period: number; whole: number; until: number } | null = null;
+  private linkFresh = false;
+  /** Whether a show server offers Link, whether it is on, and its peers, for the desk. */
+  linkStatus: LinkStatus = { available: false, on: false, peers: 0 };
+  /** Whether the operator wants Link on; the remote link asks the server for it on every connect. */
+  linkWanted = false;
+  /** Set by the remote link: asks the show server to switch Link on or off. */
+  onLinkSwitch: ((on: boolean) => void) | null = null;
+
   /** What is driving the tempo right now, or null when nothing is. */
   get active(): TempoSourceKind | null {
-    return this.kind;
+    return this.linkFresh ? 'link' : this.kind;
   }
 
   /** Beats per minute of whatever is driving, or 0. */
   get bpm(): number {
+    if (this.linkFresh && this.link) return bpmOf(this.link.period);
     return this.kind ? bpmOf(this.period) : 0;
+  }
+
+  /** Link on or off at the show server, remembered as the operator's wish. */
+  switchLink(on: boolean): void {
+    this.linkWanted = on;
+    this.onLinkSwitch?.(on);
+  }
+
+  /**
+   * A Link message from the show server, stamped `now` on arrival.
+   *
+   * Link says which beat it is (a fraction of one included) rather than when a
+   * beat fell, so the moment beat zero fell is worked back from the stamp:
+   * `now - beat * period`. That is right to within how late the message
+   * arrived, which on one machine is under a millisecond for the socket and up
+   * to a frame for the page's event loop; LINK_CREEP keeps the least late.
+   */
+  linkReading(now: number, m: LinkMessage): void {
+    this.linkStatus = { available: true, on: m.on, peers: m.on ? m.peers : 0 };
+    if (!m.on || m.beat === null || !(m.bpm > 0) || !Number.isFinite(m.beat)) {
+      this.link = null;
+      this.linkFresh = false;
+      return;
+    }
+    const period = periodOf(m.bpm);
+    const origin = now - m.beat * period;
+    const l = this.link;
+    if (l && Math.abs(l.period - period) < 1e-6 * period && Math.abs(origin - l.origin) < period / 4) {
+      l.origin = Math.min(l.origin + LINK_CREEP, origin);
+      l.until = now + LINK_HOLD;
+    } else {
+      // A new session, a tempo change or a jump in the bar: the anchor starts again.
+      this.link = { origin, period, whole: l?.whole ?? Number.NaN, until: now + LINK_HOLD };
+    }
   }
 
   /** How many taps are in the current attempt, for a button that counts them in. */
@@ -132,6 +247,17 @@ export class TempoSource {
     // typed number are deliberate acts and stay until they are replaced or
     // cleared — an operator who tapped a tempo did not mean "for four seconds".
     if (this.kind === 'clock' && now - this.lastPulseAt > CLOCK_HOLD) this.clear();
+    // Link first: the session is the room's tempo, shared with the band's own
+    // gear, and a tap or a typed number under it waits for it to end.
+    const l = this.link;
+    this.linkFresh = !!l && now < l.until;
+    if (l && this.linkFresh) {
+      const beats = (now - l.origin) / l.period;
+      const whole = Math.floor(beats);
+      if (whole !== l.whole) { l.whole = whole; this.seq++; }
+      // Not folded: Link means the tempo it says, as a MIDI clock does.
+      return { period: clampPeriod(l.period), beatAt: l.origin + whole * l.period, source: 'link', seq: this.seq, bar: ((whole % 4) + 4) % 4 };
+    }
     if (!this.kind || this.period <= 0) return null;
     return { period: this.period, beatAt: this.beatAt, source: this.kind, seq: this.seq };
   }

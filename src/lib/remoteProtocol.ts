@@ -129,6 +129,15 @@ export type RemoteMessage =
   | { type: 'mirrors'; count: number }
   /** Relay → display: how many phones (controllers) are connected. */
   | { type: 'controllers'; count: number }
+  /**
+   * Relay → display: Ableton Link (PLAN.md 13.5-link), sent on connect and,
+   * while it is on, twenty times a second. `beat` is the session's beat at the
+   * moment of sending, so its fraction is the beat's phase and its value modulo
+   * four is the bar's (beat zero is every peer's bar line); null while no session is joined.
+   */
+  | { type: 'link'; on: boolean; peers: number; bpm: number; beat: number | null; playing: boolean }
+  /** Display → relay: switch Link on or off. The relay takes it from the laptop's own page only. */
+  | { type: 'link-enable'; on: boolean }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
   | { type: 'cast'; message: CastMessage }
   /**
