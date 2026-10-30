@@ -94,13 +94,13 @@ export interface DeskProps {
   lookName: string | null;
   edited: boolean;
   dirty: boolean;
-  onSendToWall: () => void;
   /**
-   * Opens the projector window, for the header's Wall dot. Send to wall did
-   * that too until Preview had a copy to send (PLAN.md 8b); the dot still
-   * means the window, whatever the plate bar's button now does.
+   * Send to wall, for the header's Wall and ⌘⏎: in Preview with a wall up,
+   * the copy's look goes to the wall (PLAN.md 8b); otherwise the projector
+   * window opens, or comes forward. The plate bar had its own button for it
+   * until the owner took it away (2026-10-29): two controls for one thing.
    */
-  onOpenWall?: () => void;
+  onSendToWall: () => void;
   onSave: () => void;
   onSaveOver?: () => void;
   onNew: () => void;
