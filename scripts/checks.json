@@ -871,6 +871,19 @@
       ]
     },
     {
+      "name": "The video pour's dye and flow on the GPU",
+      "shard": "lab",
+      "run": "npm run videoflow",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "A poured video's frame is worked out in two compute passes and its deltas join the",
+        "CPU's at the step's flush (PLAN.md 14ab-2, lib/videoFlow.ts, scripts/videoflow.mjs):",
+        "the real FluidSimulation sends no row for it, and on the real solver the deltas the",
+        "fold takes are the CPU loop's to a few parts in ten million, at the grid's size and",
+        "four times it. Logic and numbers, the same on any adapter that computes."
+      ]
+    },
+    {
       "name": "The slosh dish on the GPU",
       "shard": "lab",
       "run": "npm run sloshgpu",
@@ -1728,6 +1741,18 @@
         "halo against Ostwald ripening into the clear oil, conserves Σc·h, and",
         "does not move without a field, and sheds its half-full cells more",
         "slowly in a second window (steps 200 to 380)."
+      ]
+    },
+    {
+      "name": "The video pour from a playing video",
+      "shard": "fifth",
+      "run": "npm run videoflow -- --video",
+      "why": [
+        "The video pour's frame copied from the <video> element itself, as the app pours",
+        "it (PLAN.md 14ab-2, scripts/videoflow.mjs): the dye lands where the canvas of the",
+        "same frame puts it, cell by cell. SwiftShader loses its GPU instance on a copy from",
+        "a <video>, so the lab shard's run pours an ImageBitmap of it and only a Mac pours",
+        "the element. About twenty seconds, on the lightest shard."
       ]
     },
     {

@@ -265,10 +265,7 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
 
 - ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Story in
   `docs/plan-shipped.md` §14ab-1 (moved 2026-10-29, 19m).
-- **14ab-2** *The video pour's optical flow is a CPU loop* over a 192² `getImageData`
-  each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
-  pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
-  belongs in a compute pass beside it.
+- ~~**14ab-2** *The video pour's optical flow is a CPU loop*~~ **Shipped** (#PRNUM, `npm run videoflow`: no loop and no rows sent while a video pours, the deltas the CPU loop's to 1.7e-7). Story in `docs/plan-shipped.md` §14ab-2.
 - ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*~~ **Shipped** (#549, `npm run framereads`: a still plate 60 → 0 readbacks asked in thirty frames). Story in `docs/plan-shipped.md` §14ab-3.
 - ~~**14ab-4** *A CPU pour uploads the whole grid every step*~~ **Shipped** (#579, `npm run frameuploads`: a cell after a cell 1.33 MB → 14 KB, the flush 318 → 18 µs). Story in `docs/plan-shipped.md` §14ab-4.
 - ~~**14ab-5** *The plate, post chain, camera, output and particles make their bind groups and views every frame*~~ **Shipped** (#549, `npm run framegroups`: 12 groups and 64 views a frame → 0 and 0). Story in `docs/plan-shipped.md` §14ab-5.
@@ -290,6 +287,22 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   comments say a starved runner's late timers part the two windows' frames by themselves. Find
   a measure of the gate's fault that holds at a quarter of the display's refreshes, or a
   starvation reading that sets the line aside and says so. The bar itself stays where it is.
+- **14ab-12** (open, found with 14ab-2, read in the code and not measured) *A pour's
+  splats fold at once, and the fold runs the step's forces.* `applySplats` ends with
+  `foldDeltas`, which besides adding the deltas runs `liquidForces` (a dt-scaled push from the
+  soap, the bodies and the polar liquid) and `squeezeUpdate` (the gap's own update, which the
+  step runs itself when no deltas were applied). So a frame whose tools lay splats runs
+  those once more than a frame that lays none, and a step after several such frames several
+  times. Measure it on a look with soap (a still plate, a tool laying splats at the frame
+  rate, the soap's push against a run where the splats go through the step's flush), and if
+  it is real, fold a frame's splats with the dye and flow alone, as the video pour's frames
+  now wait for the flush.
+- **14ab-13** (open, found with 14ab-2, read in the code) *Is a poured video upside down?*
+  The pour has always laid the frame's rows, which count down, on the grid's rows as they
+  come; the text pour (`pourText`) flips its canvas first because "the plate's rows run from
+  the bottom of the frame up", and `injectImage` does not. If that comment is right, a poured
+  video and an uploaded picture land upside down. A `look` render of a cartoon with a known
+  top (a title card) settles it; 14ab-2 kept the orientation as it was.
 - **14ab-11** (open, found with 14ab-4) *The deltas' whole-grid writers and the GPU's whole
   passes.* The writers that still set `dirty = true` send all 192² rows: the room's and the
   film's stir (whole by nature), but also a press, a lift, a carry, a pop and the liquids'

@@ -302,6 +302,10 @@ export class WebGPUFluid extends FluidReads {
     // opening's first twenty seconds on the Mac: built behind, and `npm run
     // startup` gives each look's opening seconds as well as steps to say so.
     for (const name of ['splatDeltas', 'pourImage']) add(`${name}:${RGBA32}`, splatKernel(name, RGBA32), false);
+    // The video pour's (PLAN 14ab-2), only for a show that pours a video.
+    add('videoSample:rgba8unorm', splatKernel('videoSample', 'rgba8unorm'), false);
+    add(`videoFlow:${RGBA32}`, splatKernel('videoFlow', RGBA32), false);
+    add(`upsampleDeltaSum:${RGBA32}`, splatKernel('upsampleDeltaSum', RGBA32), false);
     for (const name of ['statsTiles', 'statsFold'] as const) add(name, STATS_KERNELS[name], false);
     return [...keyed].map(([key, [code, now]]) => cache.computePrep(key, code, !now));
   }
