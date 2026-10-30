@@ -122,8 +122,10 @@ session runs two at once. On the Mac shards seven checks called through `npm run
 (`webgpu`, `qa`, `fx`, `magnet`, `depth`, `wall`, `startup`) build again after the
 shard's own build, about 6 s each; in Measure `layout`, `phone` and `applink` each build,
 while `remotemix` depends without saying so on an earlier step having built `dist/`.
-`dc.mjs` at the root and `scripts/_diag.mjs` are wired to nothing, and `dc.mjs`
-hard-codes `/opt/pw-browsers/chromium`, which `chromium.mjs` exists to avoid.
+`dc.mjs` at the root and `scripts/_diag.mjs` were wired to nothing, and `dc.mjs`
+hard-coded `/opt/pw-browsers/chromium`, which `chromium.mjs` exists to avoid. **Both
+are deleted** (this PR: `git grep` found them only in this sentence, the archive and one
+line of `scripts/checks.json`, the parse loop, which no longer names `dc.mjs`).
 `actionlint`, which CLAUDE.md asks for on a workflow change, is in no image and no job.
 
 *Fix:* a `scripts/harness.mjs` with `serve()` (port 0, polled until it answers) and
