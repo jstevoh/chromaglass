@@ -31,6 +31,16 @@
  *                 On a Mac (CI's runner, Metal) this must pass; on a Linux box
  *                 with software WebGPU the app's readbacks come back empty
  *                 (CLAUDE.md), and it is reported as skipped
+ *   live          the page's live stream (PLAN.md 37x-4b) reaches the app's
+ *                 RTMP client over IPC and a local listener records it: a
+ *                 key kept by name in the app's keychain store where the
+ *                 machine has one (a Mac), the stream started from the
+ *                 page's console API on that name, the AVC header and, at
+ *                 the listener in four seconds, half the frames the machine's
+ *                 encoder was probed able to make (sixty where it holds the
+ *                 rate, never fewer than ten), the key removed after. The stream itself (its rate, its audio, its
+ *                 sync) is `npm run live`'s; this is the plumbing only the
+ *                 app has
  *   not throttled the show window minimised, and covered by another window,
  *                 still counts as seen and keeps its frames and timers; each
  *                 judged only where a window in a bare Electron (Chromium's
@@ -55,6 +65,18 @@
  *                 same app with no key shows its door, the sign-in, and no
  *                 plate, and (built as it ships, VITE_MAC_APP=1) so does a
  *                 plain browser opened on its server (PLAN.md 23.17d)
+ *   OSC closed    the app opens with OSC off (nothing listens on its port);
+ *                 Show > OSC input turns it on for this Mac only (bound to
+ *                 127.0.0.1) or the network (0.0.0.0) without a restart, off
+ *                 again, and the choice is there after the app is quit and
+ *                 opened (PLAN.md 23.17m, the security audit's finding 4)
+ *   no debugger   (packed only) the packed app launched with
+ *                 --remote-debugging-port quits by itself, beside the same
+ *                 app launched plainly, which serves (finding 9)
+ *   entitlements  (packed, macOS) the signature carries no
+ *                 disable-library-validation and no allow-unsigned-
+ *                 executable-memory, and the app as signed still starts and
+ *                 serves, which is the proof it did not need them (finding 13)
  *
  * The second screen is a stand-in: an init script adds one to what the real
  * `getScreenDetails` returns, so the real permission (granted by the app, not
@@ -65,7 +87,7 @@
  * the site). On Linux with no display it runs itself under xvfb-run.
  */
 import { _electron as electron } from 'playwright';
-import { spawnSync } from 'node:child_process';
+import { spawn as launchProcess, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -75,6 +97,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signLicenseKey } from '../server/license-key.js';
+import { systemAudioLine } from './desktop-audio.mjs';
+import { startRtmpListener, summarize } from './rtmpListener.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DESKTOP = join(REPO, 'desktop');
@@ -224,6 +248,7 @@ const env = {
   OSC_PORT: String(OSC_PORT),
   CHROMAGLASS_USER_DATA: profile,
   CHROMAGLASS_OFFLINE: '1',
+  CHROMAGLASS_AUDIO_TAP: '1',
   CHROMAGLASS_QUERY: QUERY,
   CHROMAGLASS_REQUIRE_SIGNIN: '1',
   ...(PACKAGED ? {} : { LICENSE_PUBLIC_KEY: LIC_PUBLIC }),
@@ -368,6 +393,82 @@ try {
     : `${engine ?? 'no engine'}; ${started ? 'no painted frame read back' : 'the plate never drew 120 frames'}`;
   if (isMac || first) check('lit plate: the plate draws, lit, in colour and moving, with the network off', lit, plateDetail);
   else skip('lit plate', `software WebGPU gives the app no readback here (CLAUDE.md); CI's Mac measures it. Here: ${plateDetail}`);
+
+  // ── live ──────────────────────────────────────────────────────────────
+  /*
+    The live stream's plumbing (PLAN.md 37x-4b): the page's encoder
+    (src/lib/liveStream.ts) hands packets to the preload's bridge, main.js's
+    `wireLive` to the RTMP client (desktop/live.js), the client to the
+    socket. `npm run live` measures the stream itself in the lab, over a
+    Playwright bridge; what only the app can show is that its IPC carries the
+    same packets, and that a key kept by name is what the client publishes
+    with. The key store is Electron's safeStorage: on a Mac it encrypts
+    through the login Keychain; on a Linux box with no keyring it refuses,
+    and the repo's app (never the packed one) takes the key itself, as the
+    check does here. With no sound source open the stream is video only.
+    Since 37x-4c the page streams to two destinations at once, a landscape
+    and a portrait one, which is two encodes and two sockets through the
+    same IPC: both must arrive, each at its own size.
+  */
+  {
+    const listener = await startRtmpListener();
+    const pubs = new Map();
+    listener.on('publish', (st) => { pubs.set(st.key, st); });
+    const started = await page.evaluate(async (url) => {
+      const live = window.__cgLive;
+      if (!live) return { error: 'no __cgLive on the page' };
+      let keychain;
+      try { await live.keys.set('check', 'desktop-check-key'); await live.keys.set('check-tall', 'desktop-check-tall'); keychain = 'kept'; } catch (e) { keychain = `refused: ${e.message}`; }
+      const names = (await live.keys.list().catch(() => [])).map((k) => k.name);
+      const probes = await live.probe({ width: 640, height: 360, fps: 30 }).catch((e) => [{ acceleration: 'probe', error: e.message }]);
+      try {
+        // Both keys by name where the store keeps them: the packed app (desktop.yml's `-- --packaged`) takes no key from the page.
+        const tall = keychain === 'kept' ? { name: 'tall', url, keyName: 'check-tall', orientation: 'portrait' } : { name: 'tall', url, key: 'desktop-check-tall', orientation: 'portrait' };
+        const wide = keychain === 'kept' ? { name: 'check', url, keyName: 'check' } : { name: 'check', url, key: 'desktop-check-key' };
+        const st = await live.start({ destinations: [wide, tall], width: 640, height: 360, portrait: { width: 360, height: 640 }, fps: 30 });
+        return { state: st, keychain, names, probes };
+      } catch (e) { return { error: e.message, keychain, names, probes }; }
+    }, listener.url).catch((e) => ({ error: e.message }));
+    await sleep(4000);
+    const stopped = await page.evaluate(() => window.__cgLive?.stop()).catch(() => null);
+    const removed = await page.evaluate(async () => (await window.__cgLive?.keys.remove('check')) && (await window.__cgLive?.keys.remove('check-tall'))).catch(() => null);
+    const pub = pubs.get('desktop-check-key') ?? null;
+    const sum = pub ? summarize(pub) : null;
+    const tallPub = pubs.get('desktop-check-tall') ?? null;
+    const tallSum = tallPub ? summarize(tallPub) : null;
+    const health = (name) => stopped?.transport?.destinations?.find((d) => d.name === name) ?? null;
+    const viaKeychain = started.keychain === 'kept';
+    // On a Mac the store must work (safeStorage through the login Keychain); only a box with no keyring may fall back to the key itself.
+    const keyOk = pub?.key === 'desktop-check-key' && (isMac ? viaKeychain : true) && (!viaKeychain || (started.names?.includes('check') && removed === true));
+    /*
+      How many frames four seconds should hold: 120 at the stream's 30 fps, of which the
+      line wants half (60), as the lab's checks allow a cold start. GitHub's Mac runner
+      (a virtual machine, no GPU of its own) read 20 to 29 frames in 4 s twice over with
+      the frames costing 0.5 ms each and the probe reading 171 ms an encoded frame under
+      every hint, while the lab's Chromium on the same kind of machine holds 30 fps at
+      this size: that machine's encoder is the limit, not the app's bridge, which is what
+      this line is for. So the line wants half of what the probe says the encoder chosen
+      can make in 4 s, never fewer than 10, and 60 wherever the encoder holds the rate;
+      the probes are printed so a slow machine says it is one.
+    */
+    const chosen = (started.probes ?? []).find((p) => p.source !== 'buffer' && p.acceleration === (stopped?.acceleration ?? 'no-preference'));
+    /*
+      Since 37x-4c the machine makes two encodes of the same number of pixels
+      (640x360 and 360x640) side by side, so what it can make of each is half
+      what the probe of one says: GitHub's Mac at 171 ms a frame makes 11 of
+      each in 4 s, not 23, and the floor of 10 that 37x-4b set for one encode
+      is 5 for each of two.
+    */
+    const encodes = 2;
+    const canMake = chosen?.msAFrame ? Math.min(120, Math.floor(4000 / (chosen.msAFrame * encodes))) : 120;
+    const wanted = Math.max(10 / encodes, Math.floor(canMake / 2));
+    const framesOk = !!sum && sum.video.header && sum.video.frames >= wanted && (health('check')?.videoFrames ?? -1) === sum.video.frames;
+    // The portrait encode is a second encoder on the same machine: the same half of what the probe says, of a picture a little over half the size.
+    const tallOk = !!tallSum && tallSum.video.header && tallSum.video.frames >= wanted && tallSum.meta?.width === 360 && tallSum.meta?.height === 640 && (health('tall')?.videoFrames ?? -1) === tallSum.video.frames;
+    check(`live: the page streams the plate through the app to a landscape and a portrait destination${viaKeychain ? ', the first on a key kept by name in its keychain store' : ''}`, !started.error && keyOk && framesOk && tallOk,
+      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s (${wanted} wanted${canMake < 120 ? `: the encoder probed at ${chosen.msAFrame.toFixed(0)} ms a frame makes ${canMake}` : ''}), ${health('check')?.videoFrames ?? '?'} sent, ${health('check')?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped (${stopped?.timing ? `${(stopped.timing.grabMs / Math.max(1, stopped.frames)).toFixed(1)} ms a frame to grab, first packet ${stopped.timing.firstOutMs === null ? 'never' : `${stopped.timing.firstOutMs.toFixed(0)} ms after the first encode`}, ${stopped.timing.outputs} out; encoder ${stopped.acceleration ?? '?'}` : 'no timing'}); portrait ${tallSum ? `${tallSum.video.frames} frames at ${tallSum.meta?.width}x${tallSum.meta?.height}` : 'never published'}; encoders probed: ${(started.probes ?? []).map((p) => `${p.acceleration}${p.source === 'buffer' ? ' on buffer frames' : ''} ${p.supported === false ? 'unsupported' : p.msAFrame === null ? 'no frame out' : `${p.msAFrame.toFixed(1)} ms a frame, first after ${p.firstOutMs?.toFixed(0)} ms${p.makeMs ? `, ${p.makeMs.toFixed(1)} ms to make one` : ''}`}${p.error ? ` (${p.error})` : ''}`).join('; ') || 'none'}; key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
+    await listener.close();
+  }
 
   // ── not throttled ───────────────────────────────────────────────────
   /*
@@ -588,6 +689,101 @@ try {
     !!castState && castState.root > 0 && castState.mirror && castState.pointer.length === 0,
     castState ? (castState.pointer.length ? `a pointer on ${castState.pointer.join(', ')}` : `none on ${castState.elements} elements`) : 'no projector window opened');
 
+  // ── system audio & ambient TV (23.8) ───────────────────────────────
+  // On the Mac app, "System audio" replaces "Another tab", intercepts
+  // getDisplayMedia with no tab picker, and routes the System audio source's
+  // pipeline to the ear; the line, the tone it plays and what it prints are
+  // scripts/desktop-audio.mjs. Ambient TV mode caps the solver at 30 steps/s,
+  // caps frames drawn in the app at 60 Hz through DrawGate, and holds the
+  // machine's opening rung.
+  await systemAudioLine({ page, electronApp, check, sleep, createSocket });
+
+  // The ladder's governor exists once the renderer is up; the line below
+  // fails a show without one, so wait for it to be there before the toggle
+  // rather than read it in the instant the System audio step has just left
+  // (the first packed run on CI found none, 96975ef).
+  const governorUp = await page
+    .waitForFunction(() => Boolean(window.chromaglassGovernor?.()), null, { timeout: 15000 })
+    .then(() => true, () => false);
+  await page.locator('[data-testid=sound-ambient-toggle]').click();
+  const ambOn = await page.evaluate(async () => {
+    const g = window.chromaglassGovernor?.();
+    const hadGovernor = Boolean(g);
+    const dbg0 = window.chromaglassDebug?.();
+    const dg0 = dbg0?.drawGate;
+    const frames0 = dbg0?.frames ?? 0;
+    const drawn0 = (dg0?.drawn?.frame ?? 0) + (dg0?.drawn?.ask ?? 0);
+    const skipped0 = (dg0?.skipped?.frame ?? 0) + (dg0?.skipped?.ask ?? 0);
+    const t0 = performance.now();
+    let tick = 1;
+    await new Promise((done) => {
+      const iv = setInterval(() => {
+        const now = performance.now();
+        while (t0 + tick * (1000 / 120) <= now && tick <= 120) {
+          window.__chromaglassFrame?.(t0 + tick * (1000 / 120));
+          tick++;
+        }
+        if (now - t0 >= 1000 || tick > 120) {
+          clearInterval(iv);
+          done();
+        }
+      }, 8);
+    });
+    const cs1 = window.chromaglassCastState?.();
+    const dbg1 = window.chromaglassDebug?.();
+    const dg1 = dbg1?.drawGate;
+    const frames = (dbg1?.frames ?? 0) - frames0;
+    const drawn = (dg1?.drawn?.frame ?? 0) + (dg1?.drawn?.ask ?? 0) - drawn0;
+    const skipped = (dg1?.skipped?.frame ?? 0) + (dg1?.skipped?.ask ?? 0) - skipped0;
+    return {
+      ambient: Boolean(cs1?.ambient),
+      hadGovernor,
+      stepRate: g?.stepRate ?? null,
+      rungIndex: g?.rungIndex ?? null,
+      start: g?.start ?? null,
+      frames,
+      drawn,
+      skipped,
+    };
+  });
+  const mainAmb = await electronApp.evaluate(() => Boolean(globalThis.__chromaglassAmbient));
+  await page.locator('[data-testid=sound-ambient-toggle]').click();
+  const ambOff = await page.evaluate(() => {
+    const g = window.chromaglassGovernor?.();
+    const cs = window.chromaglassCastState?.();
+    return {
+      ambient: Boolean(cs?.ambient),
+      stepRate: g?.stepRate ?? null,
+    };
+  });
+  await page.locator('[data-testid=sound-source-none]').click();
+  await page.keyboard.press('Escape');
+  // The ceiling is the feature (60 a second on a 120 Hz offer); the floor only
+  // says the plate is still drawing, not stalled. It was 20, which measured the
+  // runner: the packed run on 3c24c37 drew 15 a second and stepped the governor
+  // down a rung while a neighbouring job loaded the machine, and the packed run
+  // on 96975ef drew 59 with the same code. The 120 Hz cap itself is counted
+  // on a clock the machine's speed cannot touch in `npm run rungs`.
+  const drawCapped =
+    ambOn.frames <= 65 &&
+    ambOn.drawn <= 65 &&
+    ambOn.skipped >= 45 &&
+    (!isMac || (ambOn.frames >= 5 && ambOn.drawn >= 5));
+  const ambientWorks =
+    ambOn.ambient === true &&
+    ambOn.stepRate === 30 &&
+    // A null is a show with no governor, which the Mac app never is: it fails.
+    ambOn.rungIndex !== null && ambOn.start !== null && ambOn.rungIndex >= ambOn.start &&
+    mainAmb === true &&
+    drawCapped &&
+    ambOff.ambient === false &&
+    ambOff.stepRate === 60;
+  check(
+    'ambient TV: caps solver at 30 steps/s, display at 60 Hz, and holds the opening rung',
+    ambientWorks,
+    `governor up before the toggle ${governorUp}, in the page ${ambOn.hadGovernor}; on: ambient=${ambOn.ambient}, stepRate=${ambOn.stepRate}, rung=${ambOn.rungIndex}/${ambOn.start}, drawn=${ambOn.drawn}/s (frames=${ambOn.frames}/s, skipped=${ambOn.skipped} of 120 Hz offers), menu=${mainAmb}; off: ambient=${ambOff.ambient}, stepRate=${ambOff.stepRate}`,
+  );
+
   // ── updates ────────────────────────────────────────────────────────
   if (!feed) {
     skip('updates: the app finds a new release and offers it', 'run from the repo, where the app does not look (add --packaged)');
@@ -610,10 +806,216 @@ try {
       `${up ? `${up.current} → ${up.version ?? 'nothing'} (${up.history.join(' → ')}${up.error ? `; ${up.error}` : ''}), ${up.signed ? 'signed' : 'ad hoc'}` : 'no updater state'}; feed asked for ${asked ?? 'nothing'}; menu ${labels.find((l) => /Update|ChromaGlass \d/.test(l)) ?? 'has no update item'}; the page sees ${pageSees ? `${pageSees.status} ${pageSees.version}` : 'nothing'}, and was told ${pushes?.length ? pushes.join(' → ') : 'nothing'}`);
   }
 
+  // ── the two Workers the app's site is built to reach (PLAN 23.17e) ──
+  // desktop.yml built the app's site without VITE_FINGERPRINT_PROXY_URL or
+  // VITE_CRASH_REPORT_URL until 23.17e, so Home's song ID (sold as "in the
+  // ChromaGlass app") could not run in the app and its crash sheet had only
+  // Save and Copy. The line reads both addresses out of the bundles the app's
+  // own page loaded, not out of the environment, so a build that dropped them
+  // fails here whatever this run's env says, and then asks each Worker, as the
+  // page's origin, whether it answers the app. The addresses come from the same
+  // secrets deploy.yml uses. One that is unset has nothing to look for (the
+  // crash report Worker was never deployed, so its secret is empty, and the
+  // line says so in its row rather than naming it a pass); a run with neither
+  // (a fork's, or a session's) skips.
+  {
+    const want = { song: process.env.VITE_FINGERPRINT_PROXY_URL, crash: process.env.VITE_CRASH_REPORT_URL };
+    if (!want.song && !want.crash) {
+      skip("workers: each address this run was given (song ID, crash report) is in the app's build, and its Worker answers the app's origin", 'this run has neither VITE_FINGERPRINT_PROXY_URL nor VITE_CRASH_REPORT_URL (desktop.yml passes both from the repository secrets)');
+    } else {
+      const bundles = await page.evaluate(async () => {
+        const urls = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => /\.js(\?|$)/.test(u));
+        const out = [];
+        for (const u of urls) out.push(await fetch(u).then((r) => r.text()).catch(() => ''));
+        return out;
+      }).catch(() => []);
+      const origin = `http://localhost:${PORT}`;
+      const rows = [];
+      let all = bundles.length > 0;
+      // What each request really sends: the song ID's is FormData with the key
+      // in X-ChromaGlass-Key (fingerprint.ts), the crash report's is JSON.
+      const asks = { song: 'x-chromaglass-key', crash: 'content-type' };
+      for (const [name, url] of Object.entries(want)) {
+        if (!url) { rows.push(`${name}: no address in this run (its repository secret is unset), so nothing to look for`); continue; }
+        const carried = bundles.some((t) => t.includes(url));
+        const reply = await fetch(url, { method: 'OPTIONS', headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': asks[name] } }).catch(() => null);
+        const allowed = reply?.headers.get('access-control-allow-origin');
+        const answers = !!reply && reply.status < 300 && (allowed === origin || allowed === '*');
+        rows.push(`${name}: ${carried ? 'in the build' : 'MISSING from the build'}, preflight from ${origin} ${reply ? `${reply.status}, allows ${allowed ?? 'nothing'}` : 'got no answer'}`);
+        all = all && carried && answers;
+      }
+      check("workers: each address this run was given (song ID, crash report) is in the app's build, and its Worker answers the app's origin", all,
+        `${bundles.length} bundles read; ${rows.join('; ')}`);
+    }
+  }
+
   // ── network off, the whole run ────────────────────────────────────
-  const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe'));
+  // The two Workers (23.17e) are the app's deliberate online features: with the
+  // song ID's address in the build, the System audio phase's tone is heard by the
+  // music intelligence, which asks the Worker what is playing, and the guard
+  // refuses it. That refusal is the guard doing its job and the page carrying on
+  // without a name, so it is not something the show "had to" fetch.
+  const workerHosts = [process.env.VITE_FINGERPRINT_PROXY_URL, process.env.VITE_CRASH_REPORT_URL].filter(Boolean).map((u) => { try { return new URL(u).host; } catch { return null; } }).filter(Boolean);
+  const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe') && !workerHosts.some((h) => { try { return new URL(b.url).host === h; } catch { return false; } }));
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
     !probeSeen ? 'the guard never refused the probe, so it saw nothing' : outside.length ? outside.slice(0, 6).map((b) => `${b.type} ${b.url}`).join(', ') : 'every request the pages made was to the app itself');
+
+  // ── the wall's title-bar chip (PLAN 14af) ─────────────────────────
+  /*
+    The title-bar chip, when the wall leaves full screen (the owner,
+    2026-10-29: "I can't get rid of this popup. I don't even know what it
+    means."). The line above only says the chip is absent while the window
+    fills its screen, which a chip that never mounts passes too. This takes
+    the projector out of full screen, as Escape on the wall does, and asks of
+    the chip what the owner could not get from it:
+
+    - that it comes up, inside the hook's 400 ms poll and a margin;
+    - that its button puts the window back (here through main.js's
+      `fillProjector`, the Mac app's own path), and the chip goes;
+    - that, framed again, its X takes it away and it stays away 2 s later
+      (five polls) while the window is still framed (read framed at that
+      moment, or the dismissal was the window filling, not the X), and
+      through the wall filling and leaving full screen once more.
+
+    It runs last, before the quit, and puts the wall back in its page's own
+    full screen at the end, as the quit line has always found it. Each step
+    waits for the window's own transition to finish ('enter-full-screen',
+    'leave-full-screen'): on a Mac those are animations of most of a second,
+    and the first version, which read only `isFullScreen()` and moved on,
+    passed its own line on CI's Mac and left an app that then did not quit
+    when the show was closed (run 40942225503; the quit line passed on every
+    other branch's run that day).
+
+    It needs the projector to have been filling its screen to start from;
+    the line above already fails a run where it was not, so this one says
+    so and leaves it there.
+  */
+  if (cast && castState?.full) {
+    const wallState = () => electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return null;
+      return { page: await w.webContents.executeJavaScript('!!document.fullscreenElement'), window: w.isFullScreen(), short: await w.webContents.executeJavaScript('innerWidth < screen.width - 1 || innerHeight < screen.height - 1') };
+    }, cast.id).catch(() => null);
+    const leaveFull = () => electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return;
+      // The window leaves full screen after the page does, and puts back its
+      // old bounds when it has: resized before then, it is put back over the
+      // resize. So wait for its own 'leave-full-screen', the end of the Mac's
+      // animation, not for `isFullScreen()` to turn.
+      const left = w.isFullScreen() ? new Promise((r) => { w.once('leave-full-screen', r); setTimeout(r, 4000); }) : null;
+      await w.webContents.executeJavaScript('document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : null', true);
+      if (w.isFullScreen()) w.setFullScreen(false);
+      if (left) await left;
+      await new Promise((r) => setTimeout(r, 300));
+      // Smaller than its screen, as a framed window is. The window is made
+      // the size of its display (main.js), and under Xvfb there is no window
+      // manager to draw a title bar, so a window left at that size has none
+      // and the app rightly counts it as filling the screen.
+      const b = w.getBounds();
+      w.setBounds({ x: b.x + 40, y: b.y + 40, width: Math.round(b.width * 0.8), height: Math.round(b.height * 0.8) });
+    }, cast.id).catch(() => {});
+    const chipCount = () => page.locator('[data-testid=projector-fill]').count();
+    const waitFor = async (ok, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ok()) return Date.now() - t0; await sleep(100); } return null; };
+    const framed = async () => { const s = await wallState(); return !!s && !s.page && !s.window && s.short; };
+    // Filled only on a read that says so: a wall that closed, reloaded or
+    // could not be read is not a filled one (the check-skeptic, 2026-10-29).
+    const filled = async () => { const s = await wallState(); return !!s && (s.page || s.window || !s.short); };
+    const chipUp = () => waitFor(async () => (await chipCount()) > 0, 2000);
+    const NAME = "projector: the title-bar chip comes up when the wall leaves full screen, its button fills the wall from the app's side, and its X keeps it hidden for that window";
+
+    await leaveFull();
+    const left = await waitFor(framed, 4000);
+    const chipUpIn = left === null ? null : await chipUp();
+    const text = chipUpIn === null ? '' : ((await page.locator('[data-testid=projector-fill-text]').textContent().catch(() => '')) ?? '').trim();
+    /*
+      The button, with the wall's page refusing its own full screen. Under
+      Xvfb the page's full screen is granted, so the delegated message alone
+      would fill the wall and a broken `fillProjector` (the IPC, the preload,
+      main.js's list of projectors) would pass, and so would a hook that no
+      longer counts the window's own full screen. Refused, the one way back is
+      main.js falling back to `setFullScreen`: the window full, the page not,
+      and the chip has to go on the window's say alone.
+    */
+    let filledIn = null, chipGoneIn = null, how = null, wmStandIn = false;
+    if (chipUpIn !== null) {
+      await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+        const w = BrowserWindow.fromId(id);
+        if (w && !w.isDestroyed()) await w.webContents.executeJavaScript('document.documentElement.requestFullscreen = () => Promise.reject(new Error("refused by the check")); true');
+      }, cast.id).catch(() => {});
+      await page.locator('[data-testid=projector-fill-go]').click();
+      filledIn = await waitFor(async () => { const s = await wallState(); return !!s && s.window && !s.page; }, 5000);
+      how = await wallState();
+      /*
+        The window's full screen covers its screen on a Mac (after its
+        animation). Under Xvfb there is no window manager to do that: the
+        window says it is in full screen and keeps its size, so its page
+        stays short of the screen and the app, rightly, still sees a frame.
+        There the check does the window manager's part and sizes it to its
+        display, and says it did. Either way the chip then has to go on the
+        page covering its screen alone, the page's own full screen refused.
+      */
+      if (filledIn !== null && (await waitFor(async () => { const t = await wallState(); return !!t && !t.short; }, 2500)) === null) {
+        wmStandIn = true;
+        await electronApp.evaluate(({ BrowserWindow, screen }, id) => {
+          const w = BrowserWindow.fromId(id);
+          if (w && !w.isDestroyed()) w.setBounds(screen.getDisplayMatching(w.getBounds()).bounds);
+        }, cast.id).catch(() => {});
+      }
+      chipGoneIn = filledIn === null ? null : await waitFor(async () => (await chipCount()) === 0, 2000);
+      // The Mac's animation into full screen, finished before the next step
+      // asks the window to leave it.
+      await sleep(1500);
+    }
+    /*
+      The X: framed again, dismissed, and still away 2 s later with the wall
+      still framed (or the dismissal was the wall filling). Then the wall
+      fills and leaves full screen once more, and the chip must stay away:
+      an X held only until the next change of state would pass the first
+      half. A new window asking again needs a second Send to wall; that is
+      `hold()` clearing it, not measured here.
+    */
+    let dismissedStays = null, stillFramed = null, again = null, staysThrough = null;
+    if (chipGoneIn !== null) {
+      await leaveFull();
+      again = (await waitFor(framed, 4000)) !== null && (await chipUp()) !== null;
+      if (again) {
+        await page.locator('[data-testid=projector-fill-dismiss]').click();
+        await sleep(2000);
+        dismissedStays = (await chipCount()) === 0;
+        stillFramed = await framed();
+        await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+          const w = BrowserWindow.fromId(id);
+          if (!w || w.isDestroyed()) return;
+          await new Promise((r) => { w.once('enter-full-screen', r); setTimeout(r, 4000); w.setFullScreen(true); });
+        }, cast.id).catch(() => {});
+        const refilled = (await waitFor(filled, 4000)) !== null;
+        await sleep(300);
+        await leaveFull();
+        const reframed = (await waitFor(framed, 4000)) !== null;
+        await sleep(1500);
+        staysThrough = refilled && reframed ? (await chipCount()) === 0 : null;
+      }
+    }
+    // The wall as the quit line has always found it: its page in its own
+    // full screen, the stand-in refusal taken off, the transition finished.
+    await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return;
+      const entered = new Promise((r) => { w.once('enter-full-screen', r); setTimeout(r, 4000); });
+      const ok = await w.webContents.executeJavaScript("delete document.documentElement.requestFullscreen; document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => true, () => false)", true);
+      if (ok) await entered;
+      await new Promise((r) => setTimeout(r, 500));
+    }, cast.id).catch(() => {});
+    check(NAME,
+      chipUpIn !== null && /full screen/i.test(text) && filledIn !== null && chipGoneIn !== null && dismissedStays === true && stillFramed === true && staysThrough === true,
+      left === null ? 'the wall never left full screen'
+        : chipUpIn === null ? 'no chip within 2 s of the wall leaving full screen'
+        : `chip up in ${chipUpIn} ms ("${text}"); with the page's own full screen refused, the button ${filledIn === null ? `left the wall unfilled by the window for 5 s (page ${how?.page}, window ${how?.window})` : `filled the wall by the window's full screen in ${filledIn} ms${wmStandIn ? ' (sized to its display by the check, as no window manager did)' : ''}, the chip ${chipGoneIn === null ? 'still up 2 s later' : `gone ${chipGoneIn} ms after`}`}${again === false ? '; the second time out of full screen, the wall or the chip did not come back, so the X was never tried' : ''}${dismissedStays === null ? '' : `; after its X the chip ${dismissedStays ? 'stayed away' : 'came back'} for 2 s with the wall ${stillFramed ? 'still framed' : 'filled again (so the X was not what was measured)'}`}${dismissedStays === null ? '' : staysThrough === null ? '; the wall could not be filled and framed again to try the X a second time' : `, and ${staysThrough ? 'stayed away' : 'came back'} after the wall filled and left full screen once more`}`);
+  } else {
+    check("projector: the title-bar chip comes up when the wall leaves full screen, its button fills the wall from the app's side, and its X keeps it hidden for that window", false,
+      cast ? 'the wall was not filling its screen to start from (the line above says why)' : 'no projector window opened');
+  }
 
   // ── quits ──────────────────────────────────────────────────────────
   const projectorOpen = (await allWindows()).some((w) => /[?&]cast=/.test(w.url));
@@ -700,6 +1102,168 @@ try {
     await second?.close().catch(() => {});
     rmSync(bare, { recursive: true, force: true });
   }
+}
+
+/*
+  ── OSC is closed until the performer opens it ───────────────────────
+  PLAN 23.17m, the security audit of 2026-10-28 (finding 4). OSC is UDP with
+  no show key, so whoever shares the venue's Wi-Fi and sends the Mac a packet
+  drives the show; the app used to listen on every interface from the first
+  launch. Read here from the main process (`globalThis.__chromaglassOsc`,
+  which says the choice and what the socket did with it) and from the world's
+  side: a plain socket asked to bind the port, which a listener (it holds the
+  port with SO_REUSEADDR) turns away. The menu item is clicked in the app, not
+  the setting written to a file, so the click handler is what is under test.
+*/
+{
+  const dir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-osc-'));
+  const oscPort = await freePort('udp');
+  const oscEnv = { ...env, PORT: String(await freePort('tcp')), CHROMAGLASS_USER_DATA: dir, CHROMAGLASS_OSC_PORT: String(oscPort) };
+  for (const k of ['OSC_PORT', 'OSC_BIND', 'CHROMAGLASS_UPDATE_FEED', 'CHROMAGLASS_QUERY']) delete oscEnv[k];
+  const open = () => electron.launch({ executablePath: app.executablePath, args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], env: oscEnv, timeout: 60_000 });
+  const stateOf = async (a) => {
+    for (let i = 0; i < 300; i++) {
+      const s = await a.evaluate(() => globalThis.__chromaglassOsc ?? null).catch(() => null);
+      if (s) return s;
+      await sleep(200);
+    }
+    return null;
+  };
+  /** Can this check take the port for itself? A listener on it, even one with SO_REUSEADDR, says no to a socket that does not share. */
+  const portIsFree = () => new Promise((done) => {
+    const probe = createSocket('udp4');
+    probe.once('error', () => { probe.close(); done(false); });
+    probe.bind(oscPort, '0.0.0.0', () => { probe.close(() => done(true)); });
+  });
+  const pick = (a, id) => a.evaluate(({ Menu }, i) => { Menu.getApplicationMenu().getMenuItemById(i).click(); }, id);
+  const settle = async (a, want) => {
+    for (let i = 0; i < 50; i++) {
+      const s = await a.evaluate(() => globalThis.__chromaglassOsc ?? null).catch(() => null);
+      if (s && s.state !== undefined && want(s)) return s;
+      await sleep(100);
+    }
+    return a.evaluate(() => globalThis.__chromaglassOsc ?? null).catch(() => null);
+  };
+  let first = null;
+  let again = null;
+  try {
+    first = await open();
+    const start = await stateOf(first);
+    const freeAtStart = await portIsFree();
+    check('OSC closed: a new app listens for no OSC on its port', start?.mode === 'off' && start.state === 'off' && freeAtStart,
+      `choice ${start?.mode ?? 'unread'}, socket ${start?.state ?? 'unread'}, port ${oscPort} ${freeAtStart ? 'free' : 'TAKEN'}`);
+
+    await pick(first, 'osc-local');
+    const local = await settle(first, (s) => s.mode === 'local' && /^udp /.test(s.state));
+    const heldLocal = !(await portIsFree());
+    await pick(first, 'osc-network');
+    const net = await settle(first, (s) => s.mode === 'network' && /^udp /.test(s.state));
+    await pick(first, 'osc-off');
+    const off = await settle(first, (s) => s.mode === 'off' && s.state === 'off');
+    const freeAgain = await portIsFree();
+    check('OSC closed: Show > OSC input opens it for this Mac only (127.0.0.1) or the network (0.0.0.0), and closes it, with no restart',
+      local?.state === `udp 127.0.0.1:${oscPort}` && heldLocal && net?.state === `udp 0.0.0.0:${oscPort}` && off?.state === 'off' && freeAgain,
+      `this Mac only: ${local?.state ?? 'unread'} (port ${heldLocal ? 'held' : 'NOT held'}); network: ${net?.state ?? 'unread'}; off: ${off?.state ?? 'unread'} (port ${freeAgain ? 'free' : 'STILL TAKEN'})`);
+
+    await pick(first, 'osc-local');
+    await settle(first, (s) => s.mode === 'local');
+    await first.close().catch(() => {});
+    first = null;
+    oscEnv.PORT = String(await freePort('tcp'));
+    again = await open();
+    const kept = await stateOf(again);
+    check('OSC closed: the choice is kept for the next launch', kept?.mode === 'local' && kept.state === `udp 127.0.0.1:${oscPort}`,
+      `after a restart: ${kept?.mode ?? 'unread'}, ${kept?.state ?? 'unread'}`);
+  } catch (err) {
+    check('OSC closed: the run finished', false, err?.message ?? String(err));
+  } finally {
+    await first?.close().catch(() => {});
+    await again?.close().catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/*
+  ── a packed app takes no debugger ───────────────────────────────────
+  PLAN 23.17m (finding 9). No fuse covers Chromium's --remote-debugging-port,
+  and a page that can be attached to is a licence gate that can be stepped
+  past, so a packed app launched with it quits at once (desktop/main.js). The
+  same binary launched without it must serve, or "it quit" would mean nothing:
+  it might simply not have started. (Playwright's own launch passes the flag
+  too, and its loader takes it out of process.argv before the app runs; every
+  other line here is that launch.)
+*/
+if (!PACKAGED) {
+  skip('no debugger: the packed app quits when launched with --remote-debugging-port', 'run from the repo, where the guard is off (add --packaged)');
+} else {
+  const run = async (args) => {
+    const dir = mkdtempSync(join(tmpdir(), 'chromaglass-desktop-debug-'));
+    const port = await freePort('tcp');
+    const e = { ...env, PORT: String(port), OSC_PORT: '0', CHROMAGLASS_USER_DATA: dir };
+    delete e.CHROMAGLASS_UPDATE_FEED;
+    const child = launchProcess(app.executablePath, [...app.args, ...args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])], { env: e, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { out += d; });
+    let exit = null;
+    child.once('exit', (code, signal) => { exit = { code, signal }; });
+    let served = false;
+    for (const t0 = Date.now(); !exit && !served && Date.now() - t0 < 45_000;) {
+      served = await fetch(`http://localhost:${port}/remote-info.json`, { signal: AbortSignal.timeout(1000) }).then((r) => r.ok, () => false);
+      if (!served) await sleep(400);
+    }
+    if (served) await sleep(500);
+    else if (!exit) await sleep(3000);
+    const quit = exit !== null;
+    if (!exit) child.kill('SIGKILL');
+    // Chromium's helpers can still be writing to the profile for a moment after the main process is gone.
+    await sleep(500);
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+    return { served, quit, exit, out };
+  };
+  const plain = await run([]);
+  const debugged = await run(['--remote-debugging-port=0']);
+  const piped = await run(['--remote-debugging-pipe']);
+  // Chromium reads a single dash as the same switch; a review found -remote-debugging-port=9333 opened DevTools past a guard that matched `--`.
+  const single = await run(['-remote-debugging-port=0']);
+  check('no debugger: the packed app serves when launched plainly, and quits when launched with --remote-debugging-port, -pipe or the single-dash spelling, serving nothing',
+    plain.served && !debugged.served && debugged.quit && debugged.exit?.code === 1 && !piped.served && piped.quit && piped.exit?.code === 1 &&
+    !single.served && single.quit && single.exit?.code === 1,
+    `plain: ${plain.served ? 'served' : 'NEVER SERVED'}; --remote-debugging-port: ${debugged.served ? 'SERVED' : debugged.quit ? `quit (${debugged.exit?.code})` : 'still running'}; -pipe: ${piped.served ? 'SERVED' : piped.quit ? `quit (${piped.exit?.code})` : 'still running'}; -remote-debugging-port: ${single.served ? 'SERVED' : single.quit ? `quit (${single.exit?.code})` : 'still running'}`);
+}
+
+/*
+  ── the hardened runtime's exceptions are the three it needs ─────────
+  PLAN 23.17m (finding 13). disable-library-validation and allow-unsigned-
+  executable-memory let code that is not ours load into a process that holds
+  the microphone and the camera, and Electron's JIT needs allow-jit alone. The
+  signature is read for what it carries, and the app as signed is started: a
+  signature without them is a claim until the app runs on it. Whether the
+  hardened runtime was actually in force says whether that start proves
+  anything: a pull request's build is signed ad hoc with none (desktop.yml), and
+  the line says so rather than passing for it.
+*/
+{
+  // A plist codesign cannot parse stops the whole signed build: an XML comment with two hyphens in it did exactly that on #539, and
+  // nothing in a cloud session noticed, because only the Mac signs. plutil is the Mac's own parser; xmllint is what a Linux box has.
+  const file = join(DESKTOP, 'resources', 'entitlements.mac.plist');
+  const lint = isMac ? spawnSync('plutil', ['-lint', file], { encoding: 'utf8' }) : spawnSync('xmllint', ['--noout', file], { encoding: 'utf8' });
+  if (lint.error) skip('entitlements: the plist parses', `no ${isMac ? 'plutil' : 'xmllint'} on this machine`);
+  else check('entitlements: the plist parses (a comment with two hyphens in it stops codesign)', lint.status === 0, lint.status === 0 ? `${isMac ? 'plutil' : 'xmllint'} reads it` : `${lint.stdout}${lint.stderr}`.trim().slice(0, 200));
+}
+if (!PACKAGED || !isMac) {
+  skip('entitlements: the signed app carries no disable-library-validation or allow-unsigned-executable-memory, and still starts', !PACKAGED ? 'run from the repo (add --packaged)' : 'macOS only: codesign');
+} else {
+  const bundle = resolve(app.executablePath, '..', '..', '..');
+  const ents = spawnSync('codesign', ['-d', '--entitlements', '-', '--xml', bundle], { encoding: 'utf8' });
+  const keys = [...String(ents.stdout ?? '').matchAll(/<key>([^<]+)<\/key>/g)].map((m) => m[1]);
+  const flags = spawnSync('codesign', ['-dv', bundle], { encoding: 'utf8' });
+  const hardened = /flags=0x[0-9a-f]+\([^)]*runtime/.test(`${flags.stderr}${flags.stdout}`);
+  const loose = keys.filter((k) => /disable-library-validation|allow-unsigned-executable-memory/.test(k));
+  const needs = ['com.apple.security.cs.allow-jit'];
+  check('entitlements: the signature carries no disable-library-validation or allow-unsigned-executable-memory, and keeps allow-jit',
+    ents.status === 0 && loose.length === 0 && needs.every((k) => keys.includes(k)),
+    `${keys.length ? keys.map((k) => k.replace('com.apple.security.', '')).join(', ') : 'no entitlements read'}${loose.length ? `; LOOSE: ${loose.join(', ')}` : ''}; hardened runtime ${hardened ? 'on, so the start above ran on exactly these' : 'OFF in this build (ad hoc), so the start above proves nothing about them: the signed release run does'}`);
 }
 
 const failed = results.filter((r) => !r.ok);

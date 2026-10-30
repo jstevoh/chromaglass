@@ -52,9 +52,9 @@ interface LookCard { id: string; name: string; line: string }
 const LOOKS: LookCard[] = [
   { id: 'ferro-paint', name: 'Ferro Paint', line: 'Black ferrofluid worked through amber, teal and coral under a wandering magnet.' },
   { id: 'aurora-borealis', name: 'Aurora Borealis', line: 'Curtains of jade and lime rippling across a night sky.' },
-  { id: 'cell-bloom', name: 'Cell Bloom', line: 'Silicone breaking into rings of paint cells under a magnifier.' },
+  { id: 'cell-bloom', name: 'Cell Bloom', line: 'Three pools of silicone and oil turning under a magnifier.' },
   { id: 'poster-1969', name: 'Poster, 1969', line: 'Two opaque dyes, orange against ultramarine, flat like a Fillmore poster.' },
-  { id: 'macro-bead', name: 'Macro Bead', line: 'The camera follows one bead close up: cells, lacing, razor edges.' },
+  { id: 'macro-bead', name: 'Macro Bead', line: 'The camera follows one bead close up: domed, wet, razor edges.' },
   { id: 'jellyfish-bloom', name: 'Jellyfish Bloom', line: 'Magenta and lavender bells pulsing through teal water.' },
   { id: 'lace-run', name: 'Lacing Run', line: 'A tongue of amber dye dragging black lace behind it.' },
   { id: 'neon-coral-reef', name: 'Neon Coral Reef', line: 'A reaction grows coral across the glass, branch by branch.' },
@@ -99,8 +99,8 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     price: '$199',
     lines: [
       'Everything in Home',
-      'Several projectors with edge blending',
-      'OSC, Art-Net / DMX and MIDI out',
+      'OSC and Art-Net / DMX in the Mac app',
+      'The finest 1024² grid, and cloud sync of your looks',
     ],
   },
 ];
@@ -182,10 +182,10 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
 
         <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col justify-end px-4 pb-[max(32px,env(safe-area-inset-bottom))] pt-16 sm:px-8 sm:pb-16">
           <h1 className="max-w-[16ch] text-[clamp(38px,9vw,72px)] font-semibold leading-[1.04] tracking-[-0.025em]">
-            A liquid light show that moves to your music.
+            A liquid light show you play to your music.
           </h1>
           <p className="mt-4 max-w-[34rem] text-[17px] leading-relaxed text-text-2 sm:text-[18px]">
-            Oil, ink and ferrofluid on a glass plate, simulated drop by drop. Play a song, pour some colour, and put it on the wall.
+            Oil, ink and ferrofluid on a glass plate, simulated drop by drop. Put a song on, pour some colour and throw it on the wall, at a gig or in your living room.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <button type="button" data-cg-landing-play="" onClick={onPlay} className={btnPrimary}>
@@ -196,10 +196,10 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </a>
           </div>
           <p className="mt-4 text-[13px] leading-relaxed text-muted">
-            Free in your browser, nothing to install. Sign in with Google, an emailed link or a password.
+            Free in your browser for good, nothing to install. You sign in once with Google, an emailed link or a password.
           </p>
           <p className="mt-1 font-mono text-[12px] text-dim">
-            Home $35 · Pro $199 · one-time payment, no subscription
+            Home $35 · Pro $199 · pay once, no subscription
           </p>
         </div>
       </section>
@@ -208,7 +208,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
       <section id="looks" className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-8 sm:py-24">
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Real looks from the app</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
-          Each one is a frame from the solver, a different liquid with its own physics.
+          Every picture here is a frame the app drew. Each look is a different liquid with its own physics.
         </p>
         {/* On a phone the looks are a row to swipe, so eight of them are not four screens of scrolling. */}
         <ul className="-mx-4 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 min-[560px]:mx-0 min-[560px]:grid min-[560px]:grid-cols-2 min-[560px]:gap-4 min-[560px]:overflow-visible min-[560px]:px-0 lg:grid-cols-4">
@@ -252,8 +252,9 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
       <section className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-8 sm:py-24">
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Free to play. Pay for the app.</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
-          The whole plate is free in your browser. The app adds what a room needs: unmarked recordings, the phone remote, more projectors.
-          One payment, no subscription. Buying opens soon.
+          The whole plate is free in your browser, and it stays free: this is not a trial. Home and Pro add the Mac app and what a show needs:
+          full-length recordings with no mark, the phone remote, OSC and Art-Net for a rig. Pay once, no subscription. Start with Home and move to
+          Pro later for the $164 difference. Buying opens soon.
         </p>
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {TIERS.map((t) => (
@@ -268,6 +269,10 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </div>
           ))}
         </div>
+        {/* What a rig needs to know, on a page of its own (PLAN.md 34a-7). */}
+        <p data-cg-landing-pro="" className="mt-4 text-[14px] leading-relaxed text-text-2">
+          Playing a rig? <a href="/pro.html" className="underline underline-offset-2 hover:text-text">What it syncs with, plugs into and records</a>, for VJs, synth players and producers.
+        </p>
         {/* The Mac app's download is a public file (the owner's choice,
             2026-10-25); the app opens only on a Home or Pro key (PLAN.md
             23.17d: the owner chose Home too, 2026-10-26). On a phone or a PC
@@ -286,9 +291,10 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <div className="max-w-[40rem]">
           <h2 className="text-[20px] font-semibold tracking-[-0.01em]">From the maker</h2>
           <p className="mt-3 text-[15px] leading-relaxed text-text-2">
-            I wanted the oil-and-glass light shows of the sixties on a screen I could play like an instrument, with a song on, in my own room.
-            So the liquid here is simulated for real: dye spreading, oil refusing to mix, a magnet pulling ferrofluid into a maze.
-            It is made by one person. If you try it and it is not for you, say so and I will make it right.
+            I wanted the oil-and-glass light shows of the sixties on a screen I could play like an instrument, with a record on, in my own front room.
+            So the liquid is simulated, not faked: dye spreads, oil refuses to mix with water, and a magnet pulls ferrofluid into spikes.
+            One person makes ChromaGlass. If something breaks, or it isn't what you hoped, write
+            to <a href="mailto:support@chromaglass.art" className="underline underline-offset-2 hover:text-text">support@chromaglass.art</a> and I'll answer you myself.
           </p>
         </div>
       </section>
@@ -301,7 +307,8 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         </div>
         <footer className="mx-auto w-full max-w-[1120px] px-4 pb-[max(32px,env(safe-area-inset-bottom))] sm:px-8">
           <p className="text-[12px] leading-relaxed text-dim">
-            Refunds within 14 days of purchase, through the store. <a href="/terms.html" className="underline underline-offset-2 hover:text-text-2">Terms</a>
+            Refunds within 14 days of buying: write to <a href="mailto:support@chromaglass.art" className="underline underline-offset-2 hover:text-text-2">support@chromaglass.art</a> or ask the store.{' '}
+            <a href="/terms.html" className="underline underline-offset-2 hover:text-text-2">Terms</a>
             {' · '}
             <a href="/privacy.html" className="underline underline-offset-2 hover:text-text-2">Privacy</a>
           </p>

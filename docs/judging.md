@@ -1286,8 +1286,9 @@ to the monitor:
 
 With the projector window up (or a cast), put the plate bar on **Preview** and change the
 look: pick another, ride a few sliders, clear the plate. The wall should carry on with
-the look it had, while the desk's preview shows the copy. Then press **Send to wall**
-(⌘⏎): the wall should fade to the copy's look over the Go's fade.
+the look it had, while the desk's preview shows the copy. Then click **Wall** in the
+header (or ⌘⏎; the plate bar's Send to wall button went in PLAN 35c-4): the wall should
+fade to the copy's look over the Go's fade.
 
 - Does the wall stay exactly as it was while you build? The dimmer, the mixer and the
   music still move it on purpose; nothing else should.
@@ -1469,8 +1470,11 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   field, parallax); the lamp's lowering and the dome gain (×14) are the two numbers to move.
 - Say whether the highlight burns out on a bright pool, and whether a pool's edge reads
   as relief without a drawn outline.
-- `macro-bead`, `cell-bloom` and `lace-run` still draw cells, by name. Say whether they
-  should (PLAN 33g-3).
+- `macro-bead`, `cell-bloom` and `lace-run` draw no cells now either (the owner, 2026-10-29,
+  PLAN 33g-3); Lacing Run alone keeps its dendritic lacing. Open Macro Bead, Cell Bloom
+  and Lacing Run at their own zoom: Cell Bloom should read as three turning pools of
+  silicone and oil, Macro Bead as domed wet beads, Lacing Run as lacing without cells.
+  Say whether Cell Bloom's name should change now that it has none.
 
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
@@ -1649,14 +1653,17 @@ On the laptop in a dark room, and on the phone, with no reading of labels:
 
 On the Mac, signed in on the site as Pro: Profile & Store should show a Mac app card with
 Download for Mac. It downloads ChromaGlass-mac-arm64.dmg; drag it into Applications over the
-copy that is there, and open it (the first open still needs System Settings → Privacy &
-Security → Open Anyway until the app is signed). On a phone the same card should say to open
+copy that is there, and open it. Install 1.3.692 or later: it is signed and notarised, so it
+opens on a double-click with no warning, and the card and the landing page no longer tell the
+way round (an older ad hoc copy, 1.3.622 or 1.3.642, still needs System Settings → Privacy &
+Security → Open Anyway). On a phone the same card should say to open
 the page on the Mac, and a Free or Home account should read "comes with Pro". After the next
 release (Actions → Mac app → Run workflow, release ticked), open the installed app and wait a
 minute: one notification should say the new version is out, the ChromaGlass menu should offer
 Download ChromaGlass <version>…, and the profile card the same button. Nothing should pop up
-while a projector is up. Once the app is signed (13.1-sign), install one signed release, make
-another, and check that the first downloads it and becomes the new version after a quit.
+while a projector is up. The signed release is out (1.3.692, 2026-10-27), so what is owed is the
+last step: install 1.3.692, make another release, and check that 1.3.692 downloads it and
+becomes the new version after a quit, replacing itself in place.
 
 ## 72. A look saved in Chrome is in the Mac app (PLAN 23.18)
 
@@ -1940,7 +1947,172 @@ Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Tr
    + Panel; the pencil's list hanging off the screen; a renamed tab losing its panels.
 5. Decide: are the three defaults the right split, and is anything on Perform too crowded at 1280?
 
-## 87. The camera's dials (PLAN 33i)
+## 89. The site's security headers (PLAN 19ag)
+
+`firebase.json` now sends a Content-Security-Policy that blocks framing and `<object>`/`<base>` tricks (enforced), a
+fuller policy that only logs (report-only), Referrer-Policy, Permissions-Policy and nosniff. Nothing should look
+different. The things to try are the ones a policy can break and the cloud cannot reach.
+
+1. After the deploy, open https://chromaglass.art with the browser console open (Cmd-Option-J) and clear it. Sign in
+   with Google (the popup), then with an email link or password. Both should work as before.
+2. Play a song from the music shelf, open Lyrics, use Song ID, the buy links, the licence key box and a Send of the
+   crash report. Open a cast window and the remote on a phone.
+3. In the console, lines that begin "[Report Only] Refused to ..." are the policy telling us what it would block if it
+   were enforced. Copy them to the thread: each one is an address to add before 19ag-2 turns it on. A line that begins
+   "Refused to ..." without "[Report Only]", or a sign-in, song, cast or video that fails, is a bug in this PR.
+4. Bad: any sign-in, song, cast, remote or video that stops working.
+5. Decide: are you happy to leave the full policy on report-only until the console is clean?
+
+
+## 87. System audio and Ambient TV mode in the Mac app (PLAN 23.8)
+
+`npm run desktop` verifies that clicking **System audio** in the Mac app intercepts `getDisplayMedia` with no tab picker and routes the System audio pipeline to the ear (using `CHROMAGLASS_AUDIO_TAP=1`, since `CHROMAGLASS_OFFLINE` skips macOS's TCC screen-capture prompt). The real ScreenCaptureKit loopback path needs macOS permission and a streaming app playing on the Mac:
+
+1. Open the Mac app, open **Sound**, and pick **System audio** (where the browser shows **Another tab**). No browser tab picker should appear; on the first run macOS asks once for Screen & System Audio Recording permission.
+2. Play an album in a streaming app (Apple Music, Spotify, or another app on the Mac). The sound bar in the Sound panel and the plate's motion (kicks, bass, swell) should follow the album in stereo with no microphone bleed from the room.
+3. Quit and reopen the Mac app while the album is still playing: **System audio** is remembered across launches in the Mac app and resumes without asking for a tab.
+4. Turn on **Ambient TV mode (cool & quiet)** from the Sound panel, from **Show → Ambient TV Mode (Cool & Quiet)** (`Cmd+Shift+A`), or from the phone's Play sheet tile: the plate steps at 30 Hz, caps display draws at 60 Hz (`DrawGate`), and stays at or below the opening rung so the Mac stays cool and quiet over a long listening session.
+
+## 88. The plate does not stutter now and then (PLAN 14aa)
+
+Play any look for five minutes on the laptop, then with the wall up, the way a show runs. Watch
+the liquid's own motion, not the music's: before this, a plate on a machine with room to spare
+could stop for a frame and jump two, in bursts of a second or two a few times a minute, worst on a
+120 Hz screen. It should glide evenly the whole time. If it still hitches, say roughly how often,
+whether the wall and the laptop hitch together, and whether the hitch is the liquid or the whole
+picture (the second is a dropped frame, a different thing). Also say if the quality ever visibly
+steps down and back up again: it should do that once at most, early, not every minute and a half.
+
+Measured: `npm run cadence` (the old loop, modelled, stopped or doubled the liquid on 7–40 % of
+frames on 60, 59.94 and 120 Hz displays, by the median of nine seeds; the new clock on none, and
+it keeps time with the wall up at another refresh rate); `npm run encode` (a step's garbage 506 KB → 31 KB);
+`npm run rungs` (a rung the machine cannot hold retried 38 times in half an hour → 10).
+
+## 90. The game controller's ring, and the ear after its detectors changed (PLAN 14ab-7, 14ab-8)
+
+Both are meant to look and sound as before; this is the look at that, on a real pad and a
+real song. (§88 is the stutter, §89 the headers.)
+
+1. Plug in or pair a controller. Push the left stick: a ring should follow the plate under it, as smooth as the
+   mouse's pointer, and swell and tint when you hold the right trigger. Let go and it should fade after about
+   two and a half seconds. On the phone nothing changes (no ring without a pad).
+2. With the pad connected, open the Perform desk's clock and the meters: nothing else on the page should be
+   busier than with the pad unplugged.
+3. Play a song with clear drums. The kick and snare triggers (Sound › patch bay, the plate's kick bloom) should
+   land on the same hits as before this change: the readings are the same to the bit on the checks' songs.
+4. Bad: a ring that lags behind the stick, jumps to a corner when it first appears, or stays after the stick is
+   released; a beat that used to fire and does not.
+
+## 91. The wall's "isn't full screen" chip goes when it should, and can be hidden (PLAN 14af)
+
+The chip at the top of the desk that says the wall window isn't full screen. It used to be
+stuck there, unexplained, with no way to close it.
+
+1. Send to wall with a projector (or a second screen) connected. The wall should fill its
+   screen by itself, and no chip should show on the laptop.
+2. Click the wall and press Escape. Within half a second the laptop should show "The wall
+   window isn't full screen, so its title bar shows on the wall". Click **Make it full
+   screen**: the wall fills again and the chip goes.
+3. Escape on the wall again, then in the Mac app use the wall window's green button instead:
+   the chip should go too (the window's own full screen has no title bar in the app).
+4. Escape once more and click the chip's X: it should stay away until a new wall window is
+   opened, even though the wall is still framed.
+5. Bad: a chip that stays up over a wall with no title bar; a button that does nothing and
+   says nothing; an X that comes back a second later.
+
+## 92. The live stream, to an unlisted YouTube broadcast (PLAN 37x-4b)
+
+The lab streams to its own server and measures the stream; only a real platform can say it
+takes ours, and only a camera can say the sound and the plate agree after the Mac's
+system-audio path. Unlisted, never public, until you say so.
+
+1. In YouTube Studio, Go live → Stream, an **unlisted** broadcast; copy the stream key. Open the
+   Mac app, the console (View → Toggle Developer Tools), and `docs/live-show.md`'s four lines
+   with that key. Within thirty seconds Studio's preview should show the plate, "Excellent
+   connection", no dropped frames in `__cgLive.state()`.
+2. Open the album in Qobuz or YouTube Music with the app's sound source on *System audio*.
+   Watch the broadcast on a phone (it runs twenty or so seconds behind): a hit in the music
+   should bloom the plate right after the hit, as it does on the laptop, not before it.
+3. Clap once in front of the laptop's camera with the microphone as the source: in the
+   broadcast, the clap and the plate's bloom should fall together within a frame or two.
+4. Stop with `__cgLive.stop()`; the broadcast should end cleanly in Studio within a few seconds.
+5. Bad: Studio never shows a picture (the key or the RTMPS path), the sound runs ahead of or
+   behind the plate by more than a frame or two (the Mac's clock, the plan's note under
+   37x-4b), frames dropped with a good upload, or the app's frame rate falling while live
+   (`npm run stutter`'s two-step frames, 37x-4c).
+6. Several at once (37x-4c), with whichever second account exists (Twitch, Kick, a Facebook
+   Page; or a second unlisted YouTube stream): keep both keys in the store, then
+   `await __cgLive.start({ destinations: [{ name: 'youtube', url: 'rtmps://a.rtmps.youtube.com/live2', keyName: 'youtube' }, { name: 'twitch', url: 'rtmps://live.twitch.tv/app', keyName: 'twitch' }] })`.
+   Both previews should show the plate; `(await __cgLive.state()).transport.destinations`
+   gives each one's kbps, seconds behind and dropped frames. `measuredAt` should read
+   `server` for YouTube (it acknowledges what it receives; if it reads `socket`, the
+   seconds-behind figure only sees the Mac's own buffer: say so).
+7. If Instagram or TikTok live is open to the account: add a destination with
+   `orientation: 'portrait'`. On a phone it should fill the screen with the middle of the plate,
+   sharp, not squeezed; the landscape one beside it unchanged.
+8. Turn the Wi-Fi off for ten seconds and on again while live: each destination should come
+   back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
+   one. A wrong key on one destination should fail that one alone, once, with the
+   platform's words, while the others stream.
+
+## 93. The rig, with free programs: OSC, Art-Net, MIDI, Ableton, Resolume (PLAN 34a-7f)
+
+`npm run rig` plays every part of a rig with sockets of its own: an OSC sender, a fixture, a
+lighting desk, a controller and a DAW's clock, against the real show server with a Pro key. It
+cannot say that the programs a buyer owns send and read what it does. One sitting, about an
+hour, all free. Install first: **QLC+ 4** (qlcplus.org, open source), **TouchDesigner**
+(derivative.ca, the free Non-Commercial key with a Derivative account), **Ableton Live 12
+trial** (ableton.com/trial, 30 days, an Ableton account), **Resolume Arena demo**
+(resolume.com/download, a watermark and a spoken reminder, no time limit), **Protokol**
+(hexler.net, free), and for the video route **OBS** with **DistroAV** (`brew install --cask
+distroav`, which asks for the free NDI runtime). Syphon, NDI and Ableton Link out of the app
+are "on the way" on `/pro`, so there is nothing of ours to test there yet (no Syphon Simple
+Client or LinkHut this time).
+
+0. In the repo on the Mac: `npm run rig`. Every line ok, including the two the cloud skips
+   (the plate's colours on the fixture, and an OSC blackout blacking out the rig).
+1. **OSC in, from TouchDesigner.** Mac app → Show → OSC input → *This Mac only*. In
+   TouchDesigner add an **OSC Out DAT** (network address 127.0.0.1, port 9000), then in the
+   Textport: `op('oscout1').sendOSC('/chromaglass/setting/audioImpact', [0.8])`. Sound Impact
+   on the Design desk reads 0.8. Then `sendOSC('/chromaglass/action/blackout-toggle', [1])`:
+   the plate goes black, sent again it comes back; and `sendOSC('/chromaglass/dye',
+   ['#ff8800'])` makes the dropper orange. Bad: nothing moves (the Show menu, the port), or a
+   value arrives scaled wrong.
+2. **OSC in, from Resolume.** Arena demo → Preferences → OSC: output on, 127.0.0.1, port 9000.
+   Shortcuts → Edit OSC, a new preset, click a layer's opacity slider, tick OSC *output*, pick
+   *custom* and type `/chromaglass/setting/audioImpact`. Move the slider: Sound Impact follows.
+   Say whether the custom address was there; if Resolume can only send its own addresses, the
+   page's "send it from Resolume" needs a line on how (PLAN 34a-7g).
+3. **Art-Net out, into QLC+.** Quit the app, then start it from Terminal so it reads the
+   settings (34a-7c: there is no panel yet):
+   `ARTNET_HOST=127.0.0.1 ARTNET_FIXTURES=4 /Applications/ChromaGlass.app/Contents/MacOS/ChromaGlass`.
+   QLC+ → Inputs/Outputs → universe 1: tick Art-Net *Input* on 127.0.0.1 and *Passthrough*;
+   open the **DMX Monitor**. Channels 1–12 should move with the plate's colours (four RGB
+   fixtures), dim when the glass thins, and go to zero on a blackout. Bad: all zero on a full
+   plate, colours that lag the screen by more than a beat, or channels out of order.
+4. **Art-Net in, from QLC+.** In QLC+ untick universe 1's Art-Net input (it holds port 6454)
+   and tick Art-Net *Output* to 127.0.0.1 instead. Start the app from Terminal with
+   `ARTNET_IN=1:audioImpact` and no `ARTNET_HOST` (with both, the app ignores the universe it
+   sends on, which here is QLC+'s universe 1, Art-Net 0). In QLC+'s **Simple Desk**, move
+   channel 1: Sound Impact follows, 0 to 255 as 0 to 1.
+5. **MIDI clock and CC, from Ableton.** Audio MIDI Setup → MIDI Studio → IAC Driver: *Device is
+   online*. In Live → Settings → Link, Tempo & MIDI: IAC Driver Bus 1 output, **Sync** and
+   **Track** on. In the app, Settings → Inputs → Controller: MIDI on, input IAC Driver Bus 1;
+   Settings → Sound → Tempo: MIDI clock. Press Play in Live at 128 BPM: the app's tempo reads
+   128 within a few beats, and Stop in Live stops the show. Change Live's tempo to 100: the app
+   follows. Then a MIDI track sending to IAC with a CC lane; MIDI-learn it to a control in the
+   app and play: the control rides the automation, on the bar it was drawn on.
+6. **MIDI out, into Protokol.** In the app's MIDI section pick IAC Driver Bus 1 as the LED
+   output too; open Protokol's MIDI tab. Moving a learned control from the screen sends one CC
+   per change on that control's number (not a stream, and nothing while your hand is on it).
+7. **Video into Resolume.** OBS: a Window Capture of the app's projector window, then Tools →
+   DistroAV NDI Settings → Main Output on. In the Resolume demo's Sources, the OBS NDI source
+   appears; drop it on a layer: the plate plays in Resolume at full frame rate. This is the
+   route `/pro` gives for Resolume, MadMapper and TouchDesigner until Syphon and NDI ship.
+
+Write down, per step, ok or what you saw. A step that fails is an item in PLAN §34a-7.
+
+## 94. The camera's dials (PLAN 33i)
 
 Settings → Camera, with Lens at 0: turn Refraction, Aperture, Bloom and Chromatic Aberration up one
 at a time on a plate with a few pours. Each should visibly matter by about half way, and none should

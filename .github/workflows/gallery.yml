@@ -55,6 +55,11 @@ concurrency:
   group: gallery-${{ github.ref }}-${{ github.event.label.name || github.run_id }}
   cancel-in-progress: true
 
+# Read-only, written out rather than left to the repository's default, which a
+# settings change could widen (the security audit of 2026-10-28).
+permissions:
+  contents: read
+
 jobs:
   gallery:
     name: Gallery (macOS)

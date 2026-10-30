@@ -274,11 +274,11 @@ export function builtInSequences(): ShowSequence[] {
       loop: true,
       builtIn: true,
       stages: [
-        s('Out of the dark', 28, { presetId: 'poster-1969', transition: 3, paletteSize: 3, paletteLead: 0, settings: { pacing: 0.7 } }),
+        s('Out of the dark', 28, { presetId: 'classic', transition: 3, paletteSize: 3, paletteLead: 0, settings: { pacing: 0.7 } }),
         s('Clock glass', 24, { presetId: 'clock-glass', transition: 3, pace: { moments: ['dyes', 'pour', 'burst'] }, settings: { pacing: 0.7 } }),
         s('Poster', 22, { presetId: 'poster-1969', transition: 3, pace: { moments: ['burst', 'dyes'] }, settings: { pacing: 0.75 } }),
         s('Chemistry', 26, { presetId: 'turing-print', transition: 3, settings: { pacing: 0.7 } }),
-        s('The dish, pressed', 24, { presetId: 'poster-1969', transition: 3, paletteSize: 4, paletteLead: 2, pace: { moments: ['burst', 'pour', 'dyes'] }, settings: { pacing: 0.8 } }),
+        s('The dish, pressed', 24, { presetId: 'oil-and-water', transition: 3, paletteSize: 4, paletteLead: 2, pace: { moments: ['burst', 'pour', 'dyes'] }, settings: { pacing: 0.8 } }),
         s('Lumia, draining away', 30, { presetId: 'lumia', transition: 3, pace: { endDark: true, moments: ['dyes', 'pour', 'drain'] }, settings: { pacing: 0.6 } }),
       ],
     },

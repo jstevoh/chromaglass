@@ -39,6 +39,13 @@ on:
       mac:
         type: boolean
         default: true
+      # The Mac shards to run on the owner's own Mac rather than GitHub's, as a
+      # JSON list of shard names (PLAN.md 19ah). Only `deploy.yml` passes one,
+      # from its `mac` probe, on a push to main or a run by hand on main; a
+      # pull request never has inputs, so its shards always run on GitHub's.
+      local:
+        type: string
+        default: '[]'
   pull_request:
 
 # A second push to a branch makes the first push's run pointless, and these are
@@ -58,6 +65,14 @@ on:
 concurrency:
   group: checks-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 }}
+
+# Read-only, written out rather than left to the repository's default, which a
+# settings change could widen (the security audit of 2026-10-28).
+permissions:
+  contents: read
+  # reach.mjs reads this PR's earlier runs, checkguard.mjs the PR's commits and body.
+  actions: read
+  pull-requests: read
 
 jobs:
   # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
@@ -341,7 +356,18 @@ jobs:
     name: WebGPU (macOS) · ${{ matrix.shard }}
     needs: reach
     if: ${{ needs.reach.outputs.mac == 'true' }}
-    runs-on: macos-15
+    # GitHub's Mac, or the owner's (PLAN.md 19ah) for a shard `deploy.yml`'s
+    # probe named. The repository is public, so a self-hosted runner must
+    # never take a pull request's job: anyone's fork can open one, and its
+    # workflow is the fork's. Hence the event test as well as the input,
+    # which a pull request cannot set. This line is not the guard, though: a
+    # branch can edit it, or bring its own workflow asking for `owner-mac`.
+    # The runner itself refuses any job that is not deploy.yml on main from
+    # a push or a run by hand (its job-started hook, scripts/macrunner-hook.sh),
+    # and a fork's PR waits for the owner's approval (docs/mac-runner.md).
+    # Only `owner-mac` is asked for, not `macOS`, so `npm run macqueue` keeps
+    # GitHub's Macs and the owner's apart.
+    runs-on: ${{ github.event_name != 'pull_request' && contains(fromJSON(inputs.local || '[]'), matrix.shard) && fromJSON('["self-hosted","owner-mac"]') || 'macos-15' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -353,6 +379,15 @@ jobs:
         shard: ${{ fromJSON(needs.reach.outputs.shards) }}
     steps:
       - uses: actions/checkout@v5
+      # The owner's Mac is also where sessions run the harnesses by hand, on
+      # the same fixed ports (`PORT = 43xx` in scripts/), so a shard started
+      # beside one would fail to serve, or read the other's server. It waits
+      # for them to close, up to ten minutes, and then fails naming who holds
+      # them. GitHub's Macs are fresh and skip this.
+      - name: The harness ports are free on the owner's Mac
+        if: ${{ runner.environment == 'self-hosted' }}
+        timeout-minutes: 11
+        run: bash scripts/macports.sh 600
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -418,10 +453,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Every change to a check's bar or input is named in the PR's body
+      - name: Every change to a check's bar or input is named, and an Antigravity PR's Measured lines quote what they printed
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
           PR_BODY: ${{ github.event.pull_request.body }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/checkguard.mjs --diff

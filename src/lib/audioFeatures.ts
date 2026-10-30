@@ -94,11 +94,26 @@ export type BandSource = typeof BAND_SOURCES[number];
 export const SOURCE_NAMES = [...SOUND_SOURCES, ...BAND_SOURCES] as const;
 export type SourceName = typeof SOURCE_NAMES[number];
 
-const BAND_LOW_HZ = 40;
-const BAND_HIGH_HZ = 16000;
+export const BAND_LOW_HZ = 40;
+export const BAND_HIGH_HZ = 16000;
 /** The nine edges of the eight bands, in Hz (40, 84.6, 179, 378, 800, 1692, 3578, 7566, 16000). */
 export const BAND_EDGES_HZ: readonly number[] = Array.from({ length: BAND_COUNT + 1 },
   (_, i) => BAND_LOW_HZ * Math.pow(BAND_HIGH_HZ / BAND_LOW_HZ, i / BAND_COUNT));
+
+/** Which of `band1`..`band8` holds `hz` (for writing `feature` as a fallback when a band is dragged; PLAN 30a). */
+export function bandForHz(hz: number): BandSource {
+  for (let i = 0; i < BAND_COUNT - 1; i++) {
+    if (hz < BAND_EDGES_HZ[i + 1]) return BAND_SOURCES[i];
+  }
+  return BAND_SOURCES[BAND_COUNT - 1];
+}
+
+/** The `[loHz, hiHz]` edges of a named band (`band1`..`band8`), or `band5` if unknown. */
+export function bandEdgesFor(feature: string): [number, number] {
+  const idx = (BAND_SOURCES as readonly string[]).indexOf(feature);
+  const i = idx >= 0 ? idx : 4;
+  return [BAND_EDGES_HZ[i], BAND_EDGES_HZ[i + 1]];
+}
 
 type Range = readonly [number, number];
 
@@ -203,6 +218,17 @@ export interface AudioReading {
    * keeps its own references, over the length of a song.
    */
   db: number[];
+  /**
+   * The frame's spectrum in dBFS (bins `0..top`), bin spacing (`hzPerBin`),
+   * reference floor (`this.ref - FLOOR_BELOW_REF_DB`) and silence flag, so a
+   * dragged band (`BandRange`, PLAN 30a) hears its `[loHz, hiHz]` bins through
+   * the exact same floor and `AutoRange` arithmetic as `band1`..`band8`, and
+   * the panel's spectrum strip can draw the live spectrum.
+   */
+  spectrum?: Float64Array;
+  hzPerBin?: number;
+  floor?: number;
+  silent?: boolean;
 }
 
 /** A reading's value for a source name, so a binding can be stored as a string. */
@@ -397,10 +423,50 @@ const LOW_MID = SOURCE_NAMES.length;
 
 const toDb = (power: number): number => 10 * Math.log10(power + 1e-30);
 
-/** One source's threshold, refractory period and strength scale. */
-class OnsetDetector {
-  private history: number[] = [];
-  private historyAt: number[] = [];
+/**
+ * The k-th smallest of a[0..n), found by partitioning, and the array left
+ * partly ordered. A detector asks for the median of its last second of flux
+ * every frame, seventeen of them: sorting a copy for it (and sorting the
+ * deviations again for their median) made four arrays a detector a frame.
+ * The element is the same one the sorted array holds at k, so a threshold
+ * is the same number to the bit.
+ */
+function select(a: Float64Array, n: number, k: number): number {
+  let lo = 0, hi = n - 1;
+  while (lo < hi) {
+    // Median of three keeps a sorted or flat history (a silent source's) from
+    // partitioning one element at a time.
+    const mid = (lo + hi) >> 1;
+    if (a[mid] < a[lo]) { const t = a[mid]; a[mid] = a[lo]; a[lo] = t; }
+    if (a[hi] < a[lo]) { const t = a[hi]; a[hi] = a[lo]; a[lo] = t; }
+    if (a[hi] < a[mid]) { const t = a[hi]; a[hi] = a[mid]; a[mid] = t; }
+    const pivot = a[mid];
+    let i = lo, j = hi;
+    while (i <= j) {
+      while (a[i] < pivot) i++;
+      while (a[j] > pivot) j--;
+      if (i <= j) { const t = a[i]; a[i] = a[j]; a[j] = t; i++; j--; }
+    }
+    if (k <= j) hi = j; else if (k >= i) lo = i; else return a[k];
+  }
+  return a[k];
+}
+
+/** One source's threshold, refractory period and strength scale. Exported for `npm run eargc`. */
+export class OnsetDetector {
+  /**
+   * The last ODF_WINDOW_S seconds of flux and when each came, in rings that
+   * double when full (a faster display keeps more frames in a second). They
+   * were arrays pushed to and shifted from, copied and sorted every frame.
+   */
+  private history = new Float64Array(128);
+  private historyAt = new Float64Array(128);
+  private head = 0;
+  private count = 0;
+  /** The median's working copy, and the deviations' (one scratch for both, selected in place). */
+  private scratch = new Float64Array(128);
+  /** The threshold the last frame was held to; read by `npm run eargc`, which compares it to the sort's, to the bit, every frame. */
+  threshold = 0;
   private lastHit = -Infinity;
   private armed = true;
   private peak = 0;
@@ -409,25 +475,43 @@ class OnsetDetector {
   last = 0;
 
   reset(): void {
-    this.history = []; this.historyAt = [];
+    this.head = 0; this.count = 0;
     this.lastHit = -Infinity; this.armed = true;
     this.peak = 0; this.peakAt = 0;
     this.at = null;
     this.last = 0;
   }
 
+  private grow(): void {
+    const cap = this.history.length;
+    const h = new Float64Array(cap * 2), t = new Float64Array(cap * 2);
+    for (let i = 0; i < this.count; i++) {
+      const at = (this.head + i) % cap;
+      h[i] = this.history[at]; t[i] = this.historyAt[at];
+    }
+    this.history = h; this.historyAt = t; this.scratch = new Float64Array(cap * 2);
+    this.head = 0;
+  }
+
   /** Is this frame a candidate hit? Also records its flux in the history. */
   candidate(time: number, odf: number, first: boolean, minimum: number): boolean {
-    const n = this.history.length;
+    const n = this.count;
+    const cap = this.history.length;
     let threshold = minimum;
     if (n > 0) {
-      const sorted = this.history.slice().sort((a, b) => a - b);
-      const median = sorted[n >> 1];
-      const dev = sorted.map(v => Math.abs(v - median)).sort((a, b) => a - b);
-      threshold += median + ODF_K * dev[n >> 1];
+      const w = this.scratch;
+      for (let i = 0; i < n; i++) w[i] = this.history[(this.head + i) % cap];
+      const median = select(w, n, n >> 1);
+      for (let i = 0; i < n; i++) w[i] = Math.abs(this.history[(this.head + i) % cap] - median);
+      threshold += median + ODF_K * select(w, n, n >> 1);
     }
-    this.history.push(odf); this.historyAt.push(time);
-    while (time - this.historyAt[0] > ODF_WINDOW_S) { this.history.shift(); this.historyAt.shift(); }
+    this.threshold = threshold;
+    if (this.count === cap) this.grow();
+    const size = this.history.length;
+    const tail = (this.head + this.count) % size;
+    this.history[tail] = odf; this.historyAt[tail] = time;
+    this.count++;
+    while (time - this.historyAt[this.head] > ODF_WINDOW_S) { this.head = (this.head + 1) % size; this.count--; }
     if (odf <= threshold) this.armed = true;
     return !first && this.armed && odf > threshold && time - this.lastHit >= REFRACTORY_S;
   }
@@ -506,6 +590,9 @@ export class AudioFeatures {
 
   private specRing: Float64Array[] = [];
   private specRingPos = 0;
+  /** The fifteen-frame median of each bin and the column it is taken from; the frame reuses them. */
+  private hDb = new Float64Array(0);
+  private readonly vals = new Float64Array(15);
 
   private readonly chromaEar = new ChromaEar();
   pitch = 0;
@@ -555,6 +642,7 @@ export class AudioFeatures {
     this.odf = new Float64Array(R);
     this.fresh = new Float64Array(R);
     this.specRing = Array.from({ length: 15 }, () => new Float64Array(count).fill(ABS_FLOOR_DB));
+    this.hDb = new Float64Array(this.top + 1);
     this.hasPrev = false;
   }
 
@@ -599,8 +687,8 @@ export class AudioFeatures {
     ring.set(db);
     this.specRingPos = (this.specRingPos + 1) % 15;
 
-    const hDb = new Float64Array(this.top + 1);
-    const vals = new Float64Array(15);
+    const hDb = this.hDb;
+    const vals = this.vals;
     let pNum = 0, pDen = 0;
     for (let k = 1; k <= this.top; k++) {
             for (let i = 0; i < 15; i++) {
@@ -752,7 +840,65 @@ export class AudioFeatures {
       brightness: this.brightness,
       timbre: this.timbre,
       complexity: this.complexity,
+      spectrum: db.slice(0, this.top + 1),
+      hzPerBin: this.hzPerBin,
+      floor,
+      silent,
     };
+  }
+}
+
+/**
+ * One dragged band's ear (PLAN 30a): hears `[loHz, hiHz]` against its own
+ * recent range using the same `binsFor`, reference floor (`FLOOR_BELOW_REF_DB`),
+ * silence gate (`SILENCE_DB`) and `AutoRange` (6 dB minimum span, 30 dB cap)
+ * as the eight named bands in `AudioFeatures.update`, so a drag set to
+ * `band5`'s edges reads identically to `band5`.
+ */
+export class BandRange {
+  private readonly range = new AutoRange({ minSpan: LEVEL_MIN_SPAN_DB });
+  private heard = false;
+  private lastTime: number | null = null;
+  private binsKey = '';
+  private bins: number[] = [];
+
+  reset(): void {
+    this.range.reset();
+    this.heard = false;
+    this.lastTime = null;
+    this.binsKey = '';
+    this.bins = [];
+  }
+
+  read(reading: AudioReading, [lo, hi]: readonly [number, number]): number {
+    const spec = reading.spectrum;
+    const hzPerBin = reading.hzPerBin;
+    if (!spec || !hzPerBin || spec.length < 2) {
+      return sourceValue(reading, bandForHz(Math.sqrt(Math.max(1, lo) * Math.max(1, hi))));
+    }
+    const top = spec.length - 1;
+    const key = `${lo}|${hi}|${hzPerBin}|${top}`;
+    if (key !== this.binsKey) {
+      this.binsKey = key;
+      this.bins = binsFor([lo, hi], hzPerBin, top);
+    }
+    const floor = reading.floor ?? (ABS_FLOOR_DB - FLOOR_BELOW_REF_DB);
+    let power = 0;
+    for (const k of this.bins) {
+      const now = Math.max(spec[k], floor);
+      power += Math.pow(10, now / 10);
+    }
+    const levelDb = toDb(power / this.bins.length);
+    const dt = this.lastTime === null ? 0 : Math.max(0, reading.time - this.lastTime);
+    this.lastTime = reading.time;
+    if (!reading.silent) {
+      this.range.update(this.heard ? Math.max(levelDb, this.range.ceiling - LEVEL_MAX_SPAN_DB) : levelDb, dt);
+      if (this.range.floor < this.range.ceiling - LEVEL_MAX_SPAN_DB) {
+        this.range.floor = this.range.ceiling - LEVEL_MAX_SPAN_DB;
+      }
+      this.heard = true;
+    }
+    return this.range.normalize(levelDb);
   }
 }
 

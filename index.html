@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>ChromaGlass</title>
-    <meta name="description" content="A liquid light show that moves to your music. Oil, ink and ferrofluid on a simulated glass plate, free to play in your browser." />
+    <meta name="description" content="A liquid light show you play to your music. Oil, ink and ferrofluid on a simulated glass plate, free in your browser." />
     <meta name="theme-color" content="#0a0a0a" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -12,8 +12,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="ChromaGlass: a liquid light show for your music" />
-    <meta property="og:description" content="Oil, ink and ferrofluid on a simulated glass plate that moves to your music. Free to play in your browser; Home $35 and Pro $199 for the app, one payment." />
+    <meta property="og:title" content="ChromaGlass: a liquid light show you play" />
+    <meta property="og:description" content="Oil, ink and ferrofluid on a simulated glass plate that moves to your music. Free in your browser; Home $35 and Pro $199 for the Mac app, pay once." />
     <meta property="og:image" content="/og-card.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <!--
@@ -190,8 +190,8 @@
       #cg-intro { position: fixed; inset: 0; z-index: 5; overflow: hidden; background: #000; pointer-events: none; container-type: size; transition: opacity 0.9s ease-out; }
       #cg-intro.cg-in-plate { position: absolute; z-index: auto; }
       #cg-intro.cg-out { opacity: 0; }
-      /* Held still from the first paint until the opening's render pipelines
-         are built (the markup below starts it with .cg-still; gpu/prepare.ts,
+      /* Held still from the first paint until the opening is built, every
+         pipeline of it (the markup below starts it with .cg-still; gpu/prepare.ts,
          Quiet, lets it go): while Chromium starts the GPU and while those
          compile, a moving picture stopped the page's frames. */
       #cg-intro.cg-still, #cg-intro.cg-still * { animation-play-state: paused !important; }

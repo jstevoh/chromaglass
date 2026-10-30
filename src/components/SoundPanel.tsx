@@ -4,6 +4,7 @@ import { Sheet, LIT } from './ui';
 import { VuMeter } from './ui/Playful';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
+import { isDesktopApp } from '../lib/platform';
 
 /**
  * Sound: where the show's music comes from, in one place you can find.
@@ -39,16 +40,18 @@ const SOURCES: ReadonlyArray<{
 ];
 
 export function SoundPanel({
-  source, onSource, inputs, inputId, onInput,
+  source, onSource, inputs, inputId, onPickMic,
   playing, time, loop, onLoop, onToggle, onSeek,
-  nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle, onClose, embed = false,
+  nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle,
+  ambientMode = false, onAmbientMode, onClose, embed = false,
   readLevel, deaf = false,
 }: {
   source: AudioSource;
   onSource: (s: AudioSource) => void;
   inputs: { id: string; label: string }[];
   inputId: string;
-  onInput: (id: string) => void;
+  /** Opens Settings at Sound's Input, where the microphone is picked (PLAN 35c-5). */
+  onPickMic: () => void;
   playing: boolean;
   time: { t: number; d: number };
   loop: boolean;
@@ -63,6 +66,8 @@ export function SoundPanel({
   /** Whether the instrument is sounding, and its start/stop. */
   droneRunning: boolean;
   onDroneToggle: () => void;
+  ambientMode?: boolean;
+  onAmbientMode?: (on: boolean) => void;
   onClose: () => void;
   /** Drawn in a desk panel rather than as a sheet (`Sheet embed`). */
   embed?: boolean;
@@ -72,7 +77,17 @@ export function SoundPanel({
   deaf?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const chosen = SOURCES.find(s => s.id === source) ?? SOURCES[0];
+  const desktop = isDesktopApp();
+  const sources = SOURCES.map(s => (
+    s.id === 'system' && desktop
+      ? {
+          ...s,
+          label: 'System audio',
+          blurb: 'Whatever this Mac plays (a streaming app, a music library, a DAW), heard directly in stereo with no tab to share.',
+        }
+      : s
+  ));
+  const chosen = sources.find(s => s.id === source) ?? sources[0];
 
   return (
     <Sheet embed={embed} title={<><Music size={16} /> Sound</>} onClose={onClose} width={760} height={680} testId="sound-panel">
@@ -92,7 +107,7 @@ export function SoundPanel({
           <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
         </div>
         <div className="grid grid-cols-2 gap-2 @lg:grid-cols-5">
-          {SOURCES.map(s => {
+          {sources.map(s => {
             const Icon = s.icon;
             const on = source === s.id;
             return (
@@ -112,6 +127,28 @@ export function SoundPanel({
           })}
         </div>
         <p className="mt-2 min-h-[32px] text-[12px] leading-relaxed text-muted">{chosen.blurb}</p>
+
+        {onAmbientMode && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-border px-3.5 py-2.5" data-testid="sound-ambient-row">
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium text-text">Ambient TV mode (cool &amp; quiet)</p>
+              <p className="text-[11px] text-faint">Caps the draw at 60 Hz, steps the liquid at 30 Hz and holds the opening rung so the fan stays off over a long listening session.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onAmbientMode(!ambientMode)}
+              aria-pressed={ambientMode}
+              data-testid="sound-ambient-toggle"
+              className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                ambientMode
+                  ? LIT
+                  : 'border-border text-muted hover:bg-hover hover:text-text'
+              }`}
+            >
+              {ambientMode ? 'On · 30 Hz' : 'Off'}
+            </button>
+          </div>
+        )}
 
         {source === 'drone' && (
           <div className="mt-3 rounded-xl border border-border p-3" data-testid="drone-controls">
@@ -208,18 +245,27 @@ export function SoundPanel({
           </div>
         )}
 
-        {source === 'microphone' && inputs.length > 0 && (
-          <div className="mt-3">
-            <p className="mb-1 text-[11px] font-bold uppercase tracking-widest text-muted">Which microphone</p>
-            <select
-              value={inputId}
-              onChange={e => onInput(e.target.value)}
-              className="w-full rounded-lg border border-border bg-black/30 px-3 py-2 text-[12px] text-text"
-              data-testid="sound-input-picker"
+        {/*
+          Which microphone, said and not picked. A select here was the second
+          picker for the one device, beside Settings' Input (where the Mic
+          light lands, and where the advice about a USB feed from the desk
+          is): on the Setup tab both stood on screen at once, and one could
+          be changed while the other was read (PLAN 35c-5). The sheet keeps
+          the source, which is its own; the device is Settings', one click on.
+        */}
+        {source === 'microphone' && (
+          <div className="mt-3 flex items-center gap-2" data-testid="sound-input-state">
+            <p className="min-w-0 flex-1 truncate text-[12px] text-muted">
+              Hearing <span className="text-text">{inputs.find(i => i.id === inputId)?.label || 'the default microphone'}</span>
+            </p>
+            <button
+              onClick={() => { if (!embed) onClose(); onPickMic(); }}
+              className="h-8 shrink-0 rounded-lg border border-border bg-black/30 px-3 text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="Pick the microphone or audio interface in Settings → Sound"
+              data-testid="sound-input-open"
             >
-              <option value="">Whatever the system offers</option>
-              {inputs.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
-            </select>
+              Change…
+            </button>
           </div>
         )}
 

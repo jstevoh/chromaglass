@@ -11,16 +11,27 @@ name: Mac app
 # request when anything the app is made from changes: that is most of the
 # site, because the check is also what stops a font or a script from a CDN
 # creeping into a show that must open offline. By hand (Actions → Mac app →
-# Run workflow) for a download of today's show, and on a `desktop-v*` tag.
+# Run workflow) for a download of today's show.
 #
-# Signing: with the secrets desktop/README.md lists, the download is signed
-# with the owner's Developer ID and notarized; without them it is signed ad hoc,
-# and macOS asks once before opening it.
+# Signing: a run started by hand on main is signed with the owner's Developer
+# ID and notarized, from the secrets desktop/README.md lists; every other run
+# (a pull request, a run by hand on a branch) is signed ad hoc, and macOS asks
+# once before opening it. Why only there (the security audit of 2026-10-28):
+# the certificate in CSC_LINK signs anything as ChromaGlass, and the app now
+# installs a newer signed build by itself, so whoever holds it can ship to every
+# installed copy. A pull request's run executes that branch's own build config,
+# npm scripts and dependencies, and until then was handed the certificate and
+# the Apple password with them. The secrets live in the `mac-signing`
+# environment, which only main may use, so a branch cannot reach them even by
+# editing this file; the expressions below keep them out of a pull request's
+# run as well, for the time before they were moved off the repository's own
+# secrets. What a pull request no longer proves is the signed path itself
+# (hardened runtime, entitlements, notarisation): the ad hoc build runs the same
+# check, and the next Run workflow on main signs, notarises and checks it.
 #
 # Releases (PLAN.md 13-update, asked 2026-10-25: "whenever we have a new release
-# update that app"). Run workflow with "release" ticked, or a pushed
-# `desktop-v<version>` tag, builds and checks the app as every run does, and
-# then the `release` job publishes it as this repo's newest GitHub Release:
+# update that app"). Run workflow on main with "release" ticked builds, signs
+# and checks the app as every run by hand does, and then the `release` job publishes it as this repo's newest GitHub Release:
 # the .dmg under one fixed name (the site's Download for Mac links to it), the
 # zip an in-place update downloads, and latest-mac.yml, which every installed
 # app reads to learn that it is out (desktop/updates.js). A release is the
@@ -28,7 +39,10 @@ name: Mac app
 # would send every installed app an unmerged build): main takes several merges a day, and each
 # would tell every installed app to update. The version of a release run is
 # the site's major and minor and this run's number, so each is newer than the
-# last without a pull request to bump it first; a tag gives its own.
+# last without a pull request to bump it first. A pushed `desktop-v*` tag no
+# longer starts a release (2026-10-28): its run is the tagged commit's own copy
+# of this file, which any branch can write, and a tag that may sign would be a
+# way round the environment's main-only rule. No release had been made that way.
 
 on:
   workflow_dispatch:
@@ -37,8 +51,6 @@ on:
         description: 'Publish this build as a release that the installed apps update to'
         type: boolean
         default: false
-  push:
-    tags: ['desktop-v*']
   pull_request:
     paths:
       - 'desktop/**'
@@ -48,6 +60,7 @@ on:
       - 'index.html'
       - 'vite.config.ts'
       - 'scripts/desktop.mjs'
+      - 'scripts/desktop-audio.mjs'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/desktop.yml'
@@ -57,8 +70,8 @@ on:
 permissions:
   contents: read
 
-# A newer push to a pull request replaces its older run; a run on main or a
-# tag is never cancelled by another, so a plain Run workflow started while a
+# A newer push to a pull request replaces its older run; a run on main is
+# never cancelled by another, so a plain Run workflow started while a
 # release is going does not end the release.
 concurrency:
   group: desktop-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
@@ -68,7 +81,17 @@ jobs:
   build:
     name: Mac app (packed, checked, built)
     runs-on: macos-15
-    timeout-minutes: 40
+    # 75, not 40: the first signed builds (2026-10-27) spent most of their time
+    # waiting on Apple's notary service, not building. The pull request's run took
+    # 38 minutes, notarisation returning at minute 36, and a Run workflow started
+    # beside it was cancelled at 40 while still waiting for its answer. Apple's
+    # queue is outside this repo's control and a release that times out publishes
+    # nothing, so the limit leaves room for a slow day on top of the ~10-minute
+    # build; an unsigned run still finishes in about 10.
+    timeout-minutes: 75
+    # The signing secrets' home (see the top of this file): main's runs by hand
+    # only. An empty name is no environment, so every other run has none.
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && 'mac-signing' || '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -91,6 +114,11 @@ jobs:
         run: npm run build
         env:
           VITE_MAC_APP: '1'
+          # Home's song ID and the crash sheet's Send (PLAN 23.17e): both Workers
+          # answer the app's http://localhost:<port> origin, which `npm run desktop`
+          # asks them before it trusts the build.
+          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+          VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -104,9 +132,7 @@ jobs:
           RELEASE: ${{ inputs.release && github.ref == 'refs/heads/main' && 'yes' || '' }}
         run: |
           base=$(node -p "require('./package.json').version")
-          if [[ "$GITHUB_REF" == refs/tags/desktop-v* ]]; then
-            v="${GITHUB_REF#refs/tags/desktop-v}"
-          elif [ -n "$RELEASE" ]; then
+          if [ -n "$RELEASE" ]; then
             v="$(echo "$base" | cut -d. -f1-2).${GITHUB_RUN_NUMBER}"
           else
             v="$base"
@@ -139,11 +165,12 @@ jobs:
       - name: Build the download
         id: build
         env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Only for the run the environment above is for; empty, and so ad hoc, for any other.
+          CSC_LINK: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && secrets.APPLE_TEAM_ID || '' }}
           CSC_FOR_PULL_REQUEST: 'true'
           DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -170,6 +197,10 @@ jobs:
           # The site above was built as the app ships it: the check's licence
           # lines ask a plain browser on the app's server for the door too.
           VITE_MAC_APP: '1'
+          # The addresses the build above carries, so the check can look for them
+          # in the app's bundles and ask each Worker (PLAN 23.17e).
+          VITE_FINGERPRINT_PROXY_URL: ${{ secrets.VITE_FINGERPRINT_PROXY_URL }}
+          VITE_CRASH_REPORT_URL: ${{ secrets.VITE_CRASH_REPORT_URL }}
           DESKTOP_CHECK_PRIVATE_KEY_FILE: ${{ runner.temp }}/check-key.json
       - name: Throw the check's key away
         if: always()
@@ -193,15 +224,16 @@ jobs:
   release:
     name: Mac app (release)
     needs: build
-    if: ${{ (inputs.release && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/desktop-v') }}
+    if: ${{ inputs.release && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
-      # A release is only ever a commit on main: a desktop-v tag pushed on a
-      # branch, or on an unmerged pull request's head, would otherwise be
-      # published as the newest release and every installed app told to take it.
+      # A release is only ever a commit on main: anything else would be
+      # published as the newest release and every installed app told to take
+      # it. The trigger above already says main; this asks git, so a change to
+      # the trigger cannot quietly widen it.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -214,7 +246,7 @@ jobs:
           name: ChromaGlass-mac
           path: release
       - name: Publish the release
-        if: ${{ (inputs.release && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/desktop-v') }}
+        if: ${{ inputs.release && github.ref == 'refs/heads/main' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

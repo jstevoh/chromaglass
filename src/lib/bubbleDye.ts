@@ -47,6 +47,9 @@ export function rimBand(R: number): { rIn: number; rOut: number; w: (d: number) 
   };
 }
 
+/** The outer edge of the ring `fillHole` draws from; it writes a cell past it (and lib/deltaRows.ts marks that). */
+export function holeRing(R: number): number { return Math.max(R * 1.45, R + 3); }
+
 /**
  * Lay `mass` of dye (with its absorptions) into the ring round a bubble at
  * (x, y) of radius R, in the grid's own log-space so the ring keeps the
@@ -84,7 +87,7 @@ export function depositRim(t: DyeTarget, N: number, x: number, y: number, R: num
  * so the hole closes from its emptiest part rather than as a flat plug.
  */
 export function fillHole(t: DyeTarget, dye: Float32Array, N: number, x: number, y: number, R: number): number {
-  const rOut = Math.max(R * 1.45, R + 3);
+  const rOut = holeRing(R);
   const yl = Math.max(0, Math.floor(y - rOut - 1)), yh = Math.min(N - 1, Math.ceil(y + rOut + 1));
   const xl = Math.max(0, Math.floor(x - rOut - 1)), xh = Math.min(N - 1, Math.ceil(x + rOut + 1));
   const inHole = (d: number) => 1 - smooth(R - 1, R + 1, d);

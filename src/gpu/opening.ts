@@ -84,6 +84,26 @@ export interface Opening {
    * its first steps with no list naming them.
    */
   gravity: boolean;
+  /**
+   * The slosh dish (PLAN 18a-13, 18a-13a): its four kernels and the solver's
+   * `addSlosh`, when the look's own settings tip the dish from its first step.
+   * Added 2026-10-29 after the first deploy run on the owner's Mac: `npm run
+   * startup` found Bass Drop asking for all five in its first steps with no
+   * list naming them, where GitHub's Macs had passed the same code for a week.
+   * The dish is driven by Plate Rock's swing where Frame Sway lets the frame
+   * move (`rockAccel`), and the swing is never nought: a resting hand sways
+   * (`swayAt`, lib/plateRock.ts), so a look with both dials up tips the dish
+   * on its first frame. Its kernels were all built behind the show, and the
+   * dish waits for them (`WebGPUSlosh.ready`), so nothing was built on a
+   * frame; but on the owner's Mac the rest was built within the look's first
+   * three seconds, the dish started and asked, and on GitHub's slower Macs
+   * it had not started by the time the window closed. The Slosh dial itself is a
+   * hand's and 0 on every look; it tips the dish at opening only with the
+   * plate stood up (`sloshAccel`), so that pair is read too. A kick's press
+   * and a held phone's tilt arrive later, and the dish waits for its kernels
+   * then as before. Off the thin gap the dish is never stepped (`stepSlosh`).
+   */
+  slosh: boolean;
 }
 
 /**
@@ -134,5 +154,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     spin: lookOpensSpinning(s),
     chemistry: on(s.chemistry),
     gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
+    slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
+      && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
   };
 }

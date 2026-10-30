@@ -16,9 +16,15 @@ name: Deploy to Firebase Hosting
 #      --iam-account=<sa>@chromaglass.iam.gserviceaccount.com)
 #   2. The account needs the "Firebase Hosting Admin" and "API Keys Viewer"
 #      roles on the chromaglass project.
-#   3. GitHub → Settings → Secrets and variables → Actions → New repository
+#   3. GitHub → Settings → Environments → firebase-live → Add environment
 #      secret, named FIREBASE_SERVICE_ACCOUNT, with the whole JSON file as its
-#      value.
+#      value. An environment secret, not a repository one (the security audit
+#      of 2026-10-28): the key can publish anything to the live site, and a
+#      repository secret is readable by any workflow a pull request's branch
+#      writes for itself. `firebase-live` lets only main deploy (its
+#      deployment branches: main), so neither a branch's run nor a Run
+#      workflow started on a branch can reach it. No required reviewers: a
+#      merge deploys without anyone waiting (the owner, 2026-09-27).
 #
 # Optional: set VITE_FINGERPRINT_PROXY_URL as a second secret to enable
 # automatic song identification. Left unset, the build still succeeds and the
@@ -41,8 +47,21 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      hosted:
+        description: "Every Mac shard on GitHub's Macs, none on the owner's (what the watchdog's re-run asks for)"
+        type: boolean
+        default: false
 
 # Never let two deploys race each other onto the live channel.
+# Read-only unless a job says otherwise; what the deploy gate and the checks
+# read is runs (actions) and the pull request (pull-requests). Written out, not
+# left to the repository's default, which a settings change could widen.
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
 concurrency:
   group: firebase-hosting-live
   cancel-in-progress: false
@@ -98,13 +117,81 @@ jobs:
   # `disjoint`, when the PR's run passed the Mac on an older main and the site
   # files it changed are not ones main changed since. Then Measure runs on the
   # exact tree and the Mac shards do not; the reasons are in deploygate.sh.
+  #
+  # Since PLAN.md 19ah the Mac shards can run on the owner's own Mac (a
+  # self-hosted runner labelled `owner-mac`) instead of GitHub's, when `mac`
+  # below finds it online and idle. On the 13 deploys of the fortnight to
+  # 2026-10-28 that ran the Mac shards, a shard waited a mean 50 minutes for a
+  # GitHub Mac (the slowest of the five, 80), for about 17 minutes of work, and
+  # such a deploy took 124 minutes from push to live. `checks` waits for the
+  # answer but never for the Mac: a probe that fails, finds no token, or finds
+  # the Mac asleep or busy names no shards, and every shard runs on GitHub's.
+  mac:
+    name: Is the owner's Mac free
+    needs: verified
+    if: ${{ !inputs.hosted && needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' && needs.verified.outputs.tested != 'disjoint' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Where MAC_RUNNER_PROBE lives: an environment that only main can use, as
+    # firebase-live is, so a branch's workflow cannot read the token. It reads
+    # the repository's runners (fine-grained, this repository only,
+    # Administration: read) and nothing else; it cannot register a runner.
+    environment: mac-runner
+    permissions:
+      contents: read
+    outputs:
+      shards: ${{ steps.probe.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: probe
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.MAC_RUNNER_PROBE }}
+          MAC_SHARDS: ${{ vars.OWNER_MAC_SHARDS }}
+        run: node scripts/macrunner.mjs
+
+  # The probe's answer can go stale: the Mac can sleep in the minute between
+  # "free" and the jobs, and a self-hosted job then queues for up to a day,
+  # holding every deploy behind it (PLAN.md 19ah-3). Beside the checks, this
+  # reads the run's jobs; a shard queued for the owner's Mac with none running
+  # for 15 minutes starts this workflow again with `hosted` (every shard on
+  # GitHub's Macs) and cancels this run. It never fails the deploy: it is not a
+  # need of `deploy`, and its step carries on past an error.
+  watchdog:
+    name: Watchdog
+    needs: mac
+    if: ${{ needs.mac.outputs.shards != '' && needs.mac.outputs.shards != '[]' }}
+    runs-on: ubuntu-latest
+    # Five shards of about 17 minutes in series, with room; it stops as soon
+    # as every one of them has started.
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      # To start deploy.yml again (a workflow_dispatch, which GITHUB_TOKEN may
+      # start) and to cancel this run. Nothing else.
+      actions: write
+    steps:
+      - uses: actions/checkout@v5
+      - continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARDS: ${{ needs.mac.outputs.shards }}
+        run: node scripts/macwatch.mjs
+
   checks:
     name: Checks
-    needs: verified
-    if: ${{ needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' }}
+    needs: [verified, mac]
+    # Written out with `!cancelled()` because `mac` is skipped whenever the
+    # Mac shards will not run, and a job whose need was skipped is skipped
+    # with it unless its condition says otherwise. `verified` must still have
+    # succeeded, as the implicit condition required before.
+    if: >-
+      ${{ !cancelled() && needs.verified.result == 'success' &&
+          needs.verified.outputs.tested != 'true' && needs.verified.outputs.tested != 'nothing' }}
     uses: ./.github/workflows/checks.yml
     with:
       mac: ${{ needs.verified.outputs.tested != 'disjoint' }}
+      local: ${{ needs.mac.outputs.shards || '[]' }}
 
   deploy:
     name: Build and deploy
@@ -118,6 +205,8 @@ jobs:
           (needs.checks.result == 'success' ||
            (needs.checks.result == 'skipped' && needs.verified.outputs.tested == 'true')) }}
     runs-on: ubuntu-latest
+    # Where FIREBASE_SERVICE_ACCOUNT lives (step 3 at the top): main only.
+    environment: firebase-live
     permissions:
       contents: read
     steps:
@@ -156,7 +245,10 @@ jobs:
           fi
 
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
+        # Pinned to a commit (v0.11.0, the commit v0 named on 2026-10-28), not
+        # the moving v0 tag: this step holds the key that publishes the site,
+        # and a tag can be moved to other code by whoever controls that repo.
+        uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0.11.0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

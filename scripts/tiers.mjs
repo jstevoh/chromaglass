@@ -190,6 +190,34 @@ try {
     );
   }
 
+  // 3b. A web page on another site cannot sign the app out (the security audit
+  // of 2026-10-28, finding 10). Section 3 left the Home key active on mac-1; a
+  // stranger's page in Safari or Firefox can POST to localhost with no preflight
+  // (a plain form or a no-cors fetch), and `/license-deactivate` took it. Each
+  // guard is asked alone, so a page that gets past one is still caught by the
+  // other, and the licence is read back after, because a 403 that still signed
+  // the key out would pass a check of the status alone.
+  {
+    const body = JSON.stringify({ key: homeKey, machineId: 'mac-1' });
+    const json = { 'content-type': 'application/json' };
+    const seat = async () => (await (await fetch(`${ORIGIN}/license-info.json`)).json());
+    const before = await seat();
+    const byOrigin = await fetch(`${ORIGIN}/license-deactivate`, { method: 'POST', headers: { ...json, origin: 'https://evil.example' }, body });
+    const bySite = await fetch(`${ORIGIN}/license-deactivate`, { method: 'POST', headers: { ...json, 'sec-fetch-site': 'cross-site' }, body });
+    const byNull = await fetch(`${ORIGIN}/license-deactivate`, { method: 'POST', headers: { ...json, origin: 'null' }, body });
+    const plain = await fetch(`${ORIGIN}/license-deactivate`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body });
+    const noType = await fetch(`${ORIGIN}/license-activate`, { method: 'POST', body: JSON.stringify({ key: proKey, machineId: 'mac-1' }) });
+    const after = await seat();
+    const own = await fetch(`${ORIGIN}/license-info.json`, { headers: { origin: ORIGIN, 'sec-fetch-site': 'same-origin' } });
+    check(
+      '3b. /license-activate and /license-deactivate turn away another site\'s page (Origin, Sec-Fetch-Site, null) and a body that is not JSON, and leave the licence as it was; the app\'s own page is still answered',
+      byOrigin.status === 403 && bySite.status === 403 && byNull.status === 403 && plain.status === 415 && noType.status === 415 &&
+        before.valid === true && after.valid === true && after.tier === before.tier &&
+        JSON.stringify(after.machines) === JSON.stringify(before.machines) && after.machineId === before.machineId && own.status === 200,
+      `evil origin ${byOrigin.status}, cross-site ${bySite.status}, null origin ${byNull.status}, text/plain ${plain.status}, no type ${noType.status}; licence ${before.tier} → ${after.tier} (${after.valid ? 'valid' : 'GONE'}), seats ${JSON.stringify(before.machines)} → ${JSON.stringify(after.machines)}; own page ${own.status}`,
+    );
+  }
+
   // 4. Upgrading from Home to Pro transitions active tier to pro
   {
     const up = await fetch(`${ORIGIN}/license-activate`, {
@@ -486,9 +514,15 @@ try {
         floatingNudgeWhilePro === 0 &&
         nudgeText.includes('ChromaGlass Pro') &&
         // Home opens the Mac app too (PLAN.md 23.17b, 23.17d), so the card
-        // sells what Pro alone adds there, never the app itself.
+        // sells what Pro alone adds there, never the app itself. It sold
+        // "several projectors with edge blending" until PLAN.md 34a-7 found
+        // the app drives one output. It names cloud sync now, which a Pro key
+        // alone opens (CloudSyncCard), and not OSC or Art-Net, which a Home
+        // key gets too until 34a-7a gates them.
         !nudgeText.includes('plus the Mac app') &&
-        nudgeText.includes('several projectors') &&
+        !nudgeText.includes('several projectors') &&
+        !nudgeText.includes('OSC') &&
+        nudgeText.includes('cloud sync') &&
         !nudgeText.includes('git clone') &&
         !nudgeText.includes('Run it locally') &&
         nudgeCtaHref.includes('lemonsqueezy.com/checkout/buy/') &&
