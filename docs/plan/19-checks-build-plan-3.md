@@ -369,6 +369,5 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
   file's header, which names each pass's file. Repoint one when its file is next touched,
   not in a sweep of its own (it would collide with every open branch for nothing).
-- **19ai-7. Open, next:** `src/gpu/fluid.ts` (291 KB, about 95 methods) split into
-  pipeline setup and per-pass encoding, the same way: a pure move, before Antigravity's
-  GPU briefs resume (they touch both files).
+- **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
+  a pure move (docs/plan-shipped.md, 19ai-7).
