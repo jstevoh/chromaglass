@@ -221,7 +221,7 @@ export default function App() {
 
   const { output, setOutput, resetOutput, wallTest, setWallTest, shownOutput } = useOutput();
 
-  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setTempoBpm } = useTempo();
+  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setLinkOn, tempoPanel } = useTempo();
 
   const { ambientMode, setAmbientMode, setAmbientModeRef } = useAmbientMode();
 
@@ -1982,7 +1982,7 @@ export default function App() {
     setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
     hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording,
     togglePerformance, goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName,
-    runActionRef, runAction,
+    runActionRef, runAction, tempoRef,
   });
 
   const {
@@ -2262,13 +2262,10 @@ export default function App() {
       wakeLock={wakeLock}
       wallTest={wallTest}
       onWallTest={setWallTest}
-      tempo={tempoLabel}
+      {...tempoPanel}
       readTempo={readTempo}
       readEar={() => ear.live.current?.features ?? null}
       spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
-      onTap={tapTempo}
-      onTempoClear={clearTempo}
-      onTempoBpm={setTempoBpm}
       midiClocked={midi.clocked}
       timecode={timecode ? formatTimecode(timecode) : null}
       focusSection={settingsSection}
@@ -3286,6 +3283,7 @@ export default function App() {
             readLevel={readLevel}
             tempo={tempoLabel}
             onTap={tapTempo}
+            onLink={setLinkOn}
             readTempo={readTempo}
             show={{
               running: sequencer.status.running,

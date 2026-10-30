@@ -197,8 +197,8 @@ Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the loa
 
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
 **5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
-**R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**; **13.5-link** before
-**13.5-osc** (§30), **13.4-ipad**, later **13.7-ipad**; **31e** halation in the Photograph
+**R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**; ~~**13.5-link**~~ (shipped
+2026-10-30, owed judging §95), then **13.5-osc** (§30), **13.4-ipad**, later **13.7-ipad**; **31e** halation in the Photograph
 style (§31).
 
 ### Wave 6. The physics under the look (lane C, one solver change at a time)
@@ -235,7 +235,7 @@ style (§31).
 - **7.1** The stores (§12), after the owner's accounts (2.x): **12.3**, **12.5**, **12.6**, then
   **12.7**, **12.8**; **12.4a**; later **12.9**. When the owner says go: **12-ship**, **12-play-org**; later **12-link**; **12-mas** not for now.
 - **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13-win-app** then
-  **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out and Link,
+  **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out (Link shipped 2026-10-30),
   **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.

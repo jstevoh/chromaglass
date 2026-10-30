@@ -685,6 +685,19 @@
       "run": "npm run timecode"
     },
     {
+      "name": "Ableton Link",
+      "shard": "logic",
+      "run": "npm run link",
+      "why": [
+        "The show server's Link peer (PLAN.md 13.5-link): its bytes against the",
+        "protocol's layout, a simulated session with Live's stand-in on clocks",
+        "minutes apart (joins without leading, reads the beat and the bar within",
+        "2 ms, follows a tempo change, lets go), the page's anchor under readings",
+        "up to a frame late, the beat clock's kicks on Link's beats, and the same",
+        "over real UDP on the runner's loopback. Node only, a few seconds."
+      ]
+    },
+    {
       "name": "The closeup's cells",
       "shard": "logic",
       "run": "npm run cellride",

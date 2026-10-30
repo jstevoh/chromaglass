@@ -72,12 +72,30 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    first (§30, 2026-10-11: Link is the shared clock of the iPad's music apps, AUM, Loopy
    Pro, Drambo, Koala, as well as of Resolume, VDMX and TouchDesigner, and VS offers it
    as a clock source):
-   - **13.5-link**: Ableton Link in, feeding the beat clock the way MIDI clock does
-     (`beatClock.setExternal`), with tempo and phase; "Link" as a tempo source in the
-     Sound sheet. A page cannot join Link, so it is the Mac app's and the show server's,
-     which fits §23's rule that paid is what a page cannot do. On the phone, Link's
-     switch, its peers and its tempo in the More sheet. *Measure:* a node Link peer at
-     a tempo and a phase the clock reaches within a beat, and follows when it changes.
+   - ~~**13.5-link**~~ **Shipped** (2026-10-30, #588): the show server joins a Link
+     session (`server/abletonLink.js`, the protocol spoken in Node, no native addon) and
+     the page's tempo source takes its tempo, beat and bar; the Link switch in Settings →
+     Sound → Tempo and on the phone's Sound sheet. `npm run link` 27/27. Story in
+     `docs/plan-shipped.md` §13.5-link. **Owed:** the owner's session with Live
+     (`docs/judging.md` §95); until it passes, the Pro page keeps Link under "on the way".
+     - **13.5-link-one.** The bar grid (`lib/barGrid.ts`) finds the one by ear; Link
+       already knows it (`TempoReading.bar`, beat zero of the session is every peer's bar
+       line). Let a Link reading set the grid's place, so Accent the One and the song's
+       bar-counted moves land on Live's downbeat from the first bar. *Measure:* `npm run
+       downbeat` with a Link session whose one is not where the onsets put it.
+     - **13.5-link-transport.** Link carries Live's play and stop (`stst`, read and
+       relayed, `playing` on the message) but nothing uses it: a stopped Live could pause
+       the Sequence the way MIDI Stop does. Off by default (a stopped transport in a DJ
+       set is not the end of the show).
+     - **13.5-link-gate.** Link is not behind the licence yet. #586 (34a-7a, open when
+       this shipped) gates OSC and Art-Net as Pro in the show server; Link belongs under
+       the same gate (`setLink` in `server/remote-server.js`), once that lands.
+     - **13.5-link-rescan.** The peer opens its sockets on the interfaces up when Link is
+       switched on; Ableton's library rescans every thirty seconds. A Mac that joins the
+       Wi-Fi after Link is on finds only loopback until Link is switched off and on.
+       Rescan on a timer, as the library does.
+     - **13.5-link-menu.** A Show menu item in the Mac app beside OSC's, for an operator
+       who never opens Settings → Sound.
    - **13.5-osc**: OSC *out* for the plate's colour, the sound bands and the beat, the
      way Art-Net out already sends the colour to the lighting (`server/artnet.js`), so
      a VJ app's effects can follow the plate.
