@@ -44,6 +44,7 @@ import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, groupOf } from '../src/lib/sett
 import { PINNABLE, DEFAULT_RIDES, DEFAULT_RECIPE } from '../src/lib/deskPins.ts';
 const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
+import { settingsSource } from './settingsSource.mjs';
 
 let total = 0, failed = 0;
 function check(name, ok, detail = '') {
@@ -198,7 +199,7 @@ console.log('\n The panels');
   the markup: a section added to the map without a `keep` around it would be a
   panel with nothing in it. Read from the source, as `npm run panel` reads the map.
 */
-const panelSrc = readFileSync('src/components/SettingsPanel.tsx', 'utf8');
+const panelSrc = settingsSource();
 const unkept = SETTINGS_SECTIONS.filter(s => !new RegExp(`\\{keep\\('${s.id}'\\) && \\(\\s*<section[^>]*data-section="${s.id}"`).test(panelSrc));
 check('every settings section is a panel the browser can open, with its markup kept for it', unkept.length === 0 && SETTINGS_SECTIONS.every(s => PANEL_BY_ID.has(s.id)),
   unkept.length ? `not kept: ${unkept.map(s => s.id).join(', ')}` : `${SETTINGS_SECTIONS.length} sections`);
