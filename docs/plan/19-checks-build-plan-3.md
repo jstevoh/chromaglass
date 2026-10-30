@@ -325,7 +325,7 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
-the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), and 19ai-8.
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), 19ai-8, and 19ai-9 (the settings panel).
 
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
   was module code above the component. Story in `docs/plan-shipped.md` §19ai-3 (moved
@@ -356,6 +356,16 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   so `useCommandPalette` takes 52 parameters, `useRemote` 48, `useWallLook` 37. Once
   19ai-8a has moved the settings' writers, the ones that read a domain's state and its
   setters can take that domain's hook result instead of its pieces.
+- **19ai-9. Shipped: the settings panel's sections into `src/components/settings/`**
+  (`SettingsPanel.tsx` 201,442 → 23,916 bytes; the story in `docs/plan-shipped.md`). A check
+  that reads the panel's markup as text reads `scripts/settingsSource.mjs`, the panel and
+  its sections as one text.
+- **19ai-9a. Open, found along the way: the panel's seventy-two props.** App hands
+  `SettingsPanel` its props one by one (thirteen for the film and the pour, eight for the
+  tempo), and the panel hands them on to its sections in `SectionCtx`. Once 19ai-8b gives
+  each domain one hook result, the panel can take the film's or the tempo's whole, as its
+  sections read them; until then a new value a section reads is four edits for one name
+  (App, the props, `SectionCtx` and the object the panel builds).
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** Story in `docs/plan-shipped.md`
   §19ai-5 (moved 2026-10-29, 19m).
 - **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** Story in

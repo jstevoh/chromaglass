@@ -4417,6 +4417,43 @@ only wiring that stayed in `App.tsx` and is unchanged.
 declarations looser than their setters (`chromaglassTool` took any string, `chromaglassBench`
 `unknown`), now the shapes the setters take.
 
+### 19ai-9. The settings panel's sections into their own files
+
+Shipped 2026-10-30. `components/SettingsPanel.tsx` was 201,442 bytes and 4,277 lines, and
+160 KB of it was one JSX tree, `sections`: twenty-nine `{keep(id) && (<section ...>)}`
+blocks reading the panel's seventy-two props and its locals by name. A session asked to
+move a slider in the Lamp read the patch bay and the controller to get there. Each section
+is now a component in `src/components/settings/`, in a file a group of the rail
+(`PlaySections`, `LookSections`, `MotionSections`, `ChemistrySections`, `PourSections`,
+`StageSections`; Feed cut into `SoundSection`, `RoomFilmSections`, `PatchesSection` and
+`MidiSection`, its three longest), with the slider and the pin chips in `controls.tsx`, the
+patch bay's lists in `patchLists.ts` and the props in `props.ts`. The panel draws the
+twenty-nine in the order they stood and keeps its shells, the engine's polling and the
+search; it is 23,916 bytes. The largest new file is `LookSections.tsx`, 34.8 KB.
+
+The move is verbatim, by a script: each section block (its leading comments to its closing
+`)}`) is in the new files byte for byte and in one piece, all twenty-nine compared, and
+every non-import line of the old file is in the new ones. A section takes one object,
+`SectionCtx` (the props it reads, with the panel's defaults applied, and sixteen locals:
+`keep`, `shown`, the card's classes, `goTo`, the live engine reading and the rest), and
+destructures what its markup reads, pruned with the typecheck's unused-locals pass. None of
+the blocks held a hook, so a section as a component renders when the panel does, as it did
+inline.
+And the built app draws the same page: the open sheet's markup (424 KB, 29 sections, 154
+sliders, 688 controls), each section opened from the rail, and the Setup desk's five
+section panels are identical, character for character, between main and this branch
+(device ids aside, which the browser hashes per origin).
+
+Three checks read the panel's markup as text: `panel` (every `<Slider>`, its chips, its
+key and its range), `desklayout` (each section kept for its panel, its `data-group`) and
+`rowfade` (the Mixer's take buttons). On `SettingsPanel.tsx` alone the first stops at "the
+settings panel still has its sliders: 0 found", `desklayout` fails every section, and
+`rowfade` fails "all four places the Mixer is drawn: Settings". `scripts/settingsSource.mjs`
+gives them the panel and its sections as one text; `panel` prints what it printed on main,
+line for line (257/257). `panel`'s "every setting is read by something that renders" leaves
+the panel out as plumbing, since a slider reads its own key; the sections are left out with
+it, or they would have passed every setting the panel draws.
+
 ## 22. Spin the plate
 
 **22a, shipped (#223).** The **Spin** tool (N on the desks, a tool on the phone's dock and the
@@ -9639,6 +9676,45 @@ model cannot reach one, the PR says what it reached and asks.
     (this line first said 0.03%, too low). It becomes material once the glass absorbs the
     infrared (36e-4), and that build adds a tighter dry-out ledger line. `boilgpu`'s
     boiling second (36e-2) already fails it, by 13% and 16% of the reference's change.
+
+### 37. Marketing and social media (asked 2026-10-29)
+
+#### 37x-4b. The encoder and one destination (#577)
+
+  - **37x-4b. The encoder and one destination (shipped 2026-10-29).** The owner: "open my mac
+    app ... configure the live show. I can then stream it on all of the popular streaming
+    platforms". The app now encodes and speaks RTMPS itself, as `docs/live-show.md` chose:
+    `src/lib/liveStream.ts` takes a frame from the plate's canvas every 1/fps of wall time
+    (not `captureStream`, which sends nothing while the plate is still) and the show's own
+    `MediaStream` through a `MediaStreamTrackProcessor`, encodes H.264 (`latencyMode:
+    realtime`, a keyframe every 2 s) and AAC (Opus where a machine has no AAC encoder),
+    stamps both on one clock (the audio on the track's timestamps, which Chromium puts on
+    `performance.now()`'s clock: an arrival-anchored draft read 17–22 ms early), and hands
+    each packet over IPC. `desktop/rtmp.js` is the wire (the handshake, chunks with a full
+    header on each message, AMF0, FLV tag bodies); `desktop/live.js` the client (connect,
+    releaseStream, FCPublish, createStream, publish, onMetaData, the sequence headers, acks
+    when the server asks, pings answered, a server's error ending the stream with its words
+    and the key cut from them, video dropped to the next keyframe past 1.5 MB behind, never
+    audio); `desktop/keys.js` the key store (Electron's `safeStorage`, the login Keychain's
+    key over a file of ciphertext; the `security` command was set aside because it takes the
+    password on its command line). The page names a key; a packed app reads one from the
+    store only. Headless: `window.__cgLive.start({ url, keyName })`, `stop()`, `state()`,
+    `keys.set/list/remove` in the Mac app, Pro only (`canUseProFeature`), installed from
+    `useAudioAnalyzer` where the show's sound and the plate meet.
+    *Measured:* `npm run live` (30 s of the lab's plate and a tone to
+    `scripts/rtmpListener.mjs`, a pure-node RTMP server that records FLV; shards `lab` and
+    `fifth`): the server took the stream and its onMetaData; the AVC and audio headers first;
+    30.0 s of audio with no gap over 21 ms (bar 100 ms); 30.0 fps over 901 frames (bar 24–31.5),
+    none out of order, none over 3 frames apart; 22 keyframes, the first at 0, never over 1.4 s
+    apart (bar 2.5 s); Chromium decodes every frame and every packet; five flashes against
+    five clicks, the picture 36 ms after the sound every time (bar 0..43 ms: a flash is seen at
+    the next frame taken, 33 ms, plus a 10 ms audio block), where the arrival-anchored draft
+    read 44–55 and the output-time pairing 59–79; one ack and one pong; a refused key fails
+    with `NetStream.Publish.BadName` and no key in the message; the key store lists names and
+    not keys, the file holds no plaintext, no encryption refuses. `npm run desktop` gained a
+    `live` line: the page's stream through the app's IPC to a listener, 72 frames in 4 s
+    under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
+    take), the key kept by name where the machine has a keychain.
 
 ### QA list: what the owner found playing it (from 2026-10-04)
 

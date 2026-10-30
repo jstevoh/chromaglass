@@ -90,3 +90,25 @@ stop the stream (§37x-4's phone version).
    YouTube + Twitch + Kick + Facebook for the cleared-music shows. Instagram and TikTok
    wait on their follower counts.
 3. Test streams are **unlisted** YouTube broadcasts; the first public one is the owner's.
+
+## What is built (37x-4b, 2026-10-29)
+
+The encoder and one destination, with no panel yet (37x-4d): in the Mac app's console,
+
+```js
+await __cgLive.keys.set('youtube', '<the stream key from YouTube Studio>');   // once; kept in the keychain store
+await __cgLive.start({ url: 'rtmps://a.rtmps.youtube.com/live2', keyName: 'youtube', width: 1920, height: 1080, fps: 30 });
+await __cgLive.state();   // frames taken and skipped, packets, the client's bytes behind, drops, acks, the server's words
+await __cgLive.stop();
+```
+
+`src/lib/liveStream.ts` encodes the plate's canvas and the sound the show hears (whichever
+source is open: a song, the microphone, the Mac's system audio); `desktop/live.js` speaks
+RTMPS from the main process; `desktop/keys.js` keeps the keys (Electron's `safeStorage`
+through the login Keychain; a key is named by the page and never read by it); `npm run live`
+measures the stream against a local RTMP server (`scripts/rtmpListener.mjs`, which also runs
+by hand: `node scripts/rtmpListener.mjs --port 1935 --out scratch/stream.flv` records a stream
+from the app or from OBS as a `.flv`). Pro only. What the stream is: 1080p by default at the
+frame rate asked, H.264 High with a keyframe every two seconds, AAC at 160 kbps, one
+destination; several, a vertical encode and the health readout are 37x-4c, the panel and the
+phone's Stop 37x-4d.

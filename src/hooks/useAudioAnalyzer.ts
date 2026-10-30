@@ -6,6 +6,8 @@ import {
 } from '../lib/audioFeatures';
 import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
+import { installLiveConsole } from '../lib/liveStream';
+import { canUseProFeature } from '../lib/tierGates';
 
 export interface AudioData {
   /**
@@ -155,6 +157,24 @@ export function useAudioAnalyzer(
 ): Ear {
   const [audioData, setAudioData] = useState<AudioData | null>(null);
   const liveRef = useRef<AudioData | null>(null);
+  /*
+    The live stream's console in the Mac app (PLAN.md 37x-4b; the panel is
+    37x-4d): `window.__cgLive.start({ url, keyName })` streams the plate's
+    canvas and this stream, the one the show hears, whichever source it is
+    (lib/liveStream.ts). Installed from here because this hook is where the
+    show's sound and the plate meet; App.tsx is at its size ceiling. Pro
+    only, asked at each start; absent on the website, where there is no RTMPS
+    client to hand the packets to (`installLiveConsole` does nothing there).
+  */
+  const streamRef = useRef<MediaStream | null>(stream);
+  streamRef.current = stream;
+  useEffect(() => {
+    installLiveConsole({
+      canvas: () => document.getElementById('liquid-canvas') as HTMLCanvasElement | null,
+      audio: () => streamRef.current,
+      allowed: () => canUseProFeature(),
+    });
+  }, []);
   const publishedAtRef = useRef(-Infinity);
   /** How many readings React has been told, for `npm run renders` (ten a second, and not none). */
   const publishedRef = useRef(0);

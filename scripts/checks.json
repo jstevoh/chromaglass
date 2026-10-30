@@ -803,6 +803,22 @@
       ]
     },
     {
+      "name": "The live stream",
+      "shard": "lab",
+      "run": "npm run live",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The Mac app's live stream (PLAN.md 37x-4b): the lab's plate and a tone",
+        "encoded by the page's live encoder (src/lib/liveStream.ts) and sent",
+        "through the app's RTMP client (desktop/live.js, in node) to the check's",
+        "own listener (scripts/rtmpListener.mjs), then decoded back: every",
+        "second of audio, frames at the stream's rate, a keyframe never far, the",
+        "picture within a frame of the sound, a bad key refused, the key store.",
+        "Software encoders here (H.264 and Opus; no AAC off a Mac); the Mac",
+        "shard runs the same with AudioToolbox's AAC, the codec the stream ships."
+      ]
+    },
+    {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
       "run": "npm run encode",
@@ -2224,6 +2240,17 @@
         "timeout inside this step (#280); show ran 8.9 to 10.7. Here open is",
         "about 14 and show about 15 (PLAN.md 19r). Nothing on show needs a",
         "cold shader cache, so the fingers warming it costs no check."
+      ]
+    },
+    {
+      "name": "The live stream, with AAC",
+      "shard": "fifth",
+      "run": "npm run live -- --codec aac",
+      "why": [
+        "The same stream on a Mac (PLAN.md 37x-4b), where Chromium encodes AAC",
+        "through AudioToolbox as the Mac app does: the codec every platform in",
+        "docs/live-show.md takes, so its sequence header, its packets and the",
+        "sync measured on them are the shipped stream's, not Opus's stand-in."
       ]
     },
     {
