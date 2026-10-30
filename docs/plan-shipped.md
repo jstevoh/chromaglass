@@ -7178,7 +7178,7 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   middle was bare (a look that pours in pools, a middle a finger had swept, a plate
   between pours) every way in (the button, M, the zoom, the phone's pinch and Zoom) was a
   4x view of nothing: the exposure stays under what the frame holds, and the frame held
-  nothing. In the app on software WebGPU, classic cleared to one pool at (0.22, 0.30) by the closeup camera's reckoning:
+  nothing. In the app on software WebGPU, classic cleared to one pool at (0.22, 0.30):
   the 4x frame's mean 1.4 of 255 and no pixel lit, for as long as it was in. Coming in,
   Hold and Follow now check their aim; if its frame holds under a tenth of the plate's
   average dye, they go to the nearest frame holding at least half what the plate's
