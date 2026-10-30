@@ -341,12 +341,7 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   next owns them: on Soap Film every step flushed even with no tool (603 of 603), so there
   the liquids' forces run once a step whatever 15e-1 says of a plate nothing is laid in; and
   `applySplats` with `gpu/splats.ts` is code nothing runs.
-- **14ab-13** (open, found with 14ab-2, read in the code) *Is a poured video upside down?*
-  The pour has always laid the frame's rows, which count down, on the grid's rows as they
-  come; the text pour (`pourText`) flips its canvas first because "the plate's rows run from
-  the bottom of the frame up", and `injectImage` does not. If that comment is right, a poured
-  video and an uploaded picture land upside down. A `look` render of a cartoon with a known
-  top (a title card) settles it; 14ab-2 kept the orientation as it was.
+- ~~**14ab-13** *Is a poured video upside down?*~~ **Shipped** (#591, finished in #596): it was, and an uploaded picture too; both turned where their rows are taken (`flipY` in the solver's copy, the loop's row read, `uprightPicture` for an upload), `npm run videoflow` asks which way up. Story in `docs/plan-shipped.md` §14ab-13.
 - **14ab-11** (open, found with 14ab-4) *The deltas' whole-grid writers and the GPU's whole
   passes.* The writers that still set `dirty = true` send all 192² rows: the room's and the
   film's stir (whole by nature), but also a press, a lift, a carry, a pop and the liquids'

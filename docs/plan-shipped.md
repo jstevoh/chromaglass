@@ -6636,6 +6636,43 @@ review (check-skeptic) found the first four of those gaps. `pourVideo` costs 0.1
 of the CPU a call on SwiftShader, a canvas's copy included; a video's is a copy on the GPU.
 `npm run wgsl` now compiles the splat kernels too, which it never had.
 
+
+## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
+
+14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the
+bottom of the frame up; a canvas's run down"), and the video pour and an uploaded picture
+did not, so if that comment was right both landed upside down. It was. On the owner's Mac
+(Apple GPU, Metal), a still plate, a pour and a photograph straight after, beside its source:
+the word "TOP RAT" over "bottom" through `pourText` stood the right way up; an uploaded
+picture of the same two words, pink above and blue below, landed with the blue on top and
+every letter upside down (a vertical flip, not a mirror: the words still read left to right);
+and a cartoon frame (Jack Frost, 240 s in: an orange sky above, pumpkins below) poured with
+the pumpkins at the top and the sky's light at the bottom. The pictures, before and after,
+desktop and phone, are on the branch `antigravity/14ab-13-pictures`.
+
+The grid's rows count up the plate and every pour but the text's laid a source's first row
+on the grid's first: `pourPictureCpu`, the solver's `videoSample` pass and the CPU loop. Each
+is turned where its rows are taken, at no cost a frame. The upload draws its picture turned
+over once, as `pourText` does (`uprightPicture` in `lib/videoFlow.ts`, called by
+`usePour.ts`). The solver's copy of a video's frame turns it (`flipY: true` on
+`copyExternalImageToTexture` in `pourVideo`, `gpu/fluid/inputs.ts`). The CPU loop
+(`pourVideoFrameCpu`, the WebGL solver's way) reads the grid's row y from the frame's row
+S−1−y, and the cell above from the row before, so the flow it reads is turned with the dye.
+Antigravity's first fix drew every video frame again onto a canvas of its own turned over,
+a full-size draw a frame on the path 14ab exists to lighten; the review moved it into the
+copy and the loop's read, and the frame loop's call is as it was.
+
+`npm run videoflow` holds it (24 lines, 5 new): a title card with a known top (a bright band
+across its top third, a dim one across its bottom third, a blob rising two rows between two
+frames) poured through the loop and through the solver's pass lands its brightest cells
+above the middle of its dye (`up` +0.334 and +0.332 of the dyed rows' height) and its rise
+as flow up the plate; an uploaded picture of it through `uprightPicture` lands +0.333. Each
+against the card turned over (−0.334, −0.332) and the upload read as it came (−0.333). On the
+code before the fix the four video lines go red (20 of 24, `up` −0.334 and −0.332): the
+other twenty hold the pass and the loop to each other, which a frame turned the same wrong
+way on both passes. The lines run on the Mac's `--video` shard too, so Metal's turned copy
+is asked as well as SwiftShader's.
+
 ## Moved in the third pass (2026-10-29, 19m)
 
 When `PLAN.md` became an index with one file a section under `docs/plan/` (19m), the
