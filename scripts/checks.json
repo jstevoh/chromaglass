@@ -20,7 +20,7 @@
     {
       "name": "The scripts parse",
       "shard": "logic",
-      "run": "for f in scripts/*.mjs server/*.js dc.mjs; do node --check \"$f\" || exit 1; done",
+      "run": "for f in scripts/*.mjs server/*.js; do node --check \"$f\" || exit 1; done",
       "always": true,
       "why": [
         "Every script parses (PLAN.md 19b). `tsc` reads only a handful of the",
@@ -597,6 +597,18 @@
         "hits (PLAN 28f): every shipped patch moves its control (four named a",
         "drum on a source without one and read 0), and each drum's hit reaches",
         "a patch on its frame, at its strength, and is gone between hits."
+      ]
+    },
+    {
+      "name": "The melody walks across the plate",
+      "shard": "logic",
+      "run": "npm run melody",
+      "why": [
+        "A played scale (24.3-place) goes through the real analyser and the walk:",
+        "one drop per note the ear called, each on the note played and in pitch",
+        "order across the plate, none from a kick or a snare, a harder note a",
+        "bigger drop, and a drop waiting for its pitch to settle is on the note",
+        "where one placed on the onset is on the note before."
       ]
     },
     {

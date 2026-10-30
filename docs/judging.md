@@ -2113,7 +2113,25 @@ Client or LinkHut this time).
 
 Write down, per step, ok or what you saw. A step that fails is an item in PLAN §34a-7.
 
-## 94. Ableton Link with Live (PLAN 13.5-link)
+## 94. The melody walks across the plate (PLAN 24.3-place)
+
+Aurora Borealis and Oil & Water now let go of a drop for each note of a tune, low notes on one side of the plate and
+high notes on the other. Melody Walk is in the desk's Show section (beside Kick Bloom) and the remote's sliders, 0 on
+every other look.
+
+1. Load Oil & Water, play a song with a clear lead (a piano, a voice, a synth line) through the microphone. A bead
+   of amber oil should land for most notes, left for low and right for high, a harder note a bigger bead; a tune
+   that goes up and comes back should draw there and back.
+2. Load Aurora Borealis with the same song: jade and lavender drops along the top of the curtains.
+3. Turn Melody Walk to 0 on each: no drops. Turn it up on Classic: a row of drops across the middle.
+4. Play a song with only drums: nothing should land. A song with a loud kick under a lead: the lead should still
+   land (about two notes in three; 24.3-place-2).
+5. Bad: a drop that lands a note late (a tenth of a second is the design), a drop for every kick or snare, drops
+   that all pile up at one end, or the plate filling with oil from a long song.
+6. Decide: is the line in the right place on each look, which looks want one next, and should the music's colour
+   (True Synesthesia) move to the finer pitch (24.3-place-4)?
+
+## 95. Ableton Link with Live (PLAN 13.5-link)
 
 `npm run link` plays a Link session against the show server with a stand-in for Live written
 from the same reading of the protocol, so only Live can say the two agree.

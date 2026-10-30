@@ -269,8 +269,17 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ kickBloom: v })}
           settingKey="kickBloom"
         />
+        <Slider
+          label="Melody Walk"
+          value={settings.melodyWalk ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ melodyWalk: v })}
+          settingKey="melodyWalk"
+        />
         <Info>
-          Kick Bloom is the dye each kick throws outward from the bass spot. Beat Squeeze presses a thin sheet on the liquid where the kick lands: a dent as wide as the sheet bends over this liquid, wide on thin oil, a fingertip on syrup. Plate Rock is the slow one: a hand tipping the dish on the one and three, the heavier colour running downhill each way.
+          Kick Bloom is the dye each kick throws outward from the bass spot. Melody Walk lets each note of a tune go as a drop, low notes on one side of the plate and high ones on the other, so a played line draws itself across it. Beat Squeeze presses a thin sheet on the liquid where the kick lands: a dent as wide as the sheet bends over this liquid, wide on thin oil, a fingertip on syrup. Plate Rock is the slow one: a hand tipping the dish on the one and three, the heavier colour running downhill each way.
         </Info>
         <Slider
           label="Beat Squeeze"
