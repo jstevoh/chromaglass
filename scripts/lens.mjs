@@ -228,8 +228,7 @@ const r = await page.evaluate(async ({ S, cams, only }) => {
   for (const [name, key] of Object.entries(dials)) {
     const full = await draw({ ...OFF, [key]: 1 });
     const half = await draw({ ...OFF, [key]: 0.5 });
-    const zero = await draw({ ...OFF, [key]: 0 });
-    o.dial[name] = { full: diff(off, full), half: diff(off, half), zero: diff(off, zero), atLens1: diff(await draw({ amount: 1, focus: 0.5 }), await draw({ amount: 1, focus: 0.5, [key]: 1 })) };
+    o.dial[name] = { full: diff(off, full), half: diff(off, half), atLens1: diff(await draw({ amount: 1, focus: 0.5 }), await draw({ amount: 1, focus: 0.5, [key]: 1 })) };
   }
   // Focus with the aperture open and shut.
   const open0 = await draw({ ...OFF, aperture: 1, focus: 0 });
@@ -242,7 +241,8 @@ const r = await page.evaluate(async ({ S, cams, only }) => {
   o.lensOnly = diff(off, lensOnly);
   const opticsOff = await draw({ ...OFF, ...optics });
   const opticsLens = await draw({ ...OFF, ...optics, amount: 1 });
-  o.opticsKept = diff(off, opticsLens);
+  o.opticsAlone = diff(off, opticsOff);
+  o.opticsUnderLens = diff(lensOnly, opticsLens);
   o.lensOverOptics = diff(opticsOff, opticsLens);
   // The pass with every dial at 0 is the plate as it was without a pass:
   // nothing jumps when a dial leaves 0.
@@ -313,24 +313,34 @@ for (const [name, bar] of Object.entries(need)) {
 }
 for (const name of Object.keys(need)) {
   const d = r.dial[name];
-  check(`${name}: a half-turn moves the frame less than a full turn, and a turn to 0 not at all`,
-    d.half.mean < d.full.mean && d.half.mean > 0 && d.zero.share === 0 && d.zero.mean === 0,
-    `half ${d.half.mean.toFixed(1)}, full ${d.full.mean.toFixed(1)}, zero ${d.zero.mean.toFixed(1)} levels`);
+  // No "and a turn to 0 not at all" here: the lab reads a dial at 0 and an
+  // absent one alike, so that render was OFF itself and the line could not
+  // fail (the check-skeptic's read of #592). The first line above, the same
+  // render twice, is what holds a 0 to the plain picture.
+  check(`${name}: a half-turn moves the frame less than a full turn`,
+    d.half.mean < d.full.mean && d.half.mean > 0,
+    `half ${d.half.mean.toFixed(1)}, full ${d.full.mean.toFixed(1)} levels`);
 }
 // Where each dial works is its physics. Refraction turns light where the
 // surface is tilted, so it must change the steep parts of the plate and leave
 // a flat part (slope under 0.02) nearly alone; dispersion is a shift of red
 // against blue about the green, so green stays; a glow adds light and never
 // takes it away.
+// These lines, the bare plate among them, passed on the old pass too, where the dials
+// did nothing at Lens 0: "changed nothing in green" is also "changed nothing".
+// Each asks its dial to have cleared its strength bar in this same run, so a
+// dead dial fails here as well as above. The bare plate is a uniform field, on
+// which any blur or glow is the identity: a weak control, kept as one.
+const strong = (name) => r.dial[name].full.mean >= need[name];
 check('refraction changes the steep parts of the plate and spares the flat',
-  r.whereRefraction.steep >= 0.3 && r.whereRefraction.steep >= 3 * r.whereRefraction.flat,
+  strong('refraction') && r.whereRefraction.steep >= 0.3 && r.whereRefraction.steep >= 3 * r.whereRefraction.flat,
   `${pct(r.whereRefraction.steep)} of steep pixels moved by 8 or more, ${pct(r.whereRefraction.flat)} of flat`);
 check('chromatic aberration leaves the green channel alone',
-  r.whereChromatic.green === 0, `${pct(r.whereChromatic.green)} of pixels changed in green`);
+  strong('chromatic') && r.whereChromatic.green === 0, `${pct(r.whereChromatic.green)} of pixels changed in green`);
 check('bloom only adds light',
-  r.whereBloom.dark < 0.005, `${pct(r.whereBloom.dark)} of pixels darkened by 3 or more levels`);
+  strong('bloom') && r.whereBloom.dark < 0.005, `${pct(r.whereBloom.dark)} of pixels darkened by 3 or more levels`);
 check('a plate with no dye on it gives refraction, aperture and bloom nothing to work on',
-  Object.values(r.bare).every((d) => d.share === 0),
+  ['refraction', 'aperture', 'bloom'].every(strong) && Object.values(r.bare).every((d) => d.share === 0),
   Object.entries(r.bare).map(([k, d]) => `${k} ${pct(d.share)}`).join(', '));
 check('Focus moves the frame with the aperture open, and not with it shut',
   r.focusOpen.share >= 0.02 && r.focusShut.share === 0,
@@ -339,9 +349,14 @@ check('Lens alone is the sensor\'s look and moves the frame by itself',
   r.lensOnly.share >= 0.1, `${pct(r.lensOnly.share)} (mean ${r.lensOnly.mean.toFixed(1)} levels)`);
 // Lens is a sensor look laid over the optics: it should still be most of what
 // it was on a bare plate once the optics are up, not eaten by them.
+// Measured against Lens alone, not the plain picture: Lens by itself moves
+// about 40% of the frame, so "the optics under Lens differ from the plain
+// picture" passed even with the optics wiped out (it passed on the old pass,
+// where they did nothing at Lens 0; the check-skeptic's read of #592).
 check('Lens over the optics keeps what the optics did and still adds its own look',
-  r.opticsKept.share >= 0.3 && r.lensOverOptics.share >= 0.5 * r.lensOnly.share,
-  `against the plain picture ${pct(r.opticsKept.share)}; Lens's own part ${pct(r.lensOverOptics.share)} against ${pct(r.lensOnly.share)} alone`);
+  r.opticsAlone.share >= 0.3 && r.opticsUnderLens.share >= 0.5 * r.opticsAlone.share
+    && r.lensOverOptics.share >= 0.5 * r.lensOnly.share,
+  `the optics alone ${pct(r.opticsAlone.share)}, under Lens against Lens alone ${pct(r.opticsUnderLens.share)}; Lens's own part ${pct(r.lensOverOptics.share)} against ${pct(r.lensOnly.share)} alone`);
 
 // ── 6. Saved looks ────────────────────────────────────────────────────
 // The mean change in levels between two frames, the larger of the three
@@ -377,6 +392,16 @@ const SOUND = /\b(audio|bass|beat|kick|energy|treble|mids?|analy[sz]er|spectrum|
 for (const f of ['src/gpu/wgsl/camera.ts', 'src/gpu/camera.ts', 'src/gpu/cameraWanted.ts']) {
   const code = readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   check(`${f} reads no sound`, !SOUND.test(code), SOUND.exec(code)?.[0] ?? '');
+}
+// And what the app hands the pass: the one fillCameraUniforms call in the
+// visualizer, read from its opening to its closing brace. The three files
+// above could stay clean while a sound term was added here.
+{
+  const src = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  const at = src.indexOf('fillCameraUniforms(cam.pack, {');
+  const call = at < 0 ? '' : src.slice(at, src.indexOf('}, canvas.width', at)).replace(/\/\/.*$/gm, '');
+  check('what the app hands the camera pass reads no sound',
+    call.includes('refraction') && !SOUND.test(call), at < 0 ? 'the call was not found' : SOUND.exec(call)?.[0] ?? '');
 }
 
 const failed = checks.filter((c) => !c.ok).length;

@@ -172,3 +172,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   0.03. `npm run lens` line 6 holds the bars (3, 6, 2.5).
 - **33i-5. `sceneMap.ts` has no keys for the camera's dials**, so a scene cannot ride
   them; add them if a scene should (the frame must not move with sound).
+- **33i-8. `npm run lens` reads a set list's looks only with Lens at 0.** The set list's
+  `upgradeSaved` goes through the same `inertOptics` as a saved look, but its Lens-up
+  branch and its absent-optic default are asserted only on the saved-look path. Add a set
+  list with Lens up to section 6 (found by the check review of #592; low risk, one function).
