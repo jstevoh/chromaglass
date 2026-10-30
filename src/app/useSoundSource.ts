@@ -1,9 +1,9 @@
-import { useRef, useCallback, useEffect, type Dispatch, type SetStateAction, type RefObject } from 'react';
+import { useRef, useState, useCallback, useEffect, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import { startPlateDrone, PLATE_PLACES, type DroneParams, type Drone } from '../lib/plateDrone';
 import { startSimulatedMusic, type SimulatedMusic } from '../lib/simulatedMusic';
 import type { Track } from '../lib/musicLibrary';
 import { isDesktopApp } from '../lib/platform';
-import { startSystemTap } from '../lib/systemTap';
+import { startSystemTap, type SystemTap } from '../lib/systemTap';
 import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY } from './shared';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 
@@ -43,9 +43,6 @@ interface SoundSourceDeps {
   audioInputId: string;
   setAudioStream: Dispatch<SetStateAction<MediaStream | null>>;
   simulatedRef: RefObject<SimulatedMusic | null>;
-  systemTapRef: RefObject<{ stop: () => void; } | null>;
-  /** The context the ear analyses in, when a source owns one (the System audio tap; PLAN 23.8-clock). */
-  setEarContext: Dispatch<SetStateAction<AudioContext | null>>;
   stopDrone: () => void;
   setAudioSource: Dispatch<SetStateAction<AudioSource>>;
   musicElRef: RefObject<HTMLAudioElement | null>;
@@ -67,11 +64,22 @@ interface SoundSourceDeps {
 }
 
 export function useSoundSource({
-  audioStream, audioInputId, setAudioStream, simulatedRef, systemTapRef, setEarContext, stopDrone, setAudioSource,
+  audioStream, audioInputId, setAudioStream, simulatedRef, stopDrone, setAudioSource,
   musicElRef, wallRef, droneParams, droneRef, setDroneRunning, refreshAudioInputs, setDroneParams,
   setAudioInputId, audioSourceRef, musicCtxRef, musicFile, setMusicFile, setMusicTime, audioSource,
   setLibraryOpen, playTrackRef,
 }: SoundSourceDeps) {
+  /** The Mac app's system-audio loopback tap (PLAN.md 23.8): the one source this hook starts and stops itself. */
+  const systemTapRef = useRef<SystemTap | null>(null);
+  /*
+    The context the ear analyses in when the source owns one. The System audio
+    source plays the Mac's sound into a context of its own, and on GitHub's
+    macOS runners the virtual output device opens one stream and refuses a
+    second, so an ear with its own context sat "running" with a clock at 0.00
+    for ten seconds while the tap's ran (PLAN 23.8-clock, the reason in
+    lib/systemTap.ts). Null for every other source: the ear makes its own.
+  */
+  const [earContext, setEarContext] = useState<AudioContext | null>(null);
   /*
     The stream the show hears and the input it was opened on, as refs beside
     the state, for handleSourceChange to read (PLAN.md 14s). Read from its
@@ -370,6 +378,6 @@ export function useSoundSource({
 
   return {
     handleSourceChange, toggleDrone, changeDrone, chooseAudioInput, toggleMusic, playMusicFile,
-    playTrack, closeMusicFile,
+    playTrack, closeMusicFile, earContext,
   };
 }
