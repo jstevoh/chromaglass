@@ -373,6 +373,163 @@ const centroid = (f, left, thick) => {
     `${best} samples in a row (5 s apart)${peak ? `; at t=${peak.t}s film under 30 nm ${(100 * peak.hb).toFixed(1)}%, dark ${(100 * peak.dark2).toFixed(1)}%, saturated ${(100 * peak.sat).toFixed(0)}%, ${peak.sectors}/12 hues` : '; never'}`);
 }
 
+// ── C8: the frame's Plateau border drains the film (PLAN 32f) ─────────
+/*
+  The prototype thinned the film by taking a constant 5 nm/s off every cell
+  (named shortcut c). A real hanging film thins at its frame: the frame wears a
+  Plateau border, a meniscus of radius r whose curvature sucks film in, and by
+  marginal regeneration (Mysels, Shinoda and Frankel 1959) thick film is drawn
+  into the border while thin film is pulled out of it and rises. The thin
+  film's thickness is Frankel's law for surfaces the surfactant makes rigid,
+  h_f = 2.68 r Ca^(2/3) with Ca = mu V / sigma, and the speed V it leaves at is
+  the film's own buoyant exchange, V = rho g (h - h_f) / zeta, the same Darcy
+  law the film's flow is made of. So the border takes V (h - h_f) per metre of
+  frame per second, and nothing else touches the volume.
+
+  The border is one body of liquid in hydrostatic balance, so its radius
+  shrinks with height, r(z) = 1 / (1/r0 + rho g z / sigma): the top border is
+  tight and sucks hardest, which is why a hanging film goes black from the top.
+
+  The contract: stepSoapFilm(f, dt, { border: r0 }) with r0 the bottom
+  border's radius in metres (absent: a film with no border, the closed box
+  C1-C7 ask about), sigma 0.025 N/m and
+  mu 1e-3 Pa s by default; f.drained is the thickness the border has taken,
+  summed over cells in nm, so sum(h) + drained is conserved.
+
+  Each line below is asked of the law, not of a picture: where the thinning
+  happens (only at the frame), where the volume goes (into the border, to
+  1e-9), how much (Frankel's thickness, solved here on its own), and that the
+  radius is the dial (a tighter meniscus sucks harder). A uniform evaporation
+  fails the first two; a border that removes a fixed fraction fails the third;
+  a border that ignores r fails the fourth.
+*/
+{
+  const RHO = 1000, ZETA = 1.5, SIGMA = 0.025, MU = 1e-3, G = 9.81;
+  const onFrame = (f, c) => { const i = c % f.nx, j = (c / f.nx) | 0; return i === 0 || j === 0 || i === f.nx - 1 || j === f.ny - 1; };
+  // One step from the same noisy film with and without a border: the transport is the same, so any difference is the border's.
+  const a = film({ seed: 7 }), b = film({ seed: 7 });
+  stepSoapFilm(a, 0.05, { border: 1e-3 }); stepSoapFilm(b, 0.05);
+  let inside = 0, framed = 0, frameCells = 0;
+  for (let c = 0; c < a.h.length; c++) {
+    const d = b.h[c] - a.h[c];
+    if (onFrame(a, c)) { frameCells++; if (d > 1e-9) framed++; } else if (Math.abs(d) > 1e-9) inside++;
+  }
+  check('C8 the border thins the film at the frame and nowhere else', inside === 0 && framed >= frameCells / 2,
+    `${framed} of ${frameCells} frame cells thinner after one step, ${inside} cells off the frame changed`);
+
+  const vol = film({ seed: 3 }), v0 = sum(vol.h);
+  for (let k = 0; k < 200; k++) stepSoapFilm(vol, 0.05, { border: 1e-3 });
+  const lost = v0 - sum(vol.h), drained = vol.drained ?? NaN;
+  check('C8 what the film loses, the border takes (10 s, r = 1 mm)', Math.abs(lost - drained) / v0 < 1e-9 && drained / v0 > 1e-4,
+    `film lost ${(100 * lost / v0).toFixed(3)}%, border took ${(100 * drained / v0).toFixed(3)}%, mismatch ${(Math.abs(lost - drained) / v0).toExponential(1)}`);
+
+  // Frankel's law solved here on its own: x = 2.68 r (mu rho g (h - x) 1e-9 / (zeta sigma))^(2/3) * 1e9, by bisection.
+  const frankel = (h, r) => {
+    let lo = 0, hi = h;
+    for (let k = 0; k < 200; k++) {
+      const x = 0.5 * (lo + hi), rhs = 2.68 * r * Math.pow((MU * RHO * G * (h - x) * 1e-9) / (ZETA * SIGMA), 2 / 3) * 1e9;
+      if (x < rhs) lo = x; else hi = x;
+    }
+    return 0.5 * (lo + hi);
+  };
+  // A uniform 800 nm film 8 mm tall: the bottom border at r0, the top one at Laplace-hydrostatic r(H).
+  const u = createSoapFilm({ nx: 8, ny: 8, noise: 0, h0: 800 });
+  stepSoapFilm(u, 0.05, { border: 1e-3 });
+  const expect = (r) => { const hf = frankel(800, r), V = (RHO * G * (800 - hf) * 1e-9) / ZETA; return [hf + (800 - hf) * Math.exp(-V * 0.05 / u.dx), hf, V]; };
+  const rTop = 1 / (1 / 1e-3 + (RHO * G * 8 * u.dx) / SIGMA);
+  const [bottom, hfB, vB] = expect(1e-3), [top, hfT] = expect(rTop);
+  const gotB = u.h[7 * 8 + 3], gotT = u.h[0 * 8 + 3];
+  check('C8 the film the border draws out is Frankel\'s (h = 2.68 r Ca^2/3 at the buoyant exchange speed, r from the border\'s hydrostatics)',
+    Math.abs(gotB - bottom) < 0.05 && Math.abs(gotT - top) < 0.05 && Math.abs(u.h[3 * 8 + 3] - 800) < 1e-9 && gotT < gotB,
+    `bottom border r 1 mm: fresh film ${hfB.toFixed(1)} nm at ${(vB * 1e3).toFixed(3)} mm/s, a cell ${gotB.toFixed(2)} (wanted ${bottom.toFixed(2)}); top border r ${(rTop * 1e6).toFixed(0)} um: fresh film ${hfT.toFixed(1)} nm, a cell ${gotT.toFixed(2)} (wanted ${top.toFixed(2)}); the middle ${u.h[27].toFixed(2)}`);
+
+  // r0 is the bottom border's radius; the borders above it are set by hydrostatics, so the dial shows most at the bottom row.
+  // The bottom row's thinning is read against the same film with no border, since thick film sinks into that row too.
+  const bottomRow = (f) => f.h.slice((f.ny - 1) * f.nx).reduce((a, x) => a + x, 0);
+  const took = [0.25e-3, 1e-3, 4e-3, 0].map((r) => {
+    const f = film({ seed: 3 });
+    for (let k = 0; k < 200; k++) stepSoapFilm(f, 0.05, r ? { border: r } : {});
+    return [f.drained ?? NaN, bottomRow(f)];
+  });
+  for (const t of took) t[1] = took[3][1] - t[1];
+  took.pop();
+  check('C8 a tighter meniscus sucks harder (bottom border r0 = 0.25, 1, 4 mm)',
+    took[0][0] > took[1][0] && took[1][0] > took[2][0] && took[0][1] >= 2 * took[2][1],
+    `border took ${took.map((x) => x[0].toFixed(0)).join(', ')} nm·cells in 10 s; the bottom row thinner than with no border by ${took.map((x) => x[1].toFixed(0)).join(', ')}`);
+
+  // The drain with no evaporation at all: the frame alone must make the thin top and thick bottom C6 asks for.
+  const dr = film({ seed: 1 }), d0 = sum(dr.h);
+  const qm = (f, k) => { let s = 0; const r0 = (k * f.ny) / 4, r1 = ((k + 1) * f.ny) / 4; for (let j = r0; j < r1; j++) for (let i = 0; i < f.nx; i++) s += f.h[j * f.nx + i]; return s / ((r1 - r0) * f.nx); };
+  let shaped = true, shapeAt = '';
+  for (let k = 0; k <= 2400; k++) {
+    if (k % 100 === 0 && k * 0.05 >= 30) {
+      const m = [0, 1, 2, 3].map((i) => qm(dr, i));
+      if (shaped && !(m[0] < m[1] && m[1] < m[2] && m[2] < m[3])) { shaped = false; shapeAt = `t=${k * 0.05}s means ${m.map((x) => x.toFixed(0)).join(' ')}`; }
+    }
+    stepSoapFilm(dr, 0.05, { border: 1e-3 });
+  }
+  const thinned = 1 - sum(dr.h) / d0;
+  check('C8 with no evaporation the border alone drains the film top-down (120 s, r = 1 mm)', shaped && thinned > 0.01,
+    `${shaped ? 'quarter means rise top to bottom after 30 s' : shapeAt}; the film lost ${(100 * thinned).toFixed(1)}%`);
+}
+
+// ── C9: black spots on Vrij's clock (PLAN 32g) ───────────────────────
+/*
+  The prototype turned a cell under 30 nm black by relaxing it to 8 nm over
+  0.5 s and deleting the difference (named shortcut d). What really happens: a
+  thin film is unstable to the van der Waals attraction between its faces, and
+  a thermal ripple grows on it at Vrij's rate (1966), its time
+  tau = 96 pi^2 sigma mu h^5 / A^2 with A the Hamaker constant (3.7e-20 J for
+  a water film in air). In a soap film the ripple stops at Newton black, 8 nm,
+  where the surfactant's own layers touch, and the liquid it held is pushed
+  out into a rim around the spot (Mysels' black spots). So the time a film
+  takes to go black is a steep law of its thickness (h^5: a 40 nm film in about
+  2 s, 60 nm in about 13, 300 nm never in a show), and no liquid is lost.
+
+  The contract: stepSoapFilm(f, dt, { sigma, mu, hamaker }) as defaults 0.025,
+  1e-3, 3.7e-20; a cell is black when f.h is 8 nm and f.ruptured is set.
+*/
+{
+  const SIGMA = 0.025, MU = 1e-3, A = 3.7e-20;
+  const tau = (h) => (96 * Math.PI ** 2 * SIGMA * MU * (h * 1e-9) ** 5) / A ** 2;
+  const firstBlack = (h, dt, T) => {
+    const f = createSoapFilm({ nx: 8, ny: 8, noise: 0, h0: h });
+    for (let k = 1; k <= T / dt; k++) {
+      stepSoapFilm(f, dt, { g: 0 });
+      for (let c = 0; c < f.h.length; c++) if (f.h[c] <= 8.01) return k * dt;
+    }
+    return Infinity;
+  };
+  const t40 = firstBlack(40, 0.01, 10), t55 = firstBlack(55, 0.05, 40);
+  check('C9 a thin film goes black on Vrij\'s clock (tau = 96 pi^2 sigma mu h^5 / A^2, at 40 and 55 nm)',
+    Math.abs(t40 / tau(40) - 1) < 0.05 && Math.abs(t55 / tau(55) - 1) < 0.05,
+    `40 nm black at ${t40.toFixed(2)} s (Vrij ${tau(40).toFixed(2)} s), 55 nm at ${t55.toFixed(2)} s (Vrij ${tau(55).toFixed(2)} s)`);
+  const t300 = firstBlack(300, 0.5, 120);
+  check('C9 a 300 nm film does not go black in a 120 s show', t300 === Infinity, t300 === Infinity ? `Vrij's time is ${(tau(300) / 3600).toFixed(0)} h` : `black at ${t300} s`);
+
+  // A thin patch in a thick still film: it goes black, keeps its liquid in a rim, and the film's total is untouched.
+  const f = createSoapFilm({ nx: 32, ny: 32, noise: 0, h0: 300 });
+  patch(f, 16, 16, 3, 40);
+  const spot = []; for (let c = 0; c < f.h.length; c++) if (f.h[c] === 40) spot.push(c);
+  const s0 = sum(f.h);
+  for (let k = 0; k < 100; k++) stepSoapFilm(f, 0.05, { g: 0 });
+  const black = spot.filter((c) => f.h[c] <= 8.01 && f.ruptured[c]).length;
+  // The rim is the film outside the patch that borders the spot. Film left inside the patch between spots that met
+  // (an island, as the photograph's dots inside the black) is allowed; the liquid must have left the patch.
+  const inPatch = new Set(spot);
+  let rim = 0, rimCells = 0;
+  for (let c = 0; c < f.h.length; c++) {
+    if (f.ruptured[c] || inPatch.has(c)) continue;
+    const near = [c - 1, c + 1, c - 32, c + 32].some((n) => n >= 0 && n < f.h.length && f.ruptured[n]);
+    if (near) { rimCells++; if (f.h[c] > 300 + 1e-6) rim++; }
+  }
+  const left = spot.reduce((a, c) => a + f.h[c] - 8, 0) / (spot.length * 32);
+  const drift = Math.abs(sum(f.h) - s0) / s0;
+  check('C9 a black spot keeps its liquid: the thin patch goes to 8 nm, its film goes to a rim, nothing is lost',
+    black >= spot.length / 2 && rimCells > 0 && rim === rimCells && left < 0.5 && drift < 1e-9,
+    `${black} of ${spot.length} patch cells black, ${(100 * left).toFixed(0)}% of the patch's liquid still in it, ${rim} of ${rimCells} film cells around it thicker than the film, total drift ${drift.toExponential(1)}`);
+}
+
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
 process.exit(failed.length ? 1 : 0);
