@@ -191,6 +191,7 @@
     "encode": "node scripts/encode.mjs",
     "framegroups": "node scripts/framegroups.mjs",
     "framereads": "node scripts/framereads.mjs",
+    "frameuploads": "node scripts/frameuploads.mjs",
     "straw": "node scripts/straw.mjs",
     "bubblephysics": "node scripts/bubblephysics.mjs",
     "lift": "node scripts/lift.mjs",

@@ -6399,6 +6399,35 @@ mapped in the same order, the rim a mask made once (`lib/rimMask.ts`, which the 
 the app's dish areas use too): the share is the same number to the bit
 (`npm run framereads`), and the two reads after the first make no buffer (2 before).
 
+## 14ab-4. The CPU's deltas go across by the rows written (shipped 2026-10-30, #579)
+
+14ab-4. With the GPU solver attached, `flushDeltas` copied all 192² cells of the CPU's
+delta arrays into two interleaved arrays and uploaded the dye, flow and multiplier grids
+whole every step it had anything, 1.33 MB through three `writeTexture`s, and 590 KB more for
+a hand's grid and again for a breath's, for what was usually a bubble's ring or a hand's
+disc. The writers that know where they wrote now say which rows (`lib/deltaRows.ts`:
+`addDensity`, `addVelocity`, `addTemp`, the bubbles' rims and the holes they fill, the hand
+on a thin gap, the breath); the old `dirty = true`, which every other writer still sets,
+means the whole grid, so a writer that forgets is slower and never wrong. The rows are a
+mask, sent as bands (bands closer than 8 rows go as one upload), with the bands the last
+upload to that texture wrote, which its copy still holds and the fold reads; the CPU's arrays
+are zero there by then. A texture's first upload is whole: the lab half of the check, handing
+its first rows to a fresh solver, caught the multiplier's texture resting at zero, not one.
+
+Finding the rows by scanning the arrays was measured first and dropped: 400 µs a flush on a
+plate with a few cells written, twice the copy it would save. `npm run frameuploads`
+(node and lab): every writer's cells inside the rows it said (a scan, with a control write it
+did not say); the arrays at rest after every flush; the solver's copies bit for bit the
+whole run's after every flush in node and the plate bit for bit after every step on the real
+solver (two whole runs agree, and a span two rows short is seen); a cell after a cell sends
+14 KB, not 1.33 MB; over the node half's thirteen frames 19.6 → 9.6 MB (a hand, a breath and
+a bubble's ring are tens of rows each, and the frames after a whole one go whole), and the
+lab half's eight 13.0 → 3.3 MB. The flush's own CPU in node, two cells a step: 318 → 18 µs.
+The review found the popped hole's fill reaching a wider ring than the rim's, past R = 22
+cells (the app caps bubbles at 13); it marks `fillHole`'s own reach now, and the check pours
+a bubble of 38 cells. It also had each frame's control seen alone, the multiplier laid in
+the lab, and a second breath, so the breath's grid goes by rows in both halves.
+
 ## Moved in the third pass (2026-10-29, 19m)
 
 When `PLAN.md` became an index with one file a section under `docs/plan/` (19m), the

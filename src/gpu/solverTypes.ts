@@ -335,8 +335,12 @@ export interface PlateSolver {
    * `sheet`, when Beat Squeeze's rhythm sheet moved this step: L² of the
    * gap's change, solved (lib/sheet.ts), laid as it is: no film closing on
    * top and no ceiling at rest (squeezeUpdate's `sheetT`, PLAN 27f-4).
+   * `rows`, a mask of the rows written since the last call, one byte a row
+   * (lib/deltaRows.ts, PLAN 14ab-4), or null for all: outside them every array
+   * is zero (`dyeMul` one), and only those rows, with the rows the last upload
+   * wrote, go across.
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null): void;
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null): void;
   /**
    * Drive the slosh dish for the next step (lib/slosh.ts SloshDrive: the tilt,
    * the water's viscosity, the presses, whether to lay it level first), or null

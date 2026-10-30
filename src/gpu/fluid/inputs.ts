@@ -21,7 +21,7 @@ export class FluidInputs extends FluidPasses {
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null, rows: Uint8Array | null = null): void {
     const q = this.device.queue;
     /*
       The press's plate mean used to be worked out here, from the gap deltas
@@ -37,18 +37,18 @@ export class FluidInputs extends FluidPasses {
       `scripts/mirror.mjs`). The mean is now taken on the GPU from the source
       itself, in project().
     */
-    q.writeTexture({ texture: this.cpuDyeTex }, dyeAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
-    q.writeTexture({ texture: this.cpuVelTex }, velAdd, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
-    q.writeTexture({ texture: this.cpuMulTex }, dyeMul, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
+    this.uploads.write(q, this.cpuDyeTex, dyeAdd, 16, rows, this.L);
+    this.uploads.write(q, this.cpuVelTex, velAdd, 16, rows, this.L);
+    this.uploads.write(q, this.cpuMulTex, dyeMul, 4, rows, this.L);
     if (hands) {
       if (!this.handTex) {
         const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
         this.cpuHandTex = this.disposer.track(this.device.createTexture({ label: 'hands (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
         this.handTex = this.disposer.track(this.device.createTexture({ label: 'hands', size: [this.N, this.N], format: RGBA32, usage }));
       }
-      q.writeTexture({ texture: this.cpuHandTex! }, hands, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
       let fastest = 0;
-      for (let k = 0; k < hands.length; k += 4) if (hands[k + 2] > 0.5) fastest = Math.max(fastest, Math.hypot(hands[k], hands[k + 1]) / hands[k + 2]);
+      for (const [h0, h1] of this.uploads.write(q, this.cpuHandTex!, hands, 16, rows, this.L))
+        for (let k = h0 * this.L * 4; k < (h1 + 1) * this.L * 4; k += 4) if (hands[k + 2] > 0.5) fastest = Math.max(fastest, Math.hypot(hands[k], hands[k + 1]) / hands[k + 2]);
       this.handFastest = fastest;
     }
     if (breath) {
@@ -57,7 +57,7 @@ export class FluidInputs extends FluidPasses {
         this.cpuBreathTex = this.disposer.track(this.device.createTexture({ label: 'breath (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
         this.breathTex = this.disposer.track(this.device.createTexture({ label: 'breath', size: [this.N, this.N], format: RGBA32, usage }));
       }
-      q.writeTexture({ texture: this.cpuBreathTex! }, breath, { bytesPerRow: this.L * 16 }, [this.L, this.L]);
+      this.uploads.write(q, this.cpuBreathTex!, breath, 16, rows, this.L);
     }
     if (sheet) {
       if (!this.sheetTex) {
@@ -65,7 +65,7 @@ export class FluidInputs extends FluidPasses {
         this.cpuSheetTex = this.disposer.track(this.device.createTexture({ label: 'sheet (cpu)', size: [this.L, this.L], format: R32, usage }));
         this.sheetTex = this.disposer.track(this.device.createTexture({ label: 'sheet', size: [this.N, this.N], format: R32, usage }));
       }
-      q.writeTexture({ texture: this.cpuSheetTex! }, sheet, { bytesPerRow: this.L * 4 }, [this.L, this.L]);
+      this.uploads.write(q, this.cpuSheetTex!, sheet, 4, null, this.L);
     }
     this.simF[0] = this.N; this.simF[1] = this.L; this.simF[2] = dt;
     q.writeBuffer(this.sim, 0, this.simData);

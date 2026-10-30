@@ -857,6 +857,20 @@
       ]
     },
     {
+      "name": "The CPU hands the solver only the rows it wrote",
+      "shard": "lab",
+      "run": "npm run frameuploads",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "A step's CPU deltas go across by the rows their writers said they wrote, with",
+        "the rows the last upload wrote (PLAN.md 14ab-4, lib/deltaRows.ts,",
+        "scripts/frameuploads.mjs): the real FluidSimulation's writers checked against",
+        "a scan of what they wrote, and the solver left the same bit for bit as by",
+        "whole grids, in node and on the real solver. Logic and counts, the same on any",
+        "adapter that computes."
+      ]
+    },
+    {
       "name": "The slosh dish on the GPU",
       "shard": "lab",
       "run": "npm run sloshgpu",
