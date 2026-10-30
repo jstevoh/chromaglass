@@ -3035,6 +3035,27 @@ the day they pass.
     holds them to 1e-4 of the depth and the wave speed: 2e-7 to 1.8e-5 on SwiftShader.
   - Shortcuts, named in `lib/slosh.ts` (a) to (i); open items 18a-13b, 13c, 13e, 13g, 13h.
 
+- **18a-13i, a look that tips its dish waits for the dish's kernels in its opening (shipped
+  2026-10-29).**
+  - What was reported: the first deploy run on the owner's Mac (run 40929715769) went red on
+    `npm run startup`'s "every look opens on only what the show waited for": Bass Drop asked
+    for the four slosh kernels (`sloshOil`, `sloshRest`, `sloshStep`, `sloshOut`) and
+    `fluid/addSlosh` in its first steps, and none was on its opening's list.
+  - Why, and why only then: not a new path. A resting hand sways (`swayAt`, lib/plateRock.ts),
+    so Plate Rock's swing through Bass Drop's Frame Sway 0.35 (`rockAccel`, 18a-13a) tips the
+    dish from its first frame. All five pipelines were built behind the show and the dish
+    waits for them (`WebGPUSlosh.ready`), so nothing was built on a frame; but on the
+    owner's Mac the build behind the show finished inside the look's forty steps and three
+    seconds, the dish started and asked, where GitHub's slower Macs had never got there
+    before the window closed, which is why a week of deploys passed on them.
+  - What changed: `gpu/opening.ts` has a `slosh` flag (on a thin gap: Plate Rock, the default
+    0.45 when a look does not say, with Frame Sway; or the Slosh dial with the plate stood
+    up), read by `WebGPUSlosh.prepare` and fluid's `addSlosh` row. The check's bar is
+    unchanged.
+  - Measured in the lab on software WebGPU (`?debug&asked&gpu=mid&look=bass-drop`): Bass
+    Drop's opening builds 61 pipelines (Classic's 56 and these five), all ready, asks for all
+    five in its first nine steps and none late, nothing on a frame; Classic 56, no slosh key.
+
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
 - **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the

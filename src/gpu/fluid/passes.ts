@@ -165,7 +165,7 @@ export class FluidPasses extends FluidFields {
     const drive = this.sloshDrive;
     if (!drive) { this.sloshTex = null; return; }
     if (!this.slosh) this.slosh = new WebGPUSlosh(this.device);
-    // Behind the show, as addSlosh is: until its kernels are built the dish waits and the plate is as it was.
+    // Built behind the show unless the look tips its dish (Opening.slosh); until built, it waits.
     if (!this.slosh.ready()) { this.sloshTex = null; return; }
     // The oil is the mix's, while the look has Oil Tension and the mix is made (lib/slosh.ts: the lens floats at its capillary thickness).
     const oil = this.mix && (p.oilTension ?? 0) > 0 ? { tex: this.mix.read, n: this.N } : null;
