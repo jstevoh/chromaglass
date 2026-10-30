@@ -362,10 +362,14 @@ jobs:
   # case), and a fork's run gets no secrets to ask with.
   #
   # The token is MAC_RUNNER_PROBE, in the `mac-runner` environment, which since
-  # 19ah-6 lets the sessions' branches (`claude/*`, `antigravity/*`) in beside
-  # main: GitHub matches a pull request's run by its head branch's name. It reads the repository's runners and nothing else, so a branch's own
-  # workflow that copied it out could learn whether the Mac is busy. Every
-  # other key stays where only main can reach it (scripts/cisecrets.mjs).
+  # 19ah-6 lets `refs/pull/*/merge` in beside main: GitHub matches a pull
+  # request's run by its merge ref, not its head branch's name (measured on
+  # this PR's first run, refused as "refs/pull/595/merge"). A fork's run
+  # matches that ref too, but it is given no secrets and this job's `if`
+  # never starts for it. The token reads the repository's runners and nothing
+  # else, so a branch's own workflow that copied it out could learn whether
+  # the Mac is busy. Every other key stays where only main can reach it
+  # (scripts/cisecrets.mjs).
   mac:
     name: Is the owner's Mac free
     needs: reach
@@ -405,8 +409,7 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@v5
-      - continue-on-error: true
-        env:
+      - env:
           GH_TOKEN: ${{ github.token }}
           SHARDS: ${{ needs.mac.outputs.shards }}
         run: node scripts/macwatch.mjs

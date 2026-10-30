@@ -133,8 +133,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Where MAC_RUNNER_PROBE lives: the `mac-runner` environment, which main
-    # and, since 19ah-6, the sessions' branches may use (a pull request's own
-    # probe in checks.yml), never a fork's. The token reads the repository's
+    # and, since 19ah-6, a pull request's merge ref (`refs/pull/*/merge`, for
+    # the pull request's own probe in checks.yml) may use; a fork's run gets
+    # no secrets and never starts that probe. The token reads the repository's
     # runners (fine-grained, this repository only, Administration: read) and
     # nothing else; it cannot register a runner. The keys that publish and
     # sign stay in environments only main can use (scripts/cisecrets.mjs).

@@ -37,9 +37,10 @@ Mac is free, and on GitHub's machines as before when it is not.
   any error, it lists none and every shard goes to GitHub as before.
 - **Its token** is `MAC_RUNNER_PROBE`, a fine-grained token for this repository with
   Administration: Read-only (listing runners needs it; the workflow's own token cannot),
-  kept in the `mac-runner` environment, which `main` and the sessions' branches
-  (`claude/*`, `antigravity/*`) may use: GitHub matches a pull request's run against its
-  head branch's name. A fork's run gets no secrets at all. The token can only list runners,
+  kept in the `mac-runner` environment, which `main` and every pull request's merge ref
+  (`refs/pull/*/merge`) may use: GitHub matches a pull request's run against that ref, not
+  its head branch's name. A fork's run matches the ref too, but it gets no secrets at all
+  and `checks.yml` never starts its probe. The token can only list runners,
   so a branch's workflow that copied it out would learn whether the Mac is busy; the keys
   that publish and sign stay in environments only `main` can use.
 - **How many shards** the Mac takes is the repository variable `OWNER_MAC_SHARDS` (a

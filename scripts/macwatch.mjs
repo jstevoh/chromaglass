@@ -64,13 +64,25 @@ const POLL_S = 30;
 // pull request's run is `checks.yml` itself.
 export const SUMMARY = 'Checks / WebGPU (macOS)';
 export const PR_SUMMARY = 'WebGPU (macOS)';
-export function verdict(jobs, shards) {
+export function verdict(jobs, shards, summary = SUMMARY) {
   const ours = jobs.filter((j) => (j.labels || []).includes(LABEL));
-  if (jobs.some((j) => (j.name === SUMMARY || j.name === PR_SUMMARY) && j.status === 'completed')) return 'done';
+  if (jobs.some((j) => j.name === summary && j.status === 'completed')) return 'done';
   const waiting = ours.filter((j) => j.status === 'queued' || j.status === 'waiting' || j.status === 'pending');
   if (ours.length >= shards.length && !waiting.length) return 'done';
   if (waiting.length && !ours.some((j) => j.status === 'in_progress')) return 'stalled';
   return 'wait';
+}
+
+/**
+ * What a stall does, by the event that started the run. Only a deploy's own
+ * events (a push to main, a hand-started deploy) may start deploy.yml again on
+ * GitHub's Macs; anything else, a pull request or an event nobody expected,
+ * only cancels its own run. The safe answer is the default: a pull request's
+ * token has `actions: write`, and a missing or new event name must never turn
+ * into a production deploy (the review of 19ah-6).
+ */
+export function onStall(event) {
+  return event === 'push' || event === 'workflow_dispatch' ? 'redeploy' : 'cancel';
 }
 
 /** POST through curl, the token only on stdin (as ghapi.mjs's GETs). The HTTP code. */
@@ -97,14 +109,14 @@ async function watch() {
   const repo = process.env.GITHUB_REPOSITORY;
   const run = process.env.GITHUB_RUN_ID;
   const shards = JSON.parse(process.env.SHARDS || '[]');
-  const pr = process.env.GITHUB_EVENT_NAME === 'pull_request';
+  const pr = onStall(process.env.GITHUB_EVENT_NAME) === 'cancel';
   if (!repo || !run || !shards.length) { console.log('no run or no shards on the owner\'s Mac: nothing to watch'); return; }
   const api = `https://api.github.com/repos/${repo}`;
   console.log(`watching run ${run}: ${shards.join(', ')} on the owner's Mac; a stall of ${STALL_MIN} minutes ${pr ? 'cancels the run' : 'moves the deploy to GitHub\'s Macs'}`);
   let since = null, last = '';
   for (;;) {
     let v = 'wait';
-    try { v = verdict(await jobs(api, run), shards); } catch (e) { console.log(`::warning::the jobs API did not answer (${String(e.message).split('\n')[0]}); trying again`); }
+    try { v = verdict(await jobs(api, run), shards, pr ? PR_SUMMARY : SUMMARY); } catch (e) { console.log(`::warning::the jobs API did not answer (${String(e.message).split('\n')[0]}); trying again`); }
     if (v !== last) { console.log(`${new Date().toISOString()} ${v}`); last = v; }
     if (v === 'done') return;
     since = v === 'stalled' ? (since ?? Date.now()) : null;
@@ -155,6 +167,7 @@ function selftest() {
     ['the summary waiting on the shards', [job('Checks / reach', 'completed'), job(SUMMARY, 'queued'), mac('lab', 'queued')], 'stalled'],
     ['the summary finished', [job('Watchdog', 'in_progress'), job('Checks / reach', 'completed'), job(SUMMARY, 'completed'), job('Build and deploy', 'queued')], 'done'],
     ['a GitHub Mac queued is not ours', [job('Checks / WebGPU (macOS) · lab', 'queued'), mac('app1', 'in_progress')], 'wait'],
+    ['a deploy\'s run does not end on a summary named as a pull request\'s', [job(PR_SUMMARY, 'completed'), mac('lab', 'queued')], 'stalled'],
     ['a pull request asleep from the first', [job('reach', 'completed'), job(PR_SUMMARY, 'pending'), prmac('lab', 'queued'), prmac('app1', 'queued')], 'stalled'],
     ['a pull request between two shards', [prmac('lab', 'completed'), prmac('app1', 'queued'), job('Measure', 'in_progress')], 'stalled'],
     ['a pull request on its first shard', [prmac('lab', 'in_progress'), prmac('app1', 'queued'), prmac('app2', 'queued')], 'wait'],
@@ -163,11 +176,19 @@ function selftest() {
   ];
   let fail = 0;
   for (const [what, js, want] of cases) {
-    const got = verdict(js, S);
+    const got = verdict(js, S, /a pull request/.test(what) && !/deploy/.test(what) ? PR_SUMMARY : SUMMARY);
     if (got !== want) fail++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}: ${got}${got === want ? '' : ` (wanted ${want})`}`);
   }
-  console.log(`${cases.length - fail} passed, ${fail} failed`);
+  // What a stall does: only a deploy's own events start a deploy.
+  const stalls = [['pull_request', 'cancel'], ['push', 'redeploy'], ['workflow_dispatch', 'redeploy'], ['', 'cancel'], [undefined, 'cancel'], ['schedule', 'cancel'], ['pull_request_target', 'cancel']];
+  for (const [ev, want] of stalls) {
+    const got = onStall(ev);
+    if (got !== want) fail++;
+    console.log(`${got === want ? ' ok  ' : ' FAIL'} a stall in a '${ev ?? 'unset'}' run: ${got}${got === want ? '' : ` (wanted ${want})`}`);
+  }
+  const all = cases.length + stalls.length;
+  console.log(`${all - fail} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }
 

@@ -20,7 +20,8 @@
 // The API needs a token that GITHUB_TOKEN cannot be (listing runners is an
 // Administration permission): MAC_RUNNER_PROBE, a fine-grained token for this
 // repository with Administration: read, kept in the `mac-runner` environment
-// that main and the sessions' branches can use, never a fork. No token, a refused one (expired), an API that does
+// that main and pull requests' merge refs (`refs/pull/*/merge`) can use; a
+// fork's run gets no secrets. No token, a refused one (expired), an API that does
 // not answer: each is `[]` with a warning that says which, never a red deploy.
 //
 // All five shards by default, one after another on the one runner: by the

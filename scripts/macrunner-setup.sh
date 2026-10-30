@@ -96,14 +96,15 @@ fi
 ./svc.sh status | grep -E 'Started|Stopped|not installed' || true
 
 echo "6. The deploy's probe can see the runner"
-# The environment main uses for the deploy's probe, and since 19ah-6 the
-# branches the sessions push (`claude/…`, `antigravity/…`) for a pull request's
-# probe: GitHub matches a pull request's run against its head branch's name.
+# The environment main uses for the deploy's probe, and since 19ah-6 every
+# pull request's merge ref for its own probe: GitHub matches a pull request's
+# run against `refs/pull/N/merge`, not its head branch's name. A fork's run
+# matches too but is given no secrets, and checks.yml never starts its probe.
 # The token in it reads the repository's runners and nothing else; no key
 # that can publish or sign is in this environment (scripts/cisecrets.mjs).
 gh api -X PUT "repos/$REPO/environments/mac-runner" --input - > /dev/null <<< '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
 have=$(gh api "repos/$REPO/environments/mac-runner/deployment-branch-policies" --jq '.branch_policies[].name')
-for b in main 'claude/*' 'antigravity/*'; do
+for b in main 'refs/pull/*/merge'; do
   grep -qxF "$b" <<< "$have" ||
     gh api -X POST "repos/$REPO/environments/mac-runner/deployment-branch-policies" -f name="$b" -f type=branch > /dev/null
 done
