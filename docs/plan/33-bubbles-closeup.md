@@ -120,10 +120,13 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   substrate seen through the surface's normal (refraction), a shallow depth of field
   and the dye's two layers parting in parallax. Each is a camera-pass term; take them
   one at a time with a `look` render, and keep `steadycam` green.
-- **33g-3. Three looks keep their cells by name.** `macro-bead`, `cell-bloom` and
-  `lace-run` set Paint Cells and Macro Lacing themselves, so they still draw cells at
-  the closeup. The owner to say whether they should stay (they are named for them) or
-  lose them too; `macroview` does not ask them.
+- ~~**33g-3. Three looks keep their cells by name.**~~ **Shipped** (the owner, 2026-10-29:
+  "No I don't want cells"). `macro-bead`, `cell-bloom` and `lace-run` now set Paint Cells
+  to 0; Macro Bead and Cell Bloom set Macro Lacing to 0 as well, and Lacing Run keeps its
+  lacing (its subject, dendrites rather than cells). Descriptions, the landing page and
+  the Guide say so, and `macroview` line 1 now audits every look. Open: Cell Bloom's name
+  says cells; the owner to say whether to rename it (its id is in set lists and saved
+  shows, so a rename keeps the id). Story in `docs/plan-shipped.md` §33g.
 - **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
   shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
   old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma
@@ -145,7 +148,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   height the lens focuses on is the dye's column (`aux.z`), not the gap's real depth.
 - **33i-2. Depth of field costs 64 taps a pixel and leaves hair at aperture 1.** Where a
   sharp dye ramp sits over a defocused ground the stochastic disc leaves a faint noise
-  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §91); if it
+  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §93); if it
   costs frames, gather at half resolution for the wide discs. The gather weights also lack
   the disc-area share (about 64 over the radius squared of the physical strength); a naive
   area weight is noisier, so the wide discs are somewhat fainter than a real lens's.
@@ -160,7 +163,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   to the refraction and shrank the blur by `1-bub*0.5` where a bubble sat; the new one reads
   no bubble mask (`aux.w`). A bubble is a diverging lens (a gas pocket in a liquid): bend by
   the bubble's own slope, and let Aperture treat it as the thing it is. Judge whether the
-  closeup misses it first (`docs/judging.md` §91).
+  closeup misses it first (`docs/judging.md` §93).
 - **33i-7. Saved looks with Lens up are close, not identical.** Each optic is rescaled by
   Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`); the old defaults sit
   2.0 to 2.3 levels from the old pass, an every-optic-at-.8 look 3.4 to 3.95, at .25 1.1 to

@@ -23,7 +23,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
+import { PINNABLE, PIN_RANGE, DEFAULT_RECIPE, DEFAULT_RIDES, MAX_PINS, onStep } from '../src/lib/deskPins.ts';
 import { PER_LAYER, PATCH_TARGETS } from '../src/lib/sceneMap.ts';
 import { THEMES, moveTargets } from '../src/lib/drift.ts';
 /*
@@ -44,12 +44,12 @@ import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { SettingRide, rideSlot } from '../src/lib/ride.ts';
-import { DEFAULT_RIDES } from '../src/components/desk/DeskPanels.tsx';
 import { SHIPPED } from '../src/lib/deskLayout.ts';
 import { lerpSettings, GLIDES } from '../src/lib/sequencer.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../src/lib/settingsMap.ts';
 import { FACTORY_MAPS, factoryFor } from '../src/lib/midi.ts';
 import { MIX_CONTROLS } from '../src/lib/mixer.ts';
+import { oneHome } from './panelOneHome.mjs';
 import { helpFor, CONTROL_HELP } from '../src/lib/controlHelp.ts';
 import { FADE_CONTROLS } from '../src/lib/mixFade.ts';
 import { HALOGEN_KELVIN, LAMP_WARMTH_MAX, LEGACY_GRADE, NEUTRAL_KELVIN, blackbodyHex, blackbodyShift, kelvinLabel, lampTint, warmthKelvin } from '../src/lib/lampKelvin.ts';
@@ -60,14 +60,16 @@ import { FULL_CM, HUB_CM, TAPE_CM_PER_S, TAPE_SECONDS, reelsAt } from '../src/li
 import { VU_FULL, needleAtRest, needleDeg, stepNeedle } from '../src/lib/vuMeter.ts';
 import { MAX_DOTS, strobeOf } from '../src/lib/strobeRing.ts';
 import { MOUNT_MM, NOTCH_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_H_MM, WINDOW_W, WINDOW_W_MM, stepOf, trayDeg } from '../src/lib/slideTray.ts';
+import { appSource } from './appSource.mjs';
+import { settingsSource, isSettingsPart } from './settingsSource.mjs';
 
 // The repository root as npm hands it over. Not `import.meta.url`: this file
 // is bundled into node_modules/.cache before it runs, so its own url points at
 // the cache directory rather than at the source it is here to read.
 const root = process.env.INIT_CWD ?? process.cwd();
-const panel = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+const panel = settingsSource();
 const panel0 = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
-const panel0app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+const panel0app = appSource();
 const sim = readFileSync(join(root, 'src/sim/fluidSimulation.ts'), 'utf8');
 
 const checks = [];
@@ -1046,7 +1048,7 @@ check('and the sections the dots aim at exist',
   named "Settings" while the button that does the same thing says "All
   settings…", so typing the words on the button matched nothing at all.
 */
-const app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
+const app = appSource();
 const guide = readFileSync(join(root, 'src/components/GuidePanel.tsx'), 'utf8');
 check('the app says Sound, never Audio, to the person using it',
   !/name: 'Audio Mappings'/.test(readFileSync(join(root, 'src/lib/settingsMap.ts'), 'utf8'))
@@ -1120,9 +1122,8 @@ check('a value reads the same way wherever it is shown',
 check('and the settings panel asks the same question',
   /readSetting\(String\(settingKey \?\? ''\), safeValue, min, max\)/.test(panel));
 
-// A line telling you where to go, where a button could take you.
-check('the no-controller line goes there instead of naming the route',
-  /data-testid="no-controller-hint"/.test(deskPanelsSrc) && !/Settings → MIDI to learn one/.test(deskPanelsSrc));
+// A line telling you where to go, and the second sweep of one home each (PLAN 35c-5).
+oneHome({ check, root, panel, header, deskSrc, deskPanelsSrc });
 
 // ── A document, and a desk that is not a performance ────────────────
 /*
@@ -1243,7 +1244,7 @@ check('and neither starts over the limit',
     // presses them.
     'ledBlend', 'gelBlend', 'lumiaBlend', 'backBlend', 'filmBlend', 'markBlend',
   ]);
-  const panelSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+  const panelSrc = settingsSource();
   const drawn = new Set([
     ...[...panelSrc.matchAll(/settingKey="([A-Za-z0-9_]+)"/g)].map(m => m[1]),
     ...[...panelSrc.matchAll(/onUpdate\(\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g)].map(m => m[1]),
@@ -1314,7 +1315,7 @@ check('and neither starts over the limit',
   const PLUMBING = new Set(['presets.ts', 'types.ts', 'SettingsPanel.tsx',
                             'deskPins.ts', 'lucky.ts', 'lookFade.ts']);
   const body = readdirSync(join(root, 'src'), { recursive: true })
-    .filter(f => /\.tsx?$/.test(f) && !PLUMBING.has(f.split('/').pop()))
+    .filter(f => /\.tsx?$/.test(f) && !PLUMBING.has(f.split('/').pop()) && !isSettingsPart(f))
     .map(f => readFileSync(join(root, 'src', f), 'utf8'))
     .join('\n');
   // `patch.layer(l)` is the frame reading one plate's settings (its dish's
@@ -1720,7 +1721,8 @@ check('and neither starts over the limit',
   /*
     Desk v2 has one desk, and its plate actions moved from the header's slot
     to the plate's own bar, which every layout draws. So "the same on both"
-    is now: Send to wall and Save are in that bar, each once, and nothing in
+    is now: Save is in that bar once, Send to wall is Wall (Desk.tsx
+    says why), and nothing in
     the bar depends on which layout is up. The header's slot holds Blackout,
     which is the same on every layout for the same reason.
   */
@@ -1728,10 +1730,10 @@ check('and neither starts over the limit',
   const barAt = src.indexOf('The plate bar.');
   const bar = barAt < 0 ? '' : src.slice(barAt, src.indexOf('data-testid="desk-preview"', barAt));
   const header = trailingOf(src);
-  const inBar = ['send-to-wall', 'save-look'].filter(t => (bar.match(new RegExp(`testId="${t}"`, 'g')) ?? []).length === 1
+  const inBar = ['save-look'].filter(t => (bar.match(new RegExp(`testId="${t}"`, 'g')) ?? []).length === 1
     && (src.match(new RegExp(`testId="${t}"`, 'g')) ?? []).length === 1);
   check('both desks put actions on the top bar at all',
-    inBar.length === 2 && header !== null && header.includes('blackout-button'),
+    inBar.length && /onWall=\{p\.onSendToWall\}/.test(src) && !/send-to-wall/.test(src) && header?.includes('blackout-button'),
     `plate bar: ${inBar.join(', ') || 'none'}; header: ${header ? header.join(', ') : 'none'}`);
   check('and they are the same actions on both',
     bar.length > 0 && bar.indexOf('<Segmented') >= 0 && !/layoutName ===? ?'(build|gig|loadin)' &&[^\n]*(send-to-wall|save-look)/.test(bar)
@@ -1912,7 +1914,7 @@ check('and neither starts over the limit',
   }
   check('the vignette blends as the old grade did, to 1.5% in the corners of the dish, from 0 to 1',
     shaderForm && worstCorner < 0.015, `shader form ${shaderForm}, worst ${(worstCorner * 100).toFixed(2)}% over 21 notches and three corner depths`);
-  const pinLamp = readFileSync(join(root, 'src/lib/deskPins.ts'), 'utf8'), settingsSrc = readFileSync(join(root, 'src/components/SettingsPanel.tsx'), 'utf8');
+  const pinLamp = readFileSync(join(root, 'src/lib/deskPins.ts'), 'utf8'), settingsSrc = settingsSource();
   check('the pin range, the Settings slider (typed as the number the sheet reads) and the bulb all end at the library\'s top',
     /key: 'lampWarmth'[^}]*max: LAMP_WARMTH_MAX/.test(pinLamp) && /settingKey="lampWarmth"/.test(settingsSrc) && Number(/label="Lamp Warmth"[\s\S]{0,160}max=\{([\d.]+)\}/.exec(settingsSrc)?.[1]) === LAMP_WARMTH_MAX &&
     /<Bulb warmth=\{at \* LAMP_WARMTH_MAX\}/.test(readFileSync(join(root, 'src/components/ui/Pace.tsx'), 'utf8')));

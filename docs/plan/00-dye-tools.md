@@ -135,6 +135,15 @@ and 24 in 12 s against a floor of 22.5 (three quarters of 30 tapped beats), so t
 that the kicks come from the tapped clock can pass with no tapped clock. It wants to count
 kicks on the tapped grid (within a fraction of a period of a tapped beat), not kicks at all.
 
+*Found 2026-10-30 (#550's fifth shard), not yet done:* **a stall piles two taps into one, and the
+harness's mean cannot see it.** "and the tapped tempo is the one the harness tapped" read the app's
+603.5 ms against the harness's 402.4. The app swallows a tap within 25 ms of the last
+(`DOUBLE_TAP_MS`, one press arriving twice), so two of the harness's four taps that reach the page in
+one turn, after a stall of a few hundred milliseconds on the shard's cold first page, count as one, and
+the gaps 400 and 800 average 600. The harness's own mean of three gaps is the elapsed time over three
+whatever the gaps did, so it reads 402 either way. The line should print the gaps, or hold the widest,
+so a stall reads as a stall and not as a wrong tempo.
+
 Still to see: the Finger's check on the Mac over a run of builds, and whether the
 looks with Polarity have lost an edge movement the owner liked (docs/judging.md
 §20).

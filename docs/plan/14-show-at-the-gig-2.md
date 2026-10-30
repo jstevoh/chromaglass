@@ -169,6 +169,12 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   2.66 s, `fluid/squeezeUpdate` 1.40 s, `plate/display` 1.03 s). The two slowest are
   the next thing to read: why each takes eight times the median, and whether the
   opening needs them before its first step.
+- **Shipped, 14v-11: the intro holds still until the whole opening is built** (2026-10-29,
+  the owner's choice: never a stutter, even if it moves later). It let go at the last render
+  compile with the solver's kernels still compiling, and #540's run 40741268086 went red on
+  startup's "no stop in the opening" 0.13 s after (2.35 s from 8.70 s). `Quiet.go` now comes
+  once the opening's last build has settled and its first uses are paid; `npm run intro`
+  lines 9 and 9b hold it to that. The Mac's `startup` check 4 is the real test.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
@@ -265,29 +271,17 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
 
 - ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Story in
   `docs/plan-shipped.md` §14ab-1 (moved 2026-10-29, 19m).
-- **14ab-2** *The video pour's optical flow is a CPU loop* over a 192² `getImageData`
-  each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
-  pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
-  belongs in a compute pass beside it.
-- **14ab-3** *Every frame reads both fields back and averages them on the CPU*
-  (`syncFromGpu`, a loop over every cell of each layer for the mean density and colour)
-  where `measure()` on the GPU returns the same means in 32 bytes. With 14j's "read back
-  only on a frame that stepped".
-- **14ab-4** *A CPU pour uploads the whole grid every step* (`flushDeltas`: about 1.3 MB
-  through three to five `writeTexture`s and the upsamples), for a few changed cells.
-  Splat records on the GPU (`applySplats`) are the path; what still goes through the
-  delta grids is the bubbles' rims, the hands, the breath and the room stir.
-- **14ab-5** *The plate, post chain, camera, output and particles make their bind groups
-  and views every frame* (10–20 `createBindGroup`, 40–60 `createView`); the solver
-  caches its own (H2c-11).
+- ~~**14ab-2** *The video pour's optical flow is a CPU loop*~~ **Shipped** (#584, `npm run videoflow`: no loop and no rows sent while a video pours, the deltas the CPU loop's to 1.7e-7). Story in `docs/plan-shipped.md` §14ab-2.
+- ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*~~ **Shipped** (#549, `npm run framereads`: a still plate 60 → 0 readbacks asked in thirty frames). Story in `docs/plan-shipped.md` §14ab-3.
+- ~~**14ab-4** *A CPU pour uploads the whole grid every step*~~ **Shipped** (#579, `npm run frameuploads`: a cell after a cell 1.33 MB → 14 KB, the flush 318 → 18 µs). Story in `docs/plan-shipped.md` §14ab-4.
+- ~~**14ab-5** *The plate, post chain, camera, output and particles make their bind groups and views every frame*~~ **Shipped** (#549, `npm run framegroups`: 12 groups and 64 views a frame → 0 and 0). Story in `docs/plan-shipped.md` §14ab-5.
 - **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
   gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
 - ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort on
   their history.~~ Shipped; story in `docs/plan-shipped.md` §14ab-7 (moved 2026-10-29, 19m).
 - ~~**14ab-8** *The gamepad* re-renders App at 30 Hz while its cursor shows~~ **Shipped** (#533, `npm run renders`' gamepad phase). Story in `docs/plan-shipped.md` §14ab-8 (moved 2026-10-29, 19m-2).
-- **14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every
-  sixty steps (`speciesShare`); a ring like the readback's.
+- ~~**14ab-9** *Thick liquid's share* makes a MAP_READ buffer and two 590 KB arrays every sixty steps~~ **Shipped** (#549, `npm run framereads`: the same share to the bit, no buffer after the first). Story in `docs/plan-shipped.md` §14ab-9.
 - **14ab-10** *Two of `npm run wall`'s lines judge the Mac runner, not the gate.* On #441's
   tools shard, two attempts on one head were each red on one line of 224, a different line
   each time. Attempt 1 failed "both windows animating, 0.25 of a refresh behind", which read
@@ -299,6 +293,29 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   comments say a starved runner's late timers part the two windows' frames by themselves. Find
   a measure of the gate's fault that holds at a quarter of the display's refreshes, or a
   starvation reading that sets the line aside and says so. The bar itself stays where it is.
+- **14ab-12** (open, found with 14ab-2, read in the code and not measured) *A pour's
+  splats fold at once, and the fold runs the step's forces.* `applySplats` ends with
+  `foldDeltas`, which besides adding the deltas runs `liquidForces` (a dt-scaled push from the
+  soap, the bodies and the polar liquid) and `squeezeUpdate` (the gap's own update, which the
+  step runs itself when no deltas were applied). So a frame whose tools lay splats runs
+  those once more than a frame that lays none, and a step after several such frames several
+  times. Measure it on a look with soap (a still plate, a tool laying splats at the frame
+  rate, the soap's push against a run where the splats go through the step's flush), and if
+  it is real, fold a frame's splats with the dye and flow alone, as the video pour's frames
+  now wait for the flush.
+- **14ab-13** (open, found with 14ab-2, read in the code) *Is a poured video upside down?*
+  The pour has always laid the frame's rows, which count down, on the grid's rows as they
+  come; the text pour (`pourText`) flips its canvas first because "the plate's rows run from
+  the bottom of the frame up", and `injectImage` does not. If that comment is right, a poured
+  video and an uploaded picture land upside down. A `look` render of a cartoon with a known
+  top (a title card) settles it; 14ab-2 kept the orientation as it was.
+- **14ab-11** (open, found with 14ab-4) *The deltas' whole-grid writers and the GPU's whole
+  passes.* The writers that still set `dirty = true` send all 192² rows: the room's and the
+  film's stir (whole by nature), but also a press, a lift, a carry, a pop and the liquids'
+  step, which know their discs and could say them with `rows.add` as the hand does. And on
+  the GPU, `applyDeltas` still upsamples the three delta grids and folds them over the
+  whole plate each flush; a dispatch over the written bands' rows (scaled to N) would do.
+  `npm run frameuploads` holds whichever writer moves to rows to its own scan.
 
 ## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 
@@ -345,6 +362,8 @@ Open, found building it:
   shelf's weight, fetched only when someone picks it. If that proves a cost (a phone on mobile
   data), cut it to a half hour of its best scenes as a separate entry, or serve it by a
   lower bitrate; the check holds a feature under 30 MB.
+- **14ac-7** *The cartoons were not in Settings → Film.* **Shipped** (2026-10-29): the Film
+  section lists the shelf under its demo loops. Story in `docs/plan-shipped.md` §14ac.
 
 ## 14ae. One Record button (shipped, asked 2026-10-24)
 

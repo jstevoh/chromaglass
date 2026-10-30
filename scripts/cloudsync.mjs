@@ -50,6 +50,7 @@ import { loadUserSequences, saveUserSequences } from '../src/lib/sequencer.ts';
 import { loadMidiMap, saveMidiMap, MIDI_FORMAT } from '../src/lib/midi.ts';
 import { loadToolAmounts, saveToolAmounts } from '../src/lib/toolAmount.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
+import { appFiles, appSource } from './appSource.mjs';
 
 const results = [];
 const check = (name, ok, detail = '') => {
@@ -360,8 +361,8 @@ check(
 {
   // Bundled into node_modules/.cache, so paths are from the repository root, where npm runs it.
   const read = (p) => readFileSync(p, 'utf8');
-  const app = read('src/App.tsx');
-  const sources = ['src/App.tsx', 'src/hooks/useUserPresets.ts', 'src/hooks/useShowSequencer.ts', 'src/hooks/useMidi.ts'].map(read).join('\n');
+  const app = appSource(read);
+  const sources = [...appFiles(), 'src/hooks/useUserPresets.ts', 'src/hooks/useShowSequencer.ts', 'src/hooks/useMidi.ts'].map(read).join('\n');
   const reloadBlocks = [...sources.matchAll(/useCloudSyncReload\(\{([\s\S]*?)\}\);/g)].map((m) => m[1]).join('\n');
   // The keys App.tsx keeps to itself are still the keys it saves under.
   const appKeys = ['chromaglass-music-settings', 'chromaglass-follow-songs'].filter((k) => app.includes(`'${k}'`));
