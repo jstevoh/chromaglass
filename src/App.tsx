@@ -2168,7 +2168,7 @@ export default function App() {
       onSource={(x) => { void handleSourceChange(x); }}
       inputs={audioInputs}
       inputId={audioInputId}
-      onInput={chooseAudioInput}
+      onPickMic={deskOpen.sound}
       playing={musicPlaying}
       time={musicTime}
       loop={musicLoop}

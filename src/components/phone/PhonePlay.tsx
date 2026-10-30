@@ -89,7 +89,7 @@ export interface PhonePlayProps {
   onDye: (hex: string) => void;
   /** The app's hand: Play sets it from the tray and from the touch itself. */
   onTool: (t: PhoneTool) => void;
-  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'automateRate' | 'macroZoom' | 'macroMode'>;
+  settings: Pick<VisualizerSettings, 'globalSpeed' | 'turbulenceScale' | 'vorticityConfinement' | 'surfactantFlow' | 'macroZoom' | 'macroMode'>;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   /** The look's own value of a setting, where a double tap on its slider puts it back (8c). */
   lookValueOf?: (key: keyof VisualizerSettings) => number | undefined;
@@ -467,8 +467,11 @@ export function PhonePlay(p: PhonePlayProps) {
               {/* To 8×, not the pinch's 16: past 8 a phone's plate is a few cells across, and the slider's travel is better spent below. */}
               <TouchSlider glass label="Zoom" help="How close the camera looks into the plate. One is the whole plate." min={1} max={8} value={Math.min(8, zoom)}
                 display={`${zoom.toFixed(1)}×`} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
-              <TouchSlider glass label="Evolve" setting="automateRate" min={0} max={1} value={s.automateRate ?? 0}
-                display={pct(s.automateRate ?? 0)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
+              {/*
+                Evolve stood here too: the same Evolve Speed as the Motion
+                sheet's, which sits under the Evolve switch it means nothing
+                without (PLAN 35c-5). It is the Motion sheet's alone now.
+              */}
               </div>
               <div className="min-w-0">
 

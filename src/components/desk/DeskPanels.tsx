@@ -424,28 +424,23 @@ function RidesBody({ p }: { p: DeskProps }) {
               }}
               testId="toggle-evolve"
             />
-            <Toggle
-              label="Follow beat"
-              on={(p.settings.beatPrediction ?? 0) > 0.05}
-              onChange={on => p.onSetting({ beatPrediction: on ? 0.7 : 0 })}
-              testId="toggle-beat"
-            />
+            {/*
+              Follow beat stood here, a switch that wrote Beat Prediction as 0
+              or 0.7: the same setting as the Sound section's slider, drawn
+              twice, and the switch read "off" at 0.04 and set 0.7 over
+              whatever the slider had (PLAN 35c-5). Beat Prediction is a
+              pinnable control, so a performer who wants it on the strip
+              chooses it and gets the real one.
+            */}
           </div>
           {/*
-            The line that says there is no controller is the one place someone
-            reads when their controller is not working, so it is a button that
-            goes there rather than a route to walk by hand.
+            With a controller, the strip says its faders move these. Without
+            one, nothing: "No controller yet — set one up" was a button here
+            that did what the header's MIDI light does, on every tab, with the
+            same words in its title (PLAN 35c-5).
           */}
-          {p.midiName ? (
+          {p.midiName && (
             <p className="mt-3 pb-2 text-[12px] text-faint">{`${p.midiName} · a CC on a fader moves it here too`}</p>
-          ) : (
-            <button
-              onClick={p.onMidi}
-              className="mt-3 pb-2 text-left text-[12px] text-faint underline decoration-dotted underline-offset-2 hover:text-text-2"
-              data-testid="no-controller-hint"
-            >
-              No controller yet — set one up
-            </button>
           )}
         </div>
       )}
@@ -455,11 +450,13 @@ function RidesBody({ p }: { p: DeskProps }) {
         mixer is opened, set and closed far more often than it is watched, and
         a level is a ride. `npm run layout` asks that it covers none of the plate.
       */}
-      <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
-        {!mixerOut && <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
-        <Button full height={40} onClick={p.onOpenSettings} testId="open-all-settings-rides">All settings…</Button>
-      </div>
-      <div className="flex shrink-0 gap-2 p-3">
+      {/* All settings… went to the status bar, on every tab; its copy here stayed until PLAN 35c-5. */}
+      {!mixerOut && (
+        <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
+          <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>
+        </div>
+      )}
+      <div className={`flex shrink-0 gap-2 p-3 ${mixerOut ? 'border-t border-border' : ''}`}>
         <Button full height={40} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
       </div>
       {mixerOpen && !mixerOut && createPortal(
@@ -494,10 +491,11 @@ function RidesBody({ p }: { p: DeskProps }) {
 function RecipeBody({ p }: { p: DeskProps }) {
   const [picking, setPicking] = useState(false);
   /*
-    Random evolve and All settings are the rides' too. With both panels out
-    (anyone can dock the recipe beside the rides now) they would be on the
-    screen twice, and a control in two places is one nobody trusts mid-set:
-    the recipe leaves them to the rides, which is where Gig keeps them.
+    Random evolve is the rides' too. With both panels out (anyone can dock the
+    recipe beside the rides now) it would be on the screen twice, and a control
+    in two places is one nobody trusts mid-set: the recipe leaves it to the
+    rides, which is where Gig keeps it. All settings… is the status bar's, on
+    every tab, so neither panel draws it (PLAN 35c-5).
   */
   const ridesOut = whereIs(p.layout, 'rides') !== null;
   // And so are the controls themselves: one control, one place on a tab (`drawnElsewhere`).
@@ -543,15 +541,10 @@ function RecipeBody({ p }: { p: DeskProps }) {
           )}
         </div>
       )}
-      {/*
-        The way in to the rest, pinned rather than at the end of a list that
-        scrolls: the one control whose job is to be found must not be below
-        the fold (the Mac's `qa` checks it is on screen).
-      */}
+      {/* Pinned rather than at the end of a list that scrolls. */}
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
-        {!ridesOut && <Button full height={32} onClick={p.onOpenSettings} testId="open-all-settings-bench">All settings…</Button>}
         <Button
-          height={32}
+          full height={32}
           pressed={!!p.settings.macroMode}
           title="The closeup camera, in among the drops (M). Lit while it is on."
           onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
@@ -562,7 +555,7 @@ function RecipeBody({ p }: { p: DeskProps }) {
         </Button>
         {/* Randomise replaces every setting at once, so it asks first. */}
         <Button
-          height={32}
+          full height={32}
           variant={p.randomiseArmed ? 'primary' : 'secondary'}
           onClick={p.onRandomise}
           midiKey="action:lucky"

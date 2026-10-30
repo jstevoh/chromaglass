@@ -6191,6 +6191,41 @@ more than once; now none) and holds the order; `panel` reads the Wall being hand
 looked for the button, and counts the dials the desk drew (Perform: 46, none twice; with the Recipe's
 filter taken out it names the six); `bubbles` slows the plate through the Rides' Speed when the Rides have it.
 
+### 35c-5. One home each, the second sweep (shipped 2026-10-30)
+
+The owner, the morning after 35c-4: "I noticed that there are a few repeated controls between
+panels. Let's check those." Every shipped tab was opened at 1440 and each panel's controls listed,
+every Settings section's writes read for a setting written by two sections, and the Sound sheet
+and the phone's sheets read beside them. Six were one control in two places:
+
+- **All settings…** was in the status bar (put there because a tab may not have the Rides), and
+  still in the Rides' footer and the Recipe's. The status bar's is on every tab and never scrolls;
+  the two panel copies are gone, and the Recipe's Close-up and Randomise take the row.
+- **Follow beat** on the Rides wrote Beat Prediction as 0 or 0.7, the setting the Sound section
+  draws as a slider: it read "off" below 0.05 and threw the slider's value away when pressed. The
+  switch is gone; Beat Prediction is pinnable, so Choose puts the real one on the strip.
+- **"No controller yet — set one up"** under the Rides did what the header's MIDI light does, on
+  every tab, whose title says "No controller. Click to set one up." The Rides keep the line that
+  names a connected controller, which is not a control.
+- **What turns the plates with the music** (`audioMappings.rotation`) was Sound's fourth wiring
+  select and Plate Spin's "Driven by". It is Plate Spin's, beside the motor it adds to; Sound's list
+  says so with a link.
+- **Which microphone** was Settings' Input and a select in the Sound sheet; on Setup, where Sound and
+  Music & Drone stand together, both were on screen. Settings' Input is where the Mic light lands
+  (and `inputpick` drives), so it is the home; the sheet says which microphone it is hearing and its
+  Change… opens Settings at Sound.
+- **The phone's Evolve Speed** was a Play slider and the Motion sheet's, the latter under the Evolve
+  switch it does nothing without. It is the Motion sheet's.
+
+Left alone on purpose: the look menu's "Save as a new preset… ⌘S" beside the plate bar's Save (a
+menu item and its key), the header's lights (each opens its panel), and the Rides as copies of a
+section's controls, which 35c-4 keeps to once a tab.
+
+Checks. `panel` asks each pair from both ends (the home there, the copy gone), in
+`scripts/panelOneHome.mjs` beside it since `panel.mjs` is at its size ceiling: 256/262 against
+main's components, 262/262 after; the no-controller check that asked for the Rides' button now asks
+for the MIDI light's words and no second route. `phone` counts five Play sliders, was six.
+
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this

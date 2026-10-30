@@ -23,8 +23,10 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The phone dock's Motion dot stands for two states (Evolve or Tilt) at once.
   - Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
     rows): legible, but a third way of saying off; make them `disabled` with the reason.
-  - "All settings…" twice on the desk (DeskPanels' rides and recipe) beside "+ Panel".
-  - "Sound" in the layout switch next to the Sound dot that opens the same panel.
+  - ~~"All settings…" twice on the desk (DeskPanels' rides and recipe) beside "+ Panel".~~ The
+    status bar's alone since 35c-5.
+  - ~~"Sound" in the layout switch next to the Sound dot that opens the same panel.~~ Gone with the
+    layout switch: the tabs are Perform, Sequence and Setup (found in 35c-5's sweep).
   - The hand-built pick-one grids in Settings (On a New Song, Render Style, Film Stock,
     folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
     draw them once, once it takes a title per option and a number id.
@@ -41,8 +43,9 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   2026-10-29, 19m).
 - ~~**35c-2** One home per setting, second half.~~ **Shipped**: Flash Limit's one switch, each Impact master under its source's Drive, Plate Spin, Squish Plate in Build's deck, the sequencer button, Takes as a pointer. Story in `docs/plan-shipped.md` §35c-2 (moved 2026-10-29, 19m-2).
 - **35c-3** One home for **MIDI on** and the **audio source**. *Shipped*: Settings' Controller section is MIDI's one home, the Sound sheet the source's. Story in `docs/plan-shipped.md` §35c-3 (moved 2026-10-29, 19m-2). Left from it:
-  - The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
-    (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.
+  - ~~The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
+    (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.~~
+    Settings' Input alone since 35c-5.
   - 35b-2's pin picker and command palette still list by section, not by the seven groups.
   - Each Drive/Impact pair (now side by side under its source) is still two knobs: whether
     each becomes one Strength per input is undecided, and 14ad-2 waits on it (from 35c-2's
@@ -54,6 +57,20 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The Recipe's and Rides' Choose list does not say a control is drawn on another panel of the
     tab, so picking Speed onto the Recipe beside the Rides answers with the line under the dials,
     not in the list where the pick was made.
+- ~~**35c-5** One home each, the second sweep.~~ **Shipped** 2026-10-30: All settings… in the status
+  bar alone, Beat Prediction in Sound alone (the rides' Follow beat switch gone), the no-controller
+  route the header's MIDI light alone, the plates' music route in Plate Spin alone, the microphone in
+  Settings' Input alone (the Sound sheet says which and leads there), and on the phone Evolve Speed in
+  the Motion sheet alone. Story in `docs/plan-shipped.md` §35c-5. Left from it:
+  - On the Setup tab the Sound section's **Change in Sound…** opens the Sound sheet over the Music &
+    Drone panel, which is that sheet, already on the tab. A section does not know the tab it is
+    drawn on (`SectionCtx` has no layout), so the button cannot yet step aside for the panel.
+  - The Cues panel's **Save** keeps the set and the plate bar's **Save** keeps the look: two actions,
+    one name (35a's rule), and both buttons are at their width at 1280.
+  - `npm run shelf` (the Sound sheet's music shelf) stops at its first line, "there is a Sound tab
+    on the desk": the tabs are Perform, Sequence and Setup since the screens became panels, and the
+    check is in no shard of `scripts/checks.json`, so nothing has run it since. Red on main as of
+    40e6291; it wants the Music & Drone panel on Setup as its way in.
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

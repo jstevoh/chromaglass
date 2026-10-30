@@ -318,13 +318,18 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         {/* What each band of the sound moves: Sound Mappings, as was. */}
         <span className="mb-2 mt-4 block text-[11px] font-medium uppercase tracking-wide text-white/40">What the sound moves</span>
         {/*
-          The four selects below are the fixed wiring — which audio band drives
-          velocity, density, colour and rotation — and they stay, because they
-          are what the solver reads directly. The other way in is a patch,
-          which can take *any* audio feature to *any* setting; Sound Impact,
-          the master over those, sits with the patch bay under Patches.
+          The selects below are the fixed wiring — which audio band drives
+          velocity, density and colour — and they stay, because they are what
+          the solver reads directly. The other way in is a patch, which can
+          take *any* audio feature to *any* setting; Sound Impact, the master
+          over those, sits with the patch bay under Patches.
+
+          Rotation was a fourth select here, the same `audioMappings.rotation`
+          as Plate Spin's "Driven by": two drawings of one route, the one here
+          with no word of what it turned (PLAN 35c-5). It lives with the motor
+          it adds to, and this list says where.
         */}
-        {['velocity', 'density', 'color', 'rotation'].map((param) => (
+        {['velocity', 'density', 'color'].map((param) => (
           <div key={param} className="flex flex-col gap-2 mb-4">
             <span className="text-[13px] font-medium text-text">{param}</span>
             <select
@@ -346,7 +351,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
           </div>
         ))}
         <p className="mb-3 text-[12px] leading-relaxed text-white/40">
-          Any sound feature onto any other control is a patch, in {goTo('patches', 'sound')}.
+          Turning the plates with the music is in {goTo('spin', 'sound')}. Any sound feature onto any other control is a patch, in {goTo('patches', 'sound')}.
         </p>
       </section>
       )}
