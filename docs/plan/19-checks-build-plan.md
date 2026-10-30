@@ -124,7 +124,7 @@ shard's own build, about 6 s each; in Measure `layout`, `phone` and `applink` ea
 while `remotemix` depends without saying so on an earlier step having built `dist/`.
 `dc.mjs` at the root and `scripts/_diag.mjs` were wired to nothing, and `dc.mjs`
 hard-coded `/opt/pw-browsers/chromium`, which `chromium.mjs` exists to avoid. **Both
-are deleted** (this PR: `git grep` found them only in this sentence, the archive and one
+are deleted** (#589: `git grep` found them only in this sentence, the archive and one
 line of `scripts/checks.json`, the parse loop, which no longer names `dc.mjs`).
 `actionlint`, which CLAUDE.md asks for on a workflow change, is in no image and no job.
 
