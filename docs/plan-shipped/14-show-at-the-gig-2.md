@@ -237,6 +237,22 @@ before the measured one (untested, and #396's warm in the same page did not help
   Named cost: a visitor who presses Play without the pointer resting on it first waits
   for Chromium's GPU start (1.8 to 4.3 s cold on CI's Mac) inside the intro, where
   before the webpage had paid it while being read.
+- **Shipped, 14v-11: the intro holds still until the whole opening is built** (2026-10-29,
+  the owner's choice: "hold the intro still through the whole cold start so the plate
+  opening never stutters, even if it moves a little later"). 14v-5 let it go when the
+  opening's last render pipeline settled, with the solver's compute kernels still
+  compiling in the other lanes; on #540's run 40741268086 the Mac's `startup` went red on
+  "no stop in the opening", 2.35 s from 8.70 s, 0.13 s after the intro let go at 8.57 s,
+  `fluid/dampGridCurv` compiling (PLAN 14v-10). That thread's `?stillall` trial (still to
+  the end) opened no later: first step 13.5 to 14.8 s on all twelve openings. Now
+  `buildInTurn` calls `Quiet.go` once, after every build of the opening has settled and
+  its first uses are paid, and on any other end (device gone, timed out). `npm run intro`
+  9 and 9b read the whole opening from the prepare log (some frames seen after the last
+  render compile, none moving; the still's release no earlier than the last build): 0 of
+  373 frames in the opening moving, and on the old code 8 of 379, all after the last
+  render compile (on software WebGPU that stretch was the first uses' wait, 9.05 to
+  9.19 s; on the Mac it is the kernels too), 9 and 9b red. Cold, the mark is now still for the whole wait and fades
+  as the plate's first step comes; the phone opens through the same code.
 
 ### 14m. Anyone on the venue's network can drive the show
 

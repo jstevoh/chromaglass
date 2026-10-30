@@ -127,3 +127,120 @@ fewer), and stamp the reading's time against the frame's.
   tone; and a 10 s clip of the bundled "Live On Rainy Days" comes back 200 `{"match":false}`
   (not in AudD's catalogue). Whether a well-known commercial track comes back named is
   the one thing left, and needs a recording no cloud session should send.
+
+## Shipped after the split
+
+### 14ab-4. The CPU's deltas go across by the rows written (shipped 2026-10-30, #579)
+
+14ab-4. With the GPU solver attached, `flushDeltas` copied all 192² cells of the CPU's
+delta arrays into two interleaved arrays and uploaded the dye, flow and multiplier grids
+whole every step it had anything, 1.33 MB through three `writeTexture`s, and 590 KB more for
+a hand's grid and again for a breath's, for what was usually a bubble's ring or a hand's
+disc. The writers that know where they wrote now say which rows (`lib/deltaRows.ts`:
+`addDensity`, `addVelocity`, `addTemp`, the bubbles' rims and the holes they fill, the hand
+on a thin gap, the breath); the old `dirty = true`, which every other writer still sets,
+means the whole grid, so a writer that forgets is slower and never wrong. The rows are a
+mask, sent as bands (bands closer than 8 rows go as one upload), with the bands the last
+upload to that texture wrote, which its copy still holds and the fold reads; the CPU's arrays
+are zero there by then. A texture's first upload is whole: the lab half of the check, handing
+its first rows to a fresh solver, caught the multiplier's texture resting at zero, not one.
+
+Finding the rows by scanning the arrays was measured first and dropped: 400 µs a flush on a
+plate with a few cells written, twice the copy it would save. `npm run frameuploads`
+(node and lab): every writer's cells inside the rows it said (a scan, with a control write it
+did not say); the arrays at rest after every flush; the solver's copies bit for bit the
+whole run's after every flush in node and the plate bit for bit after every step on the real
+solver (two whole runs agree, and a span two rows short is seen); a cell after a cell sends
+14 KB, not 1.33 MB; over the node half's thirteen frames 19.6 → 9.6 MB (a hand, a breath and
+a bubble's ring are tens of rows each, and the frames after a whole one go whole), and the
+lab half's eight 13.0 → 3.3 MB. The flush's own CPU in node, two cells a step: 318 → 18 µs.
+The review found the popped hole's fill reaching a wider ring than the rim's, past R = 22
+cells (the app caps bubbles at 13); it marks `fillHole`'s own reach now, and the check pours
+a bubble of 38 cells. It also had each frame's control seen alone, the multiplier laid in
+the lab, and a second breath, so the breath's grid goes by rows in both halves.
+
+### 14ab-2. The video pour's dye and flow on the GPU (shipped 2026-10-30, #584)
+
+14ab-2. A poured video was drawn into a 192² canvas every frame and read back with
+`getImageData`, copied whole (147 KB) to be the next frame's reference, and each of its
+36,000 cells went through `addDensity` (its brightness as dye, under a luma key) and, where
+it changed by more than the video's noise, `addVelocity` (the change read as motion along
+the brightness gradient, u = −(dI/dt)∇I/|∇I|², brightness constancy's smallest answer). On
+the GPU solver every one of those calls also marked its row, so each step sent all the
+rows the picture covered, up to the whole 1.33 MB, on top of the loop's own time (1.4 to
+1.6 ms a frame in node, before the browser's read back).
+
+The WebGPU solver now takes the frame as a texture (`pourVideo`, `fluid/inputs.ts`) and
+works out the same thing in two compute passes (`videoSample`, `videoFlow`, in
+`wgsl/splat.ts`), with the loop's numbers interpolated from `lib/videoFlow.ts`, where the
+loop itself now lives for the WebGL solver and the CPU's. The frame is drawn at the grid's
+size as the canvas did, each cell the mean of up to four bilinear taps a side over its
+footprint so a big frame's detail does not alias into motion, and kept as 8 bits, so the
+thresholds see the canvas's whole numbers. Its deltas are held until the step's flush and
+added to the CPU's there (`upsampleDeltaSum`), as the loop's writes waited in the CPU's
+arrays: two frames between two steps (a step rate under the refresh) add up, and a hand's
+push on a thin gap is imposed with the video's, as one. A step with only the video's frames
+still flushes, and sends no row of the CPU's. The app's frame makes one call
+(`pourVideoFrame` in `lib/videoFlow.ts`): the solver's pass, or, when it has none or poured
+nothing (a frame from another origin that cannot be read), the canvas and the loop. With it
+one fault went: the pour plays every cartoon on one element, so the next cartoon's first
+frame was differenced against the last one's end and the cut read as a burst of motion; a
+frame is now fresh when the video's address changes. The still picture's CPU pour
+(`injectImage`) moved beside the loop, as it was, to keep `fluidSimulation.ts` under its
+size ceiling.
+
+`npm run videoflow` (node and lab, 19 lines; the Mac's fifth shard runs its `<video>` line
+alone): in node, the real FluidSimulation through the app's own call pours through the loop
+without the pass (the reference) and with it writes nothing into the CPU's arrays, flushes
+for the held frames with 0 bytes against 1.03 MB for the check's picture (a cartoon covering
+the frame sends 1.33 MB), sends a tool's cells in the same frame by their own row, flushes
+before a read of the plate, and hands a frame the pass did not pour to the loop; each video's
+first frame is fresh. On the real solver the deltas the fold takes match the loop's to 1.7e-7
+(dye) and 3.4e-6 (flow) of their scale, at the grid's size, at four times it and at four by
+two (each cell's block dithered, so one tap a cell is seen), a frame a step later too, and
+the plate after the fold (its flow to its half float); a playing `<video>` pours where its
+frame is, cell by cell. SwiftShader loses its GPU instance copying from a `<video>`, so the
+cloud pours an ImageBitmap of it and the Mac the element. Controls: the second frame poured
+as a first is seen in the flow, the last frame alone is not the two frames' sum, a flush after
+the flush adds nothing, the canvas's pour upside down is 143% from itself, and by hand one tap
+a cell, the edge guard removed, the held frames not added, the vertical gradient reversed, the
+read's flush removed and the fresh frame keyed on the wrong thing each fail their lines. The
+review (check-skeptic) found the first four of those gaps. `pourVideo` costs 0.1 to 0.2 ms
+of the CPU a call on SwiftShader, a canvas's copy included; a video's is a copy on the GPU.
+`npm run wgsl` now compiles the splat kernels too, which it never had.
+
+### 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
+
+14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the
+bottom of the frame up; a canvas's run down"), and the video pour and an uploaded picture
+did not, so if that comment was right both landed upside down. It was. On the owner's Mac
+(Apple GPU, Metal), a still plate, a pour and a photograph straight after, beside its source:
+the word "TOP RAT" over "bottom" through `pourText` stood the right way up; an uploaded
+picture of the same two words, pink above and blue below, landed with the blue on top and
+every letter upside down (a vertical flip, not a mirror: the words still read left to right);
+and a cartoon frame (Jack Frost, 240 s in: an orange sky above, pumpkins below) poured with
+the pumpkins at the top and the sky's light at the bottom. The pictures, before and after,
+desktop and phone, are on the branch `antigravity/14ab-13-pictures`.
+
+The grid's rows count up the plate and every pour but the text's laid a source's first row
+on the grid's first: `pourPictureCpu`, the solver's `videoSample` pass and the CPU loop. Each
+is turned where its rows are taken, at no cost a frame. The upload draws its picture turned
+over once, as `pourText` does (`uprightPicture` in `lib/videoFlow.ts`, called by
+`usePour.ts`). The solver's copy of a video's frame turns it (`flipY: true` on
+`copyExternalImageToTexture` in `pourVideo`, `gpu/fluid/inputs.ts`). The CPU loop
+(`pourVideoFrameCpu`, the WebGL solver's way) reads the grid's row y from the frame's row
+S−1−y, and the cell above from the row before, so the flow it reads is turned with the dye.
+Antigravity's first fix drew every video frame again onto a canvas of its own turned over,
+a full-size draw a frame on the path 14ab exists to lighten; the review moved it into the
+copy and the loop's read, and the frame loop's call is as it was.
+
+`npm run videoflow` holds it (24 lines, 5 new): a title card with a known top (a bright band
+across its top third, a dim one across its bottom third, a blob rising two rows between two
+frames) poured through the loop and through the solver's pass lands its brightest cells
+above the middle of its dye (`up` +0.334 and +0.332 of the dyed rows' height) and its rise
+as flow up the plate; an uploaded picture of it through `uprightPicture` lands +0.333. Each
+against the card turned over (−0.334, −0.332) and the upload read as it came (−0.333). On the
+code before the fix the four video lines go red (20 of 24, `up` −0.334 and −0.332): the
+other twenty hold the pass and the loop to each other, which a frame turned the same wrong
+way on both passes. The lines run on the Mac's `--video` shard too, so Metal's turned copy
+is asked as well as SwiftShader's.

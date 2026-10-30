@@ -67,3 +67,30 @@ Measured: `npm run signin` 28/28 (the landing's own lines among them), `layout` 
   "Play free" opens the sign-in over it; a returning visit, `?remote`, `?cast`, the iPhone app,
   a desktop launch and a visit part way through a redirect or an emailed link never see it.
   `npm run signin` holds it (3a, 3, 6, 7, 10, 11b).
+
+## Shipped after the split
+
+### 34a-7a. OSC and Art-Net are Pro (2026-10-30)
+
+Asked: the Pro page (34a-7) found that only the 1024² grid and cloud sync checked for a Pro key,
+while the page, the cards and §23's table sold OSC and Art-Net as Pro. The owner chose to gate
+them ("That's good. Keep this going", 2026-10-30, on the card that recommended it).
+
+What changed: the show server (`server/remote-server.js`) keeps the tier it last read from its
+licence manager, by the page's own rule (a verified key's tier; no key in an enforced launch is
+free; no key in a bare developer run is Pro, as every local build is), renewed when a key is filed
+or removed and every two seconds, since the Mac app's main process files keys on the same file.
+Below Pro an OSC packet and an Art-Net in packet are dropped as they arrive and the Art-Net out
+tick sends nothing; until the first reading nothing passes. The gate is in the server and not the
+Mac app's menu because that is where the packets cross, so `OSC_PORT` or `ARTNET_HOST` set by
+hand meets it too. The Mac app's menu reads *OSC input (Pro)*, and Show Server Details says packets are
+ignored below Pro (a live menu is 34a-7h). A message box on the menu's pick was tried and taken
+out: on a Mac it is a sheet on the show window, and desktop.yml's packed check hung for 71
+minutes at the app's quit after picking OSC with no Pro tier read yet. The Account
+sheet's Home → Pro and Pro cards stopped selling "several projectors" and "video out", which do not
+ship, and name OSC, Art-Net, the 1024² grid and cloud sync, as the other cards do since 34a-7.
+
+Measured: `npm run tiers` 15/15. Its new lines spawn an enforced server with OSC, Art-Net out (to a
+socket in the check) and Art-Net in, and count real packets for a second each: no key, then Pro,
+then Home over the Pro key. With the gate: none 0/0/0, Pro 10 OSC, 36 Art-Net out, 10 Art-Net in,
+Home 0/0/0. On main's server the same run reads free 10/37/10 and Home 10/37/10, and 4c fails.

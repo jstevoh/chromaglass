@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import {
   DEFAULT_RECORD_CHOICE, normalizeChoice, recordMove, makesText, runningText,
 } from '../src/lib/recordChoice.ts';
+import { appSource } from './appSource.mjs';
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => { if (ok) passed++; else failed++; console.log(`${ok ? ' ok ' : ' FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`); };
@@ -60,7 +61,7 @@ const read = (p) => fs.readFileSync(p, 'utf8');
     !/record-tab-/.test(panel) && /record-makes-video/.test(panel) && /record-makes-take/.test(panel) && /record-song-film/.test(panel));
   const phone = read('src/components/phone/PhoneStage.tsx');
   check('the phone says what Record makes', /phone-record-makes/.test(phone));
-  const palette = read('src/App.tsx');
+  const palette = appSource(read);
   check('the command palette has one Record and no second "Record the plate"/"Record performance" row',
     !/Record the plate/.test(palette) && !/'Record performance \(strokes/.test(palette));
 }

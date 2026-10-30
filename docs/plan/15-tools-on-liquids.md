@@ -112,6 +112,12 @@ Left, each its own plan item:
   6 m/s), where the lab's airblow reads the two alike (2.72%, 2.82%). Something in the
   app pushes colour left during a Blow stroke, or the stroke to the right runs fewer
   steps of breath; the check prints both (wind steps, aired, readings) to find which.
+  And on GitHub's runners the stroke's "keeps it rather than erasing it" line (the pool's loss
+  held to a tenth plus five) swings from a gain to a loss of 11% across eight pull requests of one
+  morning (2026-10-30; pools of 235 to 367, 8 to 28 straw steps), and #550's shard read a loss of
+  20% on the stroke back twice running, 22 straw steps each time, while the owner's Mac at twice
+  the steps keeps or gains (608 → 597, 610 → 670). Whether the loss follows the straw count or the
+  step count is to be read before the bar is trusted on those runners.
 
 *The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped/15-tools-on-liquids.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 

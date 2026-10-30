@@ -272,6 +272,10 @@ its frame rate live. "Free" means no new passes or texture reads.
       the liquid is pushed out twice. The one-press answer: the dish takes the gap's
       squeeze as its source and the gap's own push goes. Moves what `npm run squeeze`
       measures, so it wants the owner's eyes on Beat Squeeze first (27f-3).
+    - **18a-13i. A look that tips its dish waits for the dish's kernels in its opening:
+      shipped** (2026-10-29; found by the first deploy run on the owner's Mac, `npm run
+      startup`). `gpu/opening.ts` has a `slosh` flag read by `WebGPUSlosh.prepare` and
+      `addSlosh`. Story in `docs/plan-shipped/18-physics.md` §18a-13i.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped/18-physics.md`](../plan-shipped/18-physics.md), under the same number.

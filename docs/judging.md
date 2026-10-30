@@ -1476,6 +1476,15 @@ lamp. The lab's numbers are in `docs/plan-shipped/33-bubbles-closeup.md` §33g; 
   silicone and oil, Macro Bead as domed wet beads, Lacing Run as lacing without cells.
   Say whether Cell Bloom's name should change now that it has none.
 
+  *(33g-2a, 2026-10-30.)* In the closeup the oil beads are laid twice the size scale, and
+  Macro Bead's Beads dial is 0.7 (was 0.35). Open Macro Bead and Lens Pools (Cell Bloom,
+  renamed) and look at 3x to 5x: the beads should read as glass lenses with the plate upside
+  down in them and a dark ring, big enough to be the picture. Say whether they are too big
+  or too many (the factor is `MACRO_BEAD_SCALE` in `lib/beads.ts`, the dial the look's
+  Beads), and whether the lens beads over the dye's dark ground look like glass or like
+  holes. Beads already on a plate keep their size until they retire, so switch looks, not
+  only zoom, to see the full effect.
+
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
 Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
@@ -2020,3 +2029,133 @@ stuck there, unexplained, with no way to close it.
    opened, even though the wall is still framed.
 5. Bad: a chip that stays up over a wall with no title bar; a button that does nothing and
    says nothing; an X that comes back a second later.
+
+## 92. The live stream, to an unlisted YouTube broadcast (PLAN 37x-4b)
+
+The lab streams to its own server and measures the stream; only a real platform can say it
+takes ours, and only a camera can say the sound and the plate agree after the Mac's
+system-audio path. Unlisted, never public, until you say so.
+
+1. In YouTube Studio, Go live → Stream, an **unlisted** broadcast; copy the stream key. Open the
+   Mac app, the console (View → Toggle Developer Tools), and `docs/live-show.md`'s four lines
+   with that key. Within thirty seconds Studio's preview should show the plate, "Excellent
+   connection", no dropped frames in `__cgLive.state()`.
+2. Open the album in Qobuz or YouTube Music with the app's sound source on *System audio*.
+   Watch the broadcast on a phone (it runs twenty or so seconds behind): a hit in the music
+   should bloom the plate right after the hit, as it does on the laptop, not before it.
+3. Clap once in front of the laptop's camera with the microphone as the source: in the
+   broadcast, the clap and the plate's bloom should fall together within a frame or two.
+4. Stop with `__cgLive.stop()`; the broadcast should end cleanly in Studio within a few seconds.
+5. Bad: Studio never shows a picture (the key or the RTMPS path), the sound runs ahead of or
+   behind the plate by more than a frame or two (the Mac's clock, the plan's note under
+   37x-4b), frames dropped with a good upload, or the app's frame rate falling while live
+   (`npm run stutter`'s two-step frames, 37x-4c).
+6. Several at once (37x-4c), with whichever second account exists (Twitch, Kick, a Facebook
+   Page; or a second unlisted YouTube stream): keep both keys in the store, then
+   `await __cgLive.start({ destinations: [{ name: 'youtube', url: 'rtmps://a.rtmps.youtube.com/live2', keyName: 'youtube' }, { name: 'twitch', url: 'rtmps://live.twitch.tv/app', keyName: 'twitch' }] })`.
+   Both previews should show the plate; `(await __cgLive.state()).transport.destinations`
+   gives each one's kbps, seconds behind and dropped frames. `measuredAt` should read
+   `server` for YouTube (it acknowledges what it receives; if it reads `socket`, the
+   seconds-behind figure only sees the Mac's own buffer: say so).
+7. If Instagram or TikTok live is open to the account: add a destination with
+   `orientation: 'portrait'`. On a phone it should fill the screen with the middle of the plate,
+   sharp, not squeezed; the landscape one beside it unchanged.
+8. Turn the Wi-Fi off for ten seconds and on again while live: each destination should come
+   back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
+   one. A wrong key on one destination should fail that one alone, once, with the
+   platform's words, while the others stream.
+
+## 93. The rig, with free programs: OSC, Art-Net, MIDI, Ableton, Resolume (PLAN 34a-7f)
+
+`npm run rig` plays every part of a rig with sockets of its own: an OSC sender, a fixture, a
+lighting desk, a controller and a DAW's clock, against the real show server with a Pro key. It
+cannot say that the programs a buyer owns send and read what it does. One sitting, about an
+hour, all free. Install first: **QLC+ 4** (qlcplus.org, open source), **TouchDesigner**
+(derivative.ca, the free Non-Commercial key with a Derivative account), **Ableton Live 12
+trial** (ableton.com/trial, 30 days, an Ableton account), **Resolume Arena demo**
+(resolume.com/download, a watermark and a spoken reminder, no time limit), **Protokol**
+(hexler.net, free), and for the video route **OBS** with **DistroAV** (`brew install --cask
+distroav`, which asks for the free NDI runtime). Syphon, NDI and Ableton Link out of the app
+are "on the way" on `/pro`, so there is nothing of ours to test there yet (no Syphon Simple
+Client or LinkHut this time).
+
+0. In the repo on the Mac: `npm run rig`. Every line ok, including the two the cloud skips
+   (the plate's colours on the fixture, and an OSC blackout blacking out the rig).
+1. **OSC in, from TouchDesigner.** Mac app → Show → OSC input → *This Mac only*. In
+   TouchDesigner add an **OSC Out DAT** (network address 127.0.0.1, port 9000), then in the
+   Textport: `op('oscout1').sendOSC('/chromaglass/setting/audioImpact', [0.8])`. Sound Impact
+   on the Design desk reads 0.8. Then `sendOSC('/chromaglass/action/blackout-toggle', [1])`:
+   the plate goes black, sent again it comes back; and `sendOSC('/chromaglass/dye',
+   ['#ff8800'])` makes the dropper orange. Bad: nothing moves (the Show menu, the port), or a
+   value arrives scaled wrong.
+2. **OSC in, from Resolume.** Arena demo → Preferences → OSC: output on, 127.0.0.1, port 9000.
+   Shortcuts → Edit OSC, a new preset, click a layer's opacity slider, tick OSC *output*, pick
+   *custom* and type `/chromaglass/setting/audioImpact`. Move the slider: Sound Impact follows.
+   Say whether the custom address was there; if Resolume can only send its own addresses, the
+   page's "send it from Resolume" needs a line on how (PLAN 34a-7g).
+3. **Art-Net out, into QLC+.** Quit the app, then start it from Terminal so it reads the
+   settings (34a-7c: there is no panel yet):
+   `ARTNET_HOST=127.0.0.1 ARTNET_FIXTURES=4 /Applications/ChromaGlass.app/Contents/MacOS/ChromaGlass`.
+   QLC+ → Inputs/Outputs → universe 1: tick Art-Net *Input* on 127.0.0.1 and *Passthrough*;
+   open the **DMX Monitor**. Channels 1–12 should move with the plate's colours (four RGB
+   fixtures), dim when the glass thins, and go to zero on a blackout. Bad: all zero on a full
+   plate, colours that lag the screen by more than a beat, or channels out of order.
+4. **Art-Net in, from QLC+.** In QLC+ untick universe 1's Art-Net input (it holds port 6454)
+   and tick Art-Net *Output* to 127.0.0.1 instead. Start the app from Terminal with
+   `ARTNET_IN=1:audioImpact` and no `ARTNET_HOST` (with both, the app ignores the universe it
+   sends on, which here is QLC+'s universe 1, Art-Net 0). In QLC+'s **Simple Desk**, move
+   channel 1: Sound Impact follows, 0 to 255 as 0 to 1.
+5. **MIDI clock and CC, from Ableton.** Audio MIDI Setup → MIDI Studio → IAC Driver: *Device is
+   online*. In Live → Settings → Link, Tempo & MIDI: IAC Driver Bus 1 output, **Sync** and
+   **Track** on. In the app, Settings → Inputs → Controller: MIDI on, input IAC Driver Bus 1;
+   Settings → Sound → Tempo: MIDI clock. Press Play in Live at 128 BPM: the app's tempo reads
+   128 within a few beats, and Stop in Live stops the show. Change Live's tempo to 100: the app
+   follows. Then a MIDI track sending to IAC with a CC lane; MIDI-learn it to a control in the
+   app and play: the control rides the automation, on the bar it was drawn on.
+6. **MIDI out, into Protokol.** In the app's MIDI section pick IAC Driver Bus 1 as the LED
+   output too; open Protokol's MIDI tab. Moving a learned control from the screen sends one CC
+   per change on that control's number (not a stream, and nothing while your hand is on it).
+7. **Video into Resolume.** OBS: a Window Capture of the app's projector window, then Tools →
+   DistroAV NDI Settings → Main Output on. In the Resolume demo's Sources, the OBS NDI source
+   appears; drop it on a layer: the plate plays in Resolume at full frame rate. This is the
+   route `/pro` gives for Resolume, MadMapper and TouchDesigner until Syphon and NDI ship.
+
+Write down, per step, ok or what you saw. A step that fails is an item in PLAN §34a-7.
+
+## 94. The melody walks across the plate (PLAN 24.3-place)
+
+Aurora Borealis and Oil & Water now let go of a drop for each note of a tune, low notes on one side of the plate and
+high notes on the other. Melody Walk is in the desk's Show section (beside Kick Bloom) and the remote's sliders, 0 on
+every other look.
+
+1. Load Oil & Water, play a song with a clear lead (a piano, a voice, a synth line) through the microphone. A bead
+   of amber oil should land for most notes, left for low and right for high, a harder note a bigger bead; a tune
+   that goes up and comes back should draw there and back.
+2. Load Aurora Borealis with the same song: jade and lavender drops along the top of the curtains.
+3. Turn Melody Walk to 0 on each: no drops. Turn it up on Classic: a row of drops across the middle.
+4. Play a song with only drums: nothing should land. A song with a loud kick under a lead: the lead should still
+   land (about two notes in three; 24.3-place-2).
+5. Bad: a drop that lands a note late (a tenth of a second is the design), a drop for every kick or snare, drops
+   that all pile up at one end, or the plate filling with oil from a long song.
+6. Decide: is the line in the right place on each look, which looks want one next, and should the music's colour
+   (True Synesthesia) move to the finer pitch (24.3-place-4)?
+
+## 95. Ableton Link with Live (PLAN 13.5-link)
+
+`npm run link` plays a Link session against the show server with a stand-in for Live written
+from the same reading of the protocol, so only Live can say the two agree.
+
+1. Live and the Mac app on the same Mac. In Live, Preferences → Link, Tempo & MIDI → Link on,
+   and the Link button in the transport bar lit. In the app, Settings → Sound → Tempo → **Link**.
+   Within a second or two the line beside it says "following 1 app", the tempo readout says
+   Live's tempo and "Link", and Live's transport bar says **1 Link**.
+2. Play a four-on-the-floor clip at 124. The plate's kicks should land with Live's kick, the
+   same way a MIDI clock's do; Beat Lead at 0. Change Live's tempo to 132 mid-clip: the readout
+   follows within half a second and the kicks stay on the beat.
+3. With the app open *first* and Live opened after: Live keeps its own tempo (the app must
+   never hand Live its 120).
+4. On two machines on the same Wi-Fi (Live on one, the app on the other): as step 2.
+5. Link off: Live's count goes back to 0 within a second, the readout to "listening".
+6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
+   prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
+   clock offset), Live's tempo changing when the app joins.

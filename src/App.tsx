@@ -1,158 +1,87 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react';
-import { flushSync } from 'react-dom';
+import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
-import { useSongRender } from './hooks/useSongRender';
 import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
-import { songShapeLine } from './lib/songShape';
 import { followLine } from './lib/followedPlace';
-import { barLine } from './lib/barGrid';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
-import type { CartoonShelfProps } from './components/CartoonShelf';
-import { CARTOON_BY_ID } from './lib/cartoons';
-import { SETTINGS_SECTIONS, sectionSearchText, resolveSection } from './lib/settingsMap';
+import { resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
-import type { Cue, SetAction, SetItemAction, ControlKind } from './components/desk/deskProps';
+import type { Cue, ControlKind } from './components/desk/deskProps';
 import { useDeskTabs } from './hooks/useDeskLayout';
-import { closePanel, isSectionPanel, openPanel, openPanels } from './lib/deskLayout';
+import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './lib/deskLayout';
 import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
-import { luckyLook } from './lib/lucky';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
-import { PadPictureSender, setPadPictureSender } from './lib/padPicture';
-import { CommandPalette, type Command } from './components/desk/CommandPalette';
+import { CommandPalette } from './components/desk/CommandPalette';
 import { SoundPanel } from './components/SoundPanel';
-import { startPlateDrone, DRONE_DEFAULTS, PLATE_PLACES, type Drone, type DroneParams } from './lib/plateDrone';
 import { SaveLookSheet } from './components/desk/SaveLookSheet';
 import { AddToSetSheet } from './components/desk/AddToSetSheet';
-import { targetLook, evolvedLook, lookFadeStep, LaterWrites, RIG_KEYS, DEFAULT_FADE_SECONDS, lookOf } from './lib/lookFade';
-import { SettingRide, rideSlot } from './lib/ride';
-import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Gamepad2, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User, LogIn } from 'lucide-react';
+import { targetLook, LaterWrites, RIG_KEYS, lookOf } from './lib/lookFade';
+import { SettingRide } from './lib/ride';
+import { Crosshair, Play, Pause, Mic, MicOff, Settings, Shuffle, Droplet, Layers, Wind, Eye, EyeOff, Monitor, MonitorOff, X, ImagePlus, SprayCan, Paintbrush, FlaskConical, Slash, Cast, Music, Microscope, Clapperboard, ChevronDown, LayoutGrid, Sliders, Hand, FileAudio, Circle, Square, Projector, Fingerprint, Magnet, Film, RotateCw, User, LogIn } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES } from './types';
 import { sanitizePatch } from './lib/sanitizeSettings';
-import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid, CUSTOM_LIQUIDS_KEY } from './lib/liquidFile';
-import { bottleSwatch, isClearLiquid, isNatural, laidColour } from './lib/liquidColour';
-import { loadToolAmounts, saveToolAmounts, clampAmount, TOOL_AMOUNTS_KEY } from './lib/toolAmount';
+import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
+import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
+import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
 import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
-import { useRemoteLink } from './hooks/useRemoteLink';
-import { relayInfo, parseRemoteGesture, type RemoteState, type RelayInfo } from './lib/remoteProtocol';
-import { TimecodeReader, formatTimecode, type TimecodePosition } from './lib/timecode';
-import type { CastState, CastMessage } from './lib/castProtocol';
-import type { RemoteMessage } from './lib/remoteProtocol';
-import { fitMarkForCast } from './lib/markFit';
-import { runBench, formatBench, readRenderer } from './lib/bench';
-import type { BenchOptions } from './lib/bench';
+import { relayInfo, type RelayInfo } from './lib/remoteProtocol';
+import { formatTimecode } from './lib/timecode';
 import { BenchOverlay } from './components/BenchOverlay';
-import { isDesktopApp, type EngineStatus } from './lib/platform';
-import { isGlobalAmbientMode, setGlobalAmbientMode, onAmbientModeChange } from './lib/ambient';
 import { RunLocallyCard } from './components/RunLocallyCard';
 import { ProjectorFillChip } from './components/ProjectorFillChip';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
 import { PhonePlay } from './components/phone/PhonePlay';
-import { wantsPhoneLayout, PHONE_OFF_KEY, phoneScreen, PHONE_SCREEN_KEY, type PhoneScreen } from './lib/phone';
+import { PHONE_OFF_KEY } from './lib/phone';
 import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
-import { useSongShows } from './hooks/useSongShows';
-import { BUILT_IN_SETS, SETS_KEY, SHOWS_KEY, loadSets, loadShows, saveSets, saveShows, savedLooksUsed, showsFile, titleRows, showFor, newId, type ActionSet, type ActionWhat, type ActionWhen, type SongAction, type SongShow } from './lib/songShows';
-import type { SongScoreProps } from './components/SongScore';
-import { songDuration } from './lib/songScore';
+import { savedLooksUsed, showsFile } from './lib/songShows';
 import { MidiPanel } from './components/MidiPanel';
 import { MidiActivity } from './components/MidiActivity';
-import { useMidi } from './hooks/useMidi';
-import { useGamepad } from './hooks/useGamepad';
 import { GamepadRing } from './components/GamepadRing';
-import { useSceneCamera } from './hooks/useSceneCamera';
-import { useCameras } from './hooks/useCameras';
-import { cameraPresent } from './lib/cameras';
 import { useFilmSense } from './hooks/useFilmSense';
-import { touch } from './lib/midiTouch';
-import { startSimulatedMusic, type SimulatedMusic } from './lib/simulatedMusic';
-import { useRecorder } from './hooks/useRecorder';
-import { useProjector } from './hooks/useProjector';
+import { type SimulatedMusic } from './lib/simulatedMusic';
 import { useWakeLock } from './hooks/useWakeLock';
-import { DEFAULT_OUTPUT, loadOutput, normalizeOutput, saveOutput, wallTestOn, type OutputConfig, type WallTest } from './lib/outputConfig';
-import { TempoSource, bpmOf } from './lib/tempo';
-import type { MidiAction, MidiMap, SoundBinding } from './lib/midi';
+import type { MidiAction, MidiMap } from './lib/midi';
 import { controlKindOf } from './lib/midi';
-import { runTrigger } from './lib/soundLearn';
 import { PresetMenu } from './components/PresetMenu';
 import { useUserPresets, asPreset } from './hooks/useUserPresets';
-import { downloadText, parsePresetFile, parseSequenceFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
+import { downloadText, parsePresetFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
-import { exportShowKit, importShowKit, SHOW_KIT_FORMAT } from './lib/showKit';
-import { SAVED_SETS_KEY, SETLIST_KEY, loadSetList, saveSetList, readSetListFile, writeSetListFile, moveItem, setItemId, starterSet, loadSavedSets, storeSavedSets, withSavedSet, SETLIST_FILE_EXT, type SetList, type SetItem, type SetItemKind } from './lib/setList';
+import { type SetItem } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
-import { useSongChange } from './hooks/useSongChange';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { clockText } from './lib/performanceTake';
-import { loadRecordChoice, saveRecordChoice, normalizeChoice, recordMove, makesText, runningText, type RecordChoice } from './lib/recordChoice';
-import { MusicSettings, DEFAULT_MUSIC_SETTINGS } from './lib/musicTypes';
-import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, PALETTE_RGB, DROPPER_COLORS } from './constants';
+import { makesText, runningText } from './lib/recordChoice';
+import { MusicSettings } from './lib/musicTypes';
+import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
-import { getEffectiveTier, isFreeTierGated } from './lib/tierGates';
+import { getEffectiveTier } from './lib/tierGates';
 import { syncServerLicense } from './lib/licenseKey';
-import { usePublishAccountShow } from './lib/accountShows';
-import { startCloudSync, useCloudSyncReload } from './lib/cloudSyncApp';
 import { LOCKUP_URL } from './brand';
 import { AlphaBadge } from './components/AlphaBadge';
-import { CrashReportButton, QuickReportDot, openCrashReport } from './components/CrashReportButton';
+import { CrashReportButton, QuickReportDot } from './components/CrashReportButton';
 import { PanelGuard } from './components/PanelGuard';
-import * as crashLog from './lib/crashLog';
-import { LIBRARY, librarySeconds, clock, nextTrack, credits, type Track } from './lib/musicLibrary';
-import { parseSeed, showSeed, stream } from './lib/rng';
-import { blendKey, nextBlend, raiseInMix, MIX_SOURCE_INFO, type MixMover, type MixSource } from './lib/mixer';
-import { RowFades, barsToMs, fadeBarsOf, fadeTempo, LOOK_LEVEL_KEYS, FADE_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
+import { LIBRARY, librarySeconds, clock, nextTrack, credits } from './lib/musicLibrary';
+import { showSeed, stream } from './lib/rng';
+import { blendKey, nextBlend, raiseInMix, type MixMover, type MixSource } from './lib/mixer';
+import { RowFades, LOOK_LEVEL_KEYS, FADE_ROWS, type FadeWay } from './lib/mixFade';
 import { clearShowInterval, showInterval, showNow, type ShowIntervalHandle } from './lib/showClock';
 import { SHOW_PATH } from './lib/showPath';
-
-const MUSIC_SETTINGS_KEY = 'chromaglass-music-settings';
-
-function loadMusicSettings(): MusicSettings {
-  try {
-    const raw = localStorage.getItem(MUSIC_SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_MUSIC_SETTINGS, ...JSON.parse(raw) };
-  } catch { /* fall through */ }
-  return { ...DEFAULT_MUSIC_SETTINGS };
-}
-
-type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
-
-const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
-/**
- * Where the show is listening, for as long as this tab lives.
- *
- * It used to open the microphone on load, every load, which meant a permission
- * prompt in front of the plate before anyone had asked for one. Then the choice
- * was remembered in `localStorage` and came back with every launch, and a first
- * visit's first click started the band on its own, so the Sound panel's Source
- * opened on Mic or Band and not on Off (the owner, 2026-10-22: the source is
- * None whenever the app opens). It is `sessionStorage` now: a new tab or a
- * relaunched app opens on Off whatever look loads, and the pick still survives a
- * reload of the tab, which a gig has to be able to do without losing the input.
- * Nothing is opened on its own: the microphone comes back only if the browser
- * already says permission is granted (so no prompt appears), and anything else
- * waits for a click.
- */
-const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
-/** Perform or Design. A property of this desk, not of the look, so not a setting. */
-/** The letter printed on each tool, and the tool it picks. */
-const TOOL_KEYS: Record<string, 'dropper' | 'spray' | 'splatter' | 'pour' | 'streak' | 'blow' | 'press' | 'finger' | 'magnet' | 'spin'> = {
-  d: 'dropper', s: 'spray', x: 'splatter', o: 'pour', k: 'streak', w: 'blow', p: 'press', g: 'finger', m: 'magnet', n: 'spin',
-};
 
 /** How often Evolve listens and steps its glides (lib/slowEvolve.ts). */
 const DRIFT_STEP_MS = 500;
@@ -163,36 +92,6 @@ const DRIFT_STEP_MS = 500;
  */
 const RIDE_VIEW_MS = 100;
 const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
-
-function rememberedSource(): AudioSource {
-  try {
-    const raw = sessionStorage.getItem(AUDIO_SOURCE_KEY);
-    // 'file' needs a file nobody has chosen yet, and 'system' opens a picker in a browser (never in the Mac app).
-    if (raw === 'microphone' || raw === 'simulated' || (raw === 'system' && isDesktopApp())) return raw;
-  } catch { /* private */ }
-  return 'none';
-}
-
-/** True only if the browser will hand over the microphone without asking. */
-async function micAlreadyAllowed(): Promise<boolean> {
-  try {
-    const status = await navigator.permissions?.query({ name: 'microphone' as PermissionName });
-    return status?.state === 'granted';
-  } catch {
-    // Firefox has no microphone descriptor for the Permissions API. Better to
-    // wait for a click than to guess and prompt.
-    return false;
-  }
-}
-/**
- * The room camera lives outside the settings: a preset carries how hard the
- * room drives the plate, never whether a camera is switched on or which one.
- * Loading someone else's look should not open your camera.
- */
-const SCENE_ON_KEY = 'chromaglass-scene-on';
-const SCENE_DEVICE_KEY = 'chromaglass-scene-device';
-/** The film's Webcam has a camera of its own, remembered apart from the motion camera's (PLAN 14ad). */
-const FILM_DEVICE_KEY = 'chromaglass-film-camera';
 
 // Detect which preset (if any) matches the current settings. Only the look is
 // compared: a look does not set the room (see RIG_KEYS).
@@ -212,89 +111,46 @@ function detectActivePreset(settings: VisualizerSettings): string | null {
   return null;
 }
 
-/**
- * The look the app opens on.
- *
- * It was Classic every time, which is a fine look and a poor introduction:
- * the plate can do thirty other things and the first one anybody saw was
- * always the same one. Chosen once per load rather than per render, because
- * "the look you arrived on" should not change under you when React re-renders.
- *
- * Macro looks are left out — a closeup of one bead is a strange first
- * impression of a light show — and `?look=<id>` pins it, which is how the
- * harnesses stay deterministic without the app having to be boring.
- *
- * The pick is the show's `show.opening` stream (lib/rng.ts), so it is still a
- * different look most nights and the same look on the same `?seed=`: the
- * look a render opens on is part of the film.
- */
-export const OPENING_LOOK: string = (() => {
-  try {
-    const asked = new URLSearchParams(window.location.search).get('look');
-    const named = asked ? findPreset(asked) : undefined;
-    if (named) return named.id;
-  } catch { /* no window: the default below */ }
-  const pool = PRESETS.filter(p => !p.settings.macroMode);
-  return pool.length ? stream('show.opening').pick(pool).id : 'classic';
-})();
-
-
-/**
- * What the wall shows while the desk builds on a copy (PLAN.md 8b): the look
- * as it was when Preview took the desk off the wall, or as Send to wall last
- * left it, and the counters the wall's engine had seen, so that the desk's
- * clears and seeds on the copy are not replayed on the wall.
- */
-interface WallLook {
-  settings: VisualizerSettings;
-  /** Where a Send to wall's fade is taking `settings`; Live mid-fade puts the desk there, not halfway. */
-  target: VisualizerSettings | null;
-  presetId: string | null;
-  /** The look a cast receiver lays (`activePresetId`, which also names an edited look). */
-  castPresetId: string | null;
-  presetSeq: number;
-  seedCount: number;
-  clearTrigger: number;
-  drainTrigger: number;
-  spinFlick: { seq: number; layer: number } | undefined;
-  /** The back plate's own look on the wall (16a), which a Send back on the copy does not change. */
-  backLook: { id: string; name: string; leaving?: boolean } | null;
-  /** The saved look the desk had open, so Live's Save over writes the look that is open. */
-  docId: string | null;
-  plate: { contract: number[] | null; injectStyles: string[]; liquids: string[] } | null;
-}
-
-/** The room's settings out of a whole set (lib/lookFade's RIG_KEYS): what the desk rides live on the wall even in Preview. */
-function roomOf(s: VisualizerSettings): Partial<VisualizerSettings> {
-  const out: Record<string, unknown> = {};
-  for (const k of RIG_KEYS) out[k] = (s as unknown as Record<string, unknown>)[k];
-  return out as Partial<VisualizerSettings>;
-}
-
-/**
- * What Go will send: a look (built-in or saved) with any controls a set item
- * lays on top, or a stage sequence. `item` is the set item it came from, when
- * it came from one, so the desk can light that row and not every row that
- * happens to hold the same look.
- */
-interface ArmedLook {
-  id: string;
-  name: string;
-  settings: Partial<VisualizerSettings>;
-  item?: string;
-  /** Its own fade, seconds; absent, the desk's. */
-  fade?: number;
-  /** The strip the desk shows while it is live. */
-  rides?: (keyof VisualizerSettings)[];
-  /** A stage sequence to start rather than a look to send. */
-  sequence?: string;
-}
-
 import AccountSheet from './components/AccountSheet';
 import { LIT, LIVE } from './components/ui';
 import { ACCOUNTS_ON, useSignedIn } from './lib/useSignedIn';
 import { isSignedInCached, onAuthFlagChange } from './lib/authFlag';
 import { syncAccountLicense } from './lib/accountLicense';
+import { useOutput } from './app/useOutput';
+import { useTempo } from './app/useTempo';
+import { useAmbientMode } from './app/useAmbientMode';
+import { useSoundState } from './app/useSoundState';
+import { useSongLine } from './app/useSongLine';
+import { usePour } from './app/usePour';
+import { useSoundSource } from './app/useSoundSource';
+import { useBench } from './app/useBench';
+import { useToast } from './app/useToast';
+import { useFilm } from './app/useFilm';
+import { useSceneSource } from './app/useSceneSource';
+import { usePaletteLock } from './app/usePaletteLock';
+import { useLayerReport } from './app/useLayerReport';
+import { useSetListState } from './app/useSetListState';
+import { usePhoneLayout } from './app/usePhoneLayout';
+import { useWallLook } from './app/useWallLook';
+import { useBlackout } from './app/useBlackout';
+import { useLookFades } from './app/useLookFades';
+import { useTimecode } from './app/useTimecode';
+import { useShowLibrary } from './app/useShowLibrary';
+import { useSetActions } from './app/useSetActions';
+import { useLucky } from './app/useLucky';
+import { useSongChangeFades } from './app/useSongChangeFades';
+import { useCastFeed } from './app/useCastFeed';
+import { useRecording } from './app/useRecording';
+import { useGlides } from './app/useGlides';
+import { useRowFades } from './app/useRowFades';
+import { useRemote } from './app/useRemote';
+import { useSongScore } from './app/useSongScore';
+import { useSongRendering } from './app/useSongRendering';
+import { useControllers } from './app/useControllers';
+import { useCommandPalette } from './app/useCommandPalette';
+import { useCheckHooks } from './app/useCheckHooks';
+import { useCrashState } from './app/useCrashState';
+import { SCENE_ON_KEY, ArmedLook, OPENING_LOOK, MUSIC_SETTINGS_KEY, loadMusicSettings } from './app/shared';
 
 const hasAccountOrLicenseUI =
   Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
@@ -302,11 +158,6 @@ const hasAccountOrLicenseUI =
   (typeof window !== 'undefined' &&
     (Boolean((window as unknown as { __CHROMAGLASS_NATIVE__?: unknown }).__CHROMAGLASS_NATIVE__) ||
       new URLSearchParams(window.location.search).get('tierGates') === '1'));
-
-const isUnsubscribeRoute = () =>
-  typeof window !== 'undefined' &&
-  (/^\/unsubscribe\/?$/i.test(window.location.pathname) ||
-    new URLSearchParams(window.location.search).has('unsubscribe'));
 
 const isProfileRoute = () =>
   typeof window !== 'undefined' &&
@@ -368,317 +219,19 @@ export default function App() {
   // absent on a plain-http LAN address.
   const wakeLock = useWakeLock(isActive);
 
-  // ── The projector's geometry and grade ──────────────────────────
-  // Rear-projection flip, corner pin, edge blanking, output grade. Kept on
-  // this machine rather than in the settings, because it describes the room
-  // and not the look: a preset file must not carry a venue's keystone to
-  // whoever opens it next. See `lib/outputConfig.ts`.
-  const [output, setOutputState] = useState<OutputConfig>(loadOutput);
-  const setOutput = useCallback((next: OutputConfig | ((prev: OutputConfig) => OutputConfig)) => {
-    setOutputState(prev => {
-      const value = typeof next === 'function' ? (next as (p: OutputConfig) => OutputConfig)(prev) : next;
-      saveOutput(value);
-      return value;
-    });
-  }, []);
-  // The wall's Reset squares the projector and leaves the mapped shapes: they
-  // live in a section of their own with their own Clear, and a Reset pressed
-  // over there should not quietly throw away an evening's corner-dragging here.
-  const resetOutput = useCallback(() => setOutput(prev => ({ ...DEFAULT_OUTPUT, surfaces: prev.surfaces })), [setOutput]);
-  /*
-    The wall test (Desk v2, PLAN.md 8e): Load-in's test pattern and Identify.
-    Beside the output config, never in it: that config is stored, and a show
-    that opened on last night's test pattern would put a grid on the wall in
-    front of the room. Laid onto the config only for the plate (`shownOutput`),
-    which draws it in the projector's pass, through the same pin and masks as
-    the show. Identify ends itself: once its three seconds are up the test is
-    dropped, so the pass it needed is dropped with it when nothing else does.
-  */
-  const [wallTest, setWallTest] = useState<WallTest>({ pattern: false, identifyUntil: 0 });
-  useEffect(() => {
-    const left = wallTest.identifyUntil - Date.now();
-    if (left <= 0) return;
-    const t = window.setTimeout(() => setWallTest(w => ({ ...w, identifyUntil: 0 })), left + 50);
-    return () => window.clearTimeout(t);
-  }, [wallTest.identifyUntil]);
-  const shownOutput = useMemo<OutputConfig>(
-    () => (wallTestOn(wallTest) ? { ...output, test: wallTest } : output),
-    [output, wallTest]);
+  const { output, setOutput, resetOutput, wallTest, setWallTest, shownOutput } = useOutput();
 
-  // ── Where the tempo comes from ──────────────────────────────────
-  // The microphone, unless something better is offering: a MIDI clock from
-  // the desk, four taps, or a number off the setlist. A ref because the
-  // render loop reads it once a frame and nothing else does; `tempoLabel`
-  // is the only part the UI needs, sampled rather than watched.
-  const tempoRef = useRef<TempoSource | null>(null);
-  if (!tempoRef.current) tempoRef.current = new TempoSource();
-  const [tempoLabel, setTempoLabel] = useState<{ source: string | null; bpm: number; taps: number }>({ source: null, bpm: 0, taps: 0 });
-  const tempoLabelRef = useRef(tempoLabel);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const t = tempoRef.current;
-      if (!t) return;
-      t.read(performance.now());        // lets a stopped MIDI clock lapse
-      const next = { source: t.active, bpm: Math.round(t.bpm), taps: t.tapCount };
-      // Compared here, not in an updater that hands back the old value: React
-      // still renders the App to find that out whenever anything else is
-      // pending, which with the ear running is always (PLAN.md §14f).
-      const prev = tempoLabelRef.current;
-      if (prev.source === next.source && prev.bpm === next.bpm && prev.taps === next.taps) return;
-      tempoLabelRef.current = next;
-      setTempoLabel(next);
-    }, 250);
-    return () => clearInterval(timer);
-  }, []);
-  const tapTempo = useCallback(() => tempoRef.current?.tap(performance.now()), []);
-  /** The source's reading, for the tap pad's beat light, which polls it itself so the App never re-renders for a beat (PLAN 35f). */
-  const readTempo = useCallback(() => tempoRef.current?.read(performance.now()) ?? null, []);
-  const clearTempo = useCallback(() => tempoRef.current?.clear(), []);
-  const setTempoBpm = useCallback((bpm: number) => tempoRef.current?.setBpm(bpm), []);
-  /*
-    The tempo source's own reading, for `npm run squeeze` (PLAN 0-tap). That
-    check asked whether the beat clock ran at the tapped period by comparing
-    it with the harness's own stamps of its taps, and the harness stamps a
-    tap a moment before the app does, so a pause between the two went red
-    on a clock that was right. With the source's period to hand, the clock
-    is judged against what it was actually given. Here rather than on
-    `chromaglassDebug()` because the source lives here, and so a check of
-    the tempo does not have to edit the plate.
-  */
-  useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has('debug')) return;
-    (window as unknown as { chromaglassTempo?: unknown }).chromaglassTempo =
-      () => tempoRef.current?.read(performance.now()) ?? null;
-  }, []);
+  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setLinkOn, tempoPanel } = useTempo();
 
-  // Load-in is geometry, and geometry can be checked exactly. `npm run wall`
-  // drives this to set a corner pin or a mask on a plate that is already
-  // running, so the before and the after are the same look half a second
-  // apart rather than two different plates from two page loads.
-  useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has('debug')) return;
-    (window as unknown as { chromaglassOutput?: unknown }).chromaglassOutput =
-      (patch: Partial<OutputConfig>) => { setOutput(prev => normalizeOutput({ ...prev, ...patch })); };
-  }, [setOutput]);
+  const { ambientMode, setAmbientMode, setAmbientModeRef } = useAmbientMode();
 
-  // `npm run shots` photographs the plate at 16:9, which is wider than the
-  // width the overlay's preset menu exists at — above 1024px the desk owns the
-  // window. Rather than photograph a narrow app, it applies presets through
-  // this. The picture is what that harness is about; `npm run qa` is the one
-  // that drives the menu a hand would use.
-  useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has('debug')) return;
-    (window as unknown as { chromaglassApplyPreset?: unknown }).chromaglassApplyPreset =
-      (id: string) => { cuePresetRef.current?.(id); };
-    // A Go to a look over a fade, as the palette's ⇧⏎ does (`npm run bottles` fades a look in with it).
-    (window as unknown as { chromaglassGo?: unknown }).chromaglassGo =
-      (id: string, seconds?: number) => { goLookNowRef.current?.(id, seconds); };
-    /*
-      Fire the controller's "this was hit" signal by hand.
-
-      For the harness only, and it exists because the browser it drives has no
-      Web MIDI at all — so the one thing a check could not otherwise do is
-      prove that a pad press reaches the screen. This is the same call the MIDI
-      handler makes and nothing else about the path is faked: the subscription,
-      the flash and the timer are the real ones.
-    */
-    (window as unknown as { chromaglassTouch?: unknown }).chromaglassTouch =
-      (key: string, value?: number) => { touch(key, value); };
-    /*
-      Fire any of the one-shot actions by name.
-
-      The same list a pad, a phone or an OSC message reaches, so a harness can
-      put the show into a state — automation on, the sequencer running — that
-      it would otherwise have to find a button for. Written for the motion
-      measurements, which spent several runs quietly measuring a plate whose
-      automation was off.
-    */
-    (window as unknown as { chromaglassAction?: unknown }).chromaglassAction =
-      (name: string) => { runActionRef.current?.(name as MidiAction); };
-    /*
-      Set any setting from the harness.
-
-      `npm run detail` judges a frame by numbers, and the question it exists to
-      answer — how much of the softness is the solver and how much is the
-      renderer — needs the same plate photographed under several settings
-      rather than several plates. Driving the panel for that would mean a
-      different look each time; this changes one value on the running plate.
-    */
-    (window as unknown as { chromaglassSettings?: unknown }).chromaglassSettings =
-      (patch?: Partial<VisualizerSettings>) => {
-        if (patch) setSettings(prev => ({ ...prev, ...patch }));
-        // Called with nothing, it says what the settings are (npm run qa reads the camera's aim).
-        return settingsRef.current;
-      };
-    (window as unknown as { chromaglassGovernor?: () => unknown }).chromaglassGovernor =
-      () => wallRef.current?.governor?.() ?? null;
-    (window as unknown as { chromaglassAmbient?: (on?: boolean) => boolean }).chromaglassAmbient =
-      (on?: boolean) => {
-        if (typeof on === 'boolean') setAmbientModeRef.current(on);
-        return isGlobalAmbientMode();
-      };
-    (window as unknown as { chromaglassSanitizePatch?: typeof sanitizePatch }).chromaglassSanitizePatch = sanitizePatch;
-    // Pick a tool, as the tool buttons do: `npm run tools` uses every one.
-    (window as unknown as { chromaglassTool?: unknown }).chromaglassTool =
-      (tool: typeof activeTool) => { setActiveTool(tool); };
-    // Which layer the hand is on, as the layer switch does (scripts/mirror.mjs).
-    (window as unknown as { chromaglassLayer?: unknown }).chromaglassLayer =
-      (layer: number) => { setActiveLayer(Math.max(0, Math.min(1, Math.round(layer)))); };
-    // Which bottle is in the hand, as the shelf does (npm run bottles).
-    (window as unknown as { chromaglassLiquid?: unknown }).chromaglassLiquid =
-      (id: string) => { setSelectedLiquidId(id); };
-    // A bottle's colour, as a dye swatch or Natural does (`npm run bottles` puts a dye in Glycerine).
-    (window as unknown as { chromaglassLiquidColour?: unknown }).chromaglassLiquidColour =
-      (id: string, hex: string) => { updateLiquidColor(id, hex); };
-    // Every bottle on the bench, by id (npm run bottles picks each one).
-    (window as unknown as { chromaglassBottles?: unknown }).chromaglassBottles =
-      () => liquidTypesRef.current.map(l => l.id);
-    // And its Amount, as the Amount slider does (npm run tools).
-    (window as unknown as { chromaglassToolAmount?: unknown }).chromaglassToolAmount =
-      (tool: string, v: number) => { setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })); };
-    /*
-      Put a track from the shelf on, from outside.
-
-      `npm run shelf` has to answer one question — does music that ships with
-      the show actually reach the analyser, or does it play to a plate that
-      cannot hear it — and driving the desk to ask it means finding a button
-      inside a panel inside a mode, which is a layout test wearing an audio
-      test's clothes. This is the same back door `chromaglassSettings` is: it
-      sets the test up, it does not perform it.
-    */
-    (window as unknown as { chromaglassMusic?: unknown }).chromaglassMusic =
-      (src?: string) => {
-        const t = src ? LIBRARY.find(x => x.src === src) : LIBRARY[0];
-        if (!t) throw new Error(`no such track on the shelf: ${src}`);
-        playTrackRef.current(t);
-        return t;
-      };
-    /*
-      A song's show, from outside: the clip tool starts one on the first note of
-      a take, with the song's own look already on the plate.
-    */
-    (window as unknown as { chromaglassSongs?: unknown }).chromaglassSongs = () => songShowsRef.current;
-    (window as unknown as { chromaglassSongStart?: unknown }).chromaglassSongStart =
-      (id: string, opts?: { skip?: string[]; duration?: number }) => { songRuntimeRef.current?.start(id, opts); return songRuntimeRef.current?.status ?? null; };
-    (window as unknown as { chromaglassSongFor?: unknown }).chromaglassSongFor =
-      (title: string, artist: string) => showFor(songShowsRef.current, { title, artist });
-    (window as unknown as { chromaglassSongStop?: unknown }).chromaglassSongStop = () => songRuntimeRef.current?.stop();
-    (window as unknown as { chromaglassPourText?: unknown }).chromaglassPourText =
-      (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => wallRef.current?.pourText(rows, opts);
-    (window as unknown as { chromaglassBench?: unknown }).chromaglassBench =
-      (opts?: BenchOptions) => { void startBenchRef.current?.(opts); };
-  }, []);
-
-  // ── Ambient TV mode (PLAN.md 23.8 / 14j): cool & quiet (60 Hz draw, 30 Hz physics) ──
-  const [ambientMode, setAmbientModeState] = useState<boolean>(() => isGlobalAmbientMode());
-  const setAmbientMode = useCallback((on: boolean) => {
-    setGlobalAmbientMode(on);
-    setAmbientModeState(on);
-    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { setAmbient?: (on: boolean) => void } }).__CHROMAGLASS_NATIVE__;
-    native?.setAmbient?.(on);
-  }, []);
-  const setAmbientModeRef = useRef(setAmbientMode);
-  setAmbientModeRef.current = setAmbientMode;
-  useEffect(() => {
-    const unsubGov = onAmbientModeChange((on) => setAmbientModeState(on));
-    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { onAmbientChange?: (fn: (on: boolean) => void) => () => void } }).__CHROMAGLASS_NATIVE__;
-    const unsubNative = native?.onAmbientChange?.((on) => {
-      setGlobalAmbientMode(on);
-      setAmbientModeState(on);
-    });
-    return () => {
-      unsubGov();
-      unsubNative?.();
-    };
-  }, []);
-
-  /*
-    `?bench` runs the grid sweep on its own and shows the result.
-
-    The measurement it takes is one somebody else has to run — it needs the
-    machine the show will run on, which is never the one the code was written
-    on — so the whole of it has to be a link that can be sent and a block of
-    text that comes back. Waits for the first frame, because a sweep that
-    starts before there is an engine to read measures the loading screen.
-  */
-  useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has('bench')) return;
-    let cancelled = false;
-    const wait = setInterval(() => {
-      if (cancelled || !engineStatusRef.current) return;
-      clearInterval(wait);
-      void startBenchRef.current?.();
-    }, 250);
-    return () => { cancelled = true; clearInterval(wait); };
-  }, []);
-  const [audioSource, setAudioSource] = useState<AudioSource>('none');
-  /** For the first-gesture handler, which is installed once and must not close over a stale value. */
-  const audioSourceRef = useRef(audioSource);
-  audioSourceRef.current = audioSource;
-  // ── The input the show listens to ──
-  // A USB interface fed from the desk beats the laptop's own microphone in
-  // any room with a crowd in it. The choice is remembered; the list of
-  // inputs needs microphone permission before the browser names them.
-  const [audioInputId, setAudioInputId] = useState<string>(() => { try { return localStorage.getItem(AUDIO_INPUT_KEY) ?? ''; } catch { return ''; } });
-  const [audioInputs, setAudioInputs] = useState<{ id: string; label: string }[]>([]);
-  const refreshAudioInputs = useCallback(async () => {
-    try {
-      const devs = await navigator.mediaDevices.enumerateDevices();
-      setAudioInputs(devs.filter(d => d.kind === 'audioinput').map((d, i) => ({ id: d.deviceId, label: d.label || `Input ${i + 1}` })));
-    } catch { /* no device access */ }
-  }, []);
-  useEffect(() => {
-    void refreshAudioInputs();
-    navigator.mediaDevices?.addEventListener?.('devicechange', refreshAudioInputs);
-    return () => navigator.mediaDevices?.removeEventListener?.('devicechange', refreshAudioInputs);
-  }, [refreshAudioInputs]);
-  // ── A music file, played here ──
-  // The straightest signal there is: no room, no microphone, no loopback
-  // driver. The element plays to the speakers and its stream feeds the show.
-  const [musicFile, setMusicFile] = useState<
-    { name: string; url: string; objectUrl: boolean; track?: Track } | null>(null);
-  /*
-    A track that ends does not end the room.
-
-    The element had no `loop` and `onEnded` only cleared the playing flag, so
-    one file played once and the show went quiet — fine for judging a single
-    song, useless for a projector that has to hold a room all afternoon. A
-    library track hands over to the next one and wraps; a file somebody
-    brought themselves repeats, because there is nothing to hand over to.
-  */
-  const playTrackRef = useRef<(t: Track) => void>(() => {});
-  const [musicLoop, setMusicLoop] = useState(true);
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  /*
-    Sound is a tab, because the strip it used to live in could not be found.
-
-    The audio sources were gated on `showControls && !showSettings && !deskUp`:
-    they hid when Settings opened, and hid again whenever either desk was up,
-    which is where the work happens. A shelf of music shipped into that strip
-    and the owner reported not being able to see any of it, which is the right
-    outcome for a control nobody can reach.
-  */
-  const [showSound, setShowSound] = useState(false);
-  const droneRef = useRef<Drone | null>(null);
-  const [droneParams, setDroneParams] = useState<DroneParams>(DRONE_DEFAULTS);
-  /** Whether the plate's instrument is sounding: it can be stopped without choosing another source. */
-  const [droneRunning, setDroneRunning] = useState(false);
-  /**
-   * Silence the plate's instrument. It owns an AudioContext and running
-   * oscillators, and sounds into the room as well as into its stream, so
-   * dropping the stream alone left it playing under whatever came next
-   * (reported: starting a track on the shelf or a file of one's own did not
-   * stop it).
-   */
-  const stopDrone = useCallback(() => {
-    if (droneRef.current) { droneRef.current.stop(); droneRef.current = null; }
-    setDroneRunning(false);
-  }, []);
-  const [musicPlaying, setMusicPlaying] = useState(false);
-  const [musicTime, setMusicTime] = useState({ t: 0, d: 0 });
-  const musicElRef = useRef<HTMLAudioElement>(null);
-  const musicInputRef = useRef<HTMLInputElement>(null);
-  const musicCtxRef = useRef<{ ctx: AudioContext; src: MediaElementAudioSourceNode; dest: MediaStreamAudioDestinationNode } | null>(null);
+  const {
+    audioSource, setAudioSource, audioSourceRef, audioInputId, setAudioInputId, audioInputs,
+    refreshAudioInputs, musicFile, setMusicFile, playTrackRef, musicLoop, setMusicLoop, libraryOpen,
+    setLibraryOpen, showSound, setShowSound, droneRef, droneParams, setDroneParams, droneRunning,
+    setDroneRunning, stopDrone, musicPlaying, setMusicPlaying, musicTime, setMusicTime, musicElRef,
+    musicInputRef, musicCtxRef,
+  } = useSoundState();
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   /** Which section the panel should open at, when it was opened from a ⌘K row. */
@@ -903,452 +456,33 @@ export default function App() {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   /** The synthesised band, when that is what the show is listening to. */
   const simulatedRef = useRef<SimulatedMusic | null>(null);
-  /** The Mac app's system-audio loopback tap (PLAN.md 23.8). */
-  const systemTapRef = useRef<{ stop: () => void } | null>(null);
   const visualizerRef = useRef<LiquidVisualizerHandle>(null);
   /** The wall's engine, always; `visualizerRef` is the desk's, which in Preview with a wall up is a copy (PLAN.md 8b; see `drafting`). */
   const wallRef = useRef<LiquidVisualizerHandle | null>(null);
   /** The wall's engine and the desk's copy, once each: for what is the room's on both (the mark, the palette lock). */
   const bothEngines = (): LiquidVisualizerHandle[] =>
     [...new Set([wallRef.current, visualizerRef.current])].filter((v): v is LiquidVisualizerHandle => !!v);
-  /*
-    The song's shape in a word, for the desk's status line and the phone's
-    Sound sheet (lib/songShape.ts): "drop", "build 40%", "breakdown", or
-    nothing while the song simply plays. Sampled four times a second like the
-    tempo label, because the render loop owns the tracker and the UI only
-    needs to glance at it.
-  */
-  const [songLine, setSongLine] = useState('');
-  /** What the bar grid knows (lib/barGrid.ts barLine), for Accent the One on the phone. */
-  const [barKnown, setBarKnown] = useState('');
-  /** The tempo the beat grid hears, bpm rounded, or 0: what the strobe ring on Auto Spin is lit by when nothing was tapped or clocked in. */
-  const [heardBpm, setHeardBpm] = useState(0);
-  const shownShape = useRef({ line: '', bar: '', heard: 0 });
-  /** The last song-shape event the sequencer has been handed, by its number. */
-  const songCueSeqRef = useRef(0);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const report = wallRef.current?.songShape();
-      // Compared against what was last set, for the reason the tempo label is.
-      const next = report ? songShapeLine(report.now) : '';
-      if (next !== shownShape.current.line) { shownShape.current.line = next; setSongLine(next); }
-      const bar = report ? barLine(report.bar) : '';
-      if (bar !== shownShape.current.bar) { shownShape.current.bar = bar; setBarKnown(bar); }
-      const heard = report && report.bar.period > 0 && report.bar.beatConfidence >= 0.3 ? Math.round(60 / report.bar.period) : 0;
-      // Compared here, not in an updater that hands back the old value (the tempo label's note above): that still renders the App.
-      if (heard !== shownShape.current.heard) { shownShape.current.heard = heard; setHeardBpm(heard); }
-    }, 250);
-    return () => clearInterval(timer);
-  }, []);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = () => {
-      // Draw image to an offscreen canvas to get pixel data
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, img.width, img.height);
-      visualizerRef.current?.injectImage(imageData);
-      URL.revokeObjectURL(img.src);
-    };
-    img.src = URL.createObjectURL(file);
-    // Reset so the same file can be re-selected
-    e.target.value = '';
-  }, []);
+  const { songLine, barKnown, heardBpm, songCueSeqRef } = useSongLine({ wallRef });
 
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const videoPlayerRef = useRef<HTMLVideoElement>(null);
-  /** A poured file's object URL, revoked when the pour moves on. */
-  const pourUrlRef = useRef<string | null>(null);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  /** The shelf's cartoon pouring as dye (lib/cartoons.ts), or null for a file or nothing. */
-  const [pouringCartoon, setPouringCartoon] = useState<string | null>(null);
-  /** The file pouring as dye, by its name, so a row that poured it can say it is (Settings' demo loops). */
-  const [pourName, setPourName] = useState<string | null>(null);
-  /*
-    The video pour: one hidden, muted, looping <video>, handed to the plate
-    once when it starts playing. It used to be handed over again on every
-    animation frame, which made the plate pause and play it every frame
-    (PLAN 14ab-1, fixed in `pourVideo`); the plate's own frame loop reads the
-    picture, so once is enough. A cartoon is given by address, so it pours
-    while it is still arriving; a file by an object URL.
-  */
-  const pourVideoFrom = useCallback((src: string, objectUrl: boolean) => {
-    const v = videoPlayerRef.current;
-    if (!v) return;
-    if (pourUrlRef.current) URL.revokeObjectURL(pourUrlRef.current);
-    pourUrlRef.current = objectUrl ? src : null;
-    v.onplay = () => { setIsVideoPlaying(true); visualizerRef.current?.pourVideo(v); };
-    v.onpause = () => setIsVideoPlaying(false);
-    v.onended = () => setIsVideoPlaying(false);
-    v.src = src;
-    v.play().catch(() => { /* autoplay policy: plays on the next gesture */ });
-  }, []);
-  const stopPour = useCallback(() => {
-    visualizerRef.current?.stopPourVideo();
-    const v = videoPlayerRef.current;
-    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
-    if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
-    setIsVideoPlaying(false);
-    setPouringCartoon(null);
-    setPourName(null);
-  }, []);
-  const pourFile = useCallback((file: File) => {
-    pourVideoFrom(URL.createObjectURL(file), true);
-    setPouringCartoon(null);
-    setPourName(file.name);
-  }, [pourVideoFrom]);
-  const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) pourFile(file);
-    e.target.value = '';
-  }, [pourFile]);
+  const {
+    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying, pouringCartoon,
+    setPouringCartoon, pourName, setPourName, pourVideoFrom, stopPour, pourFile, handleVideoUpload,
+  } = usePour({
+    visualizerRef,
+  });
 
   const userPresetsRef = useRef<UserPreset[]>([]);
 
-  /*
-    The stream the show hears and the input it was opened on, as refs beside
-    the state, for handleSourceChange to read (PLAN.md 14s). Read from its
-    closure, a call made through a handler from an earlier render saw the
-    stream and the input of that render: the input picker's (chooseAudioInput,
-    memoised on the source alone) was the handler from when the source last
-    changed, with no stream yet and the old input. Measured with fake devices:
-    picking Input 1 and then Input 2 made three `getUserMedia` calls, none with
-    a `deviceId`, and all three tracks stayed live, so the interface picked at
-    soundcheck was not the one the show heard until a reload, and each pick
-    left another microphone open. `scripts/inputpick.mjs`.
-  */
-  const audioStreamRef = useRef<MediaStream | null>(null);
-  audioStreamRef.current = audioStream;
-  const audioInputIdRef = useRef(audioInputId);
-  audioInputIdRef.current = audioInputId;
-  /** Counts the calls, so a device that answers after a newer pick is closed, not heard. */
-  const sourceAskRef = useRef(0);
-
-  const handleSourceChange = useCallback(async (source: AudioSource, inputId?: string) => {
-    const ask = ++sourceAskRef.current;
-    const was = audioStreamRef.current ?? audioStream;
-    if (was) {
-      was.getTracks().forEach(track => track.stop());
-      audioStreamRef.current = null;
-      setAudioStream(null);
-    }
-    if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
-    if (systemTapRef.current) { systemTapRef.current.stop(); systemTapRef.current = null; }
-    // The drone owns an AudioContext and four running oscillators; leaving it
-    // behind would keep them sounding under whatever replaced it.
-    stopDrone();
-
-    setAudioSource(source);
-    try { sessionStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
-    if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
-    if (source === 'none') return;
-    if (source === 'file') {
-      // The stream comes from the element once it is ready; see playMusicFile.
-      return;
-    }
-    if (source === 'drone') {
-      /*
-        The plate playing itself. It is a stream like any other from here on,
-        so the analyser, the calibration and the beat clock are all exercised
-        for real — and because it also sounds out of this tab, a shared tab
-        carries it to a call.
-      */
-      const drone = startPlateDrone(
-        () => wallRef.current?.plateReading(PLATE_PLACES) ?? null,
-        droneParams,
-      );
-      droneRef.current = drone;
-      setDroneRunning(true);
-      setAudioStream(drone.stream);
-      return;
-    }
-    if (source === 'simulated') {
-      // A band in a box: no device, no permission, nothing to be asked for.
-      // Downstream it is a stream like any other, so the analyser, the room
-      // calibration and the beat clock are all exercised for real.
-      const band = startSimulatedMusic();
-      simulatedRef.current = band;
-      // Under ?debug, the band's kick count for a check to set the heard
-      // kicks against. It stays defined after the source changes and then
-      // reads null: "no band now", which a check must not read as a band
-      // that played nothing.
-      if (new URLSearchParams(window.location.search).has('debug')) {
-        (window as unknown as { __band?: () => unknown }).__band = () => simulatedRef.current?.stats() ?? null;
-      }
-      void band.resume();
-      setAudioStream(band.stream);
-      return;
-    }
-
-    const deviceId = inputId ?? audioInputIdRef.current;
-    try {
-      let stream: MediaStream;
-      if (source === 'system') {
-        const nativeTap = (window as unknown as {
-          __CHROMAGLASS_NATIVE__?: { onSystemAudioPcm?: (fn: (samples: Float32Array, sampleRate: number) => void) => () => void };
-        }).__CHROMAGLASS_NATIVE__?.onSystemAudioPcm;
-        if (nativeTap) {
-          // Mac app (PLAN.md 23.8): ScreenCaptureKit loopback via setDisplayMediaRequestHandler
-          // (no tab picker) combined with the main-process loopback audio tap.
-          // Subscribe the PCM tap and hand `dest.stream` to `useAudioAnalyzer` immediately,
-          // before `getDisplayMedia` resolves (~0.8 s on macOS), so no early PCM packets
-          // are dropped while ScreenCaptureKit initializes.
-          const ctx = new AudioContext();
-          if (ctx.state === 'suspended') void ctx.resume();
-          // Under ?debug, for `npm run desktop` to say whether this context
-          // was running yet when it read the ear, beside the ear's own.
-          if (new URLSearchParams(window.location.search).has('debug')) {
-            (window as unknown as { __systemTapContext?: AudioContext }).__systemTapContext = ctx;
-          }
-          const dest = ctx.createMediaStreamDestination();
-          let displayStream: MediaStream | null = null;
-          let nextTime = 0;
-          let pcmChunks = 0;
-          const unsubPcm = nativeTap((samples: Float32Array, sampleRate: number) => {
-            if (!samples || samples.length === 0 || ctx.state === 'closed') return;
-            if (ctx.state === 'suspended') void ctx.resume();
-            const sr = sampleRate > 0 ? sampleRate : ctx.sampleRate;
-            const buf = ctx.createBuffer(1, samples.length, sr);
-            buf.getChannelData(0).set(samples);
-            const src = ctx.createBufferSource();
-            src.buffer = buf;
-            src.connect(dest);
-            const now = ctx.currentTime;
-            // Give the first scheduled chunk 60 ms so React has committed `dest.stream`
-            // and `useAudioAnalyzer` has connected its `AnalyserNode`.
-            if (nextTime < now) nextTime = now + (pcmChunks === 0 ? 0.06 : 0.005);
-            src.start(nextTime);
-            nextTime += buf.duration;
-            pcmChunks += 1;
-          });
-          systemTapRef.current = {
-            stop: () => {
-              unsubPcm();
-              displayStream?.getTracks().forEach(t => t.stop());
-              if (ctx.state !== 'closed') void ctx.close();
-            },
-          };
-          stream = dest.stream;
-          setAudioStream(stream);
-          void navigator.mediaDevices.getDisplayMedia({
-            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
-            video: true,
-          }).then((ds) => {
-            if (ask !== sourceAskRef.current || ctx.state === 'closed') {
-              ds.getTracks().forEach(t => t.stop());
-              return;
-            }
-            displayStream = ds;
-            if (ds.getAudioTracks().length > 0) {
-              try {
-                ctx.createMediaStreamSource(ds).connect(dest);
-              } catch { /* fallback to PCM tap */ }
-            }
-          }, () => { /* loopback tap continues */ });
-        } else {
-          // Raw, as the microphone below, and in stereo: a shared tab is the
-          // music itself. With plain `audio: true` Chrome shared a music tab as
-          // a call: one channel, with echo cancellation, noise suppression and
-          // auto gain all on. The show heard it processed, and a recording of
-          // it failed outright (the master's 320 kbps is more AAC than one
-          // channel carries). Plain again only if the constraints are refused,
-          // never after the person has said no to sharing.
-          try {
-            stream = await navigator.mediaDevices.getDisplayMedia({
-              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 2 } },
-              video: true,
-            });
-          } catch (e) {
-            if (!(e instanceof TypeError) && (e as Error)?.name !== 'OverconstrainedError') throw e;
-            stream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
-          }
-        }
-      } else {
-        // Ask for the raw microphone. The browser's defaults — echo
-        // cancellation, noise suppression and auto gain — are tuned for speech
-        // on a call and are actively hostile to music: suppression treats a
-        // steady groove as background noise and ducks it, AGC pumps the
-        // dynamics flat, and echo cancellation can null out the very speakers
-        // in the room. That is what "the mic isn't sensitive enough" usually
-        // is. Fall back to plain audio if a device rejects the constraints.
-        const raw: MediaStreamConstraints = {
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-            channelCount: 1,
-            ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-          },
-        };
-        try {
-          stream = await navigator.mediaDevices.getUserMedia(raw);
-        } catch {
-          stream = await navigator.mediaDevices.getUserMedia(deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true });
-        }
-        void refreshAudioInputs();   // with permission, the inputs have names now
-      }
-      // Two picks in quick succession: the first device can answer after the
-      // second was asked for. It is closed, not handed to the show over it.
-      if (ask !== sourceAskRef.current) { stream.getTracks().forEach(track => track.stop()); return; }
-      audioStreamRef.current = stream;
-      setAudioStream(stream);
-      stream.getTracks().forEach(track => {
-        track.onended = () => {
-          setAudioSource('none');
-          setAudioStream(null);
-        };
-      });
-    } catch (error: any) {
-      // Refused after a newer pick (the prompt dismissed once the band was
-      // chosen): the newer source stands.
-      if (ask !== sourceAskRef.current) return;
-      if (error.name === 'NotAllowedError' || error.name === 'AbortError' || error.message?.includes('Permission denied')) {
-        console.warn('Audio permission denied or cancelled by user.');
-      } else {
-        console.error('Error accessing audio source:', error);
-      }
-      setAudioSource('none');
-    }
-  }, [audioStream, refreshAudioInputs]);
-  const handleSourceChangeRef = useRef(handleSourceChange);
-  handleSourceChangeRef.current = handleSourceChange;
-  /** The instrument's start/stop: stopping keeps it the chosen source, so starting again is one press. */
-  const toggleDrone = useCallback(() => {
-    if (droneRef.current) {
-      stopDrone();
-      if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); setAudioStream(null); }
-      return;
-    }
-    void handleSourceChange('drone');
-  }, [audioStream, handleSourceChange, stopDrone]);
-  const changeDrone = useCallback((patch: Partial<DroneParams>) => {
-    setDroneParams(prev => {
-      const next = { ...prev, ...patch };
-      droneRef.current?.setParams(next);
-      return next;
-    });
-  }, []);
-  const chooseAudioInput = useCallback((id: string) => {
-    setAudioInputId(id);
-    audioInputIdRef.current = id;
-    try { localStorage.setItem(AUDIO_INPUT_KEY, id); } catch { /* private */ }
-    // Reopen the microphone on the new input if it is the live source: this
-    // render's handler, told the id, so it closes the stream that is live now
-    // and opens the one just picked (see audioStreamRef).
-    if (audioSourceRef.current === 'microphone') void handleSourceChangeRef.current('microphone', id);
-  }, []);
-
-  /** What the show hears of the music element. */
-  const musicStream = useCallback((el: HTMLAudioElement): MediaStream | null => {
-    let stream: MediaStream | null = null;
-    // Chrome: the element's own stream. Elsewhere: route it through an
-    // AudioContext to a stream destination, and to the speakers as well.
-    const cap = (el as HTMLMediaElement & { captureStream?: () => MediaStream; mozCaptureStream?: () => MediaStream });
-    try { stream = cap.captureStream?.() ?? cap.mozCaptureStream?.() ?? null; } catch { stream = null; }
-    if (!stream) {
-      try {
-        if (!musicCtxRef.current) {
-          const ctx = new AudioContext();
-          const src = ctx.createMediaElementSource(el);
-          const dest = ctx.createMediaStreamDestination();
-          src.connect(dest);
-          src.connect(ctx.destination);
-          musicCtxRef.current = { ctx, src, dest };
-        }
-        stream = musicCtxRef.current.dest.stream;
-      } catch { stream = null; }
-    }
-    return stream;
-  }, []);
-  /** A music file: the element plays it aloud and its stream is what the show hears. */
-  const startMusic = useCallback((
-    url: string,
-    name: string,
-    opts: { objectUrl: boolean; track?: Track },
-  ) => {
-    const el = musicElRef.current;
-    if (!el) return;
-    // Only a URL we minted needs releasing; revoking a library path does
-    // nothing the first time and would be a bug the moment it did something.
-    if (musicFile?.objectUrl) URL.revokeObjectURL(musicFile.url);
-    setMusicFile({ name, url, objectUrl: opts.objectUrl, track: opts.track });
-    setMusicTime({ t: 0, d: 0 });
-    // Music takes over: the plate's instrument and the band in a box stop.
-    stopDrone();
-    if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
-    sourceAskRef.current++;   // a microphone still being asked for is not heard over the music
-    if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); setAudioStream(null); }
-    el.src = url;
-    el.onloadedmetadata = () => setMusicTime({ t: 0, d: el.duration || 0 });
-    el.oncanplay = () => {
-      el.oncanplay = null;
-      setAudioSource('file');
-      setAudioStream(musicStream(el));
-      void el.play().catch(() => { /* needs a gesture; the play button is there */ });
-    };
-    el.load();
-  }, [audioStream, musicFile, stopDrone, musicStream]);
-  /**
-   * The transport's play/pause. Playing a file that is loaded but not the
-   * show's source (the plate's instrument or another took over since) makes
-   * it the source again and silences what was playing.
-   */
-  const toggleMusic = useCallback(() => {
-    const el = musicElRef.current;
-    if (!el) return;
-    if (!el.paused) { el.pause(); return; }
-    if (audioSource !== 'file') {
-      sourceAskRef.current++;   // as startMusic
-      stopDrone();
-      if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
-      if (audioStream) audioStream.getTracks().forEach(t => t.stop());
-      setAudioSource('file');
-      setAudioStream(musicStream(el));
-    }
-    void el.play();
-  }, [audioSource, audioStream, stopDrone, musicStream]);
-  const playMusicFile = useCallback((file: File) => {
-    startMusic(URL.createObjectURL(file), file.name.replace(/\.[^.]+$/, ''), { objectUrl: true });
-  }, [startMusic]);
-  const playTrack = useCallback((track: Track) => {
-    startMusic(track.src, track.title, { objectUrl: false, track });
-    setLibraryOpen(false);
-  }, [startMusic]);
-  // The debug hook is installed once, long before this exists; a ref is how
-  // every other late-defined thing reaches it.
-  playTrackRef.current = playTrack;
-  const closeMusicFile = useCallback(() => {
-    const el = musicElRef.current;
-    if (el) { el.pause(); el.removeAttribute('src'); el.load(); }
-    if (musicFile?.objectUrl) URL.revokeObjectURL(musicFile.url);
-    setMusicFile(null);
-    if (audioSource === 'file') { setAudioSource('none'); setAudioStream(null); }
-  }, [musicFile, audioSource]);
-
-  // What the show listened to last time, brought back without asking for
-  // anything. The microphone only reopens where permission is already granted,
-  // so a reload is silent rather than a prompt over the plate.
-  useEffect(() => {
-    let cancelled = false;
-    const restore = async () => {
-      const remembered = rememberedSource();
-      if (remembered === 'none') return;
-      if (remembered === 'microphone' && !(await micAlreadyAllowed())) return;
-      if (cancelled) return;
-      void handleSourceChange(remembered);
-    };
-    void restore();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const {
+    handleSourceChange, toggleDrone, changeDrone, chooseAudioInput, toggleMusic, playMusicFile,
+    playTrack, closeMusicFile, earContext,
+  } = useSoundSource({
+    audioStream, audioInputId, setAudioStream, simulatedRef, stopDrone,
+    setAudioSource, musicElRef, wallRef, droneParams, droneRef, setDroneRunning, refreshAudioInputs,
+    setDroneParams, setAudioInputId, audioSourceRef, musicCtxRef, musicFile, setMusicFile,
+    setMusicTime, audioSource, setLibraryOpen, playTrackRef,
+  });
 
   // The browser will not run audio before a gesture, so a restored band stays
   // silent until the first click anywhere. One listener, then gone.
@@ -1420,224 +554,27 @@ export default function App() {
     }
   }, [stageLayers, activeLayer]);
 
-  const [calibrateNonce, setCalibrateNonce] = useState(0);
-  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
-  const shownEngineStatus = useRef<EngineStatus | null>(null);
-  const engineStatusRef = useRef<EngineStatus | null>(null);
-  // ── The grid sweep ──
-  // Walks the solver down every grid and reports where a frame's time went on
-  // each, so the question "is the grid what costs you" has an answer taken the
-  // same way on every machine rather than by hand, five times, from a readout.
-  const [bench, setBench] = useState<{ running: boolean; done: number; total: number; label: string; text: string | null }>(
-    { running: false, done: 0, total: 0, label: '', text: null },
-  );
-  const benchBusyRef = useRef(false);
-  /** The effect that installs the hooks runs once; this keeps it off a stale callback. */
-  const startBenchRef = useRef<((opts?: BenchOptions) => Promise<void>) | null>(null);
-  const startBench = useCallback(async (opts?: BenchOptions) => {
-    if (benchBusyRef.current) return;
-    benchBusyRef.current = true;
-    setBench({ running: true, done: 0, total: 0, label: 'starting', text: null });
-    // Whatever the grid was before this is the grid it goes back to; a
-    // diagnostic that leaves the show on a different setting than it found it
-    // is a diagnostic that changes the thing it measured.
-    let restore: VisualizerSettings['simResolution'] = 'auto';
-    setSettings(prev => { restore = prev.simResolution; return prev; });
-    try {
-      const report = await runBench({
-        setGrid: (g) => setSettings(prev => ({ ...prev, simResolution: g })),
-        read: () => engineStatusRef.current,
-        renderer: readRenderer,
-        sleep: (ms) => new Promise(r => setTimeout(r, ms)),
-        now: () => performance.now(),
-        onProgress: (done, total, label) => setBench(b => ({ ...b, done, total, label })),
-      }, opts);
-      // Put the show back before showing the result, not after.
-      //
-      // The restore used to live only in the `finally`, which runs after the
-      // report is on screen — so for the few seconds it takes the engine to
-      // rebuild and republish, the sweep said it was finished while the plate
-      // was still on whatever rung it ended on. Measured at three and a half
-      // seconds of the show sitting on the CPU solver behind a panel saying
-      // the measurement was done. The `finally` stays as the path an error
-      // takes; setting it twice costs nothing, since the second is the same
-      // value and React drops it.
-      setSettings(prev => ({ ...prev, simResolution: restore }));
-      const text = formatBench(report);
-      console.log(text);
-      setBench({ running: false, done: 0, total: 0, label: '', text });
-    } catch (err) {
-      console.error('ChromaGlass: the grid sweep failed.', err);
-      setBench({ running: false, done: 0, total: 0, label: '', text: `The sweep failed: ${String(err)}` });
-    } finally {
-      setSettings(prev => ({ ...prev, simResolution: restore }));
-      benchBusyRef.current = false;
-    }
-  }, []);
-  startBenchRef.current = startBench;
-  const [filmSource, setFilmSource] = useState<'none' | 'file' | 'camera' | 'window'>('none');
-  /** The shelf's cartoon playing as the film; read only while the film is a file (a camera or window replaces it). */
-  const [filmCartoon, setFilmCartoon] = useState<string | null>(null);
-  /** The file playing as the film, by its name; read only while the film is a file. */
-  const [filmName, setFilmName] = useState<string | null>(null);
-  const loadFilm = async (file: File) => {
-    await wallRef.current?.loadFilmFile(file);
-    setFilmSource('file');
-    setFilmCartoon(null);
-    setFilmName(file.name);
-    setFilmCameraLost(false);
-  };
-  /*
-    Which camera the film shows (PLAN 14ad).
-
-    It used to be whichever one the browser called "environment", with no
-    say: a second webcam, a capture card or a virtual camera (the way a VJ
-    app's output arrives today, PLAN §13) could not be put on the plate. Now
-    the film's picker chooses, the choice is remembered apart from the motion
-    camera's (one camera usually watches the room while another looks down at
-    a dish), and an unplugged camera takes the film off, says so, and puts it
-    back when the same camera is plugged in again.
-  */
-  const cameras = useCameras();
-  const [filmCameraId, setFilmCameraId] = useState<string>(() => { try { return localStorage.getItem(FILM_DEVICE_KEY) ?? ''; } catch { return ''; } });
-  const filmCameraIdRef = useRef(filmCameraId);
-  filmCameraIdRef.current = filmCameraId;
-  /** What the film's camera opened as: its name, and whether the chosen one was missing. */
-  const [filmCamera, setFilmCamera] = useState<{ label: string | null; fellBack: boolean } | null>(null);
-  /** The film's camera was unplugged while it showed; it comes back when that camera does. */
-  const [filmCameraLost, setFilmCameraLost] = useState(false);
-  const startFilmCamera = async (id: string = filmCameraIdRef.current) => {
-    try {
-      const got = await wallRef.current?.startFilmCamera(id, () => {
-        setFilmSource('none');
-        setFilmCamera(null);
-        setFilmCameraLost(true);
-        setToast('The film\u2019s camera was unplugged');
-      });
-      setFilmSource('camera');
-      setFilmCartoon(null);
-      setFilmCamera(got ?? null);
-      setFilmCameraLost(false);
-      void cameras.refresh();
-    } catch (err) {
-      console.warn('ChromaGlass: camera unavailable for the film projector.', err);
-      setFilmSource('none');
-      setFilmCamera(null);
-    }
-  };
-  const chooseFilmCamera = (id: string) => {
-    setFilmCameraId(id);
-    try { localStorage.setItem(FILM_DEVICE_KEY, id); } catch { /* private */ }
-    // Showing a camera already: the new one takes over at once, which is
-    // what choosing a camera while it is on the plate means.
-    if (filmSource === 'camera') void startFilmCamera(id);
-  };
-  useEffect(() => {
-    const id = filmCameraIdRef.current;
-    const back = filmCameraLost && cameraPresent(cameras.devices, id);
-    const arrived = filmSource === 'camera' && !!filmCamera?.fellBack && id !== '' && cameraPresent(cameras.devices, id);
-    if (back || arrived) void startFilmCamera(id);
-    // startFilmCamera is a fresh closure each render; the list is what changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameras.devices]);
-  /*
-    Film from a window.
-
-    The projector fed by another tab, window or screen: a film off the
-    Internet Archive, a media player, a slide deck. It reaches what a URL
-    cannot — a cross-origin video plays in a page but cannot be read back into
-    a texture on the GPU, and the Archive's own file responses carry no header that
-    would allow it — because a captured window has no origin, only pixels.
-
-    The browser's picker decides what is shared, and the cancel case is a
-    deliberate no-op rather than an error: closing the picker means "not
-    that", not "something went wrong".
-  */
-  const startFilmWindow = async () => {
-    try {
-      await wallRef.current?.startFilmWindow(
-        () => setFilmSource('none'),
-        () => setToast('That window is coming through black — share the tab instead'),
-      );
-      setFilmSource('window');
-      setFilmCameraLost(false);
-    } catch (err) {
-      if ((err as DOMException)?.name === 'NotAllowedError') return;   // picker cancelled
-      console.warn('ChromaGlass: could not capture a window for the film projector.', err);
-    }
-  };
-  const clearFilm = () => {
-    wallRef.current?.clearFilm();
-    setFilmSource('none');
-    setFilmCartoon(null);
-    setFilmCameraLost(false);
-  };
-  const filmCartoonNow = async (id: string) => {
-    const c = CARTOON_BY_ID.get(id);
-    if (!c) return;
-    await wallRef.current?.loadFilmUrl(c.src);
-    setFilmSource('file');
-    setFilmCartoon(id);
-    setFilmName(c.title);
-    setFilmCameraLost(false);
-  };
-  /** The cartoon shelf's state and hands, the same on the desk, in Settings and on the phone. */
-  const filmingCartoon = filmSource === 'file' ? filmCartoon : null;
-  const cartoons: CartoonShelfProps = {
-    pouring: pouringCartoon,
-    filming: filmingCartoon,
-    onPour: (id) => {
-      const c = CARTOON_BY_ID.get(id);
-      if (!c) return;
-      pourVideoFrom(c.src, false);
-      setPouringCartoon(id);
-      setPourName(c.title);
-    },
-    onFilm: (id) => { if (filmingCartoon === id) clearFilm(); else void filmCartoonNow(id); },
-    onStopPour: stopPour,
-  };
-  // ── The room ────────────────────────────────────────────────────
-  // The camera as a sensor: it stirs the plate, puts hands on it and rides
-  // whatever settings the mappings name. Off unless someone switched it on.
-  /*
-    Off on every load, whatever last time said.
-
-    This used to restore straight from `localStorage`, so a camera switched on
-    once came back on by itself at every load from then on — and because the
-    browser had already granted permission there was no prompt either. The
-    light came on in a room with nothing on screen saying why. A remembered
-    switch is an offer, not an instruction.
-  */
-  const [sceneOn, setSceneOn] = useState<boolean>(false);
-  /** It was on when they left, so the app offers it back rather than taking it. */
-  const [sceneResume, setSceneResume] = useState<boolean>(() => {
-    try { return localStorage.getItem(SCENE_ON_KEY) === '1'; } catch { return false; }
+  const {
+    calibrateNonce, setCalibrateNonce, engineStatus, setEngineStatus, shownEngineStatus,
+    engineStatusRef, bench, setBench, startBenchRef,
+  } = useBench({
+    setSettings,
   });
-  const [sceneDeviceId, setSceneDeviceId] = useState<string>(() => { try { return localStorage.getItem(SCENE_DEVICE_KEY) ?? ''; } catch { return ''; } });
-  const scenePreviewRef = useRef<HTMLCanvasElement | null>(null);
-  /** True once the camera has been switched on by hand in this session. */
-  const sceneAskedRef = useRef(false);
-  const toggleScene = useCallback((on: boolean) => {
-    if (on) sceneAskedRef.current = true;
-    setSceneResume(false);
-    setSceneOn(on);
-    try { localStorage.setItem(SCENE_ON_KEY, on ? '1' : '0'); } catch { /* private */ }
-  }, []);
-  const chooseSceneDevice = useCallback((id: string) => {
-    setSceneDeviceId(id);
-    try { localStorage.setItem(SCENE_DEVICE_KEY, id); } catch { /* private */ }
-  }, []);
-  const scene = useSceneCamera({
-    enabled: sceneOn,
-    userAsked: sceneAskedRef.current,
-    deviceId: sceneDeviceId,
-    cameras: cameras.devices,
-    onOpened: cameras.refresh,
-    mirror: settings.sceneMirror !== false,
-    deadzone: settings.sceneDeadzone ?? 0.25,
-    smooth: settings.sceneSmooth ?? 0.35,
-    people: settings.scenePeople !== false,
-    preview: scenePreviewRef,
+
+  const { toast, setToast } = useToast({ setToastRef });
+
+  const {
+    filmSource, filmName, loadFilm, cameras, filmCameraId, filmCamera, filmCameraLost,
+    startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, cartoons,
+  } = useFilm({
+    wallRef, setToast, pouringCartoon, pourVideoFrom, setPouringCartoon, setPourName, stopPour,
+  });
+
+  const {
+    sceneOn, sceneResume, setSceneResume, sceneDeviceId, scenePreviewRef, toggleScene,
+    chooseSceneDevice, scene,
+  } = useSceneSource({
+    cameras, settings,
   });
 
   /*
@@ -1665,6 +602,7 @@ export default function App() {
     settings.autoCalibrate !== false, calibrateNonce,
     // The microphone hears the hand on the laptop: its clicks are not beats.
     audioSource === 'microphone',
+    earContext,
   );
   const liveAudio = ear.audioData;
   /*
@@ -1793,26 +731,7 @@ export default function App() {
     ? clockText((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000)
     : null;
 
-  // ── User palette lock ───────────────────────────────────────────
-  const [paletteLock, setPaletteLock] = useState<number | null>(() => {
-    const raw = localStorage.getItem('chromaglass-palette-lock');
-    const n = raw == null ? NaN : parseInt(raw, 10);
-    return Number.isInteger(n) && n >= 0 && n < COLOR_HARMONIES.length ? n : null;
-  });
-  const selectPalette = useCallback((index: number | null) => {
-    setPaletteLock(index);
-    try {
-      if (index == null) localStorage.removeItem('chromaglass-palette-lock');
-      else localStorage.setItem('chromaglass-palette-lock', String(index));
-    } catch { /* private mode */ }
-    // The lock is the room's, like the mark: the wall's engine and, in Preview, the desk's copy (PLAN.md 8b).
-    for (const v of bothEngines()) v.setHarmonyLock(index == null ? null : COLOR_HARMONIES[index]);
-  }, []);
-  useEffect(() => {
-    // Re-assert a persisted lock once the visualizer is mounted
-    if (paletteLock != null) visualizerRef.current?.setHarmonyLock(COLOR_HARMONIES[paletteLock]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { paletteLock, selectPalette } = usePaletteLock({ bothEngines, visualizerRef });
   // Lay the opening look's plate: its dyes, its seed, its injection styles and
   // its liquids. The settings above arrive with the first render, but the
   // plate is the visualizer's and it seeds Classic until told otherwise — so
@@ -2069,38 +988,8 @@ export default function App() {
    */
   /** What is left of the Dye Budget, for the picked bottle on the desk and the phone (PLAN 35e); a stable function, so asking re-renders nothing here. */
   const readDyeRoom = useCallback(() => visualizerRef.current?.dyeRoom?.() ?? 1, []);
-  const [layerReport, setLayerReport] = useState<{ index: number; fill: number; colour: string }[]>([]);
-  const layerReportKey = useRef('');
-  /** Whether the plate is in Preview, for the poll below, which is armed once and never re-armed. */
-  const buildingRef = useRef(false);
-  buildingRef.current = deskLayout.plateMode === 'preview';
-  useEffect(() => {
-    const id = setInterval(() => {
-      // Only a tab building a look in Preview draws them (Build's bench did),
-      // and only when there is more than one layer to tell apart — otherwise
-      // this is a re-render for a badge nobody is looking at.
-      if (!buildingRef.current) return;
-      const r = visualizerRef.current?.layerReport?.();
-      if (!r || r.length < 2) return;
-      // Only when the badge would change: a fresh array every poll re-rendered
-      // the whole App two and a half times a second on an empty plate
-      // (PLAN.md §14f, measured with `npm run renders`), and the tabs show a
-      // whole percent and a colour, not the fill's fourth decimal.
-      const key = r.map(l => `${Math.round(l.fill * 100)}:${l.colour}`).join(' ');
-      if (key === layerReportKey.current) return;
-      layerReportKey.current = key;
-      setLayerReport(r);
-    }, 400);
-    return () => clearInterval(id);
-  }, []);
 
-  const [toast, setToast] = useState<string | null>(null);
-  setToastRef.current = setToast;
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2400);
-    return () => clearTimeout(t);
-  }, [toast]);
+  const { layerReport } = useLayerReport({ deskLayout, visualizerRef });
 
   const [docId, setDocId] = useState<string | null>(null);
   const [docDirty, setDocDirty] = useState(false);
@@ -2447,52 +1336,11 @@ export default function App() {
   }, [ride]);
   useEffect(() => () => { if (rideFlush.current) clearTimeout(rideFlush.current); }, []);
 
-  // ── Cue and Go ────────────────────────────────────────────────────
-  //
-  // `applyPreset` above clears every layer and reseeds, which is what you want
-  // while you are building a look and exactly what you do not want at 11pm
-  // with the plate on a wall: the clear is a hard cut through near-black in
-  // front of a room.
-  //
-  // So a look can also be *armed* and then faded in. The fade adopts the new
-  // preset's dyes without touching the plate and walks the settings across
-  // over a few seconds, so nothing is ever wiped. `npm run desk` drives a
-  // whole fade and checks the stage never darkens; today's clearing path is
-  // the control, and it fails that check by a mile.
-  const [cued, setCued] = useState<ArmedLook | null>(null);
-  /** The armed look, for the action handlers that are defined above the state they read. */
-  const cuedRef = useRef(cued);
-  cuedRef.current = cued;
-  /*
-    The set: the operator's own cue list (lib/setList.ts), and what the desk
-    lists, in its order; each row arms its item. A first visit opens on the
-    starter set, every look as an item that can be removed. It used to list
-    every look whenever the set was empty, and those rows were not the set's,
-    so nothing on the desk could be taken off it.
-  */
-  const [setList, setSetList] = useState<SetList>(() => loadSetList(() => starterSet(PRESETS.map(p => p.id))));
-  /** Sets kept by name (the set menu's Save and Open). The working set above is kept on its own. */
-  const [savedSets, setSavedSets] = useState<SetList[]>(loadSavedSets);
-  const changeSaved = useCallback((f: (prev: SetList[]) => SetList[]) => {
-    setSavedSets(prev => { const v = f(prev); storeSavedSets(v); return v; });
-  }, []);
-  const setListRef = useRef(setList);
-  setListRef.current = setList;
-  const changeSet = useCallback((next: SetList | ((prev: SetList) => SetList)) => {
-    setSetList(prev => {
-      const v = typeof next === 'function' ? next(prev) : next;
-      saveSetList(v);
-      return v;
-    });
-  }, []);
-  /** The set item on stage, so its row reads live even when another row holds the same look. */
-  const [liveItemId, setLiveItemId] = useState<string | null>(null);
-  /** The desk's list as last drawn, for the keys and pads that step it. */
-  const cuesRef = useRef<Cue[]>([]);
-  /** The sequencer, from above where it is created (a set item can be a sequence). */
-  const sequencerRef = useRef<{ startAt: (id: string, positionSec: number) => void; sequences: ShowSequence[] } | null>(null);
-  const [fadeSeconds, setFadeSeconds] = useState<number>(DEFAULT_FADE_SECONDS);
-  const [fading, setFading] = useState(0);        // 0..1 while a Go is running
+  const {
+    cued, setCued, cuedRef, setList, setSetList, savedSets, setSavedSets, changeSaved, setListRef,
+    changeSet, liveItemId, setLiveItemId, cuesRef, sequencerRef, fadeSeconds, setFadeSeconds,
+    fading, setFading,
+  } = useSetListState();
   // On a timer rather than requestAnimationFrame, for the same reason the
   // dimmer is: the laptop's window spends a show behind the projector's, and
   // a hidden tab stops animating. A Go fired from a MIDI pad while the
@@ -2504,310 +1352,35 @@ export default function App() {
   /** The look before the last Go, so one step back is always available. */
   const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
-  /*
-    The phone (components/phone/PhoneStage.tsx, lib/phone.ts): a touch screen
-    with a phone's short side gets the plate edge to edge and the tools under
-    the thumb, instead of the narrow-screen overlay below. Read again on every
-    resize and turn, because a phone turned to landscape is still a phone
-    (844 wide, which is under the desks' 1024 anyway) and a laptop window
-    dragged narrow is still a laptop.
-  */
-  const readPhone = () => {
-    if (typeof window === 'undefined') return false;
-    let sessionOff = false;
-    try { sessionOff = sessionStorage.getItem(PHONE_OFF_KEY) === '1'; } catch { /* private */ }
-    return wantsPhoneLayout({
-      query: window.location.search,
-      coarse: window.matchMedia?.('(pointer: coarse)').matches ?? false,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      sessionOff,
-      path: window.location.pathname,
-    });
-  };
-  const [phone, setPhone] = useState(readPhone);
-  /*
-    Which of the phone's two screens (lib/phone.ts phoneScreen): Play, the
-    listening screen a phone opens on, or every control. Kept on this phone
-    when changed from either, so the screen someone went to is the one they
-    come back to.
-  */
-  const [phoneScreenUp, setPhoneScreenUp] = useState<PhoneScreen>(() => {
-    if (typeof window === 'undefined') return 'play';
-    let stored: string | null = null;
-    try { stored = localStorage.getItem(PHONE_SCREEN_KEY); } catch { /* private */ }
-    return phoneScreen({ query: window.location.search, path: window.location.pathname, stored });
+  const {
+    phone, setPhone, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp, overlayUp,
+  } = usePhoneLayout({
+    deskLayout,
   });
-  const choosePhoneScreen = (to: PhoneScreen) => {
-    try { localStorage.setItem(PHONE_SCREEN_KEY, to); } catch { /* private: this visit only */ }
-    setPhoneScreenUp(to);
-  };
-  useEffect(() => {
-    const onResize = () => setPhone(readPhone());
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /** What the desk should say is on stage. */
-  /**
-   * Is there room for a desk?
-   *
-   * Perform puts a preview and a control column side by side, which needs a
-   * laptop's width. On a narrow window the two columns leave the plate a few
-   * pixels and the whole thing is unusable — found by the QA harness, which
-   * happened to run the desk check at phone width after the small-screen
-   * check had resized the window, and reported a 420px preview in a 420px
-   * page. Below this, Perform quietly behaves as Design; a phone has a
-   * layout of its own (above), and the remote when it drives a laptop's show.
-   */
-  const [roomForDesk, setRoomForDesk] = useState(() => (typeof window === 'undefined' ? true : window.innerWidth >= 1024));
-  useEffect(() => {
-    const onResize = () => setRoomForDesk(window.innerWidth >= 1024);
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  // A phone is never a desk, whatever its width turned sideways.
-  /*
-    "Performing" was the Gig desk being up: Space is Go, a look picked from
-    the palette is cued rather than put up, and the look's clock runs. With
-    the tabs the owner's to make, it is the tab's plate being Live: the show,
-    whichever panels are round it. Preview is building (below).
-  */
-  const performing = deskLayout.plateMode === 'live' && roomForDesk && !phone;
-  /*
-    "Designing" was the Design desk being up. It is now the plate in Preview,
-    which is what it always meant to the show: while a look is being built
-    the sequencer is held, a song's show does not take the plate over and a
-    new song does not change the look under the hand. Build ships in
-    Preview, so the bench behaves as it did; Gig and Load-in ship Live, and
-    either can be put in Preview from the plate bar.
-  */
-  const designing = deskLayout.plateMode === 'preview' && roomForDesk && !phone;
-
-  /*
-    Below that width neither desk lays out, and the floating overlay UI — the
-    bottle rail, the toolbar, the title bar — is what the app shows instead.
-    It is not legacy so much as the narrow-screen surface: a phone has its own
-    (PhoneStage), and a small laptop window gets the one that does not need
-    three columns.
-  */
-  const deskUp = roomForDesk && !phone;
-  /** The laptop's floating overlay: below the desks' width, and not on a phone. */
-  const overlayUp = !deskUp && !phone;
 
   // The hole in the desk layout the plate is painted over. Both desks leave
   // one; without a desk the plate fills the window, as it always has.
   const preview = usePreviewFrame(deskUp);
-
-  /*
-    ── Preview, for real (PLAN.md 8b) ─────────────────────────────────
-
-    Preview held the sequencer, a song's show and a new song's look, but the
-    plate being built was still the plate on the wall: one canvas, which the
-    projector window is painted from, so every slider tried while choosing the
-    next look was on the wall as it was tried. The plate bar said "not on
-    wall" and it was.
-
-    Now, while Preview is on and a wall is up (the projector window, a cast
-    receiver, a network display), the desk builds on a copy: a second engine
-    (`draft` on LiquidVisualizer) drawn in the desk's preview, and the first
-    carries on drawing the wall with the look it had (`wallLook`), hidden from
-    the desk. Send to wall hands the copy's look to the wall across the fade,
-    as a Go does; leaving Preview puts the desk back on the wall's look, so
-    switching to Live never changes what the room sees.
-
-    With no wall up there is nothing to keep the desk off, and Preview stays
-    one engine: a second would cost a whole second solver on every Build
-    session for nothing anyone sees.
-
-    What stays live on the wall through Preview is the room (RIG_KEYS: the
-    dimmer, the mixer, the logo and the film's levels), which the desk still
-    rides, and the music. What waits for Send to wall is the look: its
-    settings, its dyes and pours, and the desk's clears and seeds.
-  */
-  const wallUp = isCasting || mirrorCount > 0;
-  const draftWanted = designing && wallUp;
-  const [wallLook, setWallLook] = useState<WallLook | null>(null);
-  const wallLookRef = useRef(wallLook);
-  wallLookRef.current = wallLook;
-  /*
-    The plate's read of the ride, at the top of each of its frames (PLAN.md
-    §14f; `lay` in lib/ride.ts). One for each engine, because each draws its
-    own settings:
-
-    - Neither takes a key the identified track overrides. The fader moves
-      the look's setting, and the track's value is what is drawn for that
-      key (`effectiveSettings`); laid over it, the ride would undo the track.
-    - Nor the plate count. It is a structure, not a level, the stage can hold
-      more plates than the look asks for (`stageLayers`), and it is the one
-      setting the plate's component acts on through React rather than reading
-      on its frame. It reaches the plate when React renders it.
-    - While the desk builds on a copy (Preview), the wall takes only the
-      room's keys from the desk, as `wallSettings` does: the rest of what the
-      desk rides is the copy's, not the show's.
-  */
-  const overridesRef = useRef(musicIntel.overrides);
-  overridesRef.current = musicIntel.overrides;
-  const ridePlate = useMemo(() => {
-    const deskTakes = (k: string) => k !== 'layerCount' && !(overridesRef.current && k in overridesRef.current);
-    const wallTakes = (k: string) => deskTakes(k) && (!wallLookRef.current || RIG_KEYS.has(k as keyof VisualizerSettings));
-    const deskSlot = rideSlot(), wallSlot = rideSlot();
-    type Live = Record<string, unknown>;
-    return {
-      desk: (base: VisualizerSettings) => ride.lay(base as unknown as Live, deskTakes, deskSlot) as unknown as VisualizerSettings,
-      wall: (base: VisualizerSettings) => ride.lay(base as unknown as Live, wallTakes, wallSlot) as unknown as VisualizerSettings,
-    };
-  }, [ride]);
-  const drafting = draftWanted && wallLook !== null;
-  /*
-    The wall's engine and a receiver follow `wallLook` for as long as it is
-    held, which is one render longer than the copy is up: in the render where
-    Preview ends the copy is gone but the desk's settings and counters are
-    only put back by the effect after it, and handing them to the wall's
-    engine for that one render dropped or laid plates in front of the room
-    and sent a receiver the copy's look (the pre-push review).
-  */
-  const walled = wallLook !== null;
-  /*
-    The wall's engine, always. `visualizerRef` is the engine the desk edits:
-    the same one outside Preview, the draft inside it. Everything the desk
-    does goes through `visualizerRef` and lands on the draft without each
-    call knowing; what is the show's (the music, the sequencer, the remote,
-    the projector's size) goes through `wallRef`.
-  */
-  const wallEngineRef = useCallback((h: LiquidVisualizerHandle | null) => {
-    wallRef.current = h;
-    if (!drafting) visualizerRef.current = h;
-  }, [drafting]);
-  const wallFadeRef = useRef<ShowIntervalHandle | null>(null);
-  useEffect(() => () => { if (wallFadeRef.current) clearShowInterval(wallFadeRef.current); }, []);
-  useLayoutEffect(() => {
-    if (draftWanted && !wallLookRef.current) {
-      const plate = wallRef.current?.describePlate() ?? null;
-      setWallLook({
-        settings: settingsRef.current, target: null, presetId: pinnedPresetId, castPresetId: activePresetId, presetSeq,
-        seedCount, clearTrigger, drainTrigger, spinFlick, backLook, docId,
-        plate: plate ? { contract: plate.contract, injectStyles: plate.injectStyles, liquids: plate.liquids } : null,
-      });
-    } else if (!draftWanted && wallLookRef.current) {
-      const w = wallLookRef.current;
-      if (wallFadeRef.current) { clearShowInterval(wallFadeRef.current); wallFadeRef.current = null; }
-      /*
-        Either way the counters go back to the ones the wall's engine has
-        seen, so it sees no change: its loop clears and seeds on a count
-        higher than the last, and a clear pressed on the copy was replayed on
-        the wall's plate the moment the copy went.
-      */
-      setSeedCount(w.seedCount);
-      setClearTrigger(w.clearTrigger);
-      setDrainTrigger(w.drainTrigger);
-      setSpinFlick(w.spinFlick);
-      if (!designing) {
-        // Out of Preview with the wall still up: the desk goes back to what
-        // the room is seeing (where a Send's fade was taking it, if one was
-        // under way), and to the saved look that was open.
-        setSettings(prev => ({ ...(w.target ?? w.settings), ...roomOf(prev) }));
-        setPinnedPresetId(w.presetId);
-        setPresetSeq(w.presetSeq);
-        setBackLook(w.backLook);
-        setDocId(w.docId);
-        setDocDirty(false);
-      } else if (pinnedPresetId) {
-        // The wall went away mid-Preview: the wall's engine is the desk's
-        // again and carries on from the copy's look, as a Go would.
-        adoptPreset(pinnedPresetId);
-      }
-      setWallLook(null);
-    }
-    // Only the edge matters; the snapshot reads everything else as it is then.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftWanted]);
-  // The copy starts as the wall's look, laid fresh on its own plate.
-  useEffect(() => {
-    if (!drafting) return;
-    const w = wallLookRef.current;
-    const v = visualizerRef.current;
-    // Composed at the wall's shape, letterboxed in the preview as the one engine was.
-    v?.setStage(stageRef.current);
-    if (paletteLock != null) v?.setHarmonyLock(COLOR_HARMONIES[paletteLock]);
-    /*
-      A saved look's dyes are handed over; a built-in's come from its own
-      tables. The plate tables are module constants both engines read, and
-      handing a built-in's id a null contract deleted that look's colours for
-      the wall's engine too (applyPreset's `delete PRESET_CONTRACTS[id]`).
-    */
-    const id = w?.presetId ?? OPENING_LOOK;
-    v?.applyPreset(id, w?.plate && isUserPresetId(id) ? w.plate : undefined, lookPhase(settingsRef.current));
-    if (markUrlRef.current) {
-      const img = new window.Image();
-      img.onload = () => visualizerRef.current?.loadMark?.(img, img.naturalWidth, img.naturalHeight);
-      img.src = markUrlRef.current;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drafting]);
-  /** Send to wall, in Preview: the copy's look to the wall, across the fade a Go takes. */
-  const sendDraftToWall = () => {
-    const w = wallLookRef.current;
-    if (!w) return;
-    const raw = visualizerRef.current?.describePlate();
-    const plate = raw ? { contract: raw.contract, injectStyles: raw.injectStyles, liquids: raw.liquids } : null;
-    const to = settingsRef.current;
-    const id = pinnedPresetId ?? w.presetId ?? OPENING_LOOK;
-    wallRef.current?.adoptPreset(id, plate ?? undefined);
-    wallRef.current?.handoff(Math.max(1, fadeSeconds), lookPhase(to));
-    const from = w.settings;
-    setWallLook(prev => prev && { ...prev, target: to, presetId: id, castPresetId: activePresetId, presetSeq, plate, docId });
-    if (wallFadeRef.current) clearShowInterval(wallFadeRef.current);
-    const started = showNow();
-    const ms = Math.max(1, fadeSeconds) * 1000;
-    // The handoff above swaps the ring in one frame, so the fade dips its amount there (lib/lookFade's ringDip).
-    const step = lookFadeStep(false, true);
-    wallFadeRef.current = showInterval(() => {
-      const t = Math.min(1, (showNow() - started) / ms);
-      setWallLook(prev => prev && { ...prev, settings: step(from, to, t, prev.settings), target: t >= 1 ? null : prev.target });
-      if (t >= 1 && wallFadeRef.current) { clearShowInterval(wallFadeRef.current); wallFadeRef.current = null; }
-    }, 33, 'wall-fade');
-    setToast('Sent to the wall');
-  };
   /**
-    Send to wall: in Preview with a wall up, the copy's look goes to it; with
-    none, the projector window opens, as before. A ref so ⌘⏎'s listener,
-    bound once, sends whichever is true when the key is pressed.
-  */
-  const sendToWallRef = useRef<() => void>(() => {});
-  sendToWallRef.current = () => { if (drafting) sendDraftToWall(); else void startCast('window'); };
-  /** What the wall's engine draws while the desk has a copy: the wall's look, under the desk's room. */
-  const wallSettings = useMemo(() => {
-    if (!wallLook) return effectiveSettings;
-    const s = { ...wallLook.settings, ...roomOf(effectiveSettings), ...(musicIntel.overrides ?? {}) } as VisualizerSettings;
-    // The wall's own back plate, not one sent on the copy, which would have grown the wall a plate.
-    const layers = Math.max(1, s.layerCount ?? 1, wallLook.backLook ? 2 : 1);
-    return (s.layerCount ?? 1) < layers ? { ...s, layerCount: layers } : s;
-  }, [wallLook, effectiveSettings, musicIntel.overrides]);
-
-  /**
-   * How long the look on the wall has been up.
+   * The mark, kept as a data URL so it can be sent to a receiver.
    *
-   * Ticked once a second rather than derived per frame: a clock on a desk
-   * does not need to be right to the millisecond, and the alternative is a
-   * re-render of the whole shell sixty times a second for a number that
-   * changes once.
+   * A cast receiver and a network display are separate documents running their
+   * own copy of the solver; the settings that place the logo travel with
+   * everything else, but the picture has to be handed over once. Held here
+   * rather than only in the visualizer for that reason.
    */
-  const lookSince = useRef(Date.now());
-  const [lookFor, setLookFor] = useState(0);
-  useEffect(() => { lookSince.current = Date.now(); setLookFor(0); }, [pinnedPresetId]);
-  const clockLive = deskLayout.plateMode === 'live';
-  useEffect(() => {
-    // On the tab's plate being Live, as it ran on the Gig desk being chosen:
-    // not on `performing`, which is also a window wide enough for the desk,
-    // so a phone (never a desk) lost the clock and `npm run renders` read 0
-    // renders a second where its clock is asked for (0.6 to 1.5).
-    if (!clockLive) return;
-    const id = setInterval(() => setLookFor((Date.now() - lookSince.current) / 1000), 1000);
-    return () => clearInterval(id);
-  }, [clockLive]);
+  const markUrlRef = useRef<string | null>(null);
+
+  const {
+    wallLook, ridePlate, drafting, walled, wallEngineRef, sendToWallRef, wallSettings, lookFor,
+  } = useWallLook({
+    isCasting, mirrorCount, designing, musicIntel, ride, wallRef, visualizerRef, settingsRef,
+    pinnedPresetId, activePresetId, presetSeq, seedCount, clearTrigger, drainTrigger, spinFlick,
+    backLook, docId, setSeedCount, setClearTrigger, setDrainTrigger, setSpinFlick, setSettings,
+    setPinnedPresetId, setPresetSeq, setBackLook, setDocId, setDocDirty, adoptPreset, stageRef,
+    paletteLock, lookPhase, markUrlRef, fadeSeconds, setToast, startCast, effectiveSettings,
+    deskLayout,
+  });
 
   /*
     "Edited" is the document's own flag now.
@@ -2978,255 +1551,30 @@ export default function App() {
   const liveItemIdRef = useRef<string | null>(null);
   liveItemIdRef.current = liveItemId;
 
-  /**
-   * Send a look to the stage, over `seconds`. With no fade this is still not
-   * a clear: `adoptPreset` takes the new dyes without wiping the plate.
-   *
-   * Taking the look as an argument rather than reading `cued` is what lets
-   * ⇧⏎ in the palette send one that was never armed — arming it first and
-   * then calling Go would read a `cued` that this render does not have yet.
-   */
-  /**
-   * Crossfade the settings from where the plate is now to `to`, over
-   * `seconds`. The one fade loop — Go, Revert and a new song all run through
-   * it, and there were three copies of it before there were three callers.
-   *
-   * ~30 a second: a crossfade over seconds does not need sixty settings
-   * objects a second, and the solver is the expensive part of a settings
-   * change rather than React.
-   */
-  /*
-    The room's settings (RIG_KEYS: the mixer, the dimmer, the film's and the
-    logo's levels) are the same in `from` and `to`, both taken from the plate
-    as the fade began, and each tick used to lay the whole blend down: so a
-    film brought in from its take button, or a fader ridden, during a Go was
-    put back to where it was when the Go was pressed, thirty times a second,
-    for as long as the Go ran. They are the room's, not the look's, so each
-    tick keeps them as they are now, and keeps a row taken from its button
-    since the Go began as it is too (lib/lookFade's lookStep says why).
-  */
-  /*
-    A Back (`back`) is the one fade that puts the room back too: it is undo,
-    and the owner asked for it to go fully back (lib/lookFade's backStep).
-    What a hand wrote after the Back began is left where the hand put it,
-    and so is whatever `hold` names (the dimmer, while a blackout is on).
-  */
-  const fadeSettingsTo = useCallback((to: VisualizerSettings, seconds: number, back = false, hold: readonly string[] = [], swapsRing = false) => {
-    if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
-    lookTakesLevels();
-    flushRide();
-    evolveLetsGo();
-    // From where a fader has the plate now, not where React last heard it.
-    const from = ride.lay(settingsRef.current as unknown as Record<string, unknown>, () => true, rideSlot()) as unknown as VisualizerSettings;
-    // `swapsRing`: the caller ran the visualizer's handoff, which swaps the
-    // ferrofluid ring in one frame at the middle; the amount dips to nothing there (lib/lookFade's ringDip).
-    // The handoff never runs shorter than a second, so a fade under a second would dip and come
-    // back before the swap and then swap the ring at full strength: it keeps its straight line.
-    const step = lookFadeStep(back, swapsRing && seconds >= 1);
-    if (seconds <= 0) { setSettings(prev => step(from, to, 1, prev, hold)); setFading(0); return; }
-    const started = showNow();
-    const ms = seconds * 1000;
-    lookFadeRef.current = showInterval(() => {
-      const t = Math.min(1, (showNow() - started) / ms);
-      // A take pressed since the Go began (the gel's or the lumia's, whose
-      // level the look also sets) is left to its button, to the Go's end;
-      // and on a Back, anything else written since it began.
-      const taken = back ? [...rowFades.levelsTakenSince(started), ...laterWrites.since(started), ...hold] : rowFades.levelsTakenSince(started);
-      if (t >= 1) {
-        if (lookFadeRef.current) clearShowInterval(lookFadeRef.current);
-        lookFadeRef.current = null;
-        setSettings(prev => step(from, to, 1, prev, taken));
-        setFading(0);
-        return;
-      }
-      setSettings(prev => step(from, to, t, prev, taken));
-      setFading(t);
-    }, 33, 'look-fade');
-    // lookTakesLevels closes over nothing that changes: the one RowFades and
-    // React's own setter, so the callback is still made once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const sendLook = useCallback((next: ArmedLook, seconds: number) => {
-    setLiveItemId(next.item ?? null);
-    // A set item's own strip goes up with it.
-    if (next.rides && next.rides.length) setRideKeys(next.rides);
-    if (next.sequence) {
-      setCued(null);
-      sequencerRef.current?.startAt(next.sequence, 0);
-      return;
-    }
-    const from = settingsRef.current;
-    previousLook.current = { id: pinnedPresetId, settings: from };
-    adoptPreset(next.id);
-    setCued(null);
-    // Pressing Go is a decision: the whole look, structure and all — and its
-    // colours with it, handed over across the fade rather than left to
-    // evaporate for minutes under the new ones. A cut still gets a second.
-    const target = targetLook(from, next.settings);
-    visualizerRef.current?.handoff(Math.max(1, seconds), lookPhase(target));
-    fadeSettingsTo(target, seconds, false, [], true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pinnedPresetId, adoptPreset, fadeSettingsTo]);
-
-  /** Go: the armed look, at the chosen fade. */
-  const goLook = useCallback((seconds?: number) => {
-    if (cued) sendLook(cued, seconds ?? cued.fade ?? fadeSeconds);
-  }, [cued, fadeSeconds, sendLook]);
-
-  /** For the debug hook, which is installed once and above the callback it calls. */
-  const goLookNowRef = useRef<((presetId: string, seconds?: number) => void) | null>(null);
-  /** The same, for a look that was never armed — the palette's ⇧⏎. */
-  const goLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
-    const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = up ? undefined : findPreset(presetId);
-    const look = up ? { id: presetId, name: up.name, settings: up.settings }
-      : built ? { id: built.id, name: built.name, settings: built.settings } : null;
-    if (look) sendLook(look, seconds);
-  }, [fadeSeconds, sendLook]);
-  goLookNowRef.current = goLookNow;
-
-  /*
-    Go to Back Plate (PLAN.md §16a): the cued look to the back plate alone.
-
-    The same look a Go would send, resolved over the live settings the same
-    way (`targetLook`), handed to the visualizer, which takes from it only
-    what the back plate owns: its solver settings and its dyes. The front
-    plate, the picture and the cue list's live row are untouched; the cue is
-    spent, as a Go spends it. A cued sequence is a whole show, not a dish, so
-    it has no back-plate Go.
-  */
-  const backLeavingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sendBack = useCallback((next: ArmedLook | null, seconds: number) => {
-    if (backLeavingTimer.current) { clearTimeout(backLeavingTimer.current); backLeavingTimer.current = null; }
-    if (!next) {
-      visualizerRef.current?.sendBack(null, null, seconds);
-      // Kept on the stage while it fades back (see `leaving`), then let go.
-      setBackLook(b => (b && seconds > 0 ? { ...b, leaving: true } : null));
-      if (seconds > 0) backLeavingTimer.current = setTimeout(() => { backLeavingTimer.current = null; setBackLook(null); }, seconds * 1000);
-      return;
-    }
-    if (next.sequence) return;
-    const up = isUserPresetId(next.id) ? userPresetsRef.current.find(p => p.id === next.id) : null;
-    visualizerRef.current?.sendBack(next.id, targetLook(settingsRef.current, next.settings), seconds, next.name, up
-      ? { contract: up.contract ?? null, injectStyles: up.injectStyles ?? null, liquids: up.liquids ?? null }
-      : undefined);
-    setBackLook({ id: next.id, name: next.name });
-    setCued(null);
-  }, []);
-
-  const goBackPlate = useCallback((seconds?: number) => {
-    if (cued && !cued.sequence) sendBack(cued, seconds ?? cued.fade ?? fadeSeconds);
-  }, [cued, fadeSeconds, sendBack]);
-
-  /** The same, for a look picked straight from a list (the phone's looks sheet). */
-  const backLookNow = useCallback((presetId: string, seconds = fadeSeconds) => {
-    const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = up ? undefined : findPreset(presetId);
-    const look = up ? { id: presetId, name: up.name, settings: up.settings }
-      : built ? { id: built.id, name: built.name, settings: built.settings } : null;
-    if (look) sendBack(look, seconds);
-  }, [fadeSeconds, sendBack]);
-
-  const backFollowsFront = useCallback(() => sendBack(null, fadeSeconds), [fadeSeconds, sendBack]);
-  /** The visualizer let go of the back look on its own (a render began or ended). */
-  const backLookCleared = useCallback(() => {
-    if (backLeavingTimer.current) { clearTimeout(backLeavingTimer.current); backLeavingTimer.current = null; }
-    setBackLook(null);
-  }, []);
-  useEffect(() => () => { if (backLeavingTimer.current) clearTimeout(backLeavingTimer.current); }, []);
-
-  /** One step back, at the same fade. The fastest fix mid-show is undo. */
-  const revertLook = useCallback(() => {
-    const prev = previousLook.current;
-    if (!prev) return;
-    previousLook.current = null;
-    evolveLetsGo();
-    if (prev.id) adoptPreset(prev.id);
-    visualizerRef.current?.handoff(Math.max(1, fadeSeconds), lookPhase(prev.settings));
-    // A take still walking stops where it is: the Back puts every row's level
-    // back and was pressed later, and two walks writing one setting would
-    // fight a tick at a time. Every row, not only the ones whose level moved
-    // since the Go: the Back writes them all, a row at its old level included.
-    if (rowFades.handOn(FADE_LEVEL_KEYS)) setRowFading(rowFades.running());
-    // A blackout on stays on: a Back that faded the dimmer up would light the
-    // wall with the Blackout button still lit.
-    fadeSettingsTo(prev.settings, fadeSeconds, true, blackoutRef.current ? ['dimmer'] : [], true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fadeSeconds, adoptPreset, fadeSettingsTo]);
-
-  useEffect(() => () => { if (lookFadeRef.current) clearShowInterval(lookFadeRef.current); }, []);
-
-  /*
-    MIDI timecode, and the position the sequence follows.
-
-    The reader is fed from the MIDI callback below at a hundred messages a
-    second and never touches React. This poll reads it four times a second,
-    which is as often as a stage boundary can matter, and sets state only when
-    the second changes — a set that lasts an hour is then 3600 renders rather
-    than 360,000.
-  */
-  const timecodeRef = useRef(new TimecodeReader());
-  const [timecode, setTimecode] = useState<TimecodePosition | null>(null);
-  const shownTimecode = useRef<TimecodePosition | null>(null);
-  useEffect(() => {
-    const id = setInterval(() => {
-      const p = timecodeRef.current.read(performance.now());
-      // Compared against what was last set, for the reason the tempo label is.
-      const prev = shownTimecode.current;
-      if (p === null ? prev === null : !!prev && prev.seconds === p.seconds && prev.minutes === p.minutes && prev.hours === p.hours) return;
-      shownTimecode.current = p;
-      setTimecode(p);
-    }, 250);
-    return () => clearInterval(id);
-  }, []);
-
-  // ── Songs: a look for each song, and what happens while it plays ──
-  // See lib/songShows.ts. Kept in the browser and in files; the runtime is
-  // wired up below, once the actions it performs exist.
-  const [songShows, setSongShowsState] = useState<SongShow[]>(loadShows);
-  const songShowsRef = useRef(songShows);
-  songShowsRef.current = songShows;
-  const setSongShows = useCallback((next: SongShow[]) => { setSongShowsState(next); saveShows(next); }, []);
-  const [userActionSets, setUserActionSets] = useState<ActionSet[]>(loadSets);
-  const actionSets = useMemo(() => [...BUILT_IN_SETS, ...userActionSets], [userActionSets]);
-  const saveActionSet = useCallback((set: ActionSet) => setUserActionSets(prev => {
-    const next = [...prev.filter(x => x.id !== set.id), { ...set, builtIn: undefined }];
-    saveSets(next);
-    return next;
-  }), []);
-  const deleteActionSet = useCallback((id: string) => setUserActionSets(prev => {
-    const next = prev.filter(x => x.id !== id);
-    saveSets(next);
-    return next;
-  }), []);
-  const [followSongs, setFollowSongsState] = useState<boolean>(() => {
-    try { return localStorage.getItem('chromaglass-follow-songs') !== '0'; } catch { return true; }
+  const {
+    blackout, blackoutRef, fadeRef, toggleBlackout,
+  } = useBlackout({
+    settingsRef, setSettings, laterWrites,
   });
-  const setFollowSongs = useCallback((on: boolean) => {
-    setFollowSongsState(on);
-    try { localStorage.setItem('chromaglass-follow-songs', on ? '1' : '0'); } catch { /* private */ }
-  }, []);
-  /*
-    Cloud sync (PLAN 23.18, lib/cloudSync.ts): a Pro account's saved work kept in
-    step across its browsers and Mac apps. What the cloud writes into a store held
-    here in state is read again at once: a stale list saved over it would read as
-    the player deleting what had just arrived, on every device. The saved looks,
-    sequences and MIDI map reload in their own hooks.
-  */
-  useCloudSyncReload({
-    [CUSTOM_LIQUIDS_KEY]: () => setLiquidTypes([...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]),
-    [TOOL_AMOUNTS_KEY]: () => setToolAmounts(loadToolAmounts()),
-    [MUSIC_SETTINGS_KEY]: () => setMusicSettings(loadMusicSettings()),
-    [SETLIST_KEY]: () => setSetList(loadSetList(() => starterSet(PRESETS.map(p => p.id)))),
-    [SAVED_SETS_KEY]: () => setSavedSets(loadSavedSets()),
-    [SHOWS_KEY]: () => setSongShowsState(loadShows()),
-    [SETS_KEY]: () => setUserActionSets(loadSets()),
-    'chromaglass-follow-songs': () => {
-      try { setFollowSongsState(localStorage.getItem('chromaglass-follow-songs') !== '0'); } catch { /* private */ }
-    },
+
+  const {
+    fadeSettingsTo, sendLook, goLook, goLookNowRef, goLookNow, goBackPlate, backLookNow,
+    backFollowsFront, backLookCleared, revertLook,
+  } = useLookFades({
+    lookFadeRef, lookTakesLevels, flushRide, evolveLetsGo, ride, settingsRef, setSettings,
+    setFading, rowFades, laterWrites, setLiveItemId, setRideKeys, setCued, sequencerRef,
+    previousLook, pinnedPresetId, adoptPreset, visualizerRef, lookPhase, cued, fadeSeconds,
+    userPresetsRef, setBackLook, setRowFading, blackoutRef,
   });
-  useEffect(() => startCloudSync(), []);
+
+  const { timecodeRef, timecode } = useTimecode();
+
+  const {
+    songShows, songShowsRef, setSongShows, actionSets, saveActionSet, deleteActionSet, followSongs,
+    setFollowSongs,
+  } = useShowLibrary({
+    setLiquidTypes, setToolAmounts, setMusicSettings, setSetList, setSavedSets,
+  });
   const [showSongs, setShowSongs] = useState(false);
 
   const sequencer = useShowSequencer({
@@ -3312,333 +1660,39 @@ export default function App() {
     if (dur && musicIntel.state.positionSec > dur + 2) { sequencer.stop(); songBoundRef.current = null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [musicIntel.state.positionSec]);
-  // ── The set's own edits ─────────────────────────────────────────
-  const [addingToSet, setAddingToSet] = useState(false);
-  const addToSet = useCallback((kind: SetItemKind, ref: string) => {
-    changeSet(prev => ({ ...prev, items: [...prev.items, { id: setItemId(), kind, ref }] }));
-  }, [changeSet]);
-  /** A file into the set: a whole set list replaces it; a saved look or a sequence is one more item. */
-  const importToSet = useCallback(async (file: File): Promise<{ summary: string; warnings: string[] }> => {
-    const known = (k: string) => k in DEFAULT_SETTINGS;
-    const read = readSetListFile(await file.text(), known);
-    for (const p of read.presets) userPresets.upsert(p);
-    for (const q of read.sequences) sequencer.upsertSequence(q);
-    const whole = read.list.items.length > 1 || /setlist/i.test(file.name);
-    if (whole) changeSet(read.list);
-    else changeSet(prev => ({ ...prev, items: [...prev.items, ...read.list.items] }));
-    const n = read.list.items.length;
-    return {
-      summary: whole ? `The set is now “${read.list.name}”: ${n} item${n === 1 ? '' : 's'}.` : `Added ${read.list.items[0].name ?? read.list.items[0].ref}.`,
-      warnings: read.warnings,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [changeSet]);
-  const onSetAction = useCallback((a: SetAction, name?: string) => {
-    if (a === 'import') setAddingToSet(true);
-    else if (a === 'save') changeSaved(prev => withSavedSet(prev, setListRef.current));
-    else if (a === 'open' && name) {
-      const kept = loadSavedSets().find(x => x.name === name);
-      if (kept) { changeSet({ name: kept.name, items: kept.items.map(i => ({ ...i })) }); setLiveItemId(null); }
-    } else if (a === 'delete' && name) changeSaved(prev => prev.filter(x => x.name !== name));
-    else if (a === 'rename' && name?.trim()) changeSet(prev => ({ ...prev, name: name.trim() }));
-    else if (a === 'new') { changeSet({ name: 'New set', items: [], emptied: true }); setLiveItemId(null); }
-    else if (a === 'export') {
-      const list = setListRef.current;
-      downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'set'}${SETLIST_FILE_EXT}`,
-        writeSetListFile(list, userPresetsRef.current, sequencerRef.current?.sequences ?? []));
-    }     else if (a === 'export-show') {
-      const list = setListRef.current;
-      exportShowKit(list, userPresetsRef.current, sequencer.sequences).then((text: string) => {
-        downloadText(`${list.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'show'}.chromaglass-show.json`, text);
-      });
-    } else if (a === 'import-show') {
-      const el = document.createElement('input');
-      el.type = 'file';
-      el.accept = '.json';
-      el.onchange = async () => {
-        const file = el.files?.[0];
-        if (!file) return;
-        try {
-          const text = await file.text();
-          await importShowKit(text, (res: any) => {
-            if (res.list) {
-              changeSet(res.list);
-              setLiveItemId(null);
-            }
-            if (res.presets && res.presets.length) { for (const p of res.presets) userPresets.upsert(p); }
-            if (res.sequences && res.sequences.length) { for (const q of res.sequences) sequencer.upsertSequence(q); }
-          });
-          alert('Show kit imported! Reloading the page to apply MIDI map, liquids, and wall configurations.');
-          window.location.reload();
-        } catch (err) {
-          alert('Failed to import show kit: ' + (err instanceof Error ? err.message : String(err)));
-        }
-      };
-      el.click();
-    }
-    else if (a === 'clear') { changeSet(starterSet(PRESETS.map(p => p.id))); setLiveItemId(null); }
-    else if (a === 'song-shows') setShowSongs(true);
-  }, [changeSet, changeSaved]);
-  const onItemAction = useCallback((id: string, a: SetItemAction) => {
-    changeSet(prev => {
-      if (a === 'up' || a === 'down') return moveItem(prev, id, a === 'up' ? -1 : 1);
-      if (a === 'remove') return { ...prev, items: prev.items.filter(i => i.id !== id) };
-      return {
-        ...prev,
-        items: prev.items.map(i => {
-          if (i.id !== id) return i;
-          if (a === 'link-song') return currentSong ? { ...i, song: currentSong } : i;
-          if (a === 'unlink-song') { const { song: _s, ...rest } = i; void _s; return rest; }
-          // The strip as it stands: which controls, and where each one is now.
-          const controls: Partial<Record<keyof VisualizerSettings, number>> = {};
-          for (const k of rideKeys) {
-            const v = settingsRef.current[k];
-            if (typeof v === 'number' && k !== 'dimmer') controls[k] = v;
-          }
-          return { ...i, controls, rides: [...rideKeys] };
-        }),
-      };
-    });
-  }, [changeSet, currentSong, rideKeys]);
 
-  const bindSequenceToSong = (seq: ShowSequence, song: SongRef | null) => {
-    sequencer.upsertSequence({ ...seq, song: song ?? undefined });
-  };
+  const {
+    addingToSet, setAddingToSet, addToSet, importToSet, onSetAction, onItemAction,
+    bindSequenceToSong, importSequenceFile,
+  } = useSetActions({
+    changeSet, userPresets, sequencer, changeSaved, setListRef, setLiveItemId, userPresetsRef,
+    sequencerRef, setShowSongs, currentSong, rideKeys, settingsRef,
+  });
 
-  const importSequenceFile = async (file: File) => {
-    const parsed = parseSequenceFile(await file.text());
-    for (const p of parsed.presets ?? []) userPresets.upsert(p);
-    sequencer.upsertSequence(parsed.sequence);
-    sequencer.setSelectedId(parsed.sequence.id);
-  };
+  const {
+    luckyArmed, setLuckyArmed, triggerLucky,
+  } = useLucky({
+    settings, liquidTypes, previousLook, pinnedPresetId, settingsRef, lookTakesLevels, setSettings,
+    setPinnedPresetId, visualizerRef, setSeedCount,
+  });
 
-  /**
-   * Lucky replaces all eighty settings at once, from one click, sitting next
-   * to controls that are used mid-show. That is fine while you are hunting for
-   * a look and alarming during a set, so two things guard it: the look it
-   * replaced is kept, so Revert brings it straight back, and in Perform the
-   * button asks once before it fires.
-   */
-  const [luckyArmed, setLuckyArmed] = useState(false);
-  useEffect(() => {
-    if (!luckyArmed) return;
-    const id = setTimeout(() => setLuckyArmed(false), 3000);
-    return () => clearTimeout(id);
-  }, [luckyArmed]);
+  const {
+    songChange,
+  } = useSongChangeFades({
+    ear, musicIntel, settings, isActive, renderHold, fadeSeconds, sequencer, designing, userPresets,
+    followSongs, songShowsRef, settingsRef, previousLook, pinnedPresetId, setPinnedPresetId,
+    fadeSettingsTo, liquidTypesRef, activePresetId, adoptPreset,
+  });
 
-  const triggerLucky = () => {
-    // The room's light from the bottles' colours, but not a clear bottle's white (lib/liquidColour.ts): seven of them would make most rolls white.
-    const next = luckyLook(settings, liquidTypes.filter(t => !(isNatural(t) && isClearLiquid(t))).map(t => t.color));
-    previousLook.current = { id: pinnedPresetId, settings: settingsRef.current };
-    // A look coming in, like a Go's: a take on the gel or the lumia stops.
-    lookTakesLevels();
-    setSettings(next);
-    setPinnedPresetId(null);
-    // Randomize inject style for the evolve: Lucky's own stream, like its roll.
-    const allStyles = ['drop', 'spray', 'splatter', 'pour', 'streak'];
-    const s1 = stream('show.lucky').pick(allStyles);
-    const s2 = stream('show.lucky').pick(allStyles);
-    visualizerRef.current?.setInjectStyle([s1, s2]);
-    setSeedCount(prev => prev + 1);
-  };
-
-  // ── A new song, a new look ──────────────────────────────────────
-  // Heard as a gap between tracks, or named by track identification, on the
-  // ear's own clock and landed on a beat (PLAN 14z). The sequencer owns the
-  // evolution while it runs, so it is left alone then.
-  const songChange = useSongChange(ear.onReading, musicIntel.state.track?.isrc ?? null, settings.onNewSong !== 'off' && isActive && !renderHold);
-  /*
-    How long the new song's look takes to come in, by how the song came.
-
-    After a gap the new song starts clean and the change lands on one of its
-    first beats, so it comes in quickly: a second, short enough to read as the
-    show answering the song and long enough not to read as a cut. Named by
-    identification, the new song has been playing for several seconds already
-    (a crossfade, or a gapless join; `npm run songends` measures 6 to 17 s at the
-    median), so the look blends in under it instead: twice the desk's fade,
-    and never under four seconds. Both were a fixed desk fade at whatever
-    moment the gap rule happened to fire.
-  */
-  const songFadeSeconds = (reason: 'gap' | 'track') => reason === 'gap' ? 1 : Math.max(4, fadeSeconds * 2);
-  const lastSongChangeSeq = useRef(0);
-  useEffect(() => {
-    if (!songChange || songChange.seq === lastSongChangeSeq.current) return;
-    lastSongChangeSeq.current = songChange.seq;
-    const mode = settings.onNewSong ?? 'off';
-    if (mode === 'off' || sequencer.status.running) return;
-    // Nor does a new song get to replace a look while it is being built. The
-    // sequencer is suspended in Design for the same reason; this is the other
-    // thing that rewrites the settings without being asked.
-    if (designing) return;
-    // A preset or sequence made for the song that just started takes precedence.
-    const song = musicIntel.state.track ? songRefFromTrack(musicIntel.state.track) : null;
-    if (song && (userPresets.presets.some(p => sameSong(p.song, song)) || sequencer.sequences.some(q => sameSong(q.song, song)))) return;
-    // And so does a song's own show, when the Songs sheet is following songs.
-    if (song && followSongs && showFor(songShowsRef.current, song)) return;
-    /*
-      A look change nobody asked for behaves differently from one somebody
-      pressed, in three ways that were all the same bug wearing three hats.
-
-      It used to reach for `applyPreset`, which **clears every layer and
-      reseeds** — right when you are building a look on clean glass, wrong
-      when a song ends in front of a room, because it takes the dye with it.
-      It now adopts: the new look's dyes, injection styles and liquids, with
-      the plate left where it is.
-
-      It used to snap all eighty settings at once. It fades now, at the same
-      fade the desk's Go uses.
-
-      And it used to carry the structure — so a song boundary could put an LED
-      wheel on the plate, or a second layer, or fold the picture into a
-      kaleidoscope. Those have no halfway, so fading cannot soften them; they
-      are held instead. See `STRUCTURE` in `lookFade.ts`. Structure holds,
-      character drifts.
-    */
-    const from = settingsRef.current;
-    if (mode === 'random') {
-      previousLook.current = { id: pinnedPresetId, settings: from };
-      setPinnedPresetId(null);
-      // The song boundary's own stream, not Lucky's default: a Lucky press
-      // between songs must not decide which look the next song brings.
-      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), songFadeSeconds(songChange.reason));
-      return;
-    }
-    const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
-    // Which look a song boundary brings is on the plate for the whole song:
-    // seeded (lib/rng.ts), on a stream of its own so Lucky presses between
-    // songs do not decide it.
-    const next = stream('show.newSong').pick(pool);
-    if (!next) return;
-    previousLook.current = { id: pinnedPresetId, settings: from };
-    adoptPreset(next.id);
-    fadeSettingsTo(evolvedLook(from, next.settings), songFadeSeconds(songChange.reason));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [songChange?.seq]);
-
-  // ── Cast: keep the receiver in step ─────────────────────────────
-  /*
-    A receiver that draws its own plate is the wall too: while the desk builds
-    on a copy (PLAN.md 8b) it is sent the wall's look, not the desk's, and
-    Send to wall moves it with the window's.
-  */
-  const wl = wallLook;
-  const castState = useMemo<CastState>(() => ({
-    settings: wl ? wallSettings : effectiveSettings,
-    isActive,
-    isAutomated,
-    activeLayer,
-    seedCount: wl ? wl.seedCount : seedCount,
-    clearTrigger: wl ? wl.clearTrigger : clearTrigger,
-    drainTrigger: wl ? wl.drainTrigger : drainTrigger,
-    presetId: wl ? wl.castPresetId : activePresetId,
-    presetSeq: wl ? wl.presetSeq : presetSeq,
-    harmonyLock: paletteLock == null ? null : COLOR_HARMONIES[paletteLock],
-    // With the wall test on it (8e), so a receiver that draws its own plate
-    // (a Chromecast, a second machine) shows the pattern and the numbers as
-    // the HDMI wall does. Identify's end is a clock time, so a receiver whose
-    // clock is a second off flashes a second more or less.
-    output: shownOutput,
-  }), [wl, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount, clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput]);
-  const relaySendRef = useRef<((m: RemoteMessage) => void) | null>(null);
-  /**
-   * The mark, kept as a data URL so it can be sent to a receiver.
-   *
-   * A cast receiver and a network display are separate documents running their
-   * own copy of the solver; the settings that place the logo travel with
-   * everything else, but the picture has to be handed over once. Held here
-   * rather than only in the visualizer for that reason.
-   */
-  const markUrlRef = useRef<string | null>(null);
-  /*
-    The same mark as it crosses the show server to a network display: the
-    original when it fits a relay frame, else a smaller copy (PLAN 14m-mark,
-    `lib/markFit.ts`). The relay closes a socket on a frame over 512 KB, and a
-    print-sized logo is several megabytes, so before this a big logo never
-    reached the network display at all.
-  */
-  const markRelayUrlRef = useRef<string | null>(null);
-  const [markLoaded, setMarkLoaded] = useState(false);
-  /*
-    The state, at most fifteen times a second.
-
-    It used to go out every time `castState` changed, and during a look fade
-    that is every tick of the fade (thirty a second), plus every override the
-    ear writes: a full settings object, stringified, down the Presentation
-    channel and again down the relay to every mirror, and at the other end a
-    React render of the whole receiver and a solver retune for each one. The
-    stability plan (S10) asked for ~10 Hz on the grounds that "the receiver
-    interpolates anyway". It does not: `CastDisplay` hands `state.settings`
-    straight to its own visualizer, so a receiver shows a fade as exactly the
-    staircase it was sent. At 10 Hz a two-second fade to black is twenty steps
-    of 5% brightness a tenth of a second apart, which reads as a staircase on
-    a dark wall. Fifteen is half the fade's own tick, so it still halves the
-    traffic, and gives thirty steps a fifteenth of a second apart, which does
-    not.
-
-    So: a leading and trailing throttle. The first change after a quiet spell
-    goes at once; changes inside the window are held, and one trailing send at
-    the end of it carries whatever the state is *then* (read from a ref, not
-    captured) — so the last value of a fade always arrives, and a receiver
-    never rests on a value from the middle of one.
-
-    Three things skip the wait:
-    - A receiver's hello, or a new cast or mirror (`castReadyRef`, `joined`):
-      a new receiver has nothing, and the mark goes with it on those alone,
-      exactly as before.
-    - A trigger: `presetSeq`, `seedCount`, `clearTrigger`, `drainTrigger`.
-      Those are events carried as counters, and the receiver acts on each
-      change; two coalesced into one window would be one seed or one clear
-      where the operator pressed twice, or a preset re-seed that arrives up
-      to a fifteenth of a second after the settings that follow it.
-    - Nothing else. `isActive`, the output, the harmony lock and the rest are
-      levels, and a level only needs its last value.
-  */
-  const CAST_STATE_MS = 66;
-  const castStateRef = useRef(castState);
-  castStateRef.current = castState;
-  const castSendRef = useRef(castSend);
-  castSendRef.current = castSend;
-  const mirrorCountRef = useRef(mirrorCount);
-  mirrorCountRef.current = mirrorCount;
-  const castSentAtRef = useRef(-Infinity);
-  const castSentTriggersRef = useRef('');
-  const castTrailRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const castTriggers = (s: CastState) => `${s.presetSeq}:${s.seedCount}:${s.clearTrigger}:${s.drainTrigger}`;
-  // Stable, and reads everything through refs, so the trailing timer can
-  // never send a state (or a mirror count) older than the one it was set for.
-  const castSentLogRef = useRef<{ n: number; presetSeq: number; clearTrigger: number; layers: number }[]>([]);
-  const castSentCountRef = useRef(0);
-  const sendCastState = useCallback((withMark = false) => {
-    if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
-    /*
-      With a fader's moves React has not rendered yet (PLAN.md §14f): React
-      hears a ride ten times a second, and a receiver that drew only that
-      would take a ride to black as the staircase CAST_STATE_MS is there to
-      prevent. The wall's view of the ride, since a receiver draws the wall.
-    */
-    const told = castStateRef.current;
-    const laid = ridePlate.wall(told.settings);
-    const state = laid === told.settings ? told : { ...told, settings: laid };
-    const send = castSendRef.current;
-    castSentAtRef.current = performance.now();
-    castSentTriggersRef.current = castTriggers(state);
-    // The last forty sent, for the debug hook (`npm run draftwall` reads every one, not the last).
-    castSentLogRef.current.push({ n: ++castSentCountRef.current, presetSeq: state.presetSeq, clearTrigger: state.clearTrigger, layers: state.settings.layerCount ?? 1 });
-    if (castSentLogRef.current.length > 40) castSentLogRef.current.shift();
-    send({ type: 'state', state });
-    // The picture only when a receiver is new — on its hello, or when a cast
-    // or a mirror starts — because that is the one moment it needs it.
-    // It used to ride along with every state, and the state changes twice a
-    // second while a track is identified and every frame of a fade: a data
-    // URL of up to several megabytes, sixty times a second, down the channel
-    // and the relay, each one decoded and re-uploaded at the other end.
-    if (withMark) send({ type: 'mark', dataUrl: markUrlRef.current });
-    if (mirrorCountRef.current > 0) {
-      relaySendRef.current?.({ type: 'cast', message: { type: 'state', state } });
-      if (withMark) relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
-    }
-  }, []);
-  useEffect(() => () => { if (castTrailRef.current) clearTimeout(castTrailRef.current); }, []);
+  const {
+    castState, relaySendRef, markLoaded, loadMark, clearMark,
+  } = useCastFeed({
+    wallLook, wallSettings, effectiveSettings, isActive, isAutomated, activeLayer, seedCount,
+    clearTrigger, drainTrigger, activePresetId, presetSeq, paletteLock, shownOutput, castSend,
+    mirrorCount, ridePlate, markUrlRef, bothEngines, setToastRef, castReadyRef, castNudgeRef,
+    isCasting, ear, hear, audioData, songChange, stageRef, settingsRef, renderAudioRef, renderAudio,
+    liveAudio,
+  });
 
   const [, setLicenseTick] = useState(0);
   useEffect(() => {
@@ -3657,202 +1711,6 @@ export default function App() {
     ask();
     return onAuthFlagChange(ask);
   }, []);
-
-  const loadMark = useCallback((file: File) => {
-    const effectiveFile = isFreeTierGated()
-      ? new File(
-          [`<svg xmlns="http://www.w3.org/2000/svg" width="420" height="80" viewBox="0 0 420 80"><text x="210" y="52" text-anchor="middle" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="38" font-weight="600" letter-spacing="2">ChromaGlass</text></svg>`],
-          'chromaglass-mark.svg',
-          { type: 'image/svg+xml' },
-        )
-      : file;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const url = String(reader.result ?? '');
-      const img = new window.Image();
-      img.onload = () => {
-        for (const v of bothEngines()) v.loadMark?.(img, img.naturalWidth, img.naturalHeight);
-        markUrlRef.current = url;
-        markRelayUrlRef.current = fitMarkForCast(img, url);
-        setMarkLoaded(true);
-        castSend({ type: 'mark', dataUrl: url });
-        relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: markRelayUrlRef.current } });
-        setToastRef.current?.('Mark on the wall');
-      };
-      img.onerror = () => setToastRef.current?.('That file would not open as a picture');
-      img.src = url;
-    };
-    reader.readAsDataURL(effectiveFile);
-  }, [castSend]);
-
-  const clearMark = useCallback(() => {
-    for (const v of bothEngines()) v.clearMark?.();
-    markUrlRef.current = null;
-    markRelayUrlRef.current = null;
-    setMarkLoaded(false);
-    castSend({ type: 'mark', dataUrl: null });
-    relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
-  }, [castSend]);
-  castReadyRef.current = () => sendCastState(true);
-  /*
-    A ride between React's renders asks for a send the way a change of state
-    does (the throttle just below), so a receiver hears a fader at the cast's
-    own rate rather than at React's.
-  */
-  castNudgeRef.current = () => {
-    if (!castLinkRef.current || castTrailRef.current) return;
-    const wait = CAST_STATE_MS - (performance.now() - castSentAtRef.current);
-    if (wait <= 0) { sendCastState(false); return; }
-    castTrailRef.current = setTimeout(() => { castTrailRef.current = null; sendCastState(false); }, wait);
-  };
-  const castLinkRef = useRef('');
-  useEffect(() => {
-    if (!isCasting && mirrorCount === 0) {
-      castLinkRef.current = '';
-      if (castTrailRef.current) { clearTimeout(castTrailRef.current); castTrailRef.current = null; }
-      return;
-    }
-    const link = `${isCasting}:${mirrorCount}`;
-    const joined = link !== castLinkRef.current;
-    castLinkRef.current = link;
-    if (joined || castTriggers(castState) !== castSentTriggersRef.current) { sendCastState(joined); return; }
-    const wait = CAST_STATE_MS - (performance.now() - castSentAtRef.current);
-    if (wait <= 0) { sendCastState(false); return; }
-    // One trailing send per window; it reads the state when it fires.
-    if (!castTrailRef.current) castTrailRef.current = setTimeout(() => { castTrailRef.current = null; sendCastState(false); }, wait);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCasting, mirrorCount, castState, sendCastState]);
-  /*
-    The live state, for a harness to read.
-
-    This used to close over the render's `castState` and be re-registered when
-    it changed, which sounds equivalent and is not: a look fade or the
-    sequencer rewrites settings between renders, and what came back was
-    whichever snapshot the last effect happened to capture. A harness setting a
-    value and reading it straight back got the old one — which cost three
-    rounds of measuring the wrong plate before anyone thought to check the
-    instrument. Reading refs means it cannot be stale.
-  */
-  const earDebugRef = useRef(ear.debug);
-  earDebugRef.current = ear.debug;
-  /*
-    How many times the App has rendered, for `npm run renders` (PLAN.md
-    §14f): with a band playing it was about seventy a second, one per sound
-    reading and then some, and the check holds it down. Counting in the body
-    counts the renders React commits and the ones strict mode throws away
-    alike, which is what the page paid for.
-  */
-  const appRendersRef = useRef(0);
-  appRendersRef.current++;
-  const hearRef = useRef(hear);
-  hearRef.current = hear;
-  const liveDebugRef = useRef({ isCasting, castState, audioData, songChange, isAutomated });
-  liveDebugRef.current = { isCasting, castState, audioData, songChange, isAutomated };
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassCastState?: unknown }).chromaglassCastState = () => {
-        const l = liveDebugRef.current;
-        return {
-          isCasting: l.isCasting,
-          /** The projector's size as the wall last announced it: what the show renders for (and, after a reload, hears again, S15). */
-          stage: stageRef.current,
-          castState: l.castState,
-          sent: [...castSentLogRef.current],
-          // The reading the plate hears now, not the last one React was
-          // shown: a harness asking what the show hears means the plate.
-          audio: hearRef.current(),
-          ear: earDebugRef.current(),
-          songChange: l.songChange,
-          // Straight from the render rather than from the cast snapshot, which
-          // is assembled for a receiver and not for a question.
-          isAutomated: l.isAutomated,
-          ambient: isGlobalAmbientMode(),
-          settings: settingsRef.current,
-          appRenders: appRendersRef.current,
-        };
-      };
-    }
-  }, []);
-  /*
-    The audio bands, thirty times a second; the raw spectrum stays here.
-
-    This was an effect on `audioData`, so it ran on every render the ear
-    caused. The ear now tells React what it heard ten times a second
-    (useAudioAnalyzer's EAR_VIEW_MS, PLAN.md §14f), and ten readings a second
-    is too few for a receiver's plate to move with the beat. So the feed
-    listens to the ear itself, which hands over every reading on its own
-    clock, and keeps its own thirty-a-second limit. Not a page timer: the ear
-    keeps reading while this window is hidden behind the wall (§14a), and a
-    hidden window's timers are held to one a second.
-
-    A render's readings (`renderAudio`) are sent from the effect below
-    instead, one per frame of the film as before, and the room's are not sent
-    while one is running, as they were not when this read `audioData`.
-  */
-  const lastCastAudioRef = useRef(0);
-  const sendCastAudio = useCallback((a: AudioData | null) => {
-    const now = performance.now();
-    if (now - lastCastAudioRef.current < 33) return;
-    lastCastAudioRef.current = now;
-    const message: CastMessage = {
-      type: 'audio',
-      audio: a ? {
-        volume: a.volume, bass: a.bass, mid: a.mid, treble: a.treble,
-        energy: a.energy, spectralCentroid: a.spectralCentroid, timbre: a.timbre, complexity: a.complexity,
-        passage: a.passage,
-      } : null,
-    };
-    if (castingRef.current && !stageRef.current) castSendRef.current(message);   // a mirror of this canvas needs no feed
-    if (mirrorCountRef.current > 0) relaySendRef.current?.({ type: 'cast', message });
-  }, []);
-  const castingRef = useRef(isCasting);
-  castingRef.current = isCasting;
-  const feedingCast = isCasting || mirrorCount > 0;
-  const { onReading } = ear;
-  useEffect(() => {
-    if (!feedingCast) return;
-    return onReading((a) => { if (!renderAudioRef.current) sendCastAudio(a); });
-  }, [feedingCast, onReading, sendCastAudio]);
-  // A render's reading, and the ear going quiet (stopped: no more readings to
-  // say so), both reach the feed as state.
-  useEffect(() => {
-    if (!feedingCast) return;
-    if (renderAudio) sendCastAudio(renderAudio);
-    else if (!liveAudio) { lastCastAudioRef.current = -Infinity; sendCastAudio(null); }
-  }, [feedingCast, renderAudio, liveAudio, sendCastAudio]);
-
-  // ── The house lights ──
-  // Blackout fades the dimmer to nothing over a second and back to where it
-  // was: the band stops, the wall goes dark, the band starts, the wall comes
-  // back. The dimmer itself is a setting, so a fader can ride it by hand.
-  const [blackout, setBlackout] = useState(false);
-  /** For the lighting feed below, which is armed once and must not close over a stale value. */
-  const blackoutRef = useRef(blackout);
-  blackoutRef.current = blackout;
-  const dimmerBeforeRef = useRef(1);
-  const fadeRef = useRef<ShowIntervalHandle | null>(null);
-  // On a timer, not requestAnimationFrame: the laptop's window is often
-  // behind the projector's, and a hidden tab stops animating while the
-  // fader on the desk expects the wall to go dark anyway.
-  const fadeDimmer = useCallback((to: number, ms = 1100) => {
-    if (fadeRef.current) clearShowInterval(fadeRef.current);
-    const from = settingsRef.current.dimmer ?? 1;
-    const began = showNow();
-    fadeRef.current = showInterval(() => {
-      const k = Math.min(1, (showNow() - began) / ms);
-      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-      setSettings(prev => ({ ...prev, dimmer: from + (to - from) * e }));
-      laterWrites.mark(['dimmer'], showNow());
-      if (k >= 1 && fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
-    }, 16, 'dimmer-fade');
-  }, []);
-  const toggleBlackout = useCallback(() => {
-    setBlackout(prev => {
-      if (!prev) { dimmerBeforeRef.current = Math.max(0.05, settingsRef.current.dimmer ?? 1); fadeDimmer(0); }
-      else fadeDimmer(dimmerBeforeRef.current);
-      return !prev;
-    });
-  }, [fadeDimmer]);
   // ── Macro zoom at will ──
   // + and − (and the wheel over the plate, and the chip) move the closeup's
   // magnification a step at a time; + with the closeup off turns it on at a
@@ -3869,37 +1727,13 @@ export default function App() {
     updateSettings({ macroZoom: zoom, macroMode: zoom > 1.05 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // ── Recording ──
-  const recorder = useRecorder();
-  const [showRecordPanel, setShowRecordPanel] = useState(false);
-  /*
-    The one Record button (lib/recordChoice.ts). R, the desk's button, the
-    phone's, MIDI and the remote all land here: nothing running, it starts
-    what the Record panel says it makes (the Plate video, a Take, or both);
-    anything running, it stops all of it. `toggleVideo` is the video alone.
-  */
-  const toggleVideo = useCallback(() => {
-    recorder.toggle(document.getElementById('liquid-canvas') as HTMLCanvasElement | null, audioStream);
-  }, [recorder, audioStream]);
-  const [recordChoice, setRecordChoiceState] = useState<RecordChoice>(loadRecordChoice);
-  const setRecordChoice = useCallback((c: RecordChoice) => {
-    const next = normalizeChoice(c);
-    setRecordChoiceState(next);
-    saveRecordChoice(next);
-  }, []);
-  const toggleRecording = useCallback(() => {
-    const m = recordMove(recordChoice, { videoOn: recorder.recording, takeOn: perfLive, videoSupported: recorder.supported });
-    if (m.stopVideo || m.startVideo) toggleVideo();
-    if (m.stopTake) stopPerformance();
-    if (m.startTake) startPerformance();
-  }, [recordChoice, recorder.recording, recorder.supported, perfLive, toggleVideo, stopPerformance, startPerformance]);
-  // Whatever Record is making, one clock for the phone and the overlay bar: the video's when it runs, else the take's.
-  const recordingAny = recorder.recording || perfLive;
-  const recordSeconds = recorder.recording
-    ? recorder.seconds
-    : musicIntel.performance.live
-      ? Math.max(0, Math.floor((Math.max(perfNow, musicIntel.performance.live.startedAtMs) - musicIntel.performance.live.startedAtMs) / 1000))
-      : 0;
+
+  const {
+    recorder, showRecordPanel, setShowRecordPanel, recordChoice, setRecordChoice, toggleRecording,
+    recordingAny, recordSeconds,
+  } = useRecording({
+    audioStream, perfLive, stopPerformance, startPerformance, musicIntel, perfNow,
+  });
 
   // ── The phone's own hands: a pinch on the closeup, and Tilt ──
   /*
@@ -4040,64 +1874,19 @@ export default function App() {
     laterWrites.mark([String(key)], showNow());
     setDocDirty(true);
   };
-  /*
-    A row's take button (lib/mixFade.ts): out over its fade time, or back in
-    to where it was. The bars are counted at the tempo the desk sends or taps,
-    else the one the bar grid hears in the music, else 120.
 
-    On the show timer, not requestAnimationFrame, for the dimmer's reason: the
-    laptop's window spends a show behind the projector's, and a film taken
-    out from a pad while the operator watches the wall must still go.
-  */
-  const rowFadeTimer = useRef<ShowIntervalHandle | null>(null);
-  const fadeBpm = (): number => {
-    const bar = wallRef.current?.songShape().bar;
-    return fadeTempo(tempoRef.current?.bpm ?? 0, bar?.period ?? 0, bar?.beatConfidence ?? 0);
-  };
-  /*
-    The check's window on the takes (`npm run phone`): when the page has put an
-    array at `window.__cgFadeLog`, every level a take writes is pushed there
-    with the moment it was worked out, on the page's own clock. The check used
-    to judge the fade's steps from the level slider, but a slider shows what
-    React last rendered, and on a loaded page a render lands late and the next
-    one catches up: a fade moving at the curve's own speed read as a jump (the
-    numbers are in scripts/phone.mjs). The moment each level is worked out is
-    the time its step can fairly be held to, and the gap between them is
-    where a slowed timer shows. It is `performance.now()`, not the `now` the
-    fade was handed, so a fade handed the wrong time still shows as the jump
-    it is. Nothing is kept when no array is there, as in every show.
-  */
-  const traceFade = (levels: Partial<Record<MixSource, number>>) => {
-    const log = (window as unknown as { __cgFadeLog?: unknown }).__cgFadeLog;
-    if (!Array.isArray(log)) return;
-    const at = performance.now();
-    for (const [row, v] of Object.entries(levels)) log.push([at, row, v]);
-  };
-  const fadeRow = (id: MixSource) => {
-    const cur = settingsRef.current as unknown as Record<string, unknown>;
-    const levelKey = String(MIX_SOURCE_INFO[id].level);
-    const level = typeof cur[levelKey] === 'number' ? cur[levelKey] as number : 1;
-    // A song's glide of this level stops: the button is the later hand.
-    const glide = glidesRef.current.get(levelKey);
-    if (glide) { clearShowInterval(glide); glidesRef.current.delete(levelKey); }
-    const first = rowFades.press(id, level, barsToMs(fadeBarsOf(settingsRef.current, id), fadeBpm()), showNow());
-    traceFade({ [id]: first });
-    if (first !== level) setSettings(prev => ({ ...prev, [levelKey]: first }));
-    setDocDirty(true);
-    setRowFading(rowFades.running());
-    if (rowFadeTimer.current || !rowFades.isFading(id)) return;
-    rowFadeTimer.current = showInterval(() => {
-      const levels = rowFades.step(showNow());
-      traceFade(levels);
-      const patch = Object.fromEntries(Object.entries(levels).map(([row, v]) => [String(MIX_SOURCE_INFO[row as MixSource].level), v]));
-      if (Object.keys(patch).length) setSettings(prev => ({ ...prev, ...patch }));
-      const running = rowFades.running();
-      setRowFading(prev => Object.keys(prev).join() === Object.keys(running).join() && Object.values(prev).join() === Object.values(running).join() ? prev : running);
-      if (!Object.keys(running).length && rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
-    }, 16, 'row-fade');
-  };
-  useEffect(() => () => { if (rowFadeTimer.current) clearShowInterval(rowFadeTimer.current); }, []);
-  const mixTakes = { onFade: fadeRow, fading: rowFading };
+  const {
+    glidesRef, glideSetting,
+  } = useGlides({
+    handOnLevels, settingsRef, setSettings, laterWrites,
+  });
+
+  const {
+    rowFadeTimer, fadeRow, mixTakes,
+  } = useRowFades({
+    wallRef, tempoRef, settingsRef, glidesRef, rowFades, setSettings, setDocDirty, setRowFading,
+    rowFading,
+  });
   const runActionRef = useRef<((a: MidiAction) => void) | null>(null);
   const runAction = (a: MidiAction) => {
     switch (a) {
@@ -4183,482 +1972,41 @@ export default function App() {
   };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
-  // ── Phone remote ────────────────────────────────────────────────
-  // The laptop is authoritative: it publishes a snapshot of the show whenever
-  // anything changes, and applies commands the phone sends back. When no relay
-  // is running (the Firebase-hosted build, or plain `vite dev`), the link stays
-  // dormant and nothing here changes behaviour.
-  const remoteState = useMemo<RemoteState>(() => ({
-    settings,
-    activePresetId,
-    isActive,
-    isAutomated,
-    overlaysVisible,
-    trackName: musicIntel.state.track?.title ?? null,
-    sequencer: {
-      name: sequencer.status.name,
-      running: sequencer.status.running,
-      stageIndex: sequencer.status.stageIndex,
-      stageName: sequencer.status.stageName,
-      progress: Math.round(sequencer.status.progress * 100) / 100,
-      stages: sequencer.status.stages.map(st => ({ name: st.name, seconds: st.seconds })),
-    },
-    presets: allPresets.map(p => ({ id: p.id, name: p.name, macro: !!p.settings.macroMode, user: isUserPresetId(p.id) })),
-    blackout,
-    recording: recorder.recording ? recorder.seconds : null,
-    cuedPresetId: cued?.id ?? null,
-    cuedName: cued?.name ?? null,
-    fadeSeconds,
-    filmLoaded: filmSource !== 'none',
-    markLoaded,
-    rowFading,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading]);
-
-  // Patches from a phone arrive at the rate of a thumb on a slider; apply
-  // them in batches so the show isn't re-rendered thirty times a second.
-  const pendingPatchRef = useRef<Partial<VisualizerSettings> | null>(null);
-  const patchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const queuePatch = (partial: Partial<VisualizerSettings>) => {
-    const clean = sanitizePatch(partial);
-    if (Object.keys(clean).length === 0) return;
-    pendingPatchRef.current = { ...(pendingPatchRef.current ?? {}), ...clean };
-    if (patchTimerRef.current) return;
-    patchTimerRef.current = setTimeout(() => {
-      patchTimerRef.current = null;
-      const p = pendingPatchRef.current;
-      pendingPatchRef.current = null;
-      if (p) updateSettings(p);
-    }, 50);
-  };
-
-  /*
-    A pad's point on the wall, as the plate's (PLAN 8-draw-a): the remote's
-    Draw sends where the finger is on the picture it shows, and the plate
-    under that is through the camera (`wallToPlate`). A point without `wall`
-    is the plate's already (OSC, an older remote). A stroke maps both its
-    ends, so it shrinks with the plate as a mouse's does; a lean is only a
-    direction in the room, so it is turned and keeps its length and angle.
-  */
-  const onWall = (wall: unknown, x: number, y: number, layer: number, dx?: number, dy?: number,
-                  vec: 'stroke' | 'lean' = 'stroke', turned = true) => {
-    const v = wallRef.current;
-    if (wall !== true || !v) return { x, y, dx, dy };
-    const p = v.wallToPlate(x, y, layer, turned);
-    if (dx === undefined || dy === undefined) return { x: p.x, y: p.y, dx, dy };
-    if (vec === 'stroke') {
-      const q = v.wallToPlate(x - dx, y - dy, layer, turned);
-      return { x: p.x, y: p.y, dx: p.x - q.x, dy: p.y - q.y };
-    }
-    /*
-      A pen's lean is a direction in the room, not wall units: a 45° lean
-      drawn as wall units on a 16:9 wall would come out at 29°. So it is
-      only turned, by the angle the camera turns a step to the right through.
-    */
-    const r = v.wallToPlate(x + 0.01, y, layer, turned);
-    const a = Math.atan2(r.y - p.y, r.x - p.x);
-    return { x: p.x, y: p.y, dx: dx * Math.cos(a) - dy * Math.sin(a), dy: dx * Math.sin(a) + dy * Math.cos(a) };
-  };
-  const padPictureRef = useRef<PadPictureSender | null>(null);
-
-  const remoteLink = useRemoteLink({
-    role: 'display',
-    state: remoteState,
-    onMessage: (message) => {
-      switch (message.type) {
-        case 'mirrors':
-          setMirrorCount(message.count);
-          break;
-        case 'controllers':
-          setPhoneCount(message.count);
-          break;
-        case 'request-cast':
-          relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
-          break;
-        case 'patch':
-          queuePatch(message.settings);
-          break;
-        case 'preset':
-          cuePreset(message.presetId);
-          break;
-        case 'cue':
-          // Arm, do not apply: `preset` is the destructive one.
-          if (message.presetId) cueLook(message.presetId); else setCued(null);
-          break;
-        case 'dye': {
-          const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
-          if (color) {
-            updateLiquidColor(selectedLiquidId, color);
-          }
-          break;
-        }
-        case 'liquid':
-          // Only a bottle that is actually on the bench: the pad may be a
-          // newer build than the display, or the other way round.
-          if (liquidTypesRef.current.some(l => l.id === message.id)) {
-            setSelectedLiquidId(message.id);
-          }
-          break;
-        case 'action':
-          switch (message.action) {
-            case 'play':          setIsActive(true); break;
-            case 'pause':         setIsActive(false); break;
-            case 'seed':          setSeedCount(prev => prev + 1); break;
-            case 'clear':         setClearTrigger(prev => prev + 1); break;
-            case 'drain':         setDrainTrigger(prev => prev + 1); break;
-            case 'lucky':         triggerLucky(); break;
-            case 'automate-on':   setIsAutomated(true); break;
-            case 'automate-off':  setIsAutomated(false); break;
-            case 'overlays-off':  hideOverlays(); break;
-            case 'overlays-on':   setOverlaysVisible(true); break;
-            case 'seq-play':      sequencer.play(); break;
-            case 'seq-pause':     sequencer.pause(); break;
-            case 'seq-next':      sequencer.next(); break;
-            case 'seq-prev':      sequencer.prev(); break;
-            case 'seq-stop':      sequencer.stop(); break;
-            case 'preset-next':   stepPreset(1); break;
-            case 'preset-prev':   stepPreset(-1); break;
-            case 'blackout-toggle': toggleBlackout(); break;
-            case 'record-toggle': toggleRecording(); break;
-            case 'performance-toggle': togglePerformance(); break;
-            case 'go':            goLook(); break;
-            case 'back':          revertLook(); break;
-            case 'mix-fade-led': case 'mix-fade-gel': case 'mix-fade-lumia': case 'mix-fade-front':
-            case 'mix-fade-back': case 'mix-fade-film': case 'mix-fade-mark':
-              fadeRow(message.action.slice('mix-fade-'.length) as MixSource); break;
-            // A phone may be a newer build than the display, so an action
-            // this one does not know is possible rather than impossible: it
-            // is said out loud instead of swallowed. `tsc` still requires a
-            // case for every action this build's own protocol declares.
-            default: unhandled('an action from the phone', message.action);
-          }
-          break;
-        case 'blow': {
-          const g = parseRemoteGesture(message);
-          if (!g || g.type !== 'blow') break;
-          // A pen's lean is a direction, not a stroke: turned with the dish, its length kept.
-          wallRef.current?.applyGesture({ tool: 'blow', layer: g.layer, amount: g.amount, ...onWall(g.wall, g.x, g.y, g.layer, g.dx, g.dy, 'lean') });
-          break;
-        }
-        case 'drop': {
-          const g = parseRemoteGesture(message);
-          if (!g || g.type !== 'drop') break;
-          wallRef.current?.applyGesture({ tool: 'drop', ...onWall(g.wall, g.x, g.y, g.layer), layer: g.layer, amount: g.amount, ...laidColour(selectedLiquid, g.color) });
-          break;
-        }
-        case 'press': {
-          const g = parseRemoteGesture(message);
-          if (!g || g.type !== 'press') break;
-          wallRef.current?.applyGesture({ tool: 'press', ...onWall(g.wall, g.x, g.y, g.layer), layer: g.layer, amount: g.amount });
-          break;
-        }
-        case 'finger': {
-          const g = parseRemoteGesture(message);
-          if (!g || g.type !== 'finger') break;
-          wallRef.current?.applyGesture({ tool: 'finger', layer: g.layer, amount: g.amount, ...onWall(g.wall, g.x, g.y, g.layer, g.dx, g.dy, 'stroke') });
-          break;
-        }
-        // The pad's finger on the dish (PLAN §22): the dish turns under it.
-        case 'spin': {
-          const g = parseRemoteGesture(message);
-          if (!g || g.type !== 'spin') break;
-          // Untouched by the dish's turn: Spin reads the hand's angle as the room sees it.
-          wallRef.current?.applyGesture({ tool: 'spin', ...onWall(g.wall, g.x, g.y, g.layer, undefined, undefined, 'stroke', false), layer: g.layer, amount: g.amount, id: g.id });
-          break;
-        }
-        // A remote on Draw asking for the wall (lib/padPicture.ts).
-        case 'pad-picture':
-          padPictureRef.current?.want(message.width);
-          break;
-        case 'tilt': {
-          const g = parseRemoteGesture(message);
-          if (!g || g.type !== 'tilt') break;
-          wallRef.current?.setExternalTilt(g.x, g.y);
-          break;
-        }
-        /*
-          Not this display's, and each for its own reason. Naming them is the
-          point: without these four the switch below cannot ask the compiler
-          for the rest, and "no case" reads the same whether it was decided
-          or forgotten.
-
-          `hello` goes the other way — `useRemoteLink` sends it on connect.
-          `denied` is taken by that hook too, before `onMessage` ever runs,
-          and so is `request-state`, which the hook answers for this role.
-          `lights` and `state` this display *sends*: the first a few lines
-          down from here, the second from the hook.
-          `cast` is the mirror's, and `CastDisplay` has it.
-        */
-        case 'hello':
-        case 'denied':
-        case 'request-state':
-        case 'state':
-        case 'lights':
-        case 'cast':
-        case 'picture':
-          break;
-        default: unhandled('a message from the phone', message);
-      }
-    },
+  const {
+    remoteLink,
+  } = useRemote({
+    settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
+    allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
+    updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
+    cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypesRef, setSelectedLiquidId,
+    setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
+    hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording,
+    togglePerformance, goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName,
+    runActionRef, runAction, tempoRef,
   });
-  usePublishAccountShow(!phone && remoteLink.status === 'connected', pinnedLookName);
 
-  runActionRef.current = runAction;
-
-  // The wall for a remote's Draw: one sender while the link is up, fed by the frame task.
-  const remoteSend = remoteLink.send;
-  useEffect(() => {
-    const sender = new PadPictureSender(remoteSend);
-    padPictureRef.current = sender;
-    setPadPictureSender(sender);
-    return () => { if (padPictureRef.current === sender) padPictureRef.current = null; setPadPictureSender(null); };
-  }, [remoteSend]);
-
-  // ── Songs: the runtime ──────────────────────────────────────────
-  /** A setting walked to a value over some seconds, the way a hand turns a knob. One walk per setting. */
-  const glidesRef = useRef(new Map<string, ShowIntervalHandle>());
-  const glideSetting = useCallback((key: keyof VisualizerSettings, to: number, seconds: number, atEnd?: Partial<VisualizerSettings>) => {
-    const timers = glidesRef.current;
-    const running = timers.get(String(key));
-    if (running) clearShowInterval(running);
-    // A song's glide of a Mixer row's level stops a take on it (lib/mixFade.ts).
-    handOnLevels([String(key), ...Object.keys(atEnd ?? {})]);
-    const from = Number((settingsRef.current as unknown as Record<string, unknown>)[key] ?? 0);
-    if (!(seconds > 0)) { setSettings(p => ({ ...p, [key]: to, ...(atEnd ?? {}) })); return; }
-    const started = showNow();
-    const timer: ShowIntervalHandle = showInterval(() => {
-      const k = Math.min(1, (showNow() - started) / (seconds * 1000));
-      const e = k * k * (3 - 2 * k);
-      setSettings(p => ({ ...p, [key]: k >= 1 ? to : from + (to - from) * e, ...(k >= 1 ? atEnd ?? {} : {}) }));
-      // Every tick, not only the first: a glide still walking when a Back is
-      // pressed is the later writer, and the Back leaves it be.
-      laterWrites.mark([String(key), ...(k >= 1 ? Object.keys(atEnd ?? {}) : [])], showNow());
-      if (k >= 1) { clearShowInterval(timer); timers.delete(String(key)); }
-    }, 33, `glide:${String(key)}`);
-    timers.set(String(key), timer);
-  }, []);
-  useEffect(() => () => { for (const t of glidesRef.current.values()) clearShowInterval(t); }, []);
-
-  /** Do one of a song's actions, through the same moves a pad or a key makes. */
-  const performSongAction = useCallback((action: SongAction, show: SongShow) => {
-    const a = action.what;
-    const v = wallRef.current;
-    switch (a.do) {
-      case 'look': goLookNow(a.look.id, a.fade); break;
-      case 'drain': runActionRef.current?.('drain'); break;
-      case 'clear': runActionRef.current?.('clear'); break;
-      case 'seed': runActionRef.current?.('seed'); break;
-      case 'burst': v?.applyGesture({ tool: 'press', x: 0.5, y: 0.5, layer: 0, amount: 1 }); break;
-      case 'zoom':
-        if (a.zoom > 1.05) { setSettings(p => ({ ...p, macroMode: true })); glideSetting('macroZoom', a.zoom, a.over); }
-        else glideSetting('macroZoom', 1, a.over, { macroMode: false });
-        break;
-      case 'kaleidoscope': setSettings(p => ({ ...p, kaleidoscope: a.folds })); break;
-      case 'dyes': v?.stepDyes(); break;
-      case 'blackout': glideSetting('dimmer', 0, a.over); break;
-      case 'lights-up': glideSetting('dimmer', 1, a.over); break;
-      case 'set': glideSetting(a.key, a.value, a.over); break;
-      // In an ink that reads against the plate as it is: a title poured into a
-      // full, bright plate in the look's own dye does not show.
-      case 'title': v?.pourText(titleRows(show.song), { colour: 'contrast' }); break;
-      case 'signoff': v?.pourText([{ text: 'ChromaGlass', weight: 1 }], { colour: 'contrast' }); break;
-      // A show that names something this build cannot do says so, rather
-      // than running the stage and appearing to have done it.
-      default: unhandled("a song show's action", a);
-    }
-  }, [glideSetting, goLookNow]);
-
-  const songRuntime = useSongShows({
-    shows: songShows,
-    // Not while a look is being built: Design is where settings are chosen by hand.
-    // Nor while a song is being rendered: the render plays the look on the plate (hooks/useSongRender.ts).
-    follow: followSongs && !designing && !renderHold,
-    track: musicIntel.state.track,
-    positionSec: musicIntel.state.positionSec,
-    songMap: musicIntel.state.songMap,
-    isActive,
-    kicks: () => wallRef.current?.kicks() ?? 0,
-    applyLook: (show, fade) => goLookNow(show.look.id, fade),
-    perform: performSongAction,
+  const {
+    songRuntime, songRuntimeRef, scoreProps,
+  } = useSongScore({
+    wallRef, goLookNow, runActionRef, setSettings, glideSetting, songShows, followSongs, designing,
+    renderHold, musicIntel, isActive, currentSong, songShowsRef, setSongShows, activePresetId,
+    pinnedPresetId, userPresets, tempoLabel,
   });
-  const songRuntimeRef = useRef(songRuntime);
-  songRuntimeRef.current = songRuntime;
-
-  /*
-    The score (PLAN 28h): the song as a timeline, its show's cues on it, and
-    the nudge. One set of props for the desk's Score panel and the phone's Play
-    sheet, so a cue pinned on either lands in the same song show.
-
-    A cue pinned to a song that has no show yet makes one, named for the look
-    that is playing, for the song's next play. It starts at once (Follow
-    songs) without fading to that look: the person pinned a burst on a chorus,
-    not a look change, and the plate may be a look no saved one matches (a
-    slider moved, a fader ridden), which a fade would take back.
-  */
-  const currentShow = useMemo(() => showFor(songShows, currentSong), [songShows, currentSong]);
-  const pinScoreCue = useCallback((when: ActionWhen, what: ActionWhat) => {
-    if (!currentSong) return;
-    const action: SongAction = { id: newId('act'), when, what };
-    const shows = songShowsRef.current;
-    const existing = showFor(shows, currentSong);
-    if (existing) { setSongShows(shows.map(s => (s.id === existing.id ? { ...s, actions: [...s.actions, action] } : s))); return; }
-    const lookId = activePresetId ?? pinnedPresetId ?? 'classic';
-    const saved = userPresets.presets.find(u => u.id === lookId);
-    const preset = PRESETS.find(q => q.id === lookId) ?? PRESETS.find(q => q.id === 'classic');
-    const look = saved ? { kind: 'saved' as const, id: saved.id, name: saved.name } : { kind: 'preset' as const, id: preset?.id ?? 'classic', name: preset?.name };
-    const id = newId('song');
-    songRuntimeRef.current.keepLook(id);
-    setSongShows([...shows, { id, song: currentSong, look, actions: [action] }]);
-  }, [currentSong, setSongShows, activePresetId, pinnedPresetId, userPresets.presets]);
-  const removeScoreCue = useCallback((actionId: string) => {
-    setSongShows(songShowsRef.current.map(s => (s.actions.some(a => a.id === actionId) ? { ...s, actions: s.actions.filter(a => a.id !== actionId) } : s)));
-  }, [setSongShows]);
-  const { nudgePosition, nudgeToSection, resetNudge } = musicIntel;
-  const scoreProps = useMemo<SongScoreProps>(() => ({
-    songName: currentSong ? songLabel(currentSong) : null,
-    map: musicIntel.state.songMap,
-    phase: !musicIntel.state.track ? 'none'
-      : musicIntel.state.songMap ? 'ready'
-      : musicIntel.state.analyzing ? 'analyzing'
-      : musicIntel.state.recording ? 'hearing' : 'unmapped',
-    positionSec: musicIntel.state.positionSec,
-    nudgeSec: musicIntel.state.nudgeSec,
-    bpm: tempoLabel.bpm,
-    durationSec: songDuration(musicIntel.state.track?.durationSec, currentShow?.song.durationSec, musicIntel.state.songMap?.durationSec),
-    show: currentShow,
-    // The song's clock, which a followed show and the sequencer's section
-    // stages read. A show started by hand keeps its own (PLAN 28h-4).
-    onNudge: nudgePosition,
-    onNudgeToSection: nudgeToSection,
-    onResetNudge: resetNudge,
-    onPin: pinScoreCue,
-    onRemoveCue: removeScoreCue,
-  }), [currentSong, musicIntel.state.songMap, musicIntel.state.track, musicIntel.state.analyzing, musicIntel.state.recording,
-    musicIntel.state.positionSec, musicIntel.state.nudgeSec, tempoLabel.bpm, currentShow, nudgePosition, nudgeToSection, resetNudge, pinScoreCue, removeScoreCue]);
 
   // ── Render this song (PLAN.md §6) ───────────────────────────────
   const showSequencerRef = useRef(sequencer);
   showSequencerRef.current = sequencer;
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
-  /*
-    The app's side of a render: what it steps aside from, and what it puts
-    back. The loop itself is hooks/useSongRender.ts; the plate's side is
-    `VisualizerRender` in components/LiquidVisualizer.tsx.
 
-    Stepping aside, and why each:
-      - the music element pauses: the render hears the song from its file;
-        the room does not need to hear it again at the same time. It plays
-        on afterwards if it was playing, from where it was;
-      - a sequence or a song's show stops (first cut: they do not play in a
-        render yet, and the panel says so before anything is pressed);
-      - fades and glides in flight are dropped, because their clocks were
-        started on the wall clock and would land at a moment the film does
-        not have; Evolve's own intervals are kept and re-phased onto the
-        film's clock (lib/showClock.ts), and its glide and aim start empty;
-      - a frozen plate is thawed, since a render of a still is not a film;
-      - the settings and Evolve's anchor are kept, because Evolve wanders
-        them during the render and the show after it should be the show
-        before it. The same snapshot is what makes a second render of the
-        same seed start where the first one did, which `npm run render-app`
-        measures.
-    The seed is put back too (in useSongRender), so tonight's seed is still
-    tonight's after a render on another one. And the fades and glides are
-    dropped again on the way out, for the reason given where it is done.
-  */
-  const renderHost = useMemo(() => ({
-    render: () => wallRef.current?.render() ?? null,
-    setAudio: (a: AudioData | null) => { renderAudioRef.current = a; setRenderAudio(a); },
-    prepare: () => {
-      const el = musicElRef.current;
-      if (showSequencerRef.current.status.sequenceId !== null) showSequencerRef.current.stop();
-      songRuntimeRef.current.stop();
-      if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
-      if (fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
-      for (const t of glidesRef.current.values()) clearShowInterval(t);
-      glidesRef.current.clear();
-      if (rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
-      rowFades.clear();
-      laterWrites.clear();
-      setRowFading({});
-      driftGlide.current.clear();
-      // A render plans its own moves from the start, as the show would on this song.
-      slowEvolveRef.current = null;
-      const kept = { settings: settingsRef.current, anchor: driftAnchor.current, active: isActiveRef.current, playing: !!el && !el.paused };
-      if (el && !el.paused) el.pause();
-      renderHoldRef.current = true;
-      flushSync(() => { setRenderHold(true); setIsActive(true); });
-      return () => {
-        /*
-          The same drops as on the way in, again on the way out. A fade or a
-          glide started during the render (a song show's, a look fade Evolve
-          asked for) was stamped on the film's clock, whose milliseconds start
-          at 2^20; carried into the live show, on a page younger than that it
-          reads as not begun and extrapolates, and writes over the settings
-          and the dimmer this very function is about to put back.
-        */
-        if (lookFadeRef.current) { clearShowInterval(lookFadeRef.current); lookFadeRef.current = null; }
-        if (fadeRef.current) { clearShowInterval(fadeRef.current); fadeRef.current = null; }
-        for (const t of glidesRef.current.values()) clearShowInterval(t);
-        glidesRef.current.clear();
-        if (rowFadeTimer.current) { clearShowInterval(rowFadeTimer.current); rowFadeTimer.current = null; }
-        rowFades.clear();
-        laterWrites.clear();
-        renderHoldRef.current = false;
-        flushSync(() => { setSettings(kept.settings); setIsActive(kept.active); setRenderHold(false); setRowFading({}); });
-        driftAnchor.current = kept.anchor;
-        driftGlide.current.clear();
-        slowEvolveRef.current = null;
-        // The song plays on if it was playing: a render interrupts listening, it does not end it.
-        if (kept.playing && musicElRef.current) void musicElRef.current.play().catch(() => { /* needs a gesture: the play button is there */ });
-      };
-    },
-  }), []);
-  const songRender = useSongRender(renderHost);
-  const [renderOpen, setRenderOpen] = useState(false);
-  const startRender = useCallback((choice: { width: number; height: number; fps: number; seed: string }) => {
-    if (!musicFile) return;
-    const s = settingsRef.current;
-    void songRender.start({
-      song: musicFile.url, name: musicFile.name,
-      width: choice.width, height: choice.height, fps: choice.fps,
-      seed: parseSeed(choice.seed) ?? showSeed(),
-      levels: { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false },
-    });
-  }, [musicFile, songRender.start]);
-  /*
-    For `npm run render-app` only (`?debug`): render the loaded song, or a
-    song handed over as bytes, small and kept in memory, and hand back the
-    file and a hash of every frame, so the check can render twice and compare.
-  */
-  const musicFileRef = useRef(musicFile);
-  musicFileRef.current = musicFile;
-  useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has('debug')) return;
-    // What a render could leave running in the live show: a fade or a glide
-    // stamped on the film's clock (see the restore in `renderHost`).
-    (window as unknown as { chromaglassRenderPending?: unknown }).chromaglassRenderPending = () => ({
-      lookFade: lookFadeRef.current !== null, dimmerFade: fadeRef.current !== null, glides: glidesRef.current.size,
-    });
-    (window as unknown as { chromaglassRender?: unknown }).chromaglassRender = async (o: {
-      song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number;
-    }) => {
-      const s = settingsRef.current;
-      const song = o.song ? new Blob([o.song]) : musicFileRef.current?.url;
-      if (!song) throw new Error('no song: load one or pass its bytes');
-      const r = await songRender.start({
-        song, name: 'check', width: o.width, height: o.height, fps: o.fps, seed: o.seed,
-        levels: { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false },
-        test: { keepInMemory: true, hashFrames: true, maxFrames: o.maxFrames },
-      });
-      let b64: string | null = null;
-      if (r.bytes) {
-        let bin = '';
-        for (let i = 0; i < r.bytes.length; i += 0x8000) bin += String.fromCharCode(...r.bytes.subarray(i, i + 0x8000));
-        b64 = btoa(bin);
-      }
-      return { phase: r.phase, message: r.message, format: r.format, summary: r.summary, frameHashes: r.frameHashes, frameDigests: r.frameDigests, bytes: b64 };
-    };
-  }, [songRender.start]);
+  const {
+    songRender, renderOpen, setRenderOpen, startRender,
+  } = useSongRendering({
+    wallRef, renderAudioRef, setRenderAudio, musicElRef, showSequencerRef, songRuntimeRef,
+    lookFadeRef, fadeRef, glidesRef, rowFadeTimer, rowFades, laterWrites, setRowFading, driftGlide,
+    slowEvolveRef, settingsRef, driftAnchor, isActiveRef, renderHoldRef, setRenderHold, setIsActive,
+    setSettings, musicFile,
+  });
   const lookChoices = useMemo<LookChoice[]>(() => [
     ...PRESETS.map(p => ({ kind: 'preset' as const, id: p.id, name: p.name })),
     ...userPresets.presets.map(p => ({ kind: 'saved' as const, id: p.id, name: p.name })),
@@ -4694,246 +2042,28 @@ export default function App() {
 
   // ── MIDI controller and game controller ─────────────────────────
   const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);
-  const midi = useMidi(
-    {
-      getSetting: (key) => ride.read(String(key), settingsRef.current as unknown as Record<string, unknown>),
-      setSetting: rideSetting,
-      action: runAction,
-      applyPreset: cuePreset,
-      selectDye,
-      // Every note plays the envelopes, whatever else that pad is for.
-      noteStruck: (velocity) => wallRef.current?.fireEnvelopes?.(velocity),
-    },
-    {
-      activePresetId,
-      dyeIndex: selectedDyeIndex,
-      presetColor: (id) => {
-        const contract = isUserPresetId(id) ? userPresetsRef.current.find(p => p.id === id)?.contract : PRESET_CONTRACTS[livePresetId(id)];
-        const idx = contract?.[0];
-        return idx === undefined ? null : PALETTE_RGB[idx] ?? null;
-      },
-      paletteColor: (i) => PALETTE_RGB[i] ?? null,
-      toggles: { play: isActive, automate: isAutomated, macro: !!settings.macroMode, overlays: overlaysVisible, sequencer: sequencer.status.running, blackout, record: recorder.recording, performance: !!musicIntel.performance.live },
-    },
-    allPresetIds,
-    // The tempo, if the desk is sending it. Straight into the tempo source:
-    // twenty-four messages a beat has no business going through React.
-    useCallback((kind: 'clock' | 'start' | 'continue' | 'stop', at: number) => {
-      const t = tempoRef.current;
-      if (!t) return;
-      if (kind === 'clock') t.clockPulse(at);
-      else if (kind === 'stop') t.clockStop();
-      else t.clockStart(at);
-    }, []),
-    // Timecode, straight into the reader for the same reason: a rolling desk
-    // sends a hundred of these a second and none of them is a render.
-    useCallback((message: { quarter: number } | { full: Uint8Array }, at: number) => {
-      const r = timecodeRef.current;
-      if ('quarter' in message) r.quarter(message.quarter, at);
-      else r.full(message.full, at);
-    }, []),
-  );
-  midiRef.current = midi as unknown as typeof midiRef.current;
-  /*
-    A trigger the music fired (sound learn, PLAN §5): the same action and
-    preset doors a pad goes through, so a kick on Next Preset and a pad on
-    Next Preset cannot come to mean different things. The dye is the one
-    difference, and it is deliberate: the colour changes and the tool does not
-    (`TriggerHost` in soundLearn.ts says why). `runTrigger` also refuses an
-    action a beat must not press, the last door before the show.
-  */
-  const runSoundTrigger = (b: SoundBinding) => {
-    runTrigger(b, { action: runAction, preset: cuePreset, dye: colourDye });
-  };
-  const gamepad = useGamepad({
-    gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, ...(tool === 'drop' ? laidColour(selectedLiquid) : {}) }),
-    action: runAction,
-    cycleDye: (dir) => selectDye((selectedDyeIndex < 0 ? 0 : selectedDyeIndex) + dir),
-    cycleLayer: (dir) => setActiveLayer(l => Math.max(0, Math.min(stageLayers - 1, l + dir))),
+
+  const {
+    midi, runSoundTrigger, gamepad, projector, gamepadRingRect,
+  } = useControllers({
+    ride, settingsRef, rideSetting, runAction, cuePreset, selectDye, wallRef, activePresetId,
+    selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
+    blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
+    visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, isCasting,
   });
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('debug')) {
-      (window as unknown as { chromaglassInputs?: unknown }).chromaglassInputs = () => ({ midi: { enabled: midi.enabled, input: midi.activeInputName, bindings: midi.map.bindings.length, learning: midi.learning }, gamepad: { connected: gamepad.connected, cursor: gamepad.cursor.get() } });
-    }
-  }, [midi.enabled, midi.activeInputName, midi.map, midi.learning, gamepad.connected, gamepad.cursor]);
-  // ── A projector, noticed ──
-  // A second screen that is not built in is the projector. Ask (a chip),
-  // Automatic (the show goes there on the next click after it appears), or
-  // Off; see useProjector. The window opens fullscreen on that screen.
-  const projector = useProjector({
-    send: (screen) => { void startCast('window', screen); },
-    casting: isCasting,
+
+  const {
+    showPalette, setShowPalette, paletteCommands,
+  } = useCommandPalette({
+    allPresets, userPresetsRef, performing, cueLook, cuePreset, goLookNow, goLook, revertLook,
+    blackout, toggleBlackout, newLook, saveLook, docId, docName, replaceLook, setSeedCount,
+    setClearTrigger, setDrainTrigger, isActive, setIsActive, isAutomated, setIsAutomated, settings,
+    updateSettings, recordingAny, recordChoice, toggleRecording, perfLive, togglePerformance,
+    setShowRecordPanel, triggerLucky, hideOverlays, setSettingsSection, setShowSettings,
+    setShowHelp, openAllSettings, setShowMidi, setShowSequencer, showActivity, setShowActivity,
+    setShowSongs, startCast, deskTabs, setDeskTab, setShowStage, recorder, deskUp, sendToWallRef,
+    setActiveTool, designing, cuesRef, cueAny,
   });
-  // Where the controller's ring is drawn: the plate's rectangle, or the window before it has one.
-  const gamepadRingRect = useCallback(() => {
-    const r = visualizerRef.current?.drawnRect?.();
-    return r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
-  }, []);
-
-  // ── ⌘K, and the keys a hand finds in the dark ───────────────────
-  /*
-    The desk shows six rides and a cue list and nothing else, because those
-    are what a hand is on during a set. Everything else the app can do stays
-    one keystroke away instead of one more panel: ⌘K opens a box, you type
-    three letters, you press Enter.
-
-    The keys themselves are the same commands, without the box. They are
-    printed on the buttons that share them — a shortcut nobody can see is a
-    shortcut nobody uses.
-  */
-  const [showPalette, setShowPalette] = useState(false);
-
-  const paletteCommands = useMemo<Command[]>(() => {
-    const looks: Command[] = allPresets.map(pr => {
-      const contract = isUserPresetId(pr.id)
-        ? userPresetsRef.current.find(u => u.id === pr.id)?.contract
-        : PRESET_CONTRACTS[pr.id];
-      const [a, b] = contract && contract.length
-        ? [PALETTE[contract[0]]?.hex ?? '#666', PALETTE[contract[1] ?? contract[0]]?.hex ?? '#333']
-        : ['#52525B', '#27272A'];
-      return {
-        id: `look-${pr.id}`,
-        name: pr.name,
-        kind: 'Preset palettes',
-        look: true,
-        hint: (contract ?? []).map(i => PALETTE[i]?.name ?? '').join(' '),
-        swatch: `linear-gradient(135deg, ${a}, ${b})`,
-        // In Perform a look is armed, not applied: the wall does not cut
-        // because someone searched. ⇧⏎ is the one that sends it.
-        run: () => { if (performing) cueLook(pr.id); else cuePreset(pr.id); },
-        runNow: () => { if (performing) goLookNow(pr.id); else cuePreset(pr.id); },
-      };
-    });
-
-    const doing: Command[] = [
-      { id: 'go',        name: 'Go — send the cued look',   kind: 'Actions', kbd: 'Space', run: () => goLook() },
-      { id: 'back',      name: 'Back — undo the last look', kind: 'Actions', kbd: '⌫',    run: () => revertLook() },
-      { id: 'blackout',  name: blackout ? 'Lights up' : 'Blackout', kind: 'Actions', kbd: 'B', run: toggleBlackout },
-      { id: 'new',       name: 'New — an empty plate',      kind: 'Actions', run: newLook },
-      { id: 'save',      name: 'Save as a new preset…',     kind: 'Actions', kbd: '⌘S',  run: saveLook },
-      ...(docId ? [{ id: 'save-over', name: `Save over “${docName}”`, kind: 'Actions' as const, run: replaceLook }] : []),
-      { id: 'seed',      name: 'Seed the plate',            kind: 'Actions', run: () => setSeedCount(v => v + 1) },
-      { id: 'clear',     name: 'Clear the plate',           kind: 'Actions', run: () => setClearTrigger(v => v + 1) },
-      { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
-      { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
-      { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
-      { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
-      { id: 'record-video',       name: recordingAny ? 'Stop recording' : `Record: ${makesText(recordChoice)}`, kind: 'Actions', kbd: 'R', run: toggleRecording },
-      { id: 'record-performance', name: perfLive ? 'Stop the take' : 'Record a take (your strokes and drops, replayable)', kind: 'Actions', kbd: 'T', run: togglePerformance },
-      { id: 'record-studio',      name: 'Record options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
-      { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
-      { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
-      { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
-    ];
-
-    /*
-      Every settings section, one row each.
-
-      A single "Settings" row put sixteen sections and eighty controls behind a
-      word that describes none of them — and the panel then opened on the half
-      that did not contain the room camera, the projectors, the solver or the
-      physics. Typing "room" or "keystone" or "people" now lands on the section
-      itself rather than on the top of a panel that has it somewhere.
-    */
-    const sections: Command[] = SETTINGS_SECTIONS.map(sec => ({
-      id: `settings-${sec.id}`,
-      name: `Settings: ${sec.name}`,
-      // Matched as well as the name: the section's terms and every label in
-      // it, so "keystone", "flash" or "dimmer" land on the section they live in.
-      terms: sectionSearchText(sec),
-      kind: 'Open',
-      run: () => { setSettingsSection(sec.id); setShowSettings(true); setShowHelp(false); },
-    }));
-
-    const opening: Command[] = [
-      // Named for the words on the button that does the same thing. It read
-      // "Settings", so typing what the button says — "all settings" — matched
-      // nothing at all, out of sixty-eight commands.
-      { id: 'open-settings', name: 'All settings', kind: 'Open', run: openAllSettings },
-      { id: 'open-midi',     name: 'MIDI',            kind: 'Open', run: () => { setShowMidi(true); setShowSequencer(false); } },
-      { id: 'midi-activity', name: showActivity ? 'Hide what the controller is doing' : 'Show what the controller is doing',
-        kind: 'Open', run: () => setShowActivity(v => !v) },
-      { id: 'open-songs',    name: 'Songs',           kind: 'Open', run: () => { setShowSongs(true); setShowMidi(false); } },
-      { id: 'open-seq',      name: 'Stage sequences', kind: 'Open', run: () => { setShowSequencer(true); setShowMidi(false); } },
-      { id: 'open-guide',    name: 'Guide',           kind: 'Open', run: () => { setShowHelp(true); setShowSettings(false); } },
-      { id: 'open-wall',     name: 'Send the show to a window', kind: 'Open', run: () => { void startCast('window'); } },
-      // A command for each of the desk's tabs, by the name it has now.
-      ...deskTabs.tabs.map(t => ({ id: `open-tab-${t.id}`, name: `${t.name} tab`, kind: 'Open' as const, run: () => setDeskTab(t.id) })),
-      { id: 'open-stage',    name: 'Stage: the room and the machine', kind: 'Open', run: () => { setShowStage(true); setShowSettings(false); } },
-    ];
-
-    return [...looks, ...doing, ...opening, ...sections];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allPresets, performing, blackout, isActive, isAutomated, settings.macroMode, recorder.recording, deskTabs.tabs, setDeskTab, docId, docName,
-      cueLook, cuePreset, goLook, goLookNow, revertLook, toggleBlackout, toggleRecording, hideOverlays]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-        || (e.target as HTMLElement | null)?.isContentEditable;
-
-      // ⌘K works everywhere, including out of a text field, because that is
-      // the one key whose whole job is to get you out of where you are.
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
-        e.preventDefault();
-        setShowPalette(v => !v);
-        return;
-      }
-      /*
-        ⌘S on either desk, shifted or not. It was the Design desk's alone,
-        though the Perform desk's Save button wears the same ⌘S: pressed in
-        Perform it reached the browser, which offered to save the web page.
-        Measured in `npm run saves`. The shifted one, Save as, had a branch of
-        its own after this one that it never reached (this one took any S
-        with ⌘ held); with Save always asking for a name the two are one.
-      */
-      if (deskUp && (e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
-        e.preventDefault();
-        saveLook();
-        return;
-      }
-      // ⌘⏎ is Send to wall, as the header's Wall is on every tab.
-      if (deskUp && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        sendToWallRef.current();
-        return;
-      }
-      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (!deskUp) return;          // the narrow-screen UI has its own keys
-
-      // The tools are the same letters on both desks; Design has all eight.
-      // The Perform desk's four are the ones that work the liquid already on
-      // the plate rather than adding more of it — and the finger is one of
-      // those, which is why G belongs in this list and not only in Design.
-      const tool = TOOL_KEYS[e.key.toLowerCase()];
-      // Both desks carry every tool now, so every tool's key works on both.
-      if (tool) {
-        setActiveTool(tool);
-        return;
-      }
-      if (e.key === 'f' || e.key === 'F') { setIsActive(v => !v); return; }
-      if (e.key === 't' || e.key === 'T') { togglePerformance(); return; }
-      if (e.key === 'r' || e.key === 'R') { toggleRecording(); return; }
-
-      // The rest are the show's, and only while the desk is up: on the bench
-      // Space should not fire a look change at a room.
-      // Nor with the plate in Preview: the bar says "not on wall", so a key
-      // that sends a look to the room would make it a lie.
-      if (!performing || designing) return;
-      if (e.code === 'Space') { e.preventDefault(); goLook(); return; }
-      if (e.key === 'Backspace') { e.preventDefault(); revertLook(); return; }
-      // 1–9 arm the first nine cues. Arm, not fire: the number picks the look
-      // and Space sends it, which is how a lighting desk has always worked.
-      if (e.key >= '1' && e.key <= '9') {
-        const cue = cuesRef.current[Number(e.key) - 1];
-        if (cue) cueAny(cue.id);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [performing, designing, deskUp, goLook, revertLook, cueAny, togglePerformance, toggleRecording]);
 
   /** The save sheet, opened from the bench and from ⌘S. */
   const [showSave, setShowSave] = useState(false);
@@ -5004,32 +2134,15 @@ export default function App() {
     return allPresets.find(p => p.id === activePresetId)?.name ?? null;
   }, [activePresetId, allPresets]);
 
-  // The black box's half from here: which look, where the picture is going,
-  // and the look itself for a report (docs/crash-plan.md).
-  const crashStateRef = useRef({ activePresetName, settings, output, isCasting, projector: projector.projector, isAutomated });
-  crashStateRef.current = { activePresetName, settings, output, isCasting, projector: projector.projector, isAutomated };
-  useEffect(() => {
-    const unprovide = crashLog.provide('app', () => {
-      const c = crashStateRef.current;
-      const p = c.projector;
-      return {
-        preset: c.activePresetName ?? 'custom',
-        // Whether Evolve is on, and how fast: the one switch a report about
-        // "the plate changing too much" could not answer without.
-        evolve: c.isAutomated ? `on at ${Math.round((c.settings.automateRate ?? 0) * 100)}%, surge ${Math.round((c.settings.surge ?? 0) * 100)}%` : 'off',
-        projector: c.isCasting ? `casting${p ? ` to ${p.availWidth}x${p.availHeight}` : ''}` : p ? `found ${p.availWidth}x${p.availHeight}` : 'none',
-      };
-    });
-    crashLog.provideReport({
-      look: () => ({
-        preset: crashStateRef.current.activePresetName,
-        settings: crashStateRef.current.settings,
-        plate: wallRef.current?.describePlate() ?? null,
-        output: crashStateRef.current.output,
-      }),
-    });
-    return unprovide;
-  }, []);
+  useCheckHooks({
+    cuePresetRef, goLookNowRef, runActionRef, setSettings, settingsRef, wallRef, setAmbientModeRef,
+    activeTool, setActiveTool, setActiveLayer, setSelectedLiquidId, updateLiquidColor,
+    liquidTypesRef, setToolAmounts, playTrackRef, songShowsRef, songRuntimeRef, startBenchRef,
+  });
+
+  useCrashState({
+    activePresetName, settings, output, isCasting, projector, isAutomated, wallRef,
+  });
 
   /*
     The settings, drawn three ways from one list of props: the sheet (every
@@ -5049,7 +2162,7 @@ export default function App() {
       onSource={(x) => { void handleSourceChange(x); }}
       inputs={audioInputs}
       inputId={audioInputId}
-      onInput={chooseAudioInput}
+      onPickMic={deskOpen.sound}
       playing={musicPlaying}
       time={musicTime}
       loop={musicLoop}
@@ -5149,13 +2262,10 @@ export default function App() {
       wakeLock={wakeLock}
       wallTest={wallTest}
       onWallTest={setWallTest}
-      tempo={tempoLabel}
+      {...tempoPanel}
       readTempo={readTempo}
       readEar={() => ear.live.current?.features ?? null}
       spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
-      onTap={tapTempo}
-      onTempoClear={clearTempo}
-      onTempoBpm={setTempoBpm}
       midiClocked={midi.clocked}
       timecode={timecode ? formatTimecode(timecode) : null}
       focusSection={settingsSection}
@@ -5180,6 +2290,7 @@ export default function App() {
       filmSource={filmSource}
       filmName={filmSource === 'file' ? filmName : null}
       pourName={isVideoPlaying ? pourName : null}
+      cartoons={cartoons}
       onFilmFile={loadFilm}
       onPourVideo={pourFile}
       onStopPourVideo={stopPour}
@@ -5196,6 +2307,8 @@ export default function App() {
       {...over}
     />
   );
+  // A section as a panel; with Music & Drone out, Sound has no way there (35c-5).
+  const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {}, ...(whereIs(deskLayout, 'player') && { onOpenSound: undefined }) });
 
   return (
     // On a phone the height is the dynamic viewport's: 100vh there is the
@@ -6093,7 +3206,7 @@ export default function App() {
               onAdd: (id) => onDeskLayout(l => openPanel(l, id, 'deck')),
               onRemove: (id) => onDeskLayout(l => closePanel(l, id)),
               render: (id) => (id === 'songs' ? songsScreen(true) : id === 'sequences' ? sequencesScreen(true) : id === 'player' ? soundScreen(true)
-                : isSectionPanel(id) && id !== 'mixer' ? settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} }) : null),
+                : isSectionPanel(id) && id !== 'mixer' ? sectionPanel(id) : null),
             }}
             // Mid-fade the settings are between two looks and match neither,
             // so the look is named by where it is going: the name a thumb
@@ -6170,6 +3283,7 @@ export default function App() {
             readLevel={readLevel}
             tempo={tempoLabel}
             onTap={tapTempo}
+            onLink={setLinkOn}
             readTempo={readTempo}
             show={{
               running: sequencer.status.running,
@@ -6649,7 +3763,7 @@ export default function App() {
           layout={deskLayout}
           onLayout={onDeskLayout}
           onResetLayout={onDeskReset}
-          renderSection={(id) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} })}
+          renderSection={sectionPanel}
           sheetOpen={showSettings || showStage}
           onOpenSection={openSettingsAt}
           onStage={() => { setShowStage(true); setShowSettings(false); setShowHelp(false); }}

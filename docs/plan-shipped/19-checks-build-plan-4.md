@@ -203,7 +203,7 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
 
 ## Shipped after the split
 
-### 19m-3. The archive by section (shipped 2026-10-29)
+### 19m-3. The archive by section (shipped 2026-10-30)
 
 After 19m and 19m-2 the open plan was a 45 KB index and 47 section files, and the archive
 of shipped stories, `docs/plan-shipped.md`, had grown to 750,284 bytes in 9,361 lines: a
@@ -236,6 +236,18 @@ between items into parts where a section passed about 36 KB (§14 four parts, §
   file here, under "Shipped after the split", or finds an edit inside a story by its
   context; then it removes the old file from the merge. Tried on copies of #557, #555
   and #549 before merging.
+- **The day it waited.** The PR sat a day behind main, and main wrote 486 lines into the
+  old file in that time (13 hunks: eleven new stories, from 13.5-link to 37x-4b, and two
+  added to stories already there). Merging main stopped on the old file the other way
+  round, deleted on the branch and changed on main, so `planmove.mjs` was run with its
+  sides swapped (main's diff of the old file from the merge base, placed into this
+  branch's files): 13 of 13 placed, the new stories under "Shipped after the split".
+  §24 and §37 had no shipped story before the split, so each gained its file here (45 in
+  all). Three of main's hunks opened with a section heading of the old file (`## 23.`,
+  `## 24.`, `### 37.`); in a section's own file that heading is the file's title, so it
+  was dropped and the stories under it made `###`, and 23.8-clock's bullet was given its
+  own heading. The open plan's 26 new references to the old file were pointed at the
+  files their ids are in, as before.
 
 ### 19m-4. What the two passes left half-cut (shipped 2026-10-29)
 
@@ -251,3 +263,108 @@ between items into parts where a section passed about 36 KB (§14 four parts, §
   (Blackout already one per surface; `PerformanceButton.tsx` already gone). 35c-2's
   third copy, the open half as first stated, went whole: everything in it shipped in
   35c-2 or 35c-3. A reader compared each pair line by line before the cut.
+
+### 19ai-7. The solver class, a chain of files (2026-10-30)
+
+`src/gpu/fluid.ts` was one 291 KB file: 43 lines of header, 665 lines of module-level
+constants, types and helpers, and then the `WebGPUFluid` class of about 95 methods, so a
+thread changing one pass read the whole solver first. It is now a chain of classes under
+`src/gpu/fluid/`, each extending the one before: `constants.ts` (every module-level
+declaration, now exported), `core.ts` `FluidCore` (every field in its original order, the
+constructor, `clear`, `submit`, `submitRead`), `fields.ts`, `passes.ts`, `inputs.ts`,
+`reads.ts`, and `gpu/fluid.ts` keeps the leaf `WebGPUFluid extends FluidReads` (`step`,
+the statics, `prepare`, `thinGapOn`) and re-exports everything it exported before, so no
+importer changed. `private` became `protected` only where a member is reached across
+files. All fields stay in `core.ts`, so with `useDefineForClassFields: false` their
+initialisation order is the original's; only two old lines differ, the class line and the
+constructor's `private readonly device`. The move was made by a script on the file's
+syntax tree (nothing retyped), and the PR body carries the old-lines-to-new-files table.
+
+Measured in a cloud session on the split: lint, `sizes`, `checkguard`, `npm run build`;
+`switches` 970/970, `renders` 26/26, `phone` 366/366, `layout` 81/81, `plate` 50/50,
+`slosh` all passed, `oillift` 9/9, `regrid` 6/6, `ferrodrag` 3/3. Two checks read the
+solver's text and now read the file their lines moved to: `slosh` (`fluid/constants.ts`)
+and `ferrodrag` (`fluid/passes.ts`). `scripts/sizes.json` drops the `src/gpu/fluid.ts`
+ceiling: the leaf is 99.2 KB, under the bar; `core.ts` is 40.5 KB (a warning only).
+
+### 19ai-8. App() into its domains' hooks
+
+Shipped 2026-10-29, with 19ai-4a for App's setters. `App.tsx` was 372,525 bytes and
+6,650 lines, and `App()` was one function of 577 statements: 51 `useState`, 54 `useRef`,
+70 effects, and a 97 KB JSX return. A session asked to change the tempo label or the
+Record button read its way into the whole of it. Thirty-four of its domains are hooks in
+`src/app/` now (the projector's geometry, the tempo, what the show listens to and how it
+changes, the film and the room camera, the set list and the look fades, Preview's copy for
+the wall, the cast feed, the phone remote, the controllers, the command palette and its
+keys, a song's score and its render, the checks' window hooks, and the smaller ones round
+them), with `src/app/shared.ts` for what App and several hooks both read (the opening
+look, an armed look's and the wall's look's shapes, the sound's and the camera's keys).
+`App.tsx` is 215,830 bytes and 4,049 lines; `App()` 315 statements.
+
+The move is verbatim, by a script that read `App()` with the TypeScript checker: each hook
+is a contiguous run of `App()`'s statements, moved whole with its comments, and called at
+the place the run stood, so the order React calls App's hooks in, and the order their
+effects run in within a commit, is the order it was. What a run reads from earlier in
+`App()` is its parameter object, typed from the checker; what later code reads from it is
+what it returns. Every non-import line of the old file is in the new ones (a count line by
+line; the only lines that differ are seven declarations that gained `export` in
+`shared.ts`), and the typecheck holds the rest. Five runs had to move to be extracted at
+all, because App reached forward to something declared later through a closure, which a
+hook's parameters cannot: the toast's state now comes before the film (the film says a
+lost camera through it), the blackout before the look fades (a Go reads `blackoutRef`),
+the setting glides before the row fades (a row's take stops a glide), the mark's ref
+before Preview's copy, and the `?debug` window hooks to the end, after every ref and setter
+they reach. Three effects joined the hook of the state they read (`?bench`, and the
+`chromaglassTempo` and `chromaglassOutput` hooks). Each moved state or effect is
+independent of what it moved past; the window hooks are only called by a harness after the
+page has drawn.
+
+Nine checks read App's source as text, and seven of them went red on `App.tsx` alone
+(panel 9 lines, rowfade 9, backplate 3, slowevolve 2, cloudsync, learn and downbeat one
+each); `record` stayed green on `App.tsx` alone for the wrong reason, since its assertion
+is that the palette has no second Record row and the palette had left the file.
+`scripts/appSource.mjs` gives a check App and its hooks as one text, and the eight that
+needed it now read that; each prints what it printed on main, line for line. `pacing` reads
+only wiring that stayed in `App.tsx` and is unchanged.
+
+19ai-4a: App's setters of the checks' window hooks assign `window.<name>` with no cast, so
+`lib/checkHooks.ts` is checked by the compiler and not only read. That found two
+declarations looser than their setters (`chromaglassTool` took any string, `chromaglassBench`
+`unknown`), now the shapes the setters take.
+
+### 19ai-9. The settings panel's sections into their own files
+
+Shipped 2026-10-30. `components/SettingsPanel.tsx` was 201,442 bytes and 4,277 lines, and
+160 KB of it was one JSX tree, `sections`: twenty-nine `{keep(id) && (<section ...>)}`
+blocks reading the panel's seventy-two props and its locals by name. A session asked to
+move a slider in the Lamp read the patch bay and the controller to get there. Each section
+is now a component in `src/components/settings/`, in a file a group of the rail
+(`PlaySections`, `LookSections`, `MotionSections`, `ChemistrySections`, `PourSections`,
+`StageSections`; Feed cut into `SoundSection`, `RoomFilmSections`, `PatchesSection` and
+`MidiSection`, its three longest), with the slider and the pin chips in `controls.tsx`, the
+patch bay's lists in `patchLists.ts` and the props in `props.ts`. The panel draws the
+twenty-nine in the order they stood and keeps its shells, the engine's polling and the
+search; it is 23,916 bytes. The largest new file is `LookSections.tsx`, 34.8 KB.
+
+The move is verbatim, by a script: each section block (its leading comments to its closing
+`)}`) is in the new files byte for byte and in one piece, all twenty-nine compared, and
+every non-import line of the old file is in the new ones. A section takes one object,
+`SectionCtx` (the props it reads, with the panel's defaults applied, and sixteen locals:
+`keep`, `shown`, the card's classes, `goTo`, the live engine reading and the rest), and
+destructures what its markup reads, pruned with the typecheck's unused-locals pass. None of
+the blocks held a hook, so a section as a component renders when the panel does, as it did
+inline.
+And the built app draws the same page: the open sheet's markup (424 KB, 29 sections, 154
+sliders, 688 controls), each section opened from the rail, and the Setup desk's five
+section panels are identical, character for character, between main and this branch
+(device ids aside, which the browser hashes per origin).
+
+Three checks read the panel's markup as text: `panel` (every `<Slider>`, its chips, its
+key and its range), `desklayout` (each section kept for its panel, its `data-group`) and
+`rowfade` (the Mixer's take buttons). On `SettingsPanel.tsx` alone the first stops at "the
+settings panel still has its sliders: 0 found", `desklayout` fails every section, and
+`rowfade` fails "all four places the Mixer is drawn: Settings". `scripts/settingsSource.mjs`
+gives them the panel and its sections as one text; `panel` prints what it printed on main,
+line for line (257/257). `panel`'s "every setting is read by something that renders" leaves
+the panel out as plumbing, since a slider reads its own key; the sections are left out with
+it, or they would have passed every setting the panel draws.

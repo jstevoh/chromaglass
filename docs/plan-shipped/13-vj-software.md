@@ -135,3 +135,38 @@ available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile ca
     `desktop/README.md` adds the `xattr` way. Only a Developer ID **and** notarisation
     (13.1-sign) removes the warning. *Measure:* `npm run updates`, two lines (the words,
     and the notes' gate before publishing).
+
+## Shipped after the split
+
+### 13.5-link. Ableton Link in (2026-10-30)
+
+The owner OK'd one simple piece of the DAW work on 2026-10-30, while the in-flight work
+finished: the plan's 13.5-link, which the Pro page's DAW section listed as on the way.
+
+**What was built.** `server/abletonLink.js` is a Link peer written from the protocol's
+layout: the multicast Alive/Response/ByeBye on 224.76.78.75:20808 per interface (loopback
+included, which is how Live and the app meet on one Mac with the Wi-Fi off), the
+ping/pong measurement of the ghost clock's offset (a hundred points, the median), the
+session merge rule, and the timeline rule (the larger beat origin wins). Not Ableton's
+library: from Node that is a native addon rebuilt for every Electron, GPLv2 or a separate
+licence. One departure on purpose: the peer *listens first*. The library starts a session
+of its own and the older session wins a merge, so an app started before Live would hand
+Live its 120 bpm; this peer says nothing until it has joined a session someone else
+made, and goes quiet when the last of them leaves.
+
+The show server runs it when the laptop's page asks (`link-enable`, from the display only)
+and sends `{ type: 'link', bpm, beat, peers, playing }` twenty times a second. The page's
+`TempoSource.linkReading` works back when beat zero fell from each arrival and keeps the
+earliest (`LINK_CREEP`, 0.01 ms a reading; 0.05 left a beat up to 2.3 ms late under
+frame-late arrivals, 0.01 leaves 0.86 ms), and `read()` hands the beat clock one fresh
+beat per beat with its place in the bar. Link wins over a tap or a typed bpm while it
+speaks; a second without a reading hands back. The switch is remembered on the machine
+and re-asked on every connect, so a relaunched show server comes back on.
+
+**Measured** (`npm run link`, 27/27): the bytes against a hand-written Alive and ping; on a
+simulated network with clocks minutes apart, silent while alone, joins Live's younger
+session, Live's beat at the same instant within 0.03 ms and the same beat of the bar,
+follows 128 → 140 within a broadcast, lets go on ByeBye and after a silent peer's five
+seconds; the beat clock's kicks once a beat, each in its beat's frame; and over real UDP
+on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
+the library's merge rule instead of listening first.

@@ -70,24 +70,25 @@ the end of a sentence in 15i's story that the open plan had kept is back with it
 | [09-ferrofluid.md](09-ferrofluid.md) | §9 | 22 |  |
 | [10-playing-like-a-show.md](10-playing-like-a-show.md) | §10 | 19 |  |
 | [11-mixer.md](11-mixer.md) | §11 | 27 |  |
-| [13-vj-software.md](13-vj-software.md) | §13 | 9 |  |
+| [13-vj-software.md](13-vj-software.md) | §13 | 12 |  |
 | [14-show-at-the-gig.md](14-show-at-the-gig.md) | §14 | 25 |  |
-| [14-show-at-the-gig-2.md](14-show-at-the-gig-2.md) | §14 | 30 | 14v |
-| [14-show-at-the-gig-3.md](14-show-at-the-gig-3.md) | §14 | 36 | 14aa |
-| [14-show-at-the-gig-4.md](14-show-at-the-gig-4.md) | §14 | 9 | 14ad |
+| [14-show-at-the-gig-2.md](14-show-at-the-gig-2.md) | §14 | 31 | 14v |
+| [14-show-at-the-gig-3.md](14-show-at-the-gig-3.md) | §14 | 37 | 14aa |
+| [14-show-at-the-gig-4.md](14-show-at-the-gig-4.md) | §14 | 18 | 14ad |
 | [15-tools-on-liquids.md](15-tools-on-liquids.md) | §15 | 26 |  |
 | [16-many-plates.md](16-many-plates.md) | §16 | 7 |  |
-| [18-physics.md](18-physics.md) | §18 | 27 |  |
+| [18-physics.md](18-physics.md) | §18 | 28 |  |
 | [18-physics-2.md](18-physics-2.md) | §18 | 27 | 18d |
 | [18-physics-3.md](18-physics-3.md) | §18 | 26 | 18l |
 | [19-checks-build-plan.md](19-checks-build-plan.md) | §19 | 30 |  |
 | [19-checks-build-plan-2.md](19-checks-build-plan-2.md) | §19 | 36 | 19v |
 | [19-checks-build-plan-3.md](19-checks-build-plan-3.md) | §19 | 30 | 19aa |
-| [19-checks-build-plan-4.md](19-checks-build-plan-4.md) | §19 | 18 | 19x-3 |
+| [19-checks-build-plan-4.md](19-checks-build-plan-4.md) | §19 | 25 | 19x-3 |
 | [20-lace-and-holes.md](20-lace-and-holes.md) | §20 | 5 |  |
 | [21-painters.md](21-painters.md) | §21 | 4 |  |
 | [22-spin.md](22-spin.md) | §22 | 11 |  |
-| [23-selling.md](23-selling.md) | §23 | 30 |  |
+| [23-selling.md](23-selling.md) | §23 | 32 |  |
+| [24-modular-rigs.md](24-modular-rigs.md) | §24 | 4 |  |
 | [25-areas.md](25-areas.md) | §25 | 10 |  |
 | [26-turing-print.md](26-turing-print.md) | §26 | 15 |  |
 | [27-controls-you-see.md](27-controls-you-see.md) | §27 | 28 |  |
@@ -96,8 +97,9 @@ the end of a sentence in 15i's story that the open plan had kept is back with it
 | [29-ferro-drop.md](29-ferro-drop.md) | §29 | 28 |  |
 | [30-sound-and-midi.md](30-sound-and-midi.md) | §30 | 4 |  |
 | [32-soap-film.md](32-soap-film.md) | §32 | 17 |  |
-| [33-bubbles-closeup.md](33-bubbles-closeup.md) | §33 | 14 |  |
-| [34-photism.md](34-photism.md) | §34 | 4 |  |
-| [35-clear-controls.md](35-clear-controls.md) | §35 | 30 |  |
+| [33-bubbles-closeup.md](33-bubbles-closeup.md) | §33 | 15 |  |
+| [34-photism.md](34-photism.md) | §34 | 6 |  |
+| [35-clear-controls.md](35-clear-controls.md) | §35 | 34 |  |
 | [36-analog-operators.md](36-analog-operators.md) | §36 | 5 |  |
+| [37-marketing.md](37-marketing.md) | §37 | 6 |  |
 | [qa.md](qa.md) | QA | 12 |  |

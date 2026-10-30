@@ -479,6 +479,16 @@ the feature *Gulliver's Travels* (1939, Technicolor, 74 minutes, the whole film)
 is in `SOURCES.md` with the catalogue it was checked in; the owner's look is `docs/judging.md` §85.
 `npm run cartoons` now decodes each file and holds its `colour` flag to its picture.
 
+**14ac-7, Settings → Film** (2026-10-29). The owner asked why the Film section did not have the
+open-source videos added a while back: it showed only the three demo loops. The cartoons had never
+left; they were on the desk's Dye panel and the phone's dye sheet, and `CartoonShelf.tsx` kept them
+out of Settings on purpose, so that `npm run layout` would never find a control on the screen
+twice. But Film is where someone looks for a film. Settings → Film now lists the shelf under the
+loops (`size="settings"`, ids prefixed `film-`, since Settings is a window over the desk and the
+layout check counts ids in the page, not what is in view); a docked Film panel still leaves it to
+the Dye panel beside it. `npm run cartoons` holds the window to listing all nine with their Pour
+and Film, and its Film to the real projector film: 0/0 px rows before, 28/28 after.
+
 The owner: "can we download a couple videos for inclusion into the app? things that can run
 in the background and be used for visualizations? like silly symphonies, skeleton dance? and
 other early animations?", then "I don't want a short loop, I want the extended cartoon looped."
