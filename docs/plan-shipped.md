@@ -4466,6 +4466,27 @@ only wiring that stayed in `App.tsx` and is unchanged.
 declarations looser than their setters (`chromaglassTool` took any string, `chromaglassBench`
 `unknown`), now the shapes the setters take.
 
+### 19ai-1, 19ai-2. A lighter CLAUDE.md, and a map in every folder
+
+Shipped 2026-10-30. `CLAUDE.md` is loaded on every step of every session, Claude Code's
+and Antigravity's, and it had grown to 18,082 bytes: its "Which checks for which files"
+table (6 KB) and its account of CI (3.5 KB) were read on every tool call by sessions that
+touched neither. They moved verbatim to `docs/checks-map.md` and `docs/ci.md`; `CLAUDE.md`
+keeps the rows every session needs (lint and sizes on every change, `npm run quick`, a
+setting, a check, a check's bar) and a paragraph on CI with the four files that decide it.
+In their place it gained *Where things live*: which folder README to read before code, the
+domain boundaries (physics writes and rendering reads, one owner per piece of state, no
+per-frame objects, the phone shares and never forks) and the size rule as `npm run sizes`
+now holds it (fail past 100 KB, warn past 40 KB). The domain table, the measurements and
+the splits went to `docs/architecture.md`. Net: 18,082 → 12,008 bytes. Every standing rule
+stayed in `CLAUDE.md`; the headings other files cite ("What can be verified where", "Which
+checks for which files", "Keeping a session small") kept their names.
+
+Each folder a session lands in got a `README.md` of 1.5 to 5 KB: what it owns, its entry
+files, its contracts and its checks, every file and `npm run` name in it checked against
+`main`. The first draft (2026-10-28) was written before 19ai-3 and 19ai-6 to -9 moved the
+code; it was rebuilt on `main` after them, with maps for the two new `fluid/` folders.
+
 ### 19ai-9. The settings panel's sections into their own files
 
 Shipped 2026-10-30. `components/SettingsPanel.tsx` was 201,442 bytes and 4,277 lines, and
