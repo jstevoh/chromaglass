@@ -4234,6 +4234,46 @@ still 0.12 long (0.05 would give 0.51 but fling past the rim). The bar is unchan
 at the mirror). A new line asks every run for the gap between the stroke and its mirror
 to be more than 19/128 + 0.12, so a desk that reshapes the canvas fails by name.
 
+### 19ac-4. The mirror check's "nowhere else" measures the drop's reach on the plate
+
+Shipped 2026-10-30. `npm run mirror`'s "Classic, calm, layer 1: and nowhere else" went red
+on three of the five deploys that ran a Mac shard on 2026-10-29 (570 on GitHub's Mac, 576
+and 580 on the owner's), reading 13.3, 13.7 and 15.7 past its drift against 12.9, 13.5
+and 13.1 allowed, every time at row 3, column 5: two cells above the hand in its own
+column, never a mirror image. The check judges a 6x6 grid of cells over the desk's
+preview and counted the eight cells about the hand's as "round the hand". #512 (the
+desk's tabs, 2026-10-27) changed which preview it photographs, from the Design desk's to
+the Perform tab's, and that preview is a wide window on the dish: measured in a cloud
+session with `chromaglassDebug().plateAt` at the check's viewport, 802 by 289 showing 0.92
+of the plate across and 0.33 down, so a cell is 0.154 of the plate wide and 0.055 tall,
+and the hand at the check's (0.75, 0.75) lands on the plate at (0.731, 0.417), as the
+Mac's own pointer reading said. A Drop held for 0.7 s lays a disc of 4.5 cells a step
+and the film spreads it: on the Macs it changed the picture 21 to 30 one cell up (0.055),
+22 to 25 two cells up (0.11), 6 to 7 three cells up (0.166, against a drift of 4 to 5)
+and 6 to 8 one cell across (0.154, against 5), with 53 to 64 under the hand. Before #512
+the hand sat at (0.81, 0.42) in cells a third wider, and the two-up cell read 11 against
+a drift of 9, within the allowance of drift plus four; after, 22 to 25 against 8 to 9,
+and the line failed on whichever runner laid the bigger drop. The cells under the drop
+are now the ones whose middle is within DROP_REACH, 0.14 of the plate, of the hand, both
+read with `plateAt` (the plate's turn included, so the quarter-turned scenario measures
+its own), and a line asks that the plate's coordinates read back rather than falling
+back to counting cells, that the hand's own cell is under the drop and at least half the
+grid is judged (layer 2 is viewed through its own zoom of 1.8, so its reach on the
+preview is wider and 20 cells of 36 are judged), naming any mirror that sits under the
+drop. The mirror cells are the plate's too, the cell nearest each of (1 - x, y),
+(x, 1 - y) and (1 - x, 1 - y) of the hand: on layer 1 the preview's own mirror cells,
+turned a quarter the same cells with the axes' names swapped, on layer 2 the mirror
+across the middle line lands beside the hand, under the drop, as the old eight cells
+already had it. The judged cells' bar is unchanged: the hand's mirror across the plate's
+middle line on layer 1, 0.166 away, is judged as before and reads 2 to 3 past its drift
+against 8 to 9 allowed. The skeptic pass (one Opus review) found the "nothing judged"
+consent (`!worst ||`), the line that only asked whether `plateAt` answered, and the
+footprint print's mean against the judgement's median; each is fixed or named. The check
+prints each cell's distance from the hand with its mean change past mean drift, nearest
+first, so the footprint is in every log. The control on a Mac: revert the derive pass's
+mirror fix (`npm run derive` pins it) and the line goes red at the mirror across the
+middle line, row 2, column 5.
+
 ### 19ai-6. The solver's kernels, one file a pass (2026-10-28)
 
 `src/gpu/wgsl/fluid.ts` was 5,885 lines (290 KB): 96 kernels in one object literal and
