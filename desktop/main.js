@@ -537,6 +537,9 @@ function showDetails() {
     show.oscMode === 'off'
       ? 'OSC in: off (Show menu > OSC input turns it on)'
       : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    // The server refuses OSC and Art-Net below Pro (PLAN.md 34a-7a); the
+    // details say so, rather than an open port that answers nothing.
+    ...(showServer?.linkTier && !showServer.linkTier().pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
     ...(show.port !== 3000 ? ['', `Port 3000 was taken, so this show is on ${show.port}. Looks saved on 3000 are not in this one.`] : []),
   ];
   void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'The show server', detail: lines.join('\n'), buttons: ['OK'] });
@@ -594,6 +597,12 @@ async function setOscMode(mode) {
   if (mode !== 'off' && !/^udp /.test(state ?? '') && !process.env.CHROMAGLASS_OFFLINE) {
     void dialog.showMessageBox(showWindow ?? undefined, { type: 'warning', message: `OSC could not open UDP port ${show.osc}`, detail: `${state ?? 'The show server is not running'}. Another program may be using the port; quit it, or pick the setting again.`, buttons: ['OK'] });
   }
+  // A Home licence opens the port and the server ignores what arrives
+  // (PLAN.md 34a-7a): said once here, so a desk that does nothing is not a
+  // mystery. The choice is kept, and works the moment a Pro key is in.
+  else if (mode !== 'off' && showServer?.linkTier && !showServer.linkTier().pro && !process.env.CHROMAGLASS_OFFLINE) {
+    void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'OSC input is part of ChromaGlass Pro', detail: 'The port is open, but OSC messages are ignored until a Pro licence is in (Account, then Upgrade).', buttons: ['OK'] });
+  }
 }
 
 function buildMenu() {
@@ -617,7 +626,7 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
         {
-          label: 'OSC input',
+          label: 'OSC input (Pro)',
           submenu: [
             ['off', 'Off'],
             ['local', 'This Mac only'],

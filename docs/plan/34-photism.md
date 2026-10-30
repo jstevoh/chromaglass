@@ -81,11 +81,14 @@ a grid of generic stock thumbnails: ours are the plate itself.
   MIDI out is a controller's LEDs. Those lines now name OSC, Art-Net, the 1024² grid and cloud
   sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
   Found along the way:
-  - **34a-7a. OSC and Art-Net are not gated.** Only the 1024² grid and cloud sync check for a Pro
-    key; a Home key gets OSC and Art-Net in the app (`desktop/main.js`, `server/` have no tier
-    check). The page and the cards sell them as Pro, as §23's table does. Put both behind
-    `canUseProFeature()` in the app, or move them to Home on the page (the owner's call, asked
-    2026-10-29). *Measure:* `npm run tiers` with a Home key reads OSC and Art-Net refused.
+  - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
+    2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
+  - **34a-7f. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
+    a Home licence opens the port from *Show → OSC input (Pro)* and gets a note that packets are
+    ignored, and Show Server Details says so; the menu could instead show the item disabled with
+    an upgrade line, read live from the licence rather than once at start (`show.license` is read
+    once in `desktop/main.js`). Art-Net has no menu at all yet (34a-7c), which is where its Pro
+    note would sit.
   - **34a-7b. The Terms' Pro line promises what does not ship.** `public/terms.html` lists
     multi-projector edge blending, Syphon, Spout, NDI and MIDI out under Pro. Legal text, so the
     owner's words: make it name what ships and say the rest arrives as updates.
