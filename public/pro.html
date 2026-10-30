@@ -93,7 +93,7 @@
   section.alt .card { background: var(--elevated); }
   .card h3 { font-size: 16px; font-weight: 500; margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .card p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--muted); }
-  .card ul { margin: 10px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--muted); }
+  .card ul, .card ol { margin: 10px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.55; color: var(--muted); }
   .card li { margin: 5px 0; }
   .card strong, .sub strong { color: var(--text-2); font-weight: 500; }
   .tag { flex: none; font: 500 11px/1 var(--mono); letter-spacing: .04em; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--border-strong); color: var(--muted); white-space: nowrap; }
@@ -216,6 +216,15 @@
 /chromaglass/press x y [amount]
 /chromaglass/tilt  x y
 /chromaglass/dye   #rrggbb</pre>
+        <p><strong>From Resolume</strong> (Arena or Avenue 7). Its OSC output speaks its own addresses, like <code>/composition/layers/1/video/opacity</code>, so each control you want to send needs a custom address of ours:</p>
+        <ol>
+          <li>In ChromaGlass, turn on <em>Show → OSC input → This Mac only</em>.</li>
+          <li>In Resolume, open <em>Preferences → OSC</em>, turn on <em>OSC Output</em>, send to <em>Localhost</em> (127.0.0.1) and set the outgoing port to <strong>9000</strong>.</li>
+          <li>Choose <em>Shortcuts → Edit OSC</em> (⇧⌘O) and click the slider you want to send, such as a layer's opacity.</li>
+          <li>Right-click it and enable OSC output (or enable it in the Shortcuts panel), pick that output in the panel's dropdown, and replace the address Resolume filled in with the <em>Custom Address</em> <code>/chromaglass/setting/audioImpact</code>.</li>
+          <li>Press Esc, then move the slider: Sound Drive follows it.</li>
+        </ol>
+        <p>Send a number from 0 to 1. Sound Drive, Dimmer, Bloom, Turbulence and Plate Rock are 0 to 1 already. A setting with another range (Speed runs 0 to 0.3) takes the number as it is and stops at its own top, so put those on MIDI learn. Steps are from <a href="https://resolume.com/support/en/osc#custom-osc-messages">Resolume's OSC manual</a>.</p>
       </div>
       <div class="card">
         <h3>Your phone as the remote <span class="tag">Home · Pro</span></h3>

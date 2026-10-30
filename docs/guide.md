@@ -170,6 +170,18 @@ The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_POR
 /chromaglass/dye #rrggbb               the dropper's colour
 ```
 
+### From Resolume
+
+Resolume's OSC output speaks Resolume's own addresses (`/composition/layers/1/video/opacity`), not ours, so each control you want to send needs a custom output address set in its shortcut editor. Resolume's manual ([OSC, Custom OSC Messages and Destinations](https://resolume.com/support/en/osc#custom-osc-messages), Arena and Avenue 7) describes the route:
+
+1. In ChromaGlass, turn on *Show → OSC input → This Mac only*.
+2. In Resolume, open *Preferences → OSC*, turn on *OSC Output*, send to *Localhost* (127.0.0.1) and set the outgoing port to `9000`.
+3. Choose *Shortcuts → Edit OSC* (Shift + ⌘ + O) and click the slider you want to send, such as a layer's opacity.
+4. Right-click it and enable OSC output (or enable it in the Shortcuts panel), pick that output in the panel's dropdown, and replace the address Resolume filled in with the *Custom Address* `/chromaglass/setting/audioImpact`.
+5. Press Esc and move the slider: Sound Drive follows it. Resolume saves each shortcut in the current OSC preset, so the mapping comes back with it.
+
+Send a number from 0 to 1: the server hands the number to the setting as it is. The settings that already run 0 to 1 take a Resolume slider one to one: Sound Drive (`audioImpact`), Dimmer (`dimmer`), Bloom (`bloom`), Turbulence (`turbulenceScale`), Plate Rock (`plateRock`) and Evolve Speed (`automateRate`). A setting with another range gets the 0 to 1 number unscaled and clamped to its own range: Speed (`globalSpeed`, 0 to 0.3) reaches its top 30% of the way along the slider, and Macro Zoom (`macroZoom`, 1 to 16) stays at 1. Put those on MIDI learn until the server can scale another program's ranges (PLAN 34a-7i). None of this has been tried in Resolume itself yet: `docs/judging.md` §93 is the owner's sitting with it.
+
 ## A logo that survives the plate
 
 Dropping an image into the liquid is the lovely thing to do with it — the dye
