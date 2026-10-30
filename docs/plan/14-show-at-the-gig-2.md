@@ -275,8 +275,20 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
 - ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*~~ **Shipped** (#549, `npm run framereads`: a still plate 60 → 0 readbacks asked in thirty frames). Story in `docs/plan-shipped.md` §14ab-3.
 - ~~**14ab-4** *A CPU pour uploads the whole grid every step*~~ **Shipped** (#579, `npm run frameuploads`: a cell after a cell 1.33 MB → 14 KB, the flush 318 → 18 µs). Story in `docs/plan-shipped.md` §14ab-4.
 - ~~**14ab-5** *The plate, post chain, camera, output and particles make their bind groups and views every frame*~~ **Shipped** (#549, `npm run framegroups`: 12 groups and 64 views a frame → 0 and 0). Story in `docs/plan-shipped.md` §14ab-5.
-- **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
-  gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
+- ~~**14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*~~ **Shipped** (`npm run beadmask`: the drops' mask rasterDrops' to a level, the frame's CPU 16–19 ms → 0.4–0.6 ms, 2.1 MB → 95 KB across). Story in `docs/plan-shipped.md` §14ab-6.
+- **14ab-14** (open; found with 14ab-6) *The rings' edges were the canvas's antialiasing, now
+  the distance plus a half.* Both the GPU's rings and rasterDrops' drops take a pixel's
+  coverage as the distance to the edge plus a half, which is off by up to a tenth of a pixel
+  (26 levels) at a corner and round a bead a pixel or two across: `npm run beadmask` reads 27
+  rim pixels past 24 levels of 59,000. The beads' true share of a pixel (an exact circle's
+  area, or four by four samples on the edge pixels alone) would close it for both, and the
+  drops' check would move with it. Judge by eye at 3x in the closeup first (`docs/judging.md`).
+- **14ab-15** (open; found with 14ab-6) *The beads' passes are not timed on the GPU.* `npm run
+  beadmask` times the CPU's side only (the list 0.4–0.7 ms against rasterDrops' 16–19 ms):
+  SwiftShader's GPU time says nothing about Metal's. Each pixel loops over its tile's beads,
+  and a tile in the middle of a crowd holds a few dozen. Time the `bead mask` pass with the
+  frame's timestamp queries on the Mac, the busiest crowd at Drops 1, and give it a bar
+  against the 17 ms it replaced.
 - ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort on
   their history.~~ Shipped; story in `docs/plan-shipped.md` §14ab-7 (moved 2026-10-29, 19m).

@@ -620,6 +620,7 @@ src/
     modulators.ts              # LFOs on the bar and fired envelopes, as patch-bay sources
     bubbles.ts                 # Trapped-air bubbles: ride the flow, merge, pop; drawn as lenses
     beads.ts                   # Oil beads: hundreds of dark-rimmed droplets, drawn from a mask texture
+    beadPack.ts                # The beads as a list (walls, tiles) for the plate to draw their mask from on the GPU
     chemistry.ts               # Gray-Scott reaction-diffusion: patterns that grow on the plate and deposit dye
     governor.ts                # Frame-time governor: walks the quality ladder
     platform.ts                # Tier (hosted/local/native), GPU class, quality ladders
