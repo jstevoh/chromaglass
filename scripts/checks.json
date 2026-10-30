@@ -1245,6 +1245,20 @@
       ]
     },
     {
+      "name": "The rig's wires",
+      "shard": "browser",
+      "run": "node scripts/rig.mjs",
+      "why": [
+        "OSC in, Art-Net out and in, MIDI in and out, as /pro sells them (scripts/rig.mjs,",
+        "PLAN.md 34a-7f): the real show server with a Pro key, and an OSC sender, a",
+        "fixture, a lighting desk, a controller and a DAW's clock played by sockets and",
+        "stand-in Web MIDI ports; then the built app on that server, its settings and",
+        "tempo moved by each. On the dist/ the phone's step built. The plate's colours on",
+        "the fixture need a plate that reports its dye back, so those two lines skip here",
+        "and are the owner's, run on the Mac (docs/judging.md §93 step 0), not a Mac shard's."
+      ]
+    },
+    {
       "name": "A click is not a beat, in the app",
       "shard": "browser",
       "run": "npm run clicks -- --app",

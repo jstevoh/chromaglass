@@ -99,6 +99,20 @@ a grid of generic stock thumbnails: ours are the plate itself.
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
     the set beside the page as a download.
+  - **34a-7f. The rig's wires, checked without the rig.** **Shipped** (`npm run rig`, `scripts/rig.mjs`):
+    the real show server with a Pro key; every OSC address on `/pro`, sent as Resolume, TouchDesigner
+    and Max send it, arrives as the message the page acts on; the page's `lights` leaves as an
+    ArtDmx universe at the set rate; a desk's universe arrives as settings; and in the built app an
+    OSC setting, a desk fader, a MIDI fader (past soft takeover) and a DAW's 120 BPM clock move the
+    page, and an OSC setting lights the controller's ring. All 33 lines green: no
+    claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
+    need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
+    programs themselves are `docs/judging.md` §93, one sitting with free versions.
+  - **34a-7g. Resolume sends its own OSC addresses.** Its OSC output mirrors Resolume's address space
+    (`/composition/layers/1/video/opacity`); reaching `/chromaglass/setting/<key>` takes a custom
+    output address per control (Shortcuts → Edit OSC), which `/pro` does not say. Either a line on
+    the page with the steps, or let the server take a small map of another program's addresses
+    onto ours (as `ARTNET_IN` does for channels). Judging §93 step 2 says which.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
