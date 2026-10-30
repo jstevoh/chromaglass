@@ -1102,9 +1102,13 @@ let bobProToken = '';
   const listed17 = (await (await getKeys(env17, await mintFirebaseToken({ email: 'owner@example.com' }))).json()).keys;
   const testB = listed17.find((k) => k.id === 'key_test_b').token;
   await postMachine(env17, '/activate', { key: testB, machineId: 'm' });
+  // Strict like wrangler: reading a record that is not there throws (a 404), it does not answer null.
   const kv17 = {
     list: async (prefix) => [...env17.LICENSE_KV.values.keys()].filter((k) => k.startsWith(prefix)),
-    get: (n) => env17.LICENSE_KV.get(n),
+    get: async (n) => {
+      if (!env17.LICENSE_KV.values.has(n)) throw new Error(`404 ${n}`);
+      return env17.LICENSE_KV.get(n);
+    },
     put: (n, v) => env17.LICENSE_KV.put(n, v),
     delete: (n) => env17.LICENSE_KV.delete(n),
   };
