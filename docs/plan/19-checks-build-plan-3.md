@@ -325,8 +325,20 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
-the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), 19ai-8, and 19ai-9 (the settings panel).
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai-2 (the lighter `CLAUDE.md` and the folder maps), 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), 19ai-8, and 19ai-9 (the settings panel).
 
+- **19ai-1. Shipped: a lighter `CLAUDE.md`.** 18,082 → 12,008 bytes loaded on every step;
+  the checks table to `docs/checks-map.md`, CI to `docs/ci.md`, the domain map and the
+  splits to `docs/architecture.md` (story in `docs/plan-shipped.md` §19ai-1).
+- **19ai-2. Shipped: a `README.md` per folder** (`src/gpu`, `src/gpu/fluid`, `src/gpu/wgsl`,
+  `src/gpu/wgsl/fluid`, `src/sim`, `src/lib`, `src/hooks`, `src/components/desk`,
+  `src/components/phone`, `server`, `scripts`; `src/app` and `src/components/settings`
+  came with their splits). A PR that changes a folder's exports updates its README.
+- **19ai-10. Open: the frame loop, a piece at a time.** The visualizer's frame loop is one
+  `useEffect` of about 5,500 lines (most of `LiquidVisualizer.tsx`'s 434 KB). Not split in
+  one move: a PR that changes a piece of it first moves that piece to its own module (a
+  function taking the frame's state, no per-frame allocation) in its own commit, held
+  against the checks that read the file as text (19ai-3a), then changes it.
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
   was module code above the component. Story in `docs/plan-shipped.md` §19ai-3 (moved
   2026-10-29, 19m).
@@ -386,5 +398,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
   file's header, which names each pass's file. Repoint one when its file is next touched,
   not in a sweep of its own (it would collide with every open branch for nothing).
+- **19ai-6b. Open, found by 19ai-2: `wgsl/fluid.ts` has no map.** 19ai-6a says the
+  index's header names each pass's file, and the pass files' headers point there ("that
+  file's header says what the WGSL port changes everywhere"), but the index opens with its
+  imports and no header. `src/gpu/wgsl/fluid/README.md` lists the files in step order for
+  now; the header comes back (or the pointers move to the README) with the next edit there.
 - **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
   a pure move (docs/plan-shipped.md, 19ai-7).
