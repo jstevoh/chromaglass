@@ -21,11 +21,12 @@ import { MixerPanel } from './MixerPanel';
 import { LiquidDesigner, type LiquidDesignerProps } from './LiquidDesigner';
 import { MappingPanel, OutputPanel } from './OutputPanel';
 import type { OutputConfig, WallTest } from '../lib/outputConfig';
-import { Segmented, Sheet, SwitchPill, Tag, Toggle, LIT, LIVE } from './ui';
+import { Segmented, Sheet, SwitchPill, Toggle, LIT, LIVE } from './ui';
 import { PaceTrack } from './ui/Pace';
 import { LensCap, StrobeRing, TapPad, ViscosityDrip } from './ui/Playful';
 import type { TempoReading } from '../lib/tempo';
 import { CameraPicker } from './CameraPicker';
+import { FilmShelves } from './FilmShelves';
 import { readSetting } from '../lib/readout';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import { isProLicenseUnlocked, type EngineStatus } from '../lib/platform';
@@ -276,14 +277,7 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-/** The loops that ship in public/video, for the Film section's demo rows. A loop is known by its title, which is the name of the File it is handed over as. */
-const DEMO_LOOPS = [
-  { id: 'ring', src: '/video/spinning-ring.webm', title: 'Spinning Ring (Transparent WebM)' },
-  { id: 'particles', src: '/video/pulsing-particles.webm', title: 'Pulsing Particles (Transparent WebM)' },
-  { id: 'orb', src: '/video/pulsing-orb.webm', title: 'Pulsing Orb (Transparent WebM)' },
-] as const;
-
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, readEar, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, readEar, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo, cartoons,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -1863,54 +1857,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
             )}
           </div>
 
-          {/*
-            The demo loops, each with its two uses as the cartoon shelf has
-            them: Film plays it as the source above, Pour lays it into the
-            dish as dye. The whole row was a button that filmed it, with Pour
-            as Dye a span inside it and Load Film a span that did nothing of
-            its own (a click on it fell through to the row), and nothing said
-            which loop was playing. Now each use is its own button, lit while
-            that loop is doing it, and the one filming says so.
-          */}
-          <div className="mt-3 flex flex-col gap-1" data-testid="film-demos">
-            <span className="mb-1 text-[11px] font-medium uppercase tracking-wider text-white/50">Demo loops</span>
-            {DEMO_LOOPS.map(v => {
-              const filming = filmSource === 'file' && filmName === v.title;
-              const pouring = pourName === v.title;
-              const fetchAs = async (use: (f: File) => void) => {
-                try {
-                  const blob = await (await fetch(v.src)).blob();
-                  use(new File([blob], v.title, { type: 'video/webm' }));
-                } catch (e) { console.error('Failed to load demo video', e); }
-              };
-              const btn = 'flex h-8 shrink-0 items-center gap-1 rounded-md border px-2.5 text-[12px] font-medium transition-colors';
-              const off = 'border-white/15 text-text-2 hover:bg-white/10';
-              return (
-                <div key={v.src} className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5" data-testid={`film-demo-${v.id}`}>
-                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{v.title}</span>
-                  {filming && <Tag tone="next">playing as film</Tag>}
-                  <button
-                    aria-pressed={filming}
-                    onClick={() => (filming ? onFilmClear?.() : fetchAs(f => onFilmFile?.(f)))}
-                    className={`${btn} ${filming ? LIT : off}`}
-                    title={filming ? 'Playing as the film. Click to take it off.' : 'Play it through the projector as the film, looping (Film Mix sets how much shows)'}
-                    data-testid={`film-demo-film-${v.id}`}
-                  >
-                    <Clapperboard size={11} /> Film
-                  </button>
-                  <button
-                    aria-pressed={pouring}
-                    onClick={() => (pouring ? onStopPourVideo?.() : fetchAs(f => onPourVideo?.(f)))}
-                    className={`${btn} ${pouring ? LIT : off}`}
-                    title={pouring ? 'Pouring into the dish. Click to stop.' : 'Pour it into the dish as dye, looping'}
-                    data-testid={`film-demo-pour-${v.id}`}
-                  >
-                    <Droplets size={11} /> Pour
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+          <FilmShelves filmSource={filmSource} filmName={filmName} pourName={pourName} onFilmFile={onFilmFile} onFilmClear={onFilmClear} onPourVideo={onPourVideo} onStopPourVideo={onStopPourVideo} cartoons={embed ? undefined : cartoons} />
 
           <Info>
             <span className="text-white/60">Window</span> is the way to a film you did not download.

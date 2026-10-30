@@ -9,6 +9,7 @@ import type { OutputConfig, WallTest } from '../lib/outputConfig';
 import type { RoomCalibration } from '../lib/audioCalibration';
 import type { TempoReading } from '../lib/tempo';
 import type { VisualizerSettings } from '../types';
+import type { CartoonShelfProps } from './CartoonShelf';
 import type { PinApi } from './SettingsPanel';
 
 export interface SettingsPanelProps {
@@ -146,4 +147,6 @@ export interface SettingsPanelProps {
   scope?: 'all' | 'stage';
   /** On a desk panel, where a link to another section goes: the sheet, at that section. */
   onGoTo?: (id: string) => void;
+  /** The public domain cartoons that ship with the app, for the Film section (CartoonShelf, PLAN 14ac). */
+  cartoons?: CartoonShelfProps;
 }
