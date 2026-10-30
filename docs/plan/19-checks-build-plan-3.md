@@ -116,6 +116,22 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
   The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
   the clearance each run. Story in `docs/plan-shipped.md` §19ac-3.
+- **19ac-4. `mirror`'s "and nowhere else" named the hand's own drop (shipped 2026-10-30).**
+  Since #512 the check photographs the Perform tab's preview, a wide window on the dish
+  where a cell is 0.055 of the plate tall and 0.154 wide, and a held drop reaches two cells
+  up its column (0.11 of the plate, 22 to 25 against a drift of 8 to 9) where the check
+  counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
+  under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
+  with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+- **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
+  and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
+  the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
+  fling alone cannot do it: a splatter logs one pour a step (its first droplet), 50 to 70 a
+  stroke, each 0.023 to 0.14 from the hand in a direction from a seeded stream, so the
+  mean offset's spread is about 0.008 an axis and 0.04 is a 4e-6 to 3e-4 run, not one in
+  ninety. The suspects are pours logged while the mouse was up and the pointer moving to
+  the next stroke (each adds up to 0.5 to the mean), and the look's ring (`lays`). Judge
+  the next red by its strays before changing anything.
 
 ## 19ad. The `open` shard flakes on four unrelated faults
 
@@ -292,7 +308,7 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
-the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves) and 19ai-5.
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), 19ai-8, and 19ai-9 (the settings panel).
 
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
   was module code above the component. Story in `docs/plan-shipped.md` §19ai-3 (moved
@@ -306,9 +322,33 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
   reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
   whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
-- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
-  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
-  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
+- **19ai-4a. Shipped with 19ai-8 for App's setters** (the story in `docs/plan-shipped.md`).
+  The plate's setters in `LiquidVisualizer.tsx` still cast, and drop theirs when next edited.
+- **19ai-8. Shipped: `App()` into its domains' hooks** (`src/app/`, 34 hooks; `App.tsx` 372,525
+  → 215,830 bytes; the story in `docs/plan-shipped.md`). A check that reads App's source as
+  text reads `scripts/appSource.mjs`, App and its hooks as one text.
+- **19ai-8a. Open: what stayed in `App()`.** The settings' writers at its heart (the ride,
+  the drift, `updateSettings`, `applyPreset`, the saved-look document, `lookPhase` and
+  `magnetInHand`, the automation's effect: about 30 KB) were left, because they reach
+  forward to `settingsRef`, `setDocDirty` and `lookFadeRef` declared after them, and a
+  verbatim move cannot take them without reordering more than it moves; likewise the
+  overlay's keys (they set panels declared later), the cue functions and `runAction`. Next
+  is the 97 KB JSX return, which is components rather than hooks: the overlay, the desks'
+  props and the phone's props as their own files.
+- **19ai-8b. Open: hooks that take App whole.** A verbatim move keeps every name a run read,
+  so `useCommandPalette` takes 52 parameters, `useRemote` 48, `useWallLook` 37. Once
+  19ai-8a has moved the settings' writers, the ones that read a domain's state and its
+  setters can take that domain's hook result instead of its pieces.
+- **19ai-9. Shipped: the settings panel's sections into `src/components/settings/`**
+  (`SettingsPanel.tsx` 201,442 → 23,916 bytes; the story in `docs/plan-shipped.md`). A check
+  that reads the panel's markup as text reads `scripts/settingsSource.mjs`, the panel and
+  its sections as one text.
+- **19ai-9a. Open, found along the way: the panel's seventy-two props.** App hands
+  `SettingsPanel` its props one by one (thirteen for the film and the pour, eight for the
+  tempo), and the panel hands them on to its sections in `SectionCtx`. Once 19ai-8b gives
+  each domain one hook result, the panel can take the film's or the tempo's whole, as its
+  sections read them; until then a new value a section reads is four edits for one name
+  (App, the props, `SectionCtx` and the object the panel builds).
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** Story in `docs/plan-shipped.md`
   §19ai-5 (moved 2026-10-29, 19m).
 - **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** Story in
@@ -323,3 +363,11 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-5b. Open: the ledgers come out.** 19m (PLAN.md split by section) takes PLAN.md and
   the archive off the list; `docs/guide.md` and `docs/judging.md` want the same split by
   part of the app; `scripts/checks.json` could be one file per shard.
+- **19ai-6. Shipped:** `wgsl/fluid.ts` split into one file a pass under
+  `src/gpu/wgsl/fluid/`, every kernel's text byte-identical (docs/plan-shipped.md, 19ai-6).
+- **19ai-6a. Open, found along the way.** About sixty comments across `src/` and
+  `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
+  file's header, which names each pass's file. Repoint one when its file is next touched,
+  not in a sweep of its own (it would collide with every open branch for nothing).
+- **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
+  a pure move (docs/plan-shipped.md, 19ai-7).

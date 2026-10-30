@@ -47,6 +47,13 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - Each Drive/Impact pair (now side by side under its source) is still two knobs: whether
     each becomes one Strength per input is undecided, and 14ad-2 waits on it (from 35c-2's
     first statement, moved 2026-10-29, 19m-2).
+- ~~**35c-4** One control, one place on a tab; Send to wall is the Wall.~~ **Shipped** 2026-10-29:
+  the plate bar's Send to wall button gone (the header's Wall sends Preview's copy), and the Rides,
+  Recipe and section panels never draw one control twice on a tab. Story in `docs/plan-shipped.md`
+  §35c-4. Left from it:
+  - The Recipe's and Rides' Choose list does not say a control is drawn on another panel of the
+    tab, so picking Speed onto the Recipe beside the Rides answers with the line under the dials,
+    not in the list where the pick was made.
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

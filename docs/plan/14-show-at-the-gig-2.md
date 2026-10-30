@@ -343,6 +343,8 @@ Open, found building it:
   shelf's weight, fetched only when someone picks it. If that proves a cost (a phone on mobile
   data), cut it to a half hour of its best scenes as a separate entry, or serve it by a
   lower bitrate; the check holds a feature under 30 MB.
+- **14ac-7** *The cartoons were not in Settings → Film.* **Shipped** (2026-10-29): the Film
+  section lists the shelf under its demo loops. Story in `docs/plan-shipped.md` §14ac.
 
 ## 14ae. One Record button (shipped, asked 2026-10-24)
 
