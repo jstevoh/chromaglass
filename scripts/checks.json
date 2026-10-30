@@ -803,6 +803,21 @@
       ]
     },
     {
+      "name": "A slow or lost destination is its own",
+      "shard": "logic",
+      "run": "npm run livedrop",
+      "why": [
+        "The Mac app's live show to several destinations (PLAN.md 37x-4c), in",
+        "node: one session (desktop/liveSession.js) writing a made-up 5 Mbps",
+        "stream of numbered packets to five local listeners, one throttled to a",
+        "quarter of it, one dropped mid-show, one refusing its key, one that",
+        "never acknowledges. The slow one drops video to a keyframe and no",
+        "audio, its seconds-behind and kbps readout against the truth, and",
+        "recovers; the one beside it gets every frame; the dropped one comes back",
+        "at a keyframe; the refused one is asked once. About 25 s."
+      ]
+    },
+    {
       "name": "The live stream",
       "shard": "lab",
       "run": "npm run live",
@@ -815,7 +830,9 @@
         "second of audio, frames at the stream's rate, a keyframe never far, the",
         "picture within a frame of the sound, a bad key refused, the key store.",
         "Software encoders here (H.264 and Opus; no AAC off a Mac); the Mac",
-        "shard runs the same with AudioToolbox's AAC, the codec the stream ships."
+        "shard runs the same with AudioToolbox's AAC, the codec the stream ships.",
+        "Since 37x-4c to three destinations at once: a second landscape one that",
+        "must get the same bytes, and a portrait encode decoded at its own size."
       ]
     },
     {

@@ -44,6 +44,7 @@ module.exports = {
     'main.js',
     'updates.js',
     'live.js',
+    'liveSession.js',
     'rtmp.js',
     'keys.js',
     'preload.cjs',

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * The live stream, end to end, against a local RTMP server (PLAN.md 37x-4b).
+ * The live stream, end to end, against a local RTMP server (PLAN.md 37x-4b,
+ * several destinations and a portrait encode 37x-4c).
  *
  *   npm run live                 # 30 seconds of the lab's plate and a tone, streamed and measured
  *   npm run live -- --seconds 60 # the plan's minute
@@ -58,6 +59,23 @@
  *                bytes when asked, and its own counts match the server's
  *   a bad key    a stream whose key the server refuses fails with the
  *                server's words, the key cut from them
+ *
+ * Several destinations (37x-4c): the stream goes to three at once, as the
+ * Mac app's session sends it (desktop/liveSession.js): the lines above are
+ * the first landscape one's, and
+ *
+ *   the second   the other landscape destination got the same tags, byte for
+ *                byte: one encode, written twice
+ *   portrait     the third, on the portrait encode, arrived at its own size
+ *                (onMetaData and the decoded frames 360x640), at the
+ *                stream's rate, every frame decoded, the flash in the first
+ *                frame after it was drawn; and what it shows is the plate's
+ *                middle: between flashes it is brighter than the landscape
+ *                stream, whose sides are the lab canvas's black margins (a
+ *                stretched or letterboxed picture would carry the same
+ *                share of black, a cover crop of the middle none)
+ *
+ * What a slow or lost destination does is `npm run livedrop`'s, in node.
  *   the keychain store (node)
  *                a key set is listed by name and not by value, read back,
  *                removed; the file holds no plaintext of it; a machine with
@@ -71,6 +89,7 @@ import { chromium } from 'playwright';
 import { openLab } from './lab.mjs';
 import { startRtmpListener, summarize } from './rtmpListener.mjs';
 import { LiveClient } from '../desktop/live.js';
+import { LiveSession } from '../desktop/liveSession.js';
 import { makeKeyStore } from '../desktop/keys.js';
 import { describeTag } from '../desktop/rtmp.js';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -84,6 +103,8 @@ const CODEC = arg('--codec', null);
 const FPS = 30;
 const EVENTS = 5;
 const KEY = 'check-stream-key-7f3a';
+const KEY2 = 'check-stream-key-second';
+const KEY_TALL = 'check-stream-key-tall';
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => {
@@ -120,37 +141,41 @@ const fmt = (n, d = 1) => Number(n).toFixed(d);
 
 // --- 2. The stream ---------------------------------------------------------------------
 const listener = await startRtmpListener({ refuse: 'wrong-key', pingAfterMs: 1500 });
-let published = null;
-listener.on('publish', (s) => { published = s; });
+const byKey = new Map();
+listener.on('publish', (s) => { byKey.set(s.key, s); });
 
 const { page, close } = await openLab({ entry: 'scripts/live-entry.ts' });
-let client = null;
+let session = null;
 const clients = [];
 try {
-  // The bridge: what the Mac app's preload does over IPC, done here over Playwright.
+  // The bridge: what the Mac app's preload and wireLive do over IPC, done here over Playwright.
   await page.exposeFunction('__liveStart', async (req) => {
-    client = new LiveClient({ url: req.url, key: req.key, meta: req.meta });
-    clients.push(client);
-    try { await client.connect(); return { ok: true, state: client.state() }; } catch (e) { return { ok: false, error: client.error ?? e.message, state: client.state() }; }
+    session = new LiveSession({ outputs: req.outputs, destinations: req.destinations.map((d) => ({ name: d.name, url: d.url, key: d.key, output: d.output })) });
+    const r = await session.start();
+    return { ...r, state: session.state() };
   });
   await page.exposeFunction('__liveConfig', (cfg) => {
-    if (cfg.video) client?.videoConfig(Uint8Array.from(cfg.video));
-    if (cfg.audio) client?.audioConfig(cfg.audio.codec, Uint8Array.from(cfg.audio.description));
+    if (cfg.video) session?.videoConfig(cfg.output, Uint8Array.from(cfg.video));
+    if (cfg.audio) session?.audioConfig(cfg.audio.codec, Uint8Array.from(cfg.audio.description));
     return true;
   });
   await page.exposeFunction('__livePacket', (p) => {
     const data = Buffer.from(p.data, 'base64');
-    if (p.kind === 'video') client?.video(p.timestampMs, !!p.key, data);
-    else client?.audio(p.timestampMs, data);
+    if (p.kind === 'video') session?.video(p.output, p.timestampMs, !!p.key, data);
+    else session?.audio(p.timestampMs, data);
     return true;
   });
-  await page.exposeFunction('__liveStop', () => { client?.close(); return client?.state() ?? null; });
-  await page.exposeFunction('__liveState', () => client?.state() ?? null);
+  await page.exposeFunction('__liveStop', () => { session?.close(); return session?.state() ?? null; });
+  await page.exposeFunction('__liveState', () => session?.state() ?? null);
+  /** The first landscape destination's health, which the single-stream lines below read as 37x-4b's client state. */
+  const first = (st) => st?.destinations?.find((d) => d.name === KEY) ?? null;
 
   const setup = await page.evaluate(() => window.liveLab.setup(96));
   console.log(`the lab's plate on a 640x360 canvas, a tone at ${setup.sampleRate} Hz; streaming ${SECONDS} s at ${FPS} fps to ${listener.url}`);
-  const started = await page.evaluate(([url, key, fps, codec]) => window.liveLab.start(url, key, fps, codec ?? undefined), [listener.url, KEY, FPS, CODEC]);
-  check('the server took the stream', started.phase === 'live' && published !== null && published.key === KEY, `page ${started.phase}, audio ${started.audioCodec ?? 'none'} on the ${started.audioClock ?? '?'} clock`);
+  const keys = [{ key: KEY }, { key: KEY2 }, { key: KEY_TALL, orientation: 'portrait' }];
+  const started = await page.evaluate(([url, keys, fps, codec]) => window.liveLab.start(url, keys, fps, codec ?? undefined), [listener.url, keys, FPS, CODEC]);
+  const published = byKey.get(KEY) ?? null;
+  check('the server took the stream, on all three destinations', started.phase === 'live' && published !== null && byKey.has(KEY2) && byKey.has(KEY_TALL), `page ${started.phase}, audio ${started.audioCodec ?? 'none'} on the ${started.audioClock ?? '?'} clock`);
   const codec = started.audioCodec;
   if (CODEC) check(`the stream's audio is ${CODEC}, as this machine was asked`, codec === CODEC, `${codec ?? 'none'}`);
 
@@ -170,7 +195,7 @@ try {
   const seconds = (Date.now() - published.started) / 1000;
   console.log(`  page: ${live.frames} frames taken, ${live.skipped} skipped, ${live.keyframes} keyframes, ${live.audioPackets} audio packets in ${fmt(live.seconds)} s; encoder queue ${live.encodeQueue}; the plate redrawn ${plateDrawn.redraws} times${plateDrawn.errors.length ? `, errors: ${plateDrawn.errors.join(' | ')}` : ''}`);
   check(`the plate kept redrawing under the stream, and ${EVENTS} flashes were made`, plateDrawn.redraws >= SECONDS / 2 && plateDrawn.errors.length === 0 && events.length === EVENTS, `${plateDrawn.redraws} redraws, ${events.length} flashes`);
-  console.log(`  client: ${stopped?.transport?.bytesSent ?? 0} bytes, ${stopped?.transport?.videoFrames ?? 0} frames, ${stopped?.transport?.videoDropped ?? 0} dropped, ${stopped?.transport?.acks ?? 0} acks, ${stopped?.transport?.pings ?? 0} pings; status ${JSON.stringify(stopped?.transport?.status ?? [])}`);
+  console.log(`  client: ${first(stopped?.transport)?.bytesSent ?? 0} bytes, ${first(stopped?.transport)?.videoFrames ?? 0} frames, ${first(stopped?.transport)?.videoDropped ?? 0} dropped, ${first(stopped?.transport)?.acks ?? 0} acks, ${first(stopped?.transport)?.pings ?? 0} pings; status ${JSON.stringify(first(stopped?.transport)?.status ?? [])}`);
   console.log(`  server: ${s.video.frames} frames (${s.video.keyframes} key, ${s.video.codec}) ${s.video.firstMs}..${s.video.lastMs} ms, ${s.audio.packets} ${s.audio.codec} packets ${s.audio.firstMs}..${s.audio.lastMs} ms, ${s.acks} acks, ${s.pongs} pongs`);
 
   const m = s.meta ?? {};
@@ -230,14 +255,16 @@ try {
   const missed = marks.filter((m) => !keyTimes.some((t) => t >= m - 5 && t <= m + 2 * 1000 / FPS));
   check('a keyframe within two frames after every two-second mark', enoughVideo && missed.length === 0 && keyTimes[0] === videoTags[0].timestamp, `${keyTimes.length} keyframes for ${marks.length} marks (the encoder's own included), gaps ${fmt(Math.min(...keyGaps), 0)}..${fmt(Math.max(...keyGaps), 0)} ms${missed.length ? `; no keyframe after ${missed.join(', ')} ms` : ''}`);
   // ... and sent nearly every frame the page took: equal counts of zero would read as agreement.
-  check('the client sent what the page took and the server got', enoughVideo && (stopped?.transport?.videoFrames ?? -1) === s.video.frames && (stopped?.transport?.videoFrames ?? 0) >= 0.95 * live.frames && (stopped?.transport?.audioPackets ?? -1) === s.audio.packets && (stopped?.transport?.videoDropped ?? -1) === 0, `${live.frames} taken, ${stopped?.transport?.videoFrames} sent, ${s.video.frames} received, ${stopped?.transport?.videoDropped} dropped; ${stopped?.transport?.audioPackets} / ${s.audio.packets} packets`);
+  check('the client sent what the page took and the server got', enoughVideo && (first(stopped?.transport)?.videoFrames ?? -1) === s.video.frames && (first(stopped?.transport)?.videoFrames ?? 0) >= 0.95 * live.frames && (first(stopped?.transport)?.audioPackets ?? -1) === s.audio.packets && (first(stopped?.transport)?.videoDropped ?? -1) === 0, `${live.frames} taken, ${first(stopped?.transport)?.videoFrames} sent, ${s.video.frames} received, ${first(stopped?.transport)?.videoDropped} dropped; ${first(stopped?.transport)?.audioPackets} / ${s.audio.packets} packets`);
 
   // Decodable, and in sync.
   if (!vHeader || !aHeader) throw new Error('no sequence headers to decode with: the lines above say which');
   const vdesc = tags[firstVideo].d.payload;
   const adesc = tags[firstAudio].d.payload;
+  // The portrait encode's crop of the canvas, so the landscape's frames can be read over the same columns.
+  const crop = await page.evaluate(() => window.liveLab.crop(640, 360, 360, 640, 'cover'));
   const decoded = await page.evaluate(([v, a]) => window.liveLab.decode(v, a), [
-    { description: vdesc.toString('base64'), frames: videoTags.map((t) => ({ ts: t.timestamp, key: t.d.key, data: t.d.payload.toString('base64') })) },
+    { band: { x0: crop.sx, x1: crop.sx + crop.sw }, description: vdesc.toString('base64'), frames: videoTags.map((t) => ({ ts: t.timestamp, key: t.d.key, data: t.d.payload.toString('base64') })) },
     { codec, description: adesc.toString('base64'), sampleRate: setup.sampleRate, channels: m.stereo ? 2 : 1, packets: audioTags.map((t) => ({ ts: t.timestamp, data: t.d.payload.toString('base64') })) },
   ]);
   check('Chromium decodes every frame', !decoded.videoError && decoded.frames.length === videoTags.length, decoded.videoError ?? `${decoded.frames.length} of ${videoTags.length}`);
@@ -272,9 +299,49 @@ try {
   check('the flash is in the first frame taken after it was drawn, every time', sync.length === EVENTS && sync.every((x) => x.late === 0), sync.map((x) => x.late === null ? '?' : String(x.late)).join(', ') + ' frames late');
   check(`the sound is where the page made it, within an audio block and a codec frame (±${fmt(audioBound, 0)} ms) after ${fmt(primingMs, 0)} ms of priming, every time`, sync.length === EVENTS && sync.every((x) => x.audioErr !== null && Math.abs(x.audioErr) <= audioBound), sync.map((x) => x.audioErr === null ? '?' : fmt(x.audioErr, 0)).join(', ') + ' ms');
 
+  // The second landscape destination: the same encode, so the same tags, byte for byte.
+  {
+    const media = (conn) => conn.tags.filter((t) => t.type === 8 || t.type === 9);
+    const a1 = media(published), a2 = media(byKey.get(KEY2));
+    const differ = a1.findIndex((t, i) => !a2[i] || t.type !== a2[i].type || t.timestamp !== a2[i].timestamp || !t.body.equals(a2[i].body));
+    // Same bytes alone would not say one encode: a deterministic encoder run twice on the same frames may write them too. So the page's outputs are counted: one landscape, one portrait.
+    const ids = (live.outputs ?? []).map((o) => o.id).join(',');
+    check('the second landscape destination got the same tags, byte for byte, from the one landscape encode', ids === 'landscape,portrait' && a1.length > SECONDS * FPS * 0.5 && a1.length === a2.length && differ === -1, `the page's encodes ${ids}; ${a1.length} and ${a2.length} audio and video tags${differ >= 0 ? `; the first to differ is #${differ}` : ''}`);
+  }
+
+  // The portrait destination: its own encode, of the plate's middle.
+  {
+    const tall = byKey.get(KEY_TALL);
+    const ts = summarize(tall);
+    const ttags = tall.tags.map((t) => ({ ...t, d: describeTag(t.type, t.body) }));
+    const tFirst = ttags.findIndex((t) => t.d.kind === 'video');
+    const tv = ttags.filter((t) => t.d.kind === 'video' && !t.d.header);
+    const tOut = live.outputs?.find((o) => o.id === 'portrait');
+    const tSpan = tv.length > 1 ? (tv[tv.length - 1].timestamp - tv[0].timestamp) / 1000 : 0;
+    const tRate = tSpan > 0 ? (tv.length - 1) / tSpan : 0;
+    const tm = ts.meta ?? {};
+    console.log(`  portrait: ${tOut?.frames ?? '?'} frames taken, ${tOut?.skipped ?? '?'} skipped, ${tOut?.keyframes ?? '?'} keyframes; ${tv.length} received at ${tm.width}x${tm.height}, ${fmt(tRate)} fps; the crop ${JSON.stringify(crop)}`);
+    check('the portrait destination arrived at its own size and the stream\'s rate', tm.width === 360 && tm.height === 640 && tFirst >= 0 && ttags[tFirst].d.header && tv.length >= SECONDS * FPS * 0.5 && tRate >= FPS * 0.8 && tRate <= FPS * 1.05, `onMetaData ${tm.width}x${tm.height}; ${tv.length} frames at ${fmt(tRate)} fps over ${fmt(tSpan)} s`);
+    const td = await page.evaluate((v) => window.liveLab.decode(v, null), { description: ttags[tFirst].d.payload.toString('base64'), frames: tv.map((t) => ({ ts: t.timestamp, key: t.d.key, data: t.d.payload.toString('base64') })) });
+    check('Chromium decodes every portrait frame, at 360x640', !td.videoError && td.frames.length === tv.length && td.size?.width === 360 && td.size?.height === 640, td.videoError ?? `${td.frames.length} of ${tv.length}, ${td.size?.width}x${td.size?.height}`);
+    const tframes = td.frames.slice().sort((a, b) => a.ts - b.ts);
+    const tDark = median(tframes.map((f) => f.mean));
+    const tLate = events.map((ev) => {
+      const firstAfter = tframes.findIndex((f) => f.ts >= ev.flashMs);
+      const whiteAt = tframes.findIndex((f, i) => i >= Math.max(0, firstAfter - 1) && f.ts <= ev.flashMs + 1500 && f.mean > tDark + 0.5 * (255 - tDark));
+      return whiteAt >= 0 && firstAfter >= 0 ? whiteAt - firstAfter : null;
+    });
+    check('the flash is in the first portrait frame taken after it was drawn, every time', tLate.length === EVENTS && tLate.every((x) => x === 0), tLate.map((x) => (x === null ? '?' : String(x))).join(', ') + ' frames late');
+    // The lab's canvas is the dish (360 of its 640 columns) with black either side: a cover crop's 202 middle columns are all dish.
+    check('the portrait shows the plate\'s middle: brighter between flashes than the landscape, whose sides are black', tDark >= 1.3 * dark && dark > 2, `portrait ${fmt(tDark)} of 255, landscape ${fmt(dark)} (${fmt(tDark / dark, 2)}x; a stretch or letterbox carries the same share of black, about 1x)`);
+    // And which middle: the landscape's own frames read over the crop's columns. A crop off centre by tens of columns still lies in the dish and passes the line above; it does not pass this one.
+    const bandDark = median(frames.map((f) => f.band).filter((b) => b !== null));
+    check('the portrait is the landscape\'s middle columns: their brightness between flashes within a tenth', Number.isFinite(bandDark) && bandDark > 2 && Math.abs(tDark - bandDark) <= 0.1 * bandDark, `portrait ${fmt(tDark)}, the landscape's columns ${fmt(crop.sx, 0)}..${fmt(crop.sx + crop.sw, 0)} ${fmt(bandDark)}`);
+  }
+
   // Bookkeeping.
-  check('the client answered the server\'s ping', (stopped?.transport?.pings ?? 0) >= 1 && s.pongs >= 1, `${stopped?.transport?.pings} answered, ${s.pongs} heard`);
-  check('the client acknowledged the server\'s bytes when asked', (stopped?.transport?.acks ?? 0) >= 1 && s.acks === stopped?.transport?.acks, `${stopped?.transport?.acks} sent, ${s.acks} heard, window ${256} bytes`);
+  check('the client answered the server\'s ping', (first(stopped?.transport)?.pings ?? 0) >= 1 && s.pongs >= 1, `${first(stopped?.transport)?.pings} answered, ${s.pongs} heard`);
+  check('the client acknowledged the server\'s bytes when asked', (first(stopped?.transport)?.acks ?? 0) >= 1 && s.acks === first(stopped?.transport)?.acks, `${first(stopped?.transport)?.acks} sent, ${s.acks} heard, window ${256} bytes`);
 
   // A bad key.
   const bad = new LiveClient({ url: listener.url, key: 'wrong-key', meta: {} });
@@ -282,6 +349,7 @@ try {
   try { await bad.connect(); } catch (e) { badErr = e.message; }
   check('a refused key fails with the server\'s words and without the key', badErr !== null && /BadName/.test(badErr) && !badErr.includes('wrong-key') && bad.state().phase === 'failed', badErr ?? 'connected');
 } finally {
+  session?.close();
   for (const c of clients) c.close();
   await close();
   await listener.close();

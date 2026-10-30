@@ -25,6 +25,16 @@
  * (`refuse: 'badkey'`) is answered with NetStream.Publish.BadName, which is
  * what a platform says to a wrong key, so the client's failure path is
  * measurable too.
+ *
+ * For the drop test (37x-4c, `npm run livedrop`) it acts as a slow or broken
+ * ingest: it acknowledges the bytes it has read, every Window Acknowledgement
+ * Size the client asked for, as real servers do (`acknowledge: false` for
+ * one that does not, so the client's fallback is measured too);
+ * `conn.throttle(bytesPerSecond)` reads the socket no faster than that (null
+ * lifts it), which is a slow upload as the client sees it: the bytes back up
+ * behind it in the kernel and then in the client; `conn.kill()` drops the
+ * connection, as a server restart or a lost Wi-Fi would. `refusals` counts
+ * the publishes it refused, so a client that kept asking with a bad key shows.
  */
 import { createServer } from 'node:net';
 import { writeFileSync } from 'node:fs';
@@ -33,12 +43,32 @@ import { amfDecode, amfEncode, ChunkReader, chunkMessage, serverHandshake, CSID,
 
 const SERVER_CHUNK = 4096;
 
-export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs = 1500, ackWindow = 256 } = {}) {
+export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs = 1500, ackWindow = 256, acknowledge = true } = {}) {
   const em = new EventEmitter();
   const streams = [];
+  const sockets = new Set();
+  let refusals = 0;
   const server = createServer((socket) => {
-    const conn = { socket, reader: new ChunkReader(), app: null, key: null, tags: [], meta: null, pongs: 0, acks: 0, closed: false, started: 0 };
+    const conn = { socket, reader: new ChunkReader(), app: null, key: null, tags: [], meta: null, pongs: 0, acks: 0, acksSent: 0, ackSize: 0, ackedAt: 0, closed: false, started: 0, rate: null };
+    sockets.add(socket);
     socket.setNoDelay(true);
+    // The throttle: a budget of bytes each tenth of a second; past it the socket
+    // is paused until the budget is back above zero. The overdraft carries
+    // over: node reads up to 64 KB at a time, so a budget reset each tick
+    // would let a 15 KB-a-tick throttle read 640 KB a second (the first run).
+
+    let budget = Infinity;
+    let pacer = null;
+    conn.throttle = (bytesPerSecond) => {
+      conn.rate = bytesPerSecond ?? null;
+      if (pacer) { clearInterval(pacer); pacer = null; }
+      if (conn.rate === null) { budget = Infinity; socket.resume(); return; }
+      budget = conn.rate / 10;
+      pacer = setInterval(() => { budget = Math.min(conn.rate / 10, budget + conn.rate / 10); if (budget > 0 && !socket.destroyed) socket.resume(); }, 100);
+      pacer.unref();
+    };
+    conn.kill = () => socket.destroy();
+    socket.on('close', () => { if (pacer) clearInterval(pacer); sockets.delete(socket); });
     const send = (csid, type, body, msid = 0, timestamp = 0) => { if (!socket.destroyed) socket.write(chunkMessage({ csid, msid, type, timestamp, body }, SERVER_CHUNK)); };
     const result = (txn, ...args) => send(CSID.COMMAND, MSG.COMMAND, amfEncode(['_result', txn, ...args]));
     const status = (msid, level, code, description) => send(CSID.DATA, MSG.COMMAND, amfEncode(['onStatus', 0, null, { level, code, description }]), msid);
@@ -52,6 +82,8 @@ export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs =
       send(CSID.CONTROL, MSG.SET_PEER_BANDWIDTH, Buffer.concat([u32(ackWindow), Buffer.from([2])]));
       send(CSID.CONTROL, MSG.SET_CHUNK_SIZE, u32(SERVER_CHUNK));
       const onData = (d) => {
+        budget -= d.length;
+        if (budget <= 0) socket.pause();
         let msgs;
         try { msgs = conn.reader.push(d); } catch (e) { em.emit('error', e); socket.destroy(); return; }
         for (const m of msgs) {
@@ -62,6 +94,8 @@ export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs =
             try { const v = amfDecode(m.body); if (v[0] === '@setDataFrame' && v[1] === 'onMetaData') conn.meta = v[2]; } catch { /* not ours to judge */ }
           } else if (m.type === MSG.ACK) {
             conn.acks++;
+          } else if (m.type === MSG.WINDOW_ACK_SIZE) {
+            if (m.body.length >= 4) conn.ackSize = m.body.readUInt32BE(0);
           } else if (m.type === MSG.USER_CONTROL) {
             if (m.body.length >= 2 && m.body.readUInt16BE(0) === USER_CONTROL.PING_RESPONSE) conn.pongs++;
           } else if (m.type === MSG.COMMAND) {
@@ -76,6 +110,7 @@ export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs =
             } else if (name === 'publish') {
               const key = String(args[0] ?? '');
               if (refuse !== null && key === refuse) {
+                refusals++;
                 status(m.msid, 'error', 'NetStream.Publish.BadName', `${key} is not a valid stream name`);
                 setTimeout(() => socket.destroy(), 200);
                 continue;
@@ -95,19 +130,30 @@ export async function startRtmpListener({ port = 0, refuse = null, pingAfterMs =
           }
         }
       };
-      socket.on('data', onData);
-      if (rest.length) onData(rest);
+      // What a server does with the client's window: an Acknowledgement of the bytes read so far each time another window's worth has come in.
+      const ackingData = (d) => {
+        onData(d);
+        if (acknowledge && conn.ackSize > 0 && conn.reader.bytes - conn.ackedAt >= conn.ackSize) {
+          conn.ackedAt = conn.reader.bytes;
+          send(CSID.CONTROL, MSG.ACK, u32(conn.reader.bytes % 2 ** 32));
+          conn.acksSent++;
+        }
+      };
+      socket.on('data', ackingData);
+      if (rest.length) ackingData(rest);
     }).catch((e) => { em.emit('error', e); socket.destroy(); });
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
   const bound = server.address().port;
+  // A getter, defined rather than assigned: Object.assign would copy the count once, as it stood.
+  Object.defineProperty(em, 'refusals', { get: () => refusals });
   return Object.assign(em, {
     port: bound,
     url: `rtmp://127.0.0.1:${bound}/live`,
     streams,
     toFlv: (conn) => flvFile(conn.tags),
     summarize,
-    close: () => new Promise((resolve) => { for (const s of streams) s.socket.destroy(); server.close(() => resolve()); }),
+    close: () => new Promise((resolve) => { for (const s of sockets) s.destroy(); server.close(() => resolve()); }),
   });
 }
 

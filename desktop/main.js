@@ -33,7 +33,7 @@ import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
-import { wireLive } from './live.js';
+import { wireLive } from './liveSession.js';
 import { makeKeyStore } from './keys.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

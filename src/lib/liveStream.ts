@@ -60,15 +60,33 @@
  */
 import { avcCodec, videoBitrate as bitrateFor } from './render';
 
-export interface LivePacket { kind: 'video' | 'audio'; timestampMs: number; key?: boolean; data: Uint8Array }
+export interface LivePacket { kind: 'video' | 'audio'; timestampMs: number; key?: boolean; data: Uint8Array; /** A video packet's encode (an output's id); audio goes to every destination. */ output?: string }
 export interface LiveAudioMeta { codec: 'aac' | 'opus'; sampleRate: number; channels: number; bitrate: number }
 export interface LiveMeta { width: number; height: number; fps: number; videoBitrate: number; audio: LiveAudioMeta | null }
-export interface LiveStartRequest { url: string; keyName?: string; key?: string; meta: LiveMeta }
-export interface LiveTransportState { phase: string; error: string | null; status?: string[]; bytesBehind?: number; bytesSent?: number; videoFrames?: number; videoDropped?: number; audioPackets?: number; acks?: number; pings?: number; seconds?: number }
+/**
+ * One video encode of the plate (37x-4c). A landscape output for YouTube,
+ * Twitch, Facebook, Kick and X; a portrait one, a second encode, for
+ * Instagram and TikTok, which take 9:16 only (docs/live-show.md). `fit`
+ * says how the plate's canvas meets an output of another shape: 'cover'
+ * (the default) crops the middle of the plate to fill the frame, 'contain'
+ * shows all of it with black above and below.
+ */
+export interface LiveOutputSpec { id: string; width: number; height: number; fit?: 'cover' | 'contain'; videoBitrate?: number }
+/** Where an output goes: a server, a key by name (or, from the repo only, the key), and which output. */
+export interface LiveDestinationSpec { name?: string; url: string; keyName?: string; key?: string; output?: string }
+export interface LiveStartRequest { outputs: { id: string; meta: LiveMeta }[]; destinations: LiveDestinationSpec[] }
+/** One destination's health, as desktop/liveSession.js reports it: the panel's readout (37x-4d). */
+export interface LiveDestinationHealth {
+  name: string; output: string; phase: string; error: string | null; status: string[];
+  kbps: number; secondsBehind: number; bytesBehind: number; measuredAt: 'server' | 'socket' | null; dropping: boolean;
+  videoFrames: number; videoDropped: number; dropRuns: number; audioPackets: number; bytesSent: number; joinSkipped: number;
+  acks: number; pings: number; serverAcks: number; reconnects: number; retryInMs: number | null; seconds: number;
+}
+export interface LiveTransportState { phase: string; error: string | null; destinations?: LiveDestinationHealth[] }
 
 export interface LiveTransport {
   start(req: LiveStartRequest): Promise<{ ok: boolean; error?: string; state?: LiveTransportState | null }>;
-  config(cfg: { video?: Uint8Array; audio?: { codec: 'aac' | 'opus'; description: Uint8Array } }): Promise<unknown> | unknown;
+  config(cfg: { output?: string; video?: Uint8Array; audio?: { codec: 'aac' | 'opus'; description: Uint8Array } }): Promise<unknown> | unknown;
   packet(p: LivePacket): void;
   stop(): Promise<unknown> | unknown;
   state(): Promise<LiveTransportState | null>;
@@ -79,13 +97,18 @@ export interface LiveOptions {
   /** What the show hears, or null for a silent stream. */
   audio: MediaStream | null;
   transport: LiveTransport;
-  url: string;
+  /** The encodes; unset, one landscape output of `width` x `height`. */
+  outputs?: LiveOutputSpec[];
+  /** Where they go; unset, one destination at `url` with `keyName` (or `key`) on the first output. */
+  destinations?: LiveDestinationSpec[];
+  url?: string;
   keyName?: string;
   /** From the repo only (a packed app's main process refuses it): the key itself. */
   key?: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
   fps: number;
+  /** The first output's bitrate, when `outputs` does not give one. */
   videoBitrate?: number;
   audioBitrate?: number;
   /** A keyframe this often, in seconds. The platforms ask for 2 (docs/live-show.md). */
@@ -100,19 +123,26 @@ export type LiveAcceleration = 'no-preference' | 'prefer-hardware' | 'prefer-sof
 
 export interface LiveProbe {
   acceleration: LiveAcceleration;
+  /** Where the probe's frames came from: a 2D canvas (the stream's path) or a buffer of pixels (the encoder alone). */
+  source: 'canvas' | 'buffer';
   supported: boolean;
   outputs: number;
   /** ms from the first encode to the first packet out. */
   firstOutMs: number | null;
   /** ms an encoded frame once the encoder is warm (from the first packet to the last); null when none came out. */
   msAFrame: number | null;
+  /** ms spent making the probe's frames, on average: the canvas's draw and readback, or nothing much for a buffer. */
+  makeMs: number;
   error: string | null;
 }
+
+export interface LiveOutputState { id: string; width: number; height: number; fit: 'cover' | 'contain'; videoBitrate: number; frames: number; skipped: number; keyframes: number; encodeQueue: number }
 
 export interface LiveState {
   phase: 'idle' | 'starting' | 'live' | 'stopped' | 'failed';
   error: string | null;
   seconds: number;
+  /** The first output's counts (the landscape stream's, in the usual show); every output's are in `outputs`. */
   frames: number;
   /** Frames due that were not taken: the encoder still had three queued. */
   skipped: number;
@@ -121,10 +151,11 @@ export interface LiveState {
   audioCodec: 'aac' | 'opus' | null;
   audioClock: 'track' | 'arrival' | null;
   timing: { grabMs: number; firstOutMs: number | null; firstEncodeAt: number; outputs: number };
-  /** The hint the video encoder was configured with, and what the probes read before it was chosen. */
+  /** The hint the video encoders were configured with, and what the probes read before it was chosen. */
   acceleration: LiveAcceleration | null;
   probes: LiveProbe[];
   encodeQueue: number;
+  outputs: LiveOutputState[];
   transport: LiveTransportState | null;
 }
 
@@ -161,9 +192,16 @@ export async function liveAudioCodec(sampleRate: number, channels: number, bitra
  * software encoder when the default cannot hold the frame rate and the
  * software one can. The owner's Mac has a hardware encoder that holds
  * 1080p60; there the default wins its probe and nothing changes.
+ *
+ * `source: 'buffer'` (37x-4c) makes the probe's frames from a buffer of
+ * pixels instead of a canvas, so the encoder is timed alone: on GitHub's Mac
+ * the packed app read 171 to 198 ms a frame under every hint while the
+ * lab's Chromium on the same machine held 30 fps, and a canvas-made frame
+ * there may be a readback through a software GL. Canvas slow and buffer
+ * fast says the readback is the cost; both slow says the encoder is.
  */
-export async function probeVideoEncoder(width: number, height: number, fps: number, acceleration: LiveAcceleration, frames = 24): Promise<LiveProbe> {
-  const out: LiveProbe = { acceleration, supported: false, outputs: 0, firstOutMs: null, msAFrame: null, error: null };
+export async function probeVideoEncoder(width: number, height: number, fps: number, acceleration: LiveAcceleration, frames = 24, source: 'canvas' | 'buffer' = 'canvas'): Promise<LiveProbe> {
+  const out: LiveProbe = { acceleration, source, supported: false, outputs: 0, firstOutMs: null, msAFrame: null, makeMs: 0, error: null };
   if (!liveSupport()) { out.error = 'no WebCodecs'; return out; }
   const codec = avcCodec(width, height, fps);
   const cfg = { codec, width, height, framerate: fps, bitrate: bitrateFor(codec, width, height, fps), bitrateMode: 'constant', latencyMode: 'realtime', hardwareAcceleration: acceleration, avc: { format: 'avc' } } as VideoEncoderConfig;
@@ -175,7 +213,15 @@ export async function probeVideoEncoder(width: number, height: number, fps: numb
     const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), { width, height });
     const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
     if (!ctx) { out.error = 'no 2D context for the probe'; return out; }
+    // An I420 picture per frame for the buffer probe, made before the clock starts.
+    const yuv = source === 'buffer' ? Array.from({ length: 4 }, (_, k) => {
+      const b = new Uint8Array(width * height * 3 / 2);
+      for (let i = 0; i < width * height; i++) b[i] = (i * (k + 3) + (i / width) * 7) & 0xff;
+      b.fill(128 + k * 20, width * height);
+      return b;
+    }) : [];
     let t0 = 0;
+    let makeMs = 0;
     enc = new VideoEncoder({
       output: () => { if (out.outputs++ === 0) out.firstOutMs = performance.now() - t0; },
       error: (e) => { out.error = String((e as Error)?.message ?? e); },
@@ -184,14 +230,23 @@ export async function probeVideoEncoder(width: number, height: number, fps: numb
     t0 = performance.now();
     for (let i = 0; i < frames; i++) {
       // Each frame differs, so the encoder has a picture to code, not a repeat to skip.
-      ctx.fillStyle = `hsl(${(i * 37) % 360} 60% ${30 + (i % 5) * 10}%)`; ctx.fillRect(0, 0, width, height);
-      ctx.fillStyle = '#fff'; ctx.fillRect((i * 29) % width, (i * 17) % height, 40, 40);
-      const f = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      const m0 = performance.now();
+      const timing = { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) };
+      let f: VideoFrame;
+      if (source === 'buffer') {
+        f = new VideoFrame(yuv[i % yuv.length], { format: 'I420', codedWidth: width, codedHeight: height, ...timing });
+      } else {
+        ctx.fillStyle = `hsl(${(i * 37) % 360} 60% ${30 + (i % 5) * 10}%)`; ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = '#fff'; ctx.fillRect((i * 29) % width, (i * 17) % height, 40, 40);
+        f = new VideoFrame(canvas, timing);
+      }
+      makeMs += performance.now() - m0;
       enc.encode(f, { keyFrame: i === 0 });
       f.close();
     }
     const r = await Promise.race([enc.flush().then(() => 'done' as const), new Promise<'timeout'>((res) => setTimeout(() => res('timeout'), 8000))]);
     const total = performance.now() - t0;
+    out.makeMs = makeMs / frames;
     if (r === 'timeout') out.error = `${out.outputs} of ${frames} frames out in 8 s`;
     // The steady rate, after the encoder's warm-up: the first packet's wait is reported on its own.
     out.msAFrame = out.outputs > 1 && out.firstOutMs !== null ? (total - out.firstOutMs) / (out.outputs - 1) : out.outputs ? total : null;
@@ -203,10 +258,11 @@ export async function probeVideoEncoder(width: number, height: number, fps: numb
   return out;
 }
 
-/** Every hint probed in turn, for the console and the checks. */
+/** Every hint probed in turn on canvas frames, then the default and software encoders on buffer frames: for the console and the checks. */
 export async function probeVideoEncoders(width: number, height: number, fps: number): Promise<LiveProbe[]> {
   const r: LiveProbe[] = [];
   for (const a of ['no-preference', 'prefer-hardware', 'prefer-software'] as LiveAcceleration[]) r.push(await probeVideoEncoder(width, height, fps, a));
+  for (const a of ['no-preference', 'prefer-software'] as LiveAcceleration[]) r.push(await probeVideoEncoder(width, height, fps, a, 24, 'buffer'));
   return r;
 }
 
@@ -225,37 +281,64 @@ export async function chooseAcceleration(width: number, height: number, fps: num
   return { acceleration: better ? 'prefer-software' : 'no-preference', probes: [first, soft] };
 }
 
-export class LiveEncoder {
-  readonly opts: LiveOptions;
-  private video: VideoEncoder | null = null;
-  private audio: AudioEncoder | null = null;
-  private reader: ReadableStreamDefaultReader<AudioData> | null = null;
-  private timer: ReturnType<typeof setTimeout> | null = null;
-  private t0 = 0;
+/** One video encode and its own counts, keyframe schedule and staging canvas. */
+interface VideoOut {
+  spec: Required<Omit<LiveOutputSpec, 'videoBitrate'>> & { videoBitrate: number };
+  cfg: VideoEncoderConfig;
+  encoder: VideoEncoder | null;
   /** The two-second bucket the last keyframe was in: a keyframe at the first frame of each, on the schedule, not two seconds after the last one landed (which drifts later by each tick's lateness). */
-  private lastKeyBucket = -1;
-  /** 'track' when the chunks' own timestamps are on performance.now()'s clock (Chromium); 'arrival' is the fallback. */
-  private audioClock: 'track' | 'arrival' | null = null;
-  private audioOriginUs = 0;
-  private audioBaseMs = 0;
-  private audioCodec: 'aac' | 'opus' | null = null;
-  private videoDescribed = false;
-  private audioDescribed = false;
-  private transportState: LiveTransportState | null = null;
-  private counts = { frames: 0, skipped: 0, keyframes: 0, audioPackets: 0 };
+  lastKeyBucket: number;
+  described: boolean;
+  counts: { frames: number; skipped: number; keyframes: number };
   /**
-   * Where each frame is drawn at the stream's size before it is encoded. A
+   * Where each frame is drawn at the output's size before it is encoded. A
    * VideoFrame made straight from the plate's canvas is the canvas's size
    * (the window's, 1024x653 in the Mac check), and an encoder configured for
    * another size converts and scales it on the CPU after reading the GPU
    * canvas back: the first Mac run of `npm run desktop` took 24 frames in
    * four seconds that way, skipping 97. Drawing the canvas onto a 2D canvas
-   * of the stream's size is one GPU blit, and a frame from a 2D canvas is the
-   * path the lab's check already measured at the stream's rate.
+   * of the output's size is one GPU blit, and a frame from a 2D canvas is the
+   * path the lab's check already measured at the stream's rate. It is also
+   * where the shape is made: the portrait output's crop of the plate.
    */
-  private stage: OffscreenCanvas | HTMLCanvasElement | null = null;
-  private stageCtx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null = null;
-  /** For the checks: ms spent making frames, ms from the first encode to the first packet out, packets out. */
+  stage: OffscreenCanvas | HTMLCanvasElement | null;
+  stageCtx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+}
+
+/**
+ * The part of a `cw` x `ch` canvas an output of `w` x `h` shows, and where
+ * it is drawn: 'cover' takes the largest rectangle of the output's shape
+ * from the middle of the canvas (a 9:16 slice of a 16:9 plate: the middle
+ * third of the dish, filling a phone), 'contain' draws all of the canvas
+ * inside the output, centred, with black around it. Exported for the check.
+ */
+export function liveCrop(cw: number, ch: number, w: number, h: number, fit: 'cover' | 'contain'): { sx: number; sy: number; sw: number; sh: number; dx: number; dy: number; dw: number; dh: number } {
+  const ca = cw / ch, oa = w / h;
+  if (fit === 'contain') {
+    const dw = ca > oa ? w : h * ca, dh = ca > oa ? w / ca : h;
+    return { sx: 0, sy: 0, sw: cw, sh: ch, dx: (w - dw) / 2, dy: (h - dh) / 2, dw, dh };
+  }
+  const sw = ca > oa ? ch * oa : cw, sh = ca > oa ? ch : cw / oa;
+  return { sx: (cw - sw) / 2, sy: (ch - sh) / 2, sw, sh, dx: 0, dy: 0, dw: w, dh: h };
+}
+
+export class LiveEncoder {
+  readonly opts: LiveOptions;
+  private outs: VideoOut[] = [];
+  private destinations: LiveDestinationSpec[] = [];
+  private audio: AudioEncoder | null = null;
+  private reader: ReadableStreamDefaultReader<AudioData> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private t0 = 0;
+  /** 'track' when the chunks' own timestamps are on performance.now()'s clock (Chromium); 'arrival' is the fallback. */
+  private audioClock: 'track' | 'arrival' | null = null;
+  private audioOriginUs = 0;
+  private audioBaseMs = 0;
+  private audioCodec: 'aac' | 'opus' | null = null;
+  private audioDescribed = false;
+  private transportState: LiveTransportState | null = null;
+  private audioPackets = 0;
+  /** For the checks: the first output's ms spent making frames, ms from its first encode to its first packet out, packets out. */
   readonly timing = { grabMs: 0, firstOutMs: null as number | null, firstEncodeAt: 0, outputs: 0 };
   private acceleration: LiveAcceleration | null = null;
   private probes: LiveProbe[] = [];
@@ -263,30 +346,50 @@ export class LiveEncoder {
   private error: string | null = null;
   private stopping = false;
 
-  constructor(opts: LiveOptions) { this.opts = opts; }
+  constructor(opts: LiveOptions) {
+    this.opts = opts;
+    const { fps } = opts;
+    const specs: LiveOutputSpec[] = opts.outputs?.length ? opts.outputs : [{ id: 'wide', width: opts.width ?? 1920, height: opts.height ?? 1080, videoBitrate: opts.videoBitrate }];
+    const ids = new Set<string>();
+    for (const [i, o] of specs.entries()) {
+      if (ids.has(o.id)) throw new Error(`two outputs named "${o.id}"`);
+      ids.add(o.id);
+      const codec = avcCodec(o.width, o.height, fps);
+      const videoBitrate = o.videoBitrate ?? (i === 0 ? opts.videoBitrate : undefined) ?? bitrateFor(codec, o.width, o.height, fps);
+      this.outs.push({
+        spec: { id: o.id, width: o.width, height: o.height, fit: o.fit ?? 'cover', videoBitrate },
+        cfg: { codec, width: o.width, height: o.height, framerate: fps, bitrate: videoBitrate, bitrateMode: 'constant', latencyMode: 'realtime', avc: { format: 'avc' } } as VideoEncoderConfig,
+        encoder: null, lastKeyBucket: -1, described: false, counts: { frames: 0, skipped: 0, keyframes: 0 }, stage: null, stageCtx: null,
+      });
+    }
+    this.destinations = opts.destinations?.length ? opts.destinations : [{ url: opts.url ?? '', keyName: opts.keyName, key: opts.key, output: this.outs[0].spec.id }];
+    for (const d of this.destinations) if (d.output !== undefined && !ids.has(d.output)) throw new Error(`${d.name ?? d.url}: no output "${d.output}"`);
+  }
 
   state(): LiveState {
+    const first = this.outs[0];
     return {
       phase: this.phase, error: this.error,
       seconds: this.t0 ? (performance.now() - this.t0) / 1000 : 0,
-      ...this.counts,
+      ...first.counts,
+      audioPackets: this.audioPackets,
       audioCodec: this.audioCodec,
       audioClock: this.audioClock,
       timing: { ...this.timing },
       acceleration: this.acceleration,
       probes: this.probes,
-      encodeQueue: this.video?.encodeQueueSize ?? 0,
+      encodeQueue: first.encoder?.encodeQueueSize ?? 0,
+      outputs: this.outs.map((o) => ({ ...o.spec, ...o.counts, encodeQueue: o.encoder?.encodeQueueSize ?? 0 })),
       transport: this.transportState,
     };
   }
 
-  /** Connect, then encode until `stop`. Resolves once the server has taken the stream. */
+  /** Connect, then encode until `stop`. Resolves once a server has taken the stream. */
   async start(): Promise<void> {
     if (this.phase !== 'idle') throw new Error(`already ${this.phase}`);
     if (!liveSupport()) throw new Error('this browser cannot encode a stream (no WebCodecs)');
     this.phase = 'starting';
-    const { width, height, fps, audio, transport, url, keyName, key } = this.opts;
-    const videoBitrate = this.opts.videoBitrate ?? bitrateFor(avcCodec(width, height, fps), width, height, fps);
+    const { fps, audio, transport } = this.opts;
     const audioBitrate = this.opts.audioBitrate ?? 160000;
     try {
       // The audio's rate and channels are the track's: read its first chunk before anything is configured.
@@ -308,23 +411,29 @@ export class LiveEncoder {
         this.audioCodec = codec;
         audioMeta = { codec, sampleRate: first.sampleRate, channels, bitrate: audioBitrate };
       }
+      // The hint is chosen on the first output's size (the largest, in the usual show) and used for all of them.
+      const lead = this.outs[0].spec;
       if (this.opts.acceleration) this.acceleration = this.opts.acceleration;
-      else { const c = await chooseAcceleration(width, height, fps); this.acceleration = c.acceleration; this.probes = c.probes; }
-      const vcfg: VideoEncoderConfig = { codec: avcCodec(width, height, fps), width, height, framerate: fps, bitrate: videoBitrate, bitrateMode: 'constant', latencyMode: 'realtime', hardwareAcceleration: this.acceleration, avc: { format: 'avc' } } as VideoEncoderConfig;
-      const vs = await VideoEncoder.isConfigSupported(vcfg);
-      if (!vs.supported) throw new Error(`no H.264 encoder for ${width}x${height} at ${fps} fps`);
+      else { const c = await chooseAcceleration(lead.width, lead.height, fps); this.acceleration = c.acceleration; this.probes = c.probes; }
+      for (const o of this.outs) {
+        o.cfg.hardwareAcceleration = this.acceleration;
+        const vs = await VideoEncoder.isConfigSupported(o.cfg);
+        if (!vs.supported) throw new Error(`no H.264 encoder for ${o.spec.width}x${o.spec.height} at ${fps} fps`);
+      }
 
-      const meta: LiveMeta = { width, height, fps, videoBitrate, audio: audioMeta };
-      const started = await transport.start({ url, keyName, key, meta });
+      const outputs = this.outs.map((o) => ({ id: o.spec.id, meta: { width: o.spec.width, height: o.spec.height, fps, videoBitrate: o.spec.videoBitrate, audio: audioMeta } }));
+      const started = await transport.start({ outputs, destinations: this.destinations });
       this.transportState = started.state ?? null;
       if (!started.ok) throw new Error(started.error ?? 'the server refused the stream');
 
       this.t0 = performance.now();
-      this.video = new VideoEncoder({
-        output: (chunk, m) => this.onVideo(chunk, m),
-        error: (e) => this.fail(e),
-      });
-      this.video.configure(vcfg);
+      for (const o of this.outs) {
+        o.encoder = new VideoEncoder({
+          output: (chunk, m) => this.onVideo(o, chunk, m),
+          error: (e) => this.fail(e),
+        });
+        o.encoder.configure(o.cfg);
+      }
       if (first && audioMeta) {
         this.audio = new AudioEncoder({
           output: (chunk, m) => this.onAudio(chunk, m),
@@ -341,63 +450,68 @@ export class LiveEncoder {
     }
   }
 
-  /** The frame timer: the next frame at t0 + n/fps; late ones skipped, never queued. */
+  /** The frame timer: the next frame at t0 + n/fps, for every output; late ones skipped, never queued. */
   private tick(n: number): void {
-    if (this.phase !== 'live' || !this.video) return;
+    if (this.phase !== 'live') return;
     const { fps, canvas, keySeconds = 2 } = this.opts;
     const frameMs = 1000 / fps;
     const now = performance.now() - this.t0;
     // n is the frame due now; if more than one is due, the ones between are skipped.
     const due = Math.max(n, Math.floor(now / frameMs));
-    if (due > n) this.counts.skipped += due - n;
-    if (this.video.encodeQueueSize < 3) {
-      const bucket = Math.floor(now / (keySeconds * 1000));
-      const keyFrame = bucket > this.lastKeyBucket;
+    const bucket = Math.floor(now / (keySeconds * 1000));
+    for (const [i, o] of this.outs.entries()) {
+      if (!o.encoder) continue;
+      if (due > n) o.counts.skipped += due - n;
+      // Each output is its own encoder: one that is behind skips its own frame, and the others still take theirs.
+      if (o.encoder.encodeQueueSize >= 3) { o.counts.skipped++; continue; }
+      const keyFrame = bucket > o.lastKeyBucket;
       let frame: VideoFrame | null = null;
       try {
         const t = performance.now();
-        frame = new VideoFrame(this.staged(canvas), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
-        if (this.counts.frames === 0) this.timing.firstEncodeAt = t;
-        this.video.encode(frame, { keyFrame });
-        this.timing.grabMs += performance.now() - t;
-        if (keyFrame) { this.lastKeyBucket = bucket; this.counts.keyframes++; }
-        this.counts.frames++;
+        frame = new VideoFrame(this.staged(canvas, o), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
+        if (i === 0 && o.counts.frames === 0) this.timing.firstEncodeAt = t;
+        o.encoder.encode(frame, { keyFrame });
+        if (i === 0) this.timing.grabMs += performance.now() - t;
+        if (keyFrame) { o.lastKeyBucket = bucket; o.counts.keyframes++; }
+        o.counts.frames++;
       } catch (e) {
         this.fail(e);
         return;
       } finally {
         frame?.close();
       }
-    } else {
-      this.counts.skipped++;
     }
     const next = this.t0 + (due + 1) * frameMs;
     this.timer = setTimeout(() => this.tick(due + 1), Math.max(0, next - performance.now()));
   }
 
-  /** The canvas drawn at the stream's size (see `stage`); the canvas itself when it already is. */
-  private staged(canvas: HTMLCanvasElement): HTMLCanvasElement | OffscreenCanvas {
-    const { width, height } = this.opts;
+  /** The canvas drawn at the output's size and shape (see `VideoOut.stage`); the canvas itself when it already is both. */
+  private staged(canvas: HTMLCanvasElement, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
+    const { width, height, fit } = o.spec;
     if (canvas.width === width && canvas.height === height) return canvas;
-    if (!this.stage) {
-      this.stage = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), { width, height });
-      this.stageCtx = this.stage.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+    if (!o.stage) {
+      o.stage = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), { width, height });
+      o.stageCtx = o.stage.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
     }
-    if (!this.stageCtx) throw new Error('no 2D context to stage the stream\'s frames on');
-    this.stageCtx.drawImage(canvas, 0, 0, width, height);
-    return this.stage;
+    const ctx = o.stageCtx;
+    if (!ctx) throw new Error('no 2D context to stage the stream\'s frames on');
+    // Cropped, never stretched: a round dish drawn into another shape would be an oval (37x-4b stretched the window's canvas to 16:9).
+    const c = liveCrop(canvas.width, canvas.height, width, height, fit);
+    if (fit === 'contain') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height); }
+    ctx.drawImage(canvas, c.sx, c.sy, c.sw, c.sh, c.dx, c.dy, c.dw, c.dh);
+    return o.stage;
   }
 
-  private onVideo(chunk: EncodedVideoChunk, m?: EncodedVideoChunkMetadata): void {
-    if (this.timing.outputs++ === 0) this.timing.firstOutMs = performance.now() - this.timing.firstEncodeAt;
+  private onVideo(o: VideoOut, chunk: EncodedVideoChunk, m?: EncodedVideoChunkMetadata): void {
+    if (o === this.outs[0] && this.timing.outputs++ === 0) this.timing.firstOutMs = performance.now() - this.timing.firstEncodeAt;
     const desc = m?.decoderConfig?.description;
-    if (desc && !this.videoDescribed) {
-      this.videoDescribed = true;
-      void this.opts.transport.config({ video: copyBytes(desc) });
+    if (desc && !o.described) {
+      o.described = true;
+      void this.opts.transport.config({ output: o.spec.id, video: copyBytes(desc) });
     }
     const data = new Uint8Array(chunk.byteLength);
     chunk.copyTo(data);
-    this.opts.transport.packet({ kind: 'video', timestampMs: chunk.timestamp / 1000, key: chunk.type === 'key', data });
+    this.opts.transport.packet({ kind: 'video', output: o.spec.id, timestampMs: chunk.timestamp / 1000, key: chunk.type === 'key', data });
   }
 
   private async pumpAudio(): Promise<void> {
@@ -464,7 +578,7 @@ export class LiveEncoder {
     const data = new Uint8Array(chunk.byteLength);
     chunk.copyTo(data);
     const ts = this.audioBaseMs + (chunk.timestamp - this.audioOriginUs) / 1000;
-    this.counts.audioPackets++;
+    this.audioPackets++;
     this.opts.transport.packet({ kind: 'audio', timestampMs: Math.max(0, ts), data });
   }
 
@@ -492,9 +606,9 @@ export class LiveEncoder {
     if (this.stopping) return;
     this.stopping = true;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
-    try { if (this.video && this.video.state === 'configured') await this.video.flush(); } catch { /* failed already */ }
+    for (const o of this.outs) { try { if (o.encoder && o.encoder.state === 'configured') await o.encoder.flush(); } catch { /* failed already */ } }
     try { if (this.audio && this.audio.state === 'configured') await this.audio.flush(); } catch { /* failed already */ }
-    try { this.video?.close(); } catch { /* closed */ }
+    for (const o of this.outs) { try { o.encoder?.close(); } catch { /* closed */ } }
     try { this.audio?.close(); } catch { /* closed */ }
     try { await this.reader?.cancel(); } catch { /* released */ }
     this.reader = null;
@@ -526,12 +640,20 @@ export function nativeLive(): NativeLive | null {
   return w.__CHROMAGLASS_NATIVE__?.live ?? null;
 }
 
+/** A destination as the console takes it: a portrait one goes to the vertical encode. */
+export interface LiveConsoleDestination { name?: string; url: string; keyName?: string; key?: string; orientation?: 'landscape' | 'portrait' }
+
 export interface LiveConsoleOptions {
-  url: string;
+  /** Several destinations at once (37x-4c); or `url` and `keyName` for one. */
+  destinations?: LiveConsoleDestination[];
+  url?: string;
   keyName?: string;
   key?: string;
+  /** The landscape encode's size: 1920 wide and 16:9 unless said. */
   width?: number;
   height?: number;
+  /** The portrait encode's size, made only when a destination is portrait: 720x1280 unless said (Instagram's and TikTok's). */
+  portrait?: { width?: number; height?: number; fit?: 'cover' | 'contain' };
   fps?: number;
   videoBitrate?: number;
   audioBitrate?: number;
@@ -539,10 +661,32 @@ export interface LiveConsoleOptions {
 }
 
 /**
+ * The console's options as the encoder's outputs and destinations: one
+ * landscape output, a portrait one only if a destination asks for it.
+ * Exported for the check.
+ */
+export function liveConsolePlan(o: LiveConsoleOptions): { outputs: LiveOutputSpec[]; destinations: LiveDestinationSpec[] } {
+  const asked: LiveConsoleDestination[] = o.destinations?.length ? o.destinations : [{ url: o.url ?? '', keyName: o.keyName, key: o.key }];
+  const width = o.width ?? 1920, height = o.height ?? Math.round(width * 9 / 16);
+  const portrait = asked.some((d) => d.orientation === 'portrait');
+  const landscape = asked.some((d) => d.orientation !== 'portrait');
+  const outputs: LiveOutputSpec[] = [];
+  if (landscape) outputs.push({ id: 'landscape', width, height, videoBitrate: o.videoBitrate });
+  if (portrait) {
+    const pw = o.portrait?.width ?? 720, ph = o.portrait?.height ?? Math.round(pw * 16 / 9);
+    outputs.push({ id: 'portrait', width: pw, height: ph, fit: o.portrait?.fit ?? 'cover' });
+  }
+  const destinations = asked.map((d) => ({ name: d.name ?? d.keyName, url: d.url, keyName: d.keyName, key: d.key, output: d.orientation === 'portrait' ? 'portrait' : 'landscape' }));
+  return { outputs, destinations };
+}
+
+/**
  * `window.__cgLive` in the Mac app (37x-4b: "driven first from the console
- * and the check"; the panel is 37x-4d): `start({ url, keyName })`, `stop()`,
- * `state()`, `probe({ width, height, fps })`, `keys.set(name, key)`,
- * `keys.list()`, `keys.remove(name)`.
+ * and the check"; the panel is 37x-4d): `start({ url, keyName })` for one
+ * destination or `start({ destinations: [{ name, url, keyName, orientation }] })`
+ * for several (37x-4c), `stop()`, `state()` (with each destination's health
+ * under `transport.destinations`), `probe({ width, height, fps })`,
+ * `keys.set(name, key)`, `keys.list()`, `keys.remove(name)`.
  * `allowed` is the Pro gate, asked at each start.
  */
 export function installLiveConsole(deps: { canvas: () => HTMLCanvasElement | null; audio: () => MediaStream | null; allowed: () => boolean }): void {
@@ -558,6 +702,7 @@ export function installLiveConsole(deps: { canvas: () => HTMLCanvasElement | nul
   };
   native.onEvent((e) => {
     if (current) current['transportState'] = e.state;
+    // One destination lost or refused is the session's to retry; only the whole session ending stops the encode.
     if ((e.event === 'failed' || e.event === 'closed') && current && current.state().phase === 'live') void current.stop();
   });
   const api = {
@@ -566,8 +711,8 @@ export function installLiveConsole(deps: { canvas: () => HTMLCanvasElement | nul
       if (current && (current.state().phase === 'live' || current.state().phase === 'starting')) throw new Error('already live: stop() first');
       const canvas = deps.canvas();
       if (!canvas) throw new Error('no plate to stream');
-      const width = o.width ?? 1920, height = o.height ?? Math.round(width * 9 / 16), fps = o.fps ?? 30;
-      current = new LiveEncoder({ canvas, audio: deps.audio(), transport, url: o.url, keyName: o.keyName, key: o.key, width, height, fps, videoBitrate: o.videoBitrate, audioBitrate: o.audioBitrate, acceleration: o.acceleration });
+      const { outputs, destinations } = liveConsolePlan(o);
+      current = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration });
       await current.start();
       return current.state();
     },

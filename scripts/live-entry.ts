@@ -1,9 +1,11 @@
 // Bundled into the lab page by `npm run live` (scripts/live.mjs): the lab's
 // real plate shader drawn onto a canvas, a sound beside it, and the live
 // stream's encoder (src/lib/liveStream.ts) streaming both through a bridge
-// the check exposes, to the same RTMP client the Mac app uses, in node.
+// the check exposes, to the same RTMP session the Mac app uses, in node:
+// a landscape encode to two destinations and a portrait one to a third
+// (37x-4c).
 import './lab-entry.ts';
-import { LiveEncoder, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
+import { LiveEncoder, liveCrop, liveConsolePlan, type LiveDestinationSpec, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
 
 
 type LabApi = {
@@ -18,8 +20,8 @@ const lab = (window as unknown as { lab: LabApi }).lab;
 /** The check's side of the wire, exposed by Playwright: each takes and returns JSON. */
 type Bridge = {
   __liveStart(req: LiveStartRequest): Promise<{ ok: boolean; error?: string; state?: LiveTransportState | null }>;
-  __liveConfig(cfg: { video?: number[]; audio?: { codec: string; description: number[] } }): Promise<unknown>;
-  __livePacket(p: { kind: string; timestampMs: number; key?: boolean; data: string }): Promise<unknown>;
+  __liveConfig(cfg: { output?: string; video?: number[]; audio?: { codec: string; description: number[] } }): Promise<unknown>;
+  __livePacket(p: { kind: string; output?: string; timestampMs: number; key?: boolean; data: string }): Promise<unknown>;
   __liveStop(): Promise<LiveTransportState | null>;
   __liveState(): Promise<LiveTransportState | null>;
 };
@@ -34,8 +36,8 @@ const fromB64 = (s: string): Uint8Array => Uint8Array.from(atob(s), (c) => c.cha
 
 const transport: LiveTransport = {
   start: (req) => bridge.__liveStart(req),
-  config: (cfg) => bridge.__liveConfig({ ...(cfg.video ? { video: Array.from(cfg.video) } : {}), ...(cfg.audio ? { audio: { codec: cfg.audio.codec, description: Array.from(cfg.audio.description) } } : {}) }),
-  packet: (p: LivePacket) => { void bridge.__livePacket({ kind: p.kind, timestampMs: p.timestampMs, key: p.key, data: b64(p.data) }); },
+  config: (cfg) => bridge.__liveConfig({ output: cfg.output, ...(cfg.video ? { video: Array.from(cfg.video) } : {}), ...(cfg.audio ? { audio: { codec: cfg.audio.codec, description: Array.from(cfg.audio.description) } } : {}) }),
+  packet: (p: LivePacket) => { void bridge.__livePacket({ kind: p.kind, output: p.output, timestampMs: p.timestampMs, key: p.key, data: b64(p.data) }); },
   stop: () => bridge.__liveStop(),
   state: () => bridge.__liveState(),
 };
@@ -98,10 +100,19 @@ const api = {
     return { sampleRate: ac.sampleRate };
   },
 
-  /** Start streaming to `url` with `key`; the plate steps on and is redrawn every `plateMs`. */
-  async start(url: string, key: string, fps: number, audioCodec?: 'aac' | 'opus', plateMs = 700): Promise<unknown> {
+  /**
+   * Start streaming to `url`, one destination per key: a destination is
+   * portrait when its orientation says so, and then the stream has a second
+   * encode of `portrait` (360x640: the lab's canvas is 640x360). Planned as
+   * the Mac app's console plans it (`liveConsolePlan`), so the check streams
+   * what `__cgLive.start({ destinations })` would. The plate steps on and is
+   * redrawn every `plateMs`.
+   */
+  async start(url: string, keys: { key: string; orientation?: 'landscape' | 'portrait' }[], fps: number, audioCodec?: 'aac' | 'opus', plateMs = 700): Promise<unknown> {
     if (!canvas || !stream) throw new Error('setup first');
-    encoder = new LiveEncoder({ canvas, audio: stream, transport, url, key, width: W, height: H, fps, videoBitrate: 1500000, audioBitrate: 96000, audioCodec });
+    const plan = liveConsolePlan({ destinations: keys.map((k) => ({ name: k.key, url, key: k.key, orientation: k.orientation })), width: W, height: H, portrait: { width: H, height: W }, videoBitrate: 1500000 });
+    const destinations: LiveDestinationSpec[] = plan.destinations;
+    encoder = new LiveEncoder({ canvas, audio: stream, transport, outputs: plan.outputs, destinations, fps, audioBitrate: 96000, audioCodec });
     await encoder.start();
     let busy = false;
     plateTimer = setInterval(() => {
@@ -152,6 +163,8 @@ const api = {
   },
 
   events: () => events,
+  /** The crop the portrait encode takes of the canvas, for the check to print and test. */
+  crop: (cw: number, ch: number, w: number, h: number, fit: 'cover' | 'contain') => liveCrop(cw, ch, w, h, fit),
   plate: () => ({ redraws, errors: plateErrors.slice(0, 3) }),
   state: async () => encoder ? encoder.refresh() : null,
   async stop(): Promise<unknown> {
@@ -167,18 +180,28 @@ const api = {
    * headers the stream sent. A stream a player can show is one these can
    * decode, frame for frame.
    */
-  async decode(video: { description: string; frames: { ts: number; key: boolean; data: string }[] }, audio: { codec: string; description: string; sampleRate: number; channels: number; packets: { ts: number; data: string }[] } | null) {
-    const frames: { ts: number; mean: number }[] = [];
+  async decode(video: { description: string; frames: { ts: number; key: boolean; data: string }[]; band?: { x0: number; x1: number } }, audio: { codec: string; description: string; sampleRate: number; channels: number; packets: { ts: number; data: string }[] } | null) {
+    const frames: { ts: number; mean: number; band: number | null }[] = [];
+    let size: { width: number; height: number } | null = null;
     let videoError: string | null = null;
     const vdec = new VideoDecoder({
       output: (f) => {
         const w = f.codedWidth, h = f.codedHeight;
+        size ??= { width: f.displayWidth, height: f.displayHeight };
         const c = new OffscreenCanvas(w, h); const cx = c.getContext('2d')!;
         cx.drawImage(f, 0, 0);
         const d = cx.getImageData(0, 0, w, h).data;
         let sum = 0;
         for (let i = 0; i < d.length; i += 16) sum += d[i] + d[i + 1] + d[i + 2];
-        frames.push({ ts: f.timestamp / 1000, mean: sum / (d.length / 16) / 3 });
+        // The mean over a band of columns too, when asked: the landscape's middle, which the portrait should be.
+        let band: number | null = null;
+        if (video.band) {
+          let bs = 0, bn = 0;
+          const x0 = Math.round(video.band.x0), x1 = Math.round(video.band.x1);
+          for (let y = 0; y < h; y += 2) for (let x = x0; x < x1; x += 2) { const k = (y * w + x) * 4; bs += d[k] + d[k + 1] + d[k + 2]; bn++; }
+          band = bn ? bs / bn / 3 : null;
+        }
+        frames.push({ ts: f.timestamp / 1000, mean: sum / (d.length / 16) / 3, band });
         f.close();
       },
       error: (e) => { videoError = e.message; },
@@ -229,7 +252,7 @@ const api = {
       const samples = await codecDelay(audio.codec, audio.sampleRate, audio.channels);
       primingMs = samples === null ? null : (samples / (audio.codec === 'aac' ? audio.sampleRate : 48000)) * 1000;
     }
-    return { frames, videoError, levels, audioError, audioSeconds, primingMs };
+    return { frames, size, videoError, levels, audioError, audioSeconds, primingMs };
   },
 };
 

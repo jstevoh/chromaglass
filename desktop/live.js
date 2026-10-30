@@ -42,8 +42,29 @@
  * next keyframe (a frame between keyframes cannot be decoded without the ones
  * before it, so once one is dropped the rest to the next keyframe must be);
  * audio is never dropped, since it is small and a hole in it is heard at
- * once. The counts are in `state()` for the panel's health readout (37x-4d);
- * several sockets off one encode, each dropping its own, are 37x-4c.
+ * once.
+ *
+ * How far behind is measured in seconds of the stream, not bytes (37x-4c):
+ * the media timestamp of the newest packet written against that of the
+ * newest packet the server has, so one bound means the same for a 6 Mbps
+ * landscape stream and a 3 Mbps vertical one. "The server has" is the
+ * server's own word where it gives it: RTMP's Acknowledgement, the bytes it
+ * has received, which the client asks for every `WINDOW_ACK` bytes. The
+ * socket's write buffer alone does not say it: a reader throttled to 100 KB/s
+ * on loopback (the cloud's Linux, 2026-10-30) left the kernel's own buffers
+ * holding 4.7 MB before node's buffer held a byte, six seconds of a 6 Mbps
+ * stream that `writableLength` never saw. A server that never acknowledges is
+ * judged on what node has handed the kernel, the most that can be known.
+ * The readout (`state()`: kbps out, seconds behind, frames dropped) is the
+ * panel's health line (37x-4d); several sockets off one encode, each
+ * dropping its own and reconnecting on its own, are `liveSession.js`.
+ *
+ * A connection made after the stream began (a reconnect, or a destination
+ * that could not be reached at the start) joins at a keyframe: until one
+ * comes, its video and audio wait, and its timestamps start from that
+ * keyframe's, as OBS starts each connection's clock at its first packet. A
+ * server meeting a new publish whose first frame says minute forty may wait
+ * forty minutes to show it.
  *
  * The stream key never appears in a log, an error or the state: a server's
  * `onStatus` description can quote the stream name, so it is cut from the
@@ -60,9 +81,18 @@ import { EventEmitter } from 'node:events';
 import { amfDecode, amfEncode, EcmaArray, ChunkReader, chunkMessage, clientHandshake, CSID, MSG, u32, userControl, USER_CONTROL, avcTag, aacTag, opusTag } from './rtmp.js';
 
 export const CHUNK_SIZE = 4096;
-const WINDOW_ACK = 2500000;
-/** Past this many bytes waiting on the socket, video frames are dropped to the next keyframe. About two seconds of a 6 Mbps stream. */
-export const BEHIND_LIMIT_BYTES = 1500000;
+/**
+ * How often the server is asked to acknowledge what it has received. OBS and
+ * FFmpeg ask every 2.5 MB, which on a 6 Mbps stream is one word every three
+ * seconds and on a throttled link one a minute: too coarse to say how far
+ * behind the stream is. 256 KB is a third of a second at 6 Mbps; each
+ * acknowledgement is a 16-byte message.
+ */
+export const WINDOW_ACK = 262144;
+/** Past this many seconds of the stream not yet at the server, video frames are dropped to the next keyframe, which is sent once it is back under half. */
+export const BEHIND_LIMIT_SECONDS = 2;
+/** A server's acknowledgement older than this is taken as one that has stopped acknowledging, and the socket's own word is used instead. */
+const ACK_STALE_MS = 5000;
 const CONNECT_TIMEOUT_MS = 15000;
 
 /** `rtmps://host[:port]/app[/more]` into what the connection needs. The key is never in the URL. */
@@ -89,7 +119,7 @@ export class LiveClient extends EventEmitter {
    * key, `meta` what onMetaData says: width, height, fps, videoBitrate (bps),
    * audio { codec 'aac'|'opus', sampleRate, channels, bitrate }.
    */
-  constructor({ url, key, meta }) {
+  constructor({ url, key, meta, join = false }) {
     super();
     this.target = parseRtmpUrl(url);
     this.key = String(key);
@@ -102,8 +132,20 @@ export class LiveClient extends EventEmitter {
     this.phase = 'idle';
     this.error = null;
     this.status = [];
-    this.counts = { bytesSent: 0, videoFrames: 0, videoDropped: 0, audioPackets: 0, acks: 0, pings: 0 };
+    this.counts = { bytesSent: 0, videoFrames: 0, videoDropped: 0, dropRuns: 0, audioPackets: 0, acks: 0, pings: 0, serverAcks: 0, joinSkipped: 0 };
     this.dropping = false;
+    /** Set when the server itself said no (a bad key, a refused app): not a connection to make again. */
+    this.refused = false;
+    /** The stream-clock time this connection's timestamps start from: 0 for the stream's first, the joining keyframe's for a later one (null until it comes). */
+    this.base = join ? null : 0;
+    /**
+     * What has been written and what has arrived: `queue` holds, for each
+     * media packet written and not yet known to have arrived, the byte count
+     * at its end and its timestamp. `flushed` is the bytes node has handed the
+     * kernel (each write's callback, in order); `serverAck` what the server
+     * last said it has (its count wraps at 2^32, unwrapped here).
+     */
+    this.delivery = { queue: [], head: 0, flushed: 0, serverAck: 0, serverAckAt: 0, lastAckRaw: 0, wraps: 0, writtenTs: 0, deliveredTs: 0, rate: [] };
     this.ackedAt = 0;
     this.peerWindow = 0;
     this.startedAt = 0;
@@ -111,16 +153,47 @@ export class LiveClient extends EventEmitter {
   }
 
   state() {
+    const behind = this.behind();
     return {
       phase: this.phase,
       error: this.error,
       status: this.status.slice(-5),
-      bytesBehind: this.socket ? this.socket.writableLength : 0,
-      behindLimit: BEHIND_LIMIT_BYTES,
+      bytesBehind: behind.bytes,
+      secondsBehind: behind.seconds,
+      behindLimit: BEHIND_LIMIT_SECONDS,
+      measuredAt: behind.by,
+      kbps: this.kbps(),
       dropping: this.dropping,
       seconds: this.startedAt ? (Date.now() - this.startedAt) / 1000 : 0,
       ...this.counts,
     };
+  }
+
+  /**
+   * How far behind the stream is: the bytes written that the server is not
+   * known to have, and the seconds of the stream they hold. `by` says whose
+   * word it is: 'server' (its acknowledgements) or 'socket' (what node has
+   * handed the kernel, when the server is not acknowledging).
+   */
+  behind() {
+    const d = this.delivery;
+    const fresh = d.serverAckAt > 0 && Date.now() - d.serverAckAt < ACK_STALE_MS;
+    const arrived = fresh ? Math.min(d.serverAck, d.flushed) : d.flushed;
+    while (d.head < d.queue.length && d.queue[d.head][0] <= arrived) d.deliveredTs = d.queue[d.head++][1];
+    if (d.head > 4096) { d.queue = d.queue.slice(d.head); d.head = 0; }
+    const now = Date.now();
+    const last = d.rate[d.rate.length - 1];
+    if (!last || now - last[0] >= 250) { d.rate.push([now, arrived]); while (d.rate.length > 1 && now - d.rate[0][0] > 3000) d.rate.shift(); }
+    const waiting = d.head < d.queue.length;
+    return { bytes: Math.max(0, this.counts.bytesSent - arrived), seconds: waiting ? Math.max(0, (d.writtenTs - d.deliveredTs) / 1000) : 0, by: fresh ? 'server' : 'socket' };
+  }
+
+  /** Kilobits a second arriving, over the last two to three seconds (`behind` keeps the samples). */
+  kbps() {
+    const r = this.delivery.rate;
+    if (r.length < 2) return 0;
+    const [t0, b0] = r[0], [t1, b1] = r[r.length - 1];
+    return t1 > t0 ? Math.round(((b1 - b0) * 8) / (t1 - t0)) : 0;
   }
 
   /** Connect, handshake, publish. Resolves when the server says the stream has started. */
@@ -128,12 +201,19 @@ export class LiveClient extends EventEmitter {
     if (this.phase !== 'idle') throw new Error(`already ${this.phase}`);
     const { tls, host, port, app, tcUrl } = this.target;
     this.phase = 'connecting';
-    const socket = await new Promise((resolve, reject) => {
-      const s = tls ? tlsConnect({ host, port, servername: host }) : netConnect({ host, port });
-      const timer = setTimeout(() => { s.destroy(); reject(new Error(`no answer from ${host}:${port} in ${CONNECT_TIMEOUT_MS / 1000} s`)); }, CONNECT_TIMEOUT_MS);
-      s.once(tls ? 'secureConnect' : 'connect', () => { clearTimeout(timer); resolve(s); });
-      s.once('error', (e) => { clearTimeout(timer); reject(e); });
-    });
+    let socket;
+    try {
+      socket = await new Promise((resolve, reject) => {
+        const s = tls ? tlsConnect({ host, port, servername: host }) : netConnect({ host, port });
+        const timer = setTimeout(() => { s.destroy(); reject(new Error(`no answer from ${host}:${port} in ${CONNECT_TIMEOUT_MS / 1000} s`)); }, CONNECT_TIMEOUT_MS);
+        s.once(tls ? 'secureConnect' : 'connect', () => { clearTimeout(timer); resolve(s); });
+        s.once('error', (e) => { clearTimeout(timer); reject(e); });
+      });
+    } catch (e) {
+      // A server that cannot be reached fails like one that hung up, so whoever is listening for 'failed' (a session's reconnect) hears it.
+      this.fail(e);
+      throw new Error(this.error ?? String(e));
+    }
     this.socket = socket;
     socket.setNoDelay(true);
     socket.on('error', (e) => this.fail(e));
@@ -166,11 +246,19 @@ export class LiveClient extends EventEmitter {
   }
 
   /** The chunk size the writer uses: ours, which we told the server. */
-  send(csid, type, body, { msid = 0, timestamp = 0 } = {}) {
+  send(csid, type, body, { msid = 0, timestamp = 0, media = false } = {}) {
     if (!this.socket || this.socket.destroyed) return false;
     const bytes = chunkMessage({ csid, msid, type, timestamp, body }, CHUNK_SIZE);
     this.counts.bytesSent += bytes.length;
-    return this.socket.write(bytes);
+    const d = this.delivery;
+    if (media) {
+      // Kept on the stream's clock, before the connection's base is taken off, so a join's seconds compare with the rest.
+      const at = timestamp + (this.base ?? 0);
+      d.queue.push([this.counts.bytesSent, at]);
+      if (at > d.writtenTs) d.writtenTs = at;
+    }
+    const n = bytes.length;
+    return this.socket.write(bytes, () => { d.flushed += n; });
   }
 
   command(name, args, { wait = false, msid = 0, csid = CSID.COMMAND } = {}) {
@@ -216,22 +304,29 @@ export class LiveClient extends EventEmitter {
     if (this.phase !== 'live') return false;
     // A frame before the sequence header has nothing to describe it; it is dropped, and counted.
     if (!this.sequenced.video) { this.counts.videoDropped++; return false; }
-    const behind = this.socket.writableLength;
-    if (behind > BEHIND_LIMIT_BYTES && !this.dropping) this.dropping = true;
+    // A connection that joined late starts at a keyframe, its clock from there.
+    if (this.base === null) {
+      if (!key) { this.counts.joinSkipped++; return false; }
+      this.base = timestampMs;
+    }
+    const { seconds } = this.behind();
+    if (seconds > BEHIND_LIMIT_SECONDS && !this.dropping) { this.dropping = true; this.counts.dropRuns++; }
     if (this.dropping) {
-      if (!key || behind > BEHIND_LIMIT_BYTES) { this.counts.videoDropped++; return false; }
+      // Back under half the bound, not the bound itself: a keyframe sent the moment it dips under would push it straight back over.
+      if (!key || seconds > BEHIND_LIMIT_SECONDS / 2) { this.counts.videoDropped++; return false; }
       this.dropping = false;
     }
-    this.send(CSID.VIDEO, MSG.VIDEO, avcTag(key ? 'key' : 'delta', data), { msid: this.streamId, timestamp: timestampMs });
+    this.send(CSID.VIDEO, MSG.VIDEO, avcTag(key ? 'key' : 'delta', data), { msid: this.streamId, timestamp: timestampMs - this.base, media: true });
     this.counts.videoFrames++;
     return true;
   }
 
-  /** One encoded audio packet (a raw AAC frame or an Opus packet) at `timestampMs`. */
+  /** One encoded audio packet (a raw AAC frame or an Opus packet) at `timestampMs`. Never dropped for being behind; before a join's keyframe it is not yet this connection's. */
   audio(timestampMs, data) {
     if (this.phase !== 'live' || !this.sequenced.audio) return false;
+    if (this.base === null || timestampMs < this.base) { this.counts.joinSkipped++; return false; }
     const tag = this.audioCodec === 'aac' ? aacTag('frame', data) : opusTag('frame', data);
-    this.send(CSID.AUDIO, MSG.AUDIO, tag, { msid: this.streamId, timestamp: timestampMs });
+    this.send(CSID.AUDIO, MSG.AUDIO, tag, { msid: this.streamId, timestamp: timestampMs - this.base, media: true });
     this.counts.audioPackets++;
     return true;
   }
@@ -252,6 +347,18 @@ export class LiveClient extends EventEmitter {
       case MSG.WINDOW_ACK_SIZE:
         if (m.body.length >= 4) this.peerWindow = m.body.readUInt32BE(0);
         break;
+      case MSG.ACK:
+        // The server's count of the bytes it has received, which wraps at 2^32.
+        if (m.body.length >= 4) {
+          const d = this.delivery;
+          const raw = m.body.readUInt32BE(0);
+          if (raw < d.lastAckRaw) d.wraps++;
+          d.lastAckRaw = raw;
+          d.serverAck = d.wraps * 2 ** 32 + raw;
+          d.serverAckAt = Date.now();
+          this.counts.serverAcks++;
+        }
+        break;
       case MSG.SET_PEER_BANDWIDTH:
         if (m.body.length >= 4) { this.peerWindow = m.body.readUInt32BE(0); this.send(CSID.CONTROL, MSG.WINDOW_ACK_SIZE, u32(this.peerWindow)); }
         break;
@@ -269,6 +376,7 @@ export class LiveClient extends EventEmitter {
           const p = this.pending.get(txn);
           if (!p) return;
           this.pending.delete(txn);
+          if (name === '_error') this.refused = true;
           if (name === '_error') p.reject(new Error(`${p.name}: ${withoutKey(info?.description ?? info?.code ?? 'refused', this.key)}`));
           else p.resolve(cmd);
         } else if (name === 'onStatus') {
@@ -278,6 +386,7 @@ export class LiveClient extends EventEmitter {
           this.emit('status', line);
           if (code === 'NetStream.Publish.Start' && this.publishWait) { this.publishWait.resolve(); this.publishWait = null; }
           else if (info?.level === 'error') {
+            this.refused = true;
             const err = new Error(line);
             if (this.publishWait) { this.publishWait.reject(err); this.publishWait = null; }
             this.fail(err);
@@ -316,65 +425,4 @@ export class LiveClient extends EventEmitter {
     }
     this.emit('closed');
   }
-}
-
-/**
- * The IPC the page uses (desktop/preload.cjs exposes it as
- * `__CHROMAGLASS_NATIVE__.live`): one stream at a time in this version.
- *
- *   live-start  { url, keyName } or, from the repo only, { url, key }
- *               (a packed app takes a key only from its keychain store,
- *               keys.js, so a page can never hold or read one), with the
- *               stream's `meta`; answers when the server says the stream has
- *               started, or with the error
- *   live-config { video: description } / { audio: { codec, description } }
- *   live-packet (send, not invoke: nothing to wait for) one encoded packet
- *   live-stop   ends the stream
- *   live-state  the client's state, for the console and the panel
- *   live-event  (to the page) 'live', 'status', 'failed', 'closed'
- */
-export function wireLive(ipcMain, { keys, isPackaged, send }) {
-  let client = null;
-  const tell = (event, detail) => { try { send('chromaglass:live-event', { event, detail: detail ?? null, state: client?.state() ?? null }); } catch { /* window gone */ } };
-  ipcMain.handle('chromaglass:live-start', async (_e, req) => {
-    if (client && client.phase !== 'closed' && client.phase !== 'failed') return { ok: false, error: `a stream is already ${client.phase}` };
-    const r = req && typeof req === 'object' ? req : {};
-    let key = null;
-    if (typeof r.keyName === 'string') key = await keys.read(r.keyName);
-    else if (!isPackaged && typeof r.key === 'string') key = r.key;
-    if (!key) return { ok: false, error: r.keyName ? `no key named "${r.keyName}" in the keychain` : 'no stream key' };
-    try {
-      client = new LiveClient({ url: String(r.url ?? ''), key, meta: r.meta ?? {} });
-    } catch (e) {
-      return { ok: false, error: e.message };
-    }
-    client.on('live', () => tell('live'));
-    client.on('status', (line) => tell('status', line));
-    client.on('failed', (err) => tell('failed', err));
-    client.on('closed', () => tell('closed'));
-    try {
-      await client.connect();
-      return { ok: true, state: client.state() };
-    } catch (e) {
-      return { ok: false, error: client.error ?? e.message, state: client.state() };
-    }
-  });
-  ipcMain.handle('chromaglass:live-config', (_e, cfg) => {
-    if (!client || !cfg) return false;
-    if (cfg.video) client.videoConfig(new Uint8Array(cfg.video));
-    if (cfg.audio) client.audioConfig(cfg.audio.codec === 'aac' ? 'aac' : 'opus', new Uint8Array(cfg.audio.description));
-    return true;
-  });
-  ipcMain.on('chromaglass:live-packet', (_e, p) => {
-    if (!client || !p) return;
-    const data = p.data instanceof Uint8Array ? p.data : new Uint8Array(p.data);
-    if (p.kind === 'video') client.video(Number(p.timestampMs) || 0, Boolean(p.key), data);
-    else if (p.kind === 'audio') client.audio(Number(p.timestampMs) || 0, data);
-  });
-  ipcMain.handle('chromaglass:live-stop', () => { client?.close(); return client?.state() ?? null; });
-  ipcMain.handle('chromaglass:live-state', () => client?.state() ?? null);
-  ipcMain.handle('chromaglass:live-key-set', (_e, name, key) => keys.set(String(name), String(key)));
-  ipcMain.handle('chromaglass:live-key-list', () => keys.list());
-  ipcMain.handle('chromaglass:live-key-remove', (_e, name) => keys.remove(String(name)));
-  return { current: () => client };
 }

@@ -50,6 +50,7 @@
     "render": "node --experimental-strip-types scripts/render.mjs",
     "render-lab": "node scripts/render-lab.mjs",
     "live": "node scripts/live.mjs",
+    "livedrop": "node scripts/livedrop.mjs",
     "render-app": "npm run build && node scripts/render-app.mjs",
     "liquids": "node --experimental-strip-types scripts/liquids.mjs",
     "natural": "node --experimental-strip-types scripts/natural.mjs",
