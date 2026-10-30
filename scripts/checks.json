@@ -2218,7 +2218,7 @@
     {
       "name": "The live stream, with AAC",
       "shard": "fifth",
-      "run": "npm run live",
+      "run": "npm run live -- --codec aac",
       "why": [
         "The same stream on a Mac (PLAN.md 37x-4b), where Chromium encodes AAC",
         "through AudioToolbox as the Mac app does: the codec every platform in",

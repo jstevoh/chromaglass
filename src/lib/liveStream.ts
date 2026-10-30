@@ -133,7 +133,8 @@ export class LiveEncoder {
   private reader: ReadableStreamDefaultReader<AudioData> | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private t0 = 0;
-  private lastKeyMs = -Infinity;
+  /** The two-second bucket the last keyframe was in: a keyframe at the first frame of each, on the schedule, not two seconds after the last one landed (which drifts later by each tick's lateness). */
+  private lastKeyBucket = -1;
   /** 'track' when the chunks' own timestamps are on performance.now()'s clock (Chromium); 'arrival' is the fallback. */
   private audioClock: 'track' | 'arrival' | null = null;
   private audioOriginUs = 0;
@@ -228,12 +229,13 @@ export class LiveEncoder {
     const due = Math.max(n, Math.floor(now / frameMs));
     if (due > n) this.counts.skipped += due - n;
     if (this.video.encodeQueueSize < 3) {
-      const keyFrame = now - this.lastKeyMs >= keySeconds * 1000;
+      const bucket = Math.floor(now / (keySeconds * 1000));
+      const keyFrame = bucket > this.lastKeyBucket;
       let frame: VideoFrame | null = null;
       try {
         frame = new VideoFrame(canvas, { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
         this.video.encode(frame, { keyFrame });
-        if (keyFrame) { this.lastKeyMs = now; this.counts.keyframes++; }
+        if (keyFrame) { this.lastKeyBucket = bucket; this.counts.keyframes++; }
         this.counts.frames++;
       } catch (e) {
         this.fail(e);

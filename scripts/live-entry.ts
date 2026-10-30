@@ -50,6 +50,9 @@ let encoder: LiveEncoder | null = null;
 const events: { flashMs: number; clickMs: number }[] = [];
 let flashUntil = 0;
 let plateTimer: ReturnType<typeof setInterval> | null = null;
+/** How often the plate was redrawn while streaming, and what went wrong when it was not: the check prints both. */
+let redraws = 0;
+const plateErrors: string[] = [];
 
 /** The lab's plate, drawn on a 2D canvas the encoder reads: the lab has no presented canvas of its own. */
 async function drawPlate(size: number): Promise<void> {
@@ -103,7 +106,7 @@ const api = {
     plateTimer = setInterval(() => {
       if (busy) return;
       busy = true;
-      lab.step(1).then(() => drawPlate(192)).catch(() => {}).finally(() => { busy = false; });
+      lab.step(1).then(() => drawPlate(192)).then(() => { redraws++; }).catch((e) => { plateErrors.push(String(e?.message ?? e)); }).finally(() => { busy = false; });
     }, plateMs);
     return encoder.state();
   },
@@ -124,7 +127,7 @@ const api = {
    * for the check to compare with what arrived.
    */
   event(inMs: number): void {
-    if (!ac || !encoder) return;
+    if (!ac || !encoder) throw new Error('event() before setup() and start()');
     const dest = (window as unknown as { __liveDest: MediaStreamAudioDestinationNode }).__liveDest;
     const pair = ac.getOutputTimestamp();
     const ctxNow = pair.contextTime ?? ac.currentTime, perfNow = pair.performanceTime ?? performance.now();
@@ -139,11 +142,16 @@ const api = {
       const now = performance.now();
       flashUntil = now + 120;
       paint();
+      // And the flash taken down on its own timer: left to the plate's redraw,
+      // a plate that stopped redrawing left the canvas white and every later
+      // flash unmeasurable (seen under load, the check-skeptic's control).
+      setTimeout(paint, 130);
       events.push({ flashMs: now - t0, clickMs: atPerf - t0 });
     }, Math.max(0, atPerf - performance.now()));
   },
 
   events: () => events,
+  plate: () => ({ redraws, errors: plateErrors.slice(0, 3) }),
   state: async () => encoder ? encoder.refresh() : null,
   async stop(): Promise<unknown> {
     if (plateTimer) clearInterval(plateTimer);

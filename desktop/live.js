@@ -213,7 +213,9 @@ export class LiveClient extends EventEmitter {
 
   /** One encoded frame, AVCC NAL units, at `timestampMs` on the stream's clock. Returns false when it was dropped. */
   video(timestampMs, key, data) {
-    if (this.phase !== 'live' || !this.sequenced.video) return false;
+    if (this.phase !== 'live') return false;
+    // A frame before the sequence header has nothing to describe it; it is dropped, and counted.
+    if (!this.sequenced.video) { this.counts.videoDropped++; return false; }
     const behind = this.socket.writableLength;
     if (behind > BEHIND_LIMIT_BYTES && !this.dropping) this.dropping = true;
     if (this.dropping) {

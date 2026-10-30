@@ -425,7 +425,8 @@ try {
     const removed = await page.evaluate(() => window.__cgLive?.keys.remove('check')).catch(() => null);
     const sum = pub ? summarize(pub) : null;
     const viaKeychain = started.keychain === 'kept';
-    const keyOk = pub?.key === 'desktop-check-key' && (!viaKeychain || (started.names?.includes('check') && removed === true));
+    // On a Mac the store must work (safeStorage through the login Keychain); only a box with no keyring may fall back to the key itself.
+    const keyOk = pub?.key === 'desktop-check-key' && (isMac ? viaKeychain : true) && (!viaKeychain || (started.names?.includes('check') && removed === true));
     const framesOk = !!sum && sum.video.header && sum.video.frames >= 60 && (stopped?.transport?.videoFrames ?? -1) === sum.video.frames;
     check(`live: the page streams the plate through the app to a listener${viaKeychain ? ', on a key kept by name in its keychain store' : ''}`, !started.error && keyOk && framesOk,
       started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s, ${stopped?.transport?.videoFrames ?? '?'} sent, ${stopped?.transport?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped; key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
