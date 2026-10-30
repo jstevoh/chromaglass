@@ -2020,3 +2020,24 @@ stuck there, unexplained, with no way to close it.
    opened, even though the wall is still framed.
 5. Bad: a chip that stays up over a wall with no title bar; a button that does nothing and
    says nothing; an X that comes back a second later.
+
+## 92. The live stream, to an unlisted YouTube broadcast (PLAN 37x-4b)
+
+The lab streams to its own server and measures the stream; only a real platform can say it
+takes ours, and only a camera can say the sound and the plate agree after the Mac's
+system-audio path. Unlisted, never public, until you say so.
+
+1. In YouTube Studio, Go live → Stream, an **unlisted** broadcast; copy the stream key. Open the
+   Mac app, the console (View → Toggle Developer Tools), and `docs/live-show.md`'s four lines
+   with that key. Within thirty seconds Studio's preview should show the plate, "Excellent
+   connection", no dropped frames in `__cgLive.state()`.
+2. Open the album in Qobuz or YouTube Music with the app's sound source on *System audio*.
+   Watch the broadcast on a phone (it runs twenty or so seconds behind): a hit in the music
+   should bloom the plate right after the hit, as it does on the laptop, not before it.
+3. Clap once in front of the laptop's camera with the microphone as the source: in the
+   broadcast, the clap and the plate's bloom should fall together within a frame or two.
+4. Stop with `__cgLive.stop()`; the broadcast should end cleanly in Studio within a few seconds.
+5. Bad: Studio never shows a picture (the key or the RTMPS path), the sound runs ahead of or
+   behind the plate by more than a frame or two (the Mac's clock, the plan's note under
+   37x-4b), frames dropped with a good upload, or the app's frame rate falling while live
+   (`npm run stutter`'s two-step frames, 37x-4c).

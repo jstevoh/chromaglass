@@ -9674,6 +9674,45 @@ model cannot reach one, the PR says what it reached and asks.
     infrared (36e-4), and that build adds a tighter dry-out ledger line. `boilgpu`'s
     boiling second (36e-2) already fails it, by 13% and 16% of the reference's change.
 
+### 37. Marketing and social media (asked 2026-10-29)
+
+#### 37x-4b. The encoder and one destination (#577)
+
+  - **37x-4b. The encoder and one destination (shipped 2026-10-29).** The owner: "open my mac
+    app ... configure the live show. I can then stream it on all of the popular streaming
+    platforms". The app now encodes and speaks RTMPS itself, as `docs/live-show.md` chose:
+    `src/lib/liveStream.ts` takes a frame from the plate's canvas every 1/fps of wall time
+    (not `captureStream`, which sends nothing while the plate is still) and the show's own
+    `MediaStream` through a `MediaStreamTrackProcessor`, encodes H.264 (`latencyMode:
+    realtime`, a keyframe every 2 s) and AAC (Opus where a machine has no AAC encoder),
+    stamps both on one clock (the audio on the track's timestamps, which Chromium puts on
+    `performance.now()`'s clock: an arrival-anchored draft read 17–22 ms early), and hands
+    each packet over IPC. `desktop/rtmp.js` is the wire (the handshake, chunks with a full
+    header on each message, AMF0, FLV tag bodies); `desktop/live.js` the client (connect,
+    releaseStream, FCPublish, createStream, publish, onMetaData, the sequence headers, acks
+    when the server asks, pings answered, a server's error ending the stream with its words
+    and the key cut from them, video dropped to the next keyframe past 1.5 MB behind, never
+    audio); `desktop/keys.js` the key store (Electron's `safeStorage`, the login Keychain's
+    key over a file of ciphertext; the `security` command was set aside because it takes the
+    password on its command line). The page names a key; a packed app reads one from the
+    store only. Headless: `window.__cgLive.start({ url, keyName })`, `stop()`, `state()`,
+    `keys.set/list/remove` in the Mac app, Pro only (`canUseProFeature`), installed from
+    `useAudioAnalyzer` where the show's sound and the plate meet.
+    *Measured:* `npm run live` (30 s of the lab's plate and a tone to
+    `scripts/rtmpListener.mjs`, a pure-node RTMP server that records FLV; shards `lab` and
+    `fifth`): the server took the stream and its onMetaData; the AVC and audio headers first;
+    30.0 s of audio with no gap over 21 ms (bar 100 ms); 30.0 fps over 901 frames (bar 24–31.5),
+    none out of order, none over 3 frames apart; 22 keyframes, the first at 0, never over 1.4 s
+    apart (bar 2.5 s); Chromium decodes every frame and every packet; five flashes against
+    five clicks, the picture 36 ms after the sound every time (bar 0..43 ms: a flash is seen at
+    the next frame taken, 33 ms, plus a 10 ms audio block), where the arrival-anchored draft
+    read 44–55 and the output-time pairing 59–79; one ack and one pong; a refused key fails
+    with `NetStream.Publish.BadName` and no key in the message; the key store lists names and
+    not keys, the file holds no plaintext, no encryption refuses. `npm run desktop` gained a
+    `live` line: the page's stream through the app's IPC to a listener, 72 frames in 4 s
+    under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
+    take), the key kept by name where the machine has a keychain.
+
 ### QA list: what the owner found playing it (from 2026-10-04)
 
 #### QA-19. Interacting with settings switches to and maximizes the performance window
