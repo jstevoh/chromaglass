@@ -537,6 +537,12 @@ function showDetails() {
     show.oscMode === 'off'
       ? 'OSC in: off (Show menu > OSC input turns it on)'
       : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    // The server refuses OSC and Art-Net below Pro (PLAN.md 34a-7a); the
+    // details say so, rather than an open port that answers nothing. Not a
+    // dialog on the menu's pick: on a Mac a message box is a sheet on the
+    // show window, and a window with a sheet up does not close, so the app
+    // hung at quit in desktop.yml's packed check (no Pro key in that run).
+    ...(showServer?.linkTier && !showServer.linkTier().pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
     ...(show.port !== 3000 ? ['', `Port 3000 was taken, so this show is on ${show.port}. Looks saved on 3000 are not in this one.`] : []),
   ];
   void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'The show server', detail: lines.join('\n'), buttons: ['OK'] });
@@ -617,7 +623,7 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
         {
-          label: 'OSC input',
+          label: 'OSC input (Pro)',
           submenu: [
             ['off', 'Off'],
             ['local', 'This Mac only'],
