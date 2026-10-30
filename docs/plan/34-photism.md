@@ -81,11 +81,15 @@ a grid of generic stock thumbnails: ours are the plate itself.
   MIDI out is a controller's LEDs. Those lines now name OSC, Art-Net, the 1024² grid and cloud
   sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
   Found along the way:
-  - **34a-7a. OSC and Art-Net are not gated.** Only the 1024² grid and cloud sync check for a Pro
-    key; a Home key gets OSC and Art-Net in the app (`desktop/main.js`, `server/` have no tier
-    check). The page and the cards sell them as Pro, as §23's table does. Put both behind
-    `canUseProFeature()` in the app, or move them to Home on the page (the owner's call, asked
-    2026-10-29). *Measure:* `npm run tiers` with a Home key reads OSC and Art-Net refused.
+  - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
+    2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
+  - **34a-7h. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
+    a Home licence opens the port from *Show → OSC input (Pro)* and only Show Server Details says
+    packets are ignored; the menu could instead show the item disabled with an upgrade line, read
+    live from the licence rather than once at start (`show.license` is read once in
+    `desktop/main.js`). Not a message box on the pick: on a Mac it is a sheet on the show window,
+    and a window with a sheet up did not close, so desktop.yml's packed check hung at quit. Art-Net has no menu at all yet (34a-7c), which is where its Pro
+    note would sit.
   - **34a-7b. The Terms' Pro line promises what does not ship.** `public/terms.html` lists
     multi-projector edge blending, Syphon, Spout, NDI and MIDI out under Pro. Legal text, so the
     owner's words: make it name what ships and say the rest arrives as updates.
@@ -99,6 +103,20 @@ a grid of generic stock thumbnails: ours are the plate itself.
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
     the set beside the page as a download.
+  - **34a-7f. The rig's wires, checked without the rig.** **Shipped** (`npm run rig`, `scripts/rig.mjs`):
+    the real show server with a Pro key; every OSC address on `/pro`, sent as Resolume, TouchDesigner
+    and Max send it, arrives as the message the page acts on; the page's `lights` leaves as an
+    ArtDmx universe at the set rate; a desk's universe arrives as settings; and in the built app an
+    OSC setting, a desk fader, a MIDI fader (past soft takeover) and a DAW's 120 BPM clock move the
+    page, and an OSC setting lights the controller's ring. All 33 lines green: no
+    claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
+    need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
+    programs themselves are `docs/judging.md` §93, one sitting with free versions.
+  - **34a-7g. Resolume sends its own OSC addresses.** Its OSC output mirrors Resolume's address space
+    (`/composition/layers/1/video/opacity`); reaching `/chromaglass/setting/<key>` takes a custom
+    output address per control (Shortcuts → Edit OSC), which `/pro` does not say. Either a line on
+    the page with the steps, or let the server take a small map of another program's addresses
+    onto ours (as `ARTNET_IN` does for channels). Judging §93 step 2 says which.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

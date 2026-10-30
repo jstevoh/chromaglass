@@ -2055,7 +2055,64 @@ system-audio path. Unlisted, never public, until you say so.
    one. A wrong key on one destination should fail that one alone, once, with the
    platform's words, while the others stream.
 
-## 93. The camera's dials (PLAN 33i)
+## 93. The rig, with free programs: OSC, Art-Net, MIDI, Ableton, Resolume (PLAN 34a-7f)
+
+`npm run rig` plays every part of a rig with sockets of its own: an OSC sender, a fixture, a
+lighting desk, a controller and a DAW's clock, against the real show server with a Pro key. It
+cannot say that the programs a buyer owns send and read what it does. One sitting, about an
+hour, all free. Install first: **QLC+ 4** (qlcplus.org, open source), **TouchDesigner**
+(derivative.ca, the free Non-Commercial key with a Derivative account), **Ableton Live 12
+trial** (ableton.com/trial, 30 days, an Ableton account), **Resolume Arena demo**
+(resolume.com/download, a watermark and a spoken reminder, no time limit), **Protokol**
+(hexler.net, free), and for the video route **OBS** with **DistroAV** (`brew install --cask
+distroav`, which asks for the free NDI runtime). Syphon, NDI and Ableton Link out of the app
+are "on the way" on `/pro`, so there is nothing of ours to test there yet (no Syphon Simple
+Client or LinkHut this time).
+
+0. In the repo on the Mac: `npm run rig`. Every line ok, including the two the cloud skips
+   (the plate's colours on the fixture, and an OSC blackout blacking out the rig).
+1. **OSC in, from TouchDesigner.** Mac app → Show → OSC input → *This Mac only*. In
+   TouchDesigner add an **OSC Out DAT** (network address 127.0.0.1, port 9000), then in the
+   Textport: `op('oscout1').sendOSC('/chromaglass/setting/audioImpact', [0.8])`. Sound Impact
+   on the Design desk reads 0.8. Then `sendOSC('/chromaglass/action/blackout-toggle', [1])`:
+   the plate goes black, sent again it comes back; and `sendOSC('/chromaglass/dye',
+   ['#ff8800'])` makes the dropper orange. Bad: nothing moves (the Show menu, the port), or a
+   value arrives scaled wrong.
+2. **OSC in, from Resolume.** Arena demo → Preferences → OSC: output on, 127.0.0.1, port 9000.
+   Shortcuts → Edit OSC, a new preset, click a layer's opacity slider, tick OSC *output*, pick
+   *custom* and type `/chromaglass/setting/audioImpact`. Move the slider: Sound Impact follows.
+   Say whether the custom address was there; if Resolume can only send its own addresses, the
+   page's "send it from Resolume" needs a line on how (PLAN 34a-7g).
+3. **Art-Net out, into QLC+.** Quit the app, then start it from Terminal so it reads the
+   settings (34a-7c: there is no panel yet):
+   `ARTNET_HOST=127.0.0.1 ARTNET_FIXTURES=4 /Applications/ChromaGlass.app/Contents/MacOS/ChromaGlass`.
+   QLC+ → Inputs/Outputs → universe 1: tick Art-Net *Input* on 127.0.0.1 and *Passthrough*;
+   open the **DMX Monitor**. Channels 1–12 should move with the plate's colours (four RGB
+   fixtures), dim when the glass thins, and go to zero on a blackout. Bad: all zero on a full
+   plate, colours that lag the screen by more than a beat, or channels out of order.
+4. **Art-Net in, from QLC+.** In QLC+ untick universe 1's Art-Net input (it holds port 6454)
+   and tick Art-Net *Output* to 127.0.0.1 instead. Start the app from Terminal with
+   `ARTNET_IN=1:audioImpact` and no `ARTNET_HOST` (with both, the app ignores the universe it
+   sends on, which here is QLC+'s universe 1, Art-Net 0). In QLC+'s **Simple Desk**, move
+   channel 1: Sound Impact follows, 0 to 255 as 0 to 1.
+5. **MIDI clock and CC, from Ableton.** Audio MIDI Setup → MIDI Studio → IAC Driver: *Device is
+   online*. In Live → Settings → Link, Tempo & MIDI: IAC Driver Bus 1 output, **Sync** and
+   **Track** on. In the app, Settings → Inputs → Controller: MIDI on, input IAC Driver Bus 1;
+   Settings → Sound → Tempo: MIDI clock. Press Play in Live at 128 BPM: the app's tempo reads
+   128 within a few beats, and Stop in Live stops the show. Change Live's tempo to 100: the app
+   follows. Then a MIDI track sending to IAC with a CC lane; MIDI-learn it to a control in the
+   app and play: the control rides the automation, on the bar it was drawn on.
+6. **MIDI out, into Protokol.** In the app's MIDI section pick IAC Driver Bus 1 as the LED
+   output too; open Protokol's MIDI tab. Moving a learned control from the screen sends one CC
+   per change on that control's number (not a stream, and nothing while your hand is on it).
+7. **Video into Resolume.** OBS: a Window Capture of the app's projector window, then Tools →
+   DistroAV NDI Settings → Main Output on. In the Resolume demo's Sources, the OBS NDI source
+   appears; drop it on a layer: the plate plays in Resolume at full frame rate. This is the
+   route `/pro` gives for Resolume, MadMapper and TouchDesigner until Syphon and NDI ship.
+
+Write down, per step, ok or what you saw. A step that fails is an item in PLAN §34a-7.
+
+## 94. The camera's dials (PLAN 33i)
 
 Settings → Camera, with Lens at 0: turn Refraction, Aperture, Bloom and Chromatic Aberration up one
 at a time on a plate with a few pours. Each should visibly matter by about half way, and none should
@@ -2071,3 +2128,7 @@ few levels of how it did (its optics are rescaled by Lens, the aperture by Focus
 lens` line 6); the residual is a softer blur and a wider glow, not a different picture. It is
 fitted for a frame about a thousand pixels tall: on the laptop's full screen it should match
 best, and on the phone the blur reads softer than it did. Say whether that difference shows.
+Then Evolve on a look with Lens at 0: its glass theme wanders Refraction, Chromatic Aberration and
+Aperture, which did nothing at Lens 0 before and now bend, fringe and blur the plate. Say whether
+that is welcome as part of the dish evolving, or whether Evolve should leave the camera alone
+(PLAN 33i-9), and whether the frame hitches when one of them leaves 0 (33i-8).
