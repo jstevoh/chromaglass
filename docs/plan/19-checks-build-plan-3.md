@@ -116,6 +116,22 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
   The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
   the clearance each run. Story in `docs/plan-shipped.md` §19ac-3.
+- **19ac-4. `mirror`'s "and nowhere else" named the hand's own drop (shipped 2026-10-30).**
+  Since #512 the check photographs the Perform tab's preview, a wide window on the dish
+  where a cell is 0.055 of the plate tall and 0.154 wide, and a held drop reaches two cells
+  up its column (0.11 of the plate, 22 to 25 against a drift of 8 to 9) where the check
+  counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
+  under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
+  with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+- **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
+  and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
+  the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
+  fling alone cannot do it: a splatter logs one pour a step (its first droplet), 50 to 70 a
+  stroke, each 0.023 to 0.14 from the hand in a direction from a seeded stream, so the
+  mean offset's spread is about 0.008 an axis and 0.04 is a 4e-6 to 3e-4 run, not one in
+  ninety. The suspects are pours logged while the mouse was up and the pointer moving to
+  the next stroke (each adds up to 0.5 to the mean), and the look's ring (`lays`). Judge
+  the next red by its strays before changing anything.
 
 ## 19ad. The `open` shard flakes on four unrelated faults
 
