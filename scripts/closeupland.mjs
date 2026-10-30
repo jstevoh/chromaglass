@@ -40,7 +40,7 @@
  *      zoom, to 4x, and comes out to the plate with both settings; a look
  *      carrying a zoom with the flag off is read as in
  *
- * The app half: classic, the plate cleared and one pool laid at (0.22, 0.30)
+ * The app half: classic, the plate cleared and one pool laid at (0.33, 0.5)
  * through the debug hook; at 1x the pool is drawn (the control: a black frame
  * is also what a frame that could not be read gives); the readback's dye in
  * the 4x frame on the aim is under BARE of the plate's (the control for the
@@ -217,6 +217,8 @@ if (process.argv.includes('--node')) {
   const { launchChromium, presentsInXvfb } = await import('./chromium.mjs');
   const { engineQuery, installFrameReader, frameOf, waitForShow, waitForEngine, settlePlate } = await import('./frame.mjs');
   const PORT = 4793;
+  /** The app's pool, in plate uv (see layPool). */
+  const POOL = [0.33, 0.5];
   const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'], { detached: true, stdio: 'ignore' });
   const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
   process.on('exit', stop);
@@ -238,14 +240,27 @@ if (process.argv.includes('--node')) {
       again until the plate stays as laid, at most four times; the control
       below says whether it did.
     */
-    const layPool = () => page.evaluate(() => {
+    /*
+      Where: a sixth of the plate left of the middle. The 1x frame shows the
+      middle two thirds of the plate across and, on a 16:10 desk, the middle
+      0.42 up it (the plate is drawn at 1.5 times the frame's long side), so
+      the node half's pool at (0.22, 0.30) sat on the frame's top edge here:
+      on the Mac's runs the 1x frame read 0.017 lit once and then black to
+      the last pixel twice (the brightest pixel 0 of 255), while the
+      closeup found it each time: the likeliest reading is the dish's turn
+      or the Mac's frame carrying it out of the 1x frame. At (0.33, 0.5) it stays in the 1x
+      frame however the dish turns (0.17 from the middle, under the 0.21 the
+      frame reaches up and down), and the 4x frame on the aim (0.083 by 0.052
+      of the plate either side of it) stays bare.
+    */
+    const layPool = () => page.evaluate(([px, py]) => {
       const d = window.chromaglassDebug(); const f = d.fluids[0]; const N = d.gridSize;
       f.clearAll();
       for (let j = -10; j <= 10; j++) for (let i = -10; i <= 10; i++) {
-        if (i * i + j * j < 100) f.addDensity(Math.round(N * 0.22) + i, Math.round(N * 0.3) + j, 1.5, 1, 0.3, 0.1);
+        if (i * i + j * j < 100) f.addDensity(Math.round(N * px) + i, Math.round(N * py) + j, 1.5, 1, 0.3, 0.1);
       }
       f.markDirty();
-    });
+    }, POOL);
     const lit = async () => {
       const px = await frameOf(page, 160, 100);
       if (!px) return null;
@@ -254,7 +269,7 @@ if (process.argv.includes('--node')) {
       lit.top = top;
       return n / (px.length / 4);
     };
-    const state = () => page.evaluate(() => {
+    const state = () => page.evaluate(([px, py]) => {
       const d = window.chromaglassDebug(); const rd = d.fluids[0].readDensity; const N = d.gridSize; const s = d.settings;
       // The 4x frame on the aim, as the camera reads it (a 16:10 canvas, the frame 1/1.5 of the plate across at 1x).
       const hx = (1 / 1.5) / 4 * 0.5 * N, hy = hx / 1.6;
@@ -265,32 +280,18 @@ if (process.argv.includes('--node')) {
       // How far the shot is from the pool, in halves of the frame it shows.
       const c = document.querySelector('#liquid-canvas') ?? document.querySelector('canvas');
       const w = c?.width || 16, h = c?.height || 10, maxDim = Math.max(w, h) * 1.5, z = Math.max(1, d.shot.zoom);
-      const off = Math.max(Math.abs(d.shot.cx - 0.22) / (w / maxDim / z * 0.5), Math.abs(d.shot.cy - 0.3) / (h / maxDim / z * 0.5));
+      const off = Math.max(Math.abs(d.shot.cx - px) / (w / maxDim / z * 0.5), Math.abs(d.shot.cy - py) / (h / maxDim / z * 0.5));
       return { onAim: (frame / n) / (all / rd.length), off, zoom: d.shot.zoom, macroMode: s.macroMode, macroZoom: s.macroZoom };
-    });
+    }, POOL);
     let before = null;
     for (let tries = 0; tries < 4 && !(before?.onAim < BARE); tries++) {
       await layPool();
       await settlePlate(page, 2000);
       before = await state();
     }
-    /*
-      Then the pool laid once more, fresh, and the closeup pressed on it at
-      once. On the Mac two seconds is 120 of classic's steps at Turbulence
-      0.5, and on a re-run its 1x frame read 0.000 lit where three runs had
-      read 0.017 to 0.026: the pool stirred thin, under the 24 of 255 the
-      line counts, which the 4x frame's exposure (kept under what the frame
-      holds) still lit. The plate stays as laid now (the loop above), so a
-      fresh pool needs a frame or two drawn, not two seconds of stirring.
-    */
-    if (before?.onAim < BARE) {
-      await layPool();
-      await settlePlate(page, 250);
-      before = await state();
-    }
     const flat = await lit();
-    // The pool is about half a percent of the plate; measured 0.017 to
-    // 0.026 of the 1x frame lit two seconds after it was laid.
+    // The pool is about half a percent of the plate; 0.026 of the 1x frame
+    // lit in a cloud session.
     check('the control: at 1x the pool is drawn', flat !== null && flat > 0.005,
       `${flat === null ? 'no frame read' : fx(flat)} of the frame lit, its brightest pixel ${Math.round(lit.top ?? 0)} of 255 (over 0.005 wanted: a frame that could not be read is black too)`);
     check('the control: the frame on the aim is bare glass', before.onAim < BARE,
