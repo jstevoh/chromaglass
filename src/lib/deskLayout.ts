@@ -116,6 +116,13 @@ const OWN: PanelSpec[] = [
   { id: 'tools',   name: 'Tools',   category: 'pour', kind: 'own', deckWidth: 340 },
   { id: 'phone',   name: 'Phone · iPad', category: 'stage', kind: 'own', deckWidth: 304 },
   /*
+    The Mac app's stream to YouTube, Twitch and the rest (PLAN 37x-4d). In
+    Play because it is run during the show, beside the cues, not set up once
+    with the room. Listed only where it can stream (`PanelBrowser`, lib/liveShow's
+    `liveAvailable`); on the website a tab that has it says so in its body.
+  */
+  { id: 'live',    name: 'Live Show', category: 'play', kind: 'own', deckWidth: 340, columnWidth: 340 },
+  /*
     The three that were screens of their own, behind the Sequence and Sound
     chips, before every tab was a set of panels (2026-10-27): a tab can only
     be built from panels, so a screen that was not one could not be put on a

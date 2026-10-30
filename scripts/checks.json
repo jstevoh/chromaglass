@@ -1191,6 +1191,20 @@
       ]
     },
     {
+      "name": "The Live Show panel",
+      "shard": "browser",
+      "run": "esbuild scripts/liveshow.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/liveshow.mjs && node node_modules/.cache/liveshow.mjs",
+      "why": [
+        "The Mac app's Live Show panel (PLAN.md 37x-4d; scripts/liveshow.mjs):",
+        "its sums in node against numbers worked by hand, then the built app",
+        "with a stand-in for the Mac app's bridge: a key goes to the keychain",
+        "store and nowhere else, Go live goes where it says and Test never to",
+        "the public, the upload warning, and the phone's Stop. No GPU: the",
+        "encoder is WebCodecs' software H.264. dist/ is built by an earlier",
+        "step in this shard, so this runs the script alone."
+      ]
+    },
+    {
       "name": "The remote's Mixer",
       "shard": "browser",
       "run": "node --experimental-strip-types scripts/remotemix.mjs",
