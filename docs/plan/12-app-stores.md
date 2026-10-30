@@ -6,6 +6,26 @@ built; the running order has where each step stands. The
 full iPhone write-up, with a table of every browser feature the app leans on, is in
 the project files (`iphone-app/iphone-app-plan.md`); this is the plan.
 
+**The decision (2026-10-30).** With the Apple developer account open, the owner
+asked whether to ship on the App Store now, then "The app could be free right?" and
+"What about an android app in the play store?", and chose: write it into the plan,
+build nothing yet ("no need to do this yet"). What was weighed:
+
+- *iPhone and iPad: yes, later, free with nothing to buy.* The shell is built (step
+  4). In a web view iOS gives no capture of other apps' audio, no Web MIDI, no RTMP and
+  no projector window, so the app is a pocket plate and the Mac app's remote, which
+  suits a free app. Nothing for sale inside means no in-app purchase rules and the
+  easiest review. A "get Pro" link out to our own checkout is allowed only on the US
+  storefront, at 0 % for now: in August 2026 Apple asked the court in *Epic v. Apple*
+  for 15 % on linked-out sales and the Supreme Court is reviewing the contempt
+  finding, so the first version carries no link (12-link).
+- *Google Play: yes, later, free.* The Trusted Web Activity (step 3) is less work than
+  the iPhone app and is the website itself. The Play account is opened as the LLC, an
+  organization account (it needs a D-U-N-S number), which is not held to the closed
+  test of 12 testers for 14 days that a new personal account owes (12-play-org).
+- *Mac App Store: no, for now (12-mas).* The direct Mac app (§13) is already signed,
+  notarized, self-updating from GitHub Releases and sold through Lemon Squeezy (§23).
+
 **The shape.** Neither store needs a rewrite. The show is one web build, and both
 stores take a thin shell around it, but not the same shell, because the two phones'
 web views differ in what matters here:
@@ -69,7 +89,10 @@ forms and a 15 % cut.
    ran the site in Safari on 2026-09-27 ("iPhone works. I tested it"). Android: not
    yet run.*
 2. **Open both accounts** *(owner)*: Apple Developer Program and Play Console, and
-   install Xcode. *Not started.*
+   install Xcode. *Apple's is open (2026-10); Play Console not started, to be opened
+   as the LLC (12-play-org).* Still owed on Apple's side when the work starts: the
+   App Store Connect record for `app.chromaglass`, and an App Store Connect API key
+   as a secret in one of main's environments so CI can upload to TestFlight.
 3. **The Android shell** (one PR): a Bubblewrap project, `assetlinks.json` in
    `public/.well-known/` with a Firebase Hosting header so it serves as JSON, the
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
@@ -118,3 +141,31 @@ forms and a 15 % cut.
 
 The phone layout (#173) is what both apps show, so the operating rule that every
 feature ships its phone version is what keeps them whole.
+
+**Items from the 2026-10-30 decision.**
+
+- **12-ship** *(when the owner says go)*: one PR takes the iPhone app to TestFlight:
+  the signing team in `ios/`, an archive and upload job in `ios.yml` from main only
+  (the API key from step 2), step 5's native save, step 6's privacy page, and, if the
+  app shows the sign-in, Sign in with Apple beside Google's (guideline 4.8) and
+  deleting the account inside the app (5.1.1(v); both already noted in §23). Then
+  the owner's set through TestFlight (`docs/judging.md` §16) and step 8.
+- **12-link** *(later, US only)*: a "Get the Mac app" link from the iPhone app to our
+  own checkout, once the court has set what Apple may charge on linked-out sales.
+  Outside the US the app names no price and links to no purchase.
+- **12-play-org** *(owner)*: the Play Console account as the LLC (organization,
+  D-U-N-S number), not a personal one, so publishing does not wait on the 14-day
+  closed test. Before it, step 1's Android smoke test. Unchecked: the iPhone app's
+  laptop remote leans on the app's own origin (4a), and a TWA is the https site,
+  which cannot open a plain ws:// socket to a laptop, so the Android app may have
+  no laptop remote without more work.
+- **12-mas** *(not doing, for now)*: a Mac App Store build. It would need a
+  sandboxed Electron build in place of the Developer ID one, give up
+  `desktop/updates.js` for Apple's review of every release, and put at risk the
+  system-audio loopback (`MacSckSystemAudioLoopbackOverride` and the local UDP tap in
+  `desktop/main.js`, 23.8). Pro would have to be an in-app purchase (guideline
+  3.1.1); a licence bought from our store may unlock it only if Pro is also sold in
+  the app (3.1.3(b)), so two licence systems. Apple's 15 % is about $30 on Pro's
+  $199 against Lemon Squeezy's about $10, and the tools VJs pay for (Resolume, VDMX,
+  MadMapper, TouchDesigner) sell direct. Reopen only if Home's sales show buyers
+  who would have found it in the store, and then as Home alone.

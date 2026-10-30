@@ -56,10 +56,73 @@ a grid of generic stock thumbnails: ours are the plate itself.
   webhook exists (the order in `docs/handoff` for the store go-live). Open: the buyer is asked to
   use their sign-in email, because the Worker keys on the order email; a signed-out visitor's
   button cannot prefill it.
+- **34a-4b. The licence Worker refuses test-mode orders; the live store's product ids are settings.**
+  *(S; shipped in the go-live PR, Worker deploy owed.)* The webhook never read the order's
+  `test_mode`, so while the store is in test mode anyone paying with Lemon Squeezy's published
+  test card got a genuine signed key (found reviewing #428, 2026-10-22; open to everyone since
+  the account sheet's Buy buttons, #394). A test order now answers 200 and files nothing unless
+  the buyer's email is on the `TEST_MODE_EMAILS` Worker secret (the owner proves the path with
+  it). `LS_PRO_PRODUCT_IDS` and `LS_UPGRADE_PRODUCT_IDS` (Worker vars, comma separated) name the
+  live store's products, which get ids of their own; the test-mode ids stay built in. Go-live
+  order: deploy the Worker, set the secret and vars, sweep KV for keys minted from test orders
+  (`keys:*` whose `orderId` is a test order), then change the three `CHECKOUT_*_URL`s in
+  `src/lib/tierGates.ts` to the live products' links and register the live webhook. `npm run
+  license-worker` checks 9 to 9d.
 - **34a-5. The owner's words and the share card.** *The words shipped (2026-10-28, the owner's OK
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
   note goes unsigned unless the owner says otherwise.
+- **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
+  synth people, producers and artists, who need the technical capabilities before they pay.)*
+  `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search
+  engine), at `/pro` through a `firebase.json` rewrite and linked from the landing's price section
+  as `/pro.html`. Sections: sync and control, Ableton and DAWs, sound in, projectors, lights,
+  recording, the spec table, a Free / Home / Pro table and a FAQ. Every claim was checked against
+  the code and `docs/guide.md` on 2026-10-29; what the plan has and the app does not (Syphon and NDI
+  13.2–13.3, the DAW bridge 13.7, Ableton Link and OSC out 13.5, several outputs 36b, patch inputs
+  24.1, notes as voices 24.3, YouTube Live 37x-4, Windows 13-win) is marked *on the way*. The same
+  check found the landing's Pro card, the Settings tiles (`APP_FEATURE_TILES`) and the upgrade card
+  (`RunLocallyCard`) selling "several projectors with edge blending" and "MIDI out", which do not
+  ship: the app drives one projector output, mapped into up to sixteen surfaces on every tier, and
+  MIDI out is a controller's LEDs. Those lines now name OSC, Art-Net, the 1024² grid and cloud
+  sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
+  Found along the way:
+  - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
+    2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
+  - **34a-7h. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
+    a Home licence opens the port from *Show → OSC input (Pro)* and only Show Server Details says
+    packets are ignored; the menu could instead show the item disabled with an upgrade line, read
+    live from the licence rather than once at start (`show.license` is read once in
+    `desktop/main.js`). Not a message box on the pick: on a Mac it is a sheet on the show window,
+    and a window with a sheet up did not close, so desktop.yml's packed check hung at quit. Art-Net has no menu at all yet (34a-7c), which is where its Pro
+    note would sit.
+  - **34a-7b. The Terms' Pro line promises what does not ship.** `public/terms.html` lists
+    multi-projector edge blending, Syphon, Spout, NDI and MIDI out under Pro. Legal text, so the
+    owner's words: make it name what ships and say the rest arrives as updates.
+  - **34a-7c. Art-Net has no panel in the Mac app.** It is set only by `ARTNET_*` environment
+    variables when the show server starts, which a Finder launch never sets, though
+    `desktop/README.md` says it works "with no terminal". A Show menu item or a Settings → Wall
+    card for host, universe, fixtures, order and the in-map, kept in the app's settings.
+  - **34a-7d. Network displays cannot start over the Wi-Fi.** A `?cast` page at an `http://`
+    address gets no WebGPU (14m-https, #443), so "more screens on other computers" is not sold yet.
+  - **34a-7e. The Ableton route, tried end to end on the owner's Mac.** The page tells a Live user
+    to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
+    whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
+    the set beside the page as a download.
+  - **34a-7f. The rig's wires, checked without the rig.** **Shipped** (`npm run rig`, `scripts/rig.mjs`):
+    the real show server with a Pro key; every OSC address on `/pro`, sent as Resolume, TouchDesigner
+    and Max send it, arrives as the message the page acts on; the page's `lights` leaves as an
+    ArtDmx universe at the set rate; a desk's universe arrives as settings; and in the built app an
+    OSC setting, a desk fader, a MIDI fader (past soft takeover) and a DAW's 120 BPM clock move the
+    page, and an OSC setting lights the controller's ring. All 33 lines green: no
+    claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
+    need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
+    programs themselves are `docs/judging.md` §93, one sitting with free versions.
+  - **34a-7g. Resolume sends its own OSC addresses.** Its OSC output mirrors Resolume's address space
+    (`/composition/layers/1/video/opacity`); reaching `/chromaglass/setting/<key>` takes a custom
+    output address per control (Shortcuts → Edit OSC), which `/pro` does not say. Either a line on
+    the page with the steps, or let the server take a small map of another program's addresses
+    onto ours (as `ARTNET_IN` does for channels). Judging §93 step 2 says which.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

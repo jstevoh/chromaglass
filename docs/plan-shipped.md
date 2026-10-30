@@ -1214,6 +1214,24 @@ lapses fails "stops sending" (161 → 176), a frame that ignores the picture's s
 the pad changed the finger's cell by 287 (median cell 4, drift 5, centre 0.69,0.58 for
 0.69,0.58); the same point without the dish's turn changed it by 11 (it landed at
 0.56,0.82), and the old plate point by 3.
+
+**8-draw-a-4. A slow show starved the pad (2026-10-29).** `drawwall --app`'s "the
+laptop's own frames reach Draw, at least 8 a second" was red on #390 (7.0/s) and #436
+(6.3/s, run 40094781104), PRs that touched only static pages, both on Mac runners
+whose display had fallen to 14 frames a second. Not the count: it is the pictures
+painted on the remote, and 14 frames could have given 14. The sender let three
+pictures out at once (and the GPU grab kept three slots), and a picture's trip (the
+read behind the plate's queued frames, the worker's encode, its answer) is counted in
+frames, about seven at 14, 480 ms, so the pad got three a trip. The trip is longest in
+time exactly when every frame is needed. Across 384 tools jobs (10-17 to 10-29) the
+pad's rate was 0.41–0.52 of the display's frames on every run (median 0.485, 8.0–13.0/s
+at 16–27 frames), so it was starved always, and red (28 of them, 6.3–7.7/s) whenever a
+runner fell under about 16.5 frames, 11 of 31 jobs on 10-27 as the runners slowed. Now eight (`PAD_PICTURE_IN_FLIGHT`, shared by
+the slots, which are made only when every one is out). The stand-in check holds each
+GPU read four more frames, the Mac's trip: 6.0/s at 14.3 frames with three, 14.3/s
+with eight; a new line checks the grab hands out as many slots as the sender lets out.
+The sender keeps a trace (frames offered, passed over full, round trips split into read
+and encode), printed beside every rate line, so the next slow run says what held it.
 #### 8-play. Play: the phone's listening screen (2026-10-10)
 
 `src/components/phone/PhonePlay.tsx`, `src/lib/playGesture.ts`, `src/components/ui/TouchSlider.tsx`
@@ -2092,6 +2110,22 @@ before the measured one (untested, and #396's warm in the same page did not help
   Named cost: a visitor who presses Play without the pointer resting on it first waits
   for Chromium's GPU start (1.8 to 4.3 s cold on CI's Mac) inside the intro, where
   before the webpage had paid it while being read.
+- **Shipped, 14v-11: the intro holds still until the whole opening is built** (2026-10-29,
+  the owner's choice: "hold the intro still through the whole cold start so the plate
+  opening never stutters, even if it moves a little later"). 14v-5 let it go when the
+  opening's last render pipeline settled, with the solver's compute kernels still
+  compiling in the other lanes; on #540's run 40741268086 the Mac's `startup` went red on
+  "no stop in the opening", 2.35 s from 8.70 s, 0.13 s after the intro let go at 8.57 s,
+  `fluid/dampGridCurv` compiling (PLAN 14v-10). That thread's `?stillall` trial (still to
+  the end) opened no later: first step 13.5 to 14.8 s on all twelve openings. Now
+  `buildInTurn` calls `Quiet.go` once, after every build of the opening has settled and
+  its first uses are paid, and on any other end (device gone, timed out). `npm run intro`
+  9 and 9b read the whole opening from the prepare log (some frames seen after the last
+  render compile, none moving; the still's release no earlier than the last build): 0 of
+  373 frames in the opening moving, and on the old code 8 of 379, all after the last
+  render compile (on software WebGPU that stretch was the first uses' wait, 9.05 to
+  9.19 s; on the Mac it is the kernels too), 9 and 9b red. Cold, the mark is now still for the whole wait and fades
+  as the plate's first step comes; the phone opens through the same code.
 
 ### 14m. Anyone on the venue's network can drive the show
 
@@ -2330,6 +2364,39 @@ Found along the way and written in as 14ab: the video pour's pause and play ever
 its CPU optical flow, the CPU field means, the whole-grid delta upload, per-frame bind
 groups outside the solver, the beads' canvas, the ear's allocations, the gamepad, the
 thick liquid's share.
+
+
+### 14af. The wall's "title bar" chip: it went on asking, and could not be closed (shipped 2026-10-29)
+
+The owner, from a screenshot of the desk with "THE PROJECTOR WINDOW STILL HAS ITS TITLE BAR ·
+fill its screen" across its top: "I can't get rid of this popup. I don't even know what it
+means." It meant the wall window was not in full screen, so its frame would sit across the
+top of the projection. Three things were wrong:
+
+- It had no close. A wall left framed on purpose kept it over the desk all show. Now an X
+  hides it for that wall window (`useCastSession`'s `fillDismissed`, cleared when a new
+  window is held).
+- It said a fact, not the trouble or the remedy. Now: "The wall window isn't full screen, so
+  its title bar shows on the wall" and **Make it full screen**; a click that has not taken
+  1.5 s later says to click the wall once or press F there (`ProjectorFillChip.tsx`, moved
+  out of `App.tsx`).
+- In the Mac app it read only the page's full screen (`fullscreenElement`). A plain Electron
+  window in the OS's full screen (the green button) has no title bar at all, and the chip
+  went on asking over it. The app now counts a window whose page covers its screen as
+  filling it; a window zoomed to the screen keeps its title bar and the menu bar, so its page
+  is shorter and still counts as framed. And the button now also asks main.js
+  (`fillProjector`, over `chromaglass:fill-projector`), which needs no gesture and falls
+  back to the window's own full screen if the page's is refused; the same fallback now
+  runs when the window loads. Closing the show now also exits the app 3 s after the quit
+  if something holds the quit up: on CI's Mac the check's first version left a projector
+  that had been in and out of the Mac's own full screen, and the app then stayed running
+  with its port taken.
+
+The web's path was already sound: measured in Chromium 153 under Xvfb, a delegated
+`postMessage` (`delegate: 'fullscreen'`) lets the wall's `requestFullscreen` resolve with no
+activation of its own. `npm run desktop` gained a line that takes the wall out of full
+screen and asks the chip to come up, its button to fill the wall again and the chip to go,
+and its X to keep it away for 2 s while the wall is still framed.
 
 
 ### 14ad. Any camera, anywhere; the motion camera told apart from the film's Webcam (shipped 2026-10-24)
@@ -2983,6 +3050,27 @@ the day they pass.
     `npm run sloshgpu` steps the GPU and the reference together through seven forcings and
     holds them to 1e-4 of the depth and the wave speed: 2e-7 to 1.8e-5 on SwiftShader.
   - Shortcuts, named in `lib/slosh.ts` (a) to (i); open items 18a-13b, 13c, 13e, 13g, 13h.
+
+- **18a-13i, a look that tips its dish waits for the dish's kernels in its opening (shipped
+  2026-10-29).**
+  - What was reported: the first deploy run on the owner's Mac (run 40929715769) went red on
+    `npm run startup`'s "every look opens on only what the show waited for": Bass Drop asked
+    for the four slosh kernels (`sloshOil`, `sloshRest`, `sloshStep`, `sloshOut`) and
+    `fluid/addSlosh` in its first steps, and none was on its opening's list.
+  - Why, and why only then: not a new path. A resting hand sways (`swayAt`, lib/plateRock.ts),
+    so Plate Rock's swing through Bass Drop's Frame Sway 0.35 (`rockAccel`, 18a-13a) tips the
+    dish from its first frame. All five pipelines were built behind the show and the dish
+    waits for them (`WebGPUSlosh.ready`), so nothing was built on a frame; but on the
+    owner's Mac the build behind the show finished inside the look's forty steps and three
+    seconds, the dish started and asked, where GitHub's slower Macs had never got there
+    before the window closed, which is why a week of deploys passed on them.
+  - What changed: `gpu/opening.ts` has a `slosh` flag (on a thin gap: Plate Rock, the default
+    0.45 when a look does not say, with Frame Sway; or the Slosh dial with the plate stood
+    up), read by `WebGPUSlosh.prepare` and fluid's `addSlosh` row. The check's bar is
+    unchanged.
+  - Measured in the lab on software WebGPU (`?debug&asked&gpu=mid&look=bass-drop`): Bass
+    Drop's opening builds 61 pipelines (Classic's 56 and these five), all ready, asks for all
+    five in its first nine steps and none late, nothing on a frame; Classic 56, no slosh key.
 
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
@@ -4162,6 +4250,111 @@ and a control stamped 0.6 s apart must leave Speed where one tap there puts it. 
 prints how far apart the app handled the lifts (the page's own lag, which no check bounds
 for the phone's sheet yet: 19ac-2).
 
+### 19ac-3. The bottles stroke is far enough off the middle
+
+Shipped 2026-10-29. `npm run bottles`' "splatter with the Ferrofluid bottle lays
+ferrofluid along the stroke, and not at its mirror" (and once the Oil bottle's) went red
+on PRs that touch neither, about one Mac run in sixty, each time with "1 at the mirror".
+PLAN read it as one of the look's own pours. The log of #559's red says otherwise: the
+four pours away from the stroke were all 0.12 to 0.13 from the hand, with the mouse down
+and the look's ring laid no more times, and the one at the mirror, (0.516, 0.484), was
+among them. The look poured nothing. The stroke was the cause. Its ends are fractions of
+the canvas, and the canvas is not the plate: the view shows two thirds of the plate's
+width (`fluidPointAt`'s 1.5), the desk's canvas at 1280x800 is 662x342, and the dish's turn
+rotates the stroke about the centre. On the plate the old stroke ran from (0.31, 0.40) to
+(0.38, 0.49) in one cloud run, its end 0.116 from the centre and 0.232 from its own
+mirror. A splatter flings 3 to 18 cells at the 128 grid (0.14 of the plate) and a pour
+counts at the mirror within 0.12, so a fling from the end toward the centre could count
+both ways. That pour sat 0.123 from the end and 0.10 from its mirror. Moved to (0.1, 0.3)
+to (0.25, 0.3), the stroke reads 0.218 to 0.333 from the centre and 0.436 from its mirror,
+still 0.12 long (0.05 would give 0.51 but fling past the rim). The bar is unchanged (none
+at the mirror). A new line asks every run for the gap between the stroke and its mirror
+to be more than 19/128 + 0.12, so a desk that reshapes the canvas fails by name.
+
+### 19ac-4. The mirror check's "nowhere else" measures the drop's reach on the plate
+
+Shipped 2026-10-30. `npm run mirror`'s "Classic, calm, layer 1: and nowhere else" went red
+on three of the five deploys that ran a Mac shard on 2026-10-29 (570 on GitHub's Mac, 576
+and 580 on the owner's), reading 13.3, 13.7 and 15.7 past its drift against 12.9, 13.5
+and 13.1 allowed, every time at row 3, column 5: two cells above the hand in its own
+column, never a mirror image. The check judges a 6x6 grid of cells over the desk's
+preview and counted the eight cells about the hand's as "round the hand". #512 (the
+desk's tabs, 2026-10-27) changed which preview it photographs, from the Design desk's to
+the Perform tab's, and that preview is a wide window on the dish: measured in a cloud
+session with `chromaglassDebug().plateAt` at the check's viewport, 802 by 289 showing 0.92
+of the plate across and 0.33 down, so a cell is 0.154 of the plate wide and 0.055 tall,
+and the hand at the check's (0.75, 0.75) lands on the plate at (0.731, 0.417), as the
+Mac's own pointer reading said. A Drop held for 0.7 s lays a disc of 4.5 cells a step
+and the film spreads it: on the Macs it changed the picture 21 to 30 one cell up (0.055),
+22 to 25 two cells up (0.11), 6 to 7 three cells up (0.166, against a drift of 4 to 5)
+and 6 to 8 one cell across (0.154, against 5), with 53 to 64 under the hand. Before #512
+the hand sat at (0.81, 0.42) in cells a third wider, and the two-up cell read 11 against
+a drift of 9, within the allowance of drift plus four; after, 22 to 25 against 8 to 9,
+and the line failed on whichever runner laid the bigger drop. The cells under the drop
+are now the ones whose middle is within DROP_REACH, 0.14 of the plate, of the hand, both
+read with `plateAt` (the plate's turn included, so the quarter-turned scenario measures
+its own), and a line asks that the plate's coordinates read back rather than falling
+back to counting cells, that the hand's own cell is under the drop and at least half the
+grid is judged (layer 2 is viewed through its own zoom of 1.8, so its reach on the
+preview is wider and 20 cells of 36 are judged), naming any mirror that sits under the
+drop. The mirror cells are the plate's too, the cell nearest each of (1 - x, y),
+(x, 1 - y) and (1 - x, 1 - y) of the hand: on layer 1 the preview's own mirror cells,
+turned a quarter the same cells with the axes' names swapped, on layer 2 the mirror
+across the middle line lands beside the hand, under the drop, as the old eight cells
+already had it. The judged cells' bar is unchanged: the hand's mirror across the plate's
+middle line on layer 1, 0.166 away, is judged as before and reads 2 to 3 past its drift
+against 8 to 9 allowed. The skeptic pass (one Opus review) found the "nothing judged"
+consent (`!worst ||`), the line that only asked whether `plateAt` answered, and the
+footprint print's mean against the judgement's median; each is fixed or named. The check
+prints each cell's distance from the hand with its mean change past mean drift, nearest
+first, so the footprint is in every log. The control on a Mac: revert the derive pass's
+mirror fix (`npm run derive` pins it) and the line goes red at the mirror across the
+middle line, row 2, column 5.
+
+### 19ai-6. The solver's kernels, one file a pass (2026-10-28)
+
+`src/gpu/wgsl/fluid.ts` was 5,885 lines (290 KB): 96 kernels in one object literal and
+the snippets they share, so a thread changing one pass read the whole solver's WGSL
+first. It now keeps its header, the `KERNELS` table (built by spreading the pass files),
+the substepped and plan variants made from the moved kernels, and `kernel`; the
+kernels are under `src/gpu/wgsl/fluid/`, fourteen files of 6 to 31 KB: `shared`,
+`splats`, `gap`, `phase`, `phaseForces`, `labyrinth`, `pressure`, `carry`, `forces`,
+`oil`, `capillary`, `dye`, `gridFilter`, `reactions`, `fields`. Each moved text is the
+original's, comments and all; the move was made by a script working on the file's
+syntax tree (each property's full text with its leading comments), so nothing was
+retyped.
+
+Measured: every kernel's raw source, and `kernel(name, f)` for four formats, plus the
+module's exported strings, 625 entries, hashed together before and after:
+`b95d4f88f2071321` both times. Only the order of `KERNELS`' keys changed (the files
+group them by pass), which only the order `npm run wgsl` compiles them in reads; it
+compiled all of them on SwiftShader, `checked 143 shaders` and no error. Two checks read the solver's text rather than
+importing it, and now read the file their lines moved to: `plate` (the gate, in
+`dye.ts`) and `turing` (the regime's cap and share, in `reactions.ts`).
+
+### 19ai-7. The solver class, a chain of files (2026-10-30)
+
+`src/gpu/fluid.ts` was one 291 KB file: 43 lines of header, 665 lines of module-level
+constants, types and helpers, and then the `WebGPUFluid` class of about 95 methods, so a
+thread changing one pass read the whole solver first. It is now a chain of classes under
+`src/gpu/fluid/`, each extending the one before: `constants.ts` (every module-level
+declaration, now exported), `core.ts` `FluidCore` (every field in its original order, the
+constructor, `clear`, `submit`, `submitRead`), `fields.ts`, `passes.ts`, `inputs.ts`,
+`reads.ts`, and `gpu/fluid.ts` keeps the leaf `WebGPUFluid extends FluidReads` (`step`,
+the statics, `prepare`, `thinGapOn`) and re-exports everything it exported before, so no
+importer changed. `private` became `protected` only where a member is reached across
+files. All fields stay in `core.ts`, so with `useDefineForClassFields: false` their
+initialisation order is the original's; only two old lines differ, the class line and the
+constructor's `private readonly device`. The move was made by a script on the file's
+syntax tree (nothing retyped), and the PR body carries the old-lines-to-new-files table.
+
+Measured in a cloud session on the split: lint, `sizes`, `checkguard`, `npm run build`;
+`switches` 970/970, `renders` 26/26, `phone` 366/366, `layout` 81/81, `plate` 50/50,
+`slosh` all passed, `oillift` 9/9, `regrid` 6/6, `ferrodrag` 3/3. Two checks read the
+solver's text and now read the file their lines moved to: `slosh` (`fluid/constants.ts`)
+and `ferrodrag` (`fluid/passes.ts`). `scripts/sizes.json` drops the `src/gpu/fluid.ts`
+ceiling: the leaf is 99.2 KB, under the bar; `core.ts` is 40.5 KB (a warning only).
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
@@ -4194,6 +4387,88 @@ lays the app's own seed and prints it in the lab: on main 71% of the plate absor
 three channels, the view 57% black, 37% red, 0% white, yellow and blue, 16 dots, mean
 3.69; now 0.1%, 9.9% black, 57% white, red 12.8%, yellow 6.8%, blue 9.8%, 254 dots, mean
 0.115. The phone lays the same seed (it is the plate, not a control).
+
+### 19ai-8. App() into its domains' hooks
+
+Shipped 2026-10-29, with 19ai-4a for App's setters. `App.tsx` was 372,525 bytes and
+6,650 lines, and `App()` was one function of 577 statements: 51 `useState`, 54 `useRef`,
+70 effects, and a 97 KB JSX return. A session asked to change the tempo label or the
+Record button read its way into the whole of it. Thirty-four of its domains are hooks in
+`src/app/` now (the projector's geometry, the tempo, what the show listens to and how it
+changes, the film and the room camera, the set list and the look fades, Preview's copy for
+the wall, the cast feed, the phone remote, the controllers, the command palette and its
+keys, a song's score and its render, the checks' window hooks, and the smaller ones round
+them), with `src/app/shared.ts` for what App and several hooks both read (the opening
+look, an armed look's and the wall's look's shapes, the sound's and the camera's keys).
+`App.tsx` is 215,830 bytes and 4,049 lines; `App()` 315 statements.
+
+The move is verbatim, by a script that read `App()` with the TypeScript checker: each hook
+is a contiguous run of `App()`'s statements, moved whole with its comments, and called at
+the place the run stood, so the order React calls App's hooks in, and the order their
+effects run in within a commit, is the order it was. What a run reads from earlier in
+`App()` is its parameter object, typed from the checker; what later code reads from it is
+what it returns. Every non-import line of the old file is in the new ones (a count line by
+line; the only lines that differ are seven declarations that gained `export` in
+`shared.ts`), and the typecheck holds the rest. Five runs had to move to be extracted at
+all, because App reached forward to something declared later through a closure, which a
+hook's parameters cannot: the toast's state now comes before the film (the film says a
+lost camera through it), the blackout before the look fades (a Go reads `blackoutRef`),
+the setting glides before the row fades (a row's take stops a glide), the mark's ref
+before Preview's copy, and the `?debug` window hooks to the end, after every ref and setter
+they reach. Three effects joined the hook of the state they read (`?bench`, and the
+`chromaglassTempo` and `chromaglassOutput` hooks). Each moved state or effect is
+independent of what it moved past; the window hooks are only called by a harness after the
+page has drawn.
+
+Nine checks read App's source as text, and seven of them went red on `App.tsx` alone
+(panel 9 lines, rowfade 9, backplate 3, slowevolve 2, cloudsync, learn and downbeat one
+each); `record` stayed green on `App.tsx` alone for the wrong reason, since its assertion
+is that the palette has no second Record row and the palette had left the file.
+`scripts/appSource.mjs` gives a check App and its hooks as one text, and the eight that
+needed it now read that; each prints what it printed on main, line for line. `pacing` reads
+only wiring that stayed in `App.tsx` and is unchanged.
+
+19ai-4a: App's setters of the checks' window hooks assign `window.<name>` with no cast, so
+`lib/checkHooks.ts` is checked by the compiler and not only read. That found two
+declarations looser than their setters (`chromaglassTool` took any string, `chromaglassBench`
+`unknown`), now the shapes the setters take.
+
+### 19ai-9. The settings panel's sections into their own files
+
+Shipped 2026-10-30. `components/SettingsPanel.tsx` was 201,442 bytes and 4,277 lines, and
+160 KB of it was one JSX tree, `sections`: twenty-nine `{keep(id) && (<section ...>)}`
+blocks reading the panel's seventy-two props and its locals by name. A session asked to
+move a slider in the Lamp read the patch bay and the controller to get there. Each section
+is now a component in `src/components/settings/`, in a file a group of the rail
+(`PlaySections`, `LookSections`, `MotionSections`, `ChemistrySections`, `PourSections`,
+`StageSections`; Feed cut into `SoundSection`, `RoomFilmSections`, `PatchesSection` and
+`MidiSection`, its three longest), with the slider and the pin chips in `controls.tsx`, the
+patch bay's lists in `patchLists.ts` and the props in `props.ts`. The panel draws the
+twenty-nine in the order they stood and keeps its shells, the engine's polling and the
+search; it is 23,916 bytes. The largest new file is `LookSections.tsx`, 34.8 KB.
+
+The move is verbatim, by a script: each section block (its leading comments to its closing
+`)}`) is in the new files byte for byte and in one piece, all twenty-nine compared, and
+every non-import line of the old file is in the new ones. A section takes one object,
+`SectionCtx` (the props it reads, with the panel's defaults applied, and sixteen locals:
+`keep`, `shown`, the card's classes, `goTo`, the live engine reading and the rest), and
+destructures what its markup reads, pruned with the typecheck's unused-locals pass. None of
+the blocks held a hook, so a section as a component renders when the panel does, as it did
+inline.
+And the built app draws the same page: the open sheet's markup (424 KB, 29 sections, 154
+sliders, 688 controls), each section opened from the rail, and the Setup desk's five
+section panels are identical, character for character, between main and this branch
+(device ids aside, which the browser hashes per origin).
+
+Three checks read the panel's markup as text: `panel` (every `<Slider>`, its chips, its
+key and its range), `desklayout` (each section kept for its panel, its `data-group`) and
+`rowfade` (the Mixer's take buttons). On `SettingsPanel.tsx` alone the first stops at "the
+settings panel still has its sliders: 0 found", `desklayout` fails every section, and
+`rowfade` fails "all four places the Mixer is drawn: Settings". `scripts/settingsSource.mjs`
+gives them the panel and its sections as one text; `panel` prints what it printed on main,
+line for line (257/257). `panel`'s "every setting is read by something that renders" leaves
+the panel out as plumbing, since a slider reads its own key; the sections are left out with
+it, or they would have passed every setting the panel draws.
 
 ## 22. Spin the plate
 
@@ -4326,6 +4601,20 @@ The dish is a real rotating dish, not a turned picture (`src/lib/turntable.ts`, 
     0.117 against the drag time's 0.179) on an app it had passed an hour before: it took the
     page's clock at the read against the last frame's speeds. It now times by the plate's
     own clock (`chromaglassDebug().frameAt`) and read 0.188 against 0.188.
+
+## 24. Modular rigs (what has shipped)
+
+### 24.3-place. The melody walks across the plate (shipped)
+
+Asked in PLAN Wave 5 lane D, direction B of the owner's 2026-10-24 exploration of presets that listen: parts of the plate should answer the music, and a melody is a line that goes up and down, so it is drawn along the plate's width. Each note the microphone hears lets go of one drop, low notes on one side of the plate and high notes on the other, a harder note a bigger drop; the drops are real dropper drops of the look's dye and liquid, so neighbours merge or hold apart by the liquids' own immiscibility.
+
+- **`src/lib/melodyWalk.ts`** (arithmetic only): the `note` source's onsets say when a note began, the analyser's pitch which. An onset arms a drop and the drop lets go once the pitch has had the time to settle, because the pitch comes from a median of the last fifteen spectra and a new note wins it only on the eighth reading after it starts. Placed on the onset's own reading, 6 of 7 drops sat on the note before; after the settle, 10 of 10 were within a semitone and a half. The wait is read from the ear's own rate (`AudioReading.pitchSettleS`: 0.13 s at 60 readings a second, 0.27 s at 30), so a slow Mac is not placed by a note it has left.
+- **A better pitch for the melody (`src/lib/audioFeatures.ts`, `pitchFine`).** `pitch` is a bin's (43 Hz), two to three semitones wide at middle C and an octave across C2 to C3, and under a kick on every beat it read the drum for half of every beat (28.8 where the notes were 57 to 81). `pitchFine` is a parabola through the peak and its neighbours, searched from `MELODY_LOW_HZ` (110 Hz) up so a kick's body is out of the product at the fundamental. The old `pitch` and `pitchClass` are untouched, because the music's colour follows that class (24.3-place-4).
+- **Where.** A fixed scale, C3 to C6, along a line the look gives (`MELODY_LINES`): Aurora Borealis along the top of its curtains, Oil & Water across the middle (every note a bead of amber oil); any other look a straight line across the middle. A first version placed notes against the range of the last twelve and stacked a rising scale at the far end of the line (5 of 9 drops on one spot); the fixed scale spaces it evenly (x 0.29, 0.36, 0.37, 0.42, 0.46, 0.51, 0.55, 0.60, 0.67, 0.81). Off the line by the note's place in the circle of fifths, so a melody in a key stays in a band and a note it comes back to comes back to its place.
+- **A drum is not a note.** A note onset within 60 ms of the kick's is the kick's (its body is in the note band). A snare's cannot veto outright, because the snare source fires at full strength on a lead's own attack (8 of 15 notes of the scale), so a note beside a snare onset must have moved the pitch by 0.8 of a semitone or it is dropped (a real snare's crack leaves the median where it was). Drums alone: 0 drops in 8 s.
+- **Volume** is the note band's level (against its own recent range) at its highest between the onset and the settle, not the onset's own strength, which is a rise in decibels and read 0.79 for a note 12 dB down against 1.00 for the loud one: soft notes 0.78, hard 0.91.
+- **The dial.** `melodyWalk` (0 on every look; Aurora 0.7, Oil & Water 0.8) on the desk (the Show section, beside Kick Bloom), the phone remote, MIDI learn and the help text; held out of Evolve's pool. Laid in `LiquidVisualizer.tsx` (`layMelodyDrop`) with the area cords' step, the dye under the look's fill as every music pour is.
+- **Checked by** `npm run melody` (18 lines, in `scripts/checks.json` on the logic shard): a 15-note scale with a kick on every beat and a snare on the backbeat through the real analyser.
 
 ## 25. Areas of interest: several places on one plate
 
@@ -5678,6 +5967,16 @@ relief and not an outline. Nothing moves: the camera and its clock are as before
 not a physical height field (33g-2); the thinned boundary line is a taste choice; the
 cells that remain are 20c-1's look-alike, opt-in.
 
+*33g-3 (2026-10-29, the owner: "No I don't want cells").* `macro-bead`, `cell-bloom` and
+`lace-run` set Paint Cells to 0, and Macro Bead and Cell Bloom set Macro Lacing to 0;
+Lacing Run keeps its lacing, which is dendritic filaments and not cells. `macroview` line
+1 was a settings audit that exempted those three; it now asks all looks (33 and the
+defaults) for Paint Cells 0 and for Macro Lacing 0 but in `lace-run`, and fails if
+`lace-run` loses its lacing (the exemption cannot go stale). Lab, SwiftShader: 6/6, cells
+0 in the shipped looks, the old-defaults control still 0.1399 and 0.1697 (the knob is live).
+*Shortcut, named:* the audit reads settings, not pixels, for the three looks; their frames
+are the same shader as `classic` with the knob at 0, which `macroview` measures.
+
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
 and lacing's own contribution to the frame (the frame against the same frame with both
@@ -5743,6 +6042,31 @@ descriptions follow the headline. The layout, tier lists, steps and look lines a
 
 Measured: `npm run signin` 28/28 (the landing's own lines among them), `layout` 81/81; at 390 ×
 844 and 1440 × 900 the page has 0 px of sideways overflow and the new headline fits the hero.
+
+### 34a-7a. OSC and Art-Net are Pro (2026-10-30)
+
+Asked: the Pro page (34a-7) found that only the 1024² grid and cloud sync checked for a Pro key,
+while the page, the cards and §23's table sold OSC and Art-Net as Pro. The owner chose to gate
+them ("That's good. Keep this going", 2026-10-30, on the card that recommended it).
+
+What changed: the show server (`server/remote-server.js`) keeps the tier it last read from its
+licence manager, by the page's own rule (a verified key's tier; no key in an enforced launch is
+free; no key in a bare developer run is Pro, as every local build is), renewed when a key is filed
+or removed and every two seconds, since the Mac app's main process files keys on the same file.
+Below Pro an OSC packet and an Art-Net in packet are dropped as they arrive and the Art-Net out
+tick sends nothing; until the first reading nothing passes. The gate is in the server and not the
+Mac app's menu because that is where the packets cross, so `OSC_PORT` or `ARTNET_HOST` set by
+hand meets it too. The Mac app's menu reads *OSC input (Pro)*, and Show Server Details says packets are
+ignored below Pro (a live menu is 34a-7h). A message box on the menu's pick was tried and taken
+out: on a Mac it is a sheet on the show window, and desktop.yml's packed check hung for 71
+minutes at the app's quit after picking OSC with no Pro tier read yet. The Account
+sheet's Home → Pro and Pro cards stopped selling "several projectors" and "video out", which do not
+ship, and name OSC, Art-Net, the 1024² grid and cloud sync, as the other cards do since 34a-7.
+
+Measured: `npm run tiers` 15/15. Its new lines spawn an enforced server with OSC, Art-Net out (to a
+socket in the check) and Art-Net in, and count real packets for a second each: no key, then Pro,
+then Home over the Pro key. With the gate: none 0/0/0, Pro 10 OSC, 36 Art-Net out, 10 Art-Net in,
+Home 0/0/0. On main's server the same run reads free 10/37/10 and Home 10/37/10, and 4c fails.
 
 ## 35. Clear controls: on reads on, one name for one thing
 
@@ -5892,6 +6216,92 @@ Checks. `panel` reads the section for the switch, both ports and the factory map
 the absence of its old copies; `qa`'s Mic-dot block reads the state line and follows the link to the
 sheet's Mic tile; `opensource` and `kickbubbles` choose the band in the sheet and read the state
 line. Harnesses that set `chromaglass-audio-source` in storage are unchanged.
+
+### 35c-4. One control, one place on a tab; Send to wall is the Wall (shipped 2026-10-29)
+
+Two things the owner saw twice on the Perform tab, each reported with a screenshot.
+
+- **Send to wall.** "Why is there a send to wall button when there's the 'Wall' in the menu above
+  it. Let's get rid of the big button." In Live the two did the same thing, open the projector
+  window (or bring it forward). Only in Preview with a wall up did the button do something of its
+  own: send the copy the desk was building to the wall, across the fade (8b). The plate bar's
+  button is gone; the header's Wall is handed the send itself (`onSendToWall`), so in Preview with
+  a wall up it sends the copy, and otherwise it opens the window as before. Its tooltip says which
+  (`wallSends`), the plate bar's status reads "preview · ⌘⏎ sends to wall" while there is a copy to
+  send, and ⌘⏎ is unchanged. No MIDI binding pointed at the button. The phone has no Preview and no
+  Send to wall, so nothing there changed.
+- **Repeated dials.** "Why are there repeated controls in the rides and the recipe groups?" The
+  Perform tab ships with the Rides (Gig's strip) and the Recipe (Build's) both out, and with Fluid
+  Physics and Macro in its deck: Speed, Turbulence, Soap Bursts, Beat Press and Evolve Speed were
+  drawn twice, Zoom three times, Swirl twice. Now a control is drawn once on a tab
+  (`drawnElsewhere` in `lib/deskLayout.ts`): the Rides keep all of theirs, the Recipe the rest of its
+  own, and a section's knobs panel draws what neither strip has. A panel that gives one up says
+  where it went in a faint line under its dials. Nothing is taken off a strip, so a saved Rides or
+  Recipe is untouched, and closing the Rides gives the Recipe its whole strip back. `DEFAULT_RIDES`
+  moved from `DeskPanels.tsx` to `lib/deskPins.ts`, beside `DEFAULT_RECIPE`.
+
+Checks. `desklayout` counts every control each panel draws on every shipped tab (Perform drew 7
+more than once; now none) and holds the order; `panel` reads the Wall being handed the send and no
+`send-to-wall` in the desk; `layout` looks for the Wall, once and visible, on every tab, where it
+looked for the button, and counts the dials the desk drew (Perform: 46, none twice; with the Recipe's
+filter taken out it names the six); `bubbles` slows the plate through the Rides' Speed when the Rides have it.
+
+### 35c-5. One home each, the second sweep (shipped 2026-10-30)
+
+The owner, the morning after 35c-4: "I noticed that there are a few repeated controls between
+panels. Let's check those." Every shipped tab was opened at 1440 and each panel's controls listed,
+every Settings section's writes read for a setting written by two sections, and the Sound sheet
+and the phone's sheets read beside them. Five were one control in two places:
+
+- **All settings…** was in the status bar (put there because a tab may not have the Rides), and
+  still in the Rides' footer and the Recipe's. The status bar's is on every tab and never scrolls;
+  the two panel copies are gone, and the Recipe's Close-up and Randomise take the row.
+- **Follow beat** on the Rides wrote Beat Prediction as 0 or 0.7, the setting the Sound section
+  draws as a slider: it read "off" below 0.05 and threw the slider's value away when pressed. The
+  switch is gone; Beat Prediction is pinnable, so Choose puts the real one on the strip.
+- **"No controller yet — set one up"** under the Rides did what the header's MIDI light does, on
+  every tab, whose title says "No controller. Click to set one up." The Rides keep the line that
+  names a connected controller, which is not a control.
+- **What turns the plates with the music** (`audioMappings.rotation`) was Sound's fourth wiring
+  select and Plate Spin's "Driven by". It is Plate Spin's, beside the motor it adds to; Sound's list
+  says so with a link.
+- **Which microphone** was Settings' Input and a select in the Sound sheet; on Setup, where Sound and
+  Music & Drone stand together, both were on screen. Settings' Input is where the Mic light lands
+  (and `inputpick` drives), so it is the home; the sheet says which microphone it is hearing and its
+  Change… opens Settings at Sound.
+
+A sixth was taken out and put back before merge: the phone's Play sheet draws Evolve and its speed,
+and so does the full layout's Motion sheet. The Play sheet is the simple screen, a curated set like
+the Rides, and the two layouts are never on the phone at once, so it is not a second copy on a
+surface; taking the speed off it left the simple screen with a switch and no rate.
+
+Left alone on purpose: the look menu's "Save as a new preset… ⌘S" beside the plate bar's Save (a
+menu item and its key), the header's lights (each opens its panel), and the Rides as copies of a
+section's controls, which 35c-4 keeps to once a tab.
+
+Then the three the sweep had left as open items, which the owner asked for the same day ("Fix all
+this stuff"):
+
+- **Change in Sound…** on the Setup tab opened the Sound sheet over the Music & Drone panel, which
+  is that sheet, already docked beside it. A section drawn as a desk or phone panel now goes through
+  one `sectionPanel` in `App.tsx`, which hands it no `onOpenSound` while the tab has `player` out;
+  the source's state still shows, and the Settings sheet (where the Mic light lands) keeps the
+  button. Measured in the browser at 1280: on Setup 0 buttons, with Music & Drone closed 1, in the
+  sheet 1.
+- **Two Saves.** The Cues panel's Save keeps the set and the plate bar's keeps the look; the set's
+  now says "Save set" (87 px at 1280, in its column).
+- **`npm run shelf`** looked for a button reading exactly "Sound", the tab before every tab was a
+  set of panels, found none (the header's Sound light reads "SoundSound" to it), and stopped at its first line, red, in no shard. It clicks Setup and finds the Music & Drone
+  panel's shelf; the rest of it was untouched and passes (the tracks reach the analyser, the credit
+  shows, the plate plays and stops). It is an entry in `scripts/checks.json` now, browser shard.
+
+`App.tsx` is over its size budget and may not grow: the helper takes the two call sites' repeated
+arguments, and the dead `isUnsubscribeRoute` (never called) went, so the file is 69 bytes smaller.
+
+Checks. `panel` asks each pair from both ends (the home there, the copy gone), in
+`scripts/panelOneHome.mjs` beside it since `panel.mjs` is at its size ceiling: 256/262 against
+main's components, 264/264 after (two more for the leftovers); the no-controller check that asked for the Rides' button now asks
+for the MIDI light's words and no second route.
 
 ### 35d. Colour and keys (shipped 2026-10-25)
 
@@ -6053,6 +6463,135 @@ the buttons each 16 ms. `npm run renders` gained a gamepad phase on a stand-in p
 old hook under it, 43.3 / 42.8 (laptop / phone, stick sweeping) and 42.3 / 43.0 (trigger
 held) renders a second, now 1.0 on all four; the ring found in 12 of 12 looks, changing
 place, still under a held trigger, on the page.
+
+## 23. Selling it: the site free, the app paid
+
+- **23.8-clock** (**shipped**, PR #550, 2026-10-29): the packed Mac check's system-audio line went red three times in eleven runs on 2026-10-28 (#544 twice, #537 once; each green on a re-run) with both of the source's contexts "running" within 0.1 s of the click, 239 packets sent and the ear reading volume 0 for the whole 10 s; the eight green runs heard the tone 0.7–1.0 s after the click, and the reds were the faster runners (the opening rung two steps higher). A context's state is not its clock: Chromium reports "running" when it asks the audio service for an output stream, and `currentTime` stays at zero until the device answers, so the line could not tell a dead device from a broken wire. The System audio source moved to `src/lib/systemTap.ts` (out of `App.tsx`, at its ceiling) with `stats()`, the line to `scripts/desktop-audio.mjs` (out of `desktop.mjs`, at its ceiling), printing both clocks, the packets in the page, the track, what `getDisplayMedia` answered and, when nothing is heard, whether a fresh context can render anything. The seventh run on that head (40770856220) was the red that said it: the tap's clock ran (0.43 s to 9.30 s, 232 packets in the page, the track live), the ear's context "running" with its clock never off zero, and the fresh context at 44100 Hz (the renderer's fallback when the output device will not open) with its clock at zero too. The runner's virtual output device, having opened one stream, opened no second one for the rest of that run. *Fix:* the ear analyses the System audio source inside the tap's own context (`useAudioAnalyzer`'s `sharedContext`, which it neither resumes nor closes): the PCM, ScreenCaptureKit's loopback and the analyser are one output stream, which is also one fewer for the Mac to drive at a gig. *Measure:* `npm run desktop -- --packaged` on CI's Mac, the system-audio line heard with one clock (the PR's runs on the fix are counted in its body); the line fails, with the probe's numbers, on a run where even the first stream does not open. *Open:* 23.8-streams in PLAN.md.
+## 14ab-3, 14ab-5, 14ab-9. The frame's bind groups, its readbacks and thick liquid's share (shipped 2026-10-28, #549)
+
+14ab-5. The solver has kept its bind groups since H2c-11, but every pass after it made its
+own again each frame, over a fresh `createView()` of every texture it bound: the plate's
+pack, derive and display, the camera, the post chain's effect, push, stock and finish, the
+projector, the particles' and the air's splats, the slosh dish and the ferrofluid drop's
+relaxation. `gpu/groupCache.ts` finds a group by walking `WeakMap`s keyed by the pipeline and
+then each object bound, and a view by its texture. Nothing has to be told to forget: a
+texture made again is a new key, a texture let go is a key the collector takes with every
+group under it, and the dye's ping-pong pair is two keys found again on every frame after.
+Rooted at the pipeline because `layout: 'auto'` hands out a new layout object on each
+`getBindGroupLayout`. The post chain's ring makes a view of each of its 32 layers with the
+ring. `npm run framegroups` draws the app's chain in the lab (particles, plate, camera, the
+test effect three frames back in the ring, stock, finish, a projector source and the
+projector's pass) from three sets of objects each frame, at two sizes with the solver
+stepping between frames and the dye's ping-pong pair turned round every other frame: made fresh as before, 12 bind groups and 64 views
+a frame; cached, 0 and 0 once a size's first frames are past, every frame equal to the fresh
+chain's byte for byte; and a cache keyed by the pipeline alone draws another picture
+(the control). The plate's pack argument (the grid) is written when the grid changes, not
+every frame.
+
+14ab-3. `readbackAsync` asked the GPU for both fields on every call (two downsamples, two
+590 KB copies, two mappings), and the frame calls it every frame for every layer, so a
+120 Hz display stepping at sixty, a governor at thirty or a frozen plate read the same fields
+back again and again. And it returned "fresh" whenever its ring held anything, so
+`syncFromGpu`'s loop over every cell ran each frame on numbers it had, and `rbSeq`, which
+tells the bubbles' rim deposit not to put the same displaced dye back twice, rose on every
+frame instead of on every new mirror. Every solver submit that may write a field goes through
+`submit`, which counts (`ReadGate`, `gpu/readGate.ts`); the readback, `measure`, the share's read and the
+harnesses' reads go through `submitRead`, which does not. The review pass found the two
+delta writers (`applyDeltas`, `applySplats`) submitting on their own and going round the
+count: a pour handed across with no step after it was never read back. They count now,
+and `framereads` pours on a still plate (0 asked before the fix, 1 after).
+`readbackAsync` asks when the count has moved (or a ring has nothing from this epoch, or a
+ring had no free slot last time) and returns fresh only for a landing it has not handed out.
+`npm run framereads`, one call a frame: a still plate, 60 asked and 30 taken in 30 frames →
+0 and 0; a step every other frame, 60 asked for 15 steps → 15; 74 repeats in 148 taken → 0;
+a pour and a clear with no step are still read back; the settled mirror equals the field
+read straight out. The bubbles' rim deposit now runs once a new mirror, as its comment
+meant, which on a 120 Hz display or a governor at thirty is half as often as before. The means stay in the loop that fills the mirror; the rim is a mask.
+
+14ab-9. `speciesShare` went through `readField`: a new MAP_READ buffer, a 590 KB `slice` and
+a 590 KB unpadded copy a read, and a square root a cell. One kept buffer (`gpu/rimRead.ts`), summed where it is
+mapped in the same order, the rim a mask made once (`lib/rimMask.ts`, which the solver's and
+the app's dish areas use too): the share is the same number to the bit
+(`npm run framereads`), and the two reads after the first make no buffer (2 before).
+
+## 14ab-4. The CPU's deltas go across by the rows written (shipped 2026-10-30, #579)
+
+14ab-4. With the GPU solver attached, `flushDeltas` copied all 192² cells of the CPU's
+delta arrays into two interleaved arrays and uploaded the dye, flow and multiplier grids
+whole every step it had anything, 1.33 MB through three `writeTexture`s, and 590 KB more for
+a hand's grid and again for a breath's, for what was usually a bubble's ring or a hand's
+disc. The writers that know where they wrote now say which rows (`lib/deltaRows.ts`:
+`addDensity`, `addVelocity`, `addTemp`, the bubbles' rims and the holes they fill, the hand
+on a thin gap, the breath); the old `dirty = true`, which every other writer still sets,
+means the whole grid, so a writer that forgets is slower and never wrong. The rows are a
+mask, sent as bands (bands closer than 8 rows go as one upload), with the bands the last
+upload to that texture wrote, which its copy still holds and the fold reads; the CPU's arrays
+are zero there by then. A texture's first upload is whole: the lab half of the check, handing
+its first rows to a fresh solver, caught the multiplier's texture resting at zero, not one.
+
+Finding the rows by scanning the arrays was measured first and dropped: 400 µs a flush on a
+plate with a few cells written, twice the copy it would save. `npm run frameuploads`
+(node and lab): every writer's cells inside the rows it said (a scan, with a control write it
+did not say); the arrays at rest after every flush; the solver's copies bit for bit the
+whole run's after every flush in node and the plate bit for bit after every step on the real
+solver (two whole runs agree, and a span two rows short is seen); a cell after a cell sends
+14 KB, not 1.33 MB; over the node half's thirteen frames 19.6 → 9.6 MB (a hand, a breath and
+a bubble's ring are tens of rows each, and the frames after a whole one go whole), and the
+lab half's eight 13.0 → 3.3 MB. The flush's own CPU in node, two cells a step: 318 → 18 µs.
+The review found the popped hole's fill reaching a wider ring than the rim's, past R = 22
+cells (the app caps bubbles at 13); it marks `fillHole`'s own reach now, and the check pours
+a bubble of 38 cells. It also had each frame's control seen alone, the multiplier laid in
+the lab, and a second breath, so the breath's grid goes by rows in both halves.
+
+## 14ab-2. The video pour's dye and flow on the GPU (shipped 2026-10-30, #584)
+
+14ab-2. A poured video was drawn into a 192² canvas every frame and read back with
+`getImageData`, copied whole (147 KB) to be the next frame's reference, and each of its
+36,000 cells went through `addDensity` (its brightness as dye, under a luma key) and, where
+it changed by more than the video's noise, `addVelocity` (the change read as motion along
+the brightness gradient, u = −(dI/dt)∇I/|∇I|², brightness constancy's smallest answer). On
+the GPU solver every one of those calls also marked its row, so each step sent all the
+rows the picture covered, up to the whole 1.33 MB, on top of the loop's own time (1.4 to
+1.6 ms a frame in node, before the browser's read back).
+
+The WebGPU solver now takes the frame as a texture (`pourVideo`, `fluid/inputs.ts`) and
+works out the same thing in two compute passes (`videoSample`, `videoFlow`, in
+`wgsl/splat.ts`), with the loop's numbers interpolated from `lib/videoFlow.ts`, where the
+loop itself now lives for the WebGL solver and the CPU's. The frame is drawn at the grid's
+size as the canvas did, each cell the mean of up to four bilinear taps a side over its
+footprint so a big frame's detail does not alias into motion, and kept as 8 bits, so the
+thresholds see the canvas's whole numbers. Its deltas are held until the step's flush and
+added to the CPU's there (`upsampleDeltaSum`), as the loop's writes waited in the CPU's
+arrays: two frames between two steps (a step rate under the refresh) add up, and a hand's
+push on a thin gap is imposed with the video's, as one. A step with only the video's frames
+still flushes, and sends no row of the CPU's. The app's frame makes one call
+(`pourVideoFrame` in `lib/videoFlow.ts`): the solver's pass, or, when it has none or poured
+nothing (a frame from another origin that cannot be read), the canvas and the loop. With it
+one fault went: the pour plays every cartoon on one element, so the next cartoon's first
+frame was differenced against the last one's end and the cut read as a burst of motion; a
+frame is now fresh when the video's address changes. The still picture's CPU pour
+(`injectImage`) moved beside the loop, as it was, to keep `fluidSimulation.ts` under its
+size ceiling.
+
+`npm run videoflow` (node and lab, 19 lines; the Mac's fifth shard runs its `<video>` line
+alone): in node, the real FluidSimulation through the app's own call pours through the loop
+without the pass (the reference) and with it writes nothing into the CPU's arrays, flushes
+for the held frames with 0 bytes against 1.03 MB for the check's picture (a cartoon covering
+the frame sends 1.33 MB), sends a tool's cells in the same frame by their own row, flushes
+before a read of the plate, and hands a frame the pass did not pour to the loop; each video's
+first frame is fresh. On the real solver the deltas the fold takes match the loop's to 1.7e-7
+(dye) and 3.4e-6 (flow) of their scale, at the grid's size, at four times it and at four by
+two (each cell's block dithered, so one tap a cell is seen), a frame a step later too, and
+the plate after the fold (its flow to its half float); a playing `<video>` pours where its
+frame is, cell by cell. SwiftShader loses its GPU instance copying from a `<video>`, so the
+cloud pours an ImageBitmap of it and the Mac the element. Controls: the second frame poured
+as a first is seen in the flow, the last frame alone is not the two frames' sum, a flush after
+the flush adds nothing, the canvas's pour upside down is 143% from itself, and by hand one tap
+a cell, the edge guard removed, the held frames not added, the vertical gradient reversed, the
+read's flush removed and the fresh frame keyed on the wrong thing each fail their lines. The
+review (check-skeptic) found the first four of those gaps. `pourVideo` costs 0.1 to 0.2 ms
+of the CPU a call on SwiftShader, a canvas's copy included; a video's is a copy on the GPU.
+`npm run wgsl` now compiles the splat kernels too, which it never had.
 
 ## Moved in the third pass (2026-10-29, 19m)
 
@@ -6427,6 +6966,16 @@ phone's dye sheet: *Fiddlesticks* (1930, two-colour), *Jack Frost* (1934) and *B
 the feature *Gulliver's Travels* (1939, Technicolor, 74 minutes, the whole film). Each one's status
 is in `SOURCES.md` with the catalogue it was checked in; the owner's look is `docs/judging.md` §85.
 `npm run cartoons` now decodes each file and holds its `colour` flag to its picture.
+
+**14ac-7, Settings → Film** (2026-10-29). The owner asked why the Film section did not have the
+open-source videos added a while back: it showed only the three demo loops. The cartoons had never
+left; they were on the desk's Dye panel and the phone's dye sheet, and `CartoonShelf.tsx` kept them
+out of Settings on purpose, so that `npm run layout` would never find a control on the screen
+twice. But Film is where someone looks for a film. Settings → Film now lists the shelf under the
+loops (`size="settings"`, ids prefixed `film-`, since Settings is a window over the desk and the
+layout check counts ids in the page, not what is in view); a docked Film panel still leaves it to
+the Dye panel beside it. `npm run cartoons` holds the window to listing all nine with their Pour
+and Film, and its Film to the real projector film: 0/0 px rows before, 28/28 after.
 
 The owner: "can we download a couple videos for inclusion into the app? things that can run
 in the background and be used for visualizations? like silly symphonies, skeleton dance? and
@@ -9318,6 +9867,82 @@ model cannot reach one, the PR says what it reached and asks.
     (this line first said 0.03%, too low). It becomes material once the glass absorbs the
     infrared (36e-4), and that build adds a tighter dry-out ledger line. `boilgpu`'s
     boiling second (36e-2) already fails it, by 13% and 16% of the reference's change.
+
+### 37. Marketing and social media (asked 2026-10-29)
+
+#### 37x-4c. Several destinations, and a vertical one
+
+  - **37x-4c. Several destinations, and a vertical one (shipped 2026-10-30).** The owner
+    wants the show "on all of the popular streaming platforms" at once. The page's encoder
+    (`src/lib/liveStream.ts`) now makes one video encode per output, a landscape one for
+    YouTube, Twitch, Facebook, Kick and X and, when a destination asks for portrait, a
+    second of the plate's middle at 720x1280 for Instagram and TikTok (cropped, never
+    stretched: 37x-4b squeezed a 1024x653 window into 16:9, which makes the round dish an
+    oval; `liveCrop`), each with its own keyframe schedule and its own skips, and one audio
+    encode for all. `desktop/liveSession.js` writes each output's packets to every socket
+    that carries it (two landscape destinations: one encode, the same bytes twice, checked
+    byte for byte), connects them side by side and goes live on the first yes, retries one
+    it could not reach or lost after 2, 4, 8, 15 then every 30 s with the key still held in
+    the main process, joining at the next keyframe on a clock from zero (as OBS restarts
+    each connection's clock), and never asks again where the server refused. The client
+    (`desktop/live.js`) measures how far behind it is in seconds of stream, not bytes: the
+    newest timestamp written against the newest the server has acknowledged (it asks every
+    256 KB; a throttled reader on loopback showed the kernel holding 4.7 MB, six seconds of
+    a 6 Mbps stream, before node's write buffer held a byte), drops video past 2 s until it
+    is back under 1 s at a keyframe, never audio, and reports kbps out, seconds behind and
+    whose word that is, frames dropped and drop runs; the session adds reconnects and the
+    time to the next try. `__cgLive.start({ destinations: [{ name, url, keyName,
+    orientation }] })` in the Mac app. Checks: `npm run livedrop` (node: five destinations,
+    a 5 Mbps made-up stream with numbered packets; the throttled one drops 247 of 570
+    frames in one run, its readout within 0.02 s of the truth and its kbps 1211 against the
+    throttle's 1200, every frame after a gap a keyframe, all 950 audio packets through, the
+    last three seconds complete after; the one beside it all 570; a dropped connection
+    back in 0.5 s at a keyframe from 0 ms; the refused key asked once; a server that never
+    acknowledges judged on the socket), `npm run live` to three destinations (32 lines: the
+    second landscape byte-identical, the portrait at 360x640 and 30.0 fps, decoded, the
+    flash in its first frame after, 2.04 times the landscape's brightness between flashes
+    as a crop of the middle should be), and the Mac app's `desktop` line streaming a
+    landscape and a portrait destination through its IPC (119 and 119 frames in 4 s), its
+    probe now also timing encoders on buffer-made frames (37x-4b's found item on GitHub's
+    Mac). The phone's part (the Play screen's live state and Stop) is 37x-4d's, with the
+    panel; nothing here is on a screen yet.
+
+#### 37x-4b. The encoder and one destination (#577)
+
+  - **37x-4b. The encoder and one destination (shipped 2026-10-29).** The owner: "open my mac
+    app ... configure the live show. I can then stream it on all of the popular streaming
+    platforms". The app now encodes and speaks RTMPS itself, as `docs/live-show.md` chose:
+    `src/lib/liveStream.ts` takes a frame from the plate's canvas every 1/fps of wall time
+    (not `captureStream`, which sends nothing while the plate is still) and the show's own
+    `MediaStream` through a `MediaStreamTrackProcessor`, encodes H.264 (`latencyMode:
+    realtime`, a keyframe every 2 s) and AAC (Opus where a machine has no AAC encoder),
+    stamps both on one clock (the audio on the track's timestamps, which Chromium puts on
+    `performance.now()`'s clock: an arrival-anchored draft read 17–22 ms early), and hands
+    each packet over IPC. `desktop/rtmp.js` is the wire (the handshake, chunks with a full
+    header on each message, AMF0, FLV tag bodies); `desktop/live.js` the client (connect,
+    releaseStream, FCPublish, createStream, publish, onMetaData, the sequence headers, acks
+    when the server asks, pings answered, a server's error ending the stream with its words
+    and the key cut from them, video dropped to the next keyframe past 1.5 MB behind, never
+    audio); `desktop/keys.js` the key store (Electron's `safeStorage`, the login Keychain's
+    key over a file of ciphertext; the `security` command was set aside because it takes the
+    password on its command line). The page names a key; a packed app reads one from the
+    store only. Headless: `window.__cgLive.start({ url, keyName })`, `stop()`, `state()`,
+    `keys.set/list/remove` in the Mac app, Pro only (`canUseProFeature`), installed from
+    `useAudioAnalyzer` where the show's sound and the plate meet.
+    *Measured:* `npm run live` (30 s of the lab's plate and a tone to
+    `scripts/rtmpListener.mjs`, a pure-node RTMP server that records FLV; shards `lab` and
+    `fifth`): the server took the stream and its onMetaData; the AVC and audio headers first;
+    30.0 s of audio with no gap over 21 ms (bar 100 ms); 30.0 fps over 901 frames (bar 24–31.5),
+    none out of order, none over 3 frames apart; 22 keyframes, the first at 0, never over 1.4 s
+    apart (bar 2.5 s); Chromium decodes every frame and every packet; five flashes against
+    five clicks, the picture 36 ms after the sound every time (bar 0..43 ms: a flash is seen at
+    the next frame taken, 33 ms, plus a 10 ms audio block), where the arrival-anchored draft
+    read 44–55 and the output-time pairing 59–79; one ack and one pong; a refused key fails
+    with `NetStream.Publish.BadName` and no key in the message; the key store lists names and
+    not keys, the file holds no plaintext, no encryption refuses. `npm run desktop` gained a
+    `live` line: the page's stream through the app's IPC to a listener, 72 frames in 4 s
+    under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
+    take), the key kept by name where the machine has a keychain.
 
 ### QA list: what the owner found playing it (from 2026-10-04)
 

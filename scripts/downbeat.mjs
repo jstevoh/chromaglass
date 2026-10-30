@@ -59,12 +59,12 @@
 
 import { analysePcm } from '../src/lib/audioFeatures.ts';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { BarGrid, Accent, accentGain, barLine, OFF_THE_BEAT, STRONG_BEAT, WEAK_BEAT } from '../src/lib/barGrid.ts';
 import { arrange, rng, SR } from './arrangement.mjs';
 import { kickRock, restingHand } from '../src/lib/plateRock.ts';
 import { kickDepth } from '../src/lib/squish.ts';
+import { appSource } from './appSource.mjs';
 
 let failed = 0, passed = 0;
 const check = (name, ok, detail = '') => {
@@ -649,9 +649,9 @@ console.log('\nWhat the phone says');
 */
 console.log('\nWiring');
 {
-  const src = f => readFileSync(join(process.cwd(), f), 'utf8');
+  const src = f => readFileSync(f, 'utf8');
   const vis = src('src/components/LiquidVisualizer.tsx');
-  const app = src('src/App.tsx');
+  const app = appSource(src);
   check('the plate hears the bar from the same readings, on the same clock, as the song\'s shape',
     /songShapeRef\.current\.update\(heard, songClockRef\.current\);\s*barGridRef\.current\.update\(heard, songClockRef\.current\);/.test(vis)
     && /songShapeRef\.current\.reset\(\);[\s\S]{0,200}barGridRef\.current\.reset\(\);\s*accentRef\.current\.reset\(\);/.test(vis));

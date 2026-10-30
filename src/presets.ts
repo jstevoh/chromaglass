@@ -1,4 +1,4 @@
-import { VisualizerSettings, AudioMappings } from './types';
+import { VisualizerSettings } from './types';
 
 export interface Preset {
   id: string;
@@ -6,13 +6,6 @@ export interface Preset {
   description: string;
   settings: Partial<VisualizerSettings>;
 }
-
-const DEFAULT_MAPPINGS: AudioMappings = {
-  velocity: 'mid',
-  density: 'bass',
-  color: 'treble',
-  rotation: 'none',
-};
 
 /*
   Rotation Speed, retuned when the motor's stir went (PLAN 22j).
@@ -500,6 +493,8 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.15,
       ledColor: '#020818',
       secondLamp: 0.35,
+      // A drop per note along the top; Oil & Water's is amber oil (24.3-place).
+      melodyWalk: 0.7,
       sceneMappings: [
         /*
           Both read 0 until 28f: `note` and `tonalMid` are the `bands`
@@ -1092,16 +1087,16 @@ export const PRESETS: Preset[] = [
   {
     id: 'macro-bead',
     name: 'Macro Bead',
-    description: 'The camera chases one travelling bead — teal, amber and coral on a deep sea-green ground — cells, lacing and razor edges filling the frame.',
+    description: 'The camera chases one travelling bead — teal, amber and coral on a deep sea-green ground — the beads domed and wet, with razor edges, filling the frame.',
     settings: {
       macroMode: true,
       macroCamera: 'auto',       // 28i-2: cuts across contrasting beads every few seconds so the closeup walks ≥2 hues and ≥6 colour changes/min
       macroZoom: 2.1,            // 28i-2: fully in the closeup (>=2x) while wide enough to frame contrasting neighbour beads (>=2 hues/frame)
       macroChase: 0.7,           // a quick follow with a whip on each cut
       macroHold: 2.5,
-      macroCells: 0.85,
+      macroCells: 0,
       macroCellScale: 0.45,
-      macroLacing: 0.7,
+      macroLacing: 0,
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
@@ -1164,16 +1159,16 @@ export const PRESETS: Preset[] = [
   {
     id: 'cell-bloom',
     name: 'Cell Bloom',
-    description: 'Three small pools turning under a magnifier on violet: silicone that breaks into packed rings of paint cells in magenta and ultramarine, and a lavender pool of oil between them.',
+    description: 'Three small pools turning under a magnifier on violet: silicone in magenta and ultramarine, and a lavender pool of oil between them.',
     settings: {
       macroMode: true,
       macroCamera: 'hold',       // sits on the middle, where its three pools turn (lib/plateAreas.ts); was follow, which rode one pool
       macroZoom: 3.5,
       macroChase: 0.45,          // slower drift — this one lingers on a pool
       macroHold: 7.0,
-      macroCells: 1.0,           // maximum cell structure
-      macroCellScale: 0.6,       // was 0.32, too small to resolve at 3.5x, so no cell was ever drawn (lib/plateAreas.ts)
-      macroLacing: 0.35,
+      macroCells: 0,
+      macroCellScale: 0.6,
+      macroLacing: 0,
       macroDepth: 0.7,
       macroEdgeDetail: 0.5,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
@@ -1243,7 +1238,7 @@ export const PRESETS: Preset[] = [
       macroZoom: 2.1,            // 28i-2: fully in the closeup (>=2x) while wide enough to frame contrasting lacing tongues (>=2 hues/frame)
       macroChase: 0.75,          // the liveliest of the three
       macroHold: 2.4,            // short takes
-      macroCells: 0.8,
+      macroCells: 0,
       macroCellScale: 0.55,
       macroLacing: 1.0,          // lacing is the subject here
       macroDepth: 0.6,
@@ -1565,6 +1560,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
+      melodyWalk: 0.8,
       /*
         Immiscible oil and water between glass (PLAN 28i-3b): kicks push water
         fingers into the amber oil pools, snares shear the meniscus, and the

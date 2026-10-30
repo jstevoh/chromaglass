@@ -129,6 +129,7 @@ Playing the visuals for a band is a different job from running them in a living 
 - **Freeze, pause, wash out.** Play/Pause holds the plate where it is; Drain washes it; a breakdown can also be a stage in the sequencer with the turbulence low and the palette narrow.
 - **The cue sheet is the sequencer.** Write the song as stages (verse: cool, slow; chorus: bright, fast; bridge: hard cut to red), bind it to the song, and it starts itself when the song is identified.
 - **Record it.** The red button by the Cast button (or the *Record* action) writes the show to a `.webm` file straight from the canvas, with the music muxed in, for the band's socials.
+- **Stream it (Mac app, Pro).** The app encodes the plate and the sound it hears itself and sends them to stream keys over RTMPS: YouTube, Twitch, Facebook, Kick, X, or a local RTMP server, several at once (one landscape encode shared by them all, and a second, portrait encode of the plate's middle for Instagram and TikTok), each destination falling behind, dropping frames and reconnecting on its own, from the console until the Live Show panel lands (`docs/live-show.md` has the lines; the stream key lives in the Mac's keychain store and never in the page or a log).
 - **A patch bay, the way a modular does it.** **Settings → Patches**, a section of its own after the sources it reads. A patch is a *source*, something that changes in it, a control it moves, how far, and which plate it lands on. Four sources — the room's camera, the film projector, the sound, and the shapes (the LFOs and envelopes below) — reading the same nine room features, the sound's own seven or the six shapes, onto any of eighty-six controls, listed by the settings section each one lives in. Sound and band cords can either **Follow** their reading continuously or **Gate** on a threshold with **Gain**, **Rise** (attack) and **Fall** (release), and a **Bands** cord shows a live log-frequency spectrum strip (`40 Hz`–`16 kHz`) where you can drag a custom `[loHz, hiHz]` band on the desk or by finger on the phone. Twenty-two of those controls can be aimed at *one* plate rather than all of them: speed, turbulence, evolve rate, dye budget, sound drive, and most of the physics. So a reel can drive layer 1 while the bass drives layer 2, and each source has a master fader to pull all of its patches down at once (Room Impact under Room Drive, Film Impact under Film Drive, Sound Impact under Sound Drive, and Shapes Impact at the bay); a master stays greyed until a patch reads its source. Anything aimed at the finished picture — bloom, the lens, the output grade — is global whatever you point it at, and the plate selector greys out rather than pretending otherwise.
 
 - **The film as a force, not only a light.** The projector used to be a slide: light through the dye and nothing else. **Film Drive** puts the reel's own motion into the liquid — a pan drags the dye the way it pans, a crowd scene stirs it, a locked-off shot does nothing, because nothing is moving. A patch can take any of the film's features onto any control (Settings → Patches), so *how busy → Turbulence* works off a reel as well as off a floor, and **Film Impact** is the master over those patches. It is the same analysis on both: one sensor, two sources. Both default to zero, so a look saved before this shows the same picture and moves the same way. One warning: capture this app's own window with Film Drive up and you have built a feedback loop — it saturates rather than runs away, since the stir is capped per cell, but a plate stirred by a picture of itself is a plate stirred by nothing in particular.
@@ -154,7 +155,7 @@ With the window-management permission granted (the Cast menu's **Second display*
 
 ## OSC
 
-The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_PORT=0` to turn it off), from the local network only, so Resolume, TouchDesigner, Max, Ableton (Connection Kit) and phone OSC apps can drive the show. OSC has no show key, so anyone on the same Wi-Fi who sends a packet drives the show: `OSC_BIND=127.0.0.1` keeps `npm run show` to this computer. **The Mac app starts with OSC off**; *Show → OSC input* turns it on for *This Mac only* (Resolume or Ableton on the same laptop) or *From the network* (a lighting desk or a second computer), applies at once, and is kept between launches. It is a menu on the laptop and has no phone version on purpose: a phone that could open the show to the network would hand that to anyone holding its key.
+The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_PORT=0` to turn it off), from the local network only, so Resolume, TouchDesigner, Max, Ableton (Connection Kit) and phone OSC apps can drive the show. OSC has no show key, so anyone on the same Wi-Fi who sends a packet drives the show: `OSC_BIND=127.0.0.1` keeps `npm run show` to this computer. **The Mac app starts with OSC off**; *Show → OSC input* turns it on for *This Mac only* (Resolume or Ableton on the same laptop) or *From the network* (a lighting desk or a second computer), applies at once, and is kept between launches. It is a menu on the laptop and has no phone version on purpose: a phone that could open the show to the network would hand that to anyone holding its key. OSC is **Pro**: with a Home licence, or none in the Mac app, the port opens and the server ignores what arrives, and Show Server Details says so (PLAN.md 34a-7a). A `npm run show` on a developer's machine with no licence and no `CHROMAGLASS_ENFORCE_TIERS` stays open, as every local build does.
 
 ```
 /chromaglass/setting/<key> <number>    any numeric setting, e.g. /chromaglass/setting/audioImpact 0.8
@@ -256,6 +257,9 @@ that too, but the direction worth having is the other one. The plate already
 knows what colour it is, layer by layer, so the par cans washing the room can be
 the same blue the dye just went, and the projection and the rig stop being two
 things somebody matches by hand.
+
+Art-Net out and in are **Pro**, like OSC: below Pro the server sends no packets and
+ignores a desk's (PLAN.md 34a-7a).
 
 The browser cannot open a UDP socket, so the show server does the sending — run
 `npm run remote` and give it a host:
@@ -531,7 +535,7 @@ with.
 | Sequence files | In the Show Sequencer, **Save file** writes the selected sequence to a `.chromaglass-sequence.json` file (with any of your presets it uses); **Load file** reads one in |
 | Cast | A menu: **Second display** (a projector on HDMI) opens a window on the second screen that mirrors this very canvas pixel for pixel — one render, at the projector's own resolution, every stroke on the laptop on the wall the same frame, the laptop keeping all the controls and a scaled copy (click the window once for fullscreen); **Network display** shows the address any browser on the same Wi-Fi can open to show the show — a projector or TV running its own browser, a tablet — fed through the show server's relay, no Chrome discovery involved; **Chromecast** uses Chrome's device picker — Nest displays take the show directly; a Google TV that does not appear or connect there is reached by opening Second display and then, on that window, Chrome's menu → Cast → the TV → Cast tab. Either way the receiver runs its own copy of the visualizer, fed the settings and audio bands by the show window |
 | Settings gear | Open the full settings panel |
-| All settings… | On both desks, under the rides and under the recipe: the whole panel, on a rail of named sections rather than one long scroll |
+| All settings… | In the status bar along the bottom of every tab: the whole panel, on a rail of named sections rather than one long scroll |
 | MIDI dot | The status dot in the header opens the controller panel — lit when one is connected |
 
 ## Judging it by numbers
@@ -618,7 +622,8 @@ src/
     lyrics.ts                  # LRCLIB fetch, LRC parsing, word-triggers, sentiment
   components/
     LiquidVisualizer.tsx       # the plate's own state, the show's frame loop, and the stage
-    SettingsPanel.tsx          # Full settings UI panel
+    SettingsPanel.tsx          # The settings sheet's shells: rail, search, Stage sheet, desk panel
+    settings/                  # Its sections, one component each, by the rail's groups
     TrackPanel.tsx             # Now playing, evolution, listen history/replay
     LyricsOverlay.tsx          # Kinetic typography lyric overlay
   components/

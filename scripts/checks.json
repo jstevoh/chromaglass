@@ -20,7 +20,7 @@
     {
       "name": "The scripts parse",
       "shard": "logic",
-      "run": "for f in scripts/*.mjs server/*.js dc.mjs; do node --check \"$f\" || exit 1; done",
+      "run": "for f in scripts/*.mjs server/*.js; do node --check \"$f\" || exit 1; done",
       "always": true,
       "why": [
         "Every script parses (PLAN.md 19b). `tsc` reads only a handful of the",
@@ -600,6 +600,18 @@
       ]
     },
     {
+      "name": "The melody walks across the plate",
+      "shard": "logic",
+      "run": "npm run melody",
+      "why": [
+        "A played scale (24.3-place) goes through the real analyser and the walk:",
+        "one drop per note the ear called, each on the note played and in pitch",
+        "order across the plate, none from a kick or a snare, a harder note a",
+        "bigger drop, and a drop waiting for its pitch to settle is on the note",
+        "where one placed on the onset is on the note before."
+      ]
+    },
+    {
       "name": "Hold keeps the closeup",
       "shard": "logic",
       "run": "npm run holdjump",
@@ -803,6 +815,39 @@
       ]
     },
     {
+      "name": "A slow or lost destination is its own",
+      "shard": "logic",
+      "run": "npm run livedrop",
+      "why": [
+        "The Mac app's live show to several destinations (PLAN.md 37x-4c), in",
+        "node: one session (desktop/liveSession.js) writing a made-up 5 Mbps",
+        "stream of numbered packets to five local listeners, one throttled to a",
+        "quarter of it, one dropped mid-show, one refusing its key, one that",
+        "never acknowledges. The slow one drops video to a keyframe and no",
+        "audio, its seconds-behind and kbps readout against the truth, and",
+        "recovers; the one beside it gets every frame; the dropped one comes back",
+        "at a keyframe; the refused one is asked once. About 25 s."
+      ]
+    },
+    {
+      "name": "The live stream",
+      "shard": "lab",
+      "run": "npm run live",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The Mac app's live stream (PLAN.md 37x-4b): the lab's plate and a tone",
+        "encoded by the page's live encoder (src/lib/liveStream.ts) and sent",
+        "through the app's RTMP client (desktop/live.js, in node) to the check's",
+        "own listener (scripts/rtmpListener.mjs), then decoded back: every",
+        "second of audio, frames at the stream's rate, a keyframe never far, the",
+        "picture within a frame of the sound, a bad key refused, the key store.",
+        "Software encoders here (H.264 and Opus; no AAC off a Mac); the Mac",
+        "shard runs the same with AudioToolbox's AAC, the codec the stream ships.",
+        "Since 37x-4c to three destinations at once: a second landscape one that",
+        "must get the same bytes, and a portrait encode decoded at its own size."
+      ]
+    },
+    {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
       "run": "npm run encode",
@@ -813,6 +858,58 @@
         "makes a dispatch, counted in the page by Chromium's own heap sampler.",
         "JavaScript's cost, which is the same on SwiftShader as on Metal, so it",
         "sits here rather than in the Mac queue."
+      ]
+    },
+    {
+      "name": "A frame's passes make no bind group they had",
+      "shard": "lab",
+      "run": "npm run framegroups",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The passes after the solver keep their bind groups and views (PLAN.md 14ab-5,",
+        "scripts/framegroups.mjs, gpu/groupCache.ts): the app's chain drawn frame after",
+        "frame in the lab counts the groups and views it makes, and every frame is the",
+        "fresh chain's picture byte for byte. Calls counted, which SwiftShader makes as",
+        "Metal does, so it sits with encode rather than in the Mac queue."
+      ]
+    },
+    {
+      "name": "The frame reads back what the solver wrote, once",
+      "shard": "lab",
+      "run": "npm run framereads",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The fields are read back only after a submit that may have written them, and a",
+        "readback is handed out once (PLAN.md 14ab-3, scripts/framereads.mjs); thick",
+        "liquid's share reads into one kept buffer to the same number (14ab-9). Logic",
+        "and counts, the same on any adapter that computes."
+      ]
+    },
+    {
+      "name": "The CPU hands the solver only the rows it wrote",
+      "shard": "lab",
+      "run": "npm run frameuploads",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "A step's CPU deltas go across by the rows their writers said they wrote, with",
+        "the rows the last upload wrote (PLAN.md 14ab-4, lib/deltaRows.ts,",
+        "scripts/frameuploads.mjs): the real FluidSimulation's writers checked against",
+        "a scan of what they wrote, and the solver left the same bit for bit as by",
+        "whole grids, in node and on the real solver. Logic and counts, the same on any",
+        "adapter that computes."
+      ]
+    },
+    {
+      "name": "The video pour's dye and flow on the GPU",
+      "shard": "lab",
+      "run": "npm run videoflow",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "A poured video's frame is worked out in two compute passes and its deltas join the",
+        "CPU's at the step's flush (PLAN.md 14ab-2, lib/videoFlow.ts, scripts/videoflow.mjs):",
+        "the real FluidSimulation sends no row for it, and on the real solver the deltas the",
+        "fold takes are the CPU loop's to a few parts in ten million, at the grid's size and",
+        "four times it. Logic and numbers, the same on any adapter that computes."
       ]
     },
     {
@@ -1139,7 +1236,9 @@
         "stand-in laptop running the real picture sender on a painted 4:3",
         "canvas. Asked for only on Draw, painted the right way up at 8 a second",
         "or more, the frame in the wall's shape, and dimmed when it stops; and",
-        "the WebGPU show's way, the frame read on the GPU, on SwiftShader."
+        "the WebGPU show's way, the frame read on the GPU, on SwiftShader, at",
+        "14 frames a second with each read held four frames (a starved Mac's",
+        "trip, PLAN 8-draw-a-4) still 8 a second."
       ]
     },
     {
@@ -1155,6 +1254,20 @@
         "The counts need no GPU; the plate's own line (a new reading nearly",
         "every frame) needs a plate that draws and is held on the Mac's open",
         "shard below. On the dist/ the phone's step built, like the Mixer."
+      ]
+    },
+    {
+      "name": "The rig's wires",
+      "shard": "browser",
+      "run": "node scripts/rig.mjs",
+      "why": [
+        "OSC in, Art-Net out and in, MIDI in and out, as /pro sells them (scripts/rig.mjs,",
+        "PLAN.md 34a-7f): the real show server with a Pro key, and an OSC sender, a",
+        "fixture, a lighting desk, a controller and a DAW's clock played by sockets and",
+        "stand-in Web MIDI ports; then the built app on that server, its settings and",
+        "tempo moved by each. On the dist/ the phone's step built. The plate's colours on",
+        "the fixture need a plate that reports its dye back, so those two lines skip here",
+        "and are the owner's, run on the Mac (docs/judging.md §93 step 0), not a Mac shard's."
       ]
     },
     {
@@ -1203,6 +1316,19 @@
         "inputpick.mjs, PLAN.md 14s): Chromium's fake devices, Input 1 and then",
         "Input 2 picked in the settings, each opened by its id and the earlier",
         "ones closed. Media, not the plate, so no GPU; on the same dist/."
+      ]
+    },
+    {
+      "name": "The music shelf reaches the show",
+      "shard": "browser",
+      "run": "npm run shelf",
+      "why": [
+        "The tracks that ship play from the show's own origin and drive the plate",
+        "(scripts/shelf.mjs): each served as an MP3, one picked by hand from the",
+        "Music & Drone panel on Setup, the analyser hearing it, its credit on screen,",
+        "the plate as an instrument with its start and stop, and a track taking over",
+        "from it. It looked for a Sound tab the desk no longer has and sat in no",
+        "shard, red unseen (PLAN 35c-5). Media and the DOM, not the plate: no GPU."
       ]
     },
     {
@@ -1671,6 +1797,18 @@
         "halo against Ostwald ripening into the clear oil, conserves Σc·h, and",
         "does not move without a field, and sheds its half-full cells more",
         "slowly in a second window (steps 200 to 380)."
+      ]
+    },
+    {
+      "name": "The video pour from a playing video",
+      "shard": "fifth",
+      "run": "npm run videoflow -- --video",
+      "why": [
+        "The video pour's frame copied from the <video> element itself, as the app pours",
+        "it (PLAN.md 14ab-2, scripts/videoflow.mjs): the dye lands where the canvas of the",
+        "same frame puts it, cell by cell. SwiftShader loses its GPU instance on a copy from",
+        "a <video>, so the lab shard's run pours an ImageBitmap of it and only a Mac pours",
+        "the element. About twenty seconds, on the lightest shard."
       ]
     },
     {
@@ -2197,6 +2335,17 @@
         "timeout inside this step (#280); show ran 8.9 to 10.7. Here open is",
         "about 14 and show about 15 (PLAN.md 19r). Nothing on show needs a",
         "cold shader cache, so the fingers warming it costs no check."
+      ]
+    },
+    {
+      "name": "The live stream, with AAC",
+      "shard": "fifth",
+      "run": "npm run live -- --codec aac",
+      "why": [
+        "The same stream on a Mac (PLAN.md 37x-4b), where Chromium encodes AAC",
+        "through AudioToolbox as the Mac app does: the codec every platform in",
+        "docs/live-show.md takes, so its sequence header, its packets and the",
+        "sync measured on them are the shipped stream's, not Opus's stand-in."
       ]
     },
     {

@@ -31,6 +31,16 @@
  *                 On a Mac (CI's runner, Metal) this must pass; on a Linux box
  *                 with software WebGPU the app's readbacks come back empty
  *                 (CLAUDE.md), and it is reported as skipped
+ *   live          the page's live stream (PLAN.md 37x-4b) reaches the app's
+ *                 RTMP client over IPC and a local listener records it: a
+ *                 key kept by name in the app's keychain store where the
+ *                 machine has one (a Mac), the stream started from the
+ *                 page's console API on that name, the AVC header and, at
+ *                 the listener in four seconds, half the frames the machine's
+ *                 encoder was probed able to make (sixty where it holds the
+ *                 rate, never fewer than ten), the key removed after. The stream itself (its rate, its audio, its
+ *                 sync) is `npm run live`'s; this is the plumbing only the
+ *                 app has
  *   not throttled the show window minimised, and covered by another window,
  *                 still counts as seen and keeps its frames and timers; each
  *                 judged only where a window in a bare Electron (Chromium's
@@ -87,6 +97,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signLicenseKey } from '../server/license-key.js';
+import { systemAudioLine } from './desktop-audio.mjs';
+import { startRtmpListener, summarize } from './rtmpListener.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DESKTOP = join(REPO, 'desktop');
@@ -382,6 +394,82 @@ try {
   if (isMac || first) check('lit plate: the plate draws, lit, in colour and moving, with the network off', lit, plateDetail);
   else skip('lit plate', `software WebGPU gives the app no readback here (CLAUDE.md); CI's Mac measures it. Here: ${plateDetail}`);
 
+  // ── live ──────────────────────────────────────────────────────────────
+  /*
+    The live stream's plumbing (PLAN.md 37x-4b): the page's encoder
+    (src/lib/liveStream.ts) hands packets to the preload's bridge, main.js's
+    `wireLive` to the RTMP client (desktop/live.js), the client to the
+    socket. `npm run live` measures the stream itself in the lab, over a
+    Playwright bridge; what only the app can show is that its IPC carries the
+    same packets, and that a key kept by name is what the client publishes
+    with. The key store is Electron's safeStorage: on a Mac it encrypts
+    through the login Keychain; on a Linux box with no keyring it refuses,
+    and the repo's app (never the packed one) takes the key itself, as the
+    check does here. With no sound source open the stream is video only.
+    Since 37x-4c the page streams to two destinations at once, a landscape
+    and a portrait one, which is two encodes and two sockets through the
+    same IPC: both must arrive, each at its own size.
+  */
+  {
+    const listener = await startRtmpListener();
+    const pubs = new Map();
+    listener.on('publish', (st) => { pubs.set(st.key, st); });
+    const started = await page.evaluate(async (url) => {
+      const live = window.__cgLive;
+      if (!live) return { error: 'no __cgLive on the page' };
+      let keychain;
+      try { await live.keys.set('check', 'desktop-check-key'); await live.keys.set('check-tall', 'desktop-check-tall'); keychain = 'kept'; } catch (e) { keychain = `refused: ${e.message}`; }
+      const names = (await live.keys.list().catch(() => [])).map((k) => k.name);
+      const probes = await live.probe({ width: 640, height: 360, fps: 30 }).catch((e) => [{ acceleration: 'probe', error: e.message }]);
+      try {
+        // Both keys by name where the store keeps them: the packed app (desktop.yml's `-- --packaged`) takes no key from the page.
+        const tall = keychain === 'kept' ? { name: 'tall', url, keyName: 'check-tall', orientation: 'portrait' } : { name: 'tall', url, key: 'desktop-check-tall', orientation: 'portrait' };
+        const wide = keychain === 'kept' ? { name: 'check', url, keyName: 'check' } : { name: 'check', url, key: 'desktop-check-key' };
+        const st = await live.start({ destinations: [wide, tall], width: 640, height: 360, portrait: { width: 360, height: 640 }, fps: 30 });
+        return { state: st, keychain, names, probes };
+      } catch (e) { return { error: e.message, keychain, names, probes }; }
+    }, listener.url).catch((e) => ({ error: e.message }));
+    await sleep(4000);
+    const stopped = await page.evaluate(() => window.__cgLive?.stop()).catch(() => null);
+    const removed = await page.evaluate(async () => (await window.__cgLive?.keys.remove('check')) && (await window.__cgLive?.keys.remove('check-tall'))).catch(() => null);
+    const pub = pubs.get('desktop-check-key') ?? null;
+    const sum = pub ? summarize(pub) : null;
+    const tallPub = pubs.get('desktop-check-tall') ?? null;
+    const tallSum = tallPub ? summarize(tallPub) : null;
+    const health = (name) => stopped?.transport?.destinations?.find((d) => d.name === name) ?? null;
+    const viaKeychain = started.keychain === 'kept';
+    // On a Mac the store must work (safeStorage through the login Keychain); only a box with no keyring may fall back to the key itself.
+    const keyOk = pub?.key === 'desktop-check-key' && (isMac ? viaKeychain : true) && (!viaKeychain || (started.names?.includes('check') && removed === true));
+    /*
+      How many frames four seconds should hold: 120 at the stream's 30 fps, of which the
+      line wants half (60), as the lab's checks allow a cold start. GitHub's Mac runner
+      (a virtual machine, no GPU of its own) read 20 to 29 frames in 4 s twice over with
+      the frames costing 0.5 ms each and the probe reading 171 ms an encoded frame under
+      every hint, while the lab's Chromium on the same kind of machine holds 30 fps at
+      this size: that machine's encoder is the limit, not the app's bridge, which is what
+      this line is for. So the line wants half of what the probe says the encoder chosen
+      can make in 4 s, never fewer than 10, and 60 wherever the encoder holds the rate;
+      the probes are printed so a slow machine says it is one.
+    */
+    const chosen = (started.probes ?? []).find((p) => p.source !== 'buffer' && p.acceleration === (stopped?.acceleration ?? 'no-preference'));
+    /*
+      Since 37x-4c the machine makes two encodes of the same number of pixels
+      (640x360 and 360x640) side by side, so what it can make of each is half
+      what the probe of one says: GitHub's Mac at 171 ms a frame makes 11 of
+      each in 4 s, not 23, and the floor of 10 that 37x-4b set for one encode
+      is 5 for each of two.
+    */
+    const encodes = 2;
+    const canMake = chosen?.msAFrame ? Math.min(120, Math.floor(4000 / (chosen.msAFrame * encodes))) : 120;
+    const wanted = Math.max(10 / encodes, Math.floor(canMake / 2));
+    const framesOk = !!sum && sum.video.header && sum.video.frames >= wanted && (health('check')?.videoFrames ?? -1) === sum.video.frames;
+    // The portrait encode is a second encoder on the same machine: the same half of what the probe says, of a picture a little over half the size.
+    const tallOk = !!tallSum && tallSum.video.header && tallSum.video.frames >= wanted && tallSum.meta?.width === 360 && tallSum.meta?.height === 640 && (health('tall')?.videoFrames ?? -1) === tallSum.video.frames;
+    check(`live: the page streams the plate through the app to a landscape and a portrait destination${viaKeychain ? ', the first on a key kept by name in its keychain store' : ''}`, !started.error && keyOk && framesOk && tallOk,
+      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s (${wanted} wanted${canMake < 120 ? `: the encoder probed at ${chosen.msAFrame.toFixed(0)} ms a frame makes ${canMake}` : ''}), ${health('check')?.videoFrames ?? '?'} sent, ${health('check')?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped (${stopped?.timing ? `${(stopped.timing.grabMs / Math.max(1, stopped.frames)).toFixed(1)} ms a frame to grab, first packet ${stopped.timing.firstOutMs === null ? 'never' : `${stopped.timing.firstOutMs.toFixed(0)} ms after the first encode`}, ${stopped.timing.outputs} out; encoder ${stopped.acceleration ?? '?'}` : 'no timing'}); portrait ${tallSum ? `${tallSum.video.frames} frames at ${tallSum.meta?.width}x${tallSum.meta?.height}` : 'never published'}; encoders probed: ${(started.probes ?? []).map((p) => `${p.acceleration}${p.source === 'buffer' ? ' on buffer frames' : ''} ${p.supported === false ? 'unsupported' : p.msAFrame === null ? 'no frame out' : `${p.msAFrame.toFixed(1)} ms a frame, first after ${p.firstOutMs?.toFixed(0)} ms${p.makeMs ? `, ${p.makeMs.toFixed(1)} ms to make one` : ''}`}${p.error ? ` (${p.error})` : ''}`).join('; ') || 'none'}; key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
+    await listener.close();
+  }
+
   // ── not throttled ───────────────────────────────────────────────────
   /*
     What the app promises (desktop/main.js) is that the show keeps going when
@@ -604,100 +692,11 @@ try {
   // ── system audio & ambient TV (23.8) ───────────────────────────────
   // On the Mac app, "System audio" replaces "Another tab", intercepts
   // getDisplayMedia with no tab picker, and routes the System audio source's
-  // pipeline to the ear (fed here through CHROMAGLASS_AUDIO_TAP=1, since
-  // CHROMAGLASS_OFFLINE skips macOS TCC screen capture; the real
-  // ScreenCaptureKit path is docs/judging.md §87). Ambient TV mode caps the
-  // solver at 30 steps/s, caps frames drawn in the app at 60 Hz through
-  // DrawGate, and holds the machine's opening rung.
-  await page.locator('[data-testid=mode-segmented-setup]').click();
-  await page.locator('[data-testid=sound-source-system]').waitFor({ timeout: 5_000 });
-  const sysLabel = (await page.locator('[data-testid=sound-source-system]').textContent())?.trim() ?? '';
-  const asksBefore = await electronApp.evaluate(() => globalThis.__chromaglassSystemAudioAsks ?? 0);
-  /*
-    The tone, and when the ear is read. Until 2026-10-26 the check sent 1.2 s
-    of tone in 0.56 s (a child process, run to its end) and read the ear once,
-    the moment it returned: about 0.9 s after the click. The packed app on
-    e1380fa read "ear reads 9, volume 0" there, with the picker intercepted and
-    the tap open, and the same app built the same way, packed and unpacked, in
-    a cloud session read 61 and 46. Nothing on the audio path changed between
-    the run that passed (033c845) and that one. What that one read is a moment:
-    the first sound the page makes in a run starts Chromium's audio service and
-    the Mac's output device, and both of the System audio source's contexts
-    (the tap's and the ear's) count no time and pass no sound until it is up.
-    A runner that takes longer than 0.9 s to get there read silence, however
-    well the pipeline worked.
-
-    So the tone plays in real time (one 2048-sample packet every 40 ms, a hair
-    ahead of 42.7 ms of sound, so the tap's queue never runs dry) for as long
-    as the ear has not heard it, up to TONE_DEADLINE_MS, and the ear is read
-    every 100 ms meanwhile. The bar is as it was, a reading above 5 with the
-    picker intercepted. The line prints what the old one could not: both
-    contexts' states and the ear's volume at the old moment, and when each
-    context first ran and the ear first heard. A pipeline that does not reach
-    the ear still fails, after the deadline, with the contexts' states saying
-    whether it was the sound that never started or the wiring.
-  */
-  const TONE_DEADLINE_MS = 10_000;
-  await page.locator('[data-testid=sound-source-system]').click();
-  const clickedAt = Date.now();
-  const audioPort = await electronApp.evaluate(() => globalThis.__chromaglassAudioPort ?? 0);
-  const toneSock = createSocket('udp4');
-  const pkt = Buffer.alloc(12 + 2048 * 4);
-  pkt.write('CGPCM1\0\0', 0, 8, 'ascii');
-  pkt.writeUInt32LE(48000, 8);
-  let phase = 0;
-  let sent = 0;
-  const toneTimer = audioPort > 0 ? setInterval(() => {
-    for (let i = 0; i < 2048; i++) {
-      pkt.writeFloatLE(Math.sin(phase) * 0.85, 12 + i * 4);
-      phase += (2 * Math.PI * 220) / 48000;
-    }
-    toneSock.send(pkt, audioPort, '127.0.0.1');
-    sent++;
-  }, 40) : null;
-  const readEar = () => page.evaluate(() => {
-    const cs = window.chromaglassCastState?.();
-    const r = cs?.ear?.reads;
-    return {
-      reads: r ? (r.frame ?? 0) + (r.ask ?? 0) + (r.tick ?? 0) : 0,
-      volume: cs?.audio?.volume ?? 0,
-      ear: cs?.ear?.state ?? 'none',
-      tap: window.__systemTapContext?.state ?? 'none',
-    };
-  }).catch(() => ({ reads: 0, volume: 0, ear: 'unread', tap: 'unread' }));
-  const ms = () => Date.now() - clickedAt;
-  let atOldMoment = null;
-  let earRanAt = null;
-  let tapRanAt = null;
-  let soundHeard = { reads: 0, volume: 0, ear: 'none', tap: 'none' };
-  let heardAt = null;
-  while (ms() < TONE_DEADLINE_MS) {
-    soundHeard = await readEar();
-    const t = ms();
-    if (atOldMoment === null && t >= 900) atOldMoment = { t, ...soundHeard };
-    if (earRanAt === null && soundHeard.ear === 'running') earRanAt = t;
-    if (tapRanAt === null && soundHeard.tap === 'running') tapRanAt = t;
-    if (soundHeard.reads > 0 && soundHeard.volume > 5) { heardAt = t; break; }
-    await sleep(100);
-  }
-  if (toneTimer) clearInterval(toneTimer);
-  toneSock.close();
-  const asksAfter = await electronApp.evaluate(() => globalThis.__chromaglassSystemAudioAsks ?? 0);
-  const when = (t) => (t === null ? 'never' : `${(t / 1000).toFixed(2)} s`);
-  const systemHeard =
-    sysLabel === 'System audio' &&
-    audioPort > 0 &&
-    sent > 0 &&
-    asksAfter > asksBefore &&
-    heardAt !== null;
-  check(
-    'system audio: the System audio source\'s pipeline reaches the ear, and the picker was intercepted',
-    systemHeard,
-    `label "${sysLabel}", picker intercepted ${asksAfter - asksBefore} time(s), audio port ${audioPort}, ${sent} packets sent; ` +
-      `${heardAt !== null ? `heard ${when(heardAt)} after the click` : `not heard in ${TONE_DEADLINE_MS / 1000} s`}, ear reads ${soundHeard.reads}, volume ${Math.round(soundHeard.volume)}; ` +
-      `the contexts ran at ${when(tapRanAt)} (tap) and ${when(earRanAt)} (ear); ` +
-      `at ${atOldMoment ? when(atOldMoment.t) : 'the old moment (not reached)'}, where the line used to read: ${atOldMoment ? `tap ${atOldMoment.tap}, ear ${atOldMoment.ear}, volume ${Math.round(atOldMoment.volume)}` : 'heard before it'}`,
-  );
+  // pipeline to the ear; the line, the tone it plays and what it prints are
+  // scripts/desktop-audio.mjs. Ambient TV mode caps the solver at 30 steps/s,
+  // caps frames drawn in the app at 60 Hz through DrawGate, and holds the
+  // machine's opening rung.
+  await systemAudioLine({ page, electronApp, check, sleep, createSocket });
 
   // The ladder's governor exists once the renderer is up; the line below
   // fails a show without one, so wait for it to be there before the toggle
@@ -860,6 +859,163 @@ try {
   const outside = (await refusedList()).filter((b) => !b.url.includes('desktop-probe') && !workerHosts.some((h) => { try { return new URL(b.url).host === h; } catch { return false; } }));
   check("network off: nothing the show's pages asked for had to come from outside", probeSeen && outside.length === 0,
     !probeSeen ? 'the guard never refused the probe, so it saw nothing' : outside.length ? outside.slice(0, 6).map((b) => `${b.type} ${b.url}`).join(', ') : 'every request the pages made was to the app itself');
+
+  // ── the wall's title-bar chip (PLAN 14af) ─────────────────────────
+  /*
+    The title-bar chip, when the wall leaves full screen (the owner,
+    2026-10-29: "I can't get rid of this popup. I don't even know what it
+    means."). The line above only says the chip is absent while the window
+    fills its screen, which a chip that never mounts passes too. This takes
+    the projector out of full screen, as Escape on the wall does, and asks of
+    the chip what the owner could not get from it:
+
+    - that it comes up, inside the hook's 400 ms poll and a margin;
+    - that its button puts the window back (here through main.js's
+      `fillProjector`, the Mac app's own path), and the chip goes;
+    - that, framed again, its X takes it away and it stays away 2 s later
+      (five polls) while the window is still framed (read framed at that
+      moment, or the dismissal was the window filling, not the X), and
+      through the wall filling and leaving full screen once more.
+
+    It runs last, before the quit, and puts the wall back in its page's own
+    full screen at the end, as the quit line has always found it. Each step
+    waits for the window's own transition to finish ('enter-full-screen',
+    'leave-full-screen'): on a Mac those are animations of most of a second,
+    and the first version, which read only `isFullScreen()` and moved on,
+    passed its own line on CI's Mac and left an app that then did not quit
+    when the show was closed (run 40942225503; the quit line passed on every
+    other branch's run that day).
+
+    It needs the projector to have been filling its screen to start from;
+    the line above already fails a run where it was not, so this one says
+    so and leaves it there.
+  */
+  if (cast && castState?.full) {
+    const wallState = () => electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return null;
+      return { page: await w.webContents.executeJavaScript('!!document.fullscreenElement'), window: w.isFullScreen(), short: await w.webContents.executeJavaScript('innerWidth < screen.width - 1 || innerHeight < screen.height - 1') };
+    }, cast.id).catch(() => null);
+    const leaveFull = () => electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return;
+      // The window leaves full screen after the page does, and puts back its
+      // old bounds when it has: resized before then, it is put back over the
+      // resize. So wait for its own 'leave-full-screen', the end of the Mac's
+      // animation, not for `isFullScreen()` to turn.
+      const left = w.isFullScreen() ? new Promise((r) => { w.once('leave-full-screen', r); setTimeout(r, 4000); }) : null;
+      await w.webContents.executeJavaScript('document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : null', true);
+      if (w.isFullScreen()) w.setFullScreen(false);
+      if (left) await left;
+      await new Promise((r) => setTimeout(r, 300));
+      // Smaller than its screen, as a framed window is. The window is made
+      // the size of its display (main.js), and under Xvfb there is no window
+      // manager to draw a title bar, so a window left at that size has none
+      // and the app rightly counts it as filling the screen.
+      const b = w.getBounds();
+      w.setBounds({ x: b.x + 40, y: b.y + 40, width: Math.round(b.width * 0.8), height: Math.round(b.height * 0.8) });
+    }, cast.id).catch(() => {});
+    const chipCount = () => page.locator('[data-testid=projector-fill]').count();
+    const waitFor = async (ok, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ok()) return Date.now() - t0; await sleep(100); } return null; };
+    const framed = async () => { const s = await wallState(); return !!s && !s.page && !s.window && s.short; };
+    // Filled only on a read that says so: a wall that closed, reloaded or
+    // could not be read is not a filled one (the check-skeptic, 2026-10-29).
+    const filled = async () => { const s = await wallState(); return !!s && (s.page || s.window || !s.short); };
+    const chipUp = () => waitFor(async () => (await chipCount()) > 0, 2000);
+    const NAME = "projector: the title-bar chip comes up when the wall leaves full screen, its button fills the wall from the app's side, and its X keeps it hidden for that window";
+
+    await leaveFull();
+    const left = await waitFor(framed, 4000);
+    const chipUpIn = left === null ? null : await chipUp();
+    const text = chipUpIn === null ? '' : ((await page.locator('[data-testid=projector-fill-text]').textContent().catch(() => '')) ?? '').trim();
+    /*
+      The button, with the wall's page refusing its own full screen. Under
+      Xvfb the page's full screen is granted, so the delegated message alone
+      would fill the wall and a broken `fillProjector` (the IPC, the preload,
+      main.js's list of projectors) would pass, and so would a hook that no
+      longer counts the window's own full screen. Refused, the one way back is
+      main.js falling back to `setFullScreen`: the window full, the page not,
+      and the chip has to go on the window's say alone.
+    */
+    let filledIn = null, chipGoneIn = null, how = null, wmStandIn = false;
+    if (chipUpIn !== null) {
+      await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+        const w = BrowserWindow.fromId(id);
+        if (w && !w.isDestroyed()) await w.webContents.executeJavaScript('document.documentElement.requestFullscreen = () => Promise.reject(new Error("refused by the check")); true');
+      }, cast.id).catch(() => {});
+      await page.locator('[data-testid=projector-fill-go]').click();
+      filledIn = await waitFor(async () => { const s = await wallState(); return !!s && s.window && !s.page; }, 5000);
+      how = await wallState();
+      /*
+        The window's full screen covers its screen on a Mac (after its
+        animation). Under Xvfb there is no window manager to do that: the
+        window says it is in full screen and keeps its size, so its page
+        stays short of the screen and the app, rightly, still sees a frame.
+        There the check does the window manager's part and sizes it to its
+        display, and says it did. Either way the chip then has to go on the
+        page covering its screen alone, the page's own full screen refused.
+      */
+      if (filledIn !== null && (await waitFor(async () => { const t = await wallState(); return !!t && !t.short; }, 2500)) === null) {
+        wmStandIn = true;
+        await electronApp.evaluate(({ BrowserWindow, screen }, id) => {
+          const w = BrowserWindow.fromId(id);
+          if (w && !w.isDestroyed()) w.setBounds(screen.getDisplayMatching(w.getBounds()).bounds);
+        }, cast.id).catch(() => {});
+      }
+      chipGoneIn = filledIn === null ? null : await waitFor(async () => (await chipCount()) === 0, 2000);
+      // The Mac's animation into full screen, finished before the next step
+      // asks the window to leave it.
+      await sleep(1500);
+    }
+    /*
+      The X: framed again, dismissed, and still away 2 s later with the wall
+      still framed (or the dismissal was the wall filling). Then the wall
+      fills and leaves full screen once more, and the chip must stay away:
+      an X held only until the next change of state would pass the first
+      half. A new window asking again needs a second Send to wall; that is
+      `hold()` clearing it, not measured here.
+    */
+    let dismissedStays = null, stillFramed = null, again = null, staysThrough = null;
+    if (chipGoneIn !== null) {
+      await leaveFull();
+      again = (await waitFor(framed, 4000)) !== null && (await chipUp()) !== null;
+      if (again) {
+        await page.locator('[data-testid=projector-fill-dismiss]').click();
+        await sleep(2000);
+        dismissedStays = (await chipCount()) === 0;
+        stillFramed = await framed();
+        await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+          const w = BrowserWindow.fromId(id);
+          if (!w || w.isDestroyed()) return;
+          await new Promise((r) => { w.once('enter-full-screen', r); setTimeout(r, 4000); w.setFullScreen(true); });
+        }, cast.id).catch(() => {});
+        const refilled = (await waitFor(filled, 4000)) !== null;
+        await sleep(300);
+        await leaveFull();
+        const reframed = (await waitFor(framed, 4000)) !== null;
+        await sleep(1500);
+        staysThrough = refilled && reframed ? (await chipCount()) === 0 : null;
+      }
+    }
+    // The wall as the quit line has always found it: its page in its own
+    // full screen, the stand-in refusal taken off, the transition finished.
+    await electronApp.evaluate(async ({ BrowserWindow }, id) => {
+      const w = BrowserWindow.fromId(id);
+      if (!w || w.isDestroyed()) return;
+      const entered = new Promise((r) => { w.once('enter-full-screen', r); setTimeout(r, 4000); });
+      const ok = await w.webContents.executeJavaScript("delete document.documentElement.requestFullscreen; document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => true, () => false)", true);
+      if (ok) await entered;
+      await new Promise((r) => setTimeout(r, 500));
+    }, cast.id).catch(() => {});
+    check(NAME,
+      chipUpIn !== null && /full screen/i.test(text) && filledIn !== null && chipGoneIn !== null && dismissedStays === true && stillFramed === true && staysThrough === true,
+      left === null ? 'the wall never left full screen'
+        : chipUpIn === null ? 'no chip within 2 s of the wall leaving full screen'
+        : `chip up in ${chipUpIn} ms ("${text}"); with the page's own full screen refused, the button ${filledIn === null ? `left the wall unfilled by the window for 5 s (page ${how?.page}, window ${how?.window})` : `filled the wall by the window's full screen in ${filledIn} ms${wmStandIn ? ' (sized to its display by the check, as no window manager did)' : ''}, the chip ${chipGoneIn === null ? 'still up 2 s later' : `gone ${chipGoneIn} ms after`}`}${again === false ? '; the second time out of full screen, the wall or the chip did not come back, so the X was never tried' : ''}${dismissedStays === null ? '' : `; after its X the chip ${dismissedStays ? 'stayed away' : 'came back'} for 2 s with the wall ${stillFramed ? 'still framed' : 'filled again (so the X was not what was measured)'}`}${dismissedStays === null ? '' : staysThrough === null ? '; the wall could not be filled and framed again to try the X a second time' : `, and ${staysThrough ? 'stayed away' : 'came back'} after the wall filled and left full screen once more`}`);
+  } else {
+    check("projector: the title-bar chip comes up when the wall leaves full screen, its button fills the wall from the app's side, and its X keeps it hidden for that window", false,
+      cast ? 'the wall was not filling its screen to start from (the line above says why)' : 'no projector window opened');
+  }
 
   // ── quits ──────────────────────────────────────────────────────────
   const projectorOpen = (await allWindows()).some((w) => /[?&]cast=/.test(w.url));

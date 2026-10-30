@@ -6,6 +6,8 @@ import {
 } from '../lib/audioFeatures';
 import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
+import { installLiveConsole } from '../lib/liveStream';
+import { canUseProFeature } from '../lib/tierGates';
 
 export interface AudioData {
   /**
@@ -127,7 +129,7 @@ export interface Ear {
    */
   deaf: boolean;
   /** For `?debug` and `npm run ears`: readings by who offered them, and the context's state. */
-  debug: () => { reads: Record<'frame' | 'ask' | 'tick', number>; recent: { driver: 'frame' | 'ask' | 'tick'; at: number }[]; state: string; deaf: boolean; published: number } | null;
+  debug: () => { reads: Record<'frame' | 'ask' | 'tick', number>; recent: { driver: 'frame' | 'ask' | 'tick'; at: number }[]; state: string; currentTime: number; sampleRate: number; deaf: boolean; published: number } | null;
 }
 
 export function useAudioAnalyzer(
@@ -143,9 +145,36 @@ export function useAudioAnalyzer(
    * (lib/handSounds.ts). False for a song, the band, the drone or a shared tab.
    */
   hearsRoom: boolean = false,
+  /**
+   * A context to analyse in, instead of one of the ear's own: the Mac app's
+   * System audio source (lib/systemTap.ts) makes its stream in a context and
+   * hands it here, so the source and its analysis are one output stream to
+   * the Mac rather than two. The ear never closes a context it was handed
+   * (its owner does); it may resume it on a gesture, as it does its own.
+   * Null for every other source.
+   */
+  sharedContext: AudioContext | null = null,
 ): Ear {
   const [audioData, setAudioData] = useState<AudioData | null>(null);
   const liveRef = useRef<AudioData | null>(null);
+  /*
+    The live stream's console in the Mac app (PLAN.md 37x-4b; the panel is
+    37x-4d): `window.__cgLive.start({ url, keyName })` streams the plate's
+    canvas and this stream, the one the show hears, whichever source it is
+    (lib/liveStream.ts). Installed from here because this hook is where the
+    show's sound and the plate meet; App.tsx is at its size ceiling. Pro
+    only, asked at each start; absent on the website, where there is no RTMPS
+    client to hand the packets to (`installLiveConsole` does nothing there).
+  */
+  const streamRef = useRef<MediaStream | null>(stream);
+  streamRef.current = stream;
+  useEffect(() => {
+    installLiveConsole({
+      canvas: () => document.getElementById('liquid-canvas') as HTMLCanvasElement | null,
+      audio: () => streamRef.current,
+      allowed: () => canUseProFeature(),
+    });
+  }, []);
   const publishedAtRef = useRef(-Infinity);
   /** How many readings React has been told, for `npm run renders` (ten a second, and not none). */
   const publishedRef = useRef(0);
@@ -164,6 +193,8 @@ export function useAudioAnalyzer(
   // gesture that chose it. Four listeners on the window and a short list.
   useEffect(() => listenForHands(window), []);
   const audioContextRef = useRef<AudioContext | null>(null);
+  /** Whether the ear made the context it holds (and so closes it), or was handed it. */
+  const ownsContextRef = useRef(true);
   const analyzerRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -178,7 +209,13 @@ export function useAudioAnalyzer(
     unlistenRef.current?.();
     unlistenRef.current = null;
     earRef.current = null;
-    if (audioContextRef.current) audioContextRef.current.close();
+    // Unplug the nodes before letting go: closing a context of the ear's own
+    // frees them, but a context it was handed stays open, and an analyser left
+    // in it is pulled every quantum until the source changes (a restart on
+    // Recalibrate would leave one more each time).
+    sourceRef.current?.disconnect();
+    analyzerRef.current?.disconnect();
+    if (audioContextRef.current && ownsContextRef.current) audioContextRef.current.close();
     audioContextRef.current = null;
     analyzerRef.current = null;
     sourceRef.current = null;
@@ -193,7 +230,8 @@ export function useAudioAnalyzer(
     if (!stream) return;
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const audioContext = new AudioContextClass();
+      const audioContext: AudioContext = sharedContext ?? new AudioContextClass();
+      ownsContextRef.current = !sharedContext;
       audioContextRef.current = audioContext;
 
       const analyzer = audioContext.createAnalyser();
@@ -405,7 +443,7 @@ export function useAudioAnalyzer(
     } catch (error) {
       console.error('Error accessing audio source:', error);
     }
-  }, [stream, calibrateNonce]);
+  }, [stream, calibrateNonce, sharedContext]);
 
   useEffect(() => {
     if (isActive) {
@@ -420,7 +458,10 @@ export function useAudioAnalyzer(
     const ear = earRef.current;
     const ctx = audioContextRef.current;
     if (!ear || !ctx) return null;
-    return { reads: { ...ear.reads }, recent: ear.recent.slice(), state: ctx.state, deaf: deafRef.current, published: publishedRef.current };
+    // The clock beside the state: "running" means the context asked for an
+    // output stream, and currentTime says whether the device answered
+    // (lib/systemTap.ts, the desktop check's system-audio line).
+    return { reads: { ...ear.reads }, recent: ear.recent.slice(), state: ctx.state, currentTime: ctx.currentTime, sampleRate: ctx.sampleRate, deaf: deafRef.current, published: publishedRef.current };
   }, []);
 
   const onReading = useCallback((fn: (a: AudioData) => void) => {
