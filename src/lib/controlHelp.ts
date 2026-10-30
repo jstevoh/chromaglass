@@ -58,6 +58,7 @@ export const CONTROL_HELP: Record<string, string> = {
   glossiness: 'Specular shine on the liquid. Zero is flat back-lit dye.',
   colourBody: 'How solid the colour reads. Zero is the dye\'s own thin tint, one is an opaque body of colour.',
   postBlurRadius: 'A final soft blur over the picture that makes the shapes run together.',
+  melodyWalk: 'Each note of a tune lets go of a drop, low notes at one side of the plate and high ones at the other. Zero lays none.',
   kickBloom: 'Each kick throws a ring of dye outward from the bass spot. Zero is no ring.',
   beatSqueeze: 'Each kick presses a dent into the liquid, as if the top glass were pushed down on the beat.',
   beatAccent: 'Lets the press and the tip follow the bar: the one hits hardest, three lighter, the rest let go.',

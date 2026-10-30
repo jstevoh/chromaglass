@@ -1,4 +1,4 @@
-import { VisualizerSettings, AudioMappings } from './types';
+import { VisualizerSettings } from './types';
 
 export interface Preset {
   id: string;
@@ -6,13 +6,6 @@ export interface Preset {
   description: string;
   settings: Partial<VisualizerSettings>;
 }
-
-const DEFAULT_MAPPINGS: AudioMappings = {
-  velocity: 'mid',
-  density: 'bass',
-  color: 'treble',
-  rotation: 'none',
-};
 
 /*
   Rotation Speed, retuned when the motor's stir went (PLAN 22j).
@@ -499,6 +492,8 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.15,
       ledColor: '#020818',
       secondLamp: 0.35,
+      // A drop per note along the top; Oil & Water's is amber oil (24.3-place).
+      melodyWalk: 0.7,
       sceneMappings: [
         /*
           Both read 0 until 28f: `note` and `tonalMid` are the `bands`
@@ -1104,7 +1099,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
-      beads: 0.35,            // oil drops on the plate, each a lens on the colour under it
+      beads: 0.7,             // each a lens on the colour under it
       globalSpeed: 0.06,
       surge: 0.55,        // beads visibly travel — the whole point
       layerCount: 1,
@@ -1162,7 +1157,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: 'cell-bloom',
-    name: 'Cell Bloom',
+    name: 'Lens Pools',
     description: 'Three small pools turning under a magnifier on violet: silicone in magenta and ultramarine, and a lavender pool of oil between them.',
     settings: {
       macroMode: true,
@@ -1564,6 +1559,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
+      melodyWalk: 0.8,
       /*
         Immiscible oil and water between glass (PLAN 28i-3b): kicks push water
         fingers into the amber oil pools, snares shear the meniscus, and the

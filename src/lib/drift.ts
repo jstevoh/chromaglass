@@ -134,6 +134,10 @@ const NOT_THE_LOOK = new Set([
   // which one it reached for, so `npm run slowevolve`'s answer-in-half-a-minute
   // check read 63.5 s with this dial in the pool and passes without it.
   'kickBloom',
+  // The melody's drops (Melody Walk): the look's own, 0 on every look but the
+  // ones written for it. A wander would switch the notes on in a look that
+  // has no line for them, and walk the two that do off their size.
+  'melodyWalk',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*

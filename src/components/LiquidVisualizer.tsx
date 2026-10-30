@@ -45,7 +45,7 @@ import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, step
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
-import { BeadField } from '../lib/beads';
+import { BeadField, beadPopulation } from '../lib/beads';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
@@ -55,6 +55,7 @@ import { type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
+import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib/melodyWalk';
 import { BarGrid, Accent } from '../lib/barGrid';
 import { kickPress, kickDepth, bassPressFor, bassBoostGain, bassRouteValue } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
@@ -256,179 +257,8 @@ interface LiquidVisualizerProps {
   output?: OutputConfig;
 }
 
-export interface LiquidVisualizerHandle {
-  /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
-  render: () => VisualizerRender | null;
-  /** The quality governor running the show. */
-  governor: () => QualityGovernor | null;
-  injectImage: (imageData: ImageData) => void;
-  pourVideo: (video: HTMLVideoElement) => void;
-  stopPourVideo: () => void;
-  /**
-   * Pour words into the lead plate: each row drawn at the biggest size its
-   * share of the box allows, in `colour` (default: the look's brightest dye;
-   * 'contrast' picks an ink that reads against the plate as it is), level on
-   * the frame whatever angle the plate is turned to.
-   */
-  pourText: (rows: { text: string; weight?: number }[], opts?: { colour?: string | 'contrast'; columns?: [number, number] }) => void;
-  /** Kicks heard (or predicted) since the plate started: a count to take differences of. */
-  kicks: () => number;
-  /**
-   * The song's shape (`lib/songShape.ts`): where the song is now, and the
-   * builds, drops and breakdowns heard lately, each numbered so a reader that
-   * polls can take only the ones it has not seen.
-   */
-  songShape: () => SongShapeReport;
-  /**
-   * Where the closeup camera is pointed, in plate uv, or null while there is
-   * no closeup (MacroCamera.centre): what Hold aims at, so it stays put (QA-12).
-   */
-  macroCentre: () => { x: number; y: number } | null;
-  /** Move the look's working dyes on by one, the way the hue journey would. */
-  stepDyes: () => void;
-  /** Where a paced scene is (`lib/scenePacing.ts`); the plate follows it at its own rate. 1 and 1 is no pacing. */
-  pace: (sample: PaceSample) => void;
-  /** A flood across a good share of the lead plate, `gust` (0..1, default 0.8) its size and force. */
-  pour: (gust?: number) => void;
-  /**
-   * Clear the plate and seed it as `presetId`; a user preset passes its own dyes, injection styles and liquids.
-   * `phase` is the Ferrofluid (and its Scale) the look asks for, when the caller knows it: the look's settings
-   * reach the plate a render after this call, so without it the ferrofluid is laid by the last look's.
-   */
-  applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }, phase?: LookPhase) => void;
-  /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
-  /** What is on each live layer: how full it is, and the colour of it. */
-  layerReport: () => { index: number; fill: number; colour: string }[];
-  /** What is left of the Dye Budget on the layer in hand, 0 to 1: the bottle's level (PLAN 35e). */
-  dyeRoom: () => number;
-  describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
-  /**
-   * Take on a preset's dyes, injection style and liquids without clearing the
-   * plate — the sequencer's way of changing stage, and the desk's Go.
-   *
-   * `extras` is how a user preset gets adopted. Its dyes are not in the maps
-   * here (they live in the saved file), so before this took them the only way
-   * to register them was `applyPreset` — which clears. A sequence that
-   * changed to one of your own looks cut the plate to black; the built-ins
-   * next to it did not.
-   */
-  adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
-  /** A pressed look change over `seconds`: the old dye thins while the new palette pours in. */
-  /** A look fading in over `seconds`; `phase` as for applyPreset: what the incoming look asks of the ferrofluid, laid half way. */
-  handoff: (seconds: number, phase?: LookPhase) => void;
-  /**
-   * Send a look to the back plate alone (PLAN.md §16a), or `null` to have it
-   * follow the front again. Over `seconds`: its solver settings fade the way
-   * a Go's do, its old dye thins and the look's own is laid in, and from then
-   * on it pours the look's dyes, styles and liquids while the front pours
-   * its own. `extras` is a user preset's dyes, as for `adoptPreset`.
-   */
-  sendBack: (presetId: string | null, look: VisualizerSettings | null, seconds: number, name?: string | null, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
-  /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
-  setPaletteWindow: (size: number | null, lead: number) => void;
-  setInjectStyle: (styles: string[]) => void;
-  /** What the automation may pour, as liquid ids. An empty list is a plate with only dye on it. */
-  setPlateLiquids: (ids: string[]) => void;
-  /** Pin the color harmony to a specific palette-index set (music intelligence). */
-  setHarmony: (indices: number[]) => void;
-  /** User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock. */
-  setHarmonyLock: (indices: number[] | null) => void;
-  /**
-   * Evolve turns the palette for the dye still to come (lib/slowEvolve.ts: at a
-   * drop or a breakdown, or every few minutes with no music). Nothing already
-   * on the plate changes colour; a palette lock or a hue journey keeps its own.
-   */
-  evolvePalette: () => void;
-  /** Fire a themed dye burst for a lyric word-trigger. */
-  triggerTheme: (theme: string, energy?: number) => void;
-  /** Re-fire a recorded manual gesture (performance replay). Normalized coords; `layer` defaults to the active one. */
-  /**
-   * A gesture from any hand: mouse, phone pad, pen, gamepad or MIDI. `amount`
-   * (0..1, default 0.5) scales the drop's size or the puff's strength, so a
-   * pen pressed harder drops more dye; `dx`/`dy` give a blow its direction
-   * (a pen's tilt, a stick's push) instead of a radial puff.
-   */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number }) => void;
-  /**
-   * A point on the wall (the drawn picture, normalised, y up) as the plate's
-   * point under it, through the camera: the plate is wider than the wall,
-   * turns with the dish and is magnified by the closeup. `turned` false
-   * leaves the dish's turn out, for a hand on the dish (Spin reads its
-   * angle as the room sees it). The point itself, until the canvas is up.
-   */
-  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean) => { x: number; y: number };
-  /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
-  setExternalTilt: (x: number, y: number) => void;
-  /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
-  drawnRect: () => DOMRect | null;
-  /** What the dye is doing, cheaply, for an instrument that plays the plate. */
-  plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[]; flow: number; swirl: number } | null;
-  /** Film projector: a video file, the camera, or another window, shown through the dye. */
-  loadFilmFile: (file: File) => Promise<void>;
-  /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
-  loadFilmUrl: (url: string) => Promise<void>;
-  /**
-   * A camera's picture as the film (lib/cameras.ts): `deviceId` from the
-   * film's camera picker, '' for the browser's pick (a phone's back camera,
-   * pointed at a dish). `onEnded` fires when the camera is unplugged, and the
-   * answer says which camera opened and whether the chosen one was missing.
-   */
-  startFilmCamera: (deviceId?: string, onEnded?: () => void) => Promise<{ label: string | null; fellBack: boolean }>;
-  /**
-   * A window, a tab or a screen, picked from the browser's own chooser.
-   *
-   * `onEnded` fires if the capture stops from the browser's side — the Stop
-   * sharing button, or the tab being closed — which is the one way a film
-   * source can go away without the app asking. Without it the panel goes on
-   * saying "window live" over a projector showing nothing.
-   */
-  /**
-   * Capture a tab, window or screen as the film.
-   *
-   * `onBlank` fires when the capture yields nothing but black pixels, which a
-   * window playing hardware-accelerated video does — see the note at the
-   * implementation. The plate cannot tell that from a very dark film, so the
-   * operator is told.
-   */
-  startFilmWindow: (onEnded?: () => void, onBlank?: () => void) => Promise<void>;
-  clearFilm: () => void;
-  /**
-   * A logo or title card laid over the finished frame.
-   *
-   * Not `injectImage`, which pours a picture into the plate as dye: that is
-   * the lovely thing to do with an image and the wrong thing to do with a
-   * client's mark, which has to stay readable for three hours. This one sits
-   * over the top and does not dissolve.
-   *
-   * Composited in the shader rather than as an element over the canvas, so it
-   * reaches everything that reads the canvas: the projector window, a cast to
-   * another screen, the recorder, and another machine capturing this window.
-   */
-  loadMark: (source: CanvasImageSource, width: number, height: number) => void;
-  clearMark: () => void;
-  /**
-   * Fire the envelopes — a MIDI note, a pad, a finger on the phone.
-   *
-   * On the handle rather than reached through settings because it is an event,
-   * and because the thing firing it should not have to know what an envelope
-   * is. `velocity` scales how far they swing, so a hard note hits harder.
-   */
-  fireEnvelopes: (velocity?: number) => void;
-  /**
-   * The element the film is playing in, so it can be read back as a sensor
-   * as well as shown through the dye. Null when nothing is loaded.
-   *
-   * Handed out rather than copied: there is one film, and a second video
-   * element decoding the same source would double the cost and still drift a
-   * frame from what is on the plate.
-   */
-  filmVideoEl: () => HTMLVideoElement | null;
-  /**
-   * A second display mirrors this canvas pixel for pixel: render at its size
-   * (the projector's pixels) and letterbox it here. Null returns to the window.
-   */
-  setStage: (size: { width: number; height: number } | null) => void;
-}
+import type { LiquidVisualizerHandle } from './visualizerHandle';
+export type { LiquidVisualizerHandle };
 
 
 // ─── React Component ─────────────────────────────────────────────────
@@ -644,6 +474,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     fluid.addTemp(rx, ry, 1.2);
     doseArea(fluid, layer, area, rx, ry, 0.8);
   };
+  /**
+   * One note of the melody, let go as a drop (lib/melodyWalk.ts, PLAN
+   * 24.3-place): a real dropper drop of the look's dye at the place its pitch
+   * names, with a dose of the look's liquid (or the line's own, Oil and Water's
+   * oil) where it lands, so neighbours merge or hold apart as the liquids do.
+   * `gain` is Melody Walk; a harder note is a bigger drop. The dye is held
+   * under the look's fill as every music pour is (`room`, the regulator of
+   * PLAN 28d-A); the liquid has its own headroom (pourLiquid).
+   */
+  const layMelodyDrop = (fluid: FluidSimulation, layer: number, d: MelodyDrop, line: MelodyLine, gain: number, room: number) => {
+    const x = Math.max(1, Math.min(GRID_SIZE - 2, Math.round(d.x * GRID_SIZE)));
+    const y = Math.max(1, Math.min(GRID_SIZE - 2, Math.round(d.y * GRID_SIZE)));
+    const vol = gain * (0.3 + 0.7 * d.strength * d.strength);
+    // The pitch walks the line's dyes, low to high; a line with none walks the look's working set.
+    const dyes = line.dyes && line.dyes.length > 0 ? line.dyes : harmonyOf(layer);
+    const c = harmonyCycle(dyes, d.along * (dyes.length - 1));
+    if (room > 0.001) fluid.autoInject('drop', x, y, 4.5 * vol * room, c.r, c.g, c.b, 0.5);
+    fluid.addTemp(x, y, 0.5 * vol);
+    if (line.liquid) pourLiquid(fluid, line.liquid, x, y, vol);
+    else doseLiquid(fluid, liquidsOf(layer), x, y, vol);
+  };
   /** Pour into an area: its own liquid while the bottles are the look's, else one of the bottles picked. */
   const doseArea = (fluid: FluidSimulation, layer: number, a: PlateArea, x: number, y: number, strength: number) => {
     if (areaBottlesRef.current || (layer >= 1 && backDyesRef.current)) pourLiquid(fluid, a.liquid, x, y, strength);
@@ -838,7 +689,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const rotationAnglesRef = useRef<number[]>([]);
   /*
     The plate's angular velocity, in radians a second, one per layer.
-    
+
     Rotation used to be a speed and nothing else: the angle took
     `rotationSpeed * dt` every frame and the plate turned at exactly what the
     slider said. A plate is a thing with mass resting on something, so this
@@ -1088,6 +939,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     next frame.
   */
   const hitSourceRef = useRef(new HitSource());
+  /**
+   * The melody (lib/melodyWalk.ts, PLAN 24.3-place): the walk hears every
+   * reading, the drops it lets go of wait here for the next running step that
+   * lays them (with the area cords'), and the line is the look's.
+   */
+  const melodyWalkRef = useRef(new MelodyWalk());
+  const melodyQueueRef = useRef<MelodyDrop[]>([]);
+  const melodyLineRef = useRef<MelodyLine>(melodyLine(null));
   const songEventsRef = useRef<(SongEvent & { seq: number })[]>([]);
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
@@ -1582,6 +1441,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
     plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
     areasRef.current = plateAreas(presetId);
+    melodyLineRef.current = melodyLine(presetId);
     areaBottlesRef.current = true;
     areaKicksRef.current = 0;
     // The plate is laid with its liquids as well as its dye, rather than
@@ -1855,6 +1715,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // preset's liquids are what gets poured, and into its areas if it has any.
       plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
       areasRef.current = plateAreas(presetId);
+      melodyLineRef.current = melodyLine(presetId);
       areaBottlesRef.current = true;
       if (!harmonyLockRef.current) {
         const contract = presetContractRef.current;
@@ -2767,6 +2628,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
           hitSourceRef.current.update(heard, songClockRef.current);
+          /*
+            The melody hears every reading whatever the setting, so turning
+            Melody Walk up mid-song finds its armed note as it is; it queues drops only while the dial is up, and only a few (a
+            plate that stalls for a second does not catch up with a flood).
+          */
+          {
+            const dropsNow = melodyWalkRef.current.update(heard, melodyLineRef.current);
+            if ((currentSettings.melodyWalk ?? 0) > 0) {
+              for (const d of dropsNow) melodyQueueRef.current.push(d);
+              if (melodyQueueRef.current.length > 4) melodyQueueRef.current.splice(0, melodyQueueRef.current.length - 4);
+            } else melodyQueueRef.current.length = 0;
+          }
           for (const e of songEvents) {
             songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
             if (songEventsRef.current.length > 16) songEventsRef.current.shift();
@@ -3495,7 +3368,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     af.addVelocity(px, py, (-ddy / dd) * w, (ddx / dd) * w);
                   }
                 }
-                
+
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 /*
@@ -4195,7 +4068,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const pitchClass = currentAudioData?.features?.pitchClass ?? 0;
                 // Normalize pitchClass (0-11) to a full circle (0 - 2PI)
                 const pitchAngle = (pitchClass / 12.0) * Math.PI * 2;
-                
+
                 // Each audio feature carries a different color from the harmony,
                 // offset by the true musical pitch so chords paint distinct colors!
                 /*
@@ -4521,6 +4394,24 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               }
             }
             /*
+              The melody's drops (lib/melodyWalk.ts), on the plate the music
+              plays, on the first running step after the walk let them go. The
+              queue is emptied whatever happens here, so a stopped or
+              draining plate does not hold a flood of notes for the moment it
+              runs again.
+            */
+            if (melodyQueueRef.current.length > 0) {
+              const drops = melodyQueueRef.current.splice(0);
+              const mf = fluidsRef.current[activeLayerRef.current];
+              const gain = Math.max(0, Math.min(1, currentSettings.melodyWalk ?? 0));
+              if (mf && gain > 0 && isActiveRef.current && drainFrameRef.current === 0) {
+                const target = dyeLookTarget(mf.seedMean, currentSettings.dyeBudget ?? 0.85, mf.seedBudget);
+                const clearPhase = mf.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
+                const room = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - mf.meanDensity / Math.max(0.06, target)) * 2.5));
+                for (const d of drops) layMelodyDrop(mf, activeLayerRef.current, d, melodyLineRef.current, gain, room);
+              }
+            }
+            /*
               The bass's hand on the glass, on the plate the music plays (the
               active one), every running step: let up on every other plate,
               and on this one when the music is quiet, off or Sound Drive is
@@ -4681,7 +4572,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 }
                 if (simStep === 0 && beadFrameRef.current++ % 30 === 0) {
                   const dens = fluidsRef.current[0]?.readDensity;
-                  beads.populate(Math.round(60 + 360 * beadAmt), 0.8 + 0.4 * beadAmt, dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
+                  beads.populate(...beadPopulation(beadAmt, currentSettings.macroMode), dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
                 }
                 if (isActiveRef.current && drainFrameRef.current === 0) {
                   const lead0 = fluidsRef.current[0];
@@ -5474,11 +5365,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           filmGain: filmGainRef.current,
           mark: markRef.current,
           film: filmRef.current,
-          audio: { 
-            pitchClass: audioDataRef.current?.features?.pitchClass ?? 0, 
-            brightness: audioDataRef.current?.features?.brightness ?? 0, 
-            beatPhase: beatClockRef.current?.period > 0 
-                ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0 
+          audio: {
+            pitchClass: audioDataRef.current?.features?.pitchClass ?? 0,
+            brightness: audioDataRef.current?.features?.brightness ?? 0,
+            beatPhase: beatClockRef.current?.period > 0
+                ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0
                 : 0,
             // How far the beat may turn and breathe the frame (Frame Sway, lib/plateRock.ts).
             beatSway: frameSway(currentSettings.frameSway),
@@ -5650,6 +5541,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // before, so it starts fresh with the song it is about to hear.
       songShapeRef.current.reset();
       hitSourceRef.current.reset();
+      melodyWalkRef.current.reset();
+      melodyQueueRef.current.length = 0;
       // The bar too, for the same reason: its beats are on the old clock.
       barGridRef.current.reset();
       accentRef.current.reset();

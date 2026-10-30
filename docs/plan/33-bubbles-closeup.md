@@ -127,6 +127,19 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   the Guide say so, and `macroview` line 1 now audits every look. Open: Cell Bloom's name
   says cells; the owner to say whether to rename it (its id is in set lists and saved
   shows, so a rename keeps the id). Story in `docs/plan-shipped.md` §33g.
+- ~~**33g-2a. The closeup's beads are the 3D.**~~ **Shipped** (the owner, 2026-10-30:
+  "a couple really cool macro 3d looking views", on the card "Beads first"). The oil beads
+  are the closeup's strongest depth cue (each a lens that turns the plate upside down inside
+  a dark meniscus, `dropCam`), but at the plate's size they were grain. In the closeup
+  (`macroMode`) the beads are now laid at 2.0 times the size scale (`beadPopulation` in
+  `lib/beads.ts`; the plate's is as it was, to the bit), Macro Bead's Beads dial is 0.7 (was
+  0.35), and Cell Bloom is Lens Pools (id kept: `cell-bloom`). Story in `docs/plan-shipped.md`
+  §33g. Shortcuts, named: the factor is a taste choice (1.6 gave the mean radius 1.35 times,
+  2.0 gives 1.44 to 1.49, 3.0 starts to leave the plate short of beads); beads already on the
+  plate keep their size until they retire. Open: no new setting (the size follows
+  `macroMode`, so a look cannot ask for smaller closeup beads); 33g-2 proper (refraction of
+  the ground, depth of field, parallax) is still the next optics step, and `lampjudge.mjs`
+  still quotes Cell Bloom's old description for its judge.
 - **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
   shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
   old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma
@@ -148,7 +161,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   height the lens focuses on is the dye's column (`aux.z`), not the gap's real depth.
 - **33i-2. Depth of field costs 64 taps a pixel and leaves hair at aperture 1.** Where a
   sharp dye ramp sits over a defocused ground the stochastic disc leaves a faint noise
-  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §94); if it
+  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §95); if it
   costs frames, gather at half resolution for the wide discs. The gather weights also lack
   the disc-area share (about 64 over the radius squared of the physical strength); a naive
   area weight is noisier, so the wide discs are somewhat fainter than a real lens's.
@@ -163,7 +176,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   to the refraction and shrank the blur by `1-bub*0.5` where a bubble sat; the new one reads
   no bubble mask (`aux.w`). A bubble is a diverging lens (a gas pocket in a liquid): bend by
   the bubble's own slope, and let Aperture treat it as the thing it is. Judge whether the
-  closeup misses it first (`docs/judging.md` §94).
+  closeup misses it first (`docs/judging.md` §95).
 - **33i-7. Saved looks with Lens up are close, not identical.** Each optic is rescaled by
   Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`), the aperture's by Focus
   too (`apertureScale`) and the bloom's by Lens again (`bloomScale`: the old pass sent the glow
@@ -197,7 +210,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   fifth of its range below where the look set it, floored at the dial's minimum, so one set
   under 0.2 can be walked to exactly 0 by a calm passage at full Evolve Speed: with Lens at 0
   and nothing else up the pass is torn down and built again on the way back (33i-8). Ask the
-  owner (`docs/judging.md` §94) whether the camera belongs in the glass theme; if it stays, floor
+  owner (`docs/judging.md` §95) whether the camera belongs in the glass theme; if it stays, floor
   an optic's window above 0 as the look's own zero rule does, and `npm run lens` already prints
   which optics Evolve may wander.
 - **33i-10. A set item's controls and a sequence stage's settings skip the migration.**

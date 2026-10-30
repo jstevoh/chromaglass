@@ -1476,6 +1476,15 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   silicone and oil, Macro Bead as domed wet beads, Lacing Run as lacing without cells.
   Say whether Cell Bloom's name should change now that it has none.
 
+  *(33g-2a, 2026-10-30.)* In the closeup the oil beads are laid twice the size scale, and
+  Macro Bead's Beads dial is 0.7 (was 0.35). Open Macro Bead and Lens Pools (Cell Bloom,
+  renamed) and look at 3x to 5x: the beads should read as glass lenses with the plate upside
+  down in them and a dark ring, big enough to be the picture. Say whether they are too big
+  or too many (the factor is `MACRO_BEAD_SCALE` in `lib/beads.ts`, the dial the look's
+  Beads), and whether the lens beads over the dye's dark ground look like glass or like
+  holes. Beads already on a plate keep their size until they retire, so switch looks, not
+  only zoom, to see the full effect.
+
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
 Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
@@ -2112,7 +2121,25 @@ Client or LinkHut this time).
 
 Write down, per step, ok or what you saw. A step that fails is an item in PLAN §34a-7.
 
-## 94. The camera's dials (PLAN 33i)
+## 94. The melody walks across the plate (PLAN 24.3-place)
+
+Aurora Borealis and Oil & Water now let go of a drop for each note of a tune, low notes on one side of the plate and
+high notes on the other. Melody Walk is in the desk's Show section (beside Kick Bloom) and the remote's sliders, 0 on
+every other look.
+
+1. Load Oil & Water, play a song with a clear lead (a piano, a voice, a synth line) through the microphone. A bead
+   of amber oil should land for most notes, left for low and right for high, a harder note a bigger bead; a tune
+   that goes up and comes back should draw there and back.
+2. Load Aurora Borealis with the same song: jade and lavender drops along the top of the curtains.
+3. Turn Melody Walk to 0 on each: no drops. Turn it up on Classic: a row of drops across the middle.
+4. Play a song with only drums: nothing should land. A song with a loud kick under a lead: the lead should still
+   land (about two notes in three; 24.3-place-2).
+5. Bad: a drop that lands a note late (a tenth of a second is the design), a drop for every kick or snare, drops
+   that all pile up at one end, or the plate filling with oil from a long song.
+6. Decide: is the line in the right place on each look, which looks want one next, and should the music's colour
+   (True Synesthesia) move to the finer pitch (24.3-place-4)?
+
+## 95. The camera's dials (PLAN 33i)
 
 Settings → Camera, with Lens at 0: turn Refraction, Aperture, Bloom and Chromatic Aberration up one
 at a time on a plate with a few pours. Each should visibly matter by about half way, and none should

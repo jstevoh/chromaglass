@@ -112,11 +112,22 @@ a grid of generic stock thumbnails: ours are the plate itself.
     claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
     need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
     programs themselves are `docs/judging.md` §93, one sitting with free versions.
-  - **34a-7g. Resolume sends its own OSC addresses.** Its OSC output mirrors Resolume's address space
-    (`/composition/layers/1/video/opacity`); reaching `/chromaglass/setting/<key>` takes a custom
-    output address per control (Shortcuts → Edit OSC), which `/pro` does not say. Either a line on
-    the page with the steps, or let the server take a small map of another program's addresses
-    onto ours (as `ARTNET_IN` does for channels). Judging §93 step 2 says which.
+  - **34a-7g. Resolume sends its own OSC addresses.** **Page half shipped** (`/pro`'s "OSC in" card and
+    `docs/guide.md` § OSC, "From Resolume"). Resolume's manual allows what was needed: its OSC output
+    mirrors its own address space (`/composition/layers/1/video/opacity`), and a custom output address per
+    control is set in Shortcuts → Edit OSC ("Custom OSC Messages",
+    <https://resolume.com/support/en/osc#custom-osc-messages>), with the destination (Localhost, outgoing
+    port 9000) in Preferences → OSC. No bridge is needed. Both texts give the five steps and one address,
+    `/chromaglass/setting/audioImpact`. Ranges (`src/lib/deskPins.ts`, which the sanitizer clamps to): a
+    slider's 0 to 1 is one to one for `audioImpact`, `dimmer`, `bloom`, `turbulenceScale`, `plateRock`,
+    `automateRate`; `globalSpeed` (0 to 0.3) tops out at 30% of the slider and `macroZoom` (1 to 16) stays at 1.
+    Not yet tried in Resolume itself (`docs/judging.md` §93 step 2).
+  - **34a-7i. Let the server take another program's addresses and ranges.** The server hands a
+    `/chromaglass/setting/<key>` number to the setting as it is, so a setting that does not run 0 to 1
+    gets the wrong value from a Resolume slider. A small map in the server, as `ARTNET_IN` is for channels:
+    another program's address onto ours, and its range (0 to 1 from Resolume) onto the setting's own, so
+    Resolume's own addresses, or a scaled one, reach the plate without a bridge. *Measure:* `npm run rig`
+    sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

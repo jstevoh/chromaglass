@@ -1069,3 +1069,33 @@ export function rasterDrops(beads: readonly Bead[], grid: number, S: number, out
     }
   }
 }
+
+/**
+ * How many oil beads the plate holds and how big each is, from the Beads
+ * dial, and how much bigger the closeup makes them (PLAN 33g-2a).
+ *
+ * The count and the size scale are the ones the visualizer has always passed
+ * to `BeadField.populate`: 60 + 360 beads and a scale of 0.8 + 0.4 at the
+ * dial's two ends. What is new is the closeup's share. In the macro view
+ * (`macroMode`) the camera frames a few beads at 3x to 6x, and each bead is
+ * the lens that makes the picture read as glass and liquid with depth
+ * (`dropCam`, the upside-down plate seen through a drop), but at the plate's
+ * size most are a few pixels across, so the frame shows them as grain. The
+ * owner asked for "a couple really cool macro 3d looking views": the beads
+ * are the strongest cue the closeup has, so in the closeup they are laid
+ * larger. The factor is a taste choice, named, and measured: a bead's drawn size is the
+ * scale times a long-tailed draw, but the crowding step in `populate` turns
+ * away the big ones where the patches are dense, so the mean radius of a
+ * populated field grows by less than the scale does (a scale of 1.6 gave the
+ * mean 1.35 times larger, on three seeds; 2.0 gives 1.5, about 2.3 times the
+ * area, and still all of the count, where 3.0 starts to leave the plate
+ * short of beads).
+ *
+ * Out of the closeup nothing moves: the plate's beads are the beads they were,
+ * to the bit.
+ */
+export const MACRO_BEAD_SCALE = 2.0;
+
+export function beadPopulation(beadAmt: number, macro?: boolean): [count: number, sizeScale: number] {
+  return [Math.round(60 + 360 * beadAmt), (0.8 + 0.4 * beadAmt) * (macro ? MACRO_BEAD_SCALE : 1)];
+}

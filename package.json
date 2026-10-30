@@ -273,6 +273,7 @@
     "framesway": "node scripts/framesway.mjs",
     "lens": "node scripts/lens.mjs",
     "soundpatch": "esbuild scripts/soundpatch.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundpatch.mjs && node node_modules/.cache/soundpatch.mjs",
+    "melody": "esbuild scripts/melody.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/melody.mjs && node node_modules/.cache/melody.mjs",
     "holeline": "node scripts/holeline.mjs",
     "bubblelook": "node scripts/bubblelook.mjs"
   },
