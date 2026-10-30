@@ -4222,6 +4222,29 @@ compiled all of them on SwiftShader, `checked 143 shaders` and no error. Two che
 importing it, and now read the file their lines moved to: `plate` (the gate, in
 `dye.ts`) and `turing` (the regime's cap and share, in `reactions.ts`).
 
+### 19ai-7. The solver class, a chain of files (2026-10-30)
+
+`src/gpu/fluid.ts` was one 291 KB file: 43 lines of header, 665 lines of module-level
+constants, types and helpers, and then the `WebGPUFluid` class of about 95 methods, so a
+thread changing one pass read the whole solver first. It is now a chain of classes under
+`src/gpu/fluid/`, each extending the one before: `constants.ts` (every module-level
+declaration, now exported), `core.ts` `FluidCore` (every field in its original order, the
+constructor, `clear`, `submit`, `submitRead`), `fields.ts`, `passes.ts`, `inputs.ts`,
+`reads.ts`, and `gpu/fluid.ts` keeps the leaf `WebGPUFluid extends FluidReads` (`step`,
+the statics, `prepare`, `thinGapOn`) and re-exports everything it exported before, so no
+importer changed. `private` became `protected` only where a member is reached across
+files. All fields stay in `core.ts`, so with `useDefineForClassFields: false` their
+initialisation order is the original's; only two old lines differ, the class line and the
+constructor's `private readonly device`. The move was made by a script on the file's
+syntax tree (nothing retyped), and the PR body carries the old-lines-to-new-files table.
+
+Measured in a cloud session on the split: lint, `sizes`, `checkguard`, `npm run build`;
+`switches` 970/970, `renders` 26/26, `phone` 366/366, `layout` 81/81, `plate` 50/50,
+`slosh` all passed, `oillift` 9/9, `regrid` 6/6, `ferrodrag` 3/3. Two checks read the
+solver's text and now read the file their lines moved to: `slosh` (`fluid/constants.ts`)
+and `ferrodrag` (`fluid/passes.ts`). `scripts/sizes.json` drops the `src/gpu/fluid.ts`
+ceiling: the leaf is 99.2 KB, under the bar; `core.ts` is 40.5 KB (a warning only).
+
 ## 21. Looks after painters
 
 **Shipped: Roy, 1963, and Ben-Day Dots.** A control (`benDay`, Settings → Look, MIDI,
