@@ -358,7 +358,7 @@ rest is routine and the owner's calls.
     - *The picture is the plate's canvas.* `__cgLive` streams `#liquid-canvas`, the laptop's
       plate, not the projector's pass (§31's Wall output, the mixer's stack). A show with a
       projector up should be able to stream what the wall shows; 37x-4d takes it, as a
-      choice in the panel. Found in 37x-4c: the Wall output runs in the projector's own
+      choice in the panel (still open: 37x-4d-1). Found in 37x-4c: the Wall output runs in the projector's own
       window (`CastDisplay`'s `#stage-canvas`) and carries the wall's keystone, masks and
       warp, which on a stream would be a skewed picture; so the source to offer is the
       mixer's stack before the projector's geometry, not the wall's canvas itself.
@@ -413,12 +413,38 @@ rest is routine and the owner's calls.
       the fix is a second measure for it: the socket's bytes not yet sent against the
       upload rate the client has seen, or the kernel's own queue (`TCP_NOTSENT_LOWAT` on
       macOS, which node does not expose; a small native module would).
-  - **37x-4d. The Live Show panel and the Pro gate.** *(build, M.)* The panel in the Mac
-    app's Perform desk: destinations added by name with a pasted key (the key field never
-    echoes), orientation per destination, a Test (an unlisted YouTube broadcast), Go live
-    and Stop, the health readout, and a warning when the summed bitrate passes the measured
-    upload. Pro only through §23's `canUseProFeature`; absent on the website. Phone: the
-    Play screen's live state and Stop (`remoteProtocol.ts`), through the relay.
+  - **37x-4d. The Live Show panel and the Pro gate.** *(shipped 2026-10-30.)* The Live
+    Show panel in the Mac app (`src/components/LiveShowPanel.tsx`, one controller for it,
+    the console and the phone in `src/lib/liveShow.ts`), the phone remote's live chip and
+    two-tap Stop on Draw and Controls, `npm run liveshow`; story in `docs/plan-shipped/37-marketing.md`
+    §37x-4d. Found building it, for the parts after:
+    - *37x-4d-1. Stream the mixer's stack, not only the laptop's plate.* (Open; moved here
+      from 37x-4b's found item, which 4d was to take.) The panel streams `#liquid-canvas`
+      as the console did. A show with the film, the mark or a back plate in the mixer
+      streams the plate without them. The source to offer is the projector's pass drawn
+      without the wall's geometry (keystone, masks, warp) into a canvas of the stream's
+      size: a GPU change to `src/gpu/output.ts`, measured with `mixer` and `wallpattern`
+      in the lab and the stream's frame time on the Mac, so a PR of its own.
+    - *37x-4d-2. The panel is not on a shipped tab.* The tabs are the owner's, kept in the
+      account (`deskTabs.ts`), so a new entry in Perform's shipped layout would reach only a
+      new desk; and it would sit on the website's Perform too, where it cannot stream. It
+      is one press away in + Panel (search "live"). If the owner wants it on Perform by
+      default, the shipped layout gains it only when `nativeLive()` is there.
+    - *37x-4d-3. The upload is measured by the last stream.* There is no server of ours to
+      time an upload against, so the panel's warning reads what the last stream showed:
+      the sum the destinations acknowledged while all kept up (enough for that much), and
+      the sum while one was a second behind by the server's own count (all the link
+      carries). A Test to one unlisted destination proves only its own rate: the advice
+      says "never filled the link" rather than guess. A destination that does not
+      acknowledge (37x-4c's item) cannot fill the measure either.
+    - *37x-4d-4. The Mac app's narrow window.* Narrowed under the desks' width the app
+      goes to the phone layout (`usePhoneLayout`), which has no Live Show and no live chip:
+      a stream running there keeps running, unseen. Small, since the Mac app is the
+      laptop at the desk; the fix is the remote's `LiveRemoteChip` on `PhonePlay`.
+    - *37x-4d-5. Instagram's and TikTok's keys are per stream.* The panel keeps a key until
+      it is replaced (New key), which suits YouTube, Twitch and Kick. For the two that
+      change it each stream, the row could clear the key when a stream ends and say so,
+      rather than fail the next show with last week's key.
   - **37x-4e. YouTube through the API.** *(build, S; with 37s.)* The broadcast made,
     bound and transitioned from the panel with 37s's token, so the owner never pastes a
     YouTube key; Content ID's cut reported in the health readout.

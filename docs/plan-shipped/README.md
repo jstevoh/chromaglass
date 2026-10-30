@@ -101,5 +101,5 @@ the end of a sentence in 15i's story that the open plan had kept is back with it
 | [34-photism.md](34-photism.md) | §34 | 6 |  |
 | [35-clear-controls.md](35-clear-controls.md) | §35 | 34 |  |
 | [36-analog-operators.md](36-analog-operators.md) | §36 | 5 |  |
-| [37-marketing.md](37-marketing.md) | §37 | 6 |  |
+| [37-marketing.md](37-marketing.md) | §37 | 9 |  |
 | [qa.md](qa.md) | QA | 12 |  |

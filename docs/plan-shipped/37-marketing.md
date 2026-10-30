@@ -80,3 +80,33 @@ under that heading alone.
     `live` line: the page's stream through the app's IPC to a listener, 72 frames in 4 s
     under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
     take), the key kept by name where the machine has a keychain.
+
+### 37x-4d. The Live Show panel and the Pro gate
+
+  - **37x-4d. The Live Show panel and the Pro gate (shipped 2026-10-30).** The owner asked
+    for "a Live Show panel in the Mac app, Pro only" to stream to every popular platform at
+    once; 37x-4b and 4c built the stream and drove it from the console. The panel
+    (`src/components/LiveShowPanel.tsx`, in + Panel as "Live Show", in Play) adds each
+    destination by its platform (the server filled in for YouTube, Twitch and Facebook,
+    pasted for the rest; Instagram and TikTok at 9:16), a name and its key, in a password
+    field emptied the moment the key goes to the keychain store (`desktop/keys.js`), so the
+    page can only say "Key kept" and when. A destination marked "For tests" (an unlisted
+    YouTube broadcast) is streamed by Test and never by Go live, which asks once more,
+    naming where it goes, before the one press that cannot be taken back; Stop does not
+    ask. While on air each destination has its line (kbps, seconds behind, dropping,
+    retrying, refused). The upload warning sums what the destinations will push (each its
+    own copy of its encode, at `render.ts`'s rate, plus the sound) with the research's 20%
+    headroom, against what the last stream measured: the sum acknowledged while all kept
+    up, and the sum while one was a second behind by the server's count
+    (`src/lib/liveShow.ts`), since there is no server of ours to time an upload against.
+    The panel, `window.__cgLive` and the phone share one controller in `liveShow.ts`, so two
+    encoders can never race for the main process's one session. Pro by `canUseProFeature`
+    (the panel says it is Pro on a free key and has no Go live); not offered on the website,
+    which has no RTMPS client. The phone: the remote's state carries the stream (a test or
+    live, its clock, where, whether one is in trouble), shown as a red chip on Draw and on
+    Controls, and Stop is two taps (`live-stop`); the phone cannot start a stream.
+    Check: `npm run liveshow` (32 lines: the sums against numbers worked by hand, then the
+    built app with a stand-in for the Mac app's bridge and the page's real encoder: the key
+    once to the store and nowhere in the page or its storage, Go live to the three that are
+    on with two encodes and no key, Test to the test one only, the dropping line, the
+    phone's chip and its Stop, the upload measured as enough at 24 Mb/s and short at 3).
