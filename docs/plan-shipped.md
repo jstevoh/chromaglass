@@ -5981,7 +5981,7 @@ follows the dye" correlation came out negative; and a ΔE that includes lightnes
 14 on `lava-lamp` from the relief alone. Each was dropped for a line that failed on the
 control before it was trusted on the fix.
 
-### 33i. The camera's dials do something (this PR)
+### 33i. The camera's dials do something (#592)
 
 *Reported* (the owner, 2026-10-22, relayed): "the camera controls don't really do much".
 
