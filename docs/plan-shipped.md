@@ -9676,6 +9676,43 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4c. Several destinations, and a vertical one
+
+  - **37x-4c. Several destinations, and a vertical one (shipped 2026-10-30).** The owner
+    wants the show "on all of the popular streaming platforms" at once. The page's encoder
+    (`src/lib/liveStream.ts`) now makes one video encode per output, a landscape one for
+    YouTube, Twitch, Facebook, Kick and X and, when a destination asks for portrait, a
+    second of the plate's middle at 720x1280 for Instagram and TikTok (cropped, never
+    stretched: 37x-4b squeezed a 1024x653 window into 16:9, which makes the round dish an
+    oval; `liveCrop`), each with its own keyframe schedule and its own skips, and one audio
+    encode for all. `desktop/liveSession.js` writes each output's packets to every socket
+    that carries it (two landscape destinations: one encode, the same bytes twice, checked
+    byte for byte), connects them side by side and goes live on the first yes, retries one
+    it could not reach or lost after 2, 4, 8, 15 then every 30 s with the key still held in
+    the main process, joining at the next keyframe on a clock from zero (as OBS restarts
+    each connection's clock), and never asks again where the server refused. The client
+    (`desktop/live.js`) measures how far behind it is in seconds of stream, not bytes: the
+    newest timestamp written against the newest the server has acknowledged (it asks every
+    256 KB; a throttled reader on loopback showed the kernel holding 4.7 MB, six seconds of
+    a 6 Mbps stream, before node's write buffer held a byte), drops video past 2 s until it
+    is back under 1 s at a keyframe, never audio, and reports kbps out, seconds behind and
+    whose word that is, frames dropped and drop runs; the session adds reconnects and the
+    time to the next try. `__cgLive.start({ destinations: [{ name, url, keyName,
+    orientation }] })` in the Mac app. Checks: `npm run livedrop` (node: five destinations,
+    a 5 Mbps made-up stream with numbered packets; the throttled one drops 247 of 570
+    frames in one run, its readout within 0.02 s of the truth and its kbps 1211 against the
+    throttle's 1200, every frame after a gap a keyframe, all 950 audio packets through, the
+    last three seconds complete after; the one beside it all 570; a dropped connection
+    back in 0.5 s at a keyframe from 0 ms; the refused key asked once; a server that never
+    acknowledges judged on the socket), `npm run live` to three destinations (32 lines: the
+    second landscape byte-identical, the portrait at 360x640 and 30.0 fps, decoded, the
+    flash in its first frame after, 2.04 times the landscape's brightness between flashes
+    as a crop of the middle should be), and the Mac app's `desktop` line streaming a
+    landscape and a portrait destination through its IPC (119 and 119 frames in 4 s), its
+    probe now also timing encoders on buffer-made frames (37x-4b's found item on GitHub's
+    Mac). The phone's part (the Play screen's live state and Stop) is 37x-4d's, with the
+    panel; nothing here is on a screen yet.
+
 #### 37x-4b. The encoder and one destination (#577)
 
   - **37x-4b. The encoder and one destination (shipped 2026-10-29).** The owner: "open my mac

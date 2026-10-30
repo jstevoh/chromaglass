@@ -2041,3 +2041,17 @@ system-audio path. Unlisted, never public, until you say so.
    behind the plate by more than a frame or two (the Mac's clock, the plan's note under
    37x-4b), frames dropped with a good upload, or the app's frame rate falling while live
    (`npm run stutter`'s two-step frames, 37x-4c).
+6. Several at once (37x-4c), with whichever second account exists (Twitch, Kick, a Facebook
+   Page; or a second unlisted YouTube stream): keep both keys in the store, then
+   `await __cgLive.start({ destinations: [{ name: 'youtube', url: 'rtmps://a.rtmps.youtube.com/live2', keyName: 'youtube' }, { name: 'twitch', url: 'rtmps://live.twitch.tv/app', keyName: 'twitch' }] })`.
+   Both previews should show the plate; `(await __cgLive.state()).transport.destinations`
+   gives each one's kbps, seconds behind and dropped frames. `measuredAt` should read
+   `server` for YouTube (it acknowledges what it receives; if it reads `socket`, the
+   seconds-behind figure only sees the Mac's own buffer: say so).
+7. If Instagram or TikTok live is open to the account: add a destination with
+   `orientation: 'portrait'`. On a phone it should fill the screen with the middle of the plate,
+   sharp, not squeezed; the landscape one beside it unchanged.
+8. Turn the Wi-Fi off for ten seconds and on again while live: each destination should come
+   back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
+   one. A wrong key on one destination should fail that one alone, once, with the
+   platform's words, while the others stream.

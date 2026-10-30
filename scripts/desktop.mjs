@@ -405,11 +405,14 @@ try {
     through the login Keychain; on a Linux box with no keyring it refuses,
     and the repo's app (never the packed one) takes the key itself, as the
     check does here. With no sound source open the stream is video only.
+    Since 37x-4c the page streams to two destinations at once, a landscape
+    and a portrait one, which is two encodes and two sockets through the
+    same IPC: both must arrive, each at its own size.
   */
   {
     const listener = await startRtmpListener();
-    let pub = null;
-    listener.on('publish', (st) => { pub = st; });
+    const pubs = new Map();
+    listener.on('publish', (st) => { pubs.set(st.key, st); });
     const started = await page.evaluate(async (url) => {
       const live = window.__cgLive;
       if (!live) return { error: 'no __cgLive on the page' };
@@ -418,14 +421,21 @@ try {
       const names = (await live.keys.list().catch(() => [])).map((k) => k.name);
       const probes = await live.probe({ width: 640, height: 360, fps: 30 }).catch((e) => [{ acceleration: 'probe', error: e.message }]);
       try {
-        const st = await live.start(keychain === 'kept' ? { url, keyName: 'check', width: 640, height: 360, fps: 30 } : { url, key: 'desktop-check-key', width: 640, height: 360, fps: 30 });
+        // The portrait destination's key is the repo app's own (the packed app would refuse it, and this line runs on the repo's).
+        const tall = { name: 'tall', url, key: 'desktop-check-tall', orientation: 'portrait' };
+        const wide = keychain === 'kept' ? { name: 'check', url, keyName: 'check' } : { name: 'check', url, key: 'desktop-check-key' };
+        const st = await live.start({ destinations: [wide, tall], width: 640, height: 360, portrait: { width: 360, height: 640 }, fps: 30 });
         return { state: st, keychain, names, probes };
       } catch (e) { return { error: e.message, keychain, names, probes }; }
     }, listener.url).catch((e) => ({ error: e.message }));
     await sleep(4000);
     const stopped = await page.evaluate(() => window.__cgLive?.stop()).catch(() => null);
     const removed = await page.evaluate(() => window.__cgLive?.keys.remove('check')).catch(() => null);
+    const pub = pubs.get('desktop-check-key') ?? null;
     const sum = pub ? summarize(pub) : null;
+    const tallPub = pubs.get('desktop-check-tall') ?? null;
+    const tallSum = tallPub ? summarize(tallPub) : null;
+    const health = (name) => stopped?.transport?.destinations?.find((d) => d.name === name) ?? null;
     const viaKeychain = started.keychain === 'kept';
     // On a Mac the store must work (safeStorage through the login Keychain); only a box with no keyring may fall back to the key itself.
     const keyOk = pub?.key === 'desktop-check-key' && (isMac ? viaKeychain : true) && (!viaKeychain || (started.names?.includes('check') && removed === true));
@@ -440,12 +450,22 @@ try {
       can make in 4 s, never fewer than 10, and 60 wherever the encoder holds the rate;
       the probes are printed so a slow machine says it is one.
     */
-    const chosen = (started.probes ?? []).find((p) => p.acceleration === (stopped?.acceleration ?? 'no-preference'));
-    const canMake = chosen?.msAFrame ? Math.min(120, Math.floor(4000 / chosen.msAFrame)) : 120;
-    const wanted = Math.max(10, Math.floor(canMake / 2));
-    const framesOk = !!sum && sum.video.header && sum.video.frames >= wanted && (stopped?.transport?.videoFrames ?? -1) === sum.video.frames;
-    check(`live: the page streams the plate through the app to a listener${viaKeychain ? ', on a key kept by name in its keychain store' : ''}`, !started.error && keyOk && framesOk,
-      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s (${wanted} wanted${canMake < 120 ? `: the encoder probed at ${chosen.msAFrame.toFixed(0)} ms a frame makes ${canMake}` : ''}), ${stopped?.transport?.videoFrames ?? '?'} sent, ${stopped?.transport?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped (${stopped?.timing ? `${(stopped.timing.grabMs / Math.max(1, stopped.frames)).toFixed(1)} ms a frame to grab, first packet ${stopped.timing.firstOutMs === null ? 'never' : `${stopped.timing.firstOutMs.toFixed(0)} ms after the first encode`}, ${stopped.timing.outputs} out; encoder ${stopped.acceleration ?? '?'}` : 'no timing'}); encoders probed: ${(started.probes ?? []).map((p) => `${p.acceleration} ${p.supported === false ? 'unsupported' : p.msAFrame === null ? 'no frame out' : `${p.msAFrame.toFixed(1)} ms a frame, first after ${p.firstOutMs?.toFixed(0)} ms`}${p.error ? ` (${p.error})` : ''}`).join('; ') || 'none'}; key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
+    const chosen = (started.probes ?? []).find((p) => p.source !== 'buffer' && p.acceleration === (stopped?.acceleration ?? 'no-preference'));
+    /*
+      Since 37x-4c the machine makes two encodes of the same number of pixels
+      (640x360 and 360x640) side by side, so what it can make of each is half
+      what the probe of one says: GitHub's Mac at 171 ms a frame makes 11 of
+      each in 4 s, not 23, and the floor of 10 that 37x-4b set for one encode
+      is 5 for each of two.
+    */
+    const encodes = 2;
+    const canMake = chosen?.msAFrame ? Math.min(120, Math.floor(4000 / (chosen.msAFrame * encodes))) : 120;
+    const wanted = Math.max(10 / encodes, Math.floor(canMake / 2));
+    const framesOk = !!sum && sum.video.header && sum.video.frames >= wanted && (health('check')?.videoFrames ?? -1) === sum.video.frames;
+    // The portrait encode is a second encoder on the same machine: the same half of what the probe says, of a picture a little over half the size.
+    const tallOk = !!tallSum && tallSum.video.header && tallSum.video.frames >= wanted && tallSum.meta?.width === 360 && tallSum.meta?.height === 640 && (health('tall')?.videoFrames ?? -1) === tallSum.video.frames;
+    check(`live: the page streams the plate through the app to a landscape and a portrait destination${viaKeychain ? ', the first on a key kept by name in its keychain store' : ''}`, !started.error && keyOk && framesOk && tallOk,
+      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s (${wanted} wanted${canMake < 120 ? `: the encoder probed at ${chosen.msAFrame.toFixed(0)} ms a frame makes ${canMake}` : ''}), ${health('check')?.videoFrames ?? '?'} sent, ${health('check')?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped (${stopped?.timing ? `${(stopped.timing.grabMs / Math.max(1, stopped.frames)).toFixed(1)} ms a frame to grab, first packet ${stopped.timing.firstOutMs === null ? 'never' : `${stopped.timing.firstOutMs.toFixed(0)} ms after the first encode`}, ${stopped.timing.outputs} out; encoder ${stopped.acceleration ?? '?'}` : 'no timing'}); portrait ${tallSum ? `${tallSum.video.frames} frames at ${tallSum.meta?.width}x${tallSum.meta?.height}` : 'never published'}; encoders probed: ${(started.probes ?? []).map((p) => `${p.acceleration}${p.source === 'buffer' ? ' on buffer frames' : ''} ${p.supported === false ? 'unsupported' : p.msAFrame === null ? 'no frame out' : `${p.msAFrame.toFixed(1)} ms a frame, first after ${p.firstOutMs?.toFixed(0)} ms${p.makeMs ? `, ${p.makeMs.toFixed(1)} ms to make one` : ''}`}${p.error ? ` (${p.error})` : ''}`).join('; ') || 'none'}; key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
     await listener.close();
   }
 
