@@ -92,12 +92,12 @@ export const CONTROL_HELP: Record<string, string> = {
   turingDrift: 'How far the print\'s feed and kill rates wander over a minute or so, so the pattern keeps changing.',
 
   // Camera
-  camera: 'The lens as a whole: refraction, depth of field, bloom and the sensor\'s roll-off. Zero is off.',
+  camera: 'The sensor\'s look: highlight roll-off, vignette and grain. The four optics below work without it.',
   focus: 'Where the focal plane sits, from the glass at zero to the top of the thickest domes at one.',
   aperture: 'How quickly things go soft away from the focal plane. Wide is a shallow focus.',
   bloom: 'Glow spilling out around the brightest highlights.',
   chromaticAberration: 'Colour fringing at refracting edges and the corners of the frame.',
-  refraction: 'How much the dye and the bubbles bend what is under them.',
+  refraction: 'How far the liquid\'s sloped surface bends the picture under it, as a thin prism does.',
   microDroplets: 'Satellite droplets on the glass, hundreds of tiny lenses.',
   thinFilm: 'Interference colour where the dye runs thinnest.',
   filmPhysics: 'The thin-film colours, from a plain rainbow at zero to a real soap film\'s at one.',

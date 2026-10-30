@@ -371,7 +371,8 @@ export class WebGPUPlate {
       if (this.aux) this.disposer.release(this.aux);
       this.aux = this.disposer.track(this.device.createTexture({
         label: 'aux', size: [size.width, size.height], format: 'rgba8unorm',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        // COPY_SRC so the lab can read what the lens has to bend and blur (`npm run lens`).
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
       }));
       this.auxSize = [size.width, size.height];
     }

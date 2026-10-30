@@ -1517,7 +1517,6 @@ the maker" is something you would sign, and the 14-day refund line matches what 
 the Free, Home and Pro cards promise only what the app does today. Then sign in, sign out and come
 back: the page should not flash for a returning visit.
 
-
 ## 63. Bass Boost presses harder (PLAN 27g)
 
 Play a track with a clear kick and bass line (the Sound panel's Bass Boost, in Audio Input; on the
@@ -2139,3 +2138,26 @@ every other look.
    that all pile up at one end, or the plate filling with oil from a long song.
 6. Decide: is the line in the right place on each look, which looks want one next, and should the music's colour
    (True Synesthesia) move to the finer pitch (24.3-place-4)?
+
+## 95. The camera's dials (PLAN 33i)
+
+Settings → Camera, with Lens at 0: turn Refraction, Aperture, Bloom and Chromatic Aberration up one
+at a time on a plate with a few pours. Each should visibly matter by about half way, and none should
+be greyed out. Say whether: Refraction bends what is under the domes and rings (not the whole
+frame); Aperture with Focus moved should pull a sharp ring out of a soft ground, and the soft discs
+should look like glass, not like a smear; Bloom should be a halo on the bright dye with a faint wide
+skirt; Chromatic Aberration should be a red/blue edge on the domes that you would notice but not
+mistake for a bug. Then Aperture at 1 on a dense plate: is there hair along the sharp dye edges, and
+does the frame rate hold? Chromatic Aberration alone is lateral colour only (a fringe growing
+towards the corners); a red/blue fringe along the domes' edges needs Refraction up as well, since
+the prism is what spreads the colours. A saved look from before with Lens up should look within a
+few levels of how it did (its optics are rescaled by Lens, the aperture by Focus too, `npm run
+lens` line 6); the residual is a softer blur and a wider glow, not a different picture. It is
+fitted for a frame about a thousand pixels tall: on the laptop's full screen it should match
+best, and on the phone the blur reads softer than it did. Say whether that difference shows.
+Then Evolve on a look with Lens at 0 and Refraction up a little (0.1): its glass theme wanders
+Refraction, Chromatic Aberration and Aperture where a look has them up (it never turns one on from
+0), and at Lens 0 those now bend, fringe and blur the plate where before they drew nothing. Say
+whether that is welcome as part of the dish evolving, or whether Evolve should leave the camera
+alone (PLAN 33i-9), and whether the frame hitches when a calm passage walks the Refraction down to
+0 and back up (33i-8).

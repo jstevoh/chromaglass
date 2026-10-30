@@ -502,6 +502,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'focus',           label: 'Focus',            min: 0, max: 1 },
   { key: 'aperture',        label: 'Aperture',         min: 0, max: 1 },
   { key: 'bloom',           label: 'Bloom',            min: 0, max: 1 },
+  { key: 'chromaticAberration', label: 'Chromatic Aberration', min: 0, max: 1 },
+  { key: 'refraction',      label: 'Refraction',       min: 0, max: 1 },
   { key: 'sharpness',       label: 'Sharpness',        min: 0, max: 1 },
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
