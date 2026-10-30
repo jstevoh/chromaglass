@@ -1411,7 +1411,7 @@ the same line are unmeasured: read them off the first run of the `fifth` shard. 
 
 Bubbles were drawn with a dim dye-coloured disc inside a dark band, the donut. The middle
 is now the plate itself with at most a tenth of the film's tint. The lab's numbers are in
-`docs/plan-shipped.md` §33e; the Mac's are unmeasured (`bubblelook` runs in the open
+`docs/plan-shipped/33-bubbles-closeup.md` §33e; the Mac's are unmeasured (`bubblelook` runs in the open
 shard on software WebGPU). On a real GPU:
 - Pour a dye, blow bubbles with Bubbles at the default, and look at a small and a large
   bubble on a dark look and on a lamp-ground look. A large one should be a clear window
@@ -1426,7 +1426,7 @@ shard on software WebGPU). On a real GPU:
 
 The dye beside the hole a bubble cuts was lit like a ridge, a pale soft ring two to four
 cells wide. The dye's normal is now flat beside the air. The lab's numbers are in
-`docs/plan-shipped.md` §33b; the Mac's are unmeasured (`holeline` runs on software WebGPU).
+`docs/plan-shipped/33-bubbles-closeup.md` §33b; the Mac's are unmeasured (`holeline` runs on software WebGPU).
 On a real GPU:
 - Pour a dye with Edge Relief at the default, blow bubbles and look at the dye round a
   small and a large one on a dark look and on a lamp-ground look. There should be no pale
@@ -1440,7 +1440,7 @@ On a real GPU:
 
 The new **Slosh** dial (0 by default) makes a tilt send the liquid across the plate, pile
 on the low side and come back when the tilt is reversed. The CPU half's numbers are in
-`docs/plan-shipped.md` §18a-13 (`npm run slosh`); the GPU half is unmeasured here. On a
+`docs/plan-shipped/18-physics.md` §18a-13 (`npm run slosh`); the GPU half is unmeasured here. On a
 real GPU:
 - Pour two or three dyes, raise Slosh to about half, then tip with Tilt Direction (or
   the phone's Tilt) one way and, a second later, the other. The colour should slop across
@@ -1460,7 +1460,7 @@ real GPU:
 ## 59. The closeup is the liquid, not cells (PLAN 33g)
 
 Paint Cells and Macro Lacing now default to 0, and the closeup's relief is lit by a lower
-lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmeasured
+lamp. The lab's numbers are in `docs/plan-shipped/33-bubbles-closeup.md` §33g; the Mac's are unmeasured
 (`macroview` runs on software WebGPU). On a real GPU:
 - Pour a dye, stir it, and zoom in to 4x and 6x (the pinch, the Auto camera) on `classic`,
   `jellyfish-bloom` and a dark look. It should read as the same liquid seen nearer: a
@@ -1532,7 +1532,7 @@ bass you wanted.
 
 The slosh dish is two layers now, oil lenses riding on water, solved on the GPU with a
 Riemann flux, so a hard tip makes a running jump (a bore) instead of a smooth slope. The
-numbers are in `docs/plan-shipped.md` §18a-13a (`npm run slosh`, `sloshgpu`); the Metal run
+numbers are in `docs/plan-shipped/18-physics.md` §18a-13a (`npm run slosh`, `sloshgpu`); the Metal run
 is the plate shard. On a real GPU:
 - On a look with oil on the plate, raise Slosh to about half and tip one way,
   then the other. The water should run ahead and the oil lag behind it and shear past it:

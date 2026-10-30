@@ -27,7 +27,7 @@ dropped picture or 3D model driven by the music as its own look does not.
 because our free site asks for a login and needs its own reason to (saves your looks);
 a grid of generic stock thumbnails: ours are the plate itself.
 
-- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version*: `Landing.tsx` before the sign-in, `npm run signin` holding it; the owner's look is `docs/judging.md` §62. Story in `docs/plan-shipped.md` §34a (moved 2026-10-29, 19m-2).
+- **34a. A landing page before the sign-in wall.** *Shipped (2026-10-22), first version*: `Landing.tsx` before the sign-in, `npm run signin` holding it; the owner's look is `docs/judging.md` §62. Story in `docs/plan-shipped/34-photism.md` §34a (moved 2026-10-29, 19m-2).
 - **34a-2. A filmed hero with its music, from a Mac.** *(S; owner's Mac. The owner, 2026-10-22: the
   video examples should be better, and should play with the music audibly.)* The hero is a cross-fade of five of
   the app's own frames, because a cloud session cannot film the app and the lab's plate barely
@@ -69,7 +69,7 @@ a grid of generic stock thumbnails: ours are the plate itself.
   `src/lib/tierGates.ts` to the live products' links and register the live webhook. `npm run
   license-worker` checks 9 to 9d.
 - **34a-5. The owner's words and the share card.** *The words shipped (2026-10-28, the owner's OK
-  on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
+  on a line-by-line draft; story in `docs/plan-shipped/34-photism.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
   note goes unsigned unless the owner says otherwise.
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
@@ -88,7 +88,7 @@ a grid of generic stock thumbnails: ours are the plate itself.
   sync. Rule: when an item on the page ships or a gate moves, the page changes in the same PR.
   Found along the way:
   - **34a-7a. OSC and Art-Net are Pro.** *Shipped (2026-10-30, the owner's yes on the card of
-    2026-10-29; story in `docs/plan-shipped.md` §34a-7a).* `npm run tiers` 4b and 4c.
+    2026-10-29; story in `docs/plan-shipped/34-photism.md` §34a-7a).* `npm run tiers` 4b and 4c.
   - **34a-7h. The Mac app's OSC menu does not know the tier.** The gate is in the show server, so
     a Home licence opens the port from *Show → OSC input (Pro)* and only Show Server Details says
     packets are ignored; the menu could instead show the item disabled with an upgrade line, read

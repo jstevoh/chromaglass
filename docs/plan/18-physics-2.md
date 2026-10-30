@@ -50,7 +50,7 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 ## 18c. A pour adds liquid, not only colour
 
 **18c-1 shipped** (a bottle's pour is volume on a thin gap; `npm run flush`, judging §43; story in
-`docs/plan-shipped.md` §18c). Left, each its own PR:
+`docs/plan-shipped/18-physics.md` §18c). Left, each its own PR:
 
 - **18c-2** The colour's own drops as volume. A bottle's deposit is volume now, but the
   colour each tool lays with it (`autoInject`, `addDensity`) is still stamped with none,
@@ -70,7 +70,7 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 ## 18d. Each liquid has its real properties (replaces the property scalars)
 
 **18d-1 shipped** (each poured liquid's own viscosity on a thin gap; `npm run thick`, judging §42; story in
-`docs/plan-shipped.md` §18d). The rest of 18d is these items, each its own PR:
+`docs/plan-shipped/18-physics-2.md` §18d). The rest of 18d is these items, each its own PR:
 
 - ~~**18d-2**~~ Flushing, not fading: shipped with 18c-1 (`npm run flush`). Nothing fades
   the species; it leaves over the open rim when pours push it there, and the
@@ -102,7 +102,7 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   nothing fades it the loss shows: a governor's move drops every poured liquid. Carry it.
   On the old plate (Thin Gap off), the CPU body drag is still the thickness.
 - **18d-11** The cost on the Mac. ~~**18d-11a**~~ shipped: the species rides the colour's
-  own carry (`bodyAdvectPairSub`, `npm run thick`; story in `docs/plan-shipped.md`).
+  own carry (`bodyAdvectPairSub`, `npm run thick`; story in `docs/plan-shipped/18-physics-2.md`).
   On CI's Mac it halved: 6.73 ms a step at 768² against 13.54 alone, half the colour's
   carry where it was all of it. The other half is the species' own texels (rgba32f, nine
   reads and a write a cell a substep). Left: read the owner's Mac with `?debug` (judging
@@ -116,7 +116,7 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   its own (the colour goes in the maze's sixths there, not carryPlan's substeps). Found
   in 18d-11a; Oil Bodies' pair would save a whole carry on every look with Oil Bodies.
 - **18d-12 shipped** (each liquid pours its own colour, a dye picked tints it;
-  `npm run natural`, judging §44; story in `docs/plan-shipped.md` §18d). Found with it:
+  `npm run natural`, judging §44; story in `docs/plan-shipped/18-physics-2.md` §18d). Found with it:
   - **18d-12a** The automation's pours of a bottle (`pourLiquid`, the look's own liquids
     and an area's) lay the liquid and no colour, so a look that doses syrup doses clear
     syrup. Give them the bottle's own colour (amber syrup, white milk, gold oil) as the
@@ -173,7 +173,7 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
   Extends 15e, which found these forces measured only on a stand-in plate.
 
 ## 18e. Edges come from refraction (replaces the painted rims and highlights)
-**Partly shipped** (#355): on projected looks the front plate's edges come from the projector's pupil loss and the shadowgraph's Becke doublets, from the optical path n·h in the derive pass, with a Projector Focus control (0.5, in focus, by default); the painted highlights are gone from projected looks. The named shortcuts are in `refractionOptics`' notes; story and measurements in `docs/plan-shipped.md` §18e (moved 2026-10-29, 19m-2). What did not ship is below (18e-1 to 18e-4); follow-ons **31a** (the defocus Δz as a control) and **31d** (the shadowgraph per band). Open:
+**Partly shipped** (#355): on projected looks the front plate's edges come from the projector's pupil loss and the shadowgraph's Becke doublets, from the optical path n·h in the derive pass, with a Projector Focus control (0.5, in focus, by default); the painted highlights are gone from projected looks. The named shortcuts are in `refractionOptics`' notes; story and measurements in `docs/plan-shipped/18-physics-2.md` §18e (moved 2026-10-29, 19m-2). What did not ship is below (18e-1 to 18e-4); follow-ons **31a** (the defocus Δz as a control) and **31d** (the shadowgraph per band). Open:
 
 - **18e-1. Layer 1's painted boundary line (a painted shortcut until 31a separates the two dishes' heights).** On projected looks with `derivedOn > 0.5`, Layer 1 keeps a painted boundary line (`edge1 * boundaryContrast * 1.6` from `smoothstep(0.1, 0.6, length(near1.xy))`, gated on `fluid1.a > 0.03`) alongside `refractionOptics(near1, 0.0, 0.0, 0.0)`. At default `projectorFocus = 0.5`, both dishes currently sit at Δz = 0 so the shadowgraph Becke term is 1 and `refractionOptics` only darkens by pupil loss; without the painted line on Layer 1, the back plate's Screen vs Multiply separation in `npm run mixer` falls to 9.9 (bar > 10, 11.0 on main, 10.3 with the line), while applying that brightening to Layer 0 clips the 90th-percentile thin-dye rim in `mixer`'s single-dish mid-grey contrast check (`129.5 → 136.4` without it, `130.9 → 134.7` with it). Replace the painted line when **31a** gives the upper dish its inter-dish focal offset Δz₁ in the projector cone.
 - **18e-2. A clear pour's edge, and the deflection from the optical path.** The aperture's deflection is worked out from the dye's air-masked slope (`θ ≈ |∇density| · 0.35`, weighted by Edge Relief × plateAmt, plus `bEdge · boundaryContrast · 1.1` shaped by `smoothstep(0.25, 1.0, uB) * 0.78` at a hue-gated two-dye boundary, refractionOptics note 1), and `refractionOptics` returns early where both are flat. So an edge with no dye across it, glycerine poured clear into water (Δn 0.14) or the oil's rim, reaches ∇²OPL in the derive pass but draws no line on the wall. #355 took the oil's painted rim (`|∇oil|·2.2`) off projected looks, so a clear oil drop with no dye across its rim has no rim line there until this ships (its 8% lens brightening stays). Deflect by ∇OPL instead (the derive pass would write ∇OPL in place of the dye's slope, and the camera looks keep theirs), then retune the dye's stand-in index against it. A look change: every look's edges move.
@@ -184,7 +184,7 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 
 **Shipped (#352):** In-plane thermal buoyancy is strictly gated on plate uprightness (zero
 on a level plate) with tanh saturation removed (linear Boussinesq). Story in
-`docs/plan-shipped.md` §18f (moved 2026-10-29, 19m).
+`docs/plan-shipped/18-physics-2.md` §18f (moved 2026-10-29, 19m).
 
 Open follow-ups:
 - **18f-1. Full per-channel absorbance across all passes:** decode RGB absorbance per channel for spectral heating across every look and pass rather than single-pass average.
@@ -194,15 +194,15 @@ Open follow-ups:
 
 ## 18g. Colour leaves by flushing, not by fading
 
-**18g-1 shipped** (the open circular rim, $r \ge 0.5$, into the overflow trough; `npm run flush`, story in `docs/plan-shipped.md` §18g; #362). The rest of 18g is these items, each its own PR:
+**18g-1 shipped** (the open circular rim, $r \ge 0.5$, into the overflow trough; `npm run flush`, story in `docs/plan-shipped/18-physics-2.md` §18g; #362). The rest of 18g is these items, each its own PR:
 
 - ~~**18g-1**~~ Flushing, not fading: the open rim (#362). Shipped; story in
-  `docs/plan-shipped.md` §18g-1 (moved 2026-10-29, 19m).
+  `docs/plan-shipped/18-physics-3.md` §18g-1 (moved 2026-10-29, 19m).
 - **18g-2** airExclude and the standing bubble pump: replace the destructive multiply with volume-fraction exclusion.
 - **18g-3** capDye and solvent evaporation: model real evaporation as solvent loss leaving a coffee ring at the rim, rather than dye loss.
 - **18g-4** r16f flux pass: carrier-thickness field for evaporation and liquid volume fraction.
 - **18g-5** Remove the dye-budget regulator safety cap once 18c-2 (pours add volume) ships and looks cannot saturate.
-- ~~**18g-6**~~ An oil body touching the open rim no longer drains through it by its own surface tension: the rim is held at the oil's Laplace pressure, not the water's zero (CAPILLARY, rimLaplace; `npm run rimhold`, a lens at the rim 9.6% → 97.1% kept over six seconds). Story in `docs/plan-shipped.md` §18g.
+- ~~**18g-6**~~ An oil body touching the open rim no longer drains through it by its own surface tension: the rim is held at the oil's Laplace pressure, not the water's zero (CAPILLARY, rimLaplace; `npm run rimhold`, a lens at the rim 9.6% → 97.1% kept over six seconds). Story in `docs/plan-shipped/18-physics-2.md` §18g.
 - **18g-7, open. A lens against the rim on the diagonal loses about 0.13% of its oil a second whatever its tension** (found building 18g-6: at a hundredth of Clock Glass's Oil Tension the lens laid against the rim at 45° kept 99.6% over the last three of six seconds, and over twelve seconds lost 1.8%; at the middle of the grid's edge it loses none). The oil past the rim grows by the same amount, so it is carried or relaxed across the rim's staircase cells, not pushed by a pressure: the mix's own Cahn–Hilliard relaxation (mixRelax/mixMu/mixUpdate read their neighbours past the rim with no rim condition) or the carry's faces there. Measure which first (oilBodies 0, the relaxation off), then give the mix the rim's zero-flux condition for its chemical potential, as dyeDisperse's diffusion has.
 - **18g-8, open (a shortcut named). The gap's own curvature, 2σ/h across the gap, is not in the solve.** The thin gap's surface tension is the in-plane curvature alone; across an even gap the other curvature is the same everywhere and moves nothing, but where the gap changes (a press, a domed plate, and the cover glass's edge, where the gap opens into the reservoir) it pushes a non-wetting oil body toward the deeper liquid (Dangla, Kayi & Baroud 2013, drops moved by gradients of confinement). So whether a body at the rim is drawn out under the cover's edge into the reservoir, or held there by its in-plane interface as 18g-6 now has it, depends on a term the solve does not have. Add it as a force from the gap's gradient, σ·c̃·∇(2/h), and measure a lens in a wedge against the confinement speed before it is let near the rim. And the rim sets no contact angle: 18g-6's held pressure assumes the body's interface carries on past the rim, so the angle it meets the rim at is the grid's. At the middle of the grid's edge clampP mirrors the oil's blur (about 90°) and a lens there spreads along the rim (13.8 → 37.8 cells' worth of oil on the rim's cells over six seconds, review of #455); on the diagonal it draws itself off the rim (8.3 → 1.2), so part of what `npm run rimhold` reads as held there is a lens that has left the rim. A contact-line condition at the cover glass's edge (a pinned or angled interface, Gibbs' criterion at a sharp edge) belongs with the gap's curvature here, since both are what happens to the interface at the cover's edge.
 
@@ -227,7 +227,7 @@ Open follow-ups:
 - **Gain:** a show ages the way a real plate does. It turns over, and it can dry.
 
 ## 18h. Dye diffuses physically; heat its own kappa (replaces isotropic diffusion)
-**Partly shipped** (#357): single explicit finite-volume stage (`dyeDisperse`) replaces 4-iteration isotropic Jacobi diffusion; molecular diffusion $D_m \approx 4\times 10^{-10}\text{ m}^2/\text{s}$ holds sharp edges; water thermal diffusivity ($\kappa \approx 1.4\times 10^{-7}\text{ m}^2/\text{s}$) decoupled from dye diffusion slider; limiter handles mass conservation correctly; measured by `npm run dispersion` (6/6). How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#357): single explicit finite-volume stage (`dyeDisperse`) replaces 4-iteration isotropic Jacobi diffusion; molecular diffusion $D_m \approx 4\times 10^{-10}\text{ m}^2/\text{s}$ holds sharp edges; water thermal diffusivity ($\kappa \approx 1.4\times 10^{-7}\text{ m}^2/\text{s}$) decoupled from dye diffusion slider; limiter handles mass conservation correctly; measured by `npm run dispersion` (6/6). How it was found, built and measured is in [`docs/plan-shipped/18-physics-2.md`](../plan-shipped/18-physics-2.md), under the same number.
 
 Left from 18h, each its own item:
 
@@ -236,7 +236,7 @@ Left from 18h, each its own item:
 
 ## 18i. Bubbles and beads live by physics, not timers
 
-**Partly shipped** (#358): Bretherton lubrication, agitation-driven wander, Saffman–Taylor fingers on the Straw, Reynolds film-drainage merge and the beads' pancake lag (`npm run bubblephysics`). Story in `docs/plan-shipped.md` §18i (moved 2026-10-29, 19m-2). Open:
+**Partly shipped** (#358): Bretherton lubrication, agitation-driven wander, Saffman–Taylor fingers on the Straw, Reynolds film-drainage merge and the beads' pancake lag (`npm run bubblephysics`). Story in `docs/plan-shipped/18-physics-2.md` §18i (moved 2026-10-29, 19m-2). Open:
 - Expose physical-only pop mode as a user setting (`timedPops = false`).
 - Rim drainage when bubbles reach the dish boundary.
 
@@ -245,7 +245,7 @@ Left from 18h, each its own item:
 Shipped in #353 (2026-10-10): optical scattering packed into `vel.w` from species channel 2
 with conserved flux-form advection; Kubelka–Munk diffuse backscattering on black ground
 yielding opaque white milk and pastel food dyes (PLAN §4); two-flux forward extinction with
-Rayleigh-Gans wavelength … Story in `docs/plan-shipped.md` §18j (moved 2026-10-29, 19m).
+Rayleigh-Gans wavelength … Story in `docs/plan-shipped/18-physics-2.md` §18j (moved 2026-10-29, 19m).
 
 ## 18k. Smaller ones
 
@@ -275,7 +275,7 @@ Rayleigh-Gans wavelength … Story in `docs/plan-shipped.md` §18j (moved 2026-1
   Noted for the ferrofluid thread (9f onward), not audited further here.
 
 ## 18l. A dye has more than one colour (replaces the perfect filters and the three-dye rule)
-**Partly shipped**: finite dyes, depth drawn, the hue-keeping grade and five dyes on the plate (#281). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: finite dyes, depth drawn, the hue-keeping grade and five dyes on the plate (#281). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/18-physics-3.md`](../plan-shipped/18-physics-3.md), under the same number.
 
 - **18l-4. Three widened looks read fewer colours on the survey's plate:** Acid Trip
   (146 → 138; its exclusion blend inverts where dyes overlap), Fractal Dream (42 → 38)

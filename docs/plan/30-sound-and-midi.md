@@ -52,7 +52,7 @@ analyzer look; Chladni figures, real physics). Pricing was left out at the owner
 ## ~~30a. A sound cord has only a depth~~ (shipped 2026-10-26)
 
 Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Story in
-`docs/plan-shipped.md` §30a (moved 2026-10-29, 19m).
+`docs/plan-shipped/30-sound-and-midi.md` §30a (moved 2026-10-29, 19m).
 
 - **30a-1. The dragged band on the cast display and the phone remote.** Decided with 30a:
   on a second screen attached to the laptop (`StageMirror` in `CastDisplay.tsx`), the

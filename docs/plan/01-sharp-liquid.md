@@ -1,10 +1,10 @@
 # 1. Sharp liquid, and pigment in it
 
-**Shipped**: sharpening retired, granulation stands. How it was built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped**: sharpening retired, granulation stands. How it was built and measured is in [`docs/plan-shipped/01-sharp-liquid.md`](../plan-shipped/01-sharp-liquid.md), under the same number.
 
 ## 1a. The grain at the dye's edge made the plate look digital (shipped)
 
-**Shipped.** Story in `docs/plan-shipped.md` §1a (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped/01-sharp-liquid.md` §1a (moved 2026-10-29, 19m).
 
 - **1b. Agate's Liesegang rings are dots on a 128² lattice** (lane C, `liesStep` in
   wgsl/fluid.ts, `LIES_GRID`). The precipitate nucleates once per cell of its own grid, so

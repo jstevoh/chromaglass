@@ -353,7 +353,7 @@ rest is routine and the owner's calls.
   - **37x-4b. The encoder and one destination.** *(shipped 2026-10-29, #577.)* `desktop/live.js`
     (the RTMPS client), `desktop/rtmp.js` (the wire), `desktop/keys.js` (the key store),
     `src/lib/liveStream.ts` (the wall-clock encoder), `window.__cgLive` in the Mac app, and
-    `npm run live` against `scripts/rtmpListener.mjs`; story in `docs/plan-shipped.md` §37x-4b.
+    `npm run live` against `scripts/rtmpListener.mjs`; story in `docs/plan-shipped/37-marketing.md` §37x-4b.
     Found building it, for the parts after:
     - *The picture is the plate's canvas.* `__cgLive` streams `#liquid-canvas`, the laptop's
       plate, not the projector's pass (§31's Wall output, the mixer's stack). A show with a
@@ -389,7 +389,7 @@ rest is routine and the owner's calls.
   - **37x-4c. Several destinations, and a vertical one.** *(shipped 2026-10-30.)*
     `desktop/liveSession.js` (one encode written to N sockets, each dropping and
     reconnecting on its own), a portrait encode of the plate's middle, the health readout,
-    `npm run livedrop` against a throttled listener; story in `docs/plan-shipped.md`
+    `npm run livedrop` against a throttled listener; story in `docs/plan-shipped/37-marketing.md`
     §37x-4c. Found building it, for the parts after:
     - *A slow upload stalls the stream before it drops.* The bound is two seconds of
       stream not yet at the server; past it video is dropped until it is back under one.
@@ -416,7 +416,7 @@ rest is routine and the owner's calls.
   - **37x-4d. The Live Show panel and the Pro gate.** *(shipped 2026-10-30.)* The Live
     Show panel in the Mac app (`src/components/LiveShowPanel.tsx`, one controller for it,
     the console and the phone in `src/lib/liveShow.ts`), the phone remote's live chip and
-    two-tap Stop on Draw and Controls, `npm run liveshow`; story in `docs/plan-shipped.md`
+    two-tap Stop on Draw and Controls, `npm run liveshow`; story in `docs/plan-shipped/37-marketing.md`
     §37x-4d. Found building it, for the parts after:
     - *37x-4d-1. Stream the mixer's stack, not only the laptop's plate.* (Open; moved here
       from 37x-4b's found item, which 4d was to take.) The panel streams `#liquid-canvas`

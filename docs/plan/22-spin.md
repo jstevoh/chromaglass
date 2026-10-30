@@ -1,5 +1,5 @@
 # 22. Spin the plate
-**Partly shipped** (#223, #252, #258, #261): the Spin tool, Auto Spin, the one dish under a plate, the cut of the swirl's projection and the look's motor retune are in. The shortcuts and what is open are below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#223, #252, #258, #261): the Spin tool, Auto Spin, the one dish under a plate, the cut of the swirl's projection and the look's motor retune are in. The shortcuts and what is open are below. How it was found, built and measured is in [`docs/plan-shipped/22-spin.md`](../plan-shipped/22-spin.md), under the same number.
 
 Asked 2026-09-28: "spin the plate on command, or set it to spin automatically at some
 rate (or a rate controlled by some other factor, like music tempo); give me a control
@@ -52,7 +52,7 @@ rate (or a rate controlled by some other factor, like music tempo); give me a co
   cyberpunk and stardust-collapse, their liquid turns faster than 0.05 rad/s all the
   time and the swirl's centrifuge runs on every step there, not only while they play
   (22k measured what that costs: under a fifth of a percent of the GPU).
-- ~~**22k. The swirl runs on every look with music routed to rotation.**~~ **Measured and cut** (#258). Story in `docs/plan-shipped.md` §22k (moved 2026-10-29, 19m-2).
+- ~~**22k. The swirl runs on every look with music routed to rotation.**~~ **Measured and cut** (#258). Story in `docs/plan-shipped/22-spin.md` §22k (moved 2026-10-29, 19m-2).
 
   Found along the way:
   - **22g's thin palm reads 0.307 in the lab, not the 0.607 written there,** on main before

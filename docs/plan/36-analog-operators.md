@@ -87,7 +87,7 @@ button, making it look good. Every item here is held to those.
   unblock it as a performer's control: a Heat dial and a pad gesture, the lamp feeding
   heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
   bubbles while it is held and calming when released. Not a bubble sprite.
-  - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the reference the GPU build (36e-2) is held to and `npm run boil` its judge (#352 took the buoyancy tanh out). Story in `docs/plan-shipped.md` §36e-1 (moved 2026-10-29, 19m-2). *Owed with 36e-4:* `boil`'s dry-out look-alike passes today (it throws away 1.7% of the lamp's heat, moving the ledger 0.16%, under its 3% bar); once the glass absorbs the infrared, that build adds a tighter dry-out ledger line.
+  - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the reference the GPU build (36e-2) is held to and `npm run boil` its judge (#352 took the buoyancy tanh out). Story in `docs/plan-shipped/36-analog-operators.md` §36e-1 (moved 2026-10-29, 19m-2). *Owed with 36e-4:* `boil`'s dry-out look-alike passes today (it throws away 1.7% of the lamp's heat, moving the ledger 0.16%, under its 3% bar); once the glass absorbs the infrared, that build adds a tighter dry-out ledger line.
   - **36e-2. The GPU build** (*open*, Antigravity's brief in the project's shared files).
     The model as passes on the plate's grid: the temperature in kelvin, the lamp in watts,
     the Heat dial, the hand's held air, the threshold and the vapour as a field the bubbles'

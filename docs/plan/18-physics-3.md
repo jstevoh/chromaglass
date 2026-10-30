@@ -32,9 +32,9 @@ Part 3 of 3 of §18; it begins at 18l-7. The section starts in `18-physics.md`.
 **Shipped** (#364): a pool of dye on a level plate runs out along the lower glass as a
 viscous gravity current (`wgsl/slump.ts`, its own stage in the dye's step, apart from
 18h's blur), measured against Huppert's law by `npm run slump`. How it was found, built and
-measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
+measured is in [`docs/plan-shipped/18-physics-3.md`](../plan-shipped/18-physics-3.md), under the same number. Open:
 
-- ~~**18m-1. The slump's cap (a speed shortcut).**~~ **Partly shipped** (#371): a per-cell regime switch min(viscous rate, inertial rate) with the Huppert–Simpson front Froude number in `slumpRate`, in planned substeps (`npm run slump` 13/13). Story in `docs/plan-shipped.md` §18m-1 (moved 2026-10-29, 19m-2); what it keeps is 18m-1a.
+- ~~**18m-1. The slump's cap (a speed shortcut).**~~ **Partly shipped** (#371): a per-cell regime switch min(viscous rate, inertial rate) with the Huppert–Simpson front Froude number in `slumpRate`, in planned substeps (`npm run slump` 13/13). Story in `docs/plan-shipped/18-physics-3.md` §18m-1 (moved 2026-10-29, 19m-2); what it keeps is 18m-1a.
 - **18m-1a. Implicit backward-Euler slump step and grid-independent inertial flux.**
   #371's `min(viscous, inertial)` is a regime switch inside the explicit pass, not an
   implicit step, and keeps two shortcuts: (1) the pass is still explicit forward Euler in
@@ -65,7 +65,7 @@ measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same nu
   lobes are the plate's: the drop landing off true, the glass not flat, the lamp's heat
   (18f) and the flow streaking it (18h). Look again once 18f and 18h are in; build
   nothing for them here.
-- ~~**18m-5. The grid filter makes dye at a drop's rim.**~~ **Shipped**: `dampGrid` takes its clamp's excess back across the 7×7 neighbourhood around the stencil (`dampGridCurv`, `dampGridLimit`, `dampGrid`); story and numbers in [`docs/plan-shipped.md`](docs/plan-shipped.md).
+- ~~**18m-5. The grid filter makes dye at a drop's rim.**~~ **Shipped**: `dampGrid` takes its clamp's excess back across the 7×7 neighbourhood around the stencil (`dampGridCurv`, `dampGridLimit`, `dampGrid`); story and numbers in [`docs/plan-shipped/18-physics-3.md`](../plan-shipped/18-physics-3.md).
 - **18m-5a. Run `npm run slump` with the grid filter on.** Now that `dampGrid` holds the glycerine drop's dye (`+0.000%` at 2 s and 20 s, against `+0.93%` and `+3.20%` before; `+0.42 ppm/s` on `npm run grating` §4 against `+1.47 ppm/s` on `main`) and does not move the front (`3.94 mm` at 2 s and `4.50 mm` at 20 s, against `4.13 mm` and `4.66 mm` before), turn the grid filter on in `scripts/slump.mjs` and fold the glycerine drop conservation check from the 18m-5 PR into `npm run slump`.
 
 ## Kept, named as dials or looks

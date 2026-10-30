@@ -1,6 +1,6 @@
 # 5. Playing it: sound learn, shutter, and a look link
 
-**Partly shipped** (#154, #155): the bands and sound learn's music source and triggers (`npm run bands`, `npm run learn`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped** (#154, #155): the bands and sound learn's music source and triggers (`npm run bands`, `npm run learn`). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/05-playing-it.md`](../plan-shipped/05-playing-it.md), under the same number.
 
 `src/lib/soundLearn.ts` (new), `src/hooks/useAudioAnalyzer.ts`, `src/components/MidiPanel.tsx`,
 `src/lib/cameraPass.ts`, `src/App.tsx`

@@ -19,7 +19,7 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   and last call. No bar moved. When a red names the pour, either mark it as the show's own
   in the log (the way the dye log marks `auto`) or hold the show off the plate for the
   window, as `__bottleTest` already holds `doseLiquid` off.
-- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** The hook keeps what it was asked (`forcedStepDown`); no bar, no governor change. Story in `docs/plan-shipped.md` §19aa-10 (moved 2026-10-29, 19m-2).
+- **19aa-10. `npm run tiers` raced on Measure · lab (found 2026-10-25, fixed).** The hook keeps what it was asked (`forcedStepDown`); no bar, no governor change. Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19aa-10 (moved 2026-10-29, 19m-2).
 - **19aa-11. The Mac `webgpu` check "the stage starts, with nothing asked for" (3 of 192,
   read 2026-10-25; two of them within twenty minutes that day).** `no stage` with no
   `gpuFailure`, 30 s after load, on the first page of the run only: every later page of
@@ -57,9 +57,9 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   so the week after this merges is the evidence. Two more on 2026-10-30 (#550's `open` shard on one head, af60ee4): 2.09 and 2.49 s against 0.72
   and 0.74 s, the show moving for good at 14.3 and 14.6 s against 23.6 and 22.1 s; the third run
   of the shard read it green, and nothing in that diff was on the opening's path.
-- **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
+- **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped/19-checks-build-plan-3.md`
   §19aa-2 (moved 2026-10-29, 19m).
-- **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
+- **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped/19-checks-build-plan-2.md`.
 - **19aa-4. `deploygate.sh` keeps the token off curl's command line.** It passes
   `-H "Authorization: Bearer $GH_TOKEN"` as an argument (`scripts/deploygate.sh`, the `api()`
   helper), and the owner runs it locally with `GH_TOKEN=$(gh auth token)`, so any process
@@ -71,10 +71,10 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
 ## 19ab. A shard's tool fetches are bounded, and the browser is cached
 
 - **19ab-1. A slow download no longer reads as a failing check (shipped 2026-10-24).** Story
-  in `docs/plan-shipped.md` §19ab-1 (moved 2026-10-29, 19m).
+  in `docs/plan-shipped/19-checks-build-plan-3.md` §19ab-1 (moved 2026-10-29, 19m).
 
 - **19ab-2. apt runs only for a library that is really missing, and a missing one fails by
-  name (shipped 2026-10-24).** Story in `docs/plan-shipped.md` §19ab-2 (moved 2026-10-29,
+  name (shipped 2026-10-24).** Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19ab-2 (moved 2026-10-29,
   19m).
   - **19ab-3. Open: the runner's fonts are printed, not held.** `--with-deps` pinned
     fonts-liberation and fonts-noto-color-emoji; they are on the runner today
@@ -83,7 +83,7 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
     step prints `fc-match sans-serif` and `emoji`; make it fail on a fallback that
     is not the one the checks were measured with, once CI's own reading is known.
 - **19ab-4. ffmpeg comes from the Actions cache, and a cold fetch skips a slow mirror
-  (shipped 2026-10-26).** Story in `docs/plan-shipped.md` §19ab-4 (moved 2026-10-29, 19m).
+  (shipped 2026-10-26).** Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19ab-4 (moved 2026-10-29, 19m).
   - **19ab-4a. Open: drop the cache's `restore-keys`.** `cache-hit` is true only on the
     exact key, so when a new runner image restores the last image's set through
     `restore-keys` and it installs cleanly, the save step stores that same old set under
@@ -107,7 +107,7 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
 ## 19ac. The phone's double tap on Speed is judged on two taps landing in time
 
 - **19ac-1. The double tap's two taps carry a finger's times (shipped 2026-10-24).** Story
-  in `docs/plan-shipped.md` §19ac-1 (moved 2026-10-29, 19m).
+  in `docs/plan-shipped/19-checks-build-plan-2.md` §19ac-1 (moved 2026-10-29, 19m).
 - **19ac-2. How long a tap on the phone's sheet takes to answer is unjudged.** The double
   tap now prints it ("handled N ms apart"); the old red implied up to about 400 ms on a
   busy Mac runner. Bound it where the phone's frame and renders checks live, from a
@@ -117,14 +117,14 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   the middle (shipped 2026-10-29).** The canvas's (0.25, 0.3) to (0.4, 0.3) lay on the plate
   0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
   The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
-  the clearance each run. Story in `docs/plan-shipped.md` §19ac-3.
+  the clearance each run. Story in `docs/plan-shipped/19-checks-build-plan-2.md` §19ac-3.
 - **19ac-4. `mirror`'s "and nowhere else" named the hand's own drop (shipped 2026-10-30).**
   Since #512 the check photographs the Perform tab's preview, a wide window on the dish
   where a cell is 0.055 of the plate tall and 0.154 wide, and a held drop reaches two cells
   up its column (0.11 of the plate, 22 to 25 against a drift of 8 to 9) where the check
   counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
   under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
-  with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+  with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped/19-checks-build-plan-2.md` §19ac-4.
 - **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
   and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
   the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
@@ -250,7 +250,7 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
 
 ## 19af. The repository's front page: a short README, the guide in docs/, a clean root (shipped 2026-10-25)
 
-**Shipped.** Story in `docs/plan-shipped.md` §19af (moved 2026-10-29, 19m).
+**Shipped.** Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19af (moved 2026-10-29, 19m).
 
 - **19af-2. Open, the owner's, GitHub settings a session cannot change** (the agent proxy
   refuses writes to repository-settings paths): the About description, the website link
@@ -268,7 +268,7 @@ advisories.
 - **19ag-1. Shipped.** `firebase.json` sends, on every path: an **enforced**
   `Content-Security-Policy` of the four directives that cannot break a page this app serves
   (`frame-ancestors` for the site's own three names only, which the Auth iframe needs;
-  `object-src 'none'`; `base-uri 'self'` … Story in `docs/plan-shipped.md` §19ag-1 (moved
+  `object-src 'none'`; `base-uri 'self'` … Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19ag-1 (moved
   2026-10-29, 19m).
 - **19ag-2. Open, the CSP enforced.** The report-only policy keeps `'unsafe-inline'` in
   `script-src` for three inline scripts in `index.html` and the preload list the build writes
@@ -328,7 +328,7 @@ The owner approved splitting the files sessions read most (the plan page of 2026
 the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), 19ai-8, and 19ai-9 (the settings panel).
 
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
-  was module code above the component. Story in `docs/plan-shipped.md` §19ai-3 (moved
+  was module code above the component. Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19ai-3 (moved
   2026-10-29, 19m).
 - **19ai-3a. Found along the way.** The review said `lib/stir`, `squish`, `plateRock` and
   `turntable` import types from the component; they only name it in comments. The one
@@ -339,10 +339,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
   reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
   whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
-- **19ai-4a. Shipped with 19ai-8 for App's setters** (the story in `docs/plan-shipped.md`).
+- **19ai-4a. Shipped with 19ai-8 for App's setters** (the story in `docs/plan-shipped/19-checks-build-plan-4.md`).
   The plate's setters in `LiquidVisualizer.tsx` still cast, and drop theirs when next edited.
 - **19ai-8. Shipped: `App()` into its domains' hooks** (`src/app/`, 34 hooks; `App.tsx` 372,525
-  → 215,830 bytes; the story in `docs/plan-shipped.md`). A check that reads App's source as
+  → 215,830 bytes; the story in `docs/plan-shipped/19-checks-build-plan-4.md`). A check that reads App's source as
   text reads `scripts/appSource.mjs`, App and its hooks as one text.
 - **19ai-8a. Open: what stayed in `App()`.** The settings' writers at its heart (the ride,
   the drift, `updateSettings`, `applyPreset`, the saved-look document, `lookPhase` and
@@ -357,7 +357,7 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   19ai-8a has moved the settings' writers, the ones that read a domain's state and its
   setters can take that domain's hook result instead of its pieces.
 - **19ai-9. Shipped: the settings panel's sections into `src/components/settings/`**
-  (`SettingsPanel.tsx` 201,442 → 23,916 bytes; the story in `docs/plan-shipped.md`). A check
+  (`SettingsPanel.tsx` 201,442 → 23,916 bytes; the story in `docs/plan-shipped/19-checks-build-plan-4.md`). A check
   that reads the panel's markup as text reads `scripts/settingsSource.mjs`, the panel and
   its sections as one text.
 - **19ai-9a. Open, found along the way: the panel's seventy-two props.** App hands
@@ -366,12 +366,12 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   each domain one hook result, the panel can take the film's or the tempo's whole, as its
   sections read them; until then a new value a section reads is four edits for one name
   (App, the props, `SectionCtx` and the object the panel builds).
-- **19ai-5. Shipped: `npm run sizes`, a size ratchet.** Story in `docs/plan-shipped.md`
+- **19ai-5. Shipped: `npm run sizes`, a size ratchet.** Story in `docs/plan-shipped/19-checks-build-plan-3.md`
   §19ai-5 (moved 2026-10-29, 19m).
 - **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** Story in
-  `docs/plan-shipped.md` §19ai-5c (moved 2026-10-29, 19m).
+  `docs/plan-shipped/19-checks-build-plan-3.md` §19ai-5c (moved 2026-10-29, 19m).
 - **19ai-5d. Shipped: a warning at 40 KB, a failure at 100 KB** (the owner's pick,
-  2026-10-29). Story in `docs/plan-shipped.md` §19ai-5d (moved 2026-10-29, 19m).
+  2026-10-29). Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19ai-5d (moved 2026-10-29, 19m).
 - **19ai-5a. Open: watch what the ratchet costs a feature.** In the two weeks to 2026-10-28,
   App.tsx grew in 8 merged PRs, SettingsPanel.tsx in 8 and LiquidVisualizer.tsx in 7. Each
   such PR now has to move as many bytes out as it adds, wiring lines included. If that turns
@@ -381,10 +381,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
   the archive off the list; `docs/guide.md` and `docs/judging.md` want the same split by
   part of the app; `scripts/checks.json` could be one file per shard.
 - **19ai-6. Shipped:** `wgsl/fluid.ts` split into one file a pass under
-  `src/gpu/wgsl/fluid/`, every kernel's text byte-identical (docs/plan-shipped.md, 19ai-6).
+  `src/gpu/wgsl/fluid/`, every kernel's text byte-identical (docs/plan-shipped/19-checks-build-plan-2.md, 19ai-6).
 - **19ai-6a. Open, found along the way.** About sixty comments across `src/` and
   `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
   file's header, which names each pass's file. Repoint one when its file is next touched,
   not in a sweep of its own (it would collide with every open branch for nothing).
 - **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
-  a pure move (docs/plan-shipped.md, 19ai-7).
+  a pure move (docs/plan-shipped/19-checks-build-plan-4.md, 19ai-7).

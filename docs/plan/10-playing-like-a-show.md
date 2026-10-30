@@ -1,6 +1,6 @@
 # 10. Playing like a show
 
-**Partly shipped**: the song's shape heard live and followed by a paced scene, and the first accent (Accent the One). What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: the song's shape heard live and followed by a paced scene, and the first accent (Accent the One). What is open is below. How it was found, built and measured is in [`docs/plan-shipped/10-playing-like-a-show.md`](../plan-shipped/10-playing-like-a-show.md), under the same number.
 
 `src/lib/phrasing.ts`, `src/lib/beatClock.ts`, `src/lib/audioFeatures.ts`,
 `scripts/watch.mjs`, `scripts/film.mjs`
@@ -45,7 +45,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    *Target:* swells 1.5–3.5 a minute, calm 20–40 %, near-black ranging across at least
    10–70 % over a set, cuts still zero. *Check:* a node harness on the phrase generator
    from a seeded run, and the film table.
-   *Shipped* (#170) on the stage sequencer rather than the phrase generator (`src/lib/scenePacing.ts`; a **Pacing** setting whose 0 keeps today's show, an ending per stage, a built-in **Light Show Night**; `npm run pacing`: 2.35 swells a minute, calm 25–28 %). Whether the plate delivers it is the film's to say: film Light Show Night. Story in `docs/plan-shipped.md` §10 step 1 (moved 2026-10-29, 19m-2).
+   *Shipped* (#170) on the stage sequencer rather than the phrase generator (`src/lib/scenePacing.ts`; a **Pacing** setting whose 0 keeps today's show, an ending per stage, a built-in **Light Show Night**; `npm run pacing`: 2.35 swells a minute, calm 25–28 %). Whether the plate delivers it is the film's to say: film Light Show Night. Story in `docs/plan-shipped/10-playing-like-a-show.md` §10 step 1 (moved 2026-10-29, 19m-2).
 2. **Hear the song's shape live.** Presence (rising or falling action) and a slowly
    accumulating intensity from #154's bands, and from them live build, drop and
    breakdown events that choose which swell step 1 fires and how big. *Target:* a drop
@@ -89,7 +89,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    performer pick downbeats, every other bar or fills only, vary the depth a little as a
    hand does, and pull a hand-played press onto the predicted beat. Needs a real
    downbeat, which #155 does not have yet.
-   *Check:* `npm run downbeat` (90), built: the bar grid's one on eight synthesised songs, every kick weighed by its place, the sure mark 2.2. Not yet seen on the plate: the app's frames cannot be read in a cloud session. Story in `docs/plan-shipped.md` §10 step 3 (moved 2026-10-29, 19m-2).
+   *Check:* `npm run downbeat` (90), built: the bar grid's one on eight synthesised songs, every kick weighed by its place, the sure mark 2.2. Not yet seen on the plate: the app's frames cannot be read in a cloud session. Story in `docs/plan-shipped/10-playing-like-a-show.md` §10 step 3 (moved 2026-10-29, 19m-2).
    *Found while building it, not yet done:*
    - **The rest of the step is not built.** The one (and the one after a fill) is; the
      other accents the step asks for are not: *every other bar* (the grid knows the bar,
@@ -127,17 +127,17 @@ The steps, most visible first. Each is one PR with its own check, and every step
 4. **Press smooth, lift into fingers** (roadmap G). A squeeze gives a smooth ring and a
    lift breaks into fingers; today both finger. *Check:* finger count round the ring,
    low on press and high on lift, in the lab.
-   *Built 2026-09-27* (lib/squish.ts; `npm run lift`, 25 checks): a press is round by construction and remembers itself, and the glass lifts after it in fingers at the spokes; Fingering 0 is today's plate exactly, on the phone on the Press tool's Amount. Waiting on the owner's eyes on a real GPU (judging.md 15). Story in `docs/plan-shipped.md` §10 step 4 (moved 2026-10-29, 19m-2).
+   *Built 2026-09-27* (lib/squish.ts; `npm run lift`, 25 checks): a press is round by construction and remembers itself, and the glass lifts after it in fingers at the spokes; Fingering 0 is today's plate exactly, on the phone on the Press tool's Amount. Waiting on the owner's eyes on a real GPU (judging.md 15). Story in `docs/plan-shipped/10-playing-like-a-show.md` §10 step 4 (moved 2026-10-29, 19m-2).
    *Found while building it, not yet done:*
-   - **Beat Squeeze has never pressed the plate. Fixed** (shipped with this item's fix PR, the owner's call on 2026-09-27): every stroke lands on a whole cell, and a kick is let go over a third of a second (`KickRelease`); `npm run lift`, `npm run squeeze` on the Mac shard, both on the CPU (the GPU read is an item below). Every look changes with music playing; waiting on the owner's eyes (judging.md 15). Story in `docs/plan-shipped.md` §10 step 4 (moved 2026-10-29, 19m-2).
-   - **The show hears a quarter of the simulated band's kicks, or fewer, on the Mac.** **Shipped** (with 14d): the clock and the song's shape read the kick's onset by its time, and a kick with its bass note is called (next item but one): 155–160 of 160 chorus kicks (`npm run kicks`). Still owed: the count in the app on the Mac (next item). Story in `docs/plan-shipped.md` §10 step 4 (moved 2026-10-29, 19m-2).
+   - **Beat Squeeze has never pressed the plate. Fixed** (shipped with this item's fix PR, the owner's call on 2026-09-27): every stroke lands on a whole cell, and a kick is let go over a third of a second (`KickRelease`); `npm run lift`, `npm run squeeze` on the Mac shard, both on the CPU (the GPU read is an item below). Every look changes with music playing; waiting on the owner's eyes (judging.md 15). Story in `docs/plan-shipped/10-playing-like-a-show.md` §10 step 4 (moved 2026-10-29, 19m-2).
+   - **The show hears a quarter of the simulated band's kicks, or fewer, on the Mac.** **Shipped** (with 14d): the clock and the song's shape read the kick's onset by its time, and a kick with its bass note is called (next item but one): 155–160 of 160 chorus kicks (`npm run kicks`). Still owed: the count in the app on the Mac (next item). Story in `docs/plan-shipped/10-playing-like-a-show.md` §10 step 4 (moved 2026-10-29, 19m-2).
    - **Count the heard kicks in the app on the Mac.** `npm run kicks` hears the band
      offline, through the ear's code; nothing yet counts it in the running app, where
      the plate's frames and the band's timer share a busy page. Both counts are there
      under `?debug`: `chromaglassDebug().heardKicks()` (onsets the loop saw) and `window.__band()`
      (kicks the band scheduled, and how many late). *Check to write:* a Mac check
      that plays the band for 30 s and asks for nine in ten of its kicks heard.
-   - **A kick with its bass note read as low mids.** **Shipped** with the item above (`KICK_TILT_DB` 6 → 3 dB; `npm run kicks` at 48 and 44.1 kHz holds the ear's onsets to 95 % in every section). Not yet heard on real records: a kick under a bass guitar on the beat, a floor tom; `bands` has no tom. Story in `docs/plan-shipped.md` §10 step 4 (moved 2026-10-29, 19m-2).
+   - **A kick with its bass note read as low mids.** **Shipped** with the item above (`KICK_TILT_DB` 6 → 3 dB; `npm run kicks` at 48 and 44.1 kHz holds the ear's onsets to 95 % in every section). Not yet heard on real records: a kick under a bass guitar on the beat, a floor tom; `bands` has no tom. Story in `docs/plan-shipped/10-playing-like-a-show.md` §10 step 4 (moved 2026-10-29, 19m-2).
    - **A check that reads a kick's press on the GPU.** `npm run squeeze` counts the
      cells and depth the kick hands the plate and the gap its release gives back, on
      the CPU: a regression in the upload (the plate not marked dirty, the flush
@@ -230,7 +230,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    related dials, 30–90 s glides, about one a minute), steered by the song's sections
    and its level over half a minute, the palette turning at drops and breakdowns, the
    same on a slow clock with no music; nothing that moves the frame. `npm run
-   slowevolve`. Story in `docs/plan-shipped.md` §10 step 8.
+   slowevolve`. Story in `docs/plan-shipped/10-playing-like-a-show.md` §10 step 8.
    - **8a** (open, the owner's eye): judge it on the Mac, with a song and without
      (`docs/judging.md` §51). If a minute's glide reads as nothing happening, the
      reach (`moveTargets`' share of each dial's window) is the dial to turn, not the
@@ -249,7 +249,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    - ~~**8d** the Evolve Speed dial sets the pace~~ Shipped: low creeps, high moves
      quickly (the owner, 2026-10-11), measured from each look's own Evolve Speed, where
      it plays as it did. Moves a minute from the bottom of the dial to the top 0.63 →
-     1.10 before, 0.20 → 4.87 now. Story in `docs/plan-shipped.md` §10 step 8d.
+     1.10 before, 0.20 → 4.87 now. Story in `docs/plan-shipped/10-playing-like-a-show.md` §10 step 8d.
      - **8d-1** (open): the looks set Evolve Speed from 0.02 to 0.3, and it is also the
        hands' pour rate, so the same dial position is a different pace on each look. If
        the owner would rather the number meant one pace everywhere, retune the looks'

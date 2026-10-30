@@ -79,7 +79,7 @@ line ok, with the script unchanged. If a line is wrong, say which and why under
    full layout, which draws the same desk); the phone is the device being linked. Say so
    in the PR.
 5. **PLAN.md:** strike 8f-1's line as shipped and move its story to
-   `docs/plan-shipped.md` under §8, in the same PR.
+   `docs/plan-shipped/08-desk.md`, in the same PR.
 
 ## Measure before pushing
 

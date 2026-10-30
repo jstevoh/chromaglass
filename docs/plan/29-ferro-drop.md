@@ -22,7 +22,7 @@ the code's entry points, the checks to add and the scenes to match, in
 `docs/handoff-macro-ferro-drop.md`.
 
 - ~~**29a. The drop as a bead with the light on it.**~~ **Shipped** (this PR; the story in
-  `docs/plan-shipped.md` §29a). Its shortcuts, each still open:
+  `docs/plan-shipped/29-ferro-drop.md` §29a). Its shortcuts, each still open:
   - **29a-1.** A drop smaller than l_c comes out lower than its spherical cap: P is one
     value for every drop (set by the contact angle on a wide drop), not each drop's own
     from its contact angle. Per-drop P (a drop's slope at its line set to tan θ).
@@ -57,7 +57,7 @@ the code's entry points, the checks to add and the scenes to match, in
   of the ferrofluid as though the drop filled the gap. The dye's own passes belong to
   other threads (18h, the dye's spread along the flow; 18m, a pour's slump): this one
   changes only how the dye is carried where the ferrofluid is, after coordinating.
-- ~~**29c. The drop follows the hand and holds together.**~~ Story in `docs/plan-shipped.md`
+- ~~**29c. The drop follows the hand and holds together.**~~ Story in `docs/plan-shipped/29-ferro-drop.md`
   §29c (moved 2026-10-29, 19m).
   open:
   - **29c-1. The moving edge is compressed back to the grid's width, and the deep plate keeps
@@ -99,7 +99,7 @@ the code's entry points, the checks to add and the scenes to match, in
     29c-5), only in how saturated the maze reads the field (phaseMu's `sat`), which every
     labyrinth look is tuned on: move Bs to the physics with the maze looks re-read.
   - **29c-4. The ferrofluid in a rim cell rides the cell's mean velocity, not its own
-    column's.** Tried in #373 and dropped (the story in `docs/plan-shipped.md` §29c): replacing a
+    column's.** Tried in #373 and dropped (the story in `docs/plan-shipped/29-ferro-drop.md` §29c): replacing a
     rim cell's velocity with the body's Gaussian mean (`phaseVelocity`) packed a pressed pool
     (`ferropress` middle 1.025 of full, lifted ring 0.046) and raised 23 domes with no magnet on
     the Mac (`spikes`), while a first-order least-squares fit of the body's velocity and gradients,
@@ -130,10 +130,10 @@ the code's entry points, the checks to add and the scenes to match, in
     coarsens it). Until then magnetgain reads the drop's speed against the two-liquid law, with
     the rim's own factor `share·(ν_clear/ν_ff)^(1−φ)` applied per cell as the shader applies it,
     and a bar of 20% (the weak drop reads about -6% on software WebGPU, the strong one about +4%).
-  - ~~**29c-7. A resting drop dissolves into its halo.**~~ **Shipped** (#373; `npm run ferrorest` 4/4; the deep plate's `phaseCH` stays as on `main`, under **29c-1**). Story in `docs/plan-shipped.md` §29c-7 (moved 2026-10-29, 19m-2).
-  - ~~**29c-8. A dragged drop loses its trailing rim to the oil's return flow.**~~ **Shipped** (#495; two-phase carry, `phaseVelocity` in `src/gpu/wgsl/fluid.ts`; `npm run ferrodrag` 3/3 on the Mac GPU). Story in `docs/plan-shipped.md` §29c-8 (moved 2026-10-29, 19m-2).
-  - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (`npm run ferrodrag` on the show shard, `ferrohold` 5/5 on Metal). Story in `docs/plan-shipped.md` §29c-10 (moved 2026-10-29, 19m-2).
-  - ~~**29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**~~ **Shipped** (`npm run ferrodrag -- --thinoff` in CI, Metal 5/5). Story in `docs/plan-shipped.md` §29c-11 (moved 2026-10-29, 19m-2).
+  - ~~**29c-7. A resting drop dissolves into its halo.**~~ **Shipped** (#373; `npm run ferrorest` 4/4; the deep plate's `phaseCH` stays as on `main`, under **29c-1**). Story in `docs/plan-shipped/29-ferro-drop.md` §29c-7 (moved 2026-10-29, 19m-2).
+  - ~~**29c-8. A dragged drop loses its trailing rim to the oil's return flow.**~~ **Shipped** (#495; two-phase carry, `phaseVelocity` in `src/gpu/wgsl/fluid.ts`; `npm run ferrodrag` 3/3 on the Mac GPU). Story in `docs/plan-shipped/29-ferro-drop.md` §29c-8 (moved 2026-10-29, 19m-2).
+  - ~~**29c-10. `ferrodrag` joins CI.**~~ **Shipped** (`npm run ferrodrag` on the show shard, `ferrohold` 5/5 on Metal). Story in `docs/plan-shipped/29-ferro-drop.md` §29c-10 (moved 2026-10-29, 19m-2).
+  - ~~**29c-11. On Metal, the Thin-Gap-off line cannot tell the review's fix from its absence.**~~ **Shipped** (`npm run ferrodrag -- --thinoff` in CI, Metal 5/5). Story in `docs/plan-shipped/29-ferro-drop.md` §29c-11 (moved 2026-10-29, 19m-2).
   - **29c-12. Key `phaseVel()`'s default off `thinLive` before `phaseCompress` reaches the deep plate.**
     `runPhaseCompress` and `runPhasePlanned` call `phaseVel()` with `thin = true`, which today runs only
     on a thin step. Once `phaseCompress` moves onto the deep plate (29c-1), that default must be keyed

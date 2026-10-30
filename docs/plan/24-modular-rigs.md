@@ -98,7 +98,7 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   exploration; after 25h).*~~ (shipped: each note the microphone hears lets go of one drop,
   low notes on one side of the plate and high on the other, a harder note a bigger drop; a
   `Melody Walk` dial, on Aurora Borealis and Oil & Water; `npm run melody`.) Story in
-  `docs/plan-shipped.md` §24. Open, found building it:
+  `docs/plan-shipped/24-modular-rigs.md` §24. Open, found building it:
   - **24.3-place-1. Only the microphone path, not MIDI.** The chord version (a note-on
     from a sequencer, spread across the plate by pitch, velocity as the drop's volume, a
     voice cap per channel) is still 24.3 proper; it should lay through `layMelodyDrop`

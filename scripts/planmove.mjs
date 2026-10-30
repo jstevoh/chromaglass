@@ -1,4 +1,5 @@
-// Carry a branch's edits of the old one-file PLAN.md into the split plan (PLAN.md 19m).
+// Carry a branch's edits of the old one-file PLAN.md, and of the old one-file archive
+// docs/plan-shipped.md, into the split plan and the split archive (PLAN.md 19m, 19m-3).
 //
 //   node scripts/planmove.mjs              after `git merge origin/main` stops on PLAN.md
 //   node scripts/planmove.mjs --dry        say where each hunk would go, write nothing
@@ -24,6 +25,17 @@
 // printed with its old line number, for `docs/plan/README.md`'s table to place by hand.
 // Main's PLAN.md (the index) is then taken as the merge's PLAN.md, so the conflict is
 // resolved only once every hunk landed or was printed.
+//
+// The archive, since 19m-3. `docs/plan-shipped.md` was cut the same way into
+// `docs/plan-shipped/`, one file a section, and some twenty open branches had appended a
+// story to it. Main deleted the file, so merging main stops on it ("deleted by them") with
+// the branch's copy left in the tree. Its hunks are carried too, but an appended story is
+// not placed by its context: the old file's last lines are now the end of the QA list's
+// file, and a §14 story found there would be filed with the QA list. A hunk that only adds
+// lines and has a heading with an id among them (`### 14x. …`) goes instead to the end of
+// that section's last file, under `## Shipped after the split`, its first heading made a
+// `###`; any other archive hunk (an edit inside a story) is found by its context, in the
+// archive first. Once every hunk landed the old file is removed from the merge.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,35 +55,36 @@ const baseAt = args.indexOf('--base');
 const base = baseAt >= 0 ? args[baseAt + 1] : tryGit('merge-base', mine, theirs);
 if (!base) { console.error('no merge base with main: pass --base <ref>'); process.exit(2); }
 
-const diff = git('diff', '-U3', '--no-color', base, mine, '--', 'PLAN.md');
-if (!diff) { console.log(`the branch made no change to PLAN.md since ${base.slice(0, 7)}: nothing to carry`); process.exit(0); }
-
-const hunks = [];
-for (const block of diff.split(/^(?=@@ )/m).slice(1)) {
-  const [head, ...body] = block.replace(/\n$/, '').split('\n');
-  const start = Number(/^@@ -(\d+)/.exec(head)[1]);
-  const lines = body.filter((l) => !l.startsWith('\\'));
-  hunks.push({ start, old: lines.filter((l) => l[0] !== '+').map((l) => l.slice(1)), lines });
-}
+const ARCHIVE = 'docs/plan-shipped.md';
+const hunksOf = (from) => {
+  const diff = git('diff', '-U3', '--no-color', base, mine, '--', from), out = [];
+  for (const block of diff.split(/^(?=@@ )/m).slice(1)) {
+    const [head, ...body] = block.replace(/\n$/, '').split('\n');
+    const start = Number(/^@@ -(\d+)/.exec(head)[1]);
+    const lines = body.filter((l) => !l.startsWith('\\'));
+    out.push({ from, start, old: lines.filter((l) => l[0] !== '+').map((l) => l.slice(1)), lines });
+  }
+  return out;
+};
+const hunks = [...hunksOf('PLAN.md'), ...hunksOf(ARCHIVE)];
+if (!hunks.length) { console.log(`the branch made no change to PLAN.md or ${ARCHIVE} since ${base.slice(0, 7)}: nothing to carry`); process.exit(0); }
 
 const level = (s) => (/^(#{1,6}) /.exec(s) ?? [, ''])[1].length;
 const norm = (s) => s.replace(/^#{1,6} /, '').trimEnd();
-const files = ['PLAN.md', ...fs.readdirSync(path.join(ROOT, 'docs/plan')).filter((f) => f.endsWith('.md')).sort().map((f) => `docs/plan/${f}`), 'docs/plan-shipped.md'];
-// Main's version of each file: in a merge the working tree's PLAN.md is the conflict.
-const text = new Map(files.map((f) => [f, (f === 'PLAN.md' ? git('show', `${theirs}:PLAN.md`) : fs.readFileSync(path.join(ROOT, f), 'utf8')).split('\n')]));
-// The archive is appended to by both sides: the branch's stories and the split's third
-// pass both land at its end, so a conflict there is nearly always two appends. Keep both
-// (`git merge-file --union` on the merge's three versions) and say so.
-if (text.get('docs/plan-shipped.md').some((l) => l.startsWith('<<<<<<<'))) {
-  const tmp = fs.mkdtempSync(path.join(ROOT, '.planmove-'));
-  try {
-    const stage = (n) => { const f = path.join(tmp, String(n)); fs.writeFileSync(f, git('show', `:${n}:docs/plan-shipped.md`)); return f; };
-    const [b, o, t] = [1, 2, 3].map(stage);
-    try { execFileSync('git', ['merge-file', '--union', o, b, t], { cwd: ROOT }); } catch { /* union never leaves a conflict */ }
-    text.set('docs/plan-shipped.md', fs.readFileSync(o, 'utf8').split('\n'));
-    console.log('docs/plan-shipped.md conflicted (both sides appended): kept both, the branch\'s first');
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
-}
+// Main's files: listed from main's tree, so a dry run before the merge sees them too; read
+// from the working tree where they are there (a merge in progress), else from main. In a
+// merge the working tree's PLAN.md is the conflict, so the index is always main's.
+const listed = (dir) => git('ls-tree', '--name-only', `${theirs}:${dir}`).split('\n').filter((f) => f.endsWith('.md') && f !== 'README.md').sort().map((f) => `${dir}/${f}`);
+const open = ['PLAN.md', ...listed('docs/plan')], shipped = listed('docs/plan-shipped'), files = [...open, ...shipped];
+const read = (f) => (f !== 'PLAN.md' && fs.existsSync(path.join(ROOT, f)) ? fs.readFileSync(path.join(ROOT, f), 'utf8') : git('show', `${theirs}:${f}`));
+const text = new Map(files.map((f) => [f, read(f).split('\n')]));
+// The last file of a section's archive: `14-show-at-the-gig-4.md` after `-3` and the first.
+const part = (f) => Number(/-(\d)\.md$/.exec(f)?.[1] ?? 1);
+const lastOf = (id) => {
+  const sec = id === 'QA' ? 'qa' : String(Number.parseInt(id, 10)).padStart(2, '0');
+  return shipped.filter((f) => path.basename(f).startsWith(sec === 'qa' ? 'qa' : `${sec}-`)).sort((a, b) => part(a) - part(b)).at(-1);
+};
+const AFTER = '## Shipped after the split';
 
 function find(old, pool) {
   const want = old.map(norm), hits = [];
@@ -88,7 +101,7 @@ function find(old, pool) {
 }
 
 let placed = 0;
-const unplaced = [];
+const unplaced = [], appends = [];
 // Bottom-up, so a hunk applied in a file never moves the lines a later one is matched at.
 for (const h of [...hunks].reverse()) {
   // Trim context a line at a time from either end until the hunk is found once: in the open
@@ -106,7 +119,24 @@ for (const h of [...hunks].reverse()) {
       if (ctxTop && (lo <= h.lines.length - hi || !ctxEnd)) lo++; else hi--;
     }
   };
-  const hit = place(files.filter((f) => f !== 'docs/plan-shipped.md')) ?? place(files);
+  if (h.from === ARCHIVE && h.lines.every((l) => l[0] !== '-')) {
+    const added = h.lines.filter((l) => l[0] === '+').map((l) => l.slice(1));
+    const at = added.findIndex((l) => /^#{2,6} (?:~~)?(\d+[a-z]*|QA)\b/.test(l));
+    // Only blank lines before the first heading, or the hunk is placed by its context. Each
+    // story at the first heading's level or above goes to its own section.
+    if (at >= 0 && !added.slice(0, at).some((l) => l.trim())) {
+      const stories = [];
+      for (const l of added.slice(at)) {
+        const id = level(l) && level(l) <= level(added[at]) && /^#{2,6} (?:~~)?(\d+|QA)/.exec(l)?.[1];
+        if (id) stories.push({ f: lastOf(id), lines: [] });
+        stories.at(-1).lines.push(l);
+      }
+      if (stories.every((s) => s.f)) { appends.unshift(...stories.map((s) => ({ h, ...s }))); placed++; continue; }
+    }
+  }
+  // The open plan first and then the archive for PLAN.md's hunks; the archive first for
+  // the old archive's.
+  const hit = h.from === ARCHIVE ? (place(shipped) ?? place(open)) : (place(open) ?? place(files));
   if (!hit) { unplaced.push(h); continue; }
   const lines = text.get(hit.f);
   const shift = (() => {
@@ -121,10 +151,19 @@ for (const h of [...hunks].reverse()) {
   }
   lines.splice(hit.i, hit.old.length, ...out);
   placed++;
-  console.log(`${dry ? 'would apply' : 'applied'} old line ${h.start} (${h.lines.filter((l) => l[0] === '+').length}+ ${h.lines.filter((l) => l[0] === '-').length}-) in ${hit.f} at line ${hit.i + 1}`);
+  console.log(`${dry ? 'would apply' : 'applied'} ${h.from} old line ${h.start} (${h.lines.filter((l) => l[0] === '+').length}+ ${h.lines.filter((l) => l[0] === '-').length}-) in ${hit.f} at line ${hit.i + 1}`);
+}
+// The appended stories, in the order the branch wrote them (the loop above ran bottom-up).
+for (const { h, f, lines: story } of appends) {
+  const lines = text.get(f), shift = 3 - level(story[0]);
+  while (story.length && !story.at(-1).trim()) story.pop();
+  while (lines.length && !lines.at(-1).trim()) lines.pop();
+  if (!lines.includes(AFTER)) lines.push('', AFTER);
+  lines.push('', ...story.map((l) => (level(l) ? '#'.repeat(Math.min(6, Math.max(3, level(l) + shift))) + l.replace(/^#+/, '') : l)), '');
+  console.log(`${dry ? 'would append' : 'appended'} ${ARCHIVE} old line ${h.start} (${story.length} lines), a story of §${/^#{2,6} (?:~~)?(\d+[a-z]*(?:-\w+)*|QA-?\d*)/.exec(story[0])[1]}, to the end of ${f}`);
 }
 for (const h of unplaced.reverse()) {
-  console.log(`\nNOT PLACED: old line ${h.start}; place it by docs/plan/README.md's table:`);
+  console.log(`\nNOT PLACED: ${h.from} old line ${h.start}; place it by docs/plan/README.md's table:`);
   for (const l of h.lines) console.log(`  ${l}`);
 }
 if (!dry) {
@@ -135,7 +174,10 @@ if (!dry) {
   fs.writeFileSync(path.join(ROOT, 'PLAN.md'), text.get('PLAN.md').join('\n'));
   // PLAN.md's own hunks (the order of work, the running order) were applied above to
   // main's index; mark the conflict resolved only when nothing was left over.
-  if (!unplaced.length && tryGit('rev-parse', '-q', '--verify', 'MERGE_HEAD')) git('add', 'PLAN.md', 'docs/plan', 'docs/plan-shipped.md');
+  if (!unplaced.length && tryGit('rev-parse', '-q', '--verify', 'MERGE_HEAD')) {
+    git('add', 'PLAN.md', 'docs/plan', 'docs/plan-shipped');
+    if (tryGit('ls-files', ARCHIVE)) git('rm', '-q', '--', ARCHIVE);
+  }
 }
 console.log(`\n${placed} of ${hunks.length} hunks ${dry ? 'placeable' : 'placed'}${unplaced.length ? `; ${unplaced.length} to place by hand (above)` : ''}`);
 process.exit(unplaced.length ? 1 : 0);

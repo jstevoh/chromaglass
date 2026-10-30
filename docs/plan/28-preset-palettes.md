@@ -11,8 +11,8 @@ standing domes (9t), Blow's air (15g), the controls sweep (§27) and layers on e
 look (#273). The ferrofluid and Turing shader palettes are the "Palette for ferro and
 Turing Print" work (#331), which also made the reaction grow at all.
 
-- **28a. Keep, improve, new, retire** (**shipped**, #330): named "Preset palettes", three looks retired through `RETIRED_PRESETS`, several improved, Lava Lamp new. Story in `docs/plan-shipped.md` §28a (moved 2026-10-29, 19m-2).
-- **28b. Colour palettes for the lamp** (**shipped**, #330). Story in `docs/plan-shipped.md`
+- **28a. Keep, improve, new, retire** (**shipped**, #330): named "Preset palettes", three looks retired through `RETIRED_PRESETS`, several improved, Lava Lamp new. Story in `docs/plan-shipped/28-preset-palettes-2.md` §28a (moved 2026-10-29, 19m-2).
+- **28b. Colour palettes for the lamp** (**shipped**, #330). Story in `docs/plan-shipped/28-preset-palettes-2.md`
   §28b (moved 2026-10-29, 19m).
 - **28c. Open from 28a.**
   - The retired looks' cases in `seedPreset` (LiquidVisualizer.tsx) are dead; delete
@@ -61,9 +61,9 @@ Turing Print" work (#331), which also made the reaction grow at all.
     are Antigravity's, written up with times in `docs/showreel-findings.md`; the
     breakdown, Classic, the five dim looks and the four untrue names are Claude's.
   - *Fixed here* (lab numbers; each still to be judged on a Mac showreel):
-    - *Shipped so far*: Red Cabbage's pH colour (Beer-Lambert), Chemical Clock on the show clock, Timbre Shifter's colour from timbre alone (Cyberpunk Neon, Microscopic Chaos and Jellyfish Bloom too, unjudged, unmeasured until a Mac render), Oil Wheel, Colorful Cosmos, Deep Ocean and Galaxy retuned; Red Cabbage's "washed white for 20 s" is still not explained (lead: clear doses on the thin gap). Story in `docs/plan-shipped.md` §28d (moved 2026-10-29, 19m-2).
+    - *Shipped so far*: Red Cabbage's pH colour (Beer-Lambert), Chemical Clock on the show clock, Timbre Shifter's colour from timbre alone (Cyberpunk Neon, Microscopic Chaos and Jellyfish Bloom too, unjudged, unmeasured until a Mac render), Oil Wheel, Colorful Cosmos, Deep Ocean and Galaxy retuned; Red Cabbage's "washed white for 20 s" is still not explained (lead: clear doses on the thin gap). Story in `docs/plan-shipped/28-preset-palettes-2.md` §28d (moved 2026-10-29, 19m-2).
     - **28d-A. Ten looks open on black and keep it under the music** (`docs/showreel-findings.md` §1, this PR).
-      - *Shipped so far* (#401, two rounds): why the ten washed to grey, what changed (`seedMean`, `lookTarget`, the hand bank, the sparse-dark gates), and the showreel's black share before and after. Story in `docs/plan-shipped.md` §28d-A (moved 2026-10-29, 19m-2).
+      - *Shipped so far* (#401, two rounds): why the ten washed to grey, what changed (`seedMean`, `lookTarget`, the hand bank, the sparse-dark gates), and the showreel's black share before and after. Story in `docs/plan-shipped/28-preset-palettes-2.md` §28d-A (moved 2026-10-29, 19m-2).
       - *Shortcuts named:* `seedMean` headroom gating (`pourRoom`), the `dt`-scaled regulator ceiling (`regStepScale`), the thin-film decay term `surf` in `decayDye` (round 2: gated by `surfaceClear`, 0 off a sparse dark seeded look), and the `wetOnly` host gate in `depositChem` are dye-budget regulator shortcuts pending 18c-2 (pours add volume) and 18g-4 (carrier-thickness field).
       - *Round 2 shortcuts named:* the slider scale (`seedMean * dyeBudget / seedBudget`) is a ratio standing in for the volume model (18c-2), and it changes one thing on purpose: a slider position between the composition and the look's own budget, dead before, is live now; the hand bank is a decaying allowance, not carrier volume (18c-2, 18g-4); `sparseDark` is a threshold (`lampGround < 0.05`, target < 0.45), not a measured class, and a slider dragged across 0.45 switches its four gated things at once; the hand bank is bookkeeping on the dish mean, not carrier volume; the `handpour` off arm switches only the bank and `surf`, not the sparkle, `contStyle` or the slider formula; Jellyfish Bloom is not among the looks the sparse gates reach (galaxy, aurora-borealis, stardust-collapse, lumia, cell-bloom, roy are), so its slider numbers are the only ones taken on it. Its default target sits on the 0.45 `sparseDark` cliff (it laid 0.47 on one Mac load and 0.395 on the next), so on some loads the bank, sparkle and surf changes reach it and on others they leave it as it was; `handpour` asserts it is near the cliff rather than which side.
     - Left: Fillmore East waits for 18b-5 (28c). Combed lines are 28d Part B / 18e (`docs/showreel-findings.md` §2). Oil Wheel's sound patch on its motor goes with 28f.
@@ -79,7 +79,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
       Physics, with `filmlook` rewritten to the new contract (the check-skeptic on it), the
       desk and the phone. Not in this PR.
 - **28e. A breakdown is quieter on the plate, and Classic is blobs again** (**shipped**,
-  #368; the showreel's first two findings). Story in `docs/plan-shipped.md` §28e (moved
+  #368; the showreel's first two findings). Story in `docs/plan-shipped/28-preset-palettes.md` §28e (moved
   2026-10-29, 19m).
 - **28e-2. Open from 28e.**
   - The sound mappings (a look's `sceneMappings` with source `sound`, sound learn's
@@ -107,7 +107,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
   findings: `docs/sound-patches.md`.
   - ~~28f-1 the dead patches, the named looks, the hits as a patch source (desk, phone,
     Sound learn), the first three looks as the pattern~~ (**shipped**, this PR;
-    `docs/plan-shipped.md` 28f). Step 1 as first briefed: the four patches that never
+    `docs/plan-shipped/28-preset-palettes.md` 28f). Step 1 as first briefed: the four patches that never
     fired (band names under `source: 'sound'`) and comet's depth of 45; sound to frame
     motion an opt-in per look on a short list, held by `npm run framesway`.
   - **28f-2, open (from `docs/sound-patches.md`).** Two or three liquid patches or area cords
@@ -121,7 +121,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
     the 28i film bars (`2–3.5 swells a minute`, `at least 6 colour changes a minute`, `r1 in
     [−0.13, 0.22]`; per-look numbers under 28i-3).
   - ~~**28f-3.** Ten looks still sway the dish's turn with the music through the old
-    `audioMappings.rotation` slot (27a-8).~~ **Shipped** (with 28i-3, #473). Story in `docs/plan-shipped.md` §28f-3 (moved 2026-10-29, 19m-2).
+    `audioMappings.rotation` slot (27a-8).~~ **Shipped** (with 28i-3, #473). Story in `docs/plan-shipped/28-preset-palettes-2.md` §28f-3 (moved 2026-10-29, 19m-2).
   - **28f-4, open.** Pitch is mostly the bass line on a band (72% of the showreel song's
     frames in the octave above C1): a patch on it walks with the bass, not the melody. A
     lead's pitch needs the analyser to find the strongest note above the bass.
@@ -145,8 +145,8 @@ Turing Print" work (#331), which also made the reaction grow at all.
   the live song shape hears a section bars late. Not a preset patch source (28f: patches
   use fast readings only).
   - **28g-1. The follower and its check** (**shipped**, #378; the story in
-    `docs/plan-shipped.md` §28). `chroma.ts`, `songFollow.ts`, `npm run songfollow`.
-  - **28g-2. Use it live, with the fallback** (**shipped**; `followedPlace.ts`, `npm run songfollow`, `npm run followview`). Story in `docs/plan-shipped.md` §28g-2 (moved 2026-10-29, 19m-2).
+    `docs/plan-shipped/28-preset-palettes.md` §28). `chroma.ts`, `songFollow.ts`, `npm run songfollow`.
+  - **28g-2. Use it live, with the fallback** (**shipped**; `followedPlace.ts`, `npm run songfollow`, `npm run followview`). Story in `docs/plan-shipped/28-preset-palettes.md` §28g-2 (moved 2026-10-29, 19m-2).
   - **28g-3. The show leans into what the map says is next** (Pacing/sequencer), and a map
     made from a file (the band's rehearsal, last night's set, the likeliest source; §17
     "hear the set ahead").
@@ -174,7 +174,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
     (the sequencer runs a section stage on its own clock), but a show's "at the second
     chorus" still fires on the guess. Decide whether a show's section actions wait for the
     place to be sure, and say so on the Songs panel.
-  - **28g-8. The score's nudge** (**shipped**, #375; story in `docs/plan-shipped.md` §28h).
+  - **28g-8. The score's nudge** (**shipped**, #375; story in `docs/plan-shipped/28-preset-palettes.md` §28h).
     A nudge (`useMusicIntelligence`'s `seekBy`) moves the followed place itself:
     `FollowedPlace.resync(mapSec, now)` starts the clock there and anchors the follower,
     called directly, not through the identification effect (which leaves a sure place
@@ -215,7 +215,7 @@ Turing Print" work (#331), which also made the reaction grow at all.
     SHARPNESS by how alike neighbouring bars are), measured against `npm run songfollow`
     and this replay (`/mnt/project-files/handoff/followview-replay/`, the owner's files).
 - **28h. The score: the song drawn, its show's cues on it, and a nudge** (**shipped**,
-  this PR; the story is in `docs/plan-shipped.md` §28h). Open from it:
+  this PR; the story is in `docs/plan-shipped/28-preset-palettes.md` §28h). Open from it:
   - **28h-1.** (**shipped** with 28g-8.) The nudge re-anchors the follower rather than
     adding an offset to it; position stays in the map's own seconds.
   - **28h-2.** Correct the score, not just the clock: drag a section's edge and save

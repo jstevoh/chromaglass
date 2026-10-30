@@ -11,7 +11,7 @@ against the look's own drift. On 20 of 24 looks: Turbulence visible on 5, Beat S
 Plate Rock 9, Swirl 3, Evolve Speed 5, Fingering 5, Lacing 4, Tempo Sync 4. On the `all`
 shard's three looks about twenty more read nothing on all three (27d has the list).
 
-- **27a. Plate Rock is the plate tipped (shipped, #305).** Story in `docs/plan-shipped.md`
+- **27a. Plate Rock is the plate tipped (shipped, #305).** Story in `docs/plan-shipped/27-controls-you-see.md`
   §27a (moved 2026-10-29, 19m).
     - **27a-2, open.** Read Plate Rock on the Mac's `controls` run with the glass, on
       the even looks above, against a drift floor held still across runs (each look's
@@ -20,7 +20,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     - **27a-3, open.** Glass Smear's own noise speed is laid × dt and then read × disp
       again (the 2026-10-06 audit), so at a slow look's Speed it moves the plate about
       a ten-thousandth a second; lay it in m/s as the cover's slide is.
-    - **27a-4. Found: it was the cover glass** (see 27a-1), fixed with 27a-1's return and QA-25. Story in `docs/plan-shipped.md` §27a-4 (moved 2026-10-29, 19m-2).
+    - **27a-4. Found: it was the cover glass** (see 27a-1), fixed with 27a-1's return and QA-25. Story in `docs/plan-shipped/27-controls-you-see.md` §27a-4 (moved 2026-10-29, 19m-2).
     - **27a-5, open.** One carry still rides the glass's whole drift in fixed
       substeps of 0.45 of a cell and so falls behind it: the clear film's holes
       (`filmAdvect`, wgsl/film.ts), which a sliding glass should carry with the
@@ -43,7 +43,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       The real fix is to model what is past the rim: liquid that crosses the open rim
       leaves the film (and the tilt and the body forces do not act where there is no
       film), rather than a walled square round the dish.
-  - **27a-7. Frame Sway: the music moves the liquid, not the frame (shipped).** A new dial, Frame Sway (`frameSway`, 0 by default), is the room between the two glasses' rims; `npm run framesway` holds every look and show stage at 0. Story in `docs/plan-shipped.md` §27a-7 (moved 2026-10-29, 19m-2).
+  - **27a-7. Frame Sway: the music moves the liquid, not the frame (shipped).** A new dial, Frame Sway (`frameSway`, 0 by default), is the room between the two glasses' rims; `npm run framesway` holds every look and show stage at 0. Story in `docs/plan-shipped/27-controls-you-see.md` §27a-7 (moved 2026-10-29, 19m-2).
     - **27a-8, open in part.** What still turns or zooms the whole frame with the sound,
       each off at the defaults: nine looks route a band to the dish's turn
       (`audioMappings.rotation`, about 0.02–0.05 rad/s, slow), Auto Spin's Tempo, and
@@ -51,7 +51,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       1.5–10% of zoom)~~. Read each with the owner: a slow dish turn is the oil wheel's
       own move. And Beat Squeeze's press spans the dish (Bass Drop at 0.8): measure its
       plate-wide radial part, which reads as a zoom on the kick.
-      - ~~**The closeup's camera** (QA-31).~~ **Shipped** (`npm run steadycam`). Story in `docs/plan-shipped.md` §27a-8 (moved 2026-10-29, 19m-2).
+      - ~~**The closeup's camera** (QA-31).~~ **Shipped** (`npm run steadycam`). Story in `docs/plan-shipped/27-controls-you-see.md` §27a-8 (moved 2026-10-29, 19m-2).
       - **27a-8-1.** Auto's own breathing zoom (two sines, up to 13% of the zoom on 17-
         and 57-second cycles, `macroCamera.ts`) and the dolly-out through each whip are
         camera moves with nothing behind them but the clock: a macro rig on a stand does
@@ -60,12 +60,12 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       - **27a-8-2.** The camera aims from a readback of the density a frame or two old
         (`readbackAsync`), so Follow sits that far behind a fast drop. Measure the lag on
         the Mac and, if it shows, lead by the readback's age.
-- **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick's discs span the dish (`KICK_RADII`, `kickDepth`); `npm run lift`. Story in `docs/plan-shipped.md` §27b (moved 2026-10-29, 19m-2).
+- **27b. Beat Squeeze presses the glass, not a palm (shipped, #305).** The kick's discs span the dish (`KICK_RADII`, `kickDepth`); `npm run lift`. Story in `docs/plan-shipped/27-controls-you-see.md` §27b (moved 2026-10-29, 19m-2).
   - **27b-1, open.** Let go, the ring comes back 87% of the way at the default and 79%
     at full; a squeeze film with nothing fingering should come all the way. The rest is
     the colour's first-order carry (18a-8).
-  - **27b-2. The ferrofluid is given back too (shipped, #305).** The ferrofluid takes the colour's own substep plan (`phasePlan`); `npm run rides`. Story in `docs/plan-shipped.md` §27b-2 (moved 2026-10-29, 19m-2).
-  - **27b-3. Breathing beat squeeze and organic liquid injection (shipped).** Squeeze shaped quadratically with a cosine release, automated doses as droplet clusters; `npm run lift`, `squeeze`, `downbeat`. Story in `docs/plan-shipped.md` §27b-3 (moved 2026-10-29, 19m-2).
+  - **27b-2. The ferrofluid is given back too (shipped, #305).** The ferrofluid takes the colour's own substep plan (`phasePlan`); `npm run rides`. Story in `docs/plan-shipped/27-controls-you-see.md` §27b-2 (moved 2026-10-29, 19m-2).
+  - **27b-3. Breathing beat squeeze and organic liquid injection (shipped).** Squeeze shaped quadratically with a cosine release, automated doses as droplet clusters; `npm run lift`, `squeeze`, `downbeat`. Story in `docs/plan-shipped/27-controls-you-see.md` §27b-3 (moved 2026-10-29, 19m-2).
 - **27c. Turbulence reaches (shipped, #305).** The dial was the stir's speed, so
   full was a look's 0.3 tripled, and with the band playing the music multiplied it and
   then held it to the larger of the dial and 1.2: full was 1.4 times half way. Now the
@@ -107,7 +107,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   seconds at a bass of 0.8 moved 0.006 of the plate's colour; a look's own stir 0.86.
   And the energy's swell divided the energy (0–1) by 70 as though it were a band, so it
   never reached its gate of 0.15 on any look.
-  - *Shipped so far* (#307): the bass is a hand on the glass (`BassPress`, lib/squish.ts) and the energy's swell pours on its own scale; `npm run musicforce`. Story in `docs/plan-shipped.md` §27e (moved 2026-10-29, 19m-2). Every look gains the swell's dye source while the music is loud, which no check measures yet (27e-2's film will).
+  - *Shipped so far* (#307): the bass is a hand on the glass (`BassPress`, lib/squish.ts) and the energy's swell pours on its own scale; `npm run musicforce`. Story in `docs/plan-shipped/27-controls-you-see.md` §27e (moved 2026-10-29, 19m-2). Every look gains the swell's dye source while the music is loud, which no check measures yet (27e-2's film will).
   - **27e-1, open.** The kick ring is still 14 one-cell specks of dye with an outward
     kick the projection removes (0.008 of the colour over four kicks). A drop that
     lands is a volume source (PLAN 18c): poured on each kick in the lab, a drop 0.04 of
@@ -130,16 +130,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   but Bass Drop since a direct commit on 10-08 (`beatSqueeze` 0.03–0.10 before it, already about a
   tenth of the default's press after 27b-3), so what was seen was the *kick's dye burst* (a ring of
   6–12 droplets pushed outward on every kick, gated only by Audio Impact) and Plate Rock's tilt shove.
-  - **27f-1. Kick Bloom (shipped, awaiting a Mac read).** `kickBloom` is the kick's dye burst's own dial and the burst is lobes, not a ring; `npm run panel`, the picture judging.md §60. Story in `docs/plan-shipped.md` §27f-1 (moved 2026-10-29, 19m-2).
-  - **27f-2. Plate Rock leans on the one and three (shipped; story in docs/plan-shipped.md §27f-2).**
+  - **27f-1. Kick Bloom (shipped, awaiting a Mac read).** `kickBloom` is the kick's dye burst's own dial and the burst is lobes, not a ring; `npm run panel`, the picture judging.md §60. Story in `docs/plan-shipped/27-controls-you-see.md` §27f-1 (moved 2026-10-29, 19m-2).
+  - **27f-2. Plate Rock leans on the one and three (shipped; story in docs/plan-shipped/27-controls-you-see.md §27f-2).**
     A hand's minimum-jerk reach to the other side of a turning axis on the strong beats, never a
     shove on each kick; `npm run rides` holds it (judging.md §61).
   - **27f-3. Beat Squeeze presses a sheet, locally (shipped 2026-10-22; the owner picked the
-    local sheet on the thread's card; story in docs/plan-shipped.md §27f-3).** Off the frame-moving looks the kick
+    local sheet on the thread's card; story in docs/plan-shipped/27-controls-you-see.md §27f-3).** Off the frame-moving looks the kick
     lays one dent as wide as a 0.1 mm sheet bends over the liquid in the kick's hold
     (elastohydrodynamic bending length; with the liquid's weight since 27f-4); Bass Drop keeps the
     glass. `npm run rides` holds it.
-  - **27f-4. The sheet solved, not stamped (shipped 2026-10-24; story in docs/plan-shipped.md
+  - **27f-4. The sheet solved, not stamped (shipped 2026-10-24; story in docs/plan-shipped/27-controls-you-see.md
     §27f-4).** The kick is a fingertip on a sheet floating on the liquid, solved each step on its
     own grid, exactly per Fourier mode (lib/sheet.ts): its bending, the liquid's weight under it
     (which 27f-3's reach left out, and which is the larger at a dent's size) and the dish's open
@@ -169,7 +169,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     sheet has it gone within a frame. The inertial sheet (a damped wave per mode, still exact per
     step) is the fix; judging.md §68 asks whether the missing swing shows.
   - **27f-5. The rock lifts the oil, not the frame (shipped 2026-10-24; story in
-    docs/plan-shipped.md §27f-5).** On a tipped thin gap oil rises uphill through the water at
+    docs/plan-shipped/27-controls-you-see.md §27f-5).** On a tipped thin gap oil rises uphill through the water at
     Hele-Shaw's speed (`OIL_LIFT`, in SI), laid as the closed dish's circulation so an even sheet
     feels nothing, the frame stays still and the rim holds a lens; the water's colour alone weighs.
     `npm run oillift` holds it.
@@ -189,7 +189,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     water looks (Darcy's inclusion, 2μ₂/(μ₁+μ₂)) and change how every oil body moves; its own item
     when the mix's oil gets its viscosity.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
-  feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
+  feel like it actually does anything").** Story in `docs/plan-shipped/27-controls-you-see.md` §27g (moved
   2026-10-29, 19m).
   - **27g-1, open. The readings that clip.** Presets' bass mappings (`getAudioValue`, clipped at
     100) and the camera's punch still saturate at a high boost, as the reading did. Whether the

@@ -4,7 +4,7 @@ Part 2 of 3 of §19; it begins at 19l. The section starts in `19-checks-build-pl
 
 ## 19l. App frames readable in a cloud session
 
-*Shipped so far* (2026-10-26): `scripts/chromium.mjs` launches headed into its own Xvfb, watchdog off, when `PW_WEBGPU` is set and a harness asks (`present: true`); `waitForEngine` and `settlePlate` in `scripts/frame.mjs`; a cloud run has a Mac check's logic at a twentieth of its steps. Story in `docs/plan-shipped.md` §19l (moved 2026-10-29, 19m-2).
+*Shipped so far* (2026-10-26): `scripts/chromium.mjs` launches headed into its own Xvfb, watchdog off, when `PW_WEBGPU` is set and a harness asks (`present: true`); `waitForEngine` and `settlePlate` in `scripts/frame.mjs`; a cloud run has a Mac check's logic at a twentieth of its steps. Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19l (moved 2026-10-29, 19m-2).
 
 ### 19l-2. The first step's stall on a cold compiler (found with 19l)
 
@@ -23,7 +23,7 @@ tries any of them headed. Each wants its own pass: its opening wait through `wai
 its waits through `settlePlate`, and a cloud run beside the Mac's to say which of its lines agree.
 *Size:* S each.
 
-*Shipped so far* (2026-10-27): eight more opted in (`take`, `ferro`, `ferrodrift`, `finger` agree with the Mac; `bubbles` and `depth` waited on a developed plate, done in 19l-4; `handpour` and `kickbubbles` read magnitudes). Story in `docs/plan-shipped.md` §19l-3 (moved 2026-10-29, 19m-2).
+*Shipped so far* (2026-10-27): eight more opted in (`take`, `ferro`, `ferrodrift`, `finger` agree with the Mac; `bubbles` and `depth` waited on a developed plate, done in 19l-4; `handpour` and `kickbubbles` read magnitudes). Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19l-3 (moved 2026-10-29, 19m-2).
 
 *Left out, and why:*
 - `spin`, `flick`: they read the dish's angular velocity in radians a *wall* second after a flick,
@@ -47,7 +47,7 @@ a named step count in place of nine seconds, so a Mac and a cloud run develop th
 
 ### 19l-4. A software plate develops the Mac's steps, on a clock that steps with it (found with 19l-3)
 
-*Shipped so far* (2026-10-27): `?lockstep=1` steps each frame's clock with the plate, `developPlate` in `scripts/frame.mjs` gives a software plate the Mac's steps; `bubbles` 16 of 18, `depth` 9 of 10. Story in `docs/plan-shipped.md` §19l-4 (moved 2026-10-29, 19m-2).
+*Shipped so far* (2026-10-27): `?lockstep=1` steps each frame's clock with the plate, `developPlate` in `scripts/frame.mjs` gives a software plate the Mac's steps; `bubbles` 16 of 18, `depth` 9 of 10. Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19l-4 (moved 2026-10-29, 19m-2).
 
 *Still red in `bubbles`, open:* "it lets the lamp through rather than painting light on top" found 14
 and then 32 lit pixels (the line needs forty pairs and brighter thick dye) and the bubbles 0 to -4%
@@ -72,8 +72,9 @@ in show seconds under it. *Size:* S each.
 **The index half shipped** (2026-10-29): `PLAN.md` is the index (the order of work, the
 running order, a table of sections and the rules, 45 KB), each section is a file under
 `docs/plan/` with its open work and the stubs of what shipped, and 78 shipped items' stories
-moved to `docs/plan-shipped.md` (its third pass). Story, and the plan as first written, in
-`docs/plan-shipped.md` §19m. Open:
+moved to the archive (its third pass), now one file a section under `docs/plan-shipped/`
+(19m-3). Story, and the plan as first written, in
+`docs/plan-shipped/19-checks-build-plan-3.md` §19m. Open:
 
 - **19m-1. The fragment files** (F, M): each PR writes its plan, judging and changelog notes
   as a new file in `plan.d/`, `judging.d/` and `changelog.d/`, which nothing else edits, and
@@ -83,15 +84,20 @@ moved to `docs/plan-shipped.md` (its third pass). Story, and the plan as first w
   recorded per merge of main.
 - ~~**19m-2. Read each section once for the shipped prose the markers did not catch**~~
   **Shipped** (2026-10-29): about 1,700 lines of shipped stories in 30 section files moved,
-  open plan 757 → 631 KB; 28f and 28g folded. Story in `docs/plan-shipped.md` §19m-2
+  open plan 757 → 631 KB; 28f and 28g folded. Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19m-2
   (moved 2026-10-29, 19m-2).
-- **19m-4. What the two passes left half-cut** (F, S, found in 19m-2). `15-tools-on-liquids.md`
-  line 19 is a fragment the 15i stub left ("Maze, Ferro Paint) carry their own amount…");
-  §16's three "Found while building it, not done" lists stand without the 16a, 16b and 16c
-  bullets they were under; the archive now tells §14v-7, §14ab-8, §14y's shipped bullet,
-  §27a-8 and §35c-2 twice (the third pass's copy and the fourth's), wanting one each.
-- **19m-3. The archive by section** (F, S): `docs/plan-shipped.md` is about 750 KB (after 19m-2) and a
-  ledger in `scripts/sizes.json`; one file a section, like the plan's, would take it off.
+- ~~**19m-3. The archive by section**~~ **Shipped** (2026-10-30): `docs/plan-shipped.md`
+  (750 KB, a ledger in `scripts/sizes.json`) is 45 files under `docs/plan-shipped/`, one a
+  section under the open plan's names (none over 40 KB), with a
+  README that maps them; every reference in the plan and the docs names the file its item
+  is in, and `node scripts/planmove.mjs` carries an open branch's archive edits across.
+  Two comments in `src/gpu/wgsl/fluid/phaseForces.ts` (moved there by 19ai-6) still name the
+  old path (§29c); the PR that next touches them fixes the name, so this one stays docs-only. Story in
+  `docs/plan-shipped/19-checks-build-plan-4.md` §19m-3.
+- ~~**19m-4. What the two passes left half-cut**~~ **Shipped** with 19m-3: §15's fragment
+  rejoined its sentence in 15i's story, §16's three "Found while building it" lists have
+  their 16a, 16b and 16c parents again, and the five stories told twice are told once.
+  Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19m-4.
 
 ## 19n. A shorter deploy
 
@@ -129,7 +135,7 @@ user. *Size:* S.
 
 ## 19r. Smaller, for the same pass
 
-- The open shard evened again: **shipped** (docs/plan-shipped.md 19r). New checks go on the
+- The open shard evened again: **shipped** (docs/plan-shipped/19-checks-build-plan.md 19r). New checks go on the
   shortest shard, not open, which holds `startup` (393 s alone).
 - Re-running an older deploy cancels main's newest one: `deploy.yml`'s group keeps one run
   waiting, and the re-run takes that place. On 2026-10-05 re-running be02853's deploy
@@ -167,10 +173,10 @@ grouped so one sitting covers one area, gates first. The owner's verdicts go bac
 commit. *Size:* S.
 
 ## 19u. Nothing reaches main without the checks
-**Shipped** (2026-10-10, a branch ruleset on `main`, not code): nothing lands on `main` without a pull request and green `Measure` and `WebGPU (macOS)`, and the admin's bypass works only on a pull request, never on a push. The ruleset, why those two checks, and what is left are in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Shipped** (2026-10-10, a branch ruleset on `main`, not code): nothing lands on `main` without a pull request and green `Measure` and `WebGPU (macOS)`, and the admin's bypass works only on a pull request, never on a push. The ruleset, why those two checks, and what is left are in [`docs/plan-shipped/19-checks-build-plan.md`](../plan-shipped/19-checks-build-plan.md), under the same number.
 
 ## 19v. Two checks that could not tell what they were asked
-**Shipped** (2026-10-10): the magnet's drag is laid out on the plate, off its middle row, and the Stage sheet's Esc is listened for once (`hooks/useEscape.ts`). The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+**Shipped** (2026-10-10): the magnet's drag is laid out on the plate, off its middle row, and the Stage sheet's Esc is listened for once (`hooks/useEscape.ts`). The story is in [`docs/plan-shipped/19-checks-build-plan-2.md`](../plan-shipped/19-checks-build-plan-2.md) §19v.
 
 - **19v-1. The show keys' listener comes off and goes back 11 times a second.** App's
   keydown effect for Space, Backspace, 1–9 and the tool letters is keyed on `goLook`,
@@ -192,13 +198,13 @@ commit. *Size:* S.
 - **19v-3. The magnet check's second press landed on the plate bar.** **Shipped**
   (2026-10-17): Save's changed-look dot takes no width, so the bar at 1280 no longer wraps
   when a look changes and the plate stays under the hand. `layout` and `magnet` each ask it
-  now. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+  now. The story is in [`docs/plan-shipped/19-checks-build-plan-2.md`](../plan-shipped/19-checks-build-plan-2.md) §19v.
 - **19v-4. Recording still re-wraps the plate bar at 1280, which sits on a 1 px edge.**
   **Shipped** (2026-10-25): Record's running timer on the desk (`RecordControls`) and on
   Play (`PhonePlay`) overlays its idle box and takes no extra width, so starting or stopping
   Plate video, a Take, or both never widens the button in the plate bar at 1280 or shifts
   Play's top pills. `layout` and `phone` each ask it now. The story is in
-  [`docs/plan-shipped.md`](docs/plan-shipped.md) §19v.
+  [`docs/plan-shipped/19-checks-build-plan-2.md`](../plan-shipped/19-checks-build-plan-2.md) §19v.
 - **19v-5. The plate bar at 1280 still has no slack.** What #470 left of 19v-4's ask. In Build
   at 1280 × 800 the bar's children and gaps take 935–936 px of its 936, the name already down
   to its 120 px floor. Record no longer widens it, but any text that renders a pixel wider
@@ -211,21 +217,21 @@ commit. *Size:* S.
 
 **Shipped** (2026-10-11): the plate shard ran up to 19.8 of its 20 minutes and the other
 three 15 to 17, so a fifth shard took two to five minutes from each; replayed on 11 runs,
-the longest shard went from 18.4 minutes to 15.0. Story in `docs/plan-shipped.md` §19w
+the longest shard went from 18.4 minutes to 15.0. Story in `docs/plan-shipped/19-checks-build-plan-2.md` §19w
 (moved 2026-10-29, 19m).
 
 ### 19w-1. The deploy gate counts the fifth shard
 
 **Shipped** (2026-10-17): `deploygate.sh` wanted exactly four green shards by name, so after
 19w it trusted no PR run and every deploy re-ran the whole Mac, about 55 minutes from merge
-to live. Story in `docs/plan-shipped.md` §19w-1 (moved 2026-10-29, 19m).
+to live. Story in `docs/plan-shipped/19-checks-build-plan-2.md` §19w-1 (moved 2026-10-29, 19m).
 
 ## 19x. A moved bar names itself
 
 **Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input, or turns a
 check to assert the opposite (also commit by commit, #357's case), without naming it in the
 body under `Check changes:` (`npm run checkguard`, the "Check changes named" job under the
-required `Measure`; the … Story in `docs/plan-shipped.md` §19x (moved 2026-10-29, 19m).
+required `Measure`; the … Story in `docs/plan-shipped/19-checks-build-plan-2.md` §19x (moved 2026-10-29, 19m).
 
 - **19x-1. Bars declared where the guard can read them.** The guard reads code as written
   because every check writes its bar inline. The checks the physics lane edits most
@@ -240,13 +246,13 @@ required `Measure`; the … Story in `docs/plan-shipped.md` §19x (moved 2026-10
   a red check in the last month of `antigravity/` PRs before widening it, since every
   widening costs ordinary physics work a line in the body.
 
-- **19x-3. Measured quotes what it printed.** **Shipped** (2026-10-26): the `Check changes named` job fails an Antigravity PR whose `Measured:` quotes no printed line (`scripts/measured.mjs`, `npm run checkguard`). Story in `docs/plan-shipped.md` §19x-3 (moved 2026-10-29, 19m-2). Named limit: `npm run checkguard` still reads "it passed on 2026-10-26" as printed, because the self-test holds that sentence in a string literal; the lookup cannot tell a script's fixtures from what it prints (the other scripts' fixtures are the same risk, small, and the reviewer's re-run is the guard). Found along the way: `namedLines` does not read a
+- **19x-3. Measured quotes what it printed.** **Shipped** (2026-10-26): the `Check changes named` job fails an Antigravity PR whose `Measured:` quotes no printed line (`scripts/measured.mjs`, `npm run checkguard`). Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19x-3 (moved 2026-10-29, 19m-2). Named limit: `npm run checkguard` still reads "it passed on 2026-10-26" as printed, because the self-test holds that sentence in a string literal; the lookup cannot tell a script's fixtures from what it prints (the other scripts' fixtures are the same risk, small, and the reviewer's re-run is the guard). Found along the way: `namedLines` does not read a
   `Check changes:` that is itself a list item (`- **Check changes:**`, how Antigravity's
   bodies write the whole block), so a named change under that form is not seen. It fails
   safe (red, never green) but costs a round; read it the way `measuredGroups` does.
 
 ## 19y. Compaction and helper models set from the repo, not the host
-**Shipped** (2026-10-17): `.claude/settings.json` sets the window to 200000 in its `env` block and `CLAUDE_CODE_SUBAGENT_MODEL` to sonnet; the agents that judge name opus. Story in `docs/plan-shipped.md` §19y (moved 2026-10-29, 19m-2).
+**Shipped** (2026-10-17): `.claude/settings.json` sets the window to 200000 in its `env` block and `CLAUDE_CODE_SUBAGENT_MODEL` to sonnet; the agents that judge name opus. Story in `docs/plan-shipped/19-checks-build-plan-4.md` §19y (moved 2026-10-29, 19m-2).
 
 Measure: a session started after the merge shows the window at 200000 in its
 environment, and its context compacts near 160k rather than 400k (inferred from the
@@ -259,7 +265,7 @@ pressing, as the file is about 500 KB.
 
 **Shipped** (2026-10-11): `npm run lamp`'s first line, every look at Lamp Ground 0 byte for
 byte against a lab built with the lamp's lines taken out, read "different. Story in
-`docs/plan-shipped.md` §19z (moved 2026-10-29, 19m).
+`docs/plan-shipped/19-checks-build-plan-2.md` §19z (moved 2026-10-29, 19m).
 
 - **19z-1. `npm run beams` compares two programs the same way, on the Mac.** Its first line
   holds the projector's pass against a lab built from the old pass, byte for byte, in the
@@ -276,7 +282,7 @@ byte against a lab built with the lamp's lines taken out, read "different. Story
 **Shipped** (2026-10-18): `npm run flakes` reads every run of `checks.yml` and `deploy.yml`
 in a window (`--days`, `--since`, `--until`; 7 days by default), every attempt's jobs and
 each job's log, and prints, per check (the runner's system, the command and the check's
-name, since `renders` on … Story in `docs/plan-shipped.md` §19aa (moved 2026-10-29, 19m).
+name, since `renders` on … Story in `docs/plan-shipped/19-checks-build-plan-3.md` §19aa (moved 2026-10-29, 19m).
 
 - **19aa-1. Work the list down.** The magnet's drag lines wait on #373 (29c); startup's
   on 14v-6; the Blow on its paused root cause; render-app's "same seed twice draws the
@@ -294,8 +300,8 @@ name, since `renders` on … Story in `docs/plan-shipped.md` §19aa (moved 2026-
   two fingers holding Drop 4 of 172 (19h-2, a solver rebuilt by the governor in the
   window is the lead). Two deploys went red on one-off Mac flakes on 10-24.
 - **19aa-6. The renders lines on a starved runner (shipped 2026-10-24).** Story in
-  `docs/plan-shipped.md` §19aa-6 (moved 2026-10-29, 19m).
-- **19aa-8. The Blow's push follows the solver steps, and the stroke gave it too few (shipped 2026-10-25).** The stroke takes 3000 ms of waiting. Story in `docs/plan-shipped.md` §19aa-8 (moved 2026-10-29, 19m-2). The paused hunt
+  `docs/plan-shipped/19-checks-build-plan-2.md` §19aa-6 (moved 2026-10-29, 19m).
+- **19aa-8. The Blow's push follows the solver steps, and the stroke gave it too few (shipped 2026-10-25).** The stroke takes 3000 ms of waiting. Story in `docs/plan-shipped/19-checks-build-plan-2.md` §19aa-8 (moved 2026-10-29, 19m-2). The paused hunt
   for why the app pushes less per step than the lab (the breath's share, the `still`
   threshold, the Dropper's bottle) is not answered: the toolAmount is 1, so
   `k = kRaw²` is 1, and the 0.75-cell `still` threshold is under the moves' one cell on a

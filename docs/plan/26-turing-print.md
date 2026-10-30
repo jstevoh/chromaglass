@@ -25,16 +25,16 @@ What the plate had when this was proposed, and what was missing:
 
 Steps:
 - **26a. Gray–Scott on the GPU, carried by the flow (shipped, #327; carried once since
-  26d).** Story in `docs/plan-shipped.md` §26.
+  26d).** Story in `docs/plan-shipped/26-turing-print.md` §26.
 - **26b. The pattern as a control (shipped, #327; Width in plate units and the phone
-  version with 26d).** Story in `docs/plan-shipped.md` §26.
+  version with 26d).** Story in `docs/plan-shipped/26-turing-print.md` §26.
 - **26c. Where it grows: the poured liquid is the reagent (shipped in part, #327, #331).**
   A pour of Turing Reagent feeds and seeds the reaction where it lands on any look, with
   its own pattern baked in (`npm run turing`: 70% of a pour grows, specks with no reagent
   nothing).
   - **26c-1, open.** A shape, a word or the camera laying the reagent, as images already
     pour (`injectImage`): the owner's "grow mask".
-- **26d. The look: "Turing Print" (shipped).** Story in `docs/plan-shipped.md` §26;
+- **26d. The look: "Turing Print" (shipped).** Story in `docs/plan-shipped/26-turing-print.md` §26;
   the owner's eyes owed (`docs/judging.md` §46).
   - **26d-1, open: the print's cost at 512².** The reaction takes as many substeps as its
     diffusion needs (two at 512² and the default width, up to six at Width's top), and
@@ -45,7 +45,7 @@ Steps:
     than a dish. If the owner wants that, it is a choice to make, not physics; the plate
     could threshold the reconstructed field at screen resolution, as Ben-Day's edge does.
   - ~~**26d-3. Other colour in a fed print**~~ (**shipped**; story in
-    `docs/plan-shipped.md` §26): a poured colour shows under the print, and the print
+    `docs/plan-shipped/26-turing-print.md` §26): a poured colour shows under the print, and the print
     has its own ink (`turingInk`, desk, phone, remote, MIDI).
   - **26d-3a, open: the ink is a bright hue, not a depth.** The plate reads the print's
     rgb as a colour at a fixed density, so starch's own indigo prints black and any hue
@@ -62,18 +62,18 @@ Steps:
   - **26d-5, open: half floats where the GPU cannot filter full ones.** The reaction's
     field is in full floats where the dye is (the first Metal run found the stripe 14%
     wider at 512² than at 256²: half floats round the substrate's last refill away, and
-    the Mac rounds them toward zero; the story in `docs/plan-shipped.md` §26). A GPU
+    the Mac rounds them toward zero; the story in `docs/plan-shipped/26-turing-print.md` §26). A GPU
     without `float32-filterable` (many Android phones) keeps half floats, so its
     substrate stops 0.3–0.5% short and its stripe is a little wider. Storing the substrate's
     deficit 1 − u instead of u would give half floats their fine steps where u is near
     1, on every GPU and at half the bandwidth, and would make a cleared dish full (26d-4).
-  - ~~**26d-6. The print keeps evolving**~~ (**shipped**; story in `docs/plan-shipped.md`
+  - ~~**26d-6. The print keeps evolving**~~ (**shipped**; story in `docs/plan-shipped/26-turing-print.md`
     §26): `turingDrift` slides the feed and kill along the saddle-node curve across the plate
     on a 40–90 s clock (desk, phone, remote, MIDI; the Turing Print preset sets 0.7).
     Shortcuts named: three plane waves, not a noise field; the saddle-node line, not
     Pearson's full regime boundaries; a fixed-rate clock that follows no music.
   - **26d-6a. More ways for the print to evolve** (grey patch and regime glide **shipped**;
-    story in `docs/plan-shipped.md` §26): the drift's k is now the saddle-node curve plus a
+    story in `docs/plan-shipped/26-turing-print.md` §26): the drift's k is now the saddle-node curve plus a
     margin that glides each region between stripes and spots on slower waves (50, 80 and
     120 s), which also removed the grey patch at Drift 1. Still open, each its own step:
     - **The Drift slews, it does not step**: the visualizer hands the solver the setting
@@ -123,4 +123,4 @@ Steps:
   plate shader was not in the diff, and the revert 8278374 had nothing of it to take
   out). A CIMA print is flat: the complex sits in the gel and does not raise it, so
   Turing Print draws no relief (Edge Relief 0 in the look).
-- **26-colour-b. The coral as soft blurred rings (fixed with 26d).** Story in `docs/plan-shipped.md` §26-colour-b (moved 2026-10-29, 19m-2).
+- **26-colour-b. The coral as soft blurred rings (fixed with 26d).** Story in `docs/plan-shipped/26-turing-print.md` §26-colour-b (moved 2026-10-29, 19m-2).

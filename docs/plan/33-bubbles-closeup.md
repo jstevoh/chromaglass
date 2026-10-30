@@ -12,9 +12,9 @@ Every item keeps the standing rule: nothing moves the frame as a whole from soun
 each feature ships its phone version in the same PR (the plate shader is shared, so the
 phone and the iPad draw what the desk draws; a new control goes on the phone too).
 
-## ~~33a. No stepped ring round a bubble's hole~~ — **Shipped** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33a (moved 2026-10-29, 19m-2).
+## ~~33a. No stepped ring round a bubble's hole~~ — **Shipped** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped/33-bubbles-closeup.md` §33a (moved 2026-10-29, 19m-2).
 
-## ~~33b. The soft glow still left round a hole~~ — **Shipped** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33b (moved 2026-10-29, 19m-2).
+## ~~33b. The soft glow still left round a hole~~ — **Shipped** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped/33-bubbles-closeup.md` §33b (moved 2026-10-29, 19m-2).
 
 Left from it, so none of it is lost:
 - **33b-2. A fixed reach and a wholesale flatten.** `airNear` looks 4.5 cells out and
@@ -61,7 +61,7 @@ the rim's radius found along 64 rays: RMS deviation from a circle under 0.5 scre
 pixel, and the 10–90 % rise of the edge no wider than 1.5 pixels. Today's numbers
 printed first.
 
-## ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`). Story in `docs/plan-shipped.md` §33e (moved 2026-10-29, 19m-2).
+## ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`). Story in `docs/plan-shipped/33-bubbles-closeup.md` §33e (moved 2026-10-29, 19m-2).
 
 Left from it, so none of it is lost:
 - **33e-2. The band's width from the meniscus, for small bubbles too.** The old text
@@ -111,7 +111,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
 
 ## ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped** (Paint Cells and Macro Lacing default to 0; `npm run macroview`; 20c-1 is closed by it)
 
-**Shipped.** Story in `docs/plan-shipped.md` §33g (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
+**Shipped.** Story in `docs/plan-shipped/33-bubbles-closeup.md` §33g (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
 
 - **33g-2. The closeup is still lit, not refracted.** The relief is the dye's own
   gradient read as a dome under a lowered lamp (shortcut: not a physical height field,
@@ -126,14 +126,14 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   lacing (its subject, dendrites rather than cells). Descriptions, the landing page and
   the Guide say so, and `macroview` line 1 now audits every look. Open: Cell Bloom's name
   says cells; the owner to say whether to rename it (its id is in set lists and saved
-  shows, so a rename keeps the id). Story in `docs/plan-shipped.md` §33g.
+  shows, so a rename keeps the id). Story in `docs/plan-shipped/33-bubbles-closeup.md` §33g.
 - ~~**33g-2a. The closeup's beads are the 3D.**~~ **Shipped** (the owner, 2026-10-30:
   "a couple really cool macro 3d looking views", on the card "Beads first"). The oil beads
   are the closeup's strongest depth cue (each a lens that turns the plate upside down inside
   a dark meniscus, `dropCam`), but at the plate's size they were grain. In the closeup
   (`macroMode`) the beads are now laid at 2.0 times the size scale (`beadPopulation` in
   `lib/beads.ts`; the plate's is as it was, to the bit), Macro Bead's Beads dial is 0.7 (was
-  0.35), and Cell Bloom is Lens Pools (id kept: `cell-bloom`). Story in `docs/plan-shipped.md`
+  0.35), and Cell Bloom is Lens Pools (id kept: `cell-bloom`). Story in `docs/plan-shipped/33-bubbles-closeup.md`
   §33g. Shortcuts, named: the factor is a taste choice (1.6 gave the mean radius 1.35 times,
   2.0 gives 1.44 to 1.49, 3.0 starts to leave the plate short of beads); beads already on the
   plate keep their size until they retire. Open: no new setting (the size follows

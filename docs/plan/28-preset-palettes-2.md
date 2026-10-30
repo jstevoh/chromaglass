@@ -14,17 +14,17 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
   it sells in (PLAN 23: Home includes one pack, Pro all). The reworks go to Antigravity as
   short briefs; this item lists them as they are briefed.
 
-  *Judged so far* (the Mac gallery of 2026-10-19 against the 2026-10-11 film): of 41 looks, 10 retire (nine in 28i-1, Lumia after 28i-5), 31 stay, 21 of those reworked; the three shared faults were stillness, lost black and a white ground. Story in `docs/plan-shipped.md` §28i (moved 2026-10-29, 19m-2).
+  *Judged so far* (the Mac gallery of 2026-10-19 against the 2026-10-11 film): of 41 looks, 10 retire (nine in 28i-1, Lumia after 28i-5), 31 stay, 21 of those reworked; the three shared faults were stillness, lost black and a white ground. Story in `docs/plan-shipped/28-preset-palettes.md` §28i (moved 2026-10-29, 19m-2).
 
   - ~~**28i-1. Retire nine**~~ (Antigravity, batch 1, **shipped** in #408; story in
-    `docs/plan-shipped.md` 28i-1): nine ids through `RETIRED_PRESETS`, every check that
+    `docs/plan-shipped/28-preset-palettes.md` 28i-1): nine ids through `RETIRED_PRESETS`, every check that
     named one on its replacement. What it found is **28i-6**.
   - **28i-5. Retire Lumia** (→ `velvet-underground`; Claude first). `'lumia'` is also the
     lamp's Lumia setting and mixer mover (`plateSources.ts`, `mixer.ts`), and `plate` 5b
     fails on any quoted retired id in src/, so retiring the look trips it on the layer.
     5b learns to tell a preset id from a setting key (named under `Check changes:`, its
     reach unchanged for preset ids), then the look retires.
-  - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2) **Shipped**: all 21 reworked looks meet their gallery and film bars; Poster's `>= 30 steps/s` is open as **28i-2a** below. Story in `docs/plan-shipped.md` §28i-2 (moved 2026-10-29, 19m-2).
+  - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2) **Shipped**: all 21 reworked looks meet their gallery and film bars; Poster's `>= 30 steps/s` is open as **28i-2a** below. Story in `docs/plan-shipped/28-preset-palettes.md` §28i-2 (moved 2026-10-29, 19m-2).
   - **28i-2a, open. Poster, 1969's step rate on a single 384² plate.** Measured over 12 s
     (`squeeze` harness), `poster-1969` on `main` ran `layerCount: 2` (`2 × 384²` thin-gap
     plates = 12 GPU solver steps per render frame at the 6-substep cap), stepping at
@@ -50,8 +50,8 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     input in the PR body, and run the same mutations to show 0.2 sideways now fails.
   - **28i-3. Sound on the liquid, not the frame** (batch 3, **open for the film measure**;
     frame fixes on the eight looks and the Milk Marbling dead-patch fix **shipped** in #473,
-    story in `docs/plan-shipped.md` 28i-3).
-    - ~~**Frame fixes on the eight looks and Milk Marbling's dead patch**~~ **Shipped** (#473). Story in `docs/plan-shipped.md` §28i-3 (moved 2026-10-29, 19m-2).
+    story in `docs/plan-shipped/28-preset-palettes.md` 28i-3).
+    - ~~**Frame fixes on the eight looks and Milk Marbling's dead patch**~~ **Shipped** (#473). Story in `docs/plan-shipped/28-preset-palettes.md` §28i-3 (moved 2026-10-29, 19m-2).
     - **28i-3b, open (with 28f-2).** Every look that hears sound now carries two or three
       fast liquid patches or area cords from `hits`, `bands`, onsets and notes only (#473;
       `npm run soundpatch` §2 counts both plate-wide liquid patches and area cords on fast
@@ -141,7 +141,7 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
   colour but switches lists, steps and booleans at the midpoint, and the handoff in
   `LiquidVisualizer` lays the new look's ferrofluid ring in one frame. ~~**28j-1. The two
   jumps a Go, a Back and a Send to wall made on every pair**~~ (**shipped**; story in
-  `docs/plan-shipped.md` 28j-1): the patch list (`sceneMappings`) now crossfades by depth,
+  `docs/plan-shipped/28-preset-palettes-2.md` 28j-1): the patch list (`sceneMappings`) now crossfades by depth,
   and the ring's `phaseAmount` dips to nothing at the swap and rises on the new look's own
   value. Open, each named so it is not found twice:
   - **28j-2. The handoff's first frame.** `clearChemistry` and the fluids' `liquid.clear`
@@ -170,7 +170,7 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
   photograph of a splodascope: round cells of yellow, green, red and pink oil packed edge
   to edge in blue water, some inside others; "if not, let's fix the physics").
   - ~~**28k-1. Film Hold and the Splodascope look**~~ (**shipped**, this PR; the story in
-    `docs/plan-shipped.md` §28k). `npm run filmhold`: the look's crowd held 35 → 31 bodies in
+    `docs/plan-shipped/28-preset-palettes-2.md` §28k). `npm run filmhold`: the look's crowd held 35 → 31 bodies in
     six seconds, the same plate without the hold 35 → 3.
   - **28k-2. Shortcuts named in 28k-1.** (a) The film is drawn as thick as the field's own
     edge (two to five cells), where a real one is tens of nanometres. (b) A film breaks when

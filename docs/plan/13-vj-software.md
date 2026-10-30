@@ -50,7 +50,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
 
 **Running order.** Steps marked *(owner)* need the owner's Mac and a VJ app on it.
 
-1. ~~**The wrapper**~~ **Shipped** (2026-09-27, #207): `desktop/`, checked by `npm run desktop` on the packed app in `desktop.yml`. Story in `docs/plan-shipped.md` §13.1 (moved 2026-10-29, 19m-2). **Owed:** the Mac look (`docs/judging.md` §26); signing landed with 13-update-signed.
+1. ~~**The wrapper**~~ **Shipped** (2026-09-27, #207): `desktop/`, checked by `npm run desktop` on the packed app in `desktop.yml`. Story in `docs/plan-shipped/13-vj-software.md` §13.1 (moved 2026-10-29, 19m-2). **Owed:** the Mac look (`docs/judging.md` §26); signing landed with 13-update-signed.
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
    the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
@@ -76,7 +76,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      session (`server/abletonLink.js`, the protocol spoken in Node, no native addon) and
      the page's tempo source takes its tempo, beat and bar; the Link switch in Settings →
      Sound → Tempo and on the phone's Sound sheet. `npm run link` 27/27. Story in
-     `docs/plan-shipped.md` §13.5-link. **Owed:** the owner's session with Live
+     `docs/plan-shipped/13-vj-software.md` §13.5-link. **Owed:** the owner's session with Live
      (`docs/judging.md` §95); until it passes, the Pro page keeps Link under "on the way".
      - **13.5-link-one.** The bar grid (`lib/barGrid.ts`) finds the one by ear; Link
        already knows it (`TempoReading.bar`, beat zero of the session is every peer's bar
@@ -202,7 +202,7 @@ network):
 - Record keeps the whole take in memory until it stops (`src/hooks/useRecorder.ts`).
   That's fine for a song and risky for a set. In Chrome, write to a file as it
   records (File System Access).
-- ~~Flexible Canvas Video Recording & Performance Separation~~ **Shipped**. Story in `docs/plan-shipped.md` §13 (moved 2026-10-29, 19m-2).
+- ~~Flexible Canvas Video Recording & Performance Separation~~ **Shipped**. Story in `docs/plan-shipped/13-vj-software.md` §13 (moved 2026-10-29, 19m-2).
 - The popup projector has only been used with one projector. Run two before rig R1
   counts on it.
 
@@ -225,10 +225,10 @@ network):
 - The icon is the website's (`public/icon-512.png`), a flat square in the Dock. A
   Mac icon has its own shape and shadow (a 1024 px `.icns`).
 - **13-update** (**shipped** ad hoc, asked 2026-10-25; the story is in
-  `docs/plan-shipped.md` §13) Story in `docs/plan-shipped.md` §13-update (moved 2026-10-29,
+  `docs/plan-shipped/13-vj-software.md` §13) Story in `docs/plan-shipped/13-vj-software.md` §13-update (moved 2026-10-29,
   19m).
-  - ~~**13-update-signed**~~ **Shipped** (2026-10-27: the first signed and notarised release, 1.3.692; `MAC_APP_NOTARISED` is true and `npm run updates` asserts it). Story in `docs/plan-shipped.md` §13-update-signed (moved 2026-10-29, 19m-2). Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces it in place.
-  - ~~**13-first-open**~~ **Shipped**: the release notes, the profile sheet's Mac app card and the landing page say Open Anyway (`npm run updates`). Story in `docs/plan-shipped.md` §13-first-open (moved 2026-10-29, 19m-2).
+  - ~~**13-update-signed**~~ **Shipped** (2026-10-27: the first signed and notarised release, 1.3.692; `MAC_APP_NOTARISED` is true and `npm run updates` asserts it). Story in `docs/plan-shipped/13-vj-software.md` §13-update-signed (moved 2026-10-29, 19m-2). Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces it in place.
+  - ~~**13-first-open**~~ **Shipped**: the release notes, the profile sheet's Mac app card and the landing page say Open Anyway (`npm run updates`). Story in `docs/plan-shipped/13-vj-software.md` §13-first-open (moved 2026-10-29, 19m-2).
   - *Trap:* the updater reads the repository's **newest** release. Any other kind of
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
     with `--latest=false`, or every installed app looks for `latest-mac.yml` in it
@@ -262,7 +262,7 @@ network):
   "skip" when the covered reading shows the page was starved, as the lit plate does.
 - ~~`npm run desktop`'s projector line goes red on CI's Mac on PRs that never touched it
   ("the mirror's canvas missing", #255 and #262 on 2026-10-04)~~ **Fixed 2026-10-04
-  (#263):** Story in `docs/plan-shipped.md` §13 (moved 2026-10-29, 19m).
+  (#263):** Story in `docs/plan-shipped/13-vj-software.md` §13 (moved 2026-10-29, 19m).
 - **desktop-cast-late** *(found 2026-10-27 on #507, which touched only the workflow's
   timeout)*: the projector line went red again on CI's Mac, the mirror's canvas
   "missing at 8.15 s" because the `CastDisplay` chunk itself arrived at 8.12 s (the

@@ -1,6 +1,6 @@
 # 9. Ferrofluid after the references
 
-**Partly shipped**: the edge and the two looks, the dye riding the ferrofluid, the magnet standing the pool up, fingers past the spikes, Blow and Finger on the ferrofluid, and the Magnet moving only the ferrofluid that is there. What is open is below. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+**Partly shipped**: the edge and the two looks, the dye riding the ferrofluid, the magnet standing the pool up, fingers past the spikes, Blow and Finger on the ferrofluid, and the Magnet moving only the ferrofluid that is there. What is open is below. How it was found, built and measured is in [`docs/plan-shipped/09-ferrofluid.md`](../plan-shipped/09-ferrofluid.md), under the same number.
 
 `src/gpu/wgsl/plate.ts`, `src/presets.ts`, `src/presetPlate.ts`, `scripts/ferrolook.mjs`
 
@@ -14,7 +14,7 @@ comes through the liquid, but these films are lit from the front.
 What watching the lab clips of Ferro Maze, Ferro Paint and Magnet Garden found
 (`/mnt/project-files/ferrofluid-look/watch/`), in the order to fix them:
 
-- **9b. Maze detail**, shipped in #167: Maze Detail (0 to 1) divides `MAZE_PERIOD` by up to three, Ferro Maze at 0.5 (`npm run maze`). Whether it now matches the reference is for the Mac. Story in `docs/plan-shipped.md` §9b (moved 2026-10-29, 19m-2).
+- **9b. Maze detail**, shipped in #167: Maze Detail (0 to 1) divides `MAZE_PERIOD` by up to three, Ferro Maze at 0.5 (`npm run maze`). Whether it now matches the reference is for the Mac. Story in `docs/plan-shipped/09-ferrofluid.md` §9b (moved 2026-10-29, 19m-2).
 - **9d. Smaller faults.** A sub-half phase shows as brown ghost smears; Ferro Maze's
   white table clips (32 % of the frame blown); no visible pulse on the kick.
 
@@ -26,7 +26,7 @@ Open, from building 9e (in the order to do them):
 - **9h. Thick walls in Ferro Paint and the maze.** The references' ferrofluid walls
   between dye cells are thin and even; ours still thicken where the maze coarsens.
 
-- **9ab. Fingers thinner than the grid are drawn** (**shipped**): a strand under the half-full line is drawn by Beer–Lambert through its phase's thickness (`npm run fingers`). Judging §41. Open: the maze's haze (9aa) is under half full too and is drawn by the same rule, so it reads browner until 9aa takes the leak out. Story in `docs/plan-shipped.md` §9ab (moved 2026-10-29, 19m-2).
+- **9ab. Fingers thinner than the grid are drawn** (**shipped**): a strand under the half-full line is drawn by Beer–Lambert through its phase's thickness (`npm run fingers`). Judging §41. Open: the maze's haze (9aa) is under half full too and is drawn by the same rule, so it reads browner until 9aa takes the leak out. Story in `docs/plan-shipped/09-ferrofluid.md` §9ab (moved 2026-10-29, 19m-2).
 - **9aa. The maze is two to three times coarser than its period, and leaves a haze**
   (measured 2026-10-04, building 4a-clock). Ferro Maze, Ferro Paint and Magnet Garden
   in the Mac gallery are fat black blobs with a brown haze round them, where the
@@ -102,7 +102,7 @@ Open, from building 9i:
   under a held Blow shows it.
 
 - **9t. The ferrofluid stands up as a layer that keeps its volume** (**shipped**). Story in
-  `docs/plan-shipped.md` §9t (moved 2026-10-29, 19m).
+  `docs/plan-shipped/09-ferrofluid.md` §9t (moved 2026-10-29, 19m).
   - **9t-1. The lift held near the onset.** G under the hand is 2.8 (a real layer's is
     hundreds), so the domes grow at a scale the grid draws; at the lab's G 4.3 they set
     as bars along the grid. A finer film grid under the magnet (the patch at twice the
@@ -163,7 +163,7 @@ Open, from building 9i:
   the standing-domes plate PR that lab is for, not to a retune of the set-down
   strength here.
 - **9x. Picking the Magnet poured the hole itself; a magnet you size and play**
-  (**shipped**). Story in `docs/plan-shipped.md` §9x (moved 2026-10-29, 19m).
+  (**shipped**). Story in `docs/plan-shipped/09-ferrofluid.md` §9x (moved 2026-10-29, 19m).
   Open: on one Mac run (PR #230, after main came in) the pool's centre was 0.11 off
   the hand 1.5 s after the touch, before the drag, and the drag then left it behind
   (46% of the way). The lab replaying that run's own step, magnet path and pool kept
@@ -176,7 +176,7 @@ Open, from building 9i:
   "not at its mirror", whose two arms ran on two grids when the governor moved the
   solver (384² then 256²); ferro.mjs now pins its grid (`sim=384`).
 - **9v. The magnet as a real magnet, not a deepened dipole (shipped).** Story in
-  `docs/plan-shipped.md` §9v (moved 2026-10-29, 19m).
+  `docs/plan-shipped/09-ferrofluid.md` §9v (moved 2026-10-29, 19m).
   Open, found here:
   - **9v-cost.** The field is elliptic integrals wherever the magnet reaches (in
     the solver five evaluations a cell a magnet, and per pixel on the plate inside
@@ -193,7 +193,7 @@ Open, from building 9i:
     face is a fixed 0.06 above it (`MAGNET_FACE`), clamped 0.01 under the liquid.
     Saying the setting as the gap itself would be plainer, but changes every
     saved look's magnet; worth doing with a look version bump.
-- **9w. Carry the ferrofluid across a new solver** (**shipped**): the old solver copies the ferrofluid, the mix and the reactions on the GPU before it goes (`handOver`/`takeOver` in `gpu/fluid.ts`; `npm run regrid`, `npm run magnet` check 8 on the Mac). Not carried: Oil Bodies' share of the dye, the glass's press, the particles, and 20b's clear film (#259; to be carried the same way). Not checked anywhere yet: that the app keeps the carry until the new solver's first readback, so an out-of-memory retry after a climb gets it, and that after a lost device the app's next solver refuses the old carry and lays the look's ferrofluid as before (the lab checks only a second device's refusal). Story in `docs/plan-shipped.md` §9w (moved 2026-10-29, 19m-2).
+- **9w. Carry the ferrofluid across a new solver** (**shipped**): the old solver copies the ferrofluid, the mix and the reactions on the GPU before it goes (`handOver`/`takeOver` in `gpu/fluid.ts`; `npm run regrid`, `npm run magnet` check 8 on the Mac). Not carried: Oil Bodies' share of the dye, the glass's press, the particles, and 20b's clear film (#259; to be carried the same way). Not checked anywhere yet: that the app keeps the carry until the new solver's first readback, so an out-of-memory retry after a climb gets it, and that after a lost device the app's next solver refuses the old carry and lays the look's ferrofluid as before (the lab checks only a second device's refusal). Story in `docs/plan-shipped/09-ferrofluid.md` §9w (moved 2026-10-29, 19m-2).
 - **9z. The dye at its own grid across a new solver.** Found while doing 9w: the
   dye and the flow cross a move of the grid through the CPU's 192² arrays
   (`FluidSimulation.attachGpu`, `pullStateFromGpu`), so a plate on 384² to 1024²
