@@ -45,18 +45,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    *Target:* swells 1.5–3.5 a minute, calm 20–40 %, near-black ranging across at least
    10–70 % over a set, cuts still zero. *Check:* a node harness on the phrase generator
    from a seeded run, and the film table.
-   *Shipped* (#170) on the stage sequencer rather than the phrase generator, because a
-   stage is already a scene: `src/lib/scenePacing.ts` plans each stage of a running
-   sequence (a pour, press or dye change opening each swell, rests where the plate's clock
-   drops as low as a fifth, and from Pacing ½ a slow fade to near-black at the stage's
-   end, the next coming up out of it), and the plate follows it on its clock, its
-   automation and its light. A **Pacing** setting (0 keeps today's show; sheet, MIDI,
-   desks, phone; a stage may set it and it is put back when the sequence stops), an
-   ending choice per stage, and a built-in **Light Show Night** of 22–30 s scenes.
-   `npm run pacing` measures what the sequence asks for with the footage's `shape()`,
-   counting a fade as the change in every pixel it is: 2.35 swells a minute, calm 25–28 %,
-   swells 2.4× the median, the light under a quarter 19 % of the set, every drain in the
-   dark. Whether the plate delivers it is the film's to say: film Light Show Night.
+   *Shipped* (#170) on the stage sequencer rather than the phrase generator (`src/lib/scenePacing.ts`; a **Pacing** setting whose 0 keeps today's show, an ending per stage, a built-in **Light Show Night**; `npm run pacing`: 2.35 swells a minute, calm 25–28 %). Whether the plate delivers it is the film's to say: film Light Show Night. Story in `docs/plan-shipped.md` §10 step 1 (moved 2026-10-29, 19m-2).
 2. **Hear the song's shape live.** Presence (rising or falling action) and a slowly
    accumulating intensity from #154's bands, and from them live build, drop and
    breakdown events that choose which swell step 1 fires and how big. *Target:* a drop
@@ -100,24 +89,7 @@ The steps, most visible first. Each is one PR with its own check, and every step
    performer pick downbeats, every other bar or fills only, vary the depth a little as a
    hand does, and pull a hand-played press onto the predicted beat. Needs a real
    downbeat, which #155 does not have yet.
-   *Check:* `npm run downbeat` (90): on eight synthesised songs, a real beat within
-   70 ms on every tick of every groove, at the song's tempo within 2 % on 1326 of 1326
-   ticks; no kick but the one ever called the one (0 of 528, 519 of them placed); the
-   one known for 78 % of the groove's ones (rock songs 75 to 100 %, four on the floor
-   49 to 88 % on sixteen-bar sections, where the half bar carries the rest: two and
-   four softened 98 %); every kick weighed exactly what its place says (the one 1.25
-   on 159 kicks, three 0.4 on 155), the one after a fill 1.5 on 32 of 32 fills (12 club,
-   20 rock); a pulse and three loops with no bar (118, 126, 132) never placed, on a beat
-   they do hear; the same at 30 fps, 20 dB down and on the page's clock (every
-   estimate the same); fuzzed onset streams never name a tempo outside 69 to 185 bpm
-   and always return; an estimate's median 0.5 ms, 99th percentile 0.5 ms; the accent
-   at 0 leaves every kick at exactly 1, 933 of which the accent at 1 moves. The sure
-   mark is 2.2 (it was 2.6, set over a loop whose bass played a pickup into every one,
-   a bar cue; without it the loops reach 1.65 at worst). Mended on the way: the
-   tempo's refinement between bins was unbounded on a flank (393 bpm named in a song
-   at 128; a fuzzed stream hung the render loop), and the bins moved with the clock's
-   rounding. Not yet seen on the plate: the app's frames cannot be read in a cloud
-   session.
+   *Check:* `npm run downbeat` (90), built: the bar grid's one on eight synthesised songs, every kick weighed by its place, the sure mark 2.2. Not yet seen on the plate: the app's frames cannot be read in a cloud session. Story in `docs/plan-shipped.md` §10 step 3 (moved 2026-10-29, 19m-2).
    *Found while building it, not yet done:*
    - **The rest of the step is not built.** The one (and the one after a fill) is; the
      other accents the step asks for are not: *every other bar* (the grid knows the bar,
@@ -155,100 +127,17 @@ The steps, most visible first. Each is one PR with its own check, and every step
 4. **Press smooth, lift into fingers** (roadmap G). A squeeze gives a smooth ring and a
    lift breaks into fingers; today both finger. *Check:* finger count round the ring,
    low on press and high on lift, in the lab.
-   *Built 2026-09-27* (lib/squish.ts): a press is round by construction (the film thins
-   evenly, the centre clears, the dye stands up in a round rim), and remembers itself;
-   150 ms after it lets go the glass comes up for a second and a bit, and the spokes the
-   press used to draw on the way down now come in from the rim, the gap opening along
-   them and the liquid drawn back toward the centre, as deep as the press went (a tap a
-   tenth of the way down lifts a third as hard a step as a held hand, and on the plate
-   that is a faint ripple at the spokes, too faint to count fingers). Each press lifts
-   on its own: two fingers on the phone, one let go while the other holds, and the one
-   let go lifts where it was; the pad's held press keeps pressing while held still.
-   Fingering 0 is today's plate
-   exactly; a drop's splash keeps its fingers on the way down, drawn exactly as before.
-   On the phone Fingering is on the Press tool's own Amount. *Check:* `npm run lift`:
-   held, the film under the palm has no angular structure (contrast 0.000, the stroke
-   drawn before 0.041, in spokes at its own angles); let go, at the default look's gap
-   spring, the dye round the rim goes up and down 0.073 of its level in 15 fingers,
-   sitting at the lift's spokes (correlation 0.92, 0.16 for the spokes turned a few
-   degrees), and at the fastest look's 0.078 in 10; the gap's spring alone makes 0.0026
-   of it at the spokes against the lift's 0.067; a one-frame tap lifts at 0.004. The
-   lift brings the glass back to rest and never past it: the shader caps an opening
-   there (uncapped, 0.081 against a rest of 0.030). 25 checks. Waiting on the owner's
-   eyes on a real GPU (judging.md 15).
+   *Built 2026-09-27* (lib/squish.ts; `npm run lift`, 25 checks): a press is round by construction and remembers itself, and the glass lifts after it in fingers at the spokes; Fingering 0 is today's plate exactly, on the phone on the Press tool's Amount. Waiting on the owner's eyes on a real GPU (judging.md 15). Story in `docs/plan-shipped.md` §10 step 4 (moved 2026-10-29, 19m-2).
    *Found while building it, not yet done:*
-   - **Beat Squeeze has never pressed the plate. Fixed (shipped with this item's fix
-     PR, the owner's call on 2026-09-27: "Fix it tonight").** Its centre was
-     `GRID_SIZE / 2` plus a random fraction of 30 cells, never rounded, so every cell
-     index `squishDisc` reported was fractional, and a Float32Array drops a write at a
-     fractional index without a word: the rhythm plate every Fillmore description
-     promises was the plate rock alone. Every stroke now lands on a whole cell
-     (`applySquish` and `squishDisc` both round). Rounding alone would have floored
-     the lead plate: a kick pressed and nothing let it go but the gap's spring (the
-     glass half way back in about 24 s at the default look, 50 on the Fillmore's):
-     at 140 bpm with the bass at 0.7, 100 % of the pressed disc is on the floor after
-     40 s on the Fillmore's glass (`npm run lift`; a one-off run at 120 bpm put the
-     default look at 93 % and Soap Film at 76 %).
-     So a kick is held for the lift's pause (0.15 s) and its gap given back over a
-     third of a second (`KickRelease`, lib/squish.ts): 0 % on the floor, the mean back
-     at rest, each kick still pressing the film under it to 0.0255 to 0.0258 a tenth
-     of a second after it lands. *Check:* `npm run lift` (a kick lands on whole cells, all 319,800 of
-     its writes kept, where with the rounding taken out none are; pressed and never let go at 140 bpm the disc floors,
-     let go it stays at rest on no spring, the Fillmore's and the default look's
-     glass, and at half the step rate); `npm run squeeze` in the app on the Mac shard
-     (Fillmore East with the band, on a beat tapped in at 130 bpm: the kicks press
-     the lead plate as deep as the look's squeeze, each is let go, the gap given back
-     over the run is the depth pressed, and at Beat Squeeze 0 nothing is pressed;
-     tapped since the #190 deploy, next item). Both count what the code
-     hands the plate, on the CPU; neither reads the GPU (next item). Every look changes with music
-     playing; waiting on the owner's eyes (judging.md 15).
-   - **The show hears a quarter of the simulated band's kicks, or fewer, on the Mac.**
-     **Shipped** (with 14d): two causes, both measured by `npm run kicks`, which plays
-     the band's own score (`bandStep`) through the live ear. The clock's onset, the
-     smoothed bass crossing 0.45, never crossed in the chorus, where the sawtooth
-     bass holds the level over the line: 59 of 160 chorus kicks heard at 20 fps (110
-     at 60). And a loop reading the onset's `hit` loses the kicks that land on
-     readings it never sees, since the ear reads at 60 Hz and the loop is handed the
-     latest reading: 46 of 160 at a 20 fps plate. The clock and the song's shape now
-     read the kick's onset by its time (`at` moving), and the onset calls a kick that
-     lands with a bass note (next item but one): 155–160 of 160 chorus kicks, every
-     intro and verse kick bar one, at 60, 30 and 20 fps, 48 and 44.1 kHz, late frames
-     or not. The
-     band's scheduler was not a cause (0 of 62 kicks late on the cloud's busy page,
-     `window.__band()` under `?debug`). Still owed: the count in the app on the Mac
-     (next item). What was found:
-     The band plays four on the floor at 122 bpm, two kicks a second, outside its
-     break. `npm run squeeze` counted the kicks the show heard on the Mac shard: 6 in
-     12 s and 9 in 12 s on #192's run, and on the #190 deploy (main, 2026-09-27) 3 in
-     45 s at Beat Squeeze 0.9 and 6 in 42 s at 0, the plate stepping at the same rate
-     both ways (898 and 805 steps). That run failed the deploy, since the check then
-     asked for 5 heard kicks; it now taps its beat in, so it asks the press and not
-     the ear. The ear is still open: whether the onset (bass over 0.45 from under
-     it, `beatClock.ts`) misses kicks the bassline holds the level over, whether a
-     main thread busy enough to step the plate 20 times a second leaves the band's
-     25 ms scheduler late past its 0.12 s lookahead (a note scheduled in the past
-     plays its envelope already over, so silent), or both. Every beat ride reads
-     these kicks, so a band the show hears one kick in four of is a quarter of the
-     show. *Check to write:* heard kicks against the kicks the band played, in the
-     app on the Mac, logged by section.
+   - **Beat Squeeze has never pressed the plate. Fixed** (shipped with this item's fix PR, the owner's call on 2026-09-27): every stroke lands on a whole cell, and a kick is let go over a third of a second (`KickRelease`); `npm run lift`, `npm run squeeze` on the Mac shard, both on the CPU (the GPU read is an item below). Every look changes with music playing; waiting on the owner's eyes (judging.md 15). Story in `docs/plan-shipped.md` §10 step 4 (moved 2026-10-29, 19m-2).
+   - **The show hears a quarter of the simulated band's kicks, or fewer, on the Mac.** **Shipped** (with 14d): the clock and the song's shape read the kick's onset by its time, and a kick with its bass note is called (next item but one): 155–160 of 160 chorus kicks (`npm run kicks`). Still owed: the count in the app on the Mac (next item). Story in `docs/plan-shipped.md` §10 step 4 (moved 2026-10-29, 19m-2).
    - **Count the heard kicks in the app on the Mac.** `npm run kicks` hears the band
      offline, through the ear's code; nothing yet counts it in the running app, where
      the plate's frames and the band's timer share a busy page. Both counts are there
      under `?debug`: `chromaglassDebug().heardKicks()` (onsets the loop saw) and `window.__band()`
      (kicks the band scheduled, and how many late). *Check to write:* a Mac check
      that plays the band for 30 s and asks for nine in ten of its kicks heard.
-   - **A kick with its bass note read as low mids.** **Shipped** with the item above.
-     The kick onset would not fire when a frame's new energy at 150–400 Hz came
-     within 6 dB of the new energy under 120 Hz (`KICK_TILT_DB`, which keeps snare
-     bodies off the kick). The band starts a bass note on every kick, and its
-     harmonics put the kick's lead at 3.9–5.9 dB: the ear called 134 of the chorus's
-     160 kicks at 48 kHz and 124 at 44.1 kHz (a Mac runs at either; the bins fall
-     differently), and 4 of the intro's 31. At 3 dB it calls all of them at both
-     rates, and the lone snare in `npm run bands` still fires no kick (it first does
-     at 1 dB). `npm run kicks` now runs at both rates and holds the ear's own onsets
-     to 95 % in every section. Not yet heard on real records: a kick under a bass
-     guitar played on the beat is the same case, and a floor tom the other side of
-     it, and `bands` has no tom.
+   - **A kick with its bass note read as low mids.** **Shipped** with the item above (`KICK_TILT_DB` 6 → 3 dB; `npm run kicks` at 48 and 44.1 kHz holds the ear's onsets to 95 % in every section). Not yet heard on real records: a kick under a bass guitar on the beat, a floor tom; `bands` has no tom. Story in `docs/plan-shipped.md` §10 step 4 (moved 2026-10-29, 19m-2).
    - **A check that reads a kick's press on the GPU.** `npm run squeeze` counts the
      cells and depth the kick hands the plate and the gap its release gives back, on
      the CPU: a regression in the upload (the plate not marked dirty, the flush

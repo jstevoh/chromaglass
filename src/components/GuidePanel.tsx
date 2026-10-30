@@ -378,13 +378,13 @@ const SECTIONS: Section[] = [
           of liquid, from 1× to 16×. <C>+</C> and <C>−</C>, the wheel over the plate, or the
           chip under the title. It is a different subject, not a zoom: at 8× the frame is
           the liquid itself, shaded as a thick film under a low lamp, in the dye's own
-          colour. Paint cells and lacing are opt-in, off unless a look asks for them, and
-          the presets built around them (Macro Bead, Cell Bloom, Lacing Run) do.
+          colour. Paint cells and lacing are opt-in, off unless you turn them up; of the
+          shipped looks only Lacing Run draws lacing.
         </P>
         <Rows items={[
           ['Chase Speed / Shot Length', <>How eagerly the camera follows its subject, and how long it stays on one before cutting.</>],
           ['Music Sync', <>The camera cuts on kicks. Its punch on the bass, push with the energy and tremor from the treble are the frame moving with the music, so they ride Frame Sway (Show), which is 0 unless you turn it up.</>],
-          ['Paint Cells / Cell Size', <>Opt-in, off by default: synthesised cells at magnification, the rings a pour painting makes. Macro Bead and Cell Bloom turn them on.</>],
+          ['Paint Cells / Cell Size', <>Opt-in, off by default: synthesised cells at magnification, the rings a pour painting makes. No shipped look turns them on.</>],
           ['Macro Lacing / Edge Detail / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Edge Detail is the fine boundary structure, and Relief the apparent thickness of the film, which is always on.</>],
           ['Depth / Focus', <>Shallow depth of field, the way a real macro lens has no choice about.</>],
         ]} />

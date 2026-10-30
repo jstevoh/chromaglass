@@ -34,13 +34,7 @@ viscous gravity current (`wgsl/slump.ts`, its own stage in the dye's step, apart
 18h's blur), measured against Huppert's law by `npm run slump`. How it was found, built and
 measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number. Open:
 
-- ~~**18m-1. The slump's cap (a speed shortcut).**~~ **Partly shipped** (#371): replaced
-  the viscous-only cap with a per-cell regime switch `min(viscous rate, inertial rate)`
-  using the Huppert–Simpson front Froude number `Fr = 1.19` (`Fr √(g′η(1 − η/b))`,
-  Huppert and Simpson 1980) in `slumpRate`, planned `substeps = Math.ceil(most /
-  SLUMP_FACE)` up to `SLUMP_SUBSTEPS = 20` in `fluid.ts` (covering 1024² at Heavy dye 1),
-  and kept `min(a, SLUMP_FACE)` (`0.24`) in `slump` as a stability guard (`npm run slump`
-  13/13, including deep heavy pools on 768² and 1024²).
+- ~~**18m-1. The slump's cap (a speed shortcut).**~~ **Partly shipped** (#371): a per-cell regime switch min(viscous rate, inertial rate) with the Huppert–Simpson front Froude number in `slumpRate`, in planned substeps (`npm run slump` 13/13). Story in `docs/plan-shipped.md` §18m-1 (moved 2026-10-29, 19m-2); what it keeps is 18m-1a.
 - **18m-1a. Implicit backward-Euler slump step and grid-independent inertial flux.**
   #371's `min(viscous, inertial)` is a regime switch inside the explicit pass, not an
   implicit step, and keeps two shortcuts: (1) the pass is still explicit forward Euler in

@@ -159,7 +159,8 @@ merge conflicts are the shared documents', which 0.6 ends.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
   after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
-  video pour's pause and play every frame, shipped with 14ac).
+  video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
+  -5, -9 with #549). Left: 14ab-4, -2, -6, -10.
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
@@ -247,6 +248,14 @@ style (§31).
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
 - **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
   13.1-sign), then **24.4**.
+- **7.7** Marketing (§37), tied to the store going live: before any link is posted, the share
+  card (34a-5) and the hero (34a-2); then **37a** *(owner)*, **37b**, **37c**, **37k**, the
+  launch **37f** (**37g**, **37h**, **37i**), **37l** from the first post, **37n**; **37m** and
+  **37o** are the owner's calls; **37j** the cadence after. The week that runs itself,
+  **37p** to **37s** (37s's API audit filed early: it takes weeks), then the album show:
+  **37x-1** and **37x-2** (the music) from now, the builds **37x-4** (go live from the
+  Mac app; OBS until then) and **37x-3** (the album sheet), each its own thread, then
+  **37x-7**'s routine.
 
 ### One home for work written twice
 
@@ -314,6 +323,7 @@ Where each batch stands, as of 2026-09-27:
 | 32 | The soap film in reflection | Asked 2026-10-18 from a photograph of a draining film: Newton's bands, black lace, flow-combed edges. The model (an inextensible film's gravity convection, evaporation to Newton black, angle-dependent reflection) and its judge `npm run soapfilm` (23 lines) are written; 32a, the CPU reference, is next (Antigravity); 32b–32e open |
 | 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-5's words shipped; 34a-2 to 34a-4 and the share card open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 | 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
+| 37 | Marketing and social media | Asked 2026-10-29: who it is for, the channels (YouTube, Shorts, Reels and TikTok, Reddit and the VJ and synth forums, Show HN, Product Hunt), the launch in order from the day the store goes live, a weekly cadence, who makes what and who posts, and how a sale is traced to a channel (37a–37o). The same day: the week that runs itself, the app filming itself, one Monday approval, a scheduler and YouTube's API (37p–37w), and a whole album performed live every week on YouTube from the Mac app, with a family of looks across it (37x-1 to 37x-9). 37x-4a (the live show research, `docs/live-show.md`) shipped 2026-10-29; the rest not started |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -327,53 +337,54 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 
 | § | Section | File | Items (a cut section) | KB |
 |---|---|---|---|---|
-| 0 | The dye a tool makes, and the deploys it is blocking | [`00-dye-tools.md`](docs/plan/00-dye-tools.md) |  | 21 |
+| 0 | The dye a tool makes, and the deploys it is blocking | [`00-dye-tools.md`](docs/plan/00-dye-tools.md) |  | 15 |
 | 1 | Sharp liquid, and pigment in it | [`01-sharp-liquid.md`](docs/plan/01-sharp-liquid.md) |  | 5 |
 | 2 | Lacing | [`02-lacing.md`](docs/plan/02-lacing.md) |  | 0 |
 | 3 | Drops, not rings | [`03-drops.md`](docs/plan/03-drops.md) |  | 0 |
-| 4 | Liquids that behave differently | [`04-liquids.md`](docs/plan/04-liquids.md) |  | 3 |
+| 4 | Liquids that behave differently | [`04-liquids.md`](docs/plan/04-liquids.md) |  | 2 |
 | 5 | Playing it: sound learn, shutter, and a look link | [`05-playing-it.md`](docs/plan/05-playing-it.md) |  | 8 |
 | 6 | Render a song | [`06-render-a-song.md`](docs/plan/06-render-a-song.md) |  | 1 |
 | 7 | The room in the plate: the camera as a sensor | [`07-room-camera.md`](docs/plan/07-room-camera.md) |  | 0 |
-| 8 | The desk: the laptop is a control surface, not the show | [`08-desk.md`](docs/plan/08-desk.md) |  | 15 |
-| 9 | Ferrofluid after the references | [`09-ferrofluid.md`](docs/plan/09-ferrofluid.md) |  | 18 |
-| 10 | Playing like a show | [`10-playing-like-a-show.md`](docs/plan/10-playing-like-a-show.md) |  | 29 |
-| 11 | The mixer | [`11-mixer.md`](docs/plan/11-mixer.md) |  | 29 |
+| 8 | The desk: the laptop is a control surface, not the show | [`08-desk.md`](docs/plan/08-desk.md) |  | 14 |
+| 9 | Ferrofluid after the references | [`09-ferrofluid.md`](docs/plan/09-ferrofluid.md) |  | 16 |
+| 10 | Playing like a show | [`10-playing-like-a-show.md`](docs/plan/10-playing-like-a-show.md) |  | 22 |
+| 11 | The mixer | [`11-mixer.md`](docs/plan/11-mixer.md) |  | 12 |
 | 12 | ChromaGlass in the App Store and Google Play | [`12-app-stores.md`](docs/plan/12-app-stores.md) |  | 8 |
-| 13 | ChromaGlass in popular VJ software | [`13-vj-software.md`](docs/plan/13-vj-software.md) |  | 23 |
-| 14 | The show at the gig: hearing, timing, speed and the picture on the wall | [`14-show-at-the-gig.md`](docs/plan/14-show-at-the-gig.md) | 14a–14r | 30 |
-|  | (continued) | [`14-show-at-the-gig-2.md`](docs/plan/14-show-at-the-gig-2.md) | 14s–14ae-5 | 30 |
+| 13 | ChromaGlass in popular VJ software | [`13-vj-software.md`](docs/plan/13-vj-software.md) |  | 20 |
+| 14 | The show at the gig: hearing, timing, speed and the picture on the wall | [`14-show-at-the-gig.md`](docs/plan/14-show-at-the-gig.md) | 14a–14r | 28 |
+|  | (continued) | [`14-show-at-the-gig-2.md`](docs/plan/14-show-at-the-gig-2.md) | 14s–14ae-5 | 26 |
 |  | (continued) | [`14-show-at-the-gig-3.md`](docs/plan/14-show-at-the-gig-3.md) | 14ad–14z-6 | 4 |
-| 15 | Every tool on every liquid | [`15-tools-on-liquids.md`](docs/plan/15-tools-on-liquids.md) | 15a–15h | 30 |
+| 15 | Every tool on every liquid | [`15-tools-on-liquids.md`](docs/plan/15-tools-on-liquids.md) | 15a–15h | 23 |
 |  | (continued) | [`15-tools-on-liquids-2.md`](docs/plan/15-tools-on-liquids-2.md) | 15k | 2 |
 | 16 | Many plates: each projector its own source (rig-plan R1) | [`16-many-plates.md`](docs/plan/16-many-plates.md) |  | 6 |
 | 17 | Hear the set ahead, from files | [`17-hear-ahead.md`](docs/plan/17-hear-ahead.md) |  | 3 |
-| 18 | The physics under the look: where the plate imitates a result instead of simulating it | [`18-physics.md`](docs/plan/18-physics.md) | 18a–18b-8 | 30 |
-|  | (continued) | [`18-physics-2.md`](docs/plan/18-physics-2.md) | 18b-9–18l-6 | 30 |
+| 18 | The physics under the look: where the plate imitates a result instead of simulating it | [`18-physics.md`](docs/plan/18-physics.md) | 18a–18b-8 | 24 |
+|  | (continued) | [`18-physics-2.md`](docs/plan/18-physics-2.md) | 18b-9–18l-6 | 28 |
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5a | 8 |
-| 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-6 | 25 |
-|  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 30 |
-|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ai-5b | 23 |
+| 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-6 | 19 |
+|  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
+|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ai-5b | 22 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 18 |
-| 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 4 |
+| 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
 | 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 5 |
-| 23 | Selling it: the site free, the app paid | [`23-selling.md`](docs/plan/23-selling.md) | 23.1–23.10e | 30 |
-|  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.17-cikeys | 18 |
+| 23 | Selling it: the site free, the app paid | [`23-selling.md`](docs/plan/23-selling.md) | 23.1–23.10e | 22 |
+|  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.17-cikeys | 13 |
 | 24 | Modular rigs: patch the rack into the liquid | [`24-modular-rigs.md`](docs/plan/24-modular-rigs.md) |  | 10 |
 | 25 | Areas of interest: several places on one plate | [`25-areas.md`](docs/plan/25-areas.md) |  | 11 |
 | 26 | A reaction that prints: Turing stripes in black and white (proposed 2026-10-05) | [`26-turing-print.md`](docs/plan/26-turing-print.md) |  | 10 |
-| 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 21 |
-| 28 | Preset palettes: the looks refreshed for what the plate does now (2026-10-10) | [`28-preset-palettes.md`](docs/plan/28-preset-palettes.md) | 28a–28h | 29 |
-|  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28k | 17 |
-| 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 19 |
+| 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 17 |
+| 28 | Preset palettes: the looks refreshed for what the plate does now (2026-10-10) | [`28-preset-palettes.md`](docs/plan/28-preset-palettes.md) | 28a–28h | 19 |
+|  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28k | 16 |
+| 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 14 |
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 9 |
 | 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 6 |
-| 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 15 |
-| 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) |  | 10 |
+| 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 10 |
+| 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) |  | 9 |
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 8 |
-| 35 | Clear controls: on reads on, one name for one thing (asked 2026-10-24) | [`35-clear-controls.md`](docs/plan/35-clear-controls.md) |  | 11 |
-| 36 | What the analog operators could not do (researched 2026-10-27) | [`36-analog-operators.md`](docs/plan/36-analog-operators.md) |  | 17 |
-| | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 10 |
+| 35 | Clear controls: on reads on, one name for one thing (asked 2026-10-24) | [`35-clear-controls.md`](docs/plan/35-clear-controls.md) |  | 9 |
+| 36 | What the analog operators could not do (researched 2026-10-27) | [`36-analog-operators.md`](docs/plan/36-analog-operators.md) |  | 12 |
+| 37 | Marketing and social media, and the weekly album show (asked 2026-10-29) | [`37-marketing.md`](docs/plan/37-marketing.md) |  | 30 |
+| | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 
 ## Not doing
 

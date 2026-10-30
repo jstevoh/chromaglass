@@ -123,8 +123,4 @@ Steps:
   plate shader was not in the diff, and the revert 8278374 had nothing of it to take
   out). A CIMA print is flat: the complex sits in the gel and does not raise it, so
   Turing Print draws no relief (Edge Relief 0 in the look).
-- **26-colour-b. The coral as soft blurred rings (fixed with 26d).** Three causes: the
-  deposit read the field on the logical grid, so it drew its top-left corner stretched
-  1.3–2.7 times; the field was carried twice a frame, once by a bilinear backtrace that
-  blurred it; its width was in cells. The coral looks (Sensual Laboratory, Neon Coral
-  Reef) now grow a pattern half the size they showed, where it grew.
+- **26-colour-b. The coral as soft blurred rings (fixed with 26d).** Story in `docs/plan-shipped.md` §26-colour-b (moved 2026-10-29, 19m-2).

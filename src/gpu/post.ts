@@ -20,6 +20,7 @@
  */
 
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import { groupOf, viewOf } from './groupCache';
 import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { POST_LAYOUT } from './wgsl/postFields';
@@ -102,6 +103,8 @@ export class WebGPUPostChain {
 
   /** The ring, allocated the first time an effect asks for it. */
   private ring: GPUTexture | null = null;
+  /** A view of each of the ring's layers, made with it. */
+  private ringLayers: GPUTextureView[] = [];
   private ringSize = [0, 0];
   private ringNext = 0;
   private ringFilled = 0;
@@ -175,7 +178,7 @@ export class WebGPUPostChain {
   /** Where the plate — or the camera, when one is on — draws the frame. */
   sceneView(width: number, height: number): GPUTextureView {
     this.ensure(width, height);
-    return this.targets[this.cur].createView();
+    return viewOf(this.targets[this.cur]);
   }
 
   /** The mark, uploaded when it arrives and then left alone. */
@@ -212,6 +215,9 @@ export class WebGPUPostChain {
       // exactly like a ring that kept nothing.
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     }));
+    // One view a layer, made with the ring, for the push to draw into: the
+    // ring is made again only when the picture's size changes (14ab-5).
+    this.ringLayers = Array.from({ length: RING_FRAMES }, (_, i) => this.ring!.createView({ dimension: '2d', baseArrayLayer: i, arrayLayerCount: 1 }));
     this.ringSize = [rw, rh];
     this.ringNext = 0;
     this.ringFilled = 0;
@@ -259,18 +265,10 @@ export class WebGPUPostChain {
 
     const pass = encoder.beginRenderPass({
       label: 'film stock',
-      colorAttachments: [{ view: this.targets[out].createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
+      colorAttachments: [{ view: viewOf(this.targets[out]), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
     });
     pass.setPipeline(pipe);
-    pass.setBindGroup(0, this.device.createBindGroup({
-      layout: pipe.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.ubo } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: this.targets[this.cur].createView() },
-        { binding: 3, resource: (this.markTexture ?? this.blankMark).createView() },
-      ],
-    }));
+    pass.setBindGroup(0, groupOf(this.device, pipe, [this.ubo, this.sampler, this.targets[this.cur], this.markTexture ?? this.blankMark]));
     pass.draw(6);
     pass.end();
     this.cur = out;
@@ -292,19 +290,10 @@ export class WebGPUPostChain {
 
     const pass = encoder.beginRenderPass({
       label: 'post effects',
-      colorAttachments: [{ view: this.targets[out].createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
+      colorAttachments: [{ view: viewOf(this.targets[out]), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } }],
     });
     pass.setPipeline(pipe);
-    pass.setBindGroup(0, this.device.createBindGroup({
-      layout: pipe.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.ubo } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: this.targets[this.cur].createView() },
-        { binding: 3, resource: (this.markTexture ?? this.blankMark).createView() },
-        { binding: 4, resource: ring.createView({ dimension: '2d-array' }) },
-      ],
-    }));
+    pass.setBindGroup(0, groupOf(this.device, pipe, [this.ubo, this.sampler, this.targets[this.cur], this.markTexture ?? this.blankMark, viewOf(ring, 'array')]));
     pass.draw(6);
     pass.end();
 
@@ -321,18 +310,12 @@ export class WebGPUPostChain {
     const pass = encoder.beginRenderPass({
       label: 'history push',
       colorAttachments: [{
-        view: ring.createView({ dimension: '2d', baseArrayLayer: this.ringNext, arrayLayerCount: 1 }),
+        view: this.ringLayers[this.ringNext],
         loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 },
       }],
     });
     pass.setPipeline(pipe);
-    pass.setBindGroup(0, this.device.createBindGroup({
-      layout: pipe.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: picture.createView() },
-      ],
-    }));
+    pass.setBindGroup(0, groupOf(this.device, pipe, [this.sampler, picture]));
     pass.draw(6);
     pass.end();
     this.ringNext = (this.ringNext + 1) % RING_FRAMES;
@@ -365,15 +348,7 @@ export class WebGPUPostChain {
       timestampWrites: timestamps,
     });
     pass.setPipeline(pipe);
-    pass.setBindGroup(0, this.device.createBindGroup({
-      layout: pipe.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.ubo } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: this.targets[this.cur].createView() },
-        { binding: 3, resource: (this.markTexture ?? this.blankMark).createView() },
-      ],
-    }));
+    pass.setBindGroup(0, groupOf(this.device, pipe, [this.ubo, this.sampler, this.targets[this.cur], this.markTexture ?? this.blankMark]));
     pass.draw(6);
     pass.end();
     // Back to the first picture for the next frame, so a frame's effects
