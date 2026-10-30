@@ -415,10 +415,11 @@ try {
       let keychain;
       try { await live.keys.set('check', 'desktop-check-key'); keychain = 'kept'; } catch (e) { keychain = `refused: ${e.message}`; }
       const names = (await live.keys.list().catch(() => [])).map((k) => k.name);
+      const probes = await live.probe({ width: 640, height: 360, fps: 30 }).catch((e) => [{ acceleration: 'probe', error: e.message }]);
       try {
         const st = await live.start(keychain === 'kept' ? { url, keyName: 'check', width: 640, height: 360, fps: 30 } : { url, key: 'desktop-check-key', width: 640, height: 360, fps: 30 });
-        return { state: st, keychain, names };
-      } catch (e) { return { error: e.message, keychain, names }; }
+        return { state: st, keychain, names, probes };
+      } catch (e) { return { error: e.message, keychain, names, probes }; }
     }, listener.url).catch((e) => ({ error: e.message }));
     await sleep(4000);
     const stopped = await page.evaluate(() => window.__cgLive?.stop()).catch(() => null);
@@ -429,7 +430,7 @@ try {
     const keyOk = pub?.key === 'desktop-check-key' && (isMac ? viaKeychain : true) && (!viaKeychain || (started.names?.includes('check') && removed === true));
     const framesOk = !!sum && sum.video.header && sum.video.frames >= 60 && (stopped?.transport?.videoFrames ?? -1) === sum.video.frames;
     check(`live: the page streams the plate through the app to a listener${viaKeychain ? ', on a key kept by name in its keychain store' : ''}`, !started.error && keyOk && framesOk,
-      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s, ${stopped?.transport?.videoFrames ?? '?'} sent, ${stopped?.transport?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped (${stopped?.timing ? `${(stopped.timing.grabMs / Math.max(1, stopped.frames)).toFixed(1)} ms a frame to grab, first packet ${stopped.timing.firstOutMs === null ? 'never' : `${stopped.timing.firstOutMs.toFixed(0)} ms after the first encode`}, ${stopped.timing.outputs} out` : 'no timing'}); key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
+      started.error ?? `${sum?.video.frames ?? 0} frames (${sum?.video.keyframes ?? 0} key) at the listener in 4 s, ${stopped?.transport?.videoFrames ?? '?'} sent, ${stopped?.transport?.videoDropped ?? '?'} dropped, ${stopped?.frames ?? '?'} taken, ${stopped?.skipped ?? '?'} skipped (${stopped?.timing ? `${(stopped.timing.grabMs / Math.max(1, stopped.frames)).toFixed(1)} ms a frame to grab, first packet ${stopped.timing.firstOutMs === null ? 'never' : `${stopped.timing.firstOutMs.toFixed(0)} ms after the first encode`}, ${stopped.timing.outputs} out; encoder ${stopped.acceleration ?? '?'}` : 'no timing'}); encoders probed: ${(started.probes ?? []).map((p) => `${p.acceleration} ${p.supported === false ? 'unsupported' : p.msAFrame === null ? 'no frame out' : `${p.msAFrame.toFixed(1)} ms a frame, first after ${p.firstOutMs?.toFixed(0)} ms`}${p.error ? ` (${p.error})` : ''}`).join('; ') || 'none'}; key ${started.keychain}${viaKeychain ? `, listed as ${JSON.stringify(started.names)}, removed ${removed}` : ''}; sound ${stopped?.audioCodec ?? 'none'}`);
     await listener.close();
   }
 

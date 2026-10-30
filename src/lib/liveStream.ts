@@ -92,6 +92,21 @@ export interface LiveOptions {
   keySeconds?: number;
   /** The lab's: the audio codec to use, when the machine has both. */
   audioCodec?: 'aac' | 'opus';
+  /** The encoder hint; unset, `start` probes and chooses (see `probeVideoEncoder`). */
+  acceleration?: LiveAcceleration;
+}
+
+export type LiveAcceleration = 'no-preference' | 'prefer-hardware' | 'prefer-software';
+
+export interface LiveProbe {
+  acceleration: LiveAcceleration;
+  supported: boolean;
+  outputs: number;
+  /** ms from the first encode to the first packet out. */
+  firstOutMs: number | null;
+  /** ms an encoded frame once the encoder is warm (from the first packet to the last); null when none came out. */
+  msAFrame: number | null;
+  error: string | null;
 }
 
 export interface LiveState {
@@ -106,6 +121,9 @@ export interface LiveState {
   audioCodec: 'aac' | 'opus' | null;
   audioClock: 'track' | 'arrival' | null;
   timing: { grabMs: number; firstOutMs: number | null; firstEncodeAt: number; outputs: number };
+  /** The hint the video encoder was configured with, and what the probes read before it was chosen. */
+  acceleration: LiveAcceleration | null;
+  probes: LiveProbe[];
   encodeQueue: number;
   transport: LiveTransportState | null;
 }
@@ -125,6 +143,86 @@ export async function liveAudioCodec(sampleRate: number, channels: number, bitra
     } catch { /* not this one */ }
   }
   return null;
+}
+
+
+/**
+ * How fast this machine's H.264 encoder runs at a size under one
+ * acceleration hint: `frames` frames of a canvas, encoded as fast as the
+ * encoder takes them, timed from the first encode to the last packet out.
+ *
+ * Why it exists: CI's Mac (GitHub's virtual machine, no GPU of its own) ran
+ * the app's 640x360 stream at 5 frames a second twice over, with 0.5 ms a
+ * frame spent making frames and 605 ms from the first encode to the first
+ * packet, while the lab's Chromium on the same kind of machine held 30 fps
+ * at the same size. The frames were not the cost; the encoder behind the
+ * default hint was, and WebCodecs does not say which encoder that is. The
+ * probe measures each hint instead of guessing, and `start` takes the
+ * software encoder when the default cannot hold the frame rate and the
+ * software one can. The owner's Mac has a hardware encoder that holds
+ * 1080p60; there the default wins its probe and nothing changes.
+ */
+export async function probeVideoEncoder(width: number, height: number, fps: number, acceleration: LiveAcceleration, frames = 24): Promise<LiveProbe> {
+  const out: LiveProbe = { acceleration, supported: false, outputs: 0, firstOutMs: null, msAFrame: null, error: null };
+  if (!liveSupport()) { out.error = 'no WebCodecs'; return out; }
+  const codec = avcCodec(width, height, fps);
+  const cfg = { codec, width, height, framerate: fps, bitrate: bitrateFor(codec, width, height, fps), bitrateMode: 'constant', latencyMode: 'realtime', hardwareAcceleration: acceleration, avc: { format: 'avc' } } as VideoEncoderConfig;
+  let enc: VideoEncoder | null = null;
+  try {
+    const s = await VideoEncoder.isConfigSupported(cfg);
+    if (!s.supported) return out;
+    out.supported = true;
+    const canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), { width, height });
+    const ctx = canvas.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+    if (!ctx) { out.error = 'no 2D context for the probe'; return out; }
+    let t0 = 0;
+    enc = new VideoEncoder({
+      output: () => { if (out.outputs++ === 0) out.firstOutMs = performance.now() - t0; },
+      error: (e) => { out.error = String((e as Error)?.message ?? e); },
+    });
+    enc.configure(cfg);
+    t0 = performance.now();
+    for (let i = 0; i < frames; i++) {
+      // Each frame differs, so the encoder has a picture to code, not a repeat to skip.
+      ctx.fillStyle = `hsl(${(i * 37) % 360} 60% ${30 + (i % 5) * 10}%)`; ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = '#fff'; ctx.fillRect((i * 29) % width, (i * 17) % height, 40, 40);
+      const f = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      enc.encode(f, { keyFrame: i === 0 });
+      f.close();
+    }
+    const r = await Promise.race([enc.flush().then(() => 'done' as const), new Promise<'timeout'>((res) => setTimeout(() => res('timeout'), 8000))]);
+    const total = performance.now() - t0;
+    if (r === 'timeout') out.error = `${out.outputs} of ${frames} frames out in 8 s`;
+    // The steady rate, after the encoder's warm-up: the first packet's wait is reported on its own.
+    out.msAFrame = out.outputs > 1 && out.firstOutMs !== null ? (total - out.firstOutMs) / (out.outputs - 1) : out.outputs ? total : null;
+  } catch (e) {
+    out.error = String((e as Error)?.message ?? e);
+  } finally {
+    if (enc && enc.state !== 'closed') enc.close();
+  }
+  return out;
+}
+
+/** Every hint probed in turn, for the console and the checks. */
+export async function probeVideoEncoders(width: number, height: number, fps: number): Promise<LiveProbe[]> {
+  const r: LiveProbe[] = [];
+  for (const a of ['no-preference', 'prefer-hardware', 'prefer-software'] as LiveAcceleration[]) r.push(await probeVideoEncoder(width, height, fps, a));
+  return r;
+}
+
+/**
+ * The hint a stream at this size should run with: the default unless it
+ * cannot hold the frame rate and the software encoder can (see
+ * `probeVideoEncoder`). The probes come back for the state to report.
+ */
+export async function chooseAcceleration(width: number, height: number, fps: number): Promise<{ acceleration: LiveAcceleration; probes: LiveProbe[] }> {
+  const frameMs = 1000 / fps;
+  const first = await probeVideoEncoder(width, height, fps, 'no-preference');
+  const holds = (p: LiveProbe) => p.supported && p.msAFrame !== null && p.msAFrame <= frameMs && p.error === null;
+  if (holds(first)) return { acceleration: 'no-preference', probes: [first] };
+  const soft = await probeVideoEncoder(width, height, fps, 'prefer-software');
+  const better = soft.supported && soft.msAFrame !== null && (first.msAFrame === null || soft.msAFrame < first.msAFrame);
+  return { acceleration: better ? 'prefer-software' : 'no-preference', probes: [first, soft] };
 }
 
 export class LiveEncoder {
@@ -159,6 +257,8 @@ export class LiveEncoder {
   private stageCtx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null = null;
   /** For the checks: ms spent making frames, ms from the first encode to the first packet out, packets out. */
   readonly timing = { grabMs: 0, firstOutMs: null as number | null, firstEncodeAt: 0, outputs: 0 };
+  private acceleration: LiveAcceleration | null = null;
+  private probes: LiveProbe[] = [];
   private phase: LiveState['phase'] = 'idle';
   private error: string | null = null;
   private stopping = false;
@@ -173,6 +273,8 @@ export class LiveEncoder {
       audioCodec: this.audioCodec,
       audioClock: this.audioClock,
       timing: { ...this.timing },
+      acceleration: this.acceleration,
+      probes: this.probes,
       encodeQueue: this.video?.encodeQueueSize ?? 0,
       transport: this.transportState,
     };
@@ -204,7 +306,9 @@ export class LiveEncoder {
         this.audioCodec = codec;
         audioMeta = { codec, sampleRate: first.sampleRate, channels, bitrate: audioBitrate };
       }
-      const vcfg: VideoEncoderConfig = { codec: avcCodec(width, height, fps), width, height, framerate: fps, bitrate: videoBitrate, bitrateMode: 'constant', latencyMode: 'realtime', avc: { format: 'avc' } } as VideoEncoderConfig;
+      if (this.opts.acceleration) this.acceleration = this.opts.acceleration;
+      else { const c = await chooseAcceleration(width, height, fps); this.acceleration = c.acceleration; this.probes = c.probes; }
+      const vcfg: VideoEncoderConfig = { codec: avcCodec(width, height, fps), width, height, framerate: fps, bitrate: videoBitrate, bitrateMode: 'constant', latencyMode: 'realtime', hardwareAcceleration: this.acceleration, avc: { format: 'avc' } } as VideoEncoderConfig;
       const vs = await VideoEncoder.isConfigSupported(vcfg);
       if (!vs.supported) throw new Error(`no H.264 encoder for ${width}x${height} at ${fps} fps`);
 
@@ -421,12 +525,14 @@ export interface LiveConsoleOptions {
   fps?: number;
   videoBitrate?: number;
   audioBitrate?: number;
+  acceleration?: LiveAcceleration;
 }
 
 /**
  * `window.__cgLive` in the Mac app (37x-4b: "driven first from the console
  * and the check"; the panel is 37x-4d): `start({ url, keyName })`, `stop()`,
- * `state()`, `keys.set(name, key)`, `keys.list()`, `keys.remove(name)`.
+ * `state()`, `probe({ width, height, fps })`, `keys.set(name, key)`,
+ * `keys.list()`, `keys.remove(name)`.
  * `allowed` is the Pro gate, asked at each start.
  */
 export function installLiveConsole(deps: { canvas: () => HTMLCanvasElement | null; audio: () => MediaStream | null; allowed: () => boolean }): void {
@@ -451,12 +557,14 @@ export function installLiveConsole(deps: { canvas: () => HTMLCanvasElement | nul
       const canvas = deps.canvas();
       if (!canvas) throw new Error('no plate to stream');
       const width = o.width ?? 1920, height = o.height ?? Math.round(width * 9 / 16), fps = o.fps ?? 30;
-      current = new LiveEncoder({ canvas, audio: deps.audio(), transport, url: o.url, keyName: o.keyName, key: o.key, width, height, fps, videoBitrate: o.videoBitrate, audioBitrate: o.audioBitrate });
+      current = new LiveEncoder({ canvas, audio: deps.audio(), transport, url: o.url, keyName: o.keyName, key: o.key, width, height, fps, videoBitrate: o.videoBitrate, audioBitrate: o.audioBitrate, acceleration: o.acceleration });
       await current.start();
       return current.state();
     },
     stop: () => current ? current.stop() : Promise.resolve(null),
     state: () => current ? current.refresh() : Promise.resolve(null),
+    /** Each encoder hint timed at a size (the check's diagnostic; `probeVideoEncoder`). */
+    probe: (o: { width?: number; height?: number; fps?: number } = {}) => probeVideoEncoders(o.width ?? 1920, o.height ?? Math.round((o.width ?? 1920) * 9 / 16), o.fps ?? 30),
     keys: native.keys,
   };
   (globalThis as unknown as { __cgLive?: unknown }).__cgLive = api;
