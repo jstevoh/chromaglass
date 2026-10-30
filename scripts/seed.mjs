@@ -108,6 +108,10 @@ const ALLOW = {
     crypto: 1,
     why: 'the id a device stamps on its cloud-sync records, so the cloud copy can tell two computers apart even when both opened on the same ?seed=; never drawn',
   },
+  'src/lib/liveShow.ts': {
+    crypto: 1,
+    why: 'the id a Live Show destination keeps its stream key under in the keychain store (live-<id>); seeded, two destinations added on the same ?seed= would share one key; never drawn',
+  },
 };
 
 /** Every source of randomness in one file, by kind, with lines. */

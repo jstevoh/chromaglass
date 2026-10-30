@@ -175,10 +175,10 @@ export function LiveShowPanel() {
       <div className="flex items-center gap-1.5" data-testid="live-format">
         <span className="text-text-2">Stream</span>
         {([1080, 720] as const).map(h => (
-          <button key={h} className={chip(format.height === h)} disabled={streaming} onClick={() => changeFormat({ ...format, height: h })} data-testid={`live-format-${h}`}>{h}p</button>
+          <button key={h} aria-pressed={format.height === h} className={chip(format.height === h)} disabled={streaming} onClick={() => changeFormat({ ...format, height: h })} data-testid={`live-format-${h}`}>{h}p</button>
         ))}
         {([30, 60] as const).map(f => (
-          <button key={f} className={chip(format.fps === f)} disabled={streaming} onClick={() => changeFormat({ ...format, fps: f })} data-testid={`live-format-fps-${f}`}>{f} fps</button>
+          <button key={f} aria-pressed={format.fps === f} className={chip(format.fps === f)} disabled={streaming} onClick={() => changeFormat({ ...format, fps: f })} data-testid={`live-format-fps-${f}`}>{f} fps</button>
         ))}
       </div>
       <button className="self-start text-[11px] text-text-2 underline-offset-2 hover:underline disabled:opacity-40" onClick={() => { void runProbe(); }} disabled={streaming} data-testid="live-probe">Check the encoder at this size</button>
@@ -224,8 +224,8 @@ function DestinationRow({ d, keptAt, locked, onChange, onKey, onRemove }: {
       <div className="flex items-center gap-1.5">
         <span className="min-w-0 flex-1 truncate text-text" title={d.url}>{d.name}</span>
         <span className="shrink-0 text-[11px] text-faint">{d.orientation === 'portrait' ? '9:16' : '16:9'}</span>
-        <button className={chip(d.on && !d.test)} disabled={locked} onClick={() => onChange({ ...d, on: !d.on || d.test, test: false })} data-testid={`live-dest-on-${d.id}`} title="Go live streams here">On</button>
-        <button className={chip(d.test)} disabled={locked} onClick={() => onChange({ ...d, test: !d.test })} data-testid={`live-dest-test-${d.id}`} title="Test streams here, Go live never does: an unlisted broadcast">For tests</button>
+        <button aria-pressed={d.on && !d.test} className={chip(d.on && !d.test)} disabled={locked} onClick={() => onChange({ ...d, on: !d.on || d.test, test: false })} data-testid={`live-dest-on-${d.id}`} title="Go live streams here">On</button>
+        <button aria-pressed={d.test} className={chip(d.test)} disabled={locked} onClick={() => onChange({ ...d, test: !d.test })} data-testid={`live-dest-test-${d.id}`} title="Test streams here, Go live never does: an unlisted broadcast">For tests</button>
         <button className="h-6 rounded-sm px-1.5 text-[13px] text-faint hover:bg-hover hover:text-text disabled:opacity-40" disabled={locked} onClick={onRemove} title="Remove it and its key" data-testid={`live-dest-remove-${d.id}`}>×</button>
       </div>
       <div className="flex items-center gap-1.5 text-[11px] text-text-2">

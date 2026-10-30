@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
+import { LIT } from './ui';
 
 /**
  * The live stream on the phone (PLAN 37x-4d): whether the Mac app is on air,
@@ -32,8 +33,9 @@ export function LiveRemoteChip({ live, action, className = '' }: {
   return (
     <button
       onClick={press}
-      className={`flex min-h-12 items-center justify-center gap-2 rounded-full border px-4 text-[12px] font-bold uppercase tracking-widest active:scale-95 ${armed ? 'border-white bg-white text-black' : 'border-live bg-live text-bg'} ${className}`}
+      className={`flex min-h-12 items-center justify-center gap-2 rounded-full border px-4 text-[12px] font-bold uppercase tracking-widest active:scale-95 ${armed ? LIT : 'border-live bg-live text-bg'} ${className}`}
       data-testid="remote-live"
+      aria-pressed={armed}
       data-armed={armed ? 'true' : 'false'}
       aria-label={armed ? 'Tap again to stop the stream' : `${live.test ? 'Testing' : 'Live'} for ${clock} to ${live.names.join(', ')}: tap to stop`}
     >

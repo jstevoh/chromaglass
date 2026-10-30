@@ -131,7 +131,12 @@ export function loadDestinations(): LiveDestination[] {
 export function saveDestinations(list: LiveDestination[]): void {
   write(DESTINATIONS_KEY, list.map(cleanDestination).filter(Boolean));
 }
-export const newDestinationId = () => Math.random().toString(36).slice(2, 10);
+/*
+  A name for a destination's key in the store, not a draw of the show: from the
+  platform's random source (crypto), since the plate's own randomness is seeded
+  (`npm run seed`) and an id has no business taking from it.
+*/
+export const newDestinationId = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => (b % 36).toString(36)).join('');
 
 /** The landscape encode's size and the rate of both. The portrait one is 720x1280 (Instagram's and TikTok's). */
 export interface LiveFormat { height: 720 | 1080; fps: 30 | 60 }
