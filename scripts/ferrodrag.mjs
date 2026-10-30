@@ -92,10 +92,10 @@ const R = 0.022; // drop radius, ~4.4 mm on 20 cm dish
 const RIDES_STALE = {
   name: 'rides-stale-phasevel',
   setup(b) {
-    b.onLoad({ filter: /src[\\/]gpu[\\/]fluid\.ts$/ }, (args) => {
+    b.onLoad({ filter: /src[\\/]gpu[\\/]fluid[\\/]passes\.ts$/ }, (args) => {
       const src = readFileSync(args.path, 'utf8');
       const key = 'this.phaseVel(thin && this.thinLive)';
-      if (!src.includes(key)) throw new Error('ferrodrag: the control could not find runPhaseAdvect\'s phaseVel(thin && this.thinLive) in fluid.ts');
+      if (!src.includes(key)) throw new Error('ferrodrag: the control could not find runPhaseAdvect\'s phaseVel(thin && this.thinLive) in fluid/passes.ts');
       return { contents: src.replace(key, 'this.phaseVel(thin)'), loader: 'ts' };
     });
   },
